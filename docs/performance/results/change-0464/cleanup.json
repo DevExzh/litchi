@@ -1,0 +1,62 @@
+{
+  "schema": "litchi-0464-cleanup-v1",
+  "change": 464,
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0464",
+  "temporary_directory_absent": true,
+  "temporary_audits_absent": true,
+  "files_removed": 12,
+  "bytes_removed": 252885687,
+  "inventory": {
+    "path": "temporary-artifacts.json",
+    "bytes": 3373,
+    "sha256": "27944752ce3f6f5434e0482167e0e920f3106a16bb180a29191f09558c240354"
+  },
+  "receipts": {
+    "precleanup": {
+      "path": "precleanup.json",
+      "bytes": 3753,
+      "sha256": "bcb0a966d6f52bddabd0b6730075796ff1bf7ede2103ee964de53700e950c93b"
+    },
+    "portable": {
+      "path": "portable-verification.json",
+      "bytes": 4383,
+      "sha256": "bfd9554e5ab1c5bd9ff6d869b938a01873d42c598b129af24e8ba9a73ffef3ca"
+    }
+  },
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 25924,
+    "sha256": "e9a4ac6cf59d318b8f1119459ae68b37922ab400c55a7a0880dbc71e9da79057",
+    "members": 264
+  },
+  "audit_archives": [
+    {
+      "archive": {
+        "path": "native-pair-audit/graph-audit.py",
+        "bytes": 8582,
+        "sha256": "4b516c5cc35e8c042785775f3c28c4bd8ca3df125055052789bd9f9abe756c64"
+      },
+      "temporary_path": "/tmp/litchi-0464-graph-audit.py",
+      "temporary": {
+        "bytes": 8582,
+        "sha256": "4b516c5cc35e8c042785775f3c28c4bd8ca3df125055052789bd9f9abe756c64"
+      }
+    },
+    {
+      "archive": {
+        "path": "native-pair-audit/graph-audit.json",
+        "bytes": 252568,
+        "sha256": "4c02493c3d96b54af1d2fc7a75842b6e6bffd55d7254d7d82b6fbc3c4139c6df"
+      },
+      "temporary_path": "/tmp/litchi-0464-graph-audit.json",
+      "temporary": {
+        "bytes": 252568,
+        "sha256": "4c02493c3d96b54af1d2fc7a75842b6e6bffd55d7254d7d82b6fbc3c4139c6df"
+      }
+    }
+  ],
+  "verifier_path": "verify.py",
+  "verifier_sha256": "7507e6dd94337e6d10928519a070ca091a2529f8587a4448982387e1bec4df72",
+  "driver_sha256": "bd1e8b5484bf8d107585a4dd7b039ce5c6a9247e7d3afa52b8c88f2bee890405"
+}

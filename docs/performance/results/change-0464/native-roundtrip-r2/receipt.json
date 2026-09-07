@@ -1,0 +1,373 @@
+{
+  "bundle": "native-roundtrip-r2",
+  "change": 464,
+  "create_new_receipts": {
+    "bytes": 2807,
+    "path": "native-roundtrip-r2/create-new-receipts.json",
+    "sha256": "2bc379ed5e695584d036ff5f63c746d0058d5b58f32e9aa1acf05cd9eca8e609"
+  },
+  "finished_utc": "2026-09-07T19:04:34.686213+00:00",
+  "input": {
+    "bytes": 55891,
+    "path": "captures/R1/normal-bytes/output.pptx",
+    "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+  },
+  "inventory_binary": {
+    "bytes": 2701064,
+    "path": "/tmp/litchi-goal-0464/inventory-supplemental",
+    "sha256": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3"
+  },
+  "libreoffice": {
+    "application": {
+      "argv": [
+        "/usr/bin/libreoffice",
+        "--headless",
+        "--nologo",
+        "--nodefault",
+        "--nolockcheck",
+        "--nofirststartwizard",
+        "-env:UserInstallation=file:///tmp/litchi-0464-native-profile-znlqtaxa",
+        "--convert-to",
+        "pptx:Impress MS PowerPoint 2007 XML",
+        "--outdir",
+        "/tmp/litchi-0464-native-output-hce1aizu",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "native-roundtrip-r2/libreoffice.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 229,
+        "path": "native-roundtrip-r2/libreoffice.stdout",
+        "sha256": "3a203ea5a736ef8613ca525db33e321962f3cd2582b61525c91e91752bd4577e"
+      }
+    },
+    "soffice_bin": {
+      "requested_path": "/usr/lib/libreoffice/program/soffice.bin",
+      "resolved_path": "/usr/lib/libreoffice/program/soffice.bin",
+      "resolved_target": {
+        "bytes": 14568,
+        "path": "/usr/lib/libreoffice/program/soffice.bin",
+        "sha256": "51ac4b1ad2e310024b9d55f49f615bc134bb7304a87808c40f5d5c847a45b05d"
+      }
+    },
+    "version": {
+      "argv": [
+        "/usr/bin/libreoffice",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "native-roundtrip-r2/libreoffice-version.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 35,
+        "path": "native-roundtrip-r2/libreoffice-version.stdout",
+        "sha256": "589a65ed942c0a356442e86b3886c0125528d1ee54fd56c4d0a022c96863ec13"
+      }
+    },
+    "wrapper": {
+      "requested_path": "/usr/bin/libreoffice",
+      "resolved_path": "/usr/lib/libreoffice/program/soffice",
+      "resolved_target": {
+        "bytes": 6621,
+        "path": "/usr/lib/libreoffice/program/soffice",
+        "sha256": "3d585422d7cdddf9bcc954e7064da24c7e44d43508a5abaeb11de9d918d24f13"
+      }
+    }
+  },
+  "limitations": [
+    "LibreOffice headless conversion only; no Microsoft Office acceptance claim.",
+    "No rendering, pixel, or visual-layout comparison is performed.",
+    "Archive bytes, slide names, and image encoding invariance are not required.",
+    "Unavailable or partial source-backed image inventories remain unknown comparisons."
+  ],
+  "native_acceptance": {
+    "application_exit_code": 0,
+    "image_equivalence_claimed": false,
+    "rendering_claimed": false,
+    "required_semantics": [
+      "source_backed_slide_count",
+      "eager_slide_count",
+      "source_backed_slide_size",
+      "eager_slide_size",
+      "ordered_slide_text",
+      "eager_ordered_text",
+      "eager_ordered_text_count"
+    ],
+    "scope": "application_save_plus_slide_count_size_and_ordered_text"
+  },
+  "output": {
+    "bytes": 39830,
+    "path": "native-roundtrip-r2/resaved.pptx",
+    "sha256": "d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915"
+  },
+  "post_inventory": {
+    "bytes": 1682,
+    "path": "native-roundtrip-r2/post-inventory.json",
+    "sha256": "c553b3b917f9e50ce6aa0aafa49851ad3987e6b95d992f398620aa37061604f9"
+  },
+  "post_inventory_command": {
+    "argv": [
+      "/tmp/litchi-goal-0464/inventory-supplemental",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip-r2/resaved.pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip-r2/post-inventory.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 0,
+    "stderr": {
+      "bytes": 0,
+      "path": "native-roundtrip-r2/inventory-post.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "native-roundtrip-r2/inventory-post.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "pre_inventory": {
+    "bytes": 1952,
+    "path": "native-roundtrip-r2/pre-inventory.json",
+    "sha256": "adbbb2a4238f570bf4e04969a192057d09cea5dd925fcba20fbabf36193e9ed2"
+  },
+  "pre_inventory_command": {
+    "argv": [
+      "/tmp/litchi-goal-0464/inventory-supplemental",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip-r2/pre-inventory.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 0,
+    "stderr": {
+      "bytes": 0,
+      "path": "native-roundtrip-r2/inventory-pre.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "native-roundtrip-r2/inventory-pre.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": "litchi-0464-native-roundtrip-v1",
+  "scope": "native_application_roundtrip",
+  "semantic_validation": {
+    "native_acceptance": {
+      "image_equivalence_claimed": false,
+      "rendering_claimed": false,
+      "required_semantics": [
+        "source_backed_slide_count",
+        "eager_slide_count",
+        "source_backed_slide_size",
+        "eager_slide_size",
+        "ordered_slide_text",
+        "eager_ordered_text",
+        "eager_ordered_text_count"
+      ],
+      "scope": "application_save_plus_slide_count_size_and_ordered_text"
+    },
+    "observations": {
+      "comparable": false,
+      "image_counts_equivalent_observed": null,
+      "image_encoding_invariance_required": false,
+      "image_equivalence_claimed": false,
+      "payload_identity_equal_observed": null,
+      "post": {
+        "image_availability": [
+          "unavailable",
+          "unavailable",
+          "unavailable"
+        ],
+        "image_counts": [
+          null,
+          null,
+          null
+        ],
+        "image_errors": [
+          {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          },
+          {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          },
+          {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          }
+        ],
+        "image_target_kinds": [
+          null,
+          null,
+          null
+        ],
+        "payload_identities": [
+          null,
+          null,
+          null
+        ],
+        "slide_count": 3,
+        "slide_size": [
+          10080625,
+          7559675
+        ],
+        "source_sha256": "d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915",
+        "source_size": 39830
+      },
+      "pre": {
+        "image_availability": [
+          "complete",
+          "complete",
+          "complete"
+        ],
+        "image_counts": [
+          1,
+          1,
+          1
+        ],
+        "image_errors": [
+          null,
+          null,
+          null
+        ],
+        "image_target_kinds": [
+          [
+            "internal"
+          ],
+          [
+            "internal"
+          ],
+          [
+            "internal"
+          ]
+        ],
+        "payload_identities": [
+          [
+            {
+              "sha256": "4d1c50656f3cfc644b2dec9c7af94965b46b4adb27f84b09a285c3470801562b",
+              "size": 11658
+            }
+          ],
+          [
+            {
+              "sha256": "4d1c50656f3cfc644b2dec9c7af94965b46b4adb27f84b09a285c3470801562b",
+              "size": 11658
+            }
+          ],
+          [
+            {
+              "sha256": "4d1c50656f3cfc644b2dec9c7af94965b46b4adb27f84b09a285c3470801562b",
+              "size": 11658
+            }
+          ]
+        ],
+        "slide_count": 3,
+        "slide_size": [
+          10080625,
+          7559675
+        ],
+        "source_sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb",
+        "source_size": 55891
+      },
+      "rendering_claimed": false,
+      "slide_name_equal_observed": true,
+      "slide_name_invariance_required": false,
+      "status": "unavailable_image_inventory",
+      "unavailable_image_comparisons": [
+        {
+          "availability": "unavailable",
+          "error": {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          },
+          "known_count": null,
+          "side": "post",
+          "slide_position": 0
+        },
+        {
+          "availability": "unavailable",
+          "error": {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          },
+          "known_count": null,
+          "side": "post",
+          "slide_position": 1
+        },
+        {
+          "availability": "unavailable",
+          "error": {
+            "kind": "unsafe_edit",
+            "message": "unsafe PPTX edit during source-backed picture inventory: markup-compatibility elements and attributes are refused",
+            "operation": "source-backed picture inventory",
+            "reason": "markup-compatibility elements and attributes are refused"
+          },
+          "known_count": null,
+          "side": "post",
+          "slide_position": 2
+        }
+      ],
+      "unknown_image_comparisons": [
+        {
+          "post_availability": "unavailable",
+          "pre_availability": "complete",
+          "slide_position": 0
+        },
+        {
+          "post_availability": "unavailable",
+          "pre_availability": "complete",
+          "slide_position": 1
+        },
+        {
+          "post_availability": "unavailable",
+          "pre_availability": "complete",
+          "slide_position": 2
+        }
+      ]
+    },
+    "passed": true,
+    "required_checks": {
+      "eager_ordered_text_count_equivalent": true,
+      "eager_ordered_text_equivalent": true,
+      "ordered_slide_text_equivalent": true,
+      "post_inventory_matches_output": true,
+      "post_ordered_text_count_matches_source_slides": true,
+      "post_ordered_text_matches_source_slides": true,
+      "post_source_eager_slide_count": true,
+      "post_source_eager_slide_size": true,
+      "pre_inventory_matches_input": true,
+      "pre_ordered_text_count_matches_source_slides": true,
+      "pre_ordered_text_matches_source_slides": true,
+      "pre_source_eager_slide_count": true,
+      "pre_source_eager_slide_size": true,
+      "slide_count_equivalent": true,
+      "slide_size_equivalent": true
+    }
+  },
+  "started_utc": "2026-09-07T19:04:34.071645+00:00",
+  "status": "pass",
+  "temporary": {
+    "cleaned_after_command": true,
+    "conversion_directory": "/tmp/litchi-0464-native-output-hce1aizu",
+    "profile": "/tmp/litchi-0464-native-profile-znlqtaxa"
+  }
+}

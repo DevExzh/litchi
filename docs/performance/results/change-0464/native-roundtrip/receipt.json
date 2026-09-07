@@ -1,0 +1,149 @@
+{
+  "bundle": "native-roundtrip",
+  "change": 464,
+  "create_new_receipts": {
+    "bytes": 2545,
+    "path": "native-roundtrip/create-new-receipts.json",
+    "sha256": "0d0c87bd526df5d4b024caa30a54cb45d1f8cb800996b57079752b7b7409376d"
+  },
+  "error": "RoundtripError: post-roundtrip inventory exited 1",
+  "finished_utc": "2026-09-07T18:52:45.056723+00:00",
+  "input": {
+    "bytes": 55891,
+    "path": "captures/R1/normal-bytes/output.pptx",
+    "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+  },
+  "inventory_binary": {
+    "bytes": 2695128,
+    "path": "/tmp/litchi-goal-0464/inventory",
+    "sha256": "288d050a80fc0718d744be28d0eed8f3e112497e8ee41765727a9c0646da4864"
+  },
+  "libreoffice": {
+    "application": {
+      "argv": [
+        "/usr/bin/libreoffice",
+        "--headless",
+        "--nologo",
+        "--nodefault",
+        "--nolockcheck",
+        "--nofirststartwizard",
+        "-env:UserInstallation=file:///tmp/litchi-0464-native-profile-e7jn9g9h",
+        "--convert-to",
+        "pptx:Impress MS PowerPoint 2007 XML",
+        "--outdir",
+        "/tmp/litchi-0464-native-output-n9uomc3r",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "native-roundtrip/libreoffice.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 229,
+        "path": "native-roundtrip/libreoffice.stdout",
+        "sha256": "6128d4fc9a4457891049dac9103295f128fd90f2965ed17038d623e838d8ecb9"
+      }
+    },
+    "soffice_bin": {
+      "requested_path": "/usr/lib/libreoffice/program/soffice.bin",
+      "resolved_path": "/usr/lib/libreoffice/program/soffice.bin",
+      "resolved_target": {
+        "bytes": 14568,
+        "path": "/usr/lib/libreoffice/program/soffice.bin",
+        "sha256": "51ac4b1ad2e310024b9d55f49f615bc134bb7304a87808c40f5d5c847a45b05d"
+      }
+    },
+    "version": {
+      "argv": [
+        "/usr/bin/libreoffice",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "native-roundtrip/libreoffice-version.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 35,
+        "path": "native-roundtrip/libreoffice-version.stdout",
+        "sha256": "589a65ed942c0a356442e86b3886c0125528d1ee54fd56c4d0a022c96863ec13"
+      }
+    },
+    "wrapper": {
+      "requested_path": "/usr/bin/libreoffice",
+      "resolved_path": "/usr/lib/libreoffice/program/soffice",
+      "resolved_target": {
+        "bytes": 6621,
+        "path": "/usr/lib/libreoffice/program/soffice",
+        "sha256": "3d585422d7cdddf9bcc954e7064da24c7e44d43508a5abaeb11de9d918d24f13"
+      }
+    }
+  },
+  "limitations": [
+    "LibreOffice headless conversion only; no Microsoft Office acceptance claim.",
+    "No rendering, pixel, or visual-layout comparison is performed.",
+    "Archive bytes, slide names, and image encoding invariance are not required."
+  ],
+  "output": {
+    "bytes": 39830,
+    "path": "native-roundtrip/resaved.pptx",
+    "sha256": "94efcbf70f9465f39189e61b6211f8790ca6fb6eca57bc6fed29245765ff9883"
+  },
+  "post_inventory_command": {
+    "argv": [
+      "/tmp/litchi-goal-0464/inventory",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip/resaved.pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip/post-inventory.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 1,
+    "stderr": {
+      "bytes": 135,
+      "path": "native-roundtrip/inventory-post.stderr",
+      "sha256": "1e22eb77e08fb7f885dd4d8daf5d8b38c5460fde245adef15d081f63d2fc2c58"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "native-roundtrip/inventory-post.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "pre_inventory": {
+    "bytes": 1745,
+    "path": "native-roundtrip/pre-inventory.json",
+    "sha256": "3e717d646665bf6f4f795d6d431327e585b940c80689181bc2aec2a21dfb0c4b"
+  },
+  "pre_inventory_command": {
+    "argv": [
+      "/tmp/litchi-goal-0464/inventory",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip/pre-inventory.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 0,
+    "stderr": {
+      "bytes": 0,
+      "path": "native-roundtrip/inventory-pre.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "native-roundtrip/inventory-pre.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": "litchi-0464-native-roundtrip-v1",
+  "scope": "native_application_roundtrip",
+  "started_utc": "2026-09-07T18:52:44.458335+00:00",
+  "status": "failed",
+  "temporary": {
+    "cleaned_after_command": true,
+    "conversion_directory": "/tmp/litchi-0464-native-output-n9uomc3r",
+    "profile": "/tmp/litchi-0464-native-profile-e7jn9g9h"
+  }
+}

@@ -1,0 +1,495 @@
+//! Emit a bounded semantic inventory for one PPTX package.
+//!
+//! The input is opened twice: once through the source-backed presentation
+//! facade over an owned positional source, and once through the eager package
+//! facade. The report records semantic observations useful for comparing a
+//! package before and after a native application round trip. It does not make
+//! claims about preservation of archive bytes, slide names, or image encoding.
+//!
+//! Usage: `pptx_semantic_inventory input.pptx output.json`
+
+use litchi_core::OwnedSource;
+use litchi_pptx::{Package, ReadLimits, SourceBackedPresentation, SourceImageTarget};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read, Write};
+use std::sync::Arc;
+
+type AnyResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+const SCHEMA: &str = "litchi.pptx.semantic-inventory.v1";
+const MAX_INPUT_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_ARCHIVE_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_ARCHIVE_ENTRY_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_TOTAL_PART_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_REPORT_BYTES: usize = 32 * 1024 * 1024;
+const MAX_SLIDES: usize = 100_000;
+const MAX_IMAGES_PER_SLIDE: usize = 100_000;
+const MAX_SEMANTIC_TEXT_BYTES: usize = 8 * 1024 * 1024;
+const MAX_RETAINED_SEMANTIC_BYTES: usize = 32 * 1024 * 1024;
+const MAX_ORDERED_TEXT_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DESCRIPTOR_STRING_BYTES: usize = 1024 * 1024;
+const RETAINED_SLIDE_FIXED_BYTES: usize = 256;
+const RETAINED_IMAGE_FIXED_BYTES: usize = 256;
+
+#[derive(Debug, Serialize)]
+struct Inventory {
+    schema: &'static str,
+    source: SourceInventory,
+    source_backed: SourceBackedInventory,
+    eager: EagerInventory,
+}
+
+#[derive(Debug, Serialize)]
+struct SourceInventory {
+    size: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SourceBackedInventory {
+    slide_count: usize,
+    slide_size: SlideSize,
+    slides: Vec<SourceSlideInventory>,
+}
+
+#[derive(Debug, Serialize)]
+struct SourceSlideInventory {
+    position: usize,
+    slide_id: u32,
+    text: String,
+    name: String,
+    images: Vec<ImageInventory>,
+}
+
+#[derive(Debug, Serialize)]
+struct ImageInventory {
+    position: usize,
+    shape_position: usize,
+    id: Option<u32>,
+    name: Option<String>,
+    bounds: Option<ImageBounds>,
+    relationship_id: String,
+    target: ImageTargetInventory,
+    payload: Option<PayloadInventory>,
+}
+
+#[derive(Debug, Serialize)]
+struct ImageBounds {
+    x_emu: i64,
+    y_emu: i64,
+    width_emu: i64,
+    height_emu: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ImageTargetInventory {
+    Internal {
+        part_uri: String,
+        content_type: String,
+    },
+    External {
+        target: String,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct PayloadInventory {
+    size: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SlideSize {
+    width_emu: i64,
+    height_emu: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct EagerInventory {
+    slide_count: usize,
+    slide_size: SlideSize,
+    ordered_text: String,
+    ordered_text_count: usize,
+}
+
+struct LimitedWriter {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl LimitedWriter {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for LimitedWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let end = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("semantic inventory output length overflow"))?;
+        if end > self.limit {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "semantic inventory report exceeds {limit} bytes",
+                    limit = self.limit
+                ),
+            ));
+        }
+        self.bytes.try_reserve(bytes.len()).map_err(|error| {
+            io::Error::other(format!("semantic inventory output allocation: {error}"))
+        })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn invalid_input(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, message.into())
+}
+
+fn bounded_count(count: usize, limit: usize, label: &str) -> AnyResult<()> {
+    if count > limit {
+        return Err(invalid_input(format!("{label} count {count} exceeds limit {limit}")).into());
+    }
+    Ok(())
+}
+
+fn bounded_string(value: String, limit: usize, label: &str) -> AnyResult<String> {
+    if value.len() > limit {
+        return Err(invalid_input(format!(
+            "{label} is {} bytes, exceeding limit {limit}",
+            value.len()
+        ))
+        .into());
+    }
+    Ok(value)
+}
+
+fn retain_semantic_bytes(retained: &mut usize, additional: usize) -> AnyResult<()> {
+    *retained = retained
+        .checked_add(additional)
+        .ok_or_else(|| io::Error::other("semantic inventory retention overflow"))?;
+    if *retained > MAX_RETAINED_SEMANTIC_BYTES {
+        return Err(invalid_input(format!(
+            "source-backed semantic retention exceeds {MAX_RETAINED_SEMANTIC_BYTES} bytes"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn reserve<T>(values: &mut Vec<T>, count: usize, label: &str) -> AnyResult<()> {
+    values.try_reserve_exact(count).map_err(|error| {
+        io::Error::other(format!("{label} allocation for {count} entries: {error}"))
+    })?;
+    Ok(())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
+}
+
+fn inventory_read_limits() -> AnyResult<ReadLimits> {
+    Ok(ReadLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES)?
+        .max_archive_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
+        .max_archive_total_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
+        .max_part_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
+        .max_total_part_bytes(MAX_TOTAL_PART_BYTES)?
+        .build()?)
+}
+
+fn read_input(path: &str) -> AnyResult<Vec<u8>> {
+    let metadata = fs::metadata(path)?;
+    if metadata.len() > MAX_INPUT_BYTES {
+        return Err(invalid_input(format!(
+            "input package is {} bytes, exceeding the {} byte limit",
+            metadata.len(),
+            MAX_INPUT_BYTES
+        ))
+        .into());
+    }
+
+    let capacity = usize::try_from(metadata.len())
+        .map_err(|_| invalid_input("input package length does not fit usize"))?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(capacity).map_err(|error| {
+        io::Error::other(format!(
+            "input package allocation for {capacity} bytes: {error}"
+        ))
+    })?;
+    let file = File::open(path)?;
+    file.take(MAX_INPUT_BYTES + 1).read_to_end(&mut bytes)?;
+    let actual = u64::try_from(bytes.len())
+        .map_err(|_| io::Error::other("input package length does not fit u64"))?;
+    if actual > MAX_INPUT_BYTES {
+        return Err(invalid_input(format!(
+            "input package grew to {actual} bytes, exceeding the {MAX_INPUT_BYTES} byte limit"
+        ))
+        .into());
+    }
+    Ok(bytes)
+}
+
+fn slide_size((width, height): (i64, i64)) -> SlideSize {
+    SlideSize {
+        width_emu: width,
+        height_emu: height,
+    }
+}
+
+fn image_bounds(bounds: Option<litchi_pptx::shape::Bounds>) -> Option<ImageBounds> {
+    bounds.map(|bounds| ImageBounds {
+        x_emu: bounds.x(),
+        y_emu: bounds.y(),
+        width_emu: bounds.width(),
+        height_emu: bounds.height(),
+    })
+}
+
+fn image_target(target: &SourceImageTarget) -> AnyResult<ImageTargetInventory> {
+    match target {
+        SourceImageTarget::Internal {
+            part_uri,
+            content_type,
+        } => Ok(ImageTargetInventory::Internal {
+            part_uri: bounded_string(
+                part_uri.as_str().to_owned(),
+                MAX_DESCRIPTOR_STRING_BYTES,
+                "internal image part URI",
+            )?,
+            content_type: bounded_string(
+                content_type.clone(),
+                MAX_DESCRIPTOR_STRING_BYTES,
+                "internal image content type",
+            )?,
+        }),
+        SourceImageTarget::External { target } => Ok(ImageTargetInventory::External {
+            target: bounded_string(
+                target.clone(),
+                MAX_DESCRIPTOR_STRING_BYTES,
+                "external image target",
+            )?,
+        }),
+        _ => Err(invalid_input("unsupported source image target variant").into()),
+    }
+}
+
+fn collect_source_backed(
+    presentation: &SourceBackedPresentation,
+) -> AnyResult<SourceBackedInventory> {
+    let slide_count = presentation.slide_count();
+    bounded_count(slide_count, MAX_SLIDES, "source-backed slide")?;
+
+    let mut slides = Vec::new();
+    reserve(&mut slides, slide_count, "source-backed slide inventory")?;
+    let mut retained_semantic_bytes = 0usize;
+    for slide in presentation.slides() {
+        let position = slide.position();
+        let (text, name) = slide.text_and_name()?;
+        let text = bounded_string(text, MAX_SEMANTIC_TEXT_BYTES, "source-backed slide text")?;
+        let name = bounded_string(
+            name,
+            MAX_DESCRIPTOR_STRING_BYTES,
+            "source-backed slide name",
+        )?;
+        retain_semantic_bytes(&mut retained_semantic_bytes, RETAINED_SLIDE_FIXED_BYTES)?;
+        retain_semantic_bytes(&mut retained_semantic_bytes, text.len())?;
+        retain_semantic_bytes(&mut retained_semantic_bytes, name.len())?;
+
+        let descriptors = slide.images()?;
+        bounded_count(
+            descriptors.len(),
+            MAX_IMAGES_PER_SLIDE,
+            "source-backed image",
+        )?;
+        let mut images = Vec::new();
+        reserve(
+            &mut images,
+            descriptors.len(),
+            "source-backed image inventory",
+        )?;
+        for descriptor in descriptors {
+            let payload = match descriptor.target() {
+                SourceImageTarget::Internal { .. } => {
+                    let image = slide.read_image(descriptor.position())?;
+                    let bytes = image.bytes();
+                    Some(PayloadInventory {
+                        size: u64::try_from(bytes.len()).map_err(|_| {
+                            io::Error::other("internal image payload length does not fit u64")
+                        })?,
+                        sha256: sha256_hex(bytes),
+                    })
+                },
+                SourceImageTarget::External { .. } => None,
+                _ => return Err(invalid_input("unsupported source image target variant").into()),
+            };
+            let name = descriptor
+                .name()
+                .map(str::to_owned)
+                .map(|name| bounded_string(name, MAX_DESCRIPTOR_STRING_BYTES, "image name"))
+                .transpose()?;
+            let relationship_id = bounded_string(
+                descriptor.relationship_id().to_owned(),
+                MAX_DESCRIPTOR_STRING_BYTES,
+                "image relationship ID",
+            )?;
+            retain_semantic_bytes(&mut retained_semantic_bytes, RETAINED_IMAGE_FIXED_BYTES)?;
+            if let Some(name) = &name {
+                retain_semantic_bytes(&mut retained_semantic_bytes, name.len())?;
+            }
+            retain_semantic_bytes(&mut retained_semantic_bytes, relationship_id.len())?;
+            match descriptor.target() {
+                SourceImageTarget::Internal {
+                    part_uri,
+                    content_type,
+                } => {
+                    retain_semantic_bytes(&mut retained_semantic_bytes, part_uri.as_str().len())?;
+                    retain_semantic_bytes(&mut retained_semantic_bytes, content_type.len())?;
+                },
+                SourceImageTarget::External { target } => {
+                    retain_semantic_bytes(&mut retained_semantic_bytes, target.len())?;
+                },
+                _ => return Err(invalid_input("unsupported source image target variant").into()),
+            }
+            if payload.is_some() {
+                retain_semantic_bytes(&mut retained_semantic_bytes, 64)?;
+            }
+            images.push(ImageInventory {
+                position: descriptor.position(),
+                shape_position: descriptor.shape_position(),
+                id: descriptor.id(),
+                name,
+                bounds: image_bounds(descriptor.bounds()),
+                relationship_id,
+                target: image_target(descriptor.target())?,
+                payload,
+            });
+        }
+        slides.push(SourceSlideInventory {
+            position,
+            slide_id: slide.slide_id(),
+            text,
+            name,
+            images,
+        });
+    }
+
+    Ok(SourceBackedInventory {
+        slide_count,
+        slide_size: slide_size(presentation.slide_size()?),
+        slides,
+    })
+}
+
+fn collect_eager(input: Vec<u8>, limits: ReadLimits) -> AnyResult<EagerInventory> {
+    let package = Package::from_vec_with_limits(input, limits)?;
+    let presentation = package.presentation()?;
+    let slide_count = presentation.slide_count()?;
+    bounded_count(slide_count, MAX_SLIDES, "eager slide")?;
+
+    let slides = presentation.slides()?;
+    if slides.len() != slide_count {
+        return Err(invalid_input(format!(
+            "eager slide catalog count {} differs from reported count {slide_count}",
+            slides.len()
+        ))
+        .into());
+    }
+    let mut ordered_text_count = 0usize;
+    for slide in &slides {
+        let text = slide.text()?;
+        let _ = bounded_string(text.clone(), MAX_SEMANTIC_TEXT_BYTES, "eager slide text")?;
+        if !text.is_empty() {
+            ordered_text_count = ordered_text_count
+                .checked_add(1)
+                .ok_or_else(|| io::Error::other("eager ordered text count overflow"))?;
+        }
+    }
+    let ordered_text = bounded_string(
+        presentation.text()?,
+        MAX_ORDERED_TEXT_BYTES,
+        "eager ordered text",
+    )?;
+
+    Ok(EagerInventory {
+        slide_count,
+        slide_size: slide_size(presentation.slide_size()?),
+        ordered_text,
+        ordered_text_count,
+    })
+}
+
+fn serialize_report(report: &Inventory) -> AnyResult<Vec<u8>> {
+    let mut writer = LimitedWriter::new(MAX_REPORT_BYTES);
+    serde_json::to_writer(&mut writer, report)?;
+    writer.write_all(b"\n")?;
+    Ok(writer.into_bytes())
+}
+
+fn write_output(path: &str, bytes: &[u8]) -> AnyResult<()> {
+    let mut output = match OpenOptions::new().write(true).create_new(true).open(path) {
+        Ok(output) => output,
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(invalid_input(format!("output file already exists: {path}")).into());
+        },
+        Err(error) => return Err(error.into()),
+    };
+    output.write_all(bytes)?;
+    output.sync_all()?;
+    Ok(())
+}
+
+fn main() -> AnyResult<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() != 2 {
+        return Err(invalid_input("expected input.pptx output.json").into());
+    }
+    let input_bytes = read_input(&args[0])?;
+    let source_size = u64::try_from(input_bytes.len())
+        .map_err(|_| io::Error::other("input package length does not fit u64"))?;
+    let source_sha256 = sha256_hex(&input_bytes);
+
+    let limits = inventory_read_limits()?;
+    let source = SourceBackedPresentation::from_read_at_with_limits(
+        Arc::new(OwnedSource::new(input_bytes.clone())),
+        limits,
+    )?;
+    let source_backed = collect_source_backed(&source)?;
+    let eager = collect_eager(input_bytes, limits)?;
+    let report = Inventory {
+        schema: SCHEMA,
+        source: SourceInventory {
+            size: source_size,
+            sha256: source_sha256,
+        },
+        source_backed,
+        eager,
+    };
+    let output = serialize_report(&report)?;
+    write_output(&args[1], &output)
+}

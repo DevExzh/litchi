@@ -1,0 +1,18 @@
+{
+  "schema": "litchi-0464-verification-attempt-v1",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0464/verify.py",
+    "--precleanup"
+  ],
+  "verifier_sha256": "99b7a3a5a402069d08cc7614d8e5b1c0449eef40096083fafe6996b23e55f7e6",
+  "seal_sha256": "00d84e9810b72deda73995e774ceea09fe0faf5da6c28f77474934db63b8a6f6",
+  "exit_code": 1,
+  "output": {
+    "error": "normal-binding.json.binary.sha256: expected non-empty string",
+    "portable": false,
+    "schema": "litchi-0464-verification-v1",
+    "status": "failed"
+  }
+}

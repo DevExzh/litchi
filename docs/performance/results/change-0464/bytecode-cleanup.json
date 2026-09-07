@@ -1,0 +1,11 @@
+{
+  "schema": "litchi-0464-bytecode-cleanup-v1",
+  "removed": [
+    {
+      "path": "__pycache__/pair-oracle.cpython-314.pyc",
+      "bytes": 68185,
+      "sha256": "c88486bd820126fbc1a3f6308e40ccd716f1518f39c88d154acd46e7887634c4"
+    }
+  ],
+  "directory_absent": true
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "litchi-0464-verification-attempt-v1",
+  "observed_utc": "2026-09-07T19:21:34.194125+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0464/verify.py",
+    "--precleanup"
+  ],
+  "verifier_sha256": "a7157a00ce617cb85fd21f04f3474eef8a882453fb946ba8f0bccdb9652675d2",
+  "seal_sha256": "d7be5ce456a38b85ca5bbba72a2c188af9655746e05278b0981cea4403df87d6",
+  "exit_code": 1,
+  "output": {
+    "error": "checks/allocator-build.json: source_before is outside the authenticated source epochs",
+    "portable": false,
+    "schema": "litchi-0464-verification-v1",
+    "status": "failed"
+  }
+}

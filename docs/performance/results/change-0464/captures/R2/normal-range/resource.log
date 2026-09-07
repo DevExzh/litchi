@@ -1,0 +1,23 @@
+	Command being timed: "/tmp/litchi-goal-0464/normal pptx-pair-lifecycle --manifest /home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json --provider range --samples 30 --warmup 3 --repeat R2 --output /home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R2/normal-range/report.json --output-pptx /home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R2/normal-range/output.pptx --source-revision 1c1e29473f9402190f5bc4bf68d96029ff106470 --max-range 256 --delay-us 0"
+	User time (seconds): 0.14
+	System time (seconds): 0.01
+	Percent of CPU this job got: 96%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.15
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 16684
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1652
+	Voluntary context switches: 3
+	Involuntary context switches: 1
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 3672
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

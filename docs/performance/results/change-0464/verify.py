@@ -1,0 +1,907 @@
+#!/usr/bin/env python3
+"""Authenticate the portable 0464 PPTX pair-lifecycle evidence bundle.
+
+The verifier is read-only and does not build, capture, or invoke either
+retained binary.  It authenticates the frozen protocol, pair inputs, final
+binary binding, source-custody check receipts, repeat/lane receipts, retained
+reports and PPTX artifacts, then delegates each retained output to the
+independent ``pair-oracle.py``.  It recomputes ``summary.json`` with
+``summarize.py`` and checks the complete SHA256SUMS inventory.
+
+``binding.json`` is the frozen binary contract: schema, revision, and the
+normal, allocator, and inventory entries.  Protocol, pair-manifest, oracle,
+and source-custody identities are attested by protocol.json and every retained
+capture receipt, so the binding is not rewritten after formal capture.
+Portable verification authenticates those metadata and retained bytes without
+needing the absolute temporary executable paths; ``--precleanup`` additionally
+checks those live paths before a caller removes them.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parent
+
+try:
+    import summarize
+except ModuleNotFoundError:  # allow an embedding caller to import this file by path
+    _summary_spec = importlib.util.spec_from_file_location("litchi_0464_summarize", ROOT / "summarize.py")
+    if _summary_spec is None or _summary_spec.loader is None:
+        raise
+    summarize = importlib.util.module_from_spec(_summary_spec)
+    sys.modules[_summary_spec.name] = summarize
+    _summary_spec.loader.exec_module(summarize)
+CHANGE = 464
+SCHEMA = "litchi-0464-verification-v1"
+SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+RETRY_RE = re.compile(r"^(.*)-r([0-9]+)$")
+REQUIRED_CHECKS = (
+    "harness-clippy",
+    "harness-tests",
+    "doc",
+    "fmt",
+    "boundaries",
+    "smoke",
+    "oracle-tests",
+    "capture-r1",
+    "capture-r2",
+    "native-roundtrip",
+)
+SUPPLEMENTAL_SOURCE_PATH = "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs"
+
+
+class VerificationError(ValueError):
+    pass
+
+
+def fail(message: str) -> None:
+    raise VerificationError(message)
+
+
+def load(path: Path, label: str) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        fail(f"{label}: invalid JSON ({error})")
+    raise AssertionError("unreachable")
+
+
+def obj(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        fail(f"{label}: expected object")
+    return value
+
+
+def text(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        fail(f"{label}: expected non-empty string")
+    return value
+
+
+def integer(value: Any, label: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        fail(f"{label}: expected integer >= {minimum}")
+    return value
+
+
+def digest(value: Any, label: str) -> str:
+    value = text(value, label).lower()
+    if SHA256_RE.fullmatch(value) is None:
+        fail(f"{label}: expected lowercase SHA-256")
+    return value
+
+
+def sha_file(path: Path) -> str:
+    value = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                value.update(block)
+    except OSError as error:
+        fail(f"cannot hash {path}: {error}")
+    return value.hexdigest()
+
+
+def regular(path: Path, label: str) -> Path:
+    if path.is_symlink() or not path.is_file():
+        fail(f"{label}: missing, symlinked, or non-regular file: {path}")
+    return path
+
+
+def safe_relative(value: Any, label: str) -> Path:
+    raw = text(value, label)
+    path = Path(raw)
+    if path.is_absolute() or ".." in path.parts or path.as_posix() != raw:
+        fail(f"{label}: expected a relative traversal-free path")
+    return path
+
+
+def local_path(value: Any, label: str) -> Path:
+    relative = safe_relative(value, label)
+    candidate = ROOT / relative
+    for ancestor in (ROOT, *candidate.parents):
+        if ancestor.is_symlink():
+            fail(f"{label}: symlinked ancestor")
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as error:
+        fail(f"{label}: cannot resolve path ({error})")
+    if not resolved.is_relative_to(ROOT.resolve()):
+        fail(f"{label}: path escapes bundle")
+    return regular(candidate, label)
+
+
+def artifact(value: Any, label: str, *, require_local: bool = True) -> dict[str, Any]:
+    row = obj(value, label)
+    path_value = text(row.get("path"), f"{label}.path")
+    expected_bytes = integer(row.get("bytes"), f"{label}.bytes")
+    expected_sha = digest(row.get("sha256"), f"{label}.sha256")
+    if require_local:
+        path = local_path(path_value, f"{label}.path")
+        if path.stat().st_size != expected_bytes or sha_file(path) != expected_sha:
+            fail(f"{label}: artifact identity differs")
+    return {"path": path_value, "bytes": expected_bytes, "sha256": expected_sha}
+
+
+def source_record(value: Any, label: str) -> dict[str, Any]:
+    row = obj(value, label)
+    path_value = text(row.get("path"), f"{label}.path")
+    expected_sha = digest(row.get("sha256"), f"{label}.sha256")
+    files = integer(row.get("files"), f"{label}.files", 1)
+    manifest_path = local_path(path_value, f"{label}.path")
+    if sha_file(manifest_path) != expected_sha:
+        fail(f"{label}: source manifest hash differs")
+    manifest = obj(load(manifest_path, label), label)
+    if len(manifest) != files:
+        fail(f"{label}: source manifest file count differs")
+    for name, sha in manifest.items():
+        path = Path(name)
+        if path.is_absolute() or ".." in path.parts or path.as_posix() != name or not name.endswith((".rs", ".toml", ".lock")):
+            fail(f"{label}: unsafe source path {name!r}")
+        digest(sha, f"{label}.files[{name}]")
+    return {"path": path_value, "sha256": expected_sha, "files": files}
+
+
+def source_hashes(record: dict[str, Any], label: str) -> dict[str, str]:
+    """Load the complete source hash map behind an already checked record."""
+
+    manifest = obj(load(local_path(record["path"], f"{label}.path"), label), label)
+    if len(manifest) != record["files"]:
+        fail(f"{label}: source manifest file count differs")
+    result: dict[str, str] = {}
+    for name, value in manifest.items():
+        if not isinstance(name, str) or Path(name).is_absolute() or ".." in Path(name).parts or Path(name).as_posix() != name:
+            fail(f"{label}: unsafe source path {name!r}")
+        result[name] = digest(value, f"{label}.{name}")
+    return result
+
+
+def check_source_compatibility(measured: dict[str, Any], supplemental: dict[str, Any]) -> dict[str, Any]:
+    """Authenticate the one-file diagnostic source epoch used by inventory."""
+
+    compatibility_path = local_path("source-compatibility.json", "source-compatibility")
+    compatibility = obj(load(compatibility_path, "source-compatibility.json"), "source-compatibility.json")
+    if compatibility.get("schema") != "litchi-0464-source-compatibility-v1":
+        fail("source-compatibility schema differs")
+    measured_declared = source_record(compatibility.get("measured_source"), "source-compatibility.measured_source")
+    supplemental_declared = source_record(compatibility.get("supplemental_source"), "source-compatibility.supplemental_source")
+    if measured_declared != measured or supplemental_declared != supplemental:
+        fail("source-compatibility source records differ from bindings")
+    before = source_hashes(measured, "measured source")
+    after = source_hashes(supplemental, "supplemental source")
+    if set(before) != set(after):
+        fail("source-compatibility source file sets differ")
+    differences = sorted(name for name in before if before[name] != after[name])
+    allowed = compatibility.get("allowed_differences")
+    actual = compatibility.get("actual_differences")
+    if allowed != [SUPPLEMENTAL_SOURCE_PATH] or actual != [SUPPLEMENTAL_SOURCE_PATH] or differences != [SUPPLEMENTAL_SOURCE_PATH]:
+        fail("source-compatibility must contain exactly the reviewed inventory source difference")
+    if compatibility.get("unchanged_files") != len(before) - 1:
+        fail("source-compatibility unchanged file count differs")
+    archive = obj(compatibility.get("artifact"), "source-compatibility.artifact")
+    if archive.get("source_path") != SUPPLEMENTAL_SOURCE_PATH:
+        fail("source-compatibility archive source path differs")
+    expected_sha = after[SUPPLEMENTAL_SOURCE_PATH]
+    archive_path = local_path(archive.get("path"), "source-compatibility.artifact.path")
+    expected_bytes = integer(archive.get("bytes"), "source-compatibility.artifact.bytes", 1)
+    if digest(archive.get("sha256"), "source-compatibility.artifact.sha256") != expected_sha:
+        fail("source-compatibility archived source hash differs")
+    if archive_path.stat().st_size != expected_bytes or sha_file(archive_path) != expected_sha:
+        fail("source-compatibility archived source identity differs")
+    return {"source": supplemental, "compatibility": compatibility, "artifact": archive}
+
+
+def verify_sum_file(root: Path = ROOT) -> int:
+    path = regular(root / "SHA256SUMS", "SHA256SUMS")
+    rows: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        fail(f"SHA256SUMS: cannot read ({error})")
+    for index, line in enumerate(lines, 1):
+        fields = line.split("  ", 1)
+        if len(fields) != 2 or SHA256_RE.fullmatch(fields[0]) is None:
+            fail(f"SHA256SUMS: malformed line {index}")
+        name = fields[1]
+        relative = safe_relative(name, f"SHA256SUMS line {index}")
+        if name == "SHA256SUMS" or name in rows:
+            fail(f"SHA256SUMS: duplicate or self entry {name}")
+        member = root / relative
+        regular(member, f"SHA256SUMS.{name}")
+        if sha_file(member) != fields[0]:
+            fail(f"SHA256SUMS: hash differs for {name}")
+        rows[name] = fields[0]
+    actual = set()
+    for member in root.rglob("*"):
+        if member.is_symlink():
+            fail(f"bundle contains symlink {member.relative_to(root)}")
+        if member.is_file() and member != path:
+            actual.add(member.relative_to(root).as_posix())
+    if actual != set(rows):
+        fail(f"SHA256SUMS: coverage differs (missing={sorted(actual - set(rows))[:3]}, extra={sorted(set(rows) - actual)[:3]})")
+    return len(rows)
+
+
+def check_protocol() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
+    protocol = obj(load(ROOT / "protocol.json", "protocol.json"), "protocol.json")
+    if protocol.get("schema") != summarize.PROTOCOL_SCHEMA or protocol.get("change") != CHANGE or protocol.get("status") != "frozen":
+        fail("protocol identity differs")
+    pair_spec = obj(protocol.get("pair_manifest"), "protocol.pair_manifest")
+    runner = obj(protocol.get("runner"), "protocol.runner")
+    oracle_spec = obj(protocol.get("oracle"), "protocol.oracle")
+    custody = obj(protocol.get("custody"), "protocol.custody")
+    for spec, label in ((pair_spec, "protocol.pair_manifest"), (runner, "protocol.runner"), (oracle_spec, "protocol.oracle")):
+        path = local_path(spec.get("path"), f"{label}.path")
+        if sha_file(path) != digest(spec.get("sha256"), f"{label}.sha256"):
+            fail(f"{label}: bound file hash differs")
+    custody_path = local_path(custody.get("check_path"), "protocol.custody.check_path")
+    if sha_file(custody_path) != digest(custody.get("check_sha256"), "protocol.custody.check_sha256"):
+        fail("protocol custody driver hash differs")
+    host = obj(protocol.get("host"), "protocol.host")
+    host_path = local_path(host.get("path"), "protocol.host.path")
+    if sha_file(host_path) != digest(host.get("sha256"), "protocol.host.sha256"):
+        fail("protocol host receipt hash differs")
+    binding_spec = obj(protocol.get("binding"), "protocol.binding")
+    if binding_spec.get("path") != "binding.json":
+        fail("protocol binding path must be binding.json")
+    binding_path = local_path(binding_spec.get("path"), "protocol.binding.path")
+    binding = obj(load(binding_path, "binding.json"), "binding.json")
+    contract = obj(protocol.get("binding_contract"), "protocol.binding_contract")
+    if binding.get("schema") != contract.get("schema") or binding.get("schema") != "litchi-0464-binaries-v1":
+        fail("binding schema differs from protocol contract")
+    revision = text(binding.get("revision"), "binding.revision")
+    if revision != pair_spec.get("source_revision"):
+        fail("binding revision differs from pair source revision")
+    return protocol, binding, pair_spec, revision
+
+
+def check_pair(protocol: dict[str, Any], binding: dict[str, Any], pair_spec: dict[str, Any]) -> dict[str, Any]:
+    pair_path = local_path(pair_spec.get("path"), "pair manifest path")
+    pair = obj(load(pair_path, "pair.json"), "pair.json")
+    if pair.get("schema") != "pptx_pair_manifest_v1" or pair.get("pair_id") != protocol.get("pair_id"):
+        fail("pair manifest schema or pair identity differs")
+    if sha_file(pair_path) != digest(pair_spec.get("sha256"), "protocol.pair_manifest.sha256"):
+        fail("pair manifest protocol hash differs")
+    for role in ("source", "destination"):
+        identity = obj(pair.get(role), f"pair.{role}")
+        path = local_path(identity.get("path"), f"pair.{role}.path")
+        if path.stat().st_size != integer(identity.get("bytes"), f"pair.{role}.bytes") or sha_file(path) != digest(identity.get("sha256"), f"pair.{role}.sha256"):
+            fail(f"pair {role} identity differs")
+        protocol_identity = obj(protocol["inputs"].get(role), f"protocol.inputs.{role}")
+        if identity != protocol_identity:
+            fail(f"pair {role} identity differs from protocol")
+    operation = obj(pair.get("operation"), "pair.operation")
+    for key in ("source_slide", "destination_slide", "insertion_position"):
+        integer(operation.get(key), f"pair.operation.{key}")
+    if pair.get("source_revision") != pair_spec.get("source_revision"):
+        fail("pair source revision differs")
+    return pair
+
+
+def check_binding(protocol: dict[str, Any], binding: dict[str, Any], pair: dict[str, Any], revision: str, precleanup: bool) -> dict[str, Any]:
+    binaries = obj(binding.get("binaries"), "binding.binaries")
+    if set(binaries) != {"normal", "allocator", "inventory"}:
+        fail("binding must contain exactly normal, allocator, and inventory artifacts")
+    source_records: dict[str, Any] = {}
+    for mode, entry_value in binaries.items():
+        entry = obj(entry_value, f"binding.binaries.{mode}")
+        binary_path = text(entry.get("path"), f"binding.binaries.{mode}.path")
+        binary_sha = digest(entry.get("sha256"), f"binding.binaries.{mode}.sha256")
+        binary_bytes = integer(entry.get("bytes"), f"binding.binaries.{mode}.bytes", 1)
+        if precleanup:
+            live = Path(binary_path)
+            regular(live, f"binding.binaries.{mode}.live")
+            if live.stat().st_size != binary_bytes or sha_file(live) != binary_sha:
+                fail(f"binding.binaries.{mode}: live binary identity differs")
+        source = source_record(entry.get("source"), f"binding.binaries.{mode}.source")
+        source_records[mode] = source
+        receipt_path = local_path(entry.get("build_receipt"), f"binding.binaries.{mode}.build_receipt")
+        if sha_file(receipt_path) != digest(entry.get("build_receipt_sha256"), f"binding.binaries.{mode}.build_receipt_sha256"):
+            fail(f"binding.binaries.{mode}: build receipt hash differs")
+        receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+        if receipt.get("change") != CHANGE or receipt.get("status") != "pass" or receipt.get("exit_code") != 0 or receipt.get("source_unchanged") is not True:
+            fail(f"binding.binaries.{mode}: build receipt is not a successful source-unchanged build")
+        if receipt.get("source_before") != source or receipt.get("source_after") != source:
+            fail(f"binding.binaries.{mode}: build receipt source custody differs")
+    if len({json.dumps(value, sort_keys=True) for value in source_records.values()}) != 1:
+        fail("normal, allocator, and inventory source bindings differ")
+    if binding.get("revision") != pair.get("source_revision"):
+        fail("binding revision differs from pair manifest")
+    return source_records["normal"]
+
+
+def check_historical_binding(path_value: str, label: str) -> None:
+    """Authenticate retained pre-final binary bindings without imposing final-source identity."""
+
+    path = local_path(path_value, label)
+    value = obj(load(path, label), label)
+    entries: dict[str, Any]
+    if isinstance(value.get("binaries"), dict):
+        entries = value["binaries"]
+    elif path_value == "normal-binding.json" and set(value) == {"normal", "inventory"}:
+        entries = value
+    else:
+        entries = {"binary": value}
+    source_records: list[dict[str, Any]] = []
+    for mode, entry_value in entries.items():
+        entry = obj(entry_value, f"{label}.{mode}")
+        digest(entry.get("sha256"), f"{label}.{mode}.sha256")
+        integer(entry.get("bytes"), f"{label}.{mode}.bytes", 1)
+        source = source_record(entry.get("source"), f"{label}.{mode}.source")
+        source_records.append(source)
+        receipt_path = local_path(entry.get("build_receipt"), f"{label}.{mode}.build_receipt")
+        if sha_file(receipt_path) != digest(entry.get("build_receipt_sha256"), f"{label}.{mode}.build_receipt_sha256"):
+            fail(f"{label}.{mode}: build receipt hash differs")
+        receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+        if receipt.get("change") != CHANGE or receipt.get("status") != "pass" or receipt.get("exit_code") != 0 or receipt.get("source_unchanged") is not True:
+            fail(f"{label}.{mode}: historical build receipt is not successful and source-unchanged")
+        if receipt.get("source_before") != source or receipt.get("source_after") != source:
+            fail(f"{label}.{mode}: historical build source custody differs")
+        check_receipt_log(receipt, f"{label}.{mode}.build_receipt")
+    if len(source_records) > 1 and len({json.dumps(source, sort_keys=True) for source in source_records}) != 1:
+        fail(f"{label}: historical binary source bindings differ")
+
+
+def check_inventory_binding(measured_source: dict[str, Any], revision: str, precleanup: bool) -> dict[str, Any]:
+    """Authenticate the diagnostic-only inventory binary and its custody."""
+
+    path = local_path("inventory-binding.json", "inventory-binding")
+    value = obj(load(path, "inventory-binding.json"), "inventory-binding.json")
+    if value.get("schema") != "litchi-0464-supplemental-inventory-v1":
+        fail("inventory-binding schema differs")
+    if text(value.get("revision"), "inventory-binding.revision") != revision:
+        fail("inventory-binding revision differs from measured binding")
+    binary = obj(value.get("binary"), "inventory-binding.binary")
+    binary_path = text(binary.get("path"), "inventory-binding.binary.path")
+    binary_sha = digest(binary.get("sha256"), "inventory-binding.binary.sha256")
+    binary_bytes = integer(binary.get("bytes"), "inventory-binding.binary.bytes", 1)
+    if precleanup:
+        live = Path(binary_path)
+        regular(live, "inventory-binding.binary.live")
+        if live.stat().st_size != binary_bytes or sha_file(live) != binary_sha:
+            fail("inventory-binding binary live identity differs")
+    supplemental = source_record(binary.get("source"), "inventory-binding.binary.source")
+    measured_declared = source_record(value.get("measured_source"), "inventory-binding.measured_source")
+    if measured_declared != measured_source:
+        fail("inventory-binding measured source differs from binding")
+    if supplemental == measured_source:
+        fail("inventory-binding must identify the supplemental source epoch")
+    compatibility = check_source_compatibility(measured_source, supplemental)
+    receipt_path = local_path(binary.get("build_receipt"), "inventory-binding.build_receipt")
+    if sha_file(receipt_path) != digest(binary.get("build_receipt_sha256"), "inventory-binding.build_receipt_sha256"):
+        fail("inventory-binding build receipt hash differs")
+    receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+    if receipt.get("change") != CHANGE or receipt.get("status") != "pass" or receipt.get("exit_code") != 0 or receipt.get("source_unchanged") is not True:
+        fail("inventory-binding build receipt is not a successful source-unchanged build")
+    if receipt.get("source_before") != supplemental or receipt.get("source_after") != supplemental:
+        fail("inventory-binding build receipt source custody differs")
+    return {"binary": binary, "source": supplemental, "compatibility": compatibility}
+
+
+def check_source_code_archive(source_binding: dict[str, Any]) -> None:
+    manifest_path = local_path("source-code.json", "source-code manifest")
+    manifest = obj(load(manifest_path, "source-code.json"), "source-code.json")
+    if manifest.get("schema") != "litchi-0464-source-code-v1":
+        fail("source-code.json schema differs")
+    bound = source_record(manifest.get("source"), "source-code.source")
+    if bound != source_binding:
+        fail("source-code.json source binding differs from final binary source")
+    source_manifest = obj(load(local_path(source_binding["path"], "source binding path"), "source binding"), "source binding")
+    rows = manifest.get("files")
+    if not isinstance(rows, list) or not rows:
+        fail("source-code.json files is empty")
+    seen: set[str] = set()
+    for index, value in enumerate(rows):
+        row = obj(value, f"source-code.json.files[{index}]")
+        source_path = text(row.get("source_path"), f"source-code.json.files[{index}].source_path")
+        if source_path in seen or source_path not in source_manifest:
+            fail(f"source-code.json.files[{index}]: source path is not uniquely bound")
+        seen.add(source_path)
+        source_digest = digest(source_manifest[source_path], f"source manifest.{source_path}")
+        artifact_path = local_path(row.get("artifact_path"), f"source-code.json.files[{index}].artifact_path")
+        expected_bytes = integer(row.get("bytes"), f"source-code.json.files[{index}].bytes", 1)
+        expected_sha = digest(row.get("sha256"), f"source-code.json.files[{index}].sha256")
+        if expected_sha != source_digest or artifact_path.stat().st_size != expected_bytes or sha_file(artifact_path) != expected_sha:
+            fail(f"source-code.json.files[{index}]: archived source identity differs")
+
+
+def check_receipt_log(receipt: dict[str, Any], label: str) -> None:
+    log = receipt.get("log")
+    if log is None:
+        if receipt.get("status") == "running":
+            return
+        fail(f"{label}: completed check has no log artifact")
+    artifact(log, f"{label}.log")
+
+
+def check_check_receipts(
+    protocol: dict[str, Any],
+    revision: str,
+    source_binding: dict[str, Any],
+    supplemental_source: dict[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    check_path = ROOT / "check.py"
+    driver_sha = sha_file(check_path)
+    receipts: dict[str, dict[str, Any]] = {}
+    checks_dir = ROOT / "checks"
+    for path in sorted(checks_dir.glob("*.json")):
+        receipt = obj(load(path, str(path.relative_to(ROOT))), str(path.relative_to(ROOT)))
+        label = path.stem
+        if receipt.get("change") != CHANGE or receipt.get("revision") != revision:
+            fail(f"checks/{path.name}: change/revision differs")
+        if digest(receipt.get("driver_sha256"), f"checks/{path.name}.driver_sha256") != driver_sha:
+            fail(f"checks/{path.name}: driver hash differs")
+        status = receipt.get("status")
+        if status not in {"pass", "failed", "running"}:
+            fail(f"checks/{path.name}: unsupported status")
+        before = source_record(receipt.get("source_before"), f"checks/{path.name}.source_before")
+        if status == "running":
+            receipts[label] = receipt
+            continue
+        after = source_record(receipt.get("source_after"), f"checks/{path.name}.source_after")
+        if before != after or receipt.get("source_unchanged") is not True:
+            fail(f"checks/{path.name}: source custody changed")
+        if status == "pass" and receipt.get("exit_code") != 0:
+            fail(f"checks/{path.name}: pass has nonzero exit")
+        if status == "failed" and receipt.get("exit_code") == 0:
+            fail(f"checks/{path.name}: failed has zero exit")
+        check_receipt_log(receipt, f"checks/{path.name}")
+        receipts[label] = receipt
+    required_value = protocol.get("required_checks")
+    required = tuple(required_value) if isinstance(required_value, list) and all(isinstance(item, str) and item for item in required_value) else REQUIRED_CHECKS
+    if "native-roundtrip" not in required:
+        required = (*required, "native-roundtrip")
+    for base in required:
+        candidates = [(name, receipt) for name, receipt in receipts.items() if name == base or (match := RETRY_RE.fullmatch(name)) and match.group(1) == base]
+        if not candidates:
+            fail(f"required check group {base}: no receipt")
+        candidates.sort(key=lambda item: int(RETRY_RE.fullmatch(item[0]).group(2)) if RETRY_RE.fullmatch(item[0]) else 0)
+        if any(receipt.get("status") == "running" for _, receipt in candidates):
+            fail(f"required check group {base}: a receipt is still running")
+        selected_name, selected = candidates[-1]
+        if selected.get("status") != "pass" or selected.get("exit_code") != 0:
+            fail(f"required check group {base}: latest receipt {selected_name} is not pass")
+        final_sources = {json.dumps(source_binding, sort_keys=True)}
+        if supplemental_source is not None:
+            final_sources.add(json.dumps(supplemental_source, sort_keys=True))
+        selected_before = json.dumps(selected.get("source_before"), sort_keys=True)
+        selected_after = json.dumps(selected.get("source_after"), sort_keys=True)
+        if selected_before not in final_sources or selected_after not in final_sources:
+            fail(f"required check group {base}: latest receipt {selected_name} is outside final source epochs")
+    return receipts
+
+
+def latest_check(receipts: dict[str, dict[str, Any]], base: str) -> tuple[str, dict[str, Any]] | None:
+    candidates = [
+        (name, receipt)
+        for name, receipt in receipts.items()
+        if name == base or (match := RETRY_RE.fullmatch(name)) and match.group(1) == base
+    ]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: int(RETRY_RE.fullmatch(item[0]).group(2)) if RETRY_RE.fullmatch(item[0]) else 0)
+    return candidates[-1]
+
+
+def load_oracle() -> Any:
+    path = ROOT / "pair-oracle.py"
+    spec = importlib.util.spec_from_file_location("litchi_0464_bundle_pair_oracle", path)
+    if spec is None or spec.loader is None:
+        fail("cannot load pair-oracle.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def check_capture_artifacts(protocol: dict[str, Any], binding: dict[str, Any], pair: dict[str, Any], source_binding: dict[str, Any], summary_value: dict[str, Any]) -> list[dict[str, Any]]:
+    protocol_sha = sha_file(ROOT / "protocol.json")
+    pair_sha = sha_file(ROOT / "pair.json")
+    oracle_sha = sha_file(ROOT / "pair-oracle.py")
+    binding_sha = sha_file(ROOT / "binding.json")
+    oracle = load_oracle()
+    results: list[dict[str, Any]] = []
+    source = local_path(pair["source"]["path"], "pair.source.path")
+    destination = local_path(pair["destination"]["path"], "pair.destination.path")
+    operation = pair["operation"]
+    for lane in summary_value["lanes"]:
+        lane_dir = ROOT / "captures" / lane["repeat"] / lane["id"]
+        receipt_path = lane_dir / "receipt.json"
+        receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+        if receipt.get("protocol_sha256") != protocol_sha or receipt.get("pair_manifest_sha256") != pair_sha or receipt.get("pair_oracle_sha256") != oracle_sha or receipt.get("binding_sha256") != binding_sha:
+            fail(f"{receipt_path.relative_to(ROOT)}: protocol/pair/oracle/binding identity differs")
+        if receipt.get("source_binding") != source_binding:
+            fail(f"{receipt_path.relative_to(ROOT)}: source binding differs")
+        artifacts = obj(receipt.get("artifacts"), f"{receipt_path.relative_to(ROOT)}.artifacts")
+        for key in ("report", "output_pptx", "resource", "workload", "oracle"):
+            if key not in artifacts:
+                fail(f"{receipt_path.relative_to(ROOT)}: missing artifact binding {key}")
+            artifact(artifacts[key], f"{receipt_path.relative_to(ROOT)}.artifacts.{key}")
+        if artifact(artifacts["report"], f"{receipt_path.relative_to(ROOT)}.artifacts.report") != lane["report"]:
+            fail(f"{lane['id']}: receipt report identity differs from summary")
+        if artifact(artifacts["output_pptx"], f"{receipt_path.relative_to(ROOT)}.artifacts.output_pptx") != lane["output"]:
+            fail(f"{lane['id']}: receipt output identity differs from summary")
+        report_path = local_path(artifacts["report"]["path"], "capture report artifact")
+        output_path = local_path(artifacts["output_pptx"]["path"], "capture output artifact")
+        if report_path != lane_dir / "report.json" or output_path != lane_dir / "output.pptx":
+            fail(f"{lane['id']}: receipt artifact paths differ")
+        result = oracle.verify_pair(
+            source_path=source,
+            destination_path=destination,
+            output_path=output_path,
+            source_index=integer(operation["source_slide"], "pair.operation.source_slide"),
+            insertion_index=integer(operation["insertion_position"], "pair.operation.insertion_position"),
+            expected_source_sha256=pair["source"]["sha256"],
+            expected_destination_sha256=pair["destination"]["sha256"],
+            expected_output_sha256=lane["output"]["sha256"],
+            expected_source_bytes=pair["source"]["bytes"],
+            expected_destination_bytes=pair["destination"]["bytes"],
+            expected_output_bytes=lane["output"]["bytes"],
+        )
+        if result.get("status") != "pass":
+            fail(f"{lane['id']}: pair oracle did not pass")
+        results.append({"lane": lane["id"], "output": lane["output"], "oracle": result})
+    return results
+
+
+def check_repeat_states(summary_value: dict[str, Any], protocol_sha: str, pair_sha: str, oracle_sha: str, binding_sha: str) -> None:
+    for repeat in ("R1", "R2"):
+        path = ROOT / "captures" / repeat / "capture-state.json"
+        state = obj(load(path, str(path.relative_to(ROOT))), str(path.relative_to(ROOT)))
+        if state.get("status") != "pass" or state.get("source_unchanged") is not True:
+            fail(f"{path.relative_to(ROOT)}: repeat state is not a successful source-unchanged receipt")
+        for key, expected in (
+            ("protocol_sha256", protocol_sha),
+            ("pair_manifest_sha256", pair_sha),
+            ("pair_oracle_sha256", oracle_sha),
+            ("binding_sha256", binding_sha),
+        ):
+            if state.get(key) != expected:
+                fail(f"{path.relative_to(ROOT)}: {key} differs")
+        expected = [lane["id"] for lane in summary_value["lanes"] if lane["repeat"] == repeat]
+        if state.get("completed_lanes") != expected:
+            fail(f"{path.relative_to(ROOT)}: completed lane order differs")
+        if state.get("expected_lanes") != [{"lane": lane_id, "instrumentation": next(item["instrumentation"] for item in summary_value["lanes"] if item["id"] == lane_id), "provider": next(item["provider"] for item in summary_value["lanes"] if item["id"] == lane_id), "repeat": repeat} for lane_id in expected]:
+            fail(f"{path.relative_to(ROOT)}: expected lane metadata differs")
+
+
+def check_native_roundtrip(
+    summary_value: dict[str, Any],
+    protocol_sha: str,
+    pair_sha: str,
+    binding_sha: str,
+    inventory_binding: dict[str, Any] | None = None,
+    bundle: Path | None = None,
+) -> dict[str, Any]:
+    """Validate the retained LibreOffice readback without running it."""
+
+    bundle = bundle or ROOT / "native-roundtrip"
+    receipt_path = bundle / "receipt.json"
+    receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+    if receipt.get("schema") != "litchi-0464-native-roundtrip-v1" or receipt.get("change") != CHANGE or receipt.get("status") not in {"pass", "partial"}:
+        fail("native-roundtrip receipt is not a passing or explicitly partial final helper receipt")
+    if receipt.get("scope") != "native_application_roundtrip":
+        fail("native-roundtrip scope differs")
+    expected_names = {
+        "libreoffice-version.stdout", "libreoffice-version.stderr", "libreoffice.stdout", "libreoffice.stderr",
+        "inventory-pre.stdout", "inventory-pre.stderr", "inventory-post.stdout", "inventory-post.stderr",
+        "pre-inventory.json", "post-inventory.json", "resaved.pptx", "create-new-receipts.json", "receipt.json",
+    }
+    actual_names = {path.name for path in bundle.iterdir() if path.is_file() and not path.is_symlink()}
+    if actual_names != expected_names:
+        fail(f"native-roundtrip artifact set differs (missing={sorted(expected_names - actual_names)}, extra={sorted(actual_names - expected_names)})")
+    for path in bundle.iterdir():
+        if path.is_symlink():
+            fail(f"native-roundtrip contains symlink: {path.name}")
+    if receipt.get("input") is None or receipt.get("output") is None or receipt.get("pre_inventory") is None or receipt.get("post_inventory") is None or receipt.get("create_new_receipts") is None:
+        fail("native-roundtrip receipt lacks retained input/output/inventory/create-new artifacts")
+    input_artifact = artifact(receipt["input"], "native-roundtrip.input")
+    formal = next((lane for lane in summary_value["lanes"] if lane["id"] == "normal-bytes" and lane["repeat"] == "R1"), None)
+    if formal is None:
+        fail("formal R1 normal-bytes lane is missing for native input binding")
+    if input_artifact != formal["output"]:
+        fail("native-roundtrip input is not the formal R1 normal-bytes output")
+    output_artifact = artifact(receipt["output"], "native-roundtrip.output")
+    pre_artifact = artifact(receipt["pre_inventory"], "native-roundtrip.pre_inventory")
+    post_artifact = artifact(receipt["post_inventory"], "native-roundtrip.post_inventory")
+    create_artifact = artifact(receipt["create_new_receipts"], "native-roundtrip.create_new_receipts")
+    inventory_artifact = artifact(receipt.get("inventory_binary"), "native-roundtrip.inventory_binary", require_local=False)
+    if inventory_binding is not None:
+        expected_inventory = obj(inventory_binding.get("binary"), "inventory-binding.binary")
+        if inventory_artifact != {key: expected_inventory[key] for key in ("path", "bytes", "sha256")}:
+            fail("native-roundtrip inventory binary is not the supplemental diagnostic binding")
+    if Path(output_artifact["path"]).name != "resaved.pptx" or Path(pre_artifact["path"]).name != "pre-inventory.json" or Path(post_artifact["path"]).name != "post-inventory.json":
+        fail("native-roundtrip retained artifact names differ")
+    for key in ("protocol_sha256", "pair_manifest_sha256", "binding_sha256"):
+        expected = {"protocol_sha256": protocol_sha, "pair_manifest_sha256": pair_sha, "binding_sha256": binding_sha}[key]
+        if receipt.get(key) not in (None, expected):
+            fail(f"native-roundtrip.{key} differs")
+    command_records = []
+    for section, key in (("libreoffice", "version"), ("libreoffice", "application"), (None, "pre_inventory_command"), (None, "post_inventory_command")):
+        record = receipt.get(section, {}).get(key) if section else receipt.get(key)
+        command_records.append(obj(record, f"native-roundtrip.{key}"))
+    for index, command in enumerate(command_records):
+        if command.get("exit_code") != 0:
+            fail(f"native-roundtrip command {index} did not pass")
+        artifact(command.get("stdout"), f"native-roundtrip.command[{index}].stdout")
+        artifact(command.get("stderr"), f"native-roundtrip.command[{index}].stderr")
+    create_receipts = obj(load(local_path(create_artifact["path"], "native-roundtrip.create_new_receipts.path"), "native-roundtrip.create-new receipts"), "native-roundtrip.create-new receipts")
+    entries = create_receipts.get("entries")
+    if not isinstance(entries, list) or not entries:
+        fail("native-roundtrip create-new receipt has no entries")
+    entry_paths: set[str] = set()
+    for index, value in enumerate(entries):
+        entry = obj(value, f"native-roundtrip.create_new_receipts.entries[{index}]")
+        if entry.get("created_new") is not True:
+            fail(f"native-roundtrip create-new entry {index} is not create-new")
+        bound = artifact(entry, f"native-roundtrip.create_new_receipts.entries[{index}]")
+        entry_paths.add(Path(bound["path"]).name)
+    if entry_paths != expected_names - {"receipt.json", "create-new-receipts.json"}:
+        fail("native-roundtrip create-new receipt does not cover every raw helper artifact")
+    native_spec = importlib.util.spec_from_file_location("litchi_0464_native_roundtrip", ROOT / "native-roundtrip.py")
+    if native_spec is None or native_spec.loader is None:
+        fail("cannot load native-roundtrip.py")
+    native = importlib.util.module_from_spec(native_spec)
+    sys.modules[native_spec.name] = native
+    native_spec.loader.exec_module(native)
+    before = obj(load(local_path(pre_artifact["path"], "native-roundtrip.pre_inventory.path"), "native pre inventory"), "native pre inventory")
+    after = obj(load(local_path(post_artifact["path"], "native-roundtrip.post_inventory.path"), "native post inventory"), "native post inventory")
+    recomputed = json.loads(json.dumps(
+        native.validate_semantics(before, after, input_artifact, output_artifact)
+    ))
+    if receipt.get("semantic_validation") != recomputed or recomputed.get("passed") is not True:
+        fail("native-roundtrip semantic validation does not recompute from retained inventories")
+    acceptance = obj(recomputed.get("native_acceptance"), "native-roundtrip.semantic_validation.native_acceptance")
+    if acceptance.get("scope") != "application_save_plus_slide_count_size_and_ordered_text" or acceptance.get("image_equivalence_claimed") is not False or acceptance.get("rendering_claimed") is not False:
+        fail("native-roundtrip acceptance scope overclaims image or rendering compatibility")
+    required_semantics = acceptance.get("required_semantics")
+    expected_semantics = {
+        "source_backed_slide_count", "eager_slide_count", "source_backed_slide_size",
+        "eager_slide_size", "ordered_slide_text", "eager_ordered_text", "eager_ordered_text_count",
+    }
+    if not isinstance(required_semantics, list) or set(required_semantics) != expected_semantics:
+        fail("native-roundtrip required semantic scope differs")
+    image_status = obj(recomputed.get("observations"), "native-roundtrip.semantic_validation.observations").get("status")
+    if image_status not in {"partial_image_inventory", "unavailable_image_inventory"}:
+        fail("native-roundtrip must retain an explicitly limited image inventory")
+    disclosure = json.dumps(
+        {"limitations": receipt.get("limitations"), "semantic_validation": recomputed},
+        sort_keys=True,
+    ).lower()
+    if not any(term in disclosure for term in ("picture", "image")) or not any(term in disclosure for term in ("unavailable", "not required", "partial")):
+        fail("native-roundtrip does not disclose the limited picture/image scope")
+    return {"status": receipt["status"], "input": input_artifact, "output": output_artifact, "pre_inventory": pre_artifact, "post_inventory": post_artifact, "create_new_receipts": create_artifact}
+
+
+def check_required_native_roundtrip(
+    receipts: dict[str, dict[str, Any]],
+    summary_value: dict[str, Any],
+    protocol_sha: str,
+    pair_sha: str,
+    binding_sha: str,
+    inventory_binding: dict[str, Any],
+) -> dict[str, Any]:
+    """Check the newest required native helper and its retained evidence."""
+
+    selected = latest_check(receipts, "native-roundtrip")
+    if selected is None:
+        fail("required native-roundtrip check group has no receipt")
+    selected_name, selected_receipt = selected
+    if selected_receipt.get("status") != "pass" or selected_receipt.get("exit_code") != 0:
+        fail(f"required native-roundtrip check group latest receipt {selected_name} is not pass")
+    supplemental_source = inventory_binding["source"]
+    if selected_receipt.get("source_before") != supplemental_source or selected_receipt.get("source_after") != supplemental_source or selected_receipt.get("source_unchanged") is not True:
+        fail(f"{selected_name}: native helper check is not bound to the supplemental inventory source epoch")
+    bundle_name = selected_name if selected_name != "native-roundtrip" else "native-roundtrip"
+    bundle = ROOT / bundle_name
+    receipt_path = bundle / "receipt.json"
+    if not receipt_path.is_file():
+        fail(f"{bundle_name}: selected native check has no helper receipt")
+    helper_receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+    if helper_receipt.get("status") in {"pass", "partial"}:
+        return check_native_roundtrip(summary_value, protocol_sha, pair_sha, binding_sha, inventory_binding, bundle)
+    fail(f"{bundle_name}: selected native helper receipt is incomplete ({helper_receipt.get('status')!r})")
+
+
+def profile_relative_path(value: Any, directory: Path, label: str) -> Path:
+    """Normalize either bundle-relative or repository-relative profile paths."""
+
+    raw = safe_relative(value, f"{label}.path")
+    bundle = directory.relative_to(ROOT).as_posix()
+    raw_parts = raw.parts
+    bundle_parts = Path(bundle).parts
+    normalized: Path | None = None
+    for index in range(len(raw_parts) - len(bundle_parts) + 1):
+        if raw_parts[index : index + len(bundle_parts)] == bundle_parts:
+            normalized = Path(*raw_parts[index:])
+            break
+    if normalized is None:
+        fail(f"{label}.path does not identify its profiling bundle")
+    return normalized
+
+
+def profile_artifact(value: Any, directory: Path, label: str) -> dict[str, Any]:
+    row = obj(value, label)
+    normalized = profile_relative_path(row.get("path"), directory, label)
+    expected_bytes = integer(row.get("bytes"), f"{label}.bytes")
+    expected_sha = digest(row.get("sha256"), f"{label}.sha256")
+    path = local_path(normalized.as_posix(), f"{label}.path")
+    if path.stat().st_size != expected_bytes or sha_file(path) != expected_sha:
+        fail(f"{label}: artifact identity differs")
+    return {"path": normalized.as_posix(), "bytes": expected_bytes, "sha256": expected_sha}
+
+
+def check_one_profile(directory: Path, *, final: bool) -> dict[str, Any]:
+    if directory.is_symlink() or not directory.is_dir():
+        fail(f"{directory.name}: profiling directory is not regular")
+    summary_path = directory / "profile-summary.json"
+    summary_label = f"{directory.name}/profile-summary.json"
+    summary = obj(load(summary_path, summary_label), summary_label)
+    if summary.get("schema") != "litchi-0464-profile-summary-v1" or summary.get("change") != CHANGE:
+        fail(f"{summary_label}: schema/change differs")
+    if summary.get("status") not in {"pass", "partial", "unavailable"}:
+        fail(f"{summary_label}: unsupported status")
+    if summary.get("operation_only_attribution") is not False or summary.get("samples") != 30 or summary.get("warmup") != 3:
+        fail(f"{summary_label}: scope or sample declaration differs")
+    if final:
+        amendment = obj(summary.get("amendment"), f"{summary_label}.amendment")
+        if amendment.get("schema") != "litchi-0464-profile-amendment-v1" or amendment.get("output_root") != directory.name or amendment.get("supersedes") != "profiling/profile-summary.json":
+            fail(f"{summary_label}: amendment identity differs")
+    raw_rows = summary.get("raw_artifacts")
+    raw_hashes = summary.get("raw_artifact_hashes")
+    if not isinstance(raw_rows, list) or not isinstance(raw_hashes, dict):
+        fail(f"{summary_label}: raw artifact inventory is missing")
+    normalized_hashes: dict[str, str] = {}
+    for raw_path, raw_sha in raw_hashes.items():
+        normalized = profile_relative_path(raw_path, directory, f"{summary_label}.raw_artifact_hashes")
+        if normalized.as_posix() in normalized_hashes:
+            fail(f"{summary_label}: duplicate normalized raw artifact path")
+        normalized_hashes[normalized.as_posix()] = digest(raw_sha, f"{summary_label}.raw_artifact_hashes.{raw_path}")
+    listed: set[str] = set()
+    for index, value in enumerate(raw_rows):
+        raw_row = obj(value, f"{summary_label}.raw_artifacts[{index}]")
+        row = profile_artifact(raw_row, directory, f"{summary_label}.raw_artifacts[{index}]")
+        if row["path"] == directory.relative_to(ROOT).joinpath("profile-summary.json").as_posix():
+            fail(f"{summary_label}: raw inventory includes its summary")
+        if normalized_hashes.get(row["path"]) != row["sha256"]:
+            fail(f"{summary_label}: raw artifact hash map differs for {row['path']}")
+        listed.add(row["path"])
+    if set(normalized_hashes) != listed:
+        fail(f"{summary_label}: raw artifact hash map has unlisted or missing paths")
+    actual: set[str] = set()
+    for path in directory.rglob("*"):
+        if path.is_symlink():
+            fail(f"{summary_label}: symlinked profile artifact {path}")
+        if path.is_file() and path != summary_path:
+            actual.add(path.relative_to(ROOT).as_posix())
+    if listed != actual:
+        fail(f"{summary_label}: raw artifact coverage differs (missing={sorted(actual - listed)[:3]}, extra={sorted(listed - actual)[:3]})")
+    runs = summary.get("runs", [])
+    if not isinstance(runs, list) or len(runs) not in {0, 2}:
+        fail(f"{summary_label}: run inventory differs")
+    for index, run_value in enumerate(runs):
+        run = obj(run_value, f"{summary_label}.runs[{index}]")
+        if run.get("status") not in {"pass", "partial", "unavailable"}:
+            fail(f"{summary_label}.runs[{index}] has an unsupported status")
+        kind = text(run.get("kind"), f"{summary_label}.runs[{index}].kind")
+        if kind not in {"counters", "samples"}:
+            fail(f"{summary_label}.runs[{index}] kind differs")
+        if run.get("operation_only_attribution") is not False or run.get("whole_process") is not True:
+            fail(f"{summary_label}.runs[{index}] scope overclaims operation attribution")
+        receipt_path = directory / kind / "receipt.json"
+        receipt = obj(load(receipt_path, str(receipt_path.relative_to(ROOT))), str(receipt_path.relative_to(ROOT)))
+        if receipt.get("schema") != "litchi-0464-profile-run-v1" or receipt.get("change") != CHANGE or receipt.get("kind") != kind or receipt.get("status") != run.get("status"):
+            fail(f"{summary_label} {kind} receipt differs from profile summary")
+        for key in ("report", "output"):
+            if key in run:
+                profile_artifact(run[key], directory, f"{summary_label}.runs[{index}].{key}")
+        run_artifacts = run.get("artifacts")
+        receipt_artifacts = receipt.get("artifacts")
+        if not isinstance(run_artifacts, list) or not isinstance(receipt_artifacts, list):
+            fail(f"{summary_label} {kind}: raw run artifacts are missing")
+        normalized_run = [profile_artifact(value, directory, f"{summary_label}.runs[{index}].artifacts[{j}]") for j, value in enumerate(run_artifacts)]
+        normalized_receipt = [profile_artifact(value, directory, f"{summary_label} {kind}.receipt.artifacts[{j}]") for j, value in enumerate(receipt_artifacts)]
+        if normalized_run != normalized_receipt:
+            fail(f"{summary_label} {kind}: run and receipt artifact manifests differ")
+        if run.get("status") == "unavailable" and not run.get("unavailable"):
+            fail(f"{summary_label} {kind}: unavailable status lacks an honest reason")
+    return {"path": directory.relative_to(ROOT).as_posix(), "status": summary["status"], "runs": len(runs), "final": final}
+
+
+def check_profile_artifacts() -> dict[str, Any]:
+    """Authenticate both the historical profile guard and the amended final profile."""
+
+    directories = [ROOT / "profiling", ROOT / "profiling-r1"]
+    present = [directory for directory in directories if directory.exists()]
+    if not present:
+        return {"status": "absent", "optional": True}
+    if len(present) != 2:
+        fail("both historical profiling and profiling-r1 must be retained together")
+    historical = check_one_profile(ROOT / "profiling", final=False)
+    final = check_one_profile(ROOT / "profiling-r1", final=True)
+    return {"status": final["status"], "optional": True, "historical": historical, "final": final}
+
+
+def verify(*, portable: bool = True, precleanup: bool = False, root: Path = ROOT) -> dict[str, Any]:
+    global ROOT
+    original_root = ROOT
+    ROOT = root.resolve()
+    try:
+        if precleanup:
+            portable = False
+        receipt_count = verify_sum_file(ROOT)
+        protocol_value, binding, pair_spec, revision = check_protocol()
+        pair = check_pair(protocol_value, binding, pair_spec)
+        source_binding = check_binding(protocol_value, binding, pair, revision, precleanup and not portable)
+        check_historical_binding("allocator-initial-binding.json", "allocator-initial-binding.json")
+        check_historical_binding("normal-binding.json", "normal-binding.json")
+        inventory_binding = check_inventory_binding(source_binding, revision, precleanup and not portable)
+        check_source_code_archive(source_binding)
+        receipts = check_check_receipts(protocol_value, revision, source_binding, inventory_binding["source"])
+        summary_value = summarize.check_summary(ROOT)
+        protocol_sha = sha_file(ROOT / "protocol.json")
+        pair_sha = sha_file(ROOT / "pair.json")
+        oracle_sha = sha_file(ROOT / "pair-oracle.py")
+        binding_sha = sha_file(ROOT / "binding.json")
+        check_repeat_states(summary_value, protocol_sha, pair_sha, oracle_sha, binding_sha)
+        oracle_results = check_capture_artifacts(protocol_value, binding, pair, source_binding, summary_value)
+        native_result = check_required_native_roundtrip(
+            receipts,
+            summary_value,
+            protocol_sha,
+            pair_sha,
+            binding_sha,
+            inventory_binding,
+        )
+        profile_result = check_profile_artifacts()
+        return {"schema": SCHEMA, "status": "pass", "portable": portable, "precleanup": precleanup, "sealed_files": receipt_count, "lanes": len(oracle_results), "summary": summarize.SCHEMA, "native_roundtrip": native_result, "profiling": profile_result}
+    finally:
+        ROOT = original_root
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    flags = parser.add_mutually_exclusive_group()
+    flags.add_argument("--portable", action="store_true", help="verify without live executable paths (the default)")
+    flags.add_argument("--precleanup", action="store_true", help="also verify live bound executable paths")
+    parser.add_argument("--root", type=Path, default=ROOT)
+    args = parser.parse_args(argv)
+    portable = not args.precleanup
+    try:
+        print(json.dumps(verify(portable=portable, precleanup=args.precleanup, root=args.root), sort_keys=True))
+        return 0
+    except (VerificationError, summarize.SummaryError, OSError, ValueError) as error:
+        print(json.dumps({"schema": SCHEMA, "status": "failed", "error": str(error), "portable": portable}, sort_keys=True))
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

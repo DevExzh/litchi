@@ -1,0 +1,7 @@
+base positive: pass
+wrong insertion index: rejected (slide order differs: expected ['ppt/slides/slide3.xml', 'ppt/slides/slide1.xml', 'ppt/slides/slide2.xml'], got ['ppt/slides/slide1.xml', 'ppt/slides/slide3.xml', 'ppt/slides/slide2.xml'])
+formal distinct inputs: same-byte alias case not applicable
+copied payload mutation: rejected (copied payload differs ppt/media/image1.png -> ppt/media/image1-copy2.png)
+copied relationship retargeting: rejected (closure: copied relationship target is not a new member _rels/.rels)
+unexpected output member: rejected (output: no content type for ppt/unexpected.bin)
+negative_cases=4

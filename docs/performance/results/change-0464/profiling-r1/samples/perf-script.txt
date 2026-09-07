@@ -1,0 +1,82 @@
+normal   44483 368833.091750:          1 cycles:u: 
+	ffffffff8c800b90 [unknown] ([unknown])
+	    7df621e39cc0 _start+0x0 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+normal   44483 368833.091769:          1 cycles:u: 
+	    7df621e3a87c _dl_start+0x1c (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e39cc7 _start+0x7 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+normal   44483 368833.091781:          1 cycles:u: 
+	ffffffff8c800b90 [unknown] ([unknown])
+	    7df621e3a87c _dl_start+0x1c (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e39cc7 _start+0x7 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+normal   44483 368833.091793:         65 cycles:u: 
+	ffffffff8c800b90 [unknown] ([unknown])
+	    7df621e3a883 _dl_start+0x23 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e39cc7 _start+0x7 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+normal   44483 368833.091811:       7126 cycles:u: 
+	    7df621e2e1e4 __GI___tunables_init+0xa4 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e396db _dl_sysdep_start+0x2b (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e3ae4f _dl_start+0x5ef (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7df621e39cc7 _start+0x7 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+normal   44483 368833.092323:     706428 cycles:u: 
+	ffffffff8cfed2d9 [unknown] ([unknown])
+	ffffffff8cc1a307 [unknown] ([unknown])
+	ffffffff8df1c2e3 [unknown] ([unknown])
+	ffffffff8c800bb7 [unknown] ([unknown])
+	    5c597bc74715 litchi_perf_baseline::pptx_pair_lifecycle::parse_config+0x235 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.103719:   45872020 cycles:u: 
+	    5c597d507119 zlib_rs::inflate::inflate_fast_help_avx2+0x389 (/tmp/litchi-goal-0464/normal)
+	              1f [unknown] ([unknown])
+
+normal   44483 368833.123304:   66943304 cycles:u: 
+	    5c597d5a3b43 <alloc::string::String>::try_reserve+0x3 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.134136:   46366870 cycles:u: 
+	    5c597d401946 <hashbrown::map::HashMap<alloc::string::String, usize, std::hash::random::RandomState>>::insert+0x1f6 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.144415:   43769382 cycles:u: 
+	    5c597d5045d7 zlib_rs::inflate::inftrees::inflate_table+0x147 (/tmp/litchi-goal-0464/normal)
+	              3f [unknown] ([unknown])
+
+normal   44483 368833.154505:   43393685 cycles:u: 
+	    5c597d50702f zlib_rs::inflate::inflate_fast_help_avx2+0x29f (/tmp/litchi-goal-0464/normal)
+	              3f [unknown] ([unknown])
+
+normal   44483 368833.164656:   43329348 cycles:u: 
+	    7df621bbc2d3 __memmove_avx512_unaligned_erms+0x13 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5c597b93da46 <alloc::vec::Vec<soapberry_zip::preserve::PreservedEntry>>::push_mut+0x36 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.174789:   43249386 cycles:u: 
+	    5c597d51e267 <quick_xml::name::NamespaceResolver>::set_level+0x17 (/tmp/litchi-goal-0464/normal)
+	              34 [unknown] ([unknown])
+
+normal   44483 368833.184906:   43168069 cycles:u: 
+	    5c597d512d0f zlib_rs::deflate::algorithm::medium::deflate_medium+0x82f (/tmp/litchi-goal-0464/normal)
+	 5ffffffffffffff [unknown] ([unknown])
+
+normal   44483 368833.194992:   43071504 cycles:u: 
+	    5c597d553453 <memchr::arch::x86_64::avx2::memchr::One>::find_raw+0x33 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.205107:   43072048 cycles:u: 
+	    5c597d51c030 <quick_xml::events::attributes::IterState>::next+0x110 (/tmp/litchi-goal-0464/normal)
+	    5c597d43b529 litchi_opc::xml_splice::validate_source_element+0x169 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.215314:   43122674 cycles:u: 
+	    5c597d54c58d sha2::sha256::x86_sha::compress+0xbd (/tmp/litchi-goal-0464/normal)
+	    81fde0695baf [unknown] ([unknown])
+
+normal   44483 368833.226572:   42651387 cycles:u: 
+	    5c597d54c5a3 sha2::sha256::x86_sha::compress+0xd3 (/tmp/litchi-goal-0464/normal)
+	    81fde0695baf [unknown] ([unknown])
+
+normal   44483 368833.236943:   39282193 cycles:u: 
+	    5c597d54c758 sha2::sha256::x86_sha::compress+0x288 (/tmp/litchi-goal-0464/normal)
+
+normal   44483 368833.247197:   38554141 cycles:u: 
+	    5c597b399682 serde_json::ser::format_escaped_str::<&mut alloc::vec::Vec<u8>, serde_json::ser::PrettyFormatter>+0x62 (/tmp/litchi-goal-0464/normal)
+

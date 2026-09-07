@@ -1,0 +1,13 @@
+{
+  "path": "/tmp/litchi-goal-0464/allocator-initial",
+  "sha256": "a20833d5178a4503dd996fecab419facdb9fccf8da33caf0a6e1fa2a4df062b0",
+  "bytes": 58379848,
+  "build_receipt": "checks/allocator-build.json",
+  "build_receipt_sha256": "320e6677907c1e91f240f65034657bd0c810f7a5b7c0a4f94fd5167c09c094a9",
+  "source": {
+    "path": "sources/e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3.json",
+    "sha256": "e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3",
+    "files": 7032
+  },
+  "disposition": "historical initial harness binary; pair-pilot exposed regenerated relationship payload mismatch; not formal evidence"
+}

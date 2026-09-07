@@ -1,0 +1,268 @@
+{
+  "schema": "litchi-0464-pptx-pair-capture-v1",
+  "change": 464,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T18:38:54+00:00",
+  "purpose": "Serialized lifecycle evidence for the custody-bound PPTX source/destination pair, with bytes and bounded logical range providers and a portable independent package oracle.",
+  "pair_id": "lo-smoketest-to-litchi-derived-two-slide",
+  "pair_manifest": {
+    "path": "pair.json",
+    "sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+    "schema": "pptx_pair_manifest_v1",
+    "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+  },
+  "runner": {
+    "path": "capture.py",
+    "sha256": "93205948eb434516083b674b541460a62c47fa34ce5b57fdb4e57b9bb99fb600"
+  },
+  "host": {
+    "path": "host.json",
+    "sha256": "69724a940af728d9e44f9bb0b98a21137fe39a28b61a6941e3beb478010899f6",
+    "role": "Immutable host, CPU-affinity, storage, memory, toolchain, and kernel receipt captured before the formal matrix. The runner records its identity in repeat and lane receipts."
+  },
+  "oracle": {
+    "path": "pair-oracle.py",
+    "sha256": "ac6f48efe59785debe7f0f09a27edc3fb360cfd78533b0db83a4e51281051e4c",
+    "schema": "litchi-0464-pptx-pair-oracle-v1",
+    "role": "independent package-level ZIP/XML/relationship and copied-payload verification; it does not claim native Office acceptance"
+  },
+  "custody": {
+    "check_path": "check.py",
+    "check_sha256": "467787e0a8d2c2f6186ebbba736a1f679f7ac9c5a8476f73421a5996014dd123",
+    "source_policy": "The binary binding source record is the required current check.py source record before and after every repeat and lane. The outer check.py invocation records the same before/after custody independently.",
+    "source_record_fields": [
+      "path",
+      "sha256",
+      "files"
+    ]
+  },
+  "binding": {
+    "path": "binding.json",
+    "sha256": "bound-at-capture",
+    "required_before_capture": true,
+    "attestation": "The runner records the exact binding bytes, each binary identity, build receipt identity, and shared source record in capture-state.json and every lane receipt. The sentinel is resolved to the actual binding hash in those receipts."
+  },
+  "binding_contract": {
+    "schema": "litchi-0464-binaries-v1",
+    "required_top_level_fields": [
+      "schema",
+      "revision",
+      "binaries"
+    ],
+    "required_binary_fields": [
+      "path",
+      "sha256",
+      "bytes",
+      "build_receipt",
+      "build_receipt_sha256",
+      "source"
+    ],
+    "source_fields": [
+      "path",
+      "sha256",
+      "files"
+    ],
+    "requirements": [
+      "normal and allocator entries use their protocol paths and have matching regular-file bytes and SHA-256 identities",
+      "both entries have the same source record, and each build receipt is pass/source-unchanged with source_before and source_after equal to that record",
+      "binding.revision equals pair.json source_revision",
+      "the binding itself is retained beside all captures and is never rewritten after a formal repeat starts"
+    ]
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0464/normal",
+      "instrumentation": "none",
+      "role": "bytes or logical range provider lifecycle runner"
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0464/allocator",
+      "instrumentation": "system_allocator_operation_scoped",
+      "role": "same lifecycle runner with operation-scoped allocator counters"
+    }
+  },
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "matrix": {
+    "reports_per_repeat": 4,
+    "reports_total": 8,
+    "retained_samples_per_report": 30,
+    "warmups_per_report": 3,
+    "serialized_lanes": true,
+    "repeat_order": "R1 forward, then R2 reverse",
+    "lane_order": [
+      "normal-bytes",
+      "normal-range",
+      "allocator-bytes",
+      "allocator-range"
+    ],
+    "reverse_lane_order": [
+      "allocator-range",
+      "allocator-bytes",
+      "normal-range",
+      "normal-bytes"
+    ]
+  },
+  "range": {
+    "max_range_bytes": 256,
+    "delay_us": 0,
+    "scope": "PptxRangeSource logical caller ReadAt returned-byte cap and fixed delay setting; callers may request more than 256 bytes and the adapter returns at most the configured cap. This is a simulated bounded provider and does not measure network, physical storage, or cold-cache behavior"
+  },
+  "expected_output": {
+    "slides": 3,
+    "bytes": 55891,
+    "basis": "The retained derived-pair probe established the deterministic package byte count and three-slide result; every formal report and independent oracle must reproduce those identities.",
+    "probe": {
+      "path": "derived-pair-probe.json",
+      "sha256": "cbe2f13a53c3eeb311204cb0c18151d3bd1991191aa6e84044747bcd48d1c35a"
+    }
+  },
+  "orders": {
+    "R1": [
+      {
+        "lane": "normal-bytes",
+        "instrumentation": "normal",
+        "provider": "bytes",
+        "repeat": "R1"
+      },
+      {
+        "lane": "normal-range",
+        "instrumentation": "normal",
+        "provider": "range",
+        "repeat": "R1"
+      },
+      {
+        "lane": "allocator-bytes",
+        "instrumentation": "allocator",
+        "provider": "bytes",
+        "repeat": "R1"
+      },
+      {
+        "lane": "allocator-range",
+        "instrumentation": "allocator",
+        "provider": "range",
+        "repeat": "R1"
+      }
+    ],
+    "R2": [
+      {
+        "lane": "allocator-range",
+        "instrumentation": "allocator",
+        "provider": "range",
+        "repeat": "R2"
+      },
+      {
+        "lane": "allocator-bytes",
+        "instrumentation": "allocator",
+        "provider": "bytes",
+        "repeat": "R2"
+      },
+      {
+        "lane": "normal-range",
+        "instrumentation": "normal",
+        "provider": "range",
+        "repeat": "R2"
+      },
+      {
+        "lane": "normal-bytes",
+        "instrumentation": "normal",
+        "provider": "bytes",
+        "repeat": "R2"
+      }
+    ]
+  },
+  "commands": {
+    "R1": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0464/check.py",
+      "--tag",
+      "capture-r1",
+      "--",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0464/capture.py",
+      "--repeat",
+      "R1"
+    ],
+    "R2": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0464/check.py",
+      "--tag",
+      "capture-r2",
+      "--",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0464/capture.py",
+      "--repeat",
+      "R2"
+    ]
+  },
+  "inputs": {
+    "source": {
+      "path": "inputs/source.pptx",
+      "bytes": 29956,
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    },
+    "destination": {
+      "path": "inputs/destination.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    "operation": {
+      "source_slide": 0,
+      "destination_slide": 0,
+      "insertion_position": 1
+    },
+    "limits": {
+      "input_bytes": 1048576,
+      "output_bytes": 1048576,
+      "memory_bytes": 536870912,
+      "max_write_bytes": 65536,
+      "max_range_bytes": 256,
+      "delay_us": 0
+    },
+    "unchanged_requirement": "The pair manifest and both PPTX inputs are hashed before and after every lane; any mismatch fails the repeat and preserves all receipts."
+  },
+  "artifacts": {
+    "repeat_directories": [
+      "captures/R1",
+      "captures/R2"
+    ],
+    "per_lane": [
+      "receipt.json",
+      "report.json",
+      "output.pptx",
+      "resource.log",
+      "workload.log",
+      "oracle.log"
+    ],
+    "repeat_state": "capture-state.json",
+    "portable_output": "The report, first measured output PPTX, GNU time receipt, workload log, oracle log, and exact identity receipts remain under the bundle so the independent oracle can be rerun after temporary binaries and caches are removed."
+  },
+  "claims": {
+    "allowed": [
+      "Within-protocol bytes versus bounded logical range provider lifecycle measurements for this exact pair and source revision",
+      "Per-report phase timing, API sum timing, raw lifecycle rows, logical range counters where reported, and operation-scoped allocator counters in the allocator binary",
+      "Process-level GNU time maximum resident set size and the retained output/package oracle result",
+      "Input, binary, source-manifest, protocol, pair-manifest, and oracle attestation recorded by the receipts"
+    ],
+    "withheld": [
+      "ordinary allocator comparison for the normal binary, whose allocator fields are intentionally unavailable",
+      "network or physical I/O, cache-cold behavior, or worker-scaling claims",
+      "native Office application acceptance",
+      "speedup or regression claims until an explicitly defined derive step compares the retained reports",
+      "allocation totals beyond the allocator binary's operation-scoped counters and RSS process maximum"
+    ]
+  },
+  "limitations": {
+    "rss": "GNU time -v reports process-level maximum resident set size for each taskset/time-wrapped workload, including setup and teardown outside the lifecycle clocks.",
+    "allocator": "Only the allocator binary exposes system_allocator_operation_scoped counters; normal reports omit ordinary allocator totals by design.",
+    "range": "Range is a logical ReadAt adapter with a 256-byte returned-byte cap and zero fixed delay. Caller request lengths remain diagnostic data and are not asserted to be at most 256. It is not a network transport or cold-cache experiment.",
+    "timing": "The Rust report's API sum covers open_source, open_destination, plan, and publication; input loading, adapter construction, sink reservation, artifact writes, independent oracle work, and teardown are outside that sum.",
+    "oracle": "The independent oracle checks package structure, copied slide closure, XML relationships, and raw ZIP preservation within its documented scope; it cannot prove native Office acceptance."
+  }
+}

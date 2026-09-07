@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-0464-initial-binary-retention-v1",
+  "historical_binding": "normal-binding.json",
+  "relocations": [
+    {
+      "binary": "normal",
+      "historical_execution_path": "/tmp/litchi-goal-0464/normal",
+      "retained_path": "/tmp/litchi-goal-0464/normal-initial",
+      "bytes": 58514832,
+      "sha256": "f36bafebbdf1e8702120f8fb246905acfa02449dc41269cf95be10e944ec6052"
+    },
+    {
+      "binary": "inventory",
+      "historical_execution_path": "/tmp/litchi-goal-0464/inventory",
+      "retained_path": "/tmp/litchi-goal-0464/inventory-initial",
+      "bytes": 2694536,
+      "sha256": "bb3cf25474210e2e1479716c4e063fb0b9769c0d32aa3741e6cbaa0890b05290"
+    }
+  ],
+  "scope": "Initial binaries were moved before rebuilding the corrected harness; historical execution paths remain unchanged in their original receipts."
+}

@@ -1,0 +1,26 @@
+{
+  "normal": {
+    "path": "/tmp/litchi-goal-0464/normal",
+    "sha256": "f36bafebbdf1e8702120f8fb246905acfa02449dc41269cf95be10e944ec6052",
+    "bytes": 58514832,
+    "build_receipt": "checks/normal-build.json",
+    "build_receipt_sha256": "170c33fe3c828a1084de8cc72647fe2d32562147d0d5207c563ef7d215d8f2ab",
+    "source": {
+      "path": "sources/e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3.json",
+      "sha256": "e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3",
+      "files": 7032
+    }
+  },
+  "inventory": {
+    "path": "/tmp/litchi-goal-0464/inventory",
+    "sha256": "bb3cf25474210e2e1479716c4e063fb0b9769c0d32aa3741e6cbaa0890b05290",
+    "bytes": 2694536,
+    "build_receipt": "checks/normal-build.json",
+    "build_receipt_sha256": "170c33fe3c828a1084de8cc72647fe2d32562147d0d5207c563ef7d215d8f2ab",
+    "source": {
+      "path": "sources/e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3.json",
+      "sha256": "e0a712c403ea8550f86fc069552bc0fddc89f382c0cf563c844683bcb41846a3",
+      "files": 7032
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "litchi-0464-summary-tamper-v1",
+  "status": "pass",
+  "driver_sha256": "29e107d71735880198dd7a8db7ad3eac3b3917ee495f999a94d6406d464af64e",
+  "verifier_sha256": "7507e6dd94337e6d10928519a070ca091a2529f8587a4448982387e1bec4df72",
+  "original_summary_sha256": "353e258f3531f3568dc8819bd6a1527647822046eef28b947745fd2ca496da5a",
+  "mutation": {
+    "path": "lanes[0].timings.api_sum_ns.p50",
+    "before": 1953628,
+    "after": 1953629
+  },
+  "resealed": true,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-0464-tamper-nwbba2gh/bundle/verify.py"
+  ],
+  "exit_code": 1,
+  "stdout": "{\"error\": \"summary.json is not the deterministic recomputation\", \"portable\": true, \"schema\": \"litchi-0464-verification-v1\", \"status\": \"failed\"}\n",
+  "stderr": "",
+  "temporary_directory_absent": true
+}

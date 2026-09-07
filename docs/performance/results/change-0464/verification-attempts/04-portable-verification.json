@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-0464-portable-verification-v1",
+  "change": 464,
+  "status": "failed",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py"
+  ],
+  "cwd": "/tmp/litchi-0464-portable-_vyh3f9m/change-0464",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "7507e6dd94337e6d10928519a070ca091a2529f8587a4448982387e1bec4df72",
+  "copied_verifier_sha256": "7507e6dd94337e6d10928519a070ca091a2529f8587a4448982387e1bec4df72",
+  "driver_sha256": "bd1e8b5484bf8d107585a4dd7b039ce5c6a9247e7d3afa52b8c88f2bee890405",
+  "root_seal": {
+    "path": "SHA256SUMS",
+    "bytes": 25376,
+    "sha256": "a6b2ba04484a317fe65bdbc74a9ec0024d8cd9a0296f0c1b7803e7a05cab761c",
+    "members": 259
+  },
+  "copy_seal": {
+    "path": "SHA256SUMS",
+    "bytes": 25376,
+    "sha256": "a6b2ba04484a317fe65bdbc74a9ec0024d8cd9a0296f0c1b7803e7a05cab761c",
+    "members": 259
+  },
+  "copy_seal_after": {
+    "path": "SHA256SUMS",
+    "bytes": 25376,
+    "sha256": "a6b2ba04484a317fe65bdbc74a9ec0024d8cd9a0296f0c1b7803e7a05cab761c",
+    "members": 259
+  },
+  "copy_seal_unchanged": true,
+  "started_utc": "2026-09-07T19:29:58.411530+00:00",
+  "finished_utc": "2026-09-07T19:30:10.012126+00:00",
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py\", line 907, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py\", line 899, in main\n    print(json.dumps(verify(portable=portable, precleanup=args.precleanup, root=args.root), sort_keys=True))\n                     ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py\", line 876, in verify\n    native_result = check_required_native_roundtrip(\n        receipts,\n    ...<4 lines>...\n        inventory_binding,\n    )\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py\", line 730, in check_required_native_roundtrip\n    return check_native_roundtrip(summary_value, protocol_sha, pair_sha, binding_sha, inventory_binding, bundle)\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/verify.py\", line 674, in check_native_roundtrip\n    native_spec.loader.exec_module(native)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^\n  File \"<frozen importlib._bootstrap_external>\", line 759, in exec_module\n  File \"<frozen importlib._bootstrap>\", line 491, in _call_with_frames_removed\n  File \"/tmp/litchi-0464-portable-_vyh3f9m/change-0464/native-roundtrip.py\", line 32, in <module>\n    REPO = ROOT.parents[3]\n           ~~~~~~~~~~~~^^^\n  File \"/usr/lib/python3.14/pathlib/__init__.py\", line 67, in __getitem__\n    raise IndexError(idx)\nIndexError: 3\n",
+  "verifier_output": null,
+  "temporary_directory_absent": true,
+  "mode": "complete sealed change-0464 bundle copied to a fresh temporary directory; verifier default is portable"
+}

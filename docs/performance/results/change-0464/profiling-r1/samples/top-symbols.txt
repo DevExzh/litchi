@@ -1,0 +1,31 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 20  of event 'cycles:u'
+# Event count (approx.): 626559633
+#
+# Overhead  Symbol                                                                                                 IPC   [IPC Coverage]
+# ........  .....................................................................................................  ....................
+#
+    19.96%  [.] sha2::sha256::x86_sha::compress                                                                    -      -            
+    14.25%  [.] zlib_rs::inflate::inflate_fast_help_avx2                                                           -      -            
+    10.68%  [.] <alloc::string::String>::try_reserve                                                               -      -            
+     7.40%  [.] <hashbrown::map::HashMap<alloc::string::String, usize, std::hash::random::RandomState>>::insert    -      -            
+     6.99%  [.] zlib_rs::inflate::inftrees::inflate_table                                                          -      -            
+     6.92%  [.] __memmove_avx512_unaligned_erms                                                                    -      -            
+     6.90%  [.] <quick_xml::name::NamespaceResolver>::set_level                                                    -      -            
+     6.89%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                -      -            
+     6.87%  [.] <quick_xml::events::attributes::IterState>::next                                                   -      -            
+     6.87%  [.] <memchr::arch::x86_64::avx2::memchr::One>::find_raw                                                -      -            
+     6.15%  [.] serde_json::ser::format_escaped_str::<&mut alloc::vec::Vec<u8>, serde_json::ser::PrettyFormatter>  -      -            
+     0.11%  [k] 0xffffffff8cfed2d9                                                                                 -      -            
+     0.00%  [.] __GI___tunables_init                                                                               -      -            
+     0.00%  [k] 0xffffffff8c800b90                                                                                 -      -            
+     0.00%  [.] _dl_start                                                                                          -      -            
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

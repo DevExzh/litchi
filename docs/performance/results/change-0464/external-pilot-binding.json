@@ -1,0 +1,14 @@
+{
+  "build_receipt": "checks/external-pilot-build.json",
+  "build_receipt_sha256": "e8184f2d624ccb777482dab3b5c3c21c38b13e7b1af3c9f6a9504313afabeb83",
+  "source": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0464/external-pilot",
+    "bytes": 7687400,
+    "sha256": "c52c31f7e6a1bf1e0b9e818a74fff43ee26565f6a391c239627eeae0444cea7e"
+  }
+}

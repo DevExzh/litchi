@@ -1,0 +1,163 @@
+{
+  "binding": {
+    "binaries": {
+      "allocator": {
+        "build_receipt": "checks/allocator-build-r1.json",
+        "build_receipt_sha256": "f928c0fa746cc6acf6b937eaedf9b32bdaa74f8720f71e34236c6f254f6f3615",
+        "bytes": 58197584,
+        "path": "/tmp/litchi-goal-0464/allocator",
+        "sha256": "7e2d17e73739c5296c8af959b7c1c2db5fba6f8b22fece053e31549d3fbf2ede",
+        "source": {
+          "files": 7032,
+          "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+          "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+        }
+      },
+      "inventory": {
+        "build_receipt": "checks/normal-build-r1.json",
+        "build_receipt_sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307",
+        "bytes": 2695128,
+        "path": "/tmp/litchi-goal-0464/inventory",
+        "sha256": "288d050a80fc0718d744be28d0eed8f3e112497e8ee41765727a9c0646da4864",
+        "source": {
+          "files": 7032,
+          "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+          "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+        }
+      },
+      "normal": {
+        "build_receipt": "checks/normal-build-r1.json",
+        "build_receipt_sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307",
+        "bytes": 58347576,
+        "path": "/tmp/litchi-goal-0464/normal",
+        "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+        "source": {
+          "files": 7032,
+          "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+          "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+        }
+      }
+    },
+    "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+    "schema": "litchi-0464-binaries-v1"
+  },
+  "binding_sha256": "1e20467356450d763ef9d7260aa33c014a4767f200cfa85419bceb31ae37e192",
+  "change": 464,
+  "completed_lanes": [
+    "normal-bytes",
+    "normal-range",
+    "allocator-bytes",
+    "allocator-range"
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "expected_lanes": [
+    {
+      "instrumentation": "normal",
+      "lane": "normal-bytes",
+      "provider": "bytes",
+      "repeat": "R1"
+    },
+    {
+      "instrumentation": "normal",
+      "lane": "normal-range",
+      "provider": "range",
+      "repeat": "R1"
+    },
+    {
+      "instrumentation": "allocator",
+      "lane": "allocator-bytes",
+      "provider": "bytes",
+      "repeat": "R1"
+    },
+    {
+      "instrumentation": "allocator",
+      "lane": "allocator-range",
+      "provider": "range",
+      "repeat": "R1"
+    }
+  ],
+  "expected_output_probe": {
+    "bytes": 1120,
+    "path": "derived-pair-probe.json",
+    "sha256": "cbe2f13a53c3eeb311204cb0c18151d3bd1991191aa6e84044747bcd48d1c35a"
+  },
+  "failures": [],
+  "finished_utc": "2026-09-07T18:44:42.250707+00:00",
+  "host": {
+    "kernel_perf_event_paranoid": "1",
+    "logical_cpus": 32,
+    "page_size": 4096,
+    "platform": {
+      "machine": "x86_64",
+      "node": "ip-172-31-39-190",
+      "processor": "",
+      "release": "7.0.0-1011-aws",
+      "system": "Linux",
+      "version": "#11-Ubuntu SMP PREEMPT Thu Aug  6 15:41:35 UTC 2026"
+    },
+    "process_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "python": "3.14.4"
+  },
+  "host_artifact": {
+    "bytes": 11295,
+    "path": "host.json",
+    "sha256": "69724a940af728d9e44f9bb0b98a21137fe39a28b61a6941e3beb478010899f6"
+  },
+  "pair_manifest_sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+  "pair_oracle_sha256": "ac6f48efe59785debe7f0f09a27edc3fb360cfd78533b0db83a4e51281051e4c",
+  "protocol_sha256": "55921cbea4b5bef96ec9b5a42771a41b6ec11e4ca97428f76568067421842b89",
+  "repeat": "R1",
+  "schema": "litchi-0464-pptx-pair-capture-state-v1",
+  "source_after": {
+    "files": 7032,
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+  },
+  "source_before": {
+    "files": 7032,
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T18:44:40.738413+00:00",
+  "status": "pass"
+}

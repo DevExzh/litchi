@@ -1,5 +1,84 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0464: descriptive PPTX pair evidence preserves ADR boundaries
+
+0464 is harness-only descriptive evidence for a private pair-lifecycle runner;
+no production PPTX implementation, public API, dependency, executor, source
+ownership or ADR boundary changes. The pair uses explicit source and
+destination owners and finite OPC/ZIP/semantic/oracle limits. Its destination
+is same-source-derived, so the pair is a positive control rather than an
+independently authored native package. The independent package oracle remains
+the authority for copied-slide closure and relationship/raw-member checks in
+its declared scope; it does not establish Office application acceptance.
+
+The frozen eight-report, 240-sample matrix uses serialized R1 forward/R2
+reverse lanes, normal and operation-scoped allocator binaries, bytes and a
+256-byte returned logical-range adapter with zero fixed delay. API-sum p50
+values in R1/R2 are 1.9536/1.9380 ms (normal bytes), 1.9872/1.9865 ms (normal
+range), 2.0768/2.0705 ms (allocator bytes), and 2.1182/2.1213 ms (allocator
+range). The sum covers four public calls and is not an end-to-end timer;
+normal allocator totals are intentionally unavailable. No compression,
+copied-byte, network, physical-I/O, cold-cache, scaling or reversible-Patch
+claim is asserted.
+
+Across all 120 allocator rows, summing the four allocator regions gives exactly
+8,623,012 allocated bytes, 9,616 allocation calls and 1,455 reallocation
+calls. This does not infer a lifecycle peak by summing phase peaks. Bound GNU
+time resource logs report maximum RSS in kB for R1 normal-bytes/normal-range/
+allocator-bytes/allocator-range as 16,912/16,908/17,068/17,152 and for R2 as
+16,900/16,684/16,612/16,584. The overall 16,584–17,152 KiB (~16.2–16.75 MiB)
+range is process-level and includes setup, oracle work and teardown. The
+summary does not derive this GNU-time resource field; raw
+`captures/R1/*/resource.log` and `captures/R2/*/resource.log` files are bound
+in the bundle.
+
+All formal outputs are three slides and 55,891 bytes with independent package
+oracle success. Final harness Clippy passes at custody epoch
+`a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe`; harness
+validation records 391 passing tests with one ignored, and all 240 formal
+samples plus focused smoke (four positive and seven negative cases) pass.
+
+LibreOffice 26.2.5.2 saves the formal three-slide output. Native-r2 passes the
+scoped application-save plus source-backed/eager validation of all three slide
+counts, slide sizes and ordered text; its saved output is 39,830 bytes with
+SHA-256 `d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915`.
+All three post-save source-backed image inventories are unavailable because
+`UnsafeEdit` / `source-backed picture inventory` refuses markup compatibility.
+The failed native-roundtrip-r1 receipt and raw saved output remain preserved.
+This records a scoped app-save and text/count/size result, not full Office
+acceptance; image equivalence and rendering compatibility are unproven. The
+supplemental inventory-only source epoch changes only that diagnostic binary;
+its build and warning-denied Clippy receipt pass.
+7,031 other files are unchanged, and the measured copy Rust/binary/captures
+remain immutable with no retiming. The documentation receipt and owned
+performance-crate scoped format check pass. A broad `cargo fmt --all --check`
+receipt remains failed only at pre-existing formatting in the out-of-scope
+iWork `crates/litchi-keynote/src/document.rs`; no full-workspace format pass is
+claimed. Boundary checks pass. The corrected `profiling-r1` receipt supersedes
+the initial UID-0-unavailable diagnostic. It passes a whole-process user-counter
+and DWARF profile over three warmups and 30 retained samples (33 checked
+iterations); separate counter and sampling runs add 60 diagnostic samples
+outside the 240 formal samples. Totals are instructions 1,758,215,198, cycles
+631,274,012, branches 327,372,796, branch misses 3,514,541, cache misses
+2,295,690, and page faults 1,709. PMU counters ran at 83% because of
+multiplexing, and the raw zero cache-reference value is uninterpreted. The
+20-sample cycle symbol view places `sha2::sha256::x86_sha::compress` at
+19.96% and `zlib_rs::inflate::inflate_fast_help_avx2` at 14.25%; the
+whole-process scope includes binary hashing, setup and oracle work, so this is
+diagnostic only and does not establish operation hotspots or stable ranking.
+Sealed precleanup, fresh-copy portable verification and resealed-summary
+tamper rejection pass. Owned cleanup removed 12 files totaling 252,885,687
+bytes plus two archived audit temporaries. Coverage remains 439 selectors /
+36 defaults, 0463 remains retained, the full non-iWork goal remains
+open, and iWork is excluded. See the [summary](results/change-0464/summary.json),
+[protocol](results/change-0464/protocol.json),
+[pair](results/change-0464/pair.json), [provenance](results/change-0464/fixture-provenance.md),
+[source review](results/change-0464/source-review.md), [native-r1 receipt](results/change-0464/native-roundtrip/receipt.json),
+[native-r2 receipt](results/change-0464/native-roundtrip-r2/receipt.json),
+[profile summary](results/change-0464/profiling-r1/profile-summary.json),
+[top symbols](results/change-0464/profiling-r1/samples/top-symbols.txt), and
+[source compatibility](results/change-0464/source-compatibility.json).
+
 ## Change 0463: retained private publication proof stays within ADR boundaries
 
 0463 retains a private `PublicationAuditProof` beside one successful bounded

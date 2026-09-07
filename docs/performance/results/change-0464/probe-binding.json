@@ -1,0 +1,14 @@
+{
+  "build_receipt": "checks/probe-build.json",
+  "build_receipt_sha256": "8f068104c580650e71493b61f9fdf1f156f9c560ce7fd6a36c79cddb37ea5e5a",
+  "source": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0464/probe",
+    "bytes": 3578584,
+    "sha256": "4e2602773bbda5dfd24c7f6b59851671f02d9dfbe484801db8a08c3035c00962"
+  }
+}

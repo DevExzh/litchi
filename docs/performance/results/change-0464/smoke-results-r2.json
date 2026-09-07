@@ -1,0 +1,759 @@
+{
+  "build_binding": {
+    "binding": {
+      "bytes": 1817,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/binding.json",
+      "sha256": "1e20467356450d763ef9d7260aa33c014a4767f200cfa85419bceb31ae37e192"
+    },
+    "value": {
+      "binaries": {
+        "allocator": {
+          "build_receipt": {
+            "bytes": 1401,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/checks/allocator-build-r1.json",
+            "sha256": "f928c0fa746cc6acf6b937eaedf9b32bdaa74f8720f71e34236c6f254f6f3615"
+          },
+          "build_receipt_sha256": "f928c0fa746cc6acf6b937eaedf9b32bdaa74f8720f71e34236c6f254f6f3615",
+          "bytes": 58197584,
+          "path": "/tmp/litchi-goal-0464/allocator",
+          "sha256": "7e2d17e73739c5296c8af959b7c1c2db5fba6f8b22fece053e31549d3fbf2ede",
+          "source": {
+            "files": 7032,
+            "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+            "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+          }
+        },
+        "normal": {
+          "build_receipt": {
+            "bytes": 1393,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/checks/normal-build-r1.json",
+            "sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307"
+          },
+          "build_receipt_sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307",
+          "bytes": 58347576,
+          "path": "/tmp/litchi-goal-0464/normal",
+          "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+          "source": {
+            "files": 7032,
+            "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+            "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+          }
+        }
+      },
+      "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+      "schema": "litchi-0464-binaries-v1",
+      "source": {
+        "files": 7032,
+        "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+        "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+      }
+    }
+  },
+  "change": 464,
+  "deterministic_output": {
+    "bytes": 55891,
+    "lanes": [
+      "normal-bytes",
+      "normal-range",
+      "allocator-bytes",
+      "allocator-range"
+    ],
+    "same_bytes_all_lanes": true,
+    "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+  },
+  "finished_utc": "2026-09-07T18:45:49.453159+00:00",
+  "input_identities": {
+    "destination": {
+      "bytes": 42948,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/destination.pptx",
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    "source": {
+      "bytes": 29956,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/source.pptx",
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    }
+  },
+  "manifest": {
+    "bytes": 1298,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+    "sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a"
+  },
+  "negative_cases": [
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-oversized-source-metadata-bound-ywmfsab3/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-oversized-source-metadata-bound-ywmfsab3/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-oversized-source-metadata-bound-ywmfsab3/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 55,
+          "sha256": "275f0b11616d070a89d138fe6086dd1d68cd1abf91d270aba440b555638eb4aa",
+          "text": "Error: \"source input exceeds bounded read limit 42948\"\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "source input exceeds bounded read limit"
+      ],
+      "input_limit": 42948,
+      "name": "oversized-source-metadata-bound",
+      "oversized_source": {
+        "bytes": 42949,
+        "path": "/tmp/litchi-goal-0464/smoke-oversized-source-metadata-bound-ywmfsab3/oversized-source.pptx",
+        "sha256": "2dc8d6bccba854f1d6b29aa74c11e33d249a3ba10689059a9a7207c7388604ed"
+      },
+      "pinned_source": {
+        "bytes": 29956,
+        "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+      },
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-source-hash-mismatch-y7_l1l9l/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-source-hash-mismatch-y7_l1l9l/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-source-hash-mismatch-y7_l1l9l/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 57,
+          "sha256": "e03ac2bfb55c8da32c9cf5d02bcded0638f201421f77ed212a2ba973d669d8cf",
+          "text": "Error: \"source SHA-256 differs from the pinned manifest\"\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "source SHA-256 differs from the pinned manifest"
+      ],
+      "name": "source-hash-mismatch",
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-out-of-range-slide-selector-bo7qh8_0/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-out-of-range-slide-selector-bo7qh8_0/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-out-of-range-slide-selector-bo7qh8_0/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 84,
+          "sha256": "aa9d0bfbab2250a1b12fc96c0abecda47007283b48a8e94dcd61cb9e70ced33f",
+          "text": "Error: \"pair operation selector is outside the input-derived presentation catalogs\"\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "pair operation selector is outside the input-derived presentation catalogs"
+      ],
+      "name": "out-of-range-slide-selector",
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-too-small-output-budget-4a32hhzg/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-too-small-output-budget-4a32hhzg/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-too-small-output-budget-4a32hhzg/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 145,
+          "sha256": "fe3cc2cb0c025e55dd34624d717185fc5c249d2378b6cc472f5c41c37f4d46cb",
+          "text": "Error: Opc(Execution(ResourceLimit(ResourceLimit { resource: OutputBytes, observed: 224, limit: 1, scope: \"pptx-pair-lifecycle-destination\" })))\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "OutputBytes",
+        "sequential sink byte budget exceeded"
+      ],
+      "name": "too-small-output-budget",
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-tiny-memory-expansion-bound-8e8wtaxx/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-tiny-memory-expansion-bound-8e8wtaxx/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-tiny-memory-expansion-bound-8e8wtaxx/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 81,
+          "sha256": "9943a5adf0bfc65db3346dbe6beb6df5114923e677c4a7ec59ca30be8994a44e",
+          "text": "Error: Opc(ReadLimit { resource: ArchiveMetadataBytes, actual: 46, maximum: 1 })\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "resource: ArchiveMetadataBytes"
+      ],
+      "name": "tiny-memory-expansion-bound",
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-existing-report-refusal-hqu58ykm/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-existing-report-refusal-hqu58ykm/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-existing-report-refusal-hqu58ykm/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 68,
+          "sha256": "631b7b13872862622f2cf3e89c346da69c3045cb00f04bd13ddee48baa94e09c",
+          "text": "Error: Os { code: 17, kind: AlreadyExists, message: \"File exists\" }\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "File exists"
+      ],
+      "name": "existing-report-refusal",
+      "preserved_existing": {
+        "bytes": 25,
+        "path": "/tmp/litchi-goal-0464/smoke-existing-report-refusal-hqu58ykm/report.json",
+        "sha256": "79d9e77e34121640b3a87ece80dc18b4cd2a3b0e643897ce51218ce711c9c100"
+      },
+      "temporary_directory_removed": true
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/tmp/litchi-goal-0464/smoke-existing-output-refusal-5mtf6gmc/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/tmp/litchi-goal-0464/smoke-existing-output-refusal-5mtf6gmc/report.json",
+        "--output-pptx",
+        "/tmp/litchi-goal-0464/smoke-existing-output-refusal-5mtf6gmc/output.pptx"
+      ],
+      "diagnostics": {
+        "stderr": {
+          "bytes": 68,
+          "sha256": "631b7b13872862622f2cf3e89c346da69c3045cb00f04bd13ddee48baa94e09c",
+          "text": "Error: Os { code: 17, kind: AlreadyExists, message: \"File exists\" }\n"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 1,
+      "expected_error_fragments": [
+        "File exists"
+      ],
+      "name": "existing-output-refusal",
+      "preserved_existing": {
+        "bytes": 25,
+        "path": "/tmp/litchi-goal-0464/smoke-existing-output-refusal-5mtf6gmc/output.pptx",
+        "sha256": "713fe149c51c719ee6e8ea6e3e877f63c346e2cd238ab4a085c5b42d91eb8932"
+      },
+      "temporary_directory_removed": true
+    }
+  ],
+  "owned_root": "/tmp/litchi-goal-0464",
+  "pair_id": "lo-smoketest-to-litchi-derived-two-slide",
+  "positive_lanes": [
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-bytes.json",
+        "--output-pptx",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-bytes.pptx"
+      ],
+      "contract": {
+        "allocation_fields": {
+          "open_destination_allocation_metrics": false,
+          "open_source_allocation_metrics": false,
+          "plan_allocation_metrics": false,
+          "publication_allocation_metrics": false
+        },
+        "instrumentation": "none",
+        "output_bytes": 55891,
+        "output_sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb",
+        "phase_labels": [
+          "baseline",
+          "opened",
+          "planned",
+          "published",
+          "drop_result",
+          "drop_plan",
+          "drop_view",
+          "drop_caller_sources",
+          "drop_sink"
+        ]
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "diagnostic_identity": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "diagnostics": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T18:45:49.262228+00:00",
+      "label": "normal-bytes",
+      "output": {
+        "bytes": 55891,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-bytes.pptx",
+        "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+      },
+      "report": {
+        "bytes": 65239,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-bytes.json",
+        "sha256": "1acd534484e66de622473bb80fd951d559d71a7bc5ce9b6edea4c51c6a076c55"
+      },
+      "report_binding": {
+        "binary_bytes": 58347576,
+        "binary_sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+        "manifest_sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+        "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+      },
+      "started_utc": "2026-09-07T18:45:49.218410+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/normal",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+        "--provider",
+        "range",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-range.json",
+        "--output-pptx",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-range.pptx",
+        "--max-range",
+        "256",
+        "--delay-us",
+        "0"
+      ],
+      "contract": {
+        "allocation_fields": {
+          "open_destination_allocation_metrics": false,
+          "open_source_allocation_metrics": false,
+          "plan_allocation_metrics": false,
+          "publication_allocation_metrics": false
+        },
+        "instrumentation": "none",
+        "output_bytes": 55891,
+        "output_sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb",
+        "phase_labels": [
+          "baseline",
+          "opened",
+          "planned",
+          "published",
+          "drop_result",
+          "drop_plan",
+          "drop_view",
+          "drop_caller_sources",
+          "drop_sink"
+        ]
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "diagnostic_identity": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "diagnostics": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T18:45:49.307099+00:00",
+      "label": "normal-range",
+      "output": {
+        "bytes": 55891,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-range.pptx",
+        "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+      },
+      "report": {
+        "bytes": 65338,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/normal-range.json",
+        "sha256": "1d423a608c8810d7d2dc0f99568a724be14d8b85cacf2c037443742ec931f0e8"
+      },
+      "report_binding": {
+        "binary_bytes": 58347576,
+        "binary_sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+        "manifest_sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+        "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+      },
+      "started_utc": "2026-09-07T18:45:49.262687+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/allocator",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+        "--provider",
+        "bytes",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-bytes.json",
+        "--output-pptx",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-bytes.pptx"
+      ],
+      "contract": {
+        "allocation_fields": {
+          "open_destination_allocation_metrics": true,
+          "open_source_allocation_metrics": true,
+          "plan_allocation_metrics": true,
+          "publication_allocation_metrics": true
+        },
+        "instrumentation": "system_allocator_operation_scoped",
+        "output_bytes": 55891,
+        "output_sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb",
+        "phase_labels": [
+          "baseline",
+          "opened",
+          "planned",
+          "published",
+          "drop_result",
+          "drop_plan",
+          "drop_view",
+          "drop_caller_sources",
+          "drop_sink"
+        ]
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "diagnostic_identity": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "diagnostics": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T18:45:49.349865+00:00",
+      "label": "allocator-bytes",
+      "output": {
+        "bytes": 55891,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-bytes.pptx",
+        "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+      },
+      "report": {
+        "bytes": 67687,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-bytes.json",
+        "sha256": "022fd592e1e7b7080923ee58a700983c0c8389128641aa7482714b2f06636770"
+      },
+      "report_binding": {
+        "binary_bytes": 58197584,
+        "binary_sha256": "7e2d17e73739c5296c8af959b7c1c2db5fba6f8b22fece053e31549d3fbf2ede",
+        "manifest_sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+        "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+      },
+      "started_utc": "2026-09-07T18:45:49.307467+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/litchi-goal-0464/allocator",
+        "pptx-pair-lifecycle",
+        "--manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+        "--provider",
+        "range",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--repeat",
+        "smoke",
+        "--source-revision",
+        "1c1e29473f9402190f5bc4bf68d96029ff106470",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-range.json",
+        "--output-pptx",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-range.pptx",
+        "--max-range",
+        "256",
+        "--delay-us",
+        "0"
+      ],
+      "contract": {
+        "allocation_fields": {
+          "open_destination_allocation_metrics": true,
+          "open_source_allocation_metrics": true,
+          "plan_allocation_metrics": true,
+          "publication_allocation_metrics": true
+        },
+        "instrumentation": "system_allocator_operation_scoped",
+        "output_bytes": 55891,
+        "output_sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb",
+        "phase_labels": [
+          "baseline",
+          "opened",
+          "planned",
+          "published",
+          "drop_result",
+          "drop_plan",
+          "drop_view",
+          "drop_caller_sources",
+          "drop_sink"
+        ]
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "diagnostic_identity": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "diagnostics": {
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "text": ""
+        }
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T18:45:49.394431+00:00",
+      "label": "allocator-range",
+      "output": {
+        "bytes": 55891,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-range.pptx",
+        "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+      },
+      "report": {
+        "bytes": 67786,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2/allocator-range.json",
+        "sha256": "69eef0bdaa058426c724198b78b88aebab214a8cb6020bff06110dc09f1abf23"
+      },
+      "report_binding": {
+        "binary_bytes": 58197584,
+        "binary_sha256": "7e2d17e73739c5296c8af959b7c1c2db5fba6f8b22fece053e31549d3fbf2ede",
+        "manifest_sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+        "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+      },
+      "started_utc": "2026-09-07T18:45:49.350231+00:00"
+    }
+  ],
+  "repository_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "schema": "litchi-0464-pptx-pair-smoke-v1",
+  "smoke_directory": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/smoke-r2",
+  "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "started_utc": "2026-09-07T18:45:49.218355+00:00",
+  "status": "pass"
+}

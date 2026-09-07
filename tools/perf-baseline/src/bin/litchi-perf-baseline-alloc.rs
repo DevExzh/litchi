@@ -222,6 +222,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("provider-lifecycle") => {
             litchi_perf_baseline::pptx_provider_lifecycle::run_from_args(args)
         },
+        Some(selector) if selector == std::ffi::OsStr::new("pptx-pair-lifecycle") => {
+            litchi_perf_baseline::pptx_pair_lifecycle::run_from_args(args)
+        },
         Some(selector) if selector == std::ffi::OsStr::new("odp-append-attribution") => {
             litchi_perf_baseline::odp_append_attribution::run_from_args(args)
         },
