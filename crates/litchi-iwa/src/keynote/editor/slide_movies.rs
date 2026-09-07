@@ -1,7 +1,10 @@
 //! Standalone movie-object creation and editing for Keynote slides.
 
-use litchi_iwa_common::{WireLimits, media::Type as MediaType};
-use litchi_iwa_protos::keynote_media_codec;
+use litchi_iwa_common::{
+    WireLimits, decode_varint_from_bytes, media::Type as MediaType, varint::encoded_len,
+    wire::RawWireFields,
+};
+use litchi_iwa_protos::{keynote_media_codec, keynote_media_properties_codec, pages_media_codec};
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
@@ -21,6 +24,7 @@ const SLIDE_MESSAGE_TYPE: u32 = 5;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const MOVIE_DATA_FIELD: u32 = 14;
 const POSTER_IMAGE_DATA_FIELD: u32 = 15;
+const MOVIE_FLAGS_FIELD: u32 = 13;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
 pub(in crate::keynote::editor) fn movie_playback_wire_limits(
@@ -241,10 +245,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<DrawableProperties> {
-        Ok(self
-            .require_file_movie(slide_index, drawable_object_id)?
-            .info
-            .properties)
+        decode_slide_movie_properties(self, slide_index, drawable_object_id)
     }
 
     /// Update movie accessibility, hyperlink, and lock properties.
@@ -340,6 +341,146 @@ impl KeynoteEditor {
             object_ids,
         })
     }
+}
+
+/// Read the legacy raw-ID property API through the focused, source-bound
+/// property projection. The focused package transaction also validates media
+/// assets and the complete inbound graph, which would reject older sparse
+/// documents that the legacy reader has historically accepted. Keep the
+/// legacy ownership and ordinary-file checks here, then borrow the selected
+/// MovieArchive payload directly; this preserves that admission surface
+/// without serializing and reopening the complete package for each read.
+fn decode_slide_movie_properties(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+) -> Result<DrawableProperties> {
+    let slides = editor.slides()?;
+    let slide = slides.get(slide_index).ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote slide index {slide_index} is out of range for {} slides",
+            slides.len()
+        ))
+    })?;
+    let slide_id = slide.native_ids()?.slide.get();
+    let graph = ObjectGraph::read(editor.package())?;
+    let native: kn::SlideArchive =
+        graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+    if !native
+        .owned_drawables
+        .iter()
+        .any(|reference| reference.identifier == drawable_object_id)
+    {
+        return Err(Error::ParseError(format!(
+            "Keynote movie {drawable_object_id} is not owned by slide {slide_index}"
+        )));
+    }
+    let archive_name = graph.archive_name(slide_id)?;
+    if graph.archive_name(drawable_object_id)? != archive_name {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote movie {drawable_object_id} is outside slide component {archive_name}"
+        )));
+    }
+    let archive = editor.package().archive(archive_name)?;
+    let object_ids = slide_create::graph::private_clone_object_ids(
+        &archive,
+        [drawable_object_id],
+        "slide movie",
+    )?;
+    if object_ids.contains(&slide_id) {
+        return Err(Error::InvalidFormat(
+            "Keynote movie private graph reaches its owning slide".to_owned(),
+        ));
+    }
+    let source =
+        graph.message_data_type(drawable_object_id, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+    if raw_movie_kind(source, drawable_object_id)? != MovieKind::File {
+        return Err(Error::ParseError(format!(
+            "Keynote movie {drawable_object_id} is not an ordinary file-backed movie"
+        )));
+    }
+    decode_movie_properties_payload(source, drawable_object_id)
+}
+
+fn raw_movie_kind(source: &[u8], identifier: u64) -> Result<MovieKind> {
+    let flags = pages_media_codec::decode_movie_media_flags(
+        source,
+        pages_media_codec::DecodeOptions::for_source(source),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote movie {identifier} media flags projection failed: {error}"
+        ))
+    })?;
+    let placeholder_flags = raw_movie_flags(source, identifier)?;
+    Ok(if flags.is_live_video() == Some(true) {
+        MovieKind::LiveVideo
+    } else if flags.audio_only() == Some(true) {
+        MovieKind::Audio
+    } else if placeholder_flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0 {
+        MovieKind::Placeholder
+    } else {
+        MovieKind::File
+    })
+}
+
+fn raw_movie_flags(source: &[u8], identifier: u64) -> Result<u32> {
+    let mut fields = RawWireFields::new(source);
+    let mut flags = None;
+    while let Some(field) = fields.next().map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote movie {identifier} flags wire projection failed: {error}"
+        ))
+    })? {
+        if !field.key_is_canonical() || !field.length_is_canonical() || !field.value_is_canonical()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote movie {identifier} has non-canonical wire framing"
+            )));
+        }
+        if field.number() != MOVIE_FLAGS_FIELD {
+            continue;
+        }
+        if flags.is_some() || field.wire_type() != 0 {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote movie {identifier} has an invalid or repeated flags field"
+            )));
+        }
+        let (value, width) = decode_varint_from_bytes(field.payload()).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {identifier} flags value is invalid: {error}"
+            ))
+        })?;
+        if width != field.payload().len() || width != encoded_len(value) {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote movie {identifier} flags value is not canonical"
+            )));
+        }
+        flags = Some(u32::try_from(value).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {identifier} flags value is out of range: {error}"
+            ))
+        })?);
+    }
+    Ok(flags.unwrap_or_default())
+}
+
+fn decode_movie_properties_payload(source: &[u8], identifier: u64) -> Result<DrawableProperties> {
+    let properties = keynote_media_properties_codec::decode_movie_properties(
+        source,
+        keynote_media_properties_codec::DecodeOptions::for_source(source),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote movie {identifier} properties projection failed: {error}"
+        ))
+    })?;
+    Ok(DrawableProperties {
+        hyperlink_url: properties.hyperlink_url().map(str::to_owned),
+        locked: properties.locked(),
+        aspect_ratio_locked: properties.aspect_ratio_locked(),
+        accessibility_description: properties.accessibility_description().map(str::to_owned),
+    })
 }
 
 fn movie_info(
@@ -462,7 +603,9 @@ mod tests {
     use crate::archive::RawMessage;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawableFlipAxis, DrawablePoint};
-    use crate::wire::remove_repeated_length_delimited_field_where;
+    use crate::wire::{
+        append_varint_field, patch_varint_field, remove_repeated_length_delimited_field_where,
+    };
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use litchi_keynote::slide::media::geometry::MovieGeometry;
@@ -489,6 +632,8 @@ mod tests {
         height: 720.0,
     };
     const DUPLICATE_OFFSET: f32 = 10.0;
+    const NATIVE_MEDIA_BASELINE: &[u8] =
+        include_bytes!("../../../../../test-data/iwork/keynote/media-comments-baseline-native.key");
 
     fn options() -> SlideMovieOptions {
         SlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::from_millis(1_250))
@@ -543,6 +688,154 @@ mod tests {
                 object.archive_info.message_infos[message_index]
                     .data_references
                     .retain(|identifier| *identifier != poster_data_identifier.get());
+                Ok(())
+            })
+            .unwrap();
+        let bytes = package.to_bytes().unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn remove_movie_data(
+        editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        movie_data_identifier: MediaAssetId,
+    ) {
+        let archive_name = editor
+            .slide_movie_graph(0, drawable_object_id)
+            .unwrap()
+            .archive_name;
+        let mut package = editor.package().clone();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                    .unwrap();
+                let message = &object.messages[message_index];
+                let data = remove_repeated_length_delimited_field_where(
+                    &message.data,
+                    MOVIE_DATA_FIELD,
+                    |_| Ok(true),
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: MOVIE_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                object.archive_info.message_infos[message_index]
+                    .data_references
+                    .retain(|identifier| *identifier != movie_data_identifier.get());
+                Ok(())
+            })
+            .unwrap();
+        let bytes = package.to_bytes().unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn append_movie_varint_field(
+        editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        field_number: u32,
+        value: u64,
+    ) {
+        let archive_name = editor
+            .slide_movie_graph(0, drawable_object_id)
+            .unwrap()
+            .archive_name;
+        let mut package = editor.package().clone();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                    .unwrap();
+                let mut data = object.messages[message_index].data.clone();
+                append_varint_field(&mut data, field_number, value)?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: MOVIE_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let bytes = package.to_bytes().unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn replace_movie_varint_field(
+        editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        field_number: u32,
+        value: u64,
+    ) {
+        let archive_name = editor
+            .slide_movie_graph(0, drawable_object_id)
+            .unwrap()
+            .archive_name;
+        let mut package = editor.package().clone();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                    .unwrap();
+                let data = patch_varint_field(
+                    &object.messages[message_index].data,
+                    field_number,
+                    true,
+                    Some(value),
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: MOVIE_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let bytes = package.to_bytes().unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn make_movie_graph_reach_slide(editor: &mut KeynoteEditor, drawable_object_id: u64) {
+        let slide_id = editor
+            .slides()
+            .unwrap()
+            .first()
+            .unwrap()
+            .native_ids()
+            .unwrap()
+            .slide
+            .get();
+        let archive_name = editor
+            .slide_movie_graph(0, drawable_object_id)
+            .unwrap()
+            .archive_name;
+        let mut package = editor.package().clone();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                    .unwrap();
+                object.archive_info.message_infos[message_index]
+                    .object_references
+                    .push(slide_id);
                 Ok(())
             })
             .unwrap();
@@ -832,6 +1125,33 @@ mod tests {
     }
 
     #[test]
+    fn native_file_movie_properties_match_focused_source_projection() {
+        let editor = KeynoteEditor::from_bytes(NATIVE_MEDIA_BASELINE).unwrap();
+        let focused = focused_movie_package(&editor);
+        let infos = editor.slide_media_infos(0).unwrap();
+        let mut file_count = 0;
+        for (movie_position, info) in infos.into_iter().enumerate() {
+            let focused_properties = focused
+                .slide_media_properties(
+                    SlideSelector::index(0),
+                    MovieSelector::index(movie_position),
+                )
+                .unwrap();
+            if info.kind != MovieKind::File {
+                continue;
+            }
+            assert_eq!(
+                editor
+                    .slide_movie_properties(0, info.drawable_object_id)
+                    .unwrap(),
+                raw_properties(&focused_properties)
+            );
+            file_count += 1;
+        }
+        assert!(file_count > 0);
+    }
+
+    #[test]
     fn source_built_movie_properties_support_an_absent_poster() {
         let mut seed = KeynoteDocumentBuilder::new()
             .title("Movie properties without poster")
@@ -885,6 +1205,96 @@ mod tests {
         assert_eq!(focused_after.playback, baseline.playback);
         assert_eq!(raw_after.geometry, baseline.geometry);
         assert_eq!(focused_after.geometry, baseline.geometry);
+    }
+
+    #[test]
+    fn source_built_movie_properties_support_missing_content_data() {
+        let mut seed = KeynoteDocumentBuilder::new()
+            .title("Movie properties without content")
+            .build()
+            .unwrap();
+        let created = seed
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+        remove_movie_data(
+            &mut seed,
+            created.drawable_object_id,
+            created.movie_data_identifier.unwrap(),
+        );
+
+        let editor = KeynoteEditor::from_bytes(&seed.to_bytes().unwrap()).unwrap();
+        let movie = editor.slide_movies(0).unwrap().remove(0);
+        assert_eq!(movie.kind, MovieKind::File);
+        assert_eq!(movie.movie_data_identifier, None);
+        assert_eq!(
+            editor
+                .slide_movie_properties(0, movie.drawable_object_id)
+                .unwrap(),
+            DrawableProperties {
+                hyperlink_url: None,
+                locked: Some(false),
+                aspect_ratio_locked: Some(true),
+                accessibility_description: None,
+            }
+        );
+    }
+
+    #[test]
+    fn source_built_movie_properties_accept_unknown_flags_and_reject_repeated_flags() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Movie properties flags")
+            .build()
+            .unwrap();
+        let created = editor
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+
+        // Bit 1 is currently unknown to the media-kind classifier. It must
+        // remain an ordinary file movie while the focused projection ignores
+        // the unknown flag value.
+        replace_movie_varint_field(
+            &mut editor,
+            created.drawable_object_id,
+            MOVIE_FLAGS_FIELD,
+            2,
+        );
+        assert_eq!(
+            editor
+                .slide_movie_properties(0, created.drawable_object_id)
+                .unwrap()
+                .locked,
+            Some(false)
+        );
+
+        append_movie_varint_field(
+            &mut editor,
+            created.drawable_object_id,
+            MOVIE_FLAGS_FIELD,
+            0,
+        );
+        assert!(
+            editor
+                .slide_movie_properties(0, created.drawable_object_id)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn source_built_movie_properties_reject_a_private_graph_cycle() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Movie properties graph cycle")
+            .build()
+            .unwrap();
+        let created = editor
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+        make_movie_graph_reach_slide(&mut editor, created.drawable_object_id);
+
+        assert!(
+            editor
+                .slide_movie_properties(0, created.drawable_object_id)
+                .is_err()
+        );
     }
 
     #[test]

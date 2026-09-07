@@ -146,12 +146,10 @@ fn remove_body_chart_caption(editor: &mut PagesEditor, drawable_object_id: u64) 
 }
 
 fn body_chart_caption_theme(editor: &PagesEditor) -> Result<(CaptionThemeStyle, Option<String>)> {
-    let root = root_document(editor.package())?;
+    let root = pages_document_root_facts(editor.package())?;
     let theme_id = root
         .theme
-        .as_ref()
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
-        .identifier;
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
     let archive_name = find_object_archive(editor.package(), theme_id)?;
     let archive = editor.package().archive(&archive_name)?;
     let object = archive
@@ -191,7 +189,7 @@ fn body_chart_caption_theme(editor: &PagesEditor) -> Result<(CaptionThemeStyle, 
             stylesheet_id,
             paragraph_style_id,
         },
-        root.super_.document_language,
+        root.document_language.clone(),
     ))
 }
 

@@ -736,8 +736,8 @@ fn normalize_private_chart_styles_like_pages(
         .unwrap();
     let style_ids = source_group.style_ids.clone();
     let mut package = editor.package().clone();
-    let root = root_document(&package).unwrap();
-    let theme_id = root.theme.unwrap().identifier;
+    let root = pages_document_root_facts(&package).unwrap();
+    let theme_id = root.theme.unwrap();
     let theme = chart_theme_context(&package, theme_id).unwrap();
     let stylesheet_archive_name = find_object_archive(&package, theme.stylesheet_id).unwrap();
     let stylesheet_component_id =

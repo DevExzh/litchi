@@ -1,14 +1,13 @@
 //! Table-data storage, rich-text, dependency, and tile wire updates.
 
+use super::table_info_projection;
 use super::table_model_projection::ProbeBudget;
 use super::{model, *};
-use litchi_iwa_common::wire::parse_wire_view;
-use litchi_iwa_protos::{
-    numbers_table_cell_storage_codec as table_cell_storage_codec, table_info_codec,
-};
+use litchi_iwa_protos::numbers_table_cell_storage_codec as table_cell_storage_codec;
 
 const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
 const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
+const TABLE_INFO_STORAGE_RECURSION_LIMIT: u32 = 2;
 const TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const TABLE_CELL_STORAGE_MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
 const TABLE_CELL_STORAGE_MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_REWRITE_WORK;
@@ -16,58 +15,20 @@ const TABLE_CELL_STORAGE_MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
 const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
 
 pub(super) fn table_info_model_identifier(message: &RawMessage, drawable_id: u64) -> Result<u64> {
-    let mut compatibility = Vec::new();
-    let source = if message.type_ == 6_003 {
-        // Historical type-6003 fixtures can omit the required DrawableArchive
-        // envelope. Preserve only that exact compatibility: if field 1 is
-        // present at all, the strict codec must validate it in place.
-        let view = parse_wire_view(message.data.as_slice()).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Numbers drawable object {drawable_id} contains malformed table-info payload: {error}"
-            ))
-        })?;
-        if view.fields().any(|field| field.number() == 1) {
-            message.data.as_slice()
-        } else {
-            let capacity = message.data.len().checked_add(2).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers drawable object {drawable_id} table-info size overflowed"
-                ))
-            })?;
-            compatibility
-                .try_reserve_exact(capacity)
-                .map_err(|_error| {
-                    Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                        resource: "Numbers legacy table-info compatibility source",
-                        amount: capacity,
-                    })
-                })?;
-            compatibility.extend_from_slice(&[0x0a, 0x00]);
-            compatibility.extend_from_slice(message.data.as_slice());
-            compatibility.as_slice()
-        }
-    } else {
-        message.data.as_slice()
-    };
-    let work = source.len().checked_mul(4).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Numbers drawable object {drawable_id} table-info work size overflowed"
-        ))
-    })?;
-    table_info_codec::decode_table_model_reference(
-        source,
-        table_info_codec::DecodeOptions::new(
-            source.len().max(1),
-            litchi_iwa_common::WireLimits::MAX_FIELDS,
-            work.max(1),
-            2,
-        ),
+    table_info_projection::model_reference_for_type_with_recursion_limit(
+        message.type_,
+        message.data.as_slice(),
+        TABLE_INFO_STORAGE_RECURSION_LIMIT,
     )
-    .map(|reference| reference.identifier().get())
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
+    .map(|reference| reference.get())
+    .map_err(|error| match error {
+        // Resource and allocation failures are part of the host's typed
+        // safety contract; preserve them instead of flattening them into a
+        // generic malformed-payload diagnostic.
+        Error::IwaCommon(error) => Error::IwaCommon(error),
+        error => Error::InvalidFormat(format!(
             "Numbers drawable object {drawable_id} contains malformed table-info payload: {error}"
-        ))
+        )),
     })
 }
 
@@ -4153,6 +4114,48 @@ pub(super) fn row_offset_capacity(tile: &Tile, table_columns: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn table_info_model_identifier_keeps_canonical_and_legacy_aliases() {
+        let canonical = RawMessage {
+            type_: 6_000,
+            data: vec![0x0a, 0x00, 0x12, 0x02, 0x08, 0x2a],
+        };
+        let legacy = RawMessage {
+            type_: 6_003,
+            data: vec![0x12, 0x02, 0x08, 0x29],
+        };
+
+        assert_eq!(table_info_model_identifier(&canonical, 7).unwrap(), 42);
+        assert_eq!(table_info_model_identifier(&legacy, 8).unwrap(), 41);
+    }
+
+    #[test]
+    fn table_info_model_identifier_rejects_sparse_canonical_payload() {
+        let message = RawMessage {
+            type_: 6_000,
+            data: vec![0x12, 0x02, 0x08, 0x29],
+        };
+
+        let error = table_info_model_identifier(&message, 17)
+            .expect_err("canonical table-info must retain its super envelope");
+        assert!(error.to_string().contains("drawable object 17"));
+        assert!(error.to_string().contains("malformed table-info payload"));
+    }
+
+    #[test]
+    fn table_info_model_identifier_rejects_malformed_legacy_envelope_without_mutation() {
+        let message = RawMessage {
+            type_: 6_003,
+            data: vec![0x0a, 0x01, 0x08],
+        };
+        let source = message.data.clone();
+
+        let error = table_info_model_identifier(&message, 19)
+            .expect_err("a present legacy super envelope must be strictly decoded");
+        assert!(error.to_string().contains("drawable object 19"));
+        assert_eq!(message.data, source);
+    }
 
     #[test]
     fn storage_visitor_stages_requested_strings_after_strict_decode() {

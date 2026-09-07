@@ -14488,6 +14488,77 @@ IWA_PAGES_DRAWABLE_ORDER_READ_TYPE_ALIAS = re.compile(
     r"\b(?:tp[ \t\r\n]*::[ \t\r\n]*)?DrawablesZOrderArchive"
     r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
+# Object-index extraction needs only the parent and child edges of native TSD
+# containers/groups. Keep this migration deliberately narrower than the
+# complete object-index extractor: shape/image/movie/etc. arms still own their
+# compatibility generated decodes until their own projections land.
+IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE = Path(
+    "crates/litchi-iwa/src/object_index/reference_extraction.rs"
+)
+IWA_DRAWABLE_CONTAINER_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/drawable_container_codec.rs"
+)
+IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/buffa-projections/TSDDrawableContainerArchive.proto"
+)
+IWA_DRAWABLE_CONTAINER_BUILD_SOURCE = Path("crates/litchi-iwa-protos/build.rs")
+IWA_DRAWABLE_CONTAINER_CODEC_MODULE = "drawable_container_codec"
+IWA_DRAWABLE_CONTAINER_GENERATED_MODULE = "buffa_drawable_container_generated"
+IWA_DRAWABLE_CONTAINER_GENERATED_INCLUDE = (
+    "/buffa-drawable-container/iwa_drawable_container_buffa_protos.rs"
+)
+IWA_DRAWABLE_CONTAINER_CODEC_ROUTE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"drawable_container_codec\b"
+)
+IWA_DRAWABLE_CONTAINER_CONTAINER_DECODE = re.compile(
+    r"\b(?:drawable_container_codec[ \t\r\n]*::[ \t\r\n]*)?"
+    r"decode_container(?:_[A-Za-z0-9_]+)*[ \t\r\n]*\("
+)
+IWA_DRAWABLE_CONTAINER_GROUP_DECODE = re.compile(
+    r"\b(?:drawable_container_codec[ \t\r\n]*::[ \t\r\n]*)?"
+    r"decode_group(?:_[A-Za-z0-9_]+)*[ \t\r\n]*\("
+)
+IWA_DRAWABLE_CONTAINER_FORBIDDEN_GENERATED_DECODE = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:ContainerArchive|GroupArchive)[ \t\r\n]*::[ \t\r\n]*decode[ \t\r\n]*\(|"
+    r"\b(?:decode_type|decode_message)[ \t\r\n]*(?:::<[^;{}]+>)?[ \t\r\n]*\(\s*"
+)
+IWA_DRAWABLE_CONTAINER_PROST_DECODE = re.compile(
+    r"\b(?:prost[ \t\r\n]*::[ \t\r\n]*)?Message[ \t\r\n]*::[ \t\r\n]*decode[ \t\r\n]*\("
+)
+IWA_DRAWABLE_CONTAINER_CODEC_FORBIDDEN_OPERATIONS = (
+    "to_owned_message",
+    "encode_to_vec",
+    "try_encode",
+    ".encode(",
+)
+IWA_DRAWABLE_CONTAINER_CODEC_REQUIRED_MARKERS = (
+    "const CONTAINER_PARENT_FIELD: u32 = 2;",
+    "const CONTAINER_CHILDREN_FIELD: u32 = 3;",
+    "const GROUP_SUPER_FIELD: u32 = 1;",
+    "const GROUP_CHILDREN_FIELD: u32 = 2;",
+    "pub struct ReferenceSnapshot",
+    "pub fn decode_container_references(",
+    "pub fn decode_group_references(",
+    "fn preflight_reference(",
+    "decode_lazy_view",
+    "crate::buffa_drawable_container_generated::",
+    IWA_DRAWABLE_CONTAINER_GENERATED_MODULE,
+)
+IWA_DRAWABLE_CONTAINER_PROJECTION_FIELDS = {
+    "ContainerArchive": {
+        "parent": ("Reference", 2),
+        "children": ("Reference", 3),
+    },
+    "GroupArchive": {
+        "super": ("DrawableArchive", 1),
+        "children": ("Reference", 2),
+    },
+}
 PAGES_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
@@ -47991,6 +48062,301 @@ def audit_iwa_pages_drawable_order_read_source_topology(
     return sorted(set(violations))
 
 
+def _rust_numeric_match_arm_body(
+    source: str, message_type: int
+) -> tuple[str, int] | None:
+    """Return one numeric Rust match arm body and its source offset."""
+
+    code = _mask_rust_non_code(source)
+    arm = re.search(
+        rf"(?m)^[ \t]*{message_type}[ \t]*=>[ \t]*\{{",
+        code,
+    )
+    if arm is None:
+        return None
+    opening = code.find("{", arm.start(), arm.end())
+    if opening < 0:
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == "{":
+            depth += 1
+        elif code[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return None
+    return code[opening + 1 : cursor - 1], opening + 1
+
+
+def audit_iwa_drawable_container_reference_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep only TSD 3003/3008 reference extraction on the lazy codec seam.
+
+    The object-index extractor intentionally retains generated compatibility
+    decodes for unrelated native message types. Scan only the two focused
+    numeric match arms so this ratchet cannot accidentally widen that migration
+    boundary.
+    """
+
+    path = root / IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE
+    if not path.is_file():
+        return []
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    source_code = _mask_rust_non_code(masked_source)
+    codec_present = any(
+        (root / relative).is_file()
+        for relative in (
+            IWA_DRAWABLE_CONTAINER_CODEC_SOURCE,
+            IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE,
+        )
+    )
+    route_present = IWA_DRAWABLE_CONTAINER_CODEC_ROUTE.search(source_code) is not None
+    # Before the focused migration lands, the legacy extractor has no new
+    # ownership signal. Keep the baseline green, then fail closed as soon as a
+    # codec/projection or consumer route appears.
+    if not codec_present and not route_present:
+        return []
+
+    violations: list[str] = []
+    for message_type, label, decode_pattern in (
+        (
+            3003,
+            "ContainerArchive",
+            IWA_DRAWABLE_CONTAINER_CONTAINER_DECODE,
+        ),
+        (
+            3008,
+            "GroupArchive",
+            IWA_DRAWABLE_CONTAINER_GROUP_DECODE,
+        ),
+    ):
+        arm = _rust_numeric_match_arm_body(masked_source, message_type)
+        if arm is None:
+            violations.append(
+                "litchi-iwa object-index extractor is missing focused TSD "
+                f"{label} match arm: {IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE}"
+            )
+            continue
+        body, body_offset = arm
+        production_body = _mask_rust_non_code(body)
+        if decode_pattern.search(production_body) is None:
+            line = masked_source.count("\n", 0, body_offset) + 1
+            violations.append(
+                "litchi-iwa object-index extractor must route TSD "
+                f"{label} through {IWA_DRAWABLE_CONTAINER_CODEC_MODULE}: "
+                f"{IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE}:{line}"
+            )
+        for pattern, description in (
+            (
+                IWA_DRAWABLE_CONTAINER_FORBIDDEN_GENERATED_DECODE,
+                f"generated {label} decode",
+            ),
+            (
+                IWA_DRAWABLE_CONTAINER_PROST_DECODE,
+                "generic generated Message decode",
+            ),
+        ):
+            match = pattern.search(production_body)
+            if match is not None:
+                line = masked_source.count(
+                    "\n", 0, body_offset + match.start()
+                ) + 1
+                violations.append(
+                    "litchi-iwa object-index extractor retains "
+                    f"{description}: {IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE}:{line}"
+                )
+
+    return sorted(set(violations))
+
+
+def _audit_iwa_drawable_container_projection(
+    root: Path,
+) -> list[str]:
+    """Check the checked-in TSD container/group projection field ownership."""
+
+    projection_path = root / IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE
+    if not projection_path.is_file():
+        return [
+            "focused TSD drawable-container codec is missing private Buffa "
+            f"projection: {IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE}"
+        ]
+    raw = projection_path.read_text(encoding="utf-8")
+    projection = re.sub(r"//[^\n]*|/\*.*?\*/", "", raw, flags=re.DOTALL)
+    violations: list[str] = []
+    for marker in ('syntax = "proto2"', "package LitchiIwaProjection"):
+        if marker not in projection:
+            violations.append(
+                "focused TSD drawable-container projection is missing marker "
+                f"{marker}: {IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE}"
+            )
+    for message, fields in IWA_DRAWABLE_CONTAINER_PROJECTION_FIELDS.items():
+        message_match = re.search(
+            rf"(?s)\bmessage\s+{re.escape(message)}\s*\{{(?P<body>.*?)\}}",
+            projection,
+        )
+        if message_match is None:
+            violations.append(
+                "focused TSD drawable-container projection is missing message "
+                f"{message}: {IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE}"
+            )
+            continue
+        body = message_match.group("body")
+        for field, (field_type, number) in fields.items():
+            if re.search(
+                rf"\b(?:optional|repeated|required)\s+"
+                rf"\.?(?:[A-Za-z_][A-Za-z0-9_.]*\.)?"
+                rf"{re.escape(field_type)}\s+{re.escape(field)}\s*=\s*{number}\b",
+                body,
+            ) is None:
+                violations.append(
+                    "focused TSD drawable-container projection has incorrect or "
+                    f"missing field {message}.{field}={number}: "
+                    f"{IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE}"
+                )
+    return violations
+
+
+def audit_iwa_drawable_container_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the TSD container/group codec and Buffa build ownership private."""
+
+    reference_path = root / IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE
+    codec_path = root / IWA_DRAWABLE_CONTAINER_CODEC_SOURCE
+    projection_path = root / IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE
+    build_path = root / IWA_DRAWABLE_CONTAINER_BUILD_SOURCE
+    public_path = root / IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE
+    reference = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(reference_path.read_text(encoding="utf-8"))
+        )
+        if reference_path.is_file()
+        else ""
+    )
+    if not any(
+        (
+            codec_path.is_file(),
+            projection_path.is_file(),
+            IWA_DRAWABLE_CONTAINER_CODEC_ROUTE.search(reference) is not None,
+        )
+    ):
+        return []
+
+    violations: list[str] = []
+    if not codec_path.is_file():
+        violations.append(
+            "focused TSD drawable-container codec source is missing: "
+            f"{IWA_DRAWABLE_CONTAINER_CODEC_SOURCE}"
+        )
+    else:
+        raw_codec = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        codec = _mask_rust_non_code(raw_codec)
+        for marker in IWA_DRAWABLE_CONTAINER_CODEC_REQUIRED_MARKERS:
+            if marker not in codec:
+                violations.append(
+                    "focused TSD drawable-container codec is missing marker "
+                    f"{marker}: {IWA_DRAWABLE_CONTAINER_CODEC_SOURCE}"
+                )
+        for operation in IWA_DRAWABLE_CONTAINER_CODEC_FORBIDDEN_OPERATIONS:
+            if operation in codec:
+                violations.append(
+                    "focused TSD drawable-container codec retains eager/encoding "
+                    f"operation {operation}: {IWA_DRAWABLE_CONTAINER_CODEC_SOURCE}"
+                )
+        for pattern, description in (
+            (
+                IWA_DRAWABLE_CONTAINER_FORBIDDEN_GENERATED_DECODE,
+                "generated archive decode",
+            ),
+            (IWA_DRAWABLE_CONTAINER_PROST_DECODE, "generic generated Message decode"),
+        ):
+            match = pattern.search(codec)
+            if match is not None:
+                line = codec.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused TSD drawable-container codec retains "
+                    f"{description}: {IWA_DRAWABLE_CONTAINER_CODEC_SOURCE}:{line}"
+                )
+
+    violations.extend(_audit_iwa_drawable_container_projection(root))
+
+    if not build_path.is_file():
+        violations.append(
+            "focused TSD drawable-container Buffa build source is missing: "
+            f"{IWA_DRAWABLE_CONTAINER_BUILD_SOURCE}"
+        )
+    else:
+        build = build_path.read_text(encoding="utf-8")
+        route = re.search(
+            r"(?s)\blet\s+buffa_drawable_container_out_directory\b.*?"
+            r"\benforce_drawable_container_projection_budget\s*\(\s*"
+            r"&\s*buffa_drawable_container_out_directory\s*,?\s*\)",
+            build,
+        )
+        if route is None:
+            violations.append(
+                "focused TSD drawable-container Buffa build is missing its "
+                f"dedicated route: {IWA_DRAWABLE_CONTAINER_BUILD_SOURCE}"
+            )
+            build_focus = ""
+        else:
+            build_focus = route.group(0)
+        for marker in (
+            "TSDDrawableContainerArchive.proto",
+            "buffa-drawable-container",
+            "iwa_drawable_container_buffa_protos.rs",
+            ".includes(&[buffa_projection_directory])",
+            ".generate_views(true)",
+            ".lazy_views(true)",
+            ".preserve_unknown_fields(false)",
+            ".compile()",
+            "enforce_drawable_container_projection_budget",
+        ):
+            if marker not in build_focus:
+                violations.append(
+                    "focused TSD drawable-container Buffa build is missing marker "
+                    f"{marker}: {IWA_DRAWABLE_CONTAINER_BUILD_SOURCE}"
+                )
+        for marker in (
+            "fn enforce_drawable_container_projection_provenance(",
+            "enforce_drawable_container_projection_provenance(proto_directory, "
+            "buffa_projection_directory)?",
+        ):
+            if marker not in build:
+                violations.append(
+                    "focused TSD drawable-container build is missing provenance "
+                    f"marker {marker}: {IWA_DRAWABLE_CONTAINER_BUILD_SOURCE}"
+                )
+
+    if not public_path.is_file():
+        violations.append(
+            "focused TSD drawable-container generated module owner is missing: "
+            f"{IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE}"
+        )
+    else:
+        public = public_path.read_text(encoding="utf-8")
+        if re.search(
+            rf"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\].{{0,260}}?"
+            rf"^\s*mod\s+{re.escape(IWA_DRAWABLE_CONTAINER_GENERATED_MODULE)}\b",
+            public,
+        ) is None:
+            violations.append(
+                "focused TSD drawable-container generated Buffa projection must "
+                f"remain private: {IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE}"
+            )
+        if IWA_DRAWABLE_CONTAINER_GENERATED_INCLUDE not in public:
+            violations.append(
+                "focused TSD drawable-container generated projection include is "
+                f"missing: {IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_pages_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -64887,6 +65253,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_section_template_discovery_source_topology()
         + audit_iwa_pages_root_facts_graph_source_topology()
         + audit_iwa_pages_drawable_order_read_source_topology()
+        + audit_iwa_drawable_container_reference_source_topology()
+        + audit_iwa_drawable_container_codec_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

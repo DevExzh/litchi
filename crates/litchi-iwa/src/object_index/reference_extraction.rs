@@ -6,7 +6,7 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encoded_len};
 use litchi_iwa_index::{IndexBuilder, ObjectId};
 use litchi_iwa_protos::{
-    comment_storage_codec, drawable_parent_codec, keynote_show_codec,
+    comment_storage_codec, drawable_container_codec, drawable_parent_codec, keynote_show_codec,
     numbers_table_cell_storage_codec,
 };
 
@@ -994,17 +994,16 @@ pub(super) fn extract(
                 }
             },
             3003 => {
-                // TSD.ContainerArchive - container for grouped objects
-                if let Ok(container) =
-                    crate::protobuf::tsd::ContainerArchive::decode(&*raw_msg.data)
-                {
-                    // Extract parent reference
-                    if let Some(ref parent) = container.parent {
-                        extract_reference(source_id, builder, parent)?;
-                    }
-                    // Extract all child references
-                    for child in &container.children {
-                        extract_reference(source_id, builder, child)?;
+                if let Ok(container) = drawable_container_codec::decode_container_references(
+                    &raw_msg.data,
+                    drawable_container_codec::DecodeOptions::for_source(&raw_msg.data),
+                ) {
+                    // The complete candidate is checked before its scalar
+                    // edges are published; geometry remains borrowed/opaque.
+                    for reference in container.references() {
+                        if let Some(target_id) = ObjectId::new(reference.get()) {
+                            add_reference_if_absent(builder, source_id, target_id)?;
+                        }
                     }
                 }
             },
@@ -1064,15 +1063,14 @@ pub(super) fn extract(
                 }
             },
             3008 => {
-                // TSD.GroupArchive - grouped shapes/objects
-                if let Ok(group) = crate::protobuf::tsd::GroupArchive::decode(&*raw_msg.data) {
-                    // Extract parent from super DrawableArchive (required field)
-                    if let Some(ref parent) = group.super_.parent {
-                        extract_reference(source_id, builder, parent)?;
-                    }
-                    // Extract all child references (objects in the group)
-                    for child in &group.children {
-                        extract_reference(source_id, builder, child)?;
+                if let Ok(group) = drawable_container_codec::decode_group_references(
+                    &raw_msg.data,
+                    drawable_container_codec::DecodeOptions::for_source(&raw_msg.data),
+                ) {
+                    for reference in group.references() {
+                        if let Some(target_id) = ObjectId::new(reference.get()) {
+                            add_reference_if_absent(builder, source_id, target_id)?;
+                        }
                     }
                 }
             },
@@ -1461,6 +1459,86 @@ mod tests {
 
         let index = index_for_payload(3_002, duplicate_parent);
         assert!(outgoing(&index).is_empty());
+    }
+
+    #[test]
+    fn container_and_group_reference_projection_preserves_selected_edges() {
+        let container = tsd::ContainerArchive {
+            parent: Some(reference(20)),
+            children: vec![reference(21), reference(0), reference(21), reference(22)],
+            ..Default::default()
+        };
+        let group = tsd::GroupArchive {
+            super_: tsd::DrawableArchive {
+                parent: Some(reference(20)),
+                comment: Some(reference(90)),
+                ..Default::default()
+            },
+            children: container.children.clone(),
+            fake_shape_for_empty_group: Some(reference(91)),
+        };
+        for (message_type, mut data) in [
+            (3_003, container.encode_to_vec()),
+            (3_008, group.encode_to_vec()),
+        ] {
+            data.extend_from_slice(&[0x98, 0x06, 0x81, 0x01]);
+            assert_eq!(
+                outgoing(&index_for_payload(message_type, data)),
+                [20, 21, 22]
+                    .into_iter()
+                    .map(|id| ObjectId::new(id).unwrap())
+                    .collect::<Vec<_>>(),
+                "parent/children only; nulls and duplicate edges keep compatibility semantics"
+            );
+        }
+        let parentless_group = tsd::GroupArchive {
+            super_: tsd::DrawableArchive::default(),
+            children: vec![reference(21)],
+            ..Default::default()
+        };
+        assert_eq!(
+            outgoing(&index_for_payload(3_008, parentless_group.encode_to_vec())),
+            vec![ObjectId::new(21).unwrap()],
+            "a group requires its drawable envelope, but the parent is optional"
+        );
+    }
+
+    #[test]
+    fn malformed_container_and_group_publish_no_candidate_edges() {
+        // A valid parent and child precede the malformed final child. The
+        // candidate must be validated completely before either is published.
+        for (message_type, valid) in [
+            (
+                3_003,
+                tsd::ContainerArchive {
+                    parent: Some(reference(20)),
+                    children: vec![reference(21)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            ),
+            (
+                3_008,
+                tsd::GroupArchive {
+                    super_: tsd::DrawableArchive {
+                        parent: Some(reference(20)),
+                        ..Default::default()
+                    },
+                    children: vec![reference(21)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            ),
+        ] {
+            let child_key = if message_type == 3_003 { 0x1a } else { 0x12 };
+            let mut truncated = valid.clone();
+            truncated.extend_from_slice(&[child_key, 2, 0x08]);
+            assert!(outgoing(&index_for_payload(message_type, truncated)).is_empty());
+
+            let mut missing_identifier = valid;
+            missing_identifier.extend_from_slice(&[child_key, 0]);
+            assert!(outgoing(&index_for_payload(message_type, missing_identifier)).is_empty());
+        }
     }
 
     #[test]

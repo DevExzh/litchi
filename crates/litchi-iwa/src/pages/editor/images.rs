@@ -67,11 +67,11 @@ impl PagesEditor {
         options: PagesImageOptions,
     ) -> Result<PagesImageInfo> {
         let geometry = image_creation_values(options)?;
-        let root = root_document(self.package())?;
+        let root = pages_document_root_facts(self.package())?;
         let style_id = image_style_id(self.package(), &root)?;
         let first_identifier = next_object_identifier(self.package())?;
-        let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
-            (false, z_order.identifier)
+        let (creates_z_order, z_order_id) = if let Some(z_order) = root.drawables_zorder {
+            (false, z_order)
         } else {
             (true, first_identifier)
         };
@@ -606,7 +606,7 @@ fn set_body_image_caption(
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
-        let root = root_document(editor.package())?;
+        let root = pages_document_root_facts(editor.package())?;
         let (theme, language) = image_caption_theme(editor.package(), &root)?;
         let image_width = source
             .info

@@ -39,7 +39,28 @@ pub(super) fn model_reference_for_type(message_type: u32, source: &[u8]) -> Resu
     if message_type != LEGACY_TABLE_INFO_MESSAGE_TYPE {
         return model_reference(source);
     }
-    decode_model_reference(source, decode_options(source), true)
+    model_reference_for_type_with_recursion_limit(
+        message_type,
+        source,
+        TABLE_INFO_PROJECTION_RECURSION_LIMIT,
+    )
+}
+
+/// Project one typed table-info alias with a caller-owned nesting ceiling.
+///
+/// The storage discovery path historically used a two-level codec profile;
+/// retaining that profile keeps its admission behavior stable while the
+/// attached-object compatibility path uses the common projection ceiling.
+pub(super) fn model_reference_for_type_with_recursion_limit(
+    message_type: u32,
+    source: &[u8],
+    recursion_limit: u32,
+) -> Result<NonZeroU64> {
+    let options = decode_options(source).with_recursion_limit(recursion_limit);
+    if message_type != LEGACY_TABLE_INFO_MESSAGE_TYPE {
+        return decode_model_reference(source, options, false);
+    }
+    decode_model_reference(source, options, true)
 }
 
 fn decode_model_reference(

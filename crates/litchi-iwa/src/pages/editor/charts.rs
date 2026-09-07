@@ -128,12 +128,10 @@ impl PagesEditor {
     ) -> Result<PagesBodyChartInfo> {
         require_creatable_kind(kind)?;
         let geometry = chart_geometry("Pages", position, size)?;
-        let root = root_document(self.package())?;
+        let root = pages_document_root_facts(self.package())?;
         let theme_id = root
             .theme
-            .as_ref()
-            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
-            .identifier;
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?;
         let theme = chart_theme_context(self.package(), theme_id)?;
         let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
         let component_id = component_identifier_for_entry(self.package(), &archive_name)?
@@ -153,8 +151,8 @@ impl PagesEditor {
             )?;
 
         let first_identifier = next_object_identifier(self.package())?;
-        let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
-            (false, z_order.identifier)
+        let (creates_z_order, z_order_id) = if let Some(z_order) = root.drawables_zorder {
+            (false, z_order)
         } else {
             (true, first_identifier)
         };
@@ -352,7 +350,7 @@ impl PagesEditor {
             Error::ParseError("Pages body chart geometry requires a position".into())
         })?;
         let source = body_chart_graph(self, drawable_object_id)?;
-        let left_margin = root_document(self.package())?
+        let left_margin = pages_document_root_facts(self.package())?
             .left_margin
             .unwrap_or_default();
         let mut staged = self.package().clone();
@@ -437,11 +435,10 @@ impl PagesEditor {
                 })?;
             }
         }
-        let root = root_document(&staged)?;
+        let root = pages_document_root_facts(&staged)?;
         let theme_id = root
             .theme
-            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
-            .identifier;
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?;
         let theme = chart_theme_context(&staged, theme_id)?;
         for group in &source.archive_groups {
             let new_style_ids = remapped_identifiers(&remap, &group.style_ids, "style")?;
@@ -491,7 +488,9 @@ impl PagesEditor {
                 Ok(())
             },
         )?;
-        let left_margin = root_document(&staged)?.left_margin.unwrap_or_default();
+        let left_margin = pages_document_root_facts(&staged)?
+            .left_margin
+            .unwrap_or_default();
         set_chart_attachment_position(
             &mut staged,
             &source.archive_name,
@@ -601,11 +600,10 @@ impl PagesEditor {
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
-        let root = root_document(&staged)?;
+        let root = pages_document_root_facts(&staged)?;
         let theme_id = root
             .theme
-            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
-            .identifier;
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?;
         let theme = chart_theme_context(&staged, theme_id)?;
         for group in &source.archive_groups {
             if !group.style_ids.is_empty() {

@@ -180,7 +180,7 @@ impl PagesEditor {
         expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
     ) -> Result<PagesBodyShapeInfo> {
-        let root = root_document(self.package())?;
+        let root = pages_document_root_facts(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
             self.body_storage_id.get(),
@@ -190,8 +190,8 @@ impl PagesEditor {
         let style_id = shape_style_id(self.package(), &root)?;
         let storage = body_text_storage(text, &body);
         let first_identifier = next_object_identifier(self.package())?;
-        let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
-            (false, z_order.identifier)
+        let (creates_z_order, z_order_id) = if let Some(z_order) = root.drawables_zorder {
+            (false, z_order)
         } else {
             (true, first_identifier)
         };
@@ -1030,7 +1030,7 @@ mod tests {
         );
 
         let mut package = editor.into_package();
-        let root = root_document(&package).unwrap();
+        let root = pages_document_root_facts(&package).unwrap();
         let style_id = shape_style_id(&package, &root).unwrap();
         let style_archive = find_object_archive(&package, style_id).unwrap();
         let style_component = component_identifier_for_entry(&package, &style_archive)
