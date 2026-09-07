@@ -1,0 +1,75 @@
+{
+  "schema": "litchi-0463-capture-v1",
+  "change": 463,
+  "variant": "baseline",
+  "lane": {
+    "id": "R2-allocator-large-lifecycle",
+    "repeat": "R2",
+    "instrumentation": "allocator",
+    "shape": "large",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0463/runs/baseline/R2-allocator-large-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0463/baseline/litchi-perf-baseline-alloc",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R2",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0463/runs/baseline/R2-allocator-large-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "1e38582b4b3599fc0737301172100a4a2bd4918913ad70c1074ff69d5150426d",
+  "binary_binding_sha256": "8f29df892bd241e291a339af6314ac2664eed2dd06f50555cd39ac98ac64fac8",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T17:46:45.561755+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T17:46:51.495521+00:00",
+  "artifacts": [
+    {
+      "path": "runs/baseline/R2-allocator-large-lifecycle/report.json",
+      "bytes": 51346,
+      "sha256": "8c06b6a3b2d321050331a3c0d9ab1c0ba94337f541a14d4891fc7f8ea8ed566b"
+    },
+    {
+      "path": "runs/baseline/R2-allocator-large-lifecycle/resource.log",
+      "bytes": 1004,
+      "sha256": "effcb9aa0fd21d6820f7aa8cce35e125c4e88a8febc5538fd7dc8d46867c19d5"
+    },
+    {
+      "path": "runs/baseline/R2-allocator-large-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/baseline/R2-allocator-large-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

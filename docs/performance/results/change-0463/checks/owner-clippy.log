@@ -1,0 +1,337 @@
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:280:20
+    |
+280 |     source_slides: std::sync::Arc<[Slide]>,
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+280 -     source_slides: std::sync::Arc<[Slide]>,
+280 +     source_slides: Arc<[Slide]>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:325:28
+    |
+325 |         validated_slides: &std::sync::Arc<[Slide]>,
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+325 -         validated_slides: &std::sync::Arc<[Slide]>,
+325 +         validated_slides: &Arc<[Slide]>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:350:17
+    |
+350 |                 std::sync::Arc::clone(validated_slides)
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+350 -                 std::sync::Arc::clone(validated_slides)
+350 +                 Arc::clone(validated_slides)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:352:39
+    |
+352 |             _ if slides.is_empty() => std::sync::Arc::clone(validated_slides),
+    |                                       ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+352 -             _ if slides.is_empty() => std::sync::Arc::clone(validated_slides),
+352 +             _ if slides.is_empty() => Arc::clone(validated_slides),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:434:21
+    |
+434 |                     xml_minifier::audit::verify_authored(
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+434 -                     xml_minifier::audit::verify_authored(
+434 +                     audit::verify_authored(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-odp/src/authoring/mutable.rs:436:25
+    |
+436 |                         xml_minifier::audit::Limits::default(),
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+436 -                         xml_minifier::audit::Limits::default(),
+436 +                         audit::Limits::default(),
+    |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2362:28
+     |
+2362 |                     scope: std::sync::Arc::from("ODP media reference XML parts"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2362 -                     scope: std::sync::Arc::from("ODP media reference XML parts"),
+2362 +                     scope: Arc::from("ODP media reference XML parts"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2386:32
+     |
+2386 |                         scope: std::sync::Arc::from("ODP media reference XML part"),
+     |                                ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2386 -                         scope: std::sync::Arc::from("ODP media reference XML part"),
+2386 +                         scope: Arc::from("ODP media reference XML part"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2401:32
+     |
+2401 |                         scope: std::sync::Arc::from("ODP media reference XML parts"),
+     |                                ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2401 -                         scope: std::sync::Arc::from("ODP media reference XML parts"),
+2401 +                         scope: Arc::from("ODP media reference XML parts"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2449:28
+     |
+2449 |                     scope: std::sync::Arc::from("ODP media reference XML"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2449 -                     scope: std::sync::Arc::from("ODP media reference XML"),
+2449 +                     scope: Arc::from("ODP media reference XML"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2459:28
+     |
+2459 |                     scope: std::sync::Arc::from("ODP media reference XML"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2459 -                     scope: std::sync::Arc::from("ODP media reference XML"),
+2459 +                     scope: Arc::from("ODP media reference XML"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2484:36
+     |
+2484 | ...                   scope: std::sync::Arc::from("ODP media reference XML"),
+     |                              ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2484 -                             scope: std::sync::Arc::from("ODP media reference XML"),
+2484 +                             scope: Arc::from("ODP media reference XML"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2557:28
+     |
+2557 |                     scope: std::sync::Arc::from("ODP media reference XML attribute"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2557 -                     scope: std::sync::Arc::from("ODP media reference XML attribute"),
+2557 +                     scope: Arc::from("ODP media reference XML attribute"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2591:28
+     |
+2591 |                     scope: std::sync::Arc::from("ODP media reference index"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2591 -                     scope: std::sync::Arc::from("ODP media reference index"),
+2591 +                     scope: Arc::from("ODP media reference index"),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/authoring/mutable.rs:2608:28
+     |
+2608 |                     scope: std::sync::Arc::from("ODP media reference paths"),
+     |                            ^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+2608 -                     scope: std::sync::Arc::from("ODP media reference paths"),
+2608 +                     scope: Arc::from("ODP media reference paths"),
+     |
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3119:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3112 | /             audit::Limits::new(
+3113 | |                 31 * 1024 * 1024,
+3114 | |                 256,
+3115 | |                 1_000_000,
+...    |
+3118 | |                 16 * 1024 * 1024,
+3119 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3127:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3120 | /             audit::Limits::new(
+3121 | |                 32 * 1024 * 1024,
+3122 | |                 255,
+3123 | |                 1_000_000,
+...    |
+3126 | |                 16 * 1024 * 1024,
+3127 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3135:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3128 | /             audit::Limits::new(
+3129 | |                 32 * 1024 * 1024,
+3130 | |                 256,
+3131 | |                 999_999,
+...    |
+3134 | |                 16 * 1024 * 1024,
+3135 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3143:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3136 | /             audit::Limits::new(
+3137 | |                 32 * 1024 * 1024,
+3138 | |                 256,
+3139 | |                 1_000_000,
+...    |
+3142 | |                 16 * 1024 * 1024,
+3143 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3151:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3144 | /             audit::Limits::new(
+3145 | |                 32 * 1024 * 1024,
+3146 | |                 256,
+3147 | |                 1_000_000,
+...    |
+3150 | |                 16 * 1024 * 1024,
+3151 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error[E0277]: `?` couldn't convert the error to `litchi_core::Error`
+    --> crates/litchi-odp/src/authoring/mutable.rs:3159:14
+     |
+3102 |       fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
+     |                                                                  ---------- expected `litchi_core::Error` because of this
+...
+3152 | /             audit::Limits::new(
+3153 | |                 32 * 1024 * 1024,
+3154 | |                 256,
+3155 | |                 1_000_000,
+...    |
+3158 | |                 16 * 1024 * 1024 - 1,
+3159 | |             )?,
+     | |             -^ the trait `std::convert::From<xml_minifier::audit::ConfigError>` is not implemented for `litchi_core::Error`
+     | |_____________|
+     |               this can't be annotated with `?` because it has type `Result<_, xml_minifier::audit::ConfigError>`
+     |
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+     = help: `litchi_core::Error` implements trait `std::convert::From<T>`:
+               std::convert::From<litchi_core::ResourceLimit>
+               std::convert::From<litchi_core::binary::BinaryError>
+               std::convert::From<litchi_odf_common::compact_xml::Error>
+               std::convert::From<litchi_odf_common::core::PackageWriterError>
+               std::convert::From<std::io::Error>
+
+error: could not compile `litchi-odp` (lib) due to 15 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-odp` (lib) due to 15 previous errors
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-odp` (lib test) due to 21 previous errors

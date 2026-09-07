@@ -1,0 +1,979 @@
+--- a/crates/litchi-odp/src/authoring/edit.rs
++++ b/crates/litchi-odp/src/authoring/edit.rs
+@@ -2222,18 +2222,17 @@
+         {
+             return Ok(Commit::unchanged(self.source));
+         }
+-        let (mut bytes, mut package, slide_candidate) = if self.changed {
+-            let package =
+-                OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
++        let (mut bytes, mut package, slide_candidate, mut audit_proof) = if self.changed {
++            let (package, audit_proof) = self.draft.to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
+             let bytes = package.shared_bytes();
+             let candidate = Snapshot::from_owned_package(package.clone())?;
+             if candidate.slides() != self.draft.slides() {
+                 return invalid("ODP transaction readback differs from the staged slide model");
+             }
+-            (bytes, package, Some(candidate))
++            (bytes, package, Some(candidate), audit_proof)
+         } else {
+             let package = self.source.package.clone();
+-            (package.shared_bytes(), package, None)
++            (package.shared_bytes(), package, None, None)
+         };
+         if let Some(design) = &self.design
+             && !design.operations.is_empty()
+@@ -2246,10 +2245,12 @@
+                     }
+                     package = OwnedPackage::from_bytes(output)?;
+                     bytes = package.shared_bytes();
++                    audit_proof = None;
+                 }
+             } else {
+                 package = design.package.clone();
+                 bytes = package.shared_bytes();
++                audit_proof = None;
+             }
+         }
+         if let Some(annotations) = &self.annotations
+@@ -2265,10 +2266,12 @@
+                     }
+                     package = OwnedPackage::from_bytes(output)?;
+                     bytes = package.shared_bytes();
++                    audit_proof = None;
+                 }
+             } else {
+                 package = annotations.package.clone();
+                 bytes = package.shared_bytes();
++                audit_proof = None;
+             }
+         }
+         if let Some(rdf) = &self.rdf
+@@ -2282,10 +2285,12 @@
+                     }
+                     package = OwnedPackage::from_bytes(output)?;
+                     bytes = package.shared_bytes();
++                    audit_proof = None;
+                 }
+             } else {
+                 package = rdf.package.clone();
+                 bytes = package.shared_bytes();
++                audit_proof = None;
+             }
+         }
+         if let Some(charts) = &self.charts
+@@ -2299,10 +2304,12 @@
+                     }
+                     package = OwnedPackage::from_bytes(output)?;
+                     bytes = package.shared_bytes();
++                    audit_proof = None;
+                 }
+             } else {
+                 package = charts.package.clone();
+                 bytes = package.shared_bytes();
++                audit_proof = None;
+             }
+         }
+         if let Some(content) = &self.content
+@@ -2323,10 +2330,12 @@
+                     }
+                     package = OwnedPackage::from_bytes(output)?;
+                     bytes = package.shared_bytes();
++                    audit_proof = None;
+                 }
+             } else {
+                 package = content.package.clone();
+                 bytes = package.shared_bytes();
++                audit_proof = None;
+             }
+         }
+         let reopened = package;
+@@ -2334,7 +2343,31 @@
+         if !content_changed {
+             validate_raw_preserved_referenced_xml_parts(&source_package, &source_package)?;
+         }
+-        validate_compact_xml_parts(&reopened, &source_package)?;
++        let compact_limits = audit::Limits::new(
++            MAX_PACKAGE_BYTES,
++            512,
++            1_000_000,
++            250_000,
++            MAX_TEXT_BYTES,
++            MAX_PACKAGE_BYTES,
++        )
++        .ok();
++        let proof_covers = compact_limits.is_some_and(|limits| {
++            audit_proof.as_ref().is_some_and(|proof| {
++                proof.covers(
++                    &reopened,
++                    &source_package,
++                    limits,
++                    MAX_PACKAGE_BYTES,
++                    MAX_XML_PARTS,
++                )
++            })
++        });
++        #[cfg(test)]
++        let publication_audit_hit = proof_covers;
++        if !proof_covers {
++            validate_compact_xml_parts(&reopened, &source_package)?;
++        }
+         self.draft.verify_embedded_media(&reopened)?;
+         self.draft.verify_removed_media(&reopened)?;
+         if let Some(rdf) = &self.rdf
+@@ -2392,6 +2425,8 @@
+             snapshot,
+             patch,
+             changed: true,
++            #[cfg(test)]
++            publication_audit_hit,
+         })
+     }
+ 
+@@ -2864,6 +2899,8 @@
+     snapshot: Snapshot,
+     patch: Patch,
+     changed: bool,
++    #[cfg(test)]
++    publication_audit_hit: bool,
+ }
+ 
+ impl Commit {
+@@ -2877,6 +2914,8 @@
+             snapshot,
+             patch,
+             changed: false,
++            #[cfg(test)]
++            publication_audit_hit: false,
+         }
+     }
+ 
+@@ -2902,6 +2941,11 @@
+     #[must_use]
+     pub fn into_snapshot(self) -> Snapshot {
+         self.snapshot
++    }
++
++    #[cfg(test)]
++    fn publication_audit_hit(&self) -> bool {
++        self.publication_audit_hit
+     }
+ }
+ 
+@@ -3981,8 +4025,10 @@
+ #[cfg(test)]
+ mod tests {
+     use super::{
+-        MAX_PACKAGE_BYTES, bounded_candidate, projected_size, read_bounded, validate_package_size,
++        MAX_PACKAGE_BYTES, Snapshot, bounded_candidate, projected_size, read_bounded,
++        validate_package_size,
+     };
++    use crate::Builder;
+     use litchi_core::Result;
+ 
+     #[test]
+@@ -4010,4 +4056,38 @@
+         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
+         Ok(())
+     }
+-}
++
++    #[test]
++    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> Result<()> {
++        let mut builder = Builder::new();
++        builder.add_slide_with_title("Original", "Body")?;
++        let source = Snapshot::from_bytes(builder.build()?)?;
++        let mut transaction = source.transaction()?;
++        transaction.add("Added", "Body")?;
++        let commit = transaction.commit()?;
++        assert!(commit.publication_audit_hit());
++        Ok(())
++    }
++
++    #[test]
++    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> Result<()> {
++        let mut builder = Builder::new();
++        builder.add_slide_with_title("Original", "Body")?;
++        let source = Snapshot::from_bytes(builder.build()?)?;
++        let mut transaction = source.transaction()?;
++        transaction.add("Added", "Body")?;
++        let triple = crate::rdf::Triple {
++            subject: crate::rdf::Subject::Iri("urn:litchi:test-subject".to_string()),
++            predicate: "https://example.test/predicate".to_string(),
++            object: crate::rdf::Object::Literal {
++                value: "value".to_string(),
++                datatype: None,
++                language: None,
++            },
++        };
++        transaction.add_rdf_graph(None, &[triple])?;
++        let commit = transaction.commit()?;
++        assert!(!commit.publication_audit_hit());
++        Ok(())
++    }
++}
+--- a/crates/litchi-odp/src/authoring/mutable.rs
++++ b/crates/litchi-odp/src/authoring/mutable.rs
+@@ -18,6 +18,8 @@
+     reader::NsReader,
+ };
+ use std::collections::{BTreeMap, BTreeSet, HashSet};
++use std::sync::Arc;
++use xml_minifier::audit;
+ 
+ const MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES: usize = 64 * 1024;
+ const MAX_DEPENDENCY_FREE_COPY_NAME_BYTES: usize = 4 * 1024;
+@@ -46,6 +48,136 @@
+ const MAX_MEDIA_REFERENCE_VALUE_BYTES: usize = 1_048_576;
+ const MAX_MEDIA_REFERENCE_PATHS: usize = 131_072;
+ const MAX_MEDIA_REFERENCE_PATH_BYTES: usize = 16 * 1024 * 1024;
++const AUTHORED_CORE_XML_PARTS: usize = 3;
++const MANIFEST_XML_PARTS: usize = 1;
++
++#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
++struct AuthoredXmlAccounting {
++    bytes: usize,
++    parts: usize,
++    core_parts: usize,
++    eligible: bool,
++}
++
++impl AuthoredXmlAccounting {
++    fn new() -> Self {
++        Self {
++            eligible: true,
++            ..Self::default()
++        }
++    }
++
++    fn record(&mut self, path: &str, bytes: usize, media_type: &str, core: bool) {
++        if !audit::package::is_xml_part(path, media_type) {
++            if core {
++                self.eligible = false;
++            }
++            return;
++        }
++
++        let Some(total_bytes) = self.bytes.checked_add(bytes) else {
++            self.eligible = false;
++            return;
++        };
++        let Some(total_parts) = self.parts.checked_add(1) else {
++            self.eligible = false;
++            return;
++        };
++        let total_core_parts = if core {
++            let Some(total_core_parts) = self.core_parts.checked_add(1) else {
++                self.eligible = false;
++                return;
++            };
++            total_core_parts
++        } else {
++            self.core_parts
++        };
++        self.bytes = total_bytes;
++        self.parts = total_parts;
++        self.core_parts = total_core_parts;
++    }
++
++    fn into_proof_budget(self) -> Option<(usize, usize)> {
++        if !self.eligible || self.core_parts != AUTHORED_CORE_XML_PARTS {
++            return None;
++        }
++        Some((
++            self.bytes
++                .checked_add(audit::Limits::default().max_bytes())?,
++            self.parts.checked_add(MANIFEST_XML_PARTS)?,
++        ))
++    }
++}
++
++/// Proof that the bounded writer audited authored members against one exact
++/// source package publication.
++///
++/// This is deliberately private to the ODP authoring path.  It is never cached
++/// on [`MutablePresentation`]; the candidate and source byte owners bind it to
++/// the one successful serialization that produced it.
++pub(super) struct PublicationAuditProof {
++    candidate: Arc<Vec<u8>>,
++    source: Arc<Vec<u8>>,
++    authored_xml_bytes: usize,
++    authored_xml_parts: usize,
++    limits: audit::Limits,
++}
++
++impl PublicationAuditProof {
++    fn from_successful_serialization(
++        candidate: Arc<Vec<u8>>,
++        source: Option<Arc<Vec<u8>>>,
++        accounting: AuthoredXmlAccounting,
++    ) -> Option<Self> {
++        let source = source?;
++        let (authored_xml_bytes, authored_xml_parts) = accounting.into_proof_budget()?;
++        Some(Self {
++            candidate,
++            source,
++            authored_xml_bytes,
++            authored_xml_parts,
++            limits: audit::Limits::default(),
++        })
++    }
++
++    pub(super) fn covers(
++        &self,
++        candidate: &OwnedPackage,
++        source: &OwnedPackage,
++        final_limits: audit::Limits,
++        final_max_bytes: usize,
++        final_max_parts: usize,
++    ) -> bool {
++        let candidate_bytes = candidate.shared_bytes();
++        if !Arc::ptr_eq(&self.candidate, &candidate_bytes) {
++            return false;
++        }
++
++        let source_bytes = source.shared_bytes();
++        if !Arc::ptr_eq(&self.source, &source_bytes) {
++            return false;
++        }
++
++        let captured = self.limits;
++        if captured.max_attributes() > final_limits.max_attributes()
++            || captured.max_bytes() > final_limits.max_bytes()
++            || captured.max_depth() > final_limits.max_depth()
++            || captured.max_events() > final_limits.max_events()
++            || captured.max_text_bytes() > final_limits.max_text_bytes()
++            || captured.max_token_bytes() > final_limits.max_token_bytes()
++        {
++            return false;
++        }
++
++        self.authored_xml_bytes <= final_max_bytes && self.authored_xml_parts <= final_max_parts
++    }
++}
++
++struct SerializedPublication {
++    bytes: Vec<u8>,
++    source: Option<Arc<Vec<u8>>>,
++    accounting: AuthoredXmlAccounting,
++}
+ 
+ pub(super) struct MediaChangePlan {
+     pub(super) media_files: BTreeMap<String, EmbeddedMedia>,
+@@ -145,7 +277,7 @@
+     content_source: Option<ContentSource>,
+     /// Immutable snapshot projection used to detect which pages are still pristine.
+     /// Sharing this authority keeps the detached draft as the only editable copy.
+-    source_slides: std::sync::Arc<[Slide]>,
++    source_slides: Arc<[Slide]>,
+     /// Exact source-page identity for every staged slide; inserted slides have no source origin.
+     origins: Vec<Option<usize>>,
+     /// Owned exact page fragments for dependency-free blank-slide copies.
+@@ -190,7 +322,7 @@
+     /// ```
+     pub(super) fn from_presentation_with_validated_slides(
+         presentation: &Presentation,
+-        validated_slides: &std::sync::Arc<[Slide]>,
++        validated_slides: &Arc<[Slide]>,
+     ) -> Result<Self> {
+         // Editing snapshots construct this projection from the same immutable
+         // package bytes before a transaction can be opened. Keep staging
+@@ -214,10 +346,8 @@
+             // Only pages the scanner actually recovered can be retained; a
+             // mismatch means the model and the markup disagree, so fall back to
+             // regenerating every page.
+-            Some(source) if source.page_count() == slides.len() => {
+-                std::sync::Arc::clone(validated_slides)
+-            },
+-            _ if slides.is_empty() => std::sync::Arc::clone(validated_slides),
++            Some(source) if source.page_count() == slides.len() => Arc::clone(validated_slides),
++            _ if slides.is_empty() => Arc::clone(validated_slides),
+             _ => {
+                 return Err(litchi_core::Error::Unsupported(
+                     "ODP source slide coverage is incomplete; transaction staging refuses regeneration"
+@@ -299,11 +429,7 @@
+             None => {
+                 let supported = if let Some(package) = &self.source_package {
+                     let content = package.get_file("content.xml")?;
+-                    xml_minifier::audit::verify_authored(
+-                        &content,
+-                        xml_minifier::audit::Limits::default(),
+-                    )
+-                    .is_ok()
++                    audit::verify_authored(&content, audit::Limits::default()).is_ok()
+                 } else {
+                     true
+                 };
+@@ -1647,13 +1773,20 @@
+     /// # Ok(())
+     /// # }
+     /// ```
+-    pub(super) fn to_bytes_bounded(&self, limit: usize) -> Result<Vec<u8>> {
++    /// The writer audits authored core/media members with its default
++    /// per-document profile. Exact-source auxiliary members use the writer's
++    /// `ExactSource` path, and an equivalent source manifest is preserved
++    /// verbatim, so the accounting below intentionally claims only authored
++    /// members plus a conservative default manifest bound.
++    fn serialize_bounded(&self, limit: usize) -> Result<SerializedPublication> {
+         let mut writer = PackageWriter::new_bounded(limit);
+         let source_manifest = self
+             .source_package
+             .as_ref()
+             .map(|package| package.package())
+             .transpose()?;
++        let source = self.source_package.as_ref().map(OwnedPackage::shared_bytes);
++        let mut accounting = AuthoredXmlAccounting::new();
+ 
+         // Set MIME type
+         writer.set_mimetype(&self.mimetype)?;
+@@ -1669,6 +1802,7 @@
+             content_xml.as_bytes(),
+             content_media_type,
+         )?;
++        accounting.record("content.xml", content_xml.len(), content_media_type, true);
+ 
+         // Add styles.xml (preserved or default)
+         let default_styles = Structure::default_styles_xml();
+@@ -1678,6 +1812,7 @@
+             .and_then(|package| package.manifest().get_media_type("styles.xml"))
+             .unwrap_or("text/xml");
+         writer.add_file_with_media_type("styles.xml", styles_xml.as_bytes(), styles_media_type)?;
++        accounting.record("styles.xml", styles_xml.len(), styles_media_type, true);
+ 
+         // Add meta.xml (patched from the source or regenerated with current metadata)
+         let meta_xml = self.generate_meta_xml()?;
+@@ -1686,9 +1821,11 @@
+             .and_then(|package| package.manifest().get_media_type("meta.xml"))
+             .unwrap_or("text/xml");
+         writer.add_file_with_media_type("meta.xml", meta_xml.as_bytes(), meta_media_type)?;
++        accounting.record("meta.xml", meta_xml.len(), meta_media_type, true);
+ 
+         for (path, media) in &self.media_files {
+             writer.add_file_with_media_type(path, &media.bytes, &media.media_type)?;
++            accounting.record(path, media.bytes.len(), &media.media_type, false);
+         }
+ 
+         if let Some(package) = &self.source_package {
+@@ -1701,7 +1838,32 @@
+             writer.preserve_source_manifest(package)?;
+         }
+ 
+-        writer.finish_to_bounded_bytes()
++        let bytes = writer.finish_to_bounded_bytes()?;
++        Ok(SerializedPublication {
++            bytes,
++            source,
++            accounting,
++        })
++    }
++
++    pub(super) fn to_owned_package_bounded(
++        &self,
++        limit: usize,
++    ) -> Result<(OwnedPackage, Option<PublicationAuditProof>)> {
++        let SerializedPublication {
++            bytes,
++            source,
++            accounting,
++        } = self.serialize_bounded(limit)?;
++        let package = OwnedPackage::from_bytes(bytes)?;
++        let candidate = package.shared_bytes();
++        let proof =
++            PublicationAuditProof::from_successful_serialization(candidate, source, accounting);
++        Ok((package, proof))
++    }
++
++    pub(super) fn to_bytes_bounded(&self, limit: usize) -> Result<Vec<u8>> {
++        Ok(self.serialize_bounded(limit)?.bytes)
+     }
+ }
+ 
+@@ -2191,7 +2353,7 @@
+                     resource: litchi_core::Resource::Objects,
+                     observed: files.len() as u64,
+                     limit: MAX_MEDIA_REFERENCE_XML_PARTS as u64,
+-                    scope: std::sync::Arc::from("ODP media reference XML parts"),
++                    scope: Arc::from("ODP media reference XML parts"),
+                 },
+             ));
+         }
+@@ -2215,7 +2377,7 @@
+                         resource: litchi_core::Resource::InputBytes,
+                         observed: bytes.len() as u64,
+                         limit: MAX_MEDIA_REFERENCE_XML_BYTES as u64,
+-                        scope: std::sync::Arc::from("ODP media reference XML part"),
++                        scope: Arc::from("ODP media reference XML part"),
+                     },
+                 ));
+             }
+@@ -2230,7 +2392,7 @@
+                         resource: litchi_core::Resource::InputBytes,
+                         observed: xml_bytes as u64,
+                         limit: MAX_MEDIA_REFERENCE_TOTAL_XML_BYTES as u64,
+-                        scope: std::sync::Arc::from("ODP media reference XML parts"),
++                        scope: Arc::from("ODP media reference XML parts"),
+                     },
+                 ));
+             }
+@@ -2278,7 +2440,7 @@
+                     resource: litchi_core::Resource::Work,
+                     observed: part_events as u64,
+                     limit: MAX_MEDIA_REFERENCE_XML_EVENTS as u64,
+-                    scope: std::sync::Arc::from("ODP media reference XML"),
++                    scope: Arc::from("ODP media reference XML"),
+                 },
+             ));
+         }
+@@ -2288,7 +2450,7 @@
+                     resource: litchi_core::Resource::Work,
+                     observed: *events as u64,
+                     limit: MAX_MEDIA_REFERENCE_XML_EVENTS as u64,
+-                    scope: std::sync::Arc::from("ODP media reference XML"),
++                    scope: Arc::from("ODP media reference XML"),
+                 },
+             ));
+         }
+@@ -2313,7 +2475,7 @@
+                             resource: litchi_core::Resource::Depth,
+                             observed: depth as u64,
+                             limit: MAX_MEDIA_REFERENCE_XML_DEPTH as u64,
+-                            scope: std::sync::Arc::from("ODP media reference XML"),
++                            scope: Arc::from("ODP media reference XML"),
+                         },
+                     ));
+                 }
+@@ -2386,7 +2548,7 @@
+                     resource: litchi_core::Resource::InputBytes,
+                     observed: attribute.value.len() as u64,
+                     limit: MAX_MEDIA_REFERENCE_VALUE_BYTES as u64,
+-                    scope: std::sync::Arc::from("ODP media reference XML attribute"),
++                    scope: Arc::from("ODP media reference XML attribute"),
+                 },
+             ));
+         }
+@@ -2420,7 +2582,7 @@
+                     resource: litchi_core::Resource::Objects,
+                     observed: referenced_paths.len() as u64 + 1,
+                     limit: MAX_MEDIA_REFERENCE_PATHS as u64,
+-                    scope: std::sync::Arc::from("ODP media reference index"),
++                    scope: Arc::from("ODP media reference index"),
+                 },
+             ));
+         }
+@@ -2437,7 +2599,7 @@
+                     resource: litchi_core::Resource::InputBytes,
+                     observed: path_bytes as u64,
+                     limit: MAX_MEDIA_REFERENCE_PATH_BYTES as u64,
+-                    scope: std::sync::Arc::from("ODP media reference paths"),
++                    scope: Arc::from("ODP media reference paths"),
+                 },
+             ));
+         }
+@@ -2685,9 +2847,42 @@
+ #[cfg(test)]
+ mod tests {
+     use super::MutablePresentation;
++    use crate::core::OwnedPackage;
+     use crate::{Builder, Presentation};
+     use litchi_core::Result;
++    use soapberry_zip::office::StreamingArchiveWriter;
+     use std::sync::Arc;
++    use xml_minifier::audit;
++
++    const FINAL_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
++    const FINAL_XML_PARTS: usize = 65_536;
++
++    fn final_limits() -> audit::Limits {
++        audit::Limits::new(
++            FINAL_PACKAGE_BYTES,
++            512,
++            1_000_000,
++            250_000,
++            16 * 1024 * 1024,
++            FINAL_PACKAGE_BYTES,
++        )
++        .expect("fixed ODP final limits should be valid")
++    }
++
++    fn proof_with_budget(
++        candidate: &OwnedPackage,
++        source: &OwnedPackage,
++        authored_xml_bytes: usize,
++        authored_xml_parts: usize,
++    ) -> super::PublicationAuditProof {
++        super::PublicationAuditProof {
++            candidate: candidate.shared_bytes(),
++            source: source.shared_bytes(),
++            authored_xml_bytes,
++            authored_xml_parts,
++            limits: audit::Limits::default(),
++        }
++    }
+ 
+     fn presentation_with_two_slides() -> Result<Presentation> {
+         let mut builder = Builder::new();
+@@ -2747,4 +2942,363 @@
+         assert!(error.to_string().contains("coverage is incomplete"));
+         Ok(())
+     }
+-}
++
++    #[test]
++    fn successful_bounded_publication_proof_binds_candidate_and_source_arcs() -> Result<()> {
++        let presentation = presentation_with_two_slides()?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        let (package, proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++        let proof = proof.expect("successful authored publication should be auditable");
++        let final_limits = final_limits();
++
++        assert!(proof.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits,
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++
++        let same_bytes_new_candidate = OwnedPackage::from_bytes(package.as_bytes().to_vec())?;
++        assert!(!proof.covers(
++            &same_bytes_new_candidate,
++            presentation.owned_package(),
++            final_limits,
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++
++        let same_bytes_new_source =
++            OwnedPackage::from_bytes(presentation.owned_package().as_bytes().to_vec())?;
++        assert!(!proof.covers(
++            &package,
++            &same_bytes_new_source,
++            final_limits,
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++        Ok(())
++    }
++
++    #[test]
++    fn proof_accepts_exact_aggregate_bounds_and_rejects_each_overflow() -> Result<()> {
++        let presentation = presentation_with_two_slides()?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        let (package, _proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++
++        let exact = proof_with_budget(
++            &package,
++            presentation.owned_package(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        );
++        assert!(exact.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++
++        let bytes_over = proof_with_budget(
++            &package,
++            presentation.owned_package(),
++            FINAL_PACKAGE_BYTES + 1,
++            FINAL_XML_PARTS,
++        );
++        assert!(!bytes_over.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++
++        let parts_over = proof_with_budget(
++            &package,
++            presentation.owned_package(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS + 1,
++        );
++        assert!(!parts_over.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++        Ok(())
++    }
++
++    #[test]
++    fn authored_xml_budget_counts_classified_media_and_manifest_bound() {
++        let mut accounting = super::AuthoredXmlAccounting::new();
++        accounting.record("content.xml", 10, "text/xml", true);
++        accounting.record("styles.xml", 20, "text/xml", true);
++        accounting.record("meta.xml", 30, "text/xml", true);
++        accounting.record("Pictures/image.png", 40, "image/png", false);
++        accounting.record(
++            "custom/payload.bin",
++            50,
++            "application/vnd.example.payload+xml; charset=utf-8",
++            false,
++        );
++
++        assert_eq!(
++            accounting.into_proof_budget(),
++            Some((
++                10 + 20 + 30 + 50 + audit::Limits::default().max_bytes(),
++                3 + 1 + 1,
++            ))
++        );
++    }
++
++    #[test]
++    fn ineligible_or_overflowed_audit_budget_falls_back_without_an_error() {
++        let mut non_xml_core = super::AuthoredXmlAccounting::new();
++        non_xml_core.record("core.part", 1, "application/octet-stream", true);
++        assert_eq!(non_xml_core.into_proof_budget(), None);
++
++        let mut overflow = super::AuthoredXmlAccounting {
++            bytes: usize::MAX,
++            parts: 3,
++            core_parts: 3,
++            eligible: true,
++        };
++        overflow.record("custom.xml", 1, "text/xml", false);
++        assert_eq!(overflow.into_proof_budget(), None);
++
++        let manifest_bytes_overflow = super::AuthoredXmlAccounting {
++            bytes: usize::MAX - audit::Limits::default().max_bytes() + 1,
++            parts: 3,
++            core_parts: 3,
++            eligible: true,
++        };
++        assert_eq!(manifest_bytes_overflow.into_proof_budget(), None);
++
++        let manifest_parts_overflow = super::AuthoredXmlAccounting {
++            bytes: 0,
++            parts: usize::MAX,
++            core_parts: 3,
++            eligible: true,
++        };
++        assert_eq!(manifest_parts_overflow.into_proof_budget(), None);
++    }
++
++    #[test]
++    fn proof_rejects_each_narrower_document_limit_profile() -> Result<()> {
++        let presentation = presentation_with_two_slides()?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        let (package, proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++        let proof = proof.expect("successful authored publication should be auditable");
++        let profiles = [
++            audit::Limits::new(
++                31 * 1024 * 1024,
++                256,
++                1_000_000,
++                250_000,
++                4 * 1024 * 1024,
++                16 * 1024 * 1024,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++            audit::Limits::new(
++                32 * 1024 * 1024,
++                255,
++                1_000_000,
++                250_000,
++                4 * 1024 * 1024,
++                16 * 1024 * 1024,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++            audit::Limits::new(
++                32 * 1024 * 1024,
++                256,
++                999_999,
++                250_000,
++                4 * 1024 * 1024,
++                16 * 1024 * 1024,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++            audit::Limits::new(
++                32 * 1024 * 1024,
++                256,
++                1_000_000,
++                249_999,
++                4 * 1024 * 1024,
++                16 * 1024 * 1024,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++            audit::Limits::new(
++                32 * 1024 * 1024,
++                256,
++                1_000_000,
++                250_000,
++                4 * 1024 * 1024 - 1,
++                16 * 1024 * 1024,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++            audit::Limits::new(
++                32 * 1024 * 1024,
++                256,
++                1_000_000,
++                250_000,
++                4 * 1024 * 1024,
++                16 * 1024 * 1024 - 1,
++            )
++            .expect("fixed narrower audit profile should be valid"),
++        ];
++
++        for limits in profiles {
++            assert!(!proof.covers(
++                &package,
++                presentation.owned_package(),
++                limits,
++                FINAL_PACKAGE_BYTES,
++                FINAL_XML_PARTS,
++            ));
++        }
++        Ok(())
++    }
++
++    #[test]
++    fn source_less_serialization_does_not_mint_a_publication_proof() -> Result<()> {
++        let presentation = presentation_with_two_slides()?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        let (package, _proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++        let mut accounting = super::AuthoredXmlAccounting::new();
++        accounting.record("content.xml", 1, "text/xml", true);
++        accounting.record("styles.xml", 1, "text/xml", true);
++        accounting.record("meta.xml", 1, "text/xml", true);
++        assert!(
++            super::PublicationAuditProof::from_successful_serialization(
++                package.shared_bytes(),
++                None,
++                accounting,
++            )
++            .is_none()
++        );
++        Ok(())
++    }
++
++    fn presentation_with_auxiliary_member() -> Result<Presentation> {
++        let mut builder = Builder::new();
++        builder.add_slide_with_title("First", "First body")?;
++        let base = Presentation::from_bytes(builder.build()?)?;
++        let base_package = base.owned_package();
++        let package = base_package.package()?;
++        let mut manifest = b"\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- retained noncompact manifest -->\n<m:manifest xmlns:m=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" m:version=\"1.3\">\n".to_vec();
++        for (path, entry) in &package.manifest().entries {
++            manifest.extend_from_slice(
++                format!(
++                    "  <m:file-entry m:full-path=\"{path}\" m:media-type=\"{}\"/>\n",
++                    entry.media_type
++                )
++                .as_bytes(),
++            );
++        }
++        manifest.extend_from_slice(
++            b"  <m:file-entry m:full-path=\"vendor/foreign.xml\" m:media-type=\"text/xml\"/>\n  <m:file-entry m:full-path=\"vendor/opaque.bin\" m:media-type=\"application/octet-stream\"/>\n</m:manifest>\n",
++        );
++
++        let mut archive = StreamingArchiveWriter::new();
++        archive
++            .write_stored("mimetype", base_package.mimetype()?.as_bytes())
++            .unwrap();
++        for path in package.files()? {
++            if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") {
++                continue;
++            }
++            archive
++                .write_deflated(&path, &package.get_file(&path)?)
++                .unwrap();
++        }
++        archive
++            .write_deflated("vendor/foreign.xml", b"<foreign>\n  <opaque/>\n</foreign>")
++            .unwrap();
++        archive
++            .write_deflated("vendor/opaque.bin", b"producer-owned-auxiliary")
++            .unwrap();
++        archive
++            .write_deflated("META-INF/manifest.xml", &manifest)
++            .unwrap();
++        Presentation::from_bytes(archive.finish_to_bytes().unwrap())
++    }
++
++    #[test]
++    fn proof_covers_preserved_manifest_and_exact_auxiliary_copy() -> Result<()> {
++        let presentation = presentation_with_auxiliary_member()?;
++        let source_manifest = presentation
++            .owned_package()
++            .get_file("META-INF/manifest.xml")?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        let (package, proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++        assert_eq!(package.get_file("META-INF/manifest.xml")?, source_manifest);
++        assert_eq!(
++            package.get_file("vendor/opaque.bin")?,
++            b"producer-owned-auxiliary"
++        );
++        assert_eq!(
++            package.get_file("vendor/foreign.xml")?,
++            b"<foreign>\n  <opaque/>\n</foreign>"
++        );
++        let proof = proof.expect("preserved authored publication should be auditable");
++        assert!(proof.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++        Ok(())
++    }
++
++    #[test]
++    fn proof_covers_generated_manifest_and_xml_media() -> Result<()> {
++        let presentation = presentation_with_two_slides()?;
++        let source_manifest = presentation
++            .owned_package()
++            .get_file("META-INF/manifest.xml")?;
++        let validated_slides = Arc::from(presentation.slides()?);
++        let mut draft = MutablePresentation::from_presentation_with_validated_slides(
++            &presentation,
++            &validated_slides,
++        )?;
++        draft.embed_media(
++            "vendor/generated.xml".to_string(),
++            b"<payload/>".to_vec(),
++            "application/xml".to_string(),
++        )?;
++        let (package, proof) = draft.to_owned_package_bounded(FINAL_PACKAGE_BYTES)?;
++        assert_ne!(package.get_file("META-INF/manifest.xml")?, source_manifest);
++        assert_eq!(package.get_file("vendor/generated.xml")?, b"<payload/>");
++        let proof = proof.expect("generated authored publication should be auditable");
++        assert!(proof.covers(
++            &package,
++            presentation.owned_package(),
++            final_limits(),
++            FINAL_PACKAGE_BYTES,
++            FINAL_XML_PARTS,
++        ));
++        Ok(())
++    }
++}

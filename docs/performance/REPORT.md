@@ -1,5 +1,55 @@
 # Performance program phase report
 
+## Change 0463: retain ODP publication audit proof reuse
+
+0463 tests a private writer-origin proof under the frozen A1/B1/B2/A2 lifecycle
+boundary: 24 reports, 720 samples, two repeats, normal and allocator lanes,
+three warmups and 30 samples per lane on CPU 2 with one worker. The private ODP
+serializer records proof accounting around the unchanged common `PackageWriter`
+audit path. The proof is minted only after successful bounded serialization and
+candidate reopen, binds the exact source/candidate archive owners, and
+conservatively bounds authored XML bytes and parts. A proof hit skips only the
+final compactness validator; all reopen, readback, source, media, domain,
+no-op and patch checks remain.
+
+| Shape | Normal p50 R1 / R2 | Bootstrap p50 CI R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -10.0491% / -8.9678% | [-10.3651%, -9.6897%] / [-9.6152%, -8.2944%] |
+| Medium, 4,096 slides | -6.9642% / -7.3050% | [-7.2277%, -6.6891%] / [-7.4385%, -7.1286%] |
+| Large, 8,192 slides | -7.3657% / -6.8199% | [-7.5861%, -7.1987%] / [-7.1329%, -6.5400%] |
+
+All four normal medium/large rows pass the predeclared 3% gate and every
+normal and allocator p50 bootstrap upper bound is below zero. No adverse >5%
+elapsed or process-RSS flag or allocation-increase review flag is present.
+Allocator p50 elapsed deltas are -9.2947% / -8.8357% for tiny, -3.6356% /
+-3.6243% for medium, and -4.0327% / -2.8299% for large. Allocated bytes fall
+by 2,087,682 / 11,072,106 / 20,202,090 for tiny/medium/large in both repeats;
+all lanes reduce allocation calls by 1,039, reallocations by 93 and
+deallocations by 946. Peak above entry changes are 0 / -49,674 / -15,438 bytes
+and retained-live deltas are zero.
+
+Supplementary phase clocks exclude setup, warmups and checks. Their R1/R2 p50
+deltas are commit -12.6863% / -13.0797%, transaction -3.8135% / -2.2023%,
+snapshot opening +0.9812% / +0.4743%, add +3.7947% / +1.2462%, and publication
+-0.0322% / +0.0312%. The proof changes only the commit validation path; other
+phase movement is diagnostic rather than causal attribution. Whole-process
+counters include setup, warmups and checks: instructions -5.6821%, cycles
+-6.4241%, branch misses -5.2313%, branches -5.3523%, cache misses -2.0587%,
+context switches -6.3380% and page faults -24.1941%.
+
+The source review reports no semantic blocker at candidate epoch
+`d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c`; 381 ODP
+tests and warning-denied all-target Clippy pass. The harness and final gates
+are complete: 387 harness tests pass with one ignored, for 768 passed
+ODP/harness tests in total. Warning-denied rustdoc, scoped formatting,
+boundaries, precleanup and source replay, fresh-copy portable replay, resealed
++1ns tamper rejection, and owned cleanup of four executables totaling
+233,058,712 bytes pass. 0460 remains accepted; no coverage is added, registry
+counts remain 439/36, the full non-iWork goal remains open, and iWork is
+excluded. See the [comparison summary](results/change-0463/summary.json),
+[phase summary](results/change-0463/phase-summary.json), [source review](results/change-0463/source-review.md),
+and [proof design](results/change-0463/proof-design.md).
+
 ## Change 0462: reject ODP shape-attribute index on the practical gate
 
 0462 tests a private fixed seventeen-key first-occurrence index for shape

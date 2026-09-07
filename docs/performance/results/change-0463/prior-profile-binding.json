@@ -1,0 +1,62 @@
+{
+  "schema": "litchi-0463-prior-profile-binding-v1",
+  "path": "docs/performance/results/change-0459/diagnostic-summary.json",
+  "sha256": "dfa280481e7a9a73a99de3f250ed30ef76d6dcff51be2ca1d1b38a987db5a075",
+  "scope": "Prior symbol-resolved diagnostic commit attribution from change0459, including warmups; inclusive overlapping shares, not independent ordinary-build timing or causal savings. Current baseline includes0460 staging fusion, which changes transaction setup rather than the reviewed serialization/final-validation calls.",
+  "commit_inclusive_rows": {
+    "dwarf": [
+      {
+        "period": 8996139728,
+        "share_phase_period_pct": 29.977695880681505,
+        "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded"
+      },
+      {
+        "period": 4389186815,
+        "share_phase_period_pct": 14.626018657095615,
+        "symbol": "xml_minifier::audit::verify_authored"
+      },
+      {
+        "period": 2961353858,
+        "share_phase_period_pct": 9.868073199652606,
+        "symbol": "litchi_odp::authoring::edit::validate_compact_xml_parts_against"
+      },
+      {
+        "period": 2871472610,
+        "share_phase_period_pct": 9.568563321039468,
+        "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+      },
+      {
+        "period": 2063717018,
+        "share_phase_period_pct": 6.876891980327733,
+        "symbol": "<litchi_odf_common::core::xml_splice::XmlSourcePart>::load::<&str>"
+      }
+    ],
+    "fp": [
+      {
+        "period": 8651421519,
+        "share_phase_period_pct": 27.411117191620132,
+        "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded"
+      },
+      {
+        "period": 4398532681,
+        "share_phase_period_pct": 13.936287178387117,
+        "symbol": "xml_minifier::audit::verify_authored"
+      },
+      {
+        "period": 3770895655,
+        "share_phase_period_pct": 11.947685416734132,
+        "symbol": "litchi_odp::authoring::edit::validate_compact_xml_parts_against"
+      },
+      {
+        "period": 2962970446,
+        "share_phase_period_pct": 9.387859550276637,
+        "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+      },
+      {
+        "period": 2379485576,
+        "share_phase_period_pct": 7.5391492411116365,
+        "symbol": "<litchi_odf_common::core::xml_splice::XmlSourcePart>::load::<&str>"
+      }
+    ]
+  }
+}

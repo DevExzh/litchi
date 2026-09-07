@@ -1,0 +1,11 @@
+{
+  "schema": "litchi-0463-decision-v1",
+  "change": 463,
+  "status": "accepted",
+  "production_change_retained": true,
+  "summary_sha256": "b1e9327c8bc3dcb4af32bf86a3808495a02e06c853702938639590a780a0145c",
+  "reason": "All four normal medium/large rows pass the frozen 3% practical gate with negative bootstrap upper bounds. Allocated bytes and calls decrease without retained-live or peak increases; no >5% adverse elapsed/RSS flag appears. Retain the source-bound private proof under the recorded correctness and finalization gates. No timing rerun or threshold change.",
+  "adverse_flags": [],
+  "allocation_increase_review_flags": [],
+  "baseline_revision": "c079b1c59247a26baf1cd9cb1b25a911ee15d5df"
+}

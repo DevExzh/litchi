@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-0463-supplementary-protocol-v1",
+  "created_utc": "2026-09-07T17:17:51.773536+00:00",
+  "protocol_sha256": "1e38582b4b3599fc0737301172100a4a2bd4918913ad70c1074ff69d5150426d",
+  "phase_driver_sha256": "646790f061f1ec80a3ebf6c47d22a254659f4b9021867acf9e4876e54d675e35",
+  "counter_driver_sha256": "404a0d153afa2c08c5d5a5a64a1cb558483dfbcfb8cd79960a852ad22dccf07d",
+  "phase_sequence": [
+    "baseline-R1",
+    "candidate-R1",
+    "candidate-R2",
+    "baseline-R2"
+  ],
+  "phase_samples_per_report": 30,
+  "phase_shape": "large",
+  "counter_sequence": [
+    "baseline",
+    "candidate"
+  ],
+  "counter_samples_per_report": 100,
+  "scope": "Separate measurements after the primary A1/B1/B2/A2 lifecycle matrix. Phase clocks are supplementary mechanism evidence; whole-process counters include setup and checks."
+}

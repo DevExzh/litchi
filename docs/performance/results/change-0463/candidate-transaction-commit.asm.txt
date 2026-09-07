@@ -1,0 +1,3408 @@
+
+/tmp/litchi-goal-0463/candidate/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000018bfd10 <<litchi_odp::authoring::edit::Transaction>::commit>:
+ 18bfd10:	push   %rbp
+ 18bfd11:	push   %r15
+ 18bfd13:	push   %r14
+ 18bfd15:	push   %r13
+ 18bfd17:	push   %r12
+ 18bfd19:	push   %rbx
+ 18bfd1a:	sub    $0x1000,%rsp
+ 18bfd21:	movq   $0x0,(%rsp)
+ 18bfd29:	sub    $0x98,%rsp
+ 18bfd30:	mov    %rdi,0x18(%rsp)
+ 18bfd35:	cmpq   $0xffffffffffffffff,0x478(%rsi)
+ 18bfd3d:	je     18bfdab <<litchi_odp::authoring::edit::Transaction>::commit+0x9b>
+ 18bfd3f:	cmpq   $0x0,0x4b8(%rsi)
+ 18bfd47:	setne  %r15b
+ 18bfd4b:	cmpq   $0xffffffffffffffff,0x538(%rsi)
+ 18bfd53:	je     18bfdb8 <<litchi_odp::authoring::edit::Transaction>::commit+0xa8>
+ 18bfd55:	cmpq   $0x0,0x578(%rsi)
+ 18bfd5d:	setne  %r12b
+ 18bfd61:	cmpq   $0xffffffffffffffff,0x610(%rsi)
+ 18bfd69:	je     18bfdc5 <<litchi_odp::authoring::edit::Transaction>::commit+0xb5>
+ 18bfd6b:	cmpq   $0x0,0x6b0(%rsi)
+ 18bfd73:	setne  %al
+ 18bfd76:	mov    %eax,0x2c(%rsp)
+ 18bfd7a:	cmpq   $0xffffffffffffffff,0x730(%rsi)
+ 18bfd82:	je     18bfdd7 <<litchi_odp::authoring::edit::Transaction>::commit+0xc7>
+ 18bfd84:	cmpq   $0x0,0x770(%rsi)
+ 18bfd8c:	setne  %al
+ 18bfd8f:	mov    %eax,0x30(%rsp)
+ 18bfd93:	cmpq   $0xffffffffffffffff,0x7f0(%rsi)
+ 18bfd9b:	je     18bfde9 <<litchi_odp::authoring::edit::Transaction>::commit+0xd9>
+ 18bfd9d:	cmpq   $0x0,0x800(%rsi)
+ 18bfda5:	setne  %r14b
+ 18bfda9:	jmp    18bfdec <<litchi_odp::authoring::edit::Transaction>::commit+0xdc>
+ 18bfdab:	xor    %r15d,%r15d
+ 18bfdae:	cmpq   $0xffffffffffffffff,0x538(%rsi)
+ 18bfdb6:	jne    18bfd55 <<litchi_odp::authoring::edit::Transaction>::commit+0x45>
+ 18bfdb8:	xor    %r12d,%r12d
+ 18bfdbb:	cmpq   $0xffffffffffffffff,0x610(%rsi)
+ 18bfdc3:	jne    18bfd6b <<litchi_odp::authoring::edit::Transaction>::commit+0x5b>
+ 18bfdc5:	movl   $0x0,0x2c(%rsp)
+ 18bfdcd:	cmpq   $0xffffffffffffffff,0x730(%rsi)
+ 18bfdd5:	jne    18bfd84 <<litchi_odp::authoring::edit::Transaction>::commit+0x74>
+ 18bfdd7:	movl   $0x0,0x30(%rsp)
+ 18bfddf:	cmpq   $0xffffffffffffffff,0x7f0(%rsi)
+ 18bfde7:	jne    18bfd9d <<litchi_odp::authoring::edit::Transaction>::commit+0x8d>
+ 18bfde9:	xor    %r14d,%r14d
+ 18bfdec:	lea    0x478(%rsi),%rax
+ 18bfdf3:	mov    %rax,0x138(%rsp)
+ 18bfdfb:	lea    0x538(%rsi),%rax
+ 18bfe02:	mov    %rax,0x158(%rsp)
+ 18bfe0a:	lea    0x610(%rsi),%rax
+ 18bfe11:	mov    %rax,0x150(%rsp)
+ 18bfe19:	lea    0x730(%rsi),%rax
+ 18bfe20:	mov    %rax,0x148(%rsp)
+ 18bfe28:	lea    0x7f0(%rsi),%rax
+ 18bfe2f:	mov    %rax,0x178(%rsp)
+ 18bfe37:	mov    %rsi,0x8(%rsp)
+ 18bfe3c:	movzbl 0x8a0(%rsi),%eax
+ 18bfe43:	movq   $0x0,0x48(%rsp)
+ 18bfe4c:	movq   $0x1,0x50(%rsp)
+ 18bfe55:	movq   $0x0,0x58(%rsp)
+ 18bfe5e:	mov    %al,0x37(%rsp)
+ 18bfe62:	test   %al,%al
+ 18bfe64:	je     18bfecd <<litchi_odp::authoring::edit::Transaction>::commit+0x1bd>
+ 18bfe66:	mov    $0x1,%bpl
+ 18bfe69:	lea    0x48(%rsp),%rdi
+ 18bfe6e:	call   *0x143cf6c(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bfe74:	mov    0x50(%rsp),%rax
+ 18bfe79:	movb   $0x0,(%rax)
+ 18bfe7c:	movq   $0x1,0x58(%rsp)
+ 18bfe85:	mov    $0x1,%ebx
+ 18bfe8a:	test   %r15b,%r15b
+ 18bfe8d:	jne    18bfed4 <<litchi_odp::authoring::edit::Transaction>::commit+0x1c4>
+ 18bfe8f:	test   %r12b,%r12b
+ 18bfe92:	je     18bfeff <<litchi_odp::authoring::edit::Transaction>::commit+0x1ef>
+ 18bfe94:	cmp    0x48(%rsp),%rbx
+ 18bfe99:	jne    18bfea9 <<litchi_odp::authoring::edit::Transaction>::commit+0x199>
+ 18bfe9b:	mov    $0x1,%bpl
+ 18bfe9e:	lea    0x48(%rsp),%rdi
+ 18bfea3:	call   *0x143cf37(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bfea9:	mov    0x50(%rsp),%rax
+ 18bfeae:	movb   $0x2,(%rax,%rbx,1)
+ 18bfeb2:	inc    %rbx
+ 18bfeb5:	mov    %rbx,0x58(%rsp)
+ 18bfeba:	cmpb   $0x0,0x2c(%rsp)
+ 18bfebf:	jne    18bff06 <<litchi_odp::authoring::edit::Transaction>::commit+0x1f6>
+ 18bfec1:	cmpb   $0x0,0x30(%rsp)
+ 18bfec6:	jne    18bff33 <<litchi_odp::authoring::edit::Transaction>::commit+0x223>
+ 18bfec8:	jmp    18bff59 <<litchi_odp::authoring::edit::Transaction>::commit+0x249>
+ 18bfecd:	xor    %ebx,%ebx
+ 18bfecf:	test   %r15b,%r15b
+ 18bfed2:	je     18bfe8f <<litchi_odp::authoring::edit::Transaction>::commit+0x17f>
+ 18bfed4:	cmp    0x48(%rsp),%rbx
+ 18bfed9:	jne    18bfee9 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d9>
+ 18bfedb:	mov    $0x1,%bpl
+ 18bfede:	lea    0x48(%rsp),%rdi
+ 18bfee3:	call   *0x143cef7(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bfee9:	mov    0x50(%rsp),%rax
+ 18bfeee:	movb   $0x1,(%rax,%rbx,1)
+ 18bfef2:	inc    %rbx
+ 18bfef5:	mov    %rbx,0x58(%rsp)
+ 18bfefa:	test   %r12b,%r12b
+ 18bfefd:	jne    18bfe94 <<litchi_odp::authoring::edit::Transaction>::commit+0x184>
+ 18bfeff:	cmpb   $0x0,0x2c(%rsp)
+ 18bff04:	je     18bfec1 <<litchi_odp::authoring::edit::Transaction>::commit+0x1b1>
+ 18bff06:	cmp    0x48(%rsp),%rbx
+ 18bff0b:	jne    18bff1b <<litchi_odp::authoring::edit::Transaction>::commit+0x20b>
+ 18bff0d:	mov    $0x1,%bpl
+ 18bff10:	lea    0x48(%rsp),%rdi
+ 18bff15:	call   *0x143cec5(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bff1b:	mov    0x50(%rsp),%rax
+ 18bff20:	movb   $0x3,(%rax,%rbx,1)
+ 18bff24:	inc    %rbx
+ 18bff27:	mov    %rbx,0x58(%rsp)
+ 18bff2c:	cmpb   $0x0,0x30(%rsp)
+ 18bff31:	je     18bff59 <<litchi_odp::authoring::edit::Transaction>::commit+0x249>
+ 18bff33:	cmp    0x48(%rsp),%rbx
+ 18bff38:	jne    18bff48 <<litchi_odp::authoring::edit::Transaction>::commit+0x238>
+ 18bff3a:	mov    $0x1,%bpl
+ 18bff3d:	lea    0x48(%rsp),%rdi
+ 18bff42:	call   *0x143ce98(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bff48:	mov    0x50(%rsp),%rax
+ 18bff4d:	movb   $0x4,(%rax,%rbx,1)
+ 18bff51:	inc    %rbx
+ 18bff54:	mov    %rbx,0x58(%rsp)
+ 18bff59:	mov    %r12d,%edx
+ 18bff5c:	or     %r15b,%dl
+ 18bff5f:	or     0x2c(%rsp),%dl
+ 18bff63:	or     0x30(%rsp),%dl
+ 18bff67:	test   %r14b,%r14b
+ 18bff6a:	je     18c0038 <<litchi_odp::authoring::edit::Transaction>::commit+0x328>
+ 18bff70:	mov    %dl,0x2b(%rsp)
+ 18bff74:	cmp    0x48(%rsp),%rbx
+ 18bff79:	jne    18bff89 <<litchi_odp::authoring::edit::Transaction>::commit+0x279>
+ 18bff7b:	mov    $0x1,%bpl
+ 18bff7e:	lea    0x48(%rsp),%rdi
+ 18bff83:	call   *0x143ce57(%rip)        # 2cfcde0 <_DYNAMIC+0x6e48>
+ 18bff89:	mov    0x50(%rsp),%rax
+ 18bff8e:	movb   $0x5,(%rax,%rbx,1)
+ 18bff92:	inc    %rbx
+ 18bff95:	mov    %rbx,0x58(%rsp)
+ 18bff9a:	mov    0x8(%rsp),%rsi
+ 18bff9f:	cmpb   $0x0,0x8a0(%rsi)
+ 18bffa6:	je     18c005a <<litchi_odp::authoring::edit::Transaction>::commit+0x34a>
+ 18bffac:	mov    $0x1,%bpl
+ 18bffaf:	lea    0x230(%rsp),%rdi
+ 18bffb7:	mov    $0x8000000,%edx
+ 18bffbc:	call   18af0e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_owned_package_bounded>
+ 18bffc1:	mov    0x230(%rsp),%rbx
+ 18bffc9:	movups 0x238(%rsp),%xmm0
+ 18bffd1:	movaps %xmm0,0xc70(%rsp)
+ 18bffd9:	movups 0x248(%rsp),%xmm0
+ 18bffe1:	movaps %xmm0,0xc80(%rsp)
+ 18bffe9:	movups 0x258(%rsp),%xmm0
+ 18bfff1:	movaps %xmm0,0xc90(%rsp)
+ 18bfff9:	cmp    $0xfffffffffffffffe,%rbx
+ 18bfffd:	jne    18c020d <<litchi_odp::authoring::edit::Transaction>::commit+0x4fd>
+ 18c0003:	movaps 0xc70(%rsp),%xmm0
+ 18c000b:	movaps 0xc80(%rsp),%xmm1
+ 18c0013:	movaps 0xc90(%rsp),%xmm2
+ 18c001b:	mov    0x18(%rsp),%rax
+ 18c0020:	movups %xmm2,0x28(%rax)
+ 18c0024:	movups %xmm1,0x18(%rax)
+ 18c0028:	movups %xmm0,0x8(%rax)
+ 18c002c:	movq   $0xfffffffffffffffe,(%rax)
+ 18c0033:	jmp    18c3f95 <<litchi_odp::authoring::edit::Transaction>::commit+0x4285>
+ 18c0038:	mov    0x8(%rsp),%rsi
+ 18c003d:	movzbl 0x8a0(%rsi),%eax
+ 18c0044:	mov    %edx,%ecx
+ 18c0046:	or     %al,%cl
+ 18c0048:	je     18c00e1 <<litchi_odp::authoring::edit::Transaction>::commit+0x3d1>
+ 18c004e:	mov    %dl,0x2b(%rsp)
+ 18c0052:	test   %al,%al
+ 18c0054:	jne    18bffac <<litchi_odp::authoring::edit::Transaction>::commit+0x29c>
+ 18c005a:	mov    %r12d,0x160(%rsp)
+ 18c0062:	mov    %r15d,0x144(%rsp)
+ 18c006a:	mov    0x3f8(%rsi),%rbx
+ 18c0071:	lock incq (%rbx)
+ 18c0075:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c007b:	mov    %rbx,0x180(%rsp)
+ 18c0083:	mov    0x400(%rsi),%r12
+ 18c008a:	lock incq (%r12)
+ 18c008f:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0095:	add    $0x3e0,%rsi
+ 18c009c:	mov    %r12,0xc70(%rsp)
+ 18c00a4:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c00a8:	mov    %r14d,0x164(%rsp)
+ 18c00b0:	je     18c0385 <<litchi_odp::authoring::edit::Transaction>::commit+0x675>
+ 18c00b6:	lea    0x230(%rsp),%rdi
+ 18c00be:	call   *0x1436294(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c00c4:	mov    0x230(%rsp),%r14
+ 18c00cc:	movups 0x238(%rsp),%xmm0
+ 18c00d4:	movaps %xmm0,0x5c0(%rsp)
+ 18c00dc:	jmp    18c038c <<litchi_odp::authoring::edit::Transaction>::commit+0x67c>
+ 18c00e1:	add    $0x3e0,%rsi
+ 18c00e8:	lea    0x180(%rsp),%rbx
+ 18c00f0:	mov    $0x98,%edx
+ 18c00f5:	mov    %rbx,%rdi
+ 18c00f8:	call   *0x14360ea(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c00fe:	lea    0xc70(%rsp),%rdi
+ 18c0106:	mov    %rbx,%rsi
+ 18c0109:	call   18c8b30 <<litchi_odp::authoring::edit::Snapshot as core::clone::Clone>::clone>
+ 18c010e:	lea    0x230(%rsp),%rdi
+ 18c0116:	lea    0x180(%rsp),%rsi
+ 18c011e:	call   18c8b30 <<litchi_odp::authoring::edit::Snapshot as core::clone::Clone>::clone>
+ 18c0123:	call   *0x14360f7(%rip)        # 2cf6220 <_DYNAMIC+0x288>
+ 18c0129:	mov    $0x10,%edi
+ 18c012e:	mov    $0x8,%esi
+ 18c0133:	call   *0x14360ef(%rip)        # 2cf6228 <_DYNAMIC+0x290>
+ 18c0139:	test   %rax,%rax
+ 18c013c:	je     18c2f93 <<litchi_odp::authoring::edit::Transaction>::commit+0x3283>
+ 18c0142:	mov    %rax,%rbx
+ 18c0145:	movq   $0x1,(%rax)
+ 18c014c:	movq   $0x1,0x8(%rax)
+ 18c0154:	lea    0x5c0(%rsp),%r14
+ 18c015c:	lea    0xc70(%rsp),%rsi
+ 18c0164:	mov    0x143607d(%rip),%r12        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c016b:	mov    $0x98,%edx
+ 18c0170:	mov    %r14,%rdi
+ 18c0173:	call   *%r12
+ 18c0176:	lea    0x658(%rsp),%rdi
+ 18c017e:	lea    0x230(%rsp),%rsi
+ 18c0186:	mov    $0x98,%edx
+ 18c018b:	call   *%r12
+ 18c018e:	lea    0x230(%rsp),%r15
+ 18c0196:	lea    0x180(%rsp),%rsi
+ 18c019e:	mov    $0x98,%edx
+ 18c01a3:	mov    %r15,%rdi
+ 18c01a6:	call   *%r12
+ 18c01a9:	lea    0x2c8(%rsp),%rdi
+ 18c01b1:	mov    $0x130,%edx
+ 18c01b6:	mov    %r14,%rsi
+ 18c01b9:	call   *%r12
+ 18c01bc:	mov    $0x1c8,%edx
+ 18c01c1:	mov    0x18(%rsp),%r14
+ 18c01c6:	mov    %r14,%rdi
+ 18c01c9:	mov    %r15,%rsi
+ 18c01cc:	call   *%r12
+ 18c01cf:	mov    %rbx,0x1c8(%r14)
+ 18c01d6:	movq   $0x0,0x1d0(%r14)
+ 18c01e1:	movb   $0x0,0x1d8(%r14)
+ 18c01e9:	mov    0x48(%rsp),%rsi
+ 18c01ee:	test   %rsi,%rsi
+ 18c01f1:	je     18c0203 <<litchi_odp::authoring::edit::Transaction>::commit+0x4f3>
+ 18c01f3:	mov    0x50(%rsp),%rdi
+ 18c01f8:	mov    $0x1,%edx
+ 18c01fd:	call   *0x143602d(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c0203:	mov    0x8(%rsp),%rbx
+ 18c0208:	jmp    18c3fc0 <<litchi_odp::authoring::edit::Transaction>::commit+0x42b0>
+ 18c020d:	lea    0x268(%rsp),%rsi
+ 18c0215:	lea    0x5c0(%rsp),%rdi
+ 18c021d:	mov    $0x90,%edx
+ 18c0222:	call   *0x1435fc0(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c0228:	movaps 0xc70(%rsp),%xmm0
+ 18c0230:	movaps 0xc80(%rsp),%xmm1
+ 18c0238:	movaps 0xc90(%rsp),%xmm2
+ 18c0240:	movups %xmm2,0x1a8(%rsp)
+ 18c0248:	movups %xmm1,0x198(%rsp)
+ 18c0250:	movups %xmm0,0x188(%rsp)
+ 18c0258:	movups 0x5c0(%rsp),%xmm0
+ 18c0260:	movups 0x5d0(%rsp),%xmm1
+ 18c0268:	movups 0x5e0(%rsp),%xmm2
+ 18c0270:	movups 0x5f0(%rsp),%xmm3
+ 18c0278:	movups %xmm0,0x1b8(%rsp)
+ 18c0280:	movups %xmm1,0x1c8(%rsp)
+ 18c0288:	movups %xmm2,0x1d8(%rsp)
+ 18c0290:	movups %xmm3,0x1e8(%rsp)
+ 18c0298:	movups 0x640(%rsp),%xmm0
+ 18c02a0:	movaps %xmm0,0x560(%rsp)
+ 18c02a8:	movups 0x630(%rsp),%xmm0
+ 18c02b0:	movaps %xmm0,0x550(%rsp)
+ 18c02b8:	movups 0x620(%rsp),%xmm0
+ 18c02c0:	movaps %xmm0,0x540(%rsp)
+ 18c02c8:	movups 0x610(%rsp),%xmm0
+ 18c02d0:	movaps %xmm0,0x530(%rsp)
+ 18c02d8:	movups 0x600(%rsp),%xmm0
+ 18c02e0:	movaps %xmm0,0x520(%rsp)
+ 18c02e8:	mov    %rbx,0x180(%rsp)
+ 18c02f0:	mov    0x198(%rsp),%rax
+ 18c02f8:	lock incq (%rax)
+ 18c02fc:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0302:	mov    %r14d,0x164(%rsp)
+ 18c030a:	mov    0x198(%rsp),%rbx
+ 18c0312:	mov    %rbx,0x70(%rsp)
+ 18c0317:	lock incq (%rbx)
+ 18c031b:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0321:	mov    %rbx,0xc0(%rsp)
+ 18c0329:	mov    0x1a0(%rsp),%r14
+ 18c0331:	lock incq (%r14)
+ 18c0335:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c033b:	mov    %r14,0x9a0(%rsp)
+ 18c0343:	cmpq   $0xffffffffffffffff,0x180(%rsp)
+ 18c034c:	je     18c07e4 <<litchi_odp::authoring::edit::Transaction>::commit+0xad4>
+ 18c0352:	lea    0xc70(%rsp),%rdi
+ 18c035a:	lea    0x180(%rsp),%rsi
+ 18c0362:	call   *0x1435ff0(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c0368:	mov    0xc70(%rsp),%rax
+ 18c0370:	movups 0xc78(%rsp),%xmm0
+ 18c0378:	movaps %xmm0,0xbf0(%rsp)
+ 18c0380:	jmp    18c07eb <<litchi_odp::authoring::edit::Transaction>::commit+0xadb>
+ 18c0385:	mov    $0xffffffffffffffff,%r14
+ 18c038c:	mov    0x8(%rsp),%rcx
+ 18c0391:	mov    0x448(%rcx),%rax
+ 18c0398:	mov    %rax,0xa60(%rsp)
+ 18c03a0:	movups 0x408(%rcx),%xmm0
+ 18c03a7:	movups 0x418(%rcx),%xmm1
+ 18c03ae:	movups 0x428(%rcx),%xmm2
+ 18c03b5:	movups 0x438(%rcx),%xmm3
+ 18c03bc:	movaps %xmm3,0xa50(%rsp)
+ 18c03c4:	movaps %xmm2,0xa40(%rsp)
+ 18c03cc:	movaps %xmm1,0xa30(%rsp)
+ 18c03d4:	movaps %xmm0,0xa20(%rsp)
+ 18c03dc:	movzbl 0x450(%rcx),%ebp
+ 18c03e3:	movaps 0x5c0(%rsp),%xmm0
+ 18c03eb:	movaps %xmm0,0xa70(%rsp)
+ 18c03f3:	lock incq (%rbx)
+ 18c03f7:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c03fd:	xor    %r15d,%r15d
+ 18c0400:	movq   %r12,%xmm0
+ 18c0405:	movq   %rbx,%xmm1
+ 18c040a:	punpcklqdq %xmm0,%xmm1
+ 18c040e:	mov    $0xfffffffffffffffe,%r12
+ 18c0415:	mov    %rbx,0x10(%rsp)
+ 18c041a:	mov    %r14,0xc0(%rsp)
+ 18c0422:	movaps 0xa70(%rsp),%xmm0
+ 18c042a:	movups %xmm0,0xc8(%rsp)
+ 18c0432:	movdqu %xmm1,0xd8(%rsp)
+ 18c043b:	movaps 0xa20(%rsp),%xmm0
+ 18c0443:	movaps 0xa30(%rsp),%xmm1
+ 18c044b:	movaps 0xa40(%rsp),%xmm2
+ 18c0453:	movaps 0xa50(%rsp),%xmm3
+ 18c045b:	movups %xmm0,0xe8(%rsp)
+ 18c0463:	movups %xmm1,0xf8(%rsp)
+ 18c046b:	movups %xmm2,0x108(%rsp)
+ 18c0473:	movups %xmm3,0x118(%rsp)
+ 18c047b:	mov    0xa60(%rsp),%rax
+ 18c0483:	mov    %rax,0x128(%rsp)
+ 18c048b:	mov    %bpl,0x130(%rsp)
+ 18c0493:	mov    0x220(%rsp),%eax
+ 18c049a:	mov    0x223(%rsp),%ecx
+ 18c04a1:	mov    %eax,0x131(%rsp)
+ 18c04a8:	mov    %ecx,0x134(%rsp)
+ 18c04af:	mov    %r12,0xf70(%rsp)
+ 18c04b7:	lea    0xf78(%rsp),%rdi
+ 18c04bf:	lea    0x1008(%rsp),%rsi
+ 18c04c7:	mov    $0x90,%edx
+ 18c04cc:	call   *0x1435d16(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c04d2:	mov    %r15,0x70(%rsp)
+ 18c04d7:	mov    0xf60(%rsp),%rax
+ 18c04df:	mov    %rax,0xb8(%rsp)
+ 18c04e7:	movaps 0xf20(%rsp),%xmm0
+ 18c04ef:	movaps 0xf30(%rsp),%xmm1
+ 18c04f7:	movaps 0xf40(%rsp),%xmm2
+ 18c04ff:	movaps 0xf50(%rsp),%xmm3
+ 18c0507:	movups %xmm3,0xa8(%rsp)
+ 18c050f:	movups %xmm2,0x98(%rsp)
+ 18c0517:	movups %xmm1,0x88(%rsp)
+ 18c051f:	movups %xmm0,0x78(%rsp)
+ 18c0524:	mov    0x8(%rsp),%rax
+ 18c0529:	add    $0x610,%rax
+ 18c052f:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c0533:	je     18c0d31 <<litchi_odp::authoring::edit::Transaction>::commit+0x1021>
+ 18c0539:	mov    0x8(%rsp),%rax
+ 18c053e:	mov    0x6b0(%rax),%rax
+ 18c0545:	test   %rax,%rax
+ 18c0548:	je     18c0d31 <<litchi_odp::authoring::edit::Transaction>::commit+0x1021>
+ 18c054e:	mov    0x8(%rsp),%rcx
+ 18c0553:	cmpb   $0x0,0x8a0(%rcx)
+ 18c055a:	je     18c0776 <<litchi_odp::authoring::edit::Transaction>::commit+0xa66>
+ 18c0560:	mov    0x6a8(%rcx),%rbx
+ 18c0567:	imul   $0x128,%rax,%r14
+ 18c056e:	lea    0x238(%rsp),%r13
+ 18c0576:	lea    0x230(%rsp),%r15
+ 18c057e:	jmp    18c059d <<litchi_odp::authoring::edit::Transaction>::commit+0x88d>
+ 18c0580:	add    $0x128,%rbx
+ 18c0587:	movq   $0x0,0x70(%rsp)
+ 18c0590:	add    $0xfffffffffffffed8,%r14
+ 18c0597:	je     18c0d31 <<litchi_odp::authoring::edit::Transaction>::commit+0x1021>
+ 18c059d:	mov    %r14,0x60(%rsp)
+ 18c05a2:	mov    %r15,%rbp
+ 18c05a5:	mov    %r15,%rdi
+ 18c05a8:	lea    0xc0(%rsp),%rsi
+ 18c05b0:	mov    %rbx,%rdx
+ 18c05b3:	call   18c7010 <litchi_odp::authoring::edit::apply_design_operation>
+ 18c05b8:	mov    0x230(%rsp),%rcx
+ 18c05c0:	mov    0x238(%rsp),%r14
+ 18c05c8:	mov    0x240(%rsp),%r12
+ 18c05d0:	mov    0x248(%rsp),%rax
+ 18c05d8:	cmp    $0xffffffffffffffff,%rcx
+ 18c05dc:	jne    18c21bd <<litchi_odp::authoring::edit::Transaction>::commit+0x24ad>
+ 18c05e2:	cmp    $0x8000000,%rax
+ 18c05e8:	ja     18c1d40 <<litchi_odp::authoring::edit::Transaction>::commit+0x2030>
+ 18c05ee:	mov    %r14,0x5c0(%rsp)
+ 18c05f6:	mov    %r12,0x5c8(%rsp)
+ 18c05fe:	mov    %rax,0x5d0(%rsp)
+ 18c0606:	mov    %rbp,%r15
+ 18c0609:	mov    %rbp,%rdi
+ 18c060c:	lea    0x5c0(%rsp),%rsi
+ 18c0614:	call   *0x14364ae(%rip)        # 2cf6ac8 <_DYNAMIC+0xb30>
+ 18c061a:	mov    0x230(%rsp),%r12
+ 18c0622:	movups 0x0(%r13),%xmm0
+ 18c0627:	movups 0x10(%r13),%xmm1
+ 18c062c:	movups 0x20(%r13),%xmm2
+ 18c0631:	movaps %xmm0,0x8b0(%rsp)
+ 18c0639:	movaps %xmm1,0x8c0(%rsp)
+ 18c0641:	movaps %xmm2,0x8d0(%rsp)
+ 18c0649:	cmp    $0xfffffffffffffffe,%r12
+ 18c064d:	je     18c1d67 <<litchi_odp::authoring::edit::Transaction>::commit+0x2057>
+ 18c0653:	movups 0x30(%r13),%xmm0
+ 18c0658:	movups 0x40(%r13),%xmm1
+ 18c065d:	movups 0x50(%r13),%xmm2
+ 18c0662:	movups 0x60(%r13),%xmm3
+ 18c0667:	movaps %xmm3,0xab0(%rsp)
+ 18c066f:	movaps %xmm2,0xaa0(%rsp)
+ 18c0677:	movaps %xmm1,0xa90(%rsp)
+ 18c067f:	movaps %xmm0,0xa80(%rsp)
+ 18c0687:	lea    0xc0(%rsp),%rdi
+ 18c068f:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c0694:	mov    %r12,0xc0(%rsp)
+ 18c069c:	movaps 0x8b0(%rsp),%xmm0
+ 18c06a4:	movaps 0x8c0(%rsp),%xmm1
+ 18c06ac:	movaps 0x8d0(%rsp),%xmm2
+ 18c06b4:	lea    0xc8(%rsp),%rax
+ 18c06bc:	movups %xmm2,0x20(%rax)
+ 18c06c0:	movups %xmm1,0x10(%rax)
+ 18c06c4:	movups %xmm0,(%rax)
+ 18c06c7:	movaps 0xa80(%rsp),%xmm0
+ 18c06cf:	movaps 0xa90(%rsp),%xmm1
+ 18c06d7:	movaps 0xaa0(%rsp),%xmm2
+ 18c06df:	movaps 0xab0(%rsp),%xmm3
+ 18c06e7:	lea    0xf8(%rsp),%rax
+ 18c06ef:	movups %xmm3,0x30(%rax)
+ 18c06f3:	movups %xmm2,0x20(%rax)
+ 18c06f7:	movups %xmm1,0x10(%rax)
+ 18c06fb:	movups %xmm0,(%rax)
+ 18c06fe:	mov    0xd8(%rsp),%rax
+ 18c0706:	lock incq (%rax)
+ 18c070a:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0710:	mov    0xd8(%rsp),%r12
+ 18c0718:	mov    0x10(%rsp),%rax
+ 18c071d:	lock decq (%rax)
+ 18c0721:	jne    18c072e <<litchi_odp::authoring::edit::Transaction>::commit+0xa1e>
+ 18c0723:	lea    0x10(%rsp),%rdi
+ 18c0728:	call   *0x1435fe2(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c072e:	mov    %r12,0x10(%rsp)
+ 18c0733:	mov    0x70(%rsp),%rax
+ 18c0738:	test   %rax,%rax
+ 18c073b:	mov    0x60(%rsp),%r14
+ 18c0740:	je     18c0580 <<litchi_odp::authoring::edit::Transaction>::commit+0x870>
+ 18c0746:	lock decq (%rax)
+ 18c074a:	jne    18c0757 <<litchi_odp::authoring::edit::Transaction>::commit+0xa47>
+ 18c074c:	lea    0x70(%rsp),%rdi
+ 18c0751:	call   *0x1435fb9(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0757:	mov    0x78(%rsp),%rax
+ 18c075c:	lock decq (%rax)
+ 18c0760:	jne    18c0580 <<litchi_odp::authoring::edit::Transaction>::commit+0x870>
+ 18c0766:	lea    0x78(%rsp),%rdi
+ 18c076b:	call   *0x1435f9f(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0771:	jmp    18c0580 <<litchi_odp::authoring::edit::Transaction>::commit+0x870>
+ 18c0776:	mov    0x6d0(%rcx),%rbx
+ 18c077d:	lock incq (%rbx)
+ 18c0781:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0787:	mov    %rbx,0x520(%rsp)
+ 18c078f:	mov    0x6d8(%rcx),%r14
+ 18c0796:	lock incq (%r14)
+ 18c079a:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c07a0:	lea    0x6b8(%rcx),%rsi
+ 18c07a7:	mov    %r14,0x180(%rsp)
+ 18c07af:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c07b3:	je     18c0be0 <<litchi_odp::authoring::edit::Transaction>::commit+0xed0>
+ 18c07b9:	lea    0x230(%rsp),%rdi
+ 18c07c1:	call   *0x1435b91(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c07c7:	mov    0x230(%rsp),%r15
+ 18c07cf:	movups 0x238(%rsp),%xmm0
+ 18c07d7:	movaps %xmm0,0x5c0(%rsp)
+ 18c07df:	jmp    18c0be7 <<litchi_odp::authoring::edit::Transaction>::commit+0xed7>
+ 18c07e4:	mov    $0xffffffffffffffff,%rax
+ 18c07eb:	mov    0x1e8(%rsp),%rcx
+ 18c07f3:	mov    %rcx,0xcd8(%rsp)
+ 18c07fb:	movups 0x1a8(%rsp),%xmm0
+ 18c0803:	movups 0x1b8(%rsp),%xmm1
+ 18c080b:	movups 0x1c8(%rsp),%xmm2
+ 18c0813:	movups 0x1d8(%rsp),%xmm3
+ 18c081b:	movups %xmm3,0xcc8(%rsp)
+ 18c0823:	movups %xmm2,0xcb8(%rsp)
+ 18c082b:	movups %xmm1,0xca8(%rsp)
+ 18c0833:	movups %xmm0,0xc98(%rsp)
+ 18c083b:	movzbl 0x1f0(%rsp),%ecx
+ 18c0843:	mov    %rbx,0xc88(%rsp)
+ 18c084b:	mov    %r14,0xc90(%rsp)
+ 18c0853:	mov    %rax,0xc70(%rsp)
+ 18c085b:	movaps 0xbf0(%rsp),%xmm0
+ 18c0863:	movups %xmm0,0xc78(%rsp)
+ 18c086b:	mov    %cl,0xce0(%rsp)
+ 18c0872:	lea    0x230(%rsp),%rdi
+ 18c087a:	lea    0xc70(%rsp),%rsi
+ 18c0882:	call   18bcff0 <<litchi_odp::authoring::edit::Snapshot>::from_owned_package>
+ 18c0887:	mov    0x230(%rsp),%rax
+ 18c088f:	movups 0x238(%rsp),%xmm0
+ 18c0897:	movaps %xmm0,0xf70(%rsp)
+ 18c089f:	movups 0x248(%rsp),%xmm0
+ 18c08a7:	movaps %xmm0,0xf80(%rsp)
+ 18c08af:	movups 0x258(%rsp),%xmm0
+ 18c08b7:	movaps %xmm0,0xf90(%rsp)
+ 18c08bf:	cmp    $0xfffffffffffffffe,%rax
+ 18c08c3:	jne    18c08fa <<litchi_odp::authoring::edit::Transaction>::commit+0xbea>
+ 18c08c5:	movaps 0xf70(%rsp),%xmm0
+ 18c08cd:	movaps 0xf80(%rsp),%xmm1
+ 18c08d5:	movaps 0xf90(%rsp),%xmm2
+ 18c08dd:	mov    0x18(%rsp),%rax
+ 18c08e2:	movups %xmm2,0x28(%rax)
+ 18c08e6:	movups %xmm1,0x18(%rax)
+ 18c08ea:	movups %xmm0,0x8(%rax)
+ 18c08ee:	movq   $0xfffffffffffffffe,(%rax)
+ 18c08f5:	jmp    18c0b7b <<litchi_odp::authoring::edit::Transaction>::commit+0xe6b>
+ 18c08fa:	movups 0x2b8(%rsp),%xmm0
+ 18c0902:	movups %xmm0,0x648(%rsp)
+ 18c090a:	movups 0x2a8(%rsp),%xmm0
+ 18c0912:	movups %xmm0,0x638(%rsp)
+ 18c091a:	movups 0x268(%rsp),%xmm0
+ 18c0922:	movups 0x278(%rsp),%xmm1
+ 18c092a:	movups 0x288(%rsp),%xmm2
+ 18c0932:	movups 0x298(%rsp),%xmm3
+ 18c093a:	movups %xmm3,0x628(%rsp)
+ 18c0942:	movups %xmm2,0x618(%rsp)
+ 18c094a:	movups %xmm1,0x608(%rsp)
+ 18c0952:	movups %xmm0,0x5f8(%rsp)
+ 18c095a:	movaps 0xf70(%rsp),%xmm0
+ 18c0962:	movaps 0xf80(%rsp),%xmm1
+ 18c096a:	movaps 0xf90(%rsp),%xmm2
+ 18c0972:	movups %xmm0,0x5c8(%rsp)
+ 18c097a:	movups %xmm1,0x5d8(%rsp)
+ 18c0982:	movups %xmm2,0x5e8(%rsp)
+ 18c098a:	mov    %rax,0x5c0(%rsp)
+ 18c0992:	mov    0x648(%rsp),%rdx
+ 18c099a:	mov    0x8(%rsp),%rax
+ 18c099f:	cmp    0x128(%rax),%rdx
+ 18c09a6:	jne    18c0af6 <<litchi_odp::authoring::edit::Transaction>::commit+0xde6>
+ 18c09ac:	mov    0x8(%rsp),%rax
+ 18c09b1:	mov    0x120(%rax),%rsi
+ 18c09b8:	mov    0x640(%rsp),%rdi
+ 18c09c0:	add    $0x10,%rdi
+ 18c09c4:	call   1894290 <<litchi_odp::model::slide::Slide as core::slice::cmp::SlicePartialEq<litchi_odp::model::slide::Slide>>::equal_same_length>
+ 18c09c9:	test   %al,%al
+ 18c09cb:	je     18c0af6 <<litchi_odp::authoring::edit::Transaction>::commit+0xde6>
+ 18c09d1:	mov    %r12d,0x160(%rsp)
+ 18c09d9:	mov    %r15d,0x144(%rsp)
+ 18c09e1:	lea    0x188(%rsp),%rax
+ 18c09e9:	lea    0x5c8(%rsp),%rsi
+ 18c09f1:	mov    0x70(%rsp),%rbx
+ 18c09f6:	mov    0x180(%rsp),%r14
+ 18c09fe:	movups (%rax),%xmm0
+ 18c0a01:	movaps %xmm0,0xa70(%rsp)
+ 18c0a09:	movups 0x198(%rsp),%xmm0
+ 18c0a11:	movaps %xmm0,0x60(%rsp)
+ 18c0a16:	mov    0x60(%rax),%rcx
+ 18c0a1a:	mov    %rcx,0xa60(%rsp)
+ 18c0a22:	movups 0x20(%rax),%xmm0
+ 18c0a26:	movups 0x30(%rax),%xmm1
+ 18c0a2a:	movups 0x40(%rax),%xmm2
+ 18c0a2e:	movups 0x50(%rax),%xmm3
+ 18c0a32:	movaps %xmm3,0xa50(%rsp)
+ 18c0a3a:	movaps %xmm2,0xa40(%rsp)
+ 18c0a42:	movaps %xmm1,0xa30(%rsp)
+ 18c0a4a:	movaps %xmm0,0xa20(%rsp)
+ 18c0a52:	movzbl 0x1f0(%rsp),%ebp
+ 18c0a5a:	mov    0x1f4(%rsp),%eax
+ 18c0a61:	mov    %eax,0x223(%rsp)
+ 18c0a68:	mov    0x1f1(%rsp),%eax
+ 18c0a6f:	mov    %eax,0x220(%rsp)
+ 18c0a76:	mov    0x5c0(%rsp),%r12
+ 18c0a7e:	lea    0x1008(%rsp),%rdi
+ 18c0a86:	mov    $0x90,%edx
+ 18c0a8b:	call   *0x1435757(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c0a91:	movdqa 0x60(%rsp),%xmm1
+ 18c0a97:	mov    0x520(%rsp),%r15
+ 18c0a9f:	movups 0x528(%rsp),%xmm0
+ 18c0aa7:	movaps %xmm0,0xf20(%rsp)
+ 18c0aaf:	movups 0x538(%rsp),%xmm0
+ 18c0ab7:	movaps %xmm0,0xf30(%rsp)
+ 18c0abf:	movups 0x548(%rsp),%xmm0
+ 18c0ac7:	movaps %xmm0,0xf40(%rsp)
+ 18c0acf:	movdqu 0x558(%rsp),%xmm0
+ 18c0ad8:	movdqa %xmm0,0xf50(%rsp)
+ 18c0ae1:	mov    0x568(%rsp),%rax
+ 18c0ae9:	mov    %rax,0xf60(%rsp)
+ 18c0af1:	jmp    18c0415 <<litchi_odp::authoring::edit::Transaction>::commit+0x705>
+ 18c0af6:	call   *0x1435724(%rip)        # 2cf6220 <_DYNAMIC+0x288>
+ 18c0afc:	mov    $0x3c,%edi
+ 18c0b01:	mov    $0x1,%esi
+ 18c0b06:	call   *0x143571c(%rip)        # 2cf6228 <_DYNAMIC+0x290>
+ 18c0b0c:	test   %rax,%rax
+ 18c0b0f:	je     18c340f <<litchi_odp::authoring::edit::Transaction>::commit+0x36ff>
+ 18c0b15:	movups -0x1550c52(%rip),%xmm0        # 36feca <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x5c8>
+ 18c0b1c:	movups %xmm0,0x2c(%rax)
+ 18c0b20:	movups -0x1550c69(%rip),%xmm0        # 36febe <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x5bc>
+ 18c0b27:	movups %xmm0,0x20(%rax)
+ 18c0b2b:	movups -0x1550c84(%rip),%xmm0        # 36feae <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x5ac>
+ 18c0b32:	movups %xmm0,0x10(%rax)
+ 18c0b36:	movups -0x1550c9f(%rip),%xmm0        # 36fe9e <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x59c>
+ 18c0b3d:	movups %xmm0,(%rax)
+ 18c0b40:	movabs $0x8000000000000002,%rcx
+ 18c0b4a:	mov    0x18(%rsp),%rdx
+ 18c0b4f:	mov    %rcx,0x8(%rdx)
+ 18c0b53:	movq   $0x3c,0x10(%rdx)
+ 18c0b5b:	mov    %rax,0x18(%rdx)
+ 18c0b5f:	movq   $0x3c,0x20(%rdx)
+ 18c0b67:	movq   $0xfffffffffffffffe,(%rdx)
+ 18c0b6e:	lea    0x5c0(%rsp),%rdi
+ 18c0b76:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c0b7b:	mov    0x70(%rsp),%rax
+ 18c0b80:	lock decq (%rax)
+ 18c0b84:	jne    18c0b91 <<litchi_odp::authoring::edit::Transaction>::commit+0xe81>
+ 18c0b86:	lea    0x70(%rsp),%rdi
+ 18c0b8b:	call   *0x1435b7f(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0b91:	mov    0x520(%rsp),%rax
+ 18c0b99:	test   %rax,%rax
+ 18c0b9c:	je     18c0bce <<litchi_odp::authoring::edit::Transaction>::commit+0xebe>
+ 18c0b9e:	lock decq (%rax)
+ 18c0ba2:	jne    18c0bb2 <<litchi_odp::authoring::edit::Transaction>::commit+0xea2>
+ 18c0ba4:	lea    0x520(%rsp),%rdi
+ 18c0bac:	call   *0x1435b5e(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0bb2:	mov    0x528(%rsp),%rax
+ 18c0bba:	lock decq (%rax)
+ 18c0bbe:	jne    18c0bce <<litchi_odp::authoring::edit::Transaction>::commit+0xebe>
+ 18c0bc0:	lea    0x528(%rsp),%rdi
+ 18c0bc8:	call   *0x1435b42(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0bce:	lea    0x180(%rsp),%rdi
+ 18c0bd6:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c0bdb:	jmp    18c3f95 <<litchi_odp::authoring::edit::Transaction>::commit+0x4285>
+ 18c0be0:	mov    $0xffffffffffffffff,%r15
+ 18c0be7:	mov    0x8(%rsp),%rcx
+ 18c0bec:	mov    0x720(%rcx),%rax
+ 18c0bf3:	mov    %rax,0x270(%rsp)
+ 18c0bfb:	movups 0x6e0(%rcx),%xmm0
+ 18c0c02:	movups 0x6f0(%rcx),%xmm1
+ 18c0c09:	movups 0x700(%rcx),%xmm2
+ 18c0c10:	movups 0x710(%rcx),%xmm3
+ 18c0c17:	movaps %xmm3,0x260(%rsp)
+ 18c0c1f:	movaps %xmm2,0x250(%rsp)
+ 18c0c27:	movaps %xmm1,0x240(%rsp)
+ 18c0c2f:	movaps %xmm0,0x230(%rsp)
+ 18c0c37:	movzbl 0x728(%rcx),%ebp
+ 18c0c3e:	movaps 0x5c0(%rsp),%xmm0
+ 18c0c46:	movaps %xmm0,0xc70(%rsp)
+ 18c0c4e:	lea    0xc0(%rsp),%rdi
+ 18c0c56:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c0c5b:	mov    %r15,0xc0(%rsp)
+ 18c0c63:	movaps 0xc70(%rsp),%xmm0
+ 18c0c6b:	lea    0xc8(%rsp),%rcx
+ 18c0c73:	movups %xmm0,(%rcx)
+ 18c0c76:	mov    %rbx,0xd8(%rsp)
+ 18c0c7e:	mov    %r14,0xe0(%rsp)
+ 18c0c86:	mov    0x270(%rsp),%rax
+ 18c0c8e:	mov    %rax,0x60(%rcx)
+ 18c0c92:	movaps 0x230(%rsp),%xmm0
+ 18c0c9a:	movaps 0x240(%rsp),%xmm1
+ 18c0ca2:	movaps 0x250(%rsp),%xmm2
+ 18c0caa:	movaps 0x260(%rsp),%xmm3
+ 18c0cb2:	movups %xmm3,0x50(%rcx)
+ 18c0cb6:	movups %xmm2,0x40(%rcx)
+ 18c0cba:	movups %xmm1,0x30(%rcx)
+ 18c0cbe:	movups %xmm0,0x20(%rcx)
+ 18c0cc2:	mov    %bpl,0x130(%rsp)
+ 18c0cca:	lock incq (%rbx)
+ 18c0cce:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0cd4:	mov    0xd8(%rsp),%rbx
+ 18c0cdc:	mov    0x10(%rsp),%rax
+ 18c0ce1:	lock decq (%rax)
+ 18c0ce5:	jne    18c0cf2 <<litchi_odp::authoring::edit::Transaction>::commit+0xfe2>
+ 18c0ce7:	lea    0x10(%rsp),%rdi
+ 18c0cec:	call   *0x1435a1e(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0cf2:	mov    %rbx,0x10(%rsp)
+ 18c0cf7:	mov    0x70(%rsp),%rax
+ 18c0cfc:	test   %rax,%rax
+ 18c0cff:	je     18c0d28 <<litchi_odp::authoring::edit::Transaction>::commit+0x1018>
+ 18c0d01:	lock decq (%rax)
+ 18c0d05:	jne    18c0d12 <<litchi_odp::authoring::edit::Transaction>::commit+0x1002>
+ 18c0d07:	lea    0x70(%rsp),%rdi
+ 18c0d0c:	call   *0x14359fe(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0d12:	mov    0x78(%rsp),%rax
+ 18c0d17:	lock decq (%rax)
+ 18c0d1b:	jne    18c0d28 <<litchi_odp::authoring::edit::Transaction>::commit+0x1018>
+ 18c0d1d:	lea    0x78(%rsp),%rdi
+ 18c0d22:	call   *0x14359e8(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c0d28:	movq   $0x0,0x70(%rsp)
+ 18c0d31:	mov    0x8(%rsp),%rax
+ 18c0d36:	add    $0x730,%rax
+ 18c0d3c:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c0d40:	je     18c181d <<litchi_odp::authoring::edit::Transaction>::commit+0x1b0d>
+ 18c0d46:	mov    0x8(%rsp),%rax
+ 18c0d4b:	mov    0x770(%rax),%rax
+ 18c0d52:	test   %rax,%rax
+ 18c0d55:	je     18c181d <<litchi_odp::authoring::edit::Transaction>::commit+0x1b0d>
+ 18c0d5b:	mov    0x8(%rsp),%rdx
+ 18c0d60:	movzbl 0x8a0(%rdx),%ecx
+ 18c0d67:	or     0x2c(%rsp),%cl
+ 18c0d6b:	cmp    $0x1,%cl
+ 18c0d6e:	jne    18c1651 <<litchi_odp::authoring::edit::Transaction>::commit+0x1941>
+ 18c0d74:	mov    0x768(%rdx),%rcx
+ 18c0d7b:	mov    %rcx,0x60(%rsp)
+ 18c0d80:	imul   $0x68,%rax,%rbx
+ 18c0d84:	lea    0x238(%rsp),%r13
+ 18c0d8c:	jmp    18c0da9 <<litchi_odp::authoring::edit::Transaction>::commit+0x1099>
+ 18c0d8e:	xchg   %ax,%ax
+ 18c0d90:	addq   $0x68,0x60(%rsp)
+ 18c0d96:	movq   $0x0,0x70(%rsp)
+ 18c0d9f:	add    $0xffffffffffffff98,%rbx
+ 18c0da3:	je     18c181d <<litchi_odp::authoring::edit::Transaction>::commit+0x1b0d>
+ 18c0da9:	mov    %rbx,0x228(%rsp)
+ 18c0db1:	mov    0xd8(%rsp),%rbx
+ 18c0db9:	lock incq (%rbx)
+ 18c0dbd:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0dc3:	mov    %rbx,0xbf0(%rsp)
+ 18c0dcb:	mov    0xe0(%rsp),%r14
+ 18c0dd3:	lock incq (%r14)
+ 18c0dd7:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c0ddd:	mov    %r14,0x520(%rsp)
+ 18c0de5:	cmpq   $0xffffffffffffffff,0xc0(%rsp)
+ 18c0dee:	je     18c0e1d <<litchi_odp::authoring::edit::Transaction>::commit+0x110d>
+ 18c0df0:	lea    0x230(%rsp),%rdi
+ 18c0df8:	lea    0xc0(%rsp),%rsi
+ 18c0e00:	call   *0x1435552(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c0e06:	mov    0x230(%rsp),%rax
+ 18c0e0e:	movups 0x0(%r13),%xmm0
+ 18c0e13:	movaps %xmm0,0x180(%rsp)
+ 18c0e1b:	jmp    18c0e24 <<litchi_odp::authoring::edit::Transaction>::commit+0x1114>
+ 18c0e1d:	mov    $0xffffffffffffffff,%rax
+ 18c0e24:	lea    0xc8(%rsp),%rdx
+ 18c0e2c:	mov    0x60(%rdx),%rcx
+ 18c0e30:	lea    0xc98(%rsp),%rsi
+ 18c0e38:	mov    %rcx,0x40(%rsi)
+ 18c0e3c:	movups 0x20(%rdx),%xmm0
+ 18c0e40:	movups 0x30(%rdx),%xmm1
+ 18c0e44:	movups 0x40(%rdx),%xmm2
+ 18c0e48:	movups 0x50(%rdx),%xmm3
+ 18c0e4c:	movups %xmm3,0x30(%rsi)
+ 18c0e50:	movups %xmm2,0x20(%rsi)
+ 18c0e54:	movups %xmm1,0x10(%rsi)
+ 18c0e58:	movups %xmm0,(%rsi)
+ 18c0e5b:	movzbl 0x130(%rsp),%ecx
+ 18c0e63:	mov    %rbx,0xc88(%rsp)
+ 18c0e6b:	mov    %r14,0xc90(%rsp)
+ 18c0e73:	mov    %rax,0xc70(%rsp)
+ 18c0e7b:	movaps 0x180(%rsp),%xmm0
+ 18c0e83:	movups %xmm0,-0x20(%rsi)
+ 18c0e87:	mov    %cl,0xce0(%rsp)
+ 18c0e8e:	mov    $0x2f,%ecx
+ 18c0e93:	mov    $0x14,%r9d
+ 18c0e99:	lea    0x230(%rsp),%rdi
+ 18c0ea1:	lea    0xc70(%rsp),%rsi
+ 18c0ea9:	lea    -0x154a924(%rip),%rdx        # 37658c <anon.df51520b29a100593cf67444222ff428.56.llvm.10873956771832366964>
+ 18c0eb0:	lea    -0x154a8fc(%rip),%r8        # 3765bb <anon.df51520b29a100593cf67444222ff428.57.llvm.10873956771832366964>
+ 18c0eb7:	push   $0x3
+ 18c0eb9:	lea    -0x154a8f1(%rip),%rax        # 3765cf <anon.df51520b29a100593cf67444222ff428.58.llvm.10873956771832366964>
+ 18c0ec0:	push   %rax
+ 18c0ec1:	call   *0x143baa1(%rip)        # 2cfc968 <_DYNAMIC+0x69d0>
+ 18c0ec7:	add    $0x10,%rsp
+ 18c0ecb:	mov    0x230(%rsp),%r13
+ 18c0ed3:	mov    0x238(%rsp),%rbp
+ 18c0edb:	mov    0x240(%rsp),%r15
+ 18c0ee3:	mov    0x248(%rsp),%rax
+ 18c0eeb:	mov    0x250(%rsp),%rbx
+ 18c0ef3:	mov    0x258(%rsp),%r14
+ 18c0efb:	mov    0x260(%rsp),%r12
+ 18c0f03:	cmp    $0xffffffffffffffff,%r13
+ 18c0f07:	je     18c10ab <<litchi_odp::authoring::edit::Transaction>::commit+0x139b>
+ 18c0f0d:	mov    $0x2b0,%edx
+ 18c0f12:	lea    0x5f8(%rsp),%rdi
+ 18c0f1a:	lea    0x268(%rsp),%rsi
+ 18c0f22:	mov    %rbx,0x38(%rsp)
+ 18c0f27:	mov    %rax,%rbx
+ 18c0f2a:	call   *0x14352b8(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c0f30:	mov    %rbp,%rdx
+ 18c0f33:	mov    %rbp,0x5c8(%rsp)
+ 18c0f3b:	mov    %r15,%r10
+ 18c0f3e:	mov    %r15,0x5d0(%rsp)
+ 18c0f46:	mov    %rbx,0x5d8(%rsp)
+ 18c0f4e:	mov    0x38(%rsp),%rax
+ 18c0f53:	mov    %rax,0x5e0(%rsp)
+ 18c0f5b:	mov    %r14,0x5e8(%rsp)
+ 18c0f63:	mov    %r12,0x5f0(%rsp)
+ 18c0f6b:	mov    %r13,0x5c0(%rsp)
+ 18c0f73:	mov    0x60(%rsp),%rax
+ 18c0f78:	mov    (%rax),%rax
+ 18c0f7b:	movabs $0x8000000000000002,%rcx
+ 18c0f85:	add    %rax,%rcx
+ 18c0f88:	dec    %rcx
+ 18c0f8b:	sar    $0x3f,%rax
+ 18c0f8f:	and    %rcx,%rax
+ 18c0f92:	je     18c10d0 <<litchi_odp::authoring::edit::Transaction>::commit+0x13c0>
+ 18c0f98:	cmp    $0x1,%rax
+ 18c0f9c:	lea    0x238(%rsp),%r13
+ 18c0fa4:	lea    0xc70(%rsp),%r12
+ 18c0fac:	jne    18c114f <<litchi_odp::authoring::edit::Transaction>::commit+0x143f>
+ 18c0fb2:	mov    0x60(%rsp),%rax
+ 18c0fb7:	lea    0x8(%rax),%r9
+ 18c0fbb:	mov    0x50(%rax),%r8
+ 18c0fbf:	lea    0x230(%rsp),%rdi
+ 18c0fc7:	lea    0x5d8(%rsp),%rsi
+ 18c0fcf:	mov    %r10,%rcx
+ 18c0fd2:	call   1902ab0 <litchi_odp::annotation::codec::replace>
+ 18c0fd7:	mov    0x143520a(%rip),%rbx        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c0fde:	mov    0x230(%rsp),%rbp
+ 18c0fe6:	mov    0x238(%rsp),%rcx
+ 18c0fee:	mov    0x240(%rsp),%r14
+ 18c0ff6:	mov    0x248(%rsp),%rax
+ 18c0ffe:	cmp    $0xffffffffffffffff,%rbp
+ 18c1002:	jne    18c11a1 <<litchi_odp::authoring::edit::Transaction>::commit+0x1491>
+ 18c1008:	mov    %rcx,0x180(%rsp)
+ 18c1010:	mov    %r14,0x188(%rsp)
+ 18c1018:	mov    %rax,0x190(%rsp)
+ 18c1020:	lea    0x230(%rsp),%rdi
+ 18c1028:	lea    0x180(%rsp),%rsi
+ 18c1030:	call   *0x1435cea(%rip)        # 2cf6d20 <_DYNAMIC+0xd88>
+ 18c1036:	mov    0x230(%rsp),%r13
+ 18c103e:	mov    0x238(%rsp),%rbp
+ 18c1046:	mov    0x240(%rsp),%rax
+ 18c104e:	mov    %rax,0x20(%rsp)
+ 18c1053:	mov    0x248(%rsp),%r14
+ 18c105b:	mov    0x250(%rsp),%rax
+ 18c1063:	mov    %rax,0x38(%rsp)
+ 18c1068:	mov    0x258(%rsp),%r15
+ 18c1070:	mov    0x260(%rsp),%rax
+ 18c1078:	mov    %rax,0x40(%rsp)
+ 18c107d:	cmp    $0xffffffffffffffff,%r13
+ 18c1081:	je     18c15e9 <<litchi_odp::authoring::edit::Transaction>::commit+0x18d9>
+ 18c1087:	mov    $0x2b0,%edx
+ 18c108c:	mov    %r12,%rdi
+ 18c108f:	lea    0x268(%rsp),%rsi
+ 18c1097:	call   *%rbx
+ 18c1099:	lea    0x5c0(%rsp),%rdi
+ 18c10a1:	call   193f540 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c10a6:	jmp    18c1517 <<litchi_odp::authoring::edit::Transaction>::commit+0x1807>
+ 18c10ab:	mov    %r14,0x170(%rsp)
+ 18c10b3:	mov    %r12,0x168(%rsp)
+ 18c10bb:	lea    0x238(%rsp),%r13
+ 18c10c3:	mov    %r15,0x20(%rsp)
+ 18c10c8:	mov    %rax,%r14
+ 18c10cb:	jmp    18c11d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x14c6>
+ 18c10d0:	mov    0x60(%rsp),%r9
+ 18c10d5:	lea    0x48(%r9),%r8
+ 18c10d9:	lea    0x230(%rsp),%rdi
+ 18c10e1:	lea    0x5d8(%rsp),%rsi
+ 18c10e9:	mov    %r10,%rcx
+ 18c10ec:	call   18ff510 <litchi_odp::annotation::codec::add>
+ 18c10f1:	lea    0x238(%rsp),%r13
+ 18c10f9:	lea    0xc70(%rsp),%r14
+ 18c1101:	mov    0x14350e0(%rip),%rbx        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c1108:	mov    0x230(%rsp),%rbp
+ 18c1110:	mov    0x238(%rsp),%rdx
+ 18c1118:	mov    0x240(%rsp),%rax
+ 18c1120:	mov    0x248(%rsp),%rcx
+ 18c1128:	cmp    $0xffffffffffffffff,%rbp
+ 18c112c:	je     18c137f <<litchi_odp::authoring::edit::Transaction>::commit+0x166f>
+ 18c1132:	mov    %rdx,0x20(%rsp)
+ 18c1137:	mov    0x250(%rsp),%r15
+ 18c113f:	mov    0x258(%rsp),%r12
+ 18c1147:	mov    %rax,%r14
+ 18c114a:	mov    %rcx,%rbx
+ 18c114d:	jmp    18c11b9 <<litchi_odp::authoring::edit::Transaction>::commit+0x14a9>
+ 18c114f:	mov    0x60(%rsp),%rax
+ 18c1154:	mov    0x8(%rax),%r8
+ 18c1158:	lea    0x230(%rsp),%rdi
+ 18c1160:	lea    0x5d8(%rsp),%rsi
+ 18c1168:	mov    %r10,%rcx
+ 18c116b:	call   1902720 <litchi_odp::annotation::codec::remove>
+ 18c1170:	mov    0x1435071(%rip),%rbx        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c1177:	mov    0x230(%rsp),%rbp
+ 18c117f:	mov    0x238(%rsp),%rcx
+ 18c1187:	mov    0x240(%rsp),%r14
+ 18c118f:	mov    0x248(%rsp),%rax
+ 18c1197:	cmp    $0xffffffffffffffff,%rbp
+ 18c119b:	je     18c1479 <<litchi_odp::authoring::edit::Transaction>::commit+0x1769>
+ 18c11a1:	mov    %rcx,0x20(%rsp)
+ 18c11a6:	mov    0x250(%rsp),%r15
+ 18c11ae:	mov    0x258(%rsp),%r12
+ 18c11b6:	mov    %rax,%rbx
+ 18c11b9:	lea    0x5c0(%rsp),%rdi
+ 18c11c1:	call   18bafc0 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c11c6:	mov    %r15,0x170(%rsp)
+ 18c11ce:	mov    %r12,0x168(%rsp)
+ 18c11d6:	cmp    $0xffffffffffffffff,%rbp
+ 18c11da:	jne    18c2761 <<litchi_odp::authoring::edit::Transaction>::commit+0x2a51>
+ 18c11e0:	cmp    $0x8000000,%rbx
+ 18c11e7:	ja     18c2798 <<litchi_odp::authoring::edit::Transaction>::commit+0x2a88>
+ 18c11ed:	mov    0x20(%rsp),%rax
+ 18c11f2:	mov    %rax,0x5c0(%rsp)
+ 18c11fa:	mov    %r14,0x5c8(%rsp)
+ 18c1202:	mov    %rbx,0x5d0(%rsp)
+ 18c120a:	lea    0x230(%rsp),%rdi
+ 18c1212:	lea    0x5c0(%rsp),%rsi
+ 18c121a:	call   *0x14358a8(%rip)        # 2cf6ac8 <_DYNAMIC+0xb30>
+ 18c1220:	mov    0x230(%rsp),%rbx
+ 18c1228:	movups 0x0(%r13),%xmm0
+ 18c122d:	movups 0x10(%r13),%xmm1
+ 18c1232:	movups 0x20(%r13),%xmm2
+ 18c1237:	movaps %xmm0,0x8e0(%rsp)
+ 18c123f:	movaps %xmm1,0x8f0(%rsp)
+ 18c1247:	movaps %xmm2,0x900(%rsp)
+ 18c124f:	cmp    $0xfffffffffffffffe,%rbx
+ 18c1253:	je     18c27d5 <<litchi_odp::authoring::edit::Transaction>::commit+0x2ac5>
+ 18c1259:	movups 0x30(%r13),%xmm0
+ 18c125e:	movups 0x40(%r13),%xmm1
+ 18c1263:	movups 0x50(%r13),%xmm2
+ 18c1268:	movups 0x60(%r13),%xmm3
+ 18c126d:	movaps %xmm3,0xaf0(%rsp)
+ 18c1275:	movaps %xmm2,0xae0(%rsp)
+ 18c127d:	movaps %xmm1,0xad0(%rsp)
+ 18c1285:	movaps %xmm0,0xac0(%rsp)
+ 18c128d:	lea    0xc0(%rsp),%rdi
+ 18c1295:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c129a:	mov    %rbx,0xc0(%rsp)
+ 18c12a2:	movaps 0x8e0(%rsp),%xmm0
+ 18c12aa:	movaps 0x8f0(%rsp),%xmm1
+ 18c12b2:	movaps 0x900(%rsp),%xmm2
+ 18c12ba:	lea    0xc8(%rsp),%rax
+ 18c12c2:	movups %xmm2,0x20(%rax)
+ 18c12c6:	movups %xmm1,0x10(%rax)
+ 18c12ca:	movups %xmm0,(%rax)
+ 18c12cd:	movaps 0xac0(%rsp),%xmm0
+ 18c12d5:	movaps 0xad0(%rsp),%xmm1
+ 18c12dd:	movaps 0xae0(%rsp),%xmm2
+ 18c12e5:	movaps 0xaf0(%rsp),%xmm3
+ 18c12ed:	lea    0xf8(%rsp),%rax
+ 18c12f5:	movups %xmm3,0x30(%rax)
+ 18c12f9:	movups %xmm2,0x20(%rax)
+ 18c12fd:	movups %xmm1,0x10(%rax)
+ 18c1301:	movups %xmm0,(%rax)
+ 18c1304:	mov    0xd8(%rsp),%rax
+ 18c130c:	lock incq (%rax)
+ 18c1310:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1316:	mov    0xd8(%rsp),%rbx
+ 18c131e:	mov    0x10(%rsp),%rax
+ 18c1323:	lock decq (%rax)
+ 18c1327:	jne    18c1334 <<litchi_odp::authoring::edit::Transaction>::commit+0x1624>
+ 18c1329:	lea    0x10(%rsp),%rdi
+ 18c132e:	call   *0x14353dc(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1334:	mov    %rbx,0x10(%rsp)
+ 18c1339:	mov    0x70(%rsp),%rax
+ 18c133e:	test   %rax,%rax
+ 18c1341:	mov    0x228(%rsp),%rbx
+ 18c1349:	je     18c0d90 <<litchi_odp::authoring::edit::Transaction>::commit+0x1080>
+ 18c134f:	lock decq (%rax)
+ 18c1353:	jne    18c1360 <<litchi_odp::authoring::edit::Transaction>::commit+0x1650>
+ 18c1355:	lea    0x70(%rsp),%rdi
+ 18c135a:	call   *0x14353b0(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1360:	mov    0x78(%rsp),%rax
+ 18c1365:	lock decq (%rax)
+ 18c1369:	jne    18c0d90 <<litchi_odp::authoring::edit::Transaction>::commit+0x1080>
+ 18c136f:	lea    0x78(%rsp),%rdi
+ 18c1374:	call   *0x1435396(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c137a:	jmp    18c0d90 <<litchi_odp::authoring::edit::Transaction>::commit+0x1080>
+ 18c137f:	mov    %rdx,0x180(%rsp)
+ 18c1387:	mov    %rax,0x188(%rsp)
+ 18c138f:	mov    %rcx,0x190(%rsp)
+ 18c1397:	lea    0x230(%rsp),%rdi
+ 18c139f:	lea    0x180(%rsp),%rsi
+ 18c13a7:	call   *0x1435973(%rip)        # 2cf6d20 <_DYNAMIC+0xd88>
+ 18c13ad:	mov    0x230(%rsp),%r13
+ 18c13b5:	mov    0x238(%rsp),%rbp
+ 18c13bd:	mov    0x240(%rsp),%rax
+ 18c13c5:	mov    %rax,0x20(%rsp)
+ 18c13ca:	mov    0x248(%rsp),%rax
+ 18c13d2:	mov    %rax,0x40(%rsp)
+ 18c13d7:	mov    0x250(%rsp),%rax
+ 18c13df:	mov    %rax,0x38(%rsp)
+ 18c13e4:	mov    0x258(%rsp),%r15
+ 18c13ec:	mov    0x260(%rsp),%r12
+ 18c13f4:	cmp    $0xffffffffffffffff,%r13
+ 18c13f8:	je     18c1630 <<litchi_odp::authoring::edit::Transaction>::commit+0x1920>
+ 18c13fe:	mov    $0x2b0,%edx
+ 18c1403:	mov    %r14,%rdi
+ 18c1406:	lea    0x268(%rsp),%rsi
+ 18c140e:	call   *%rbx
+ 18c1410:	lea    0x5c0(%rsp),%rdi
+ 18c1418:	call   193f540 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c141d:	mov    %r13,0x5c0(%rsp)
+ 18c1425:	mov    %rbp,0x5c8(%rsp)
+ 18c142d:	mov    0x20(%rsp),%rax
+ 18c1432:	mov    %rax,0x5d0(%rsp)
+ 18c143a:	mov    0x40(%rsp),%rax
+ 18c143f:	mov    %rax,0x5d8(%rsp)
+ 18c1447:	mov    0x38(%rsp),%rax
+ 18c144c:	mov    %rax,0x5e0(%rsp)
+ 18c1454:	mov    %r15,0x5e8(%rsp)
+ 18c145c:	mov    %r12,0x5f0(%rsp)
+ 18c1464:	mov    $0x2b0,%edx
+ 18c1469:	lea    0x5f8(%rsp),%rdi
+ 18c1471:	mov    %r14,%rsi
+ 18c1474:	jmp    18c156e <<litchi_odp::authoring::edit::Transaction>::commit+0x185e>
+ 18c1479:	mov    %rcx,0x180(%rsp)
+ 18c1481:	mov    %r14,0x188(%rsp)
+ 18c1489:	mov    %rax,0x190(%rsp)
+ 18c1491:	lea    0x230(%rsp),%rdi
+ 18c1499:	lea    0x180(%rsp),%rsi
+ 18c14a1:	call   *0x1435879(%rip)        # 2cf6d20 <_DYNAMIC+0xd88>
+ 18c14a7:	mov    0x230(%rsp),%r13
+ 18c14af:	mov    0x238(%rsp),%rbp
+ 18c14b7:	mov    0x240(%rsp),%rax
+ 18c14bf:	mov    %rax,0x20(%rsp)
+ 18c14c4:	mov    0x248(%rsp),%r14
+ 18c14cc:	mov    0x250(%rsp),%rax
+ 18c14d4:	mov    %rax,0x38(%rsp)
+ 18c14d9:	mov    0x258(%rsp),%r15
+ 18c14e1:	mov    0x260(%rsp),%rax
+ 18c14e9:	mov    %rax,0x40(%rsp)
+ 18c14ee:	cmp    $0xffffffffffffffff,%r13
+ 18c14f2:	je     18c15e9 <<litchi_odp::authoring::edit::Transaction>::commit+0x18d9>
+ 18c14f8:	mov    $0x2b0,%edx
+ 18c14fd:	mov    %r12,%rdi
+ 18c1500:	lea    0x268(%rsp),%rsi
+ 18c1508:	call   *%rbx
+ 18c150a:	lea    0x5c0(%rsp),%rdi
+ 18c1512:	call   193f540 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c1517:	mov    %r13,0x5c0(%rsp)
+ 18c151f:	mov    %rbp,0x5c8(%rsp)
+ 18c1527:	mov    0x20(%rsp),%rax
+ 18c152c:	mov    %rax,0x5d0(%rsp)
+ 18c1534:	mov    %r14,0x5d8(%rsp)
+ 18c153c:	mov    0x38(%rsp),%rax
+ 18c1541:	mov    %rax,0x5e0(%rsp)
+ 18c1549:	mov    %r15,0x5e8(%rsp)
+ 18c1551:	mov    0x40(%rsp),%rax
+ 18c1556:	mov    %rax,0x5f0(%rsp)
+ 18c155e:	mov    $0x2b0,%edx
+ 18c1563:	lea    0x5f8(%rsp),%rdi
+ 18c156b:	mov    %r12,%rsi
+ 18c156e:	call   *%rbx
+ 18c1570:	lea    0x238(%rsp),%r13
+ 18c1578:	mov    0x5f0(%rsp),%rax
+ 18c1580:	mov    0x20(%rax),%rbx
+ 18c1584:	test   %rbx,%rbx
+ 18c1587:	js     18c16b8 <<litchi_odp::authoring::edit::Transaction>::commit+0x19a8>
+ 18c158d:	mov    $0xffffffffffffffff,%rbp
+ 18c1594:	je     18c160a <<litchi_odp::authoring::edit::Transaction>::commit+0x18fa>
+ 18c1596:	mov    0x18(%rax),%r12
+ 18c159a:	call   *0x1434c80(%rip)        # 2cf6220 <_DYNAMIC+0x288>
+ 18c15a0:	mov    $0x1,%r15d
+ 18c15a6:	mov    $0x1,%esi
+ 18c15ab:	mov    %rbx,%rdi
+ 18c15ae:	call   *0x1434c74(%rip)        # 2cf6228 <_DYNAMIC+0x290>
+ 18c15b4:	test   %rax,%rax
+ 18c15b7:	je     18c16bb <<litchi_odp::authoring::edit::Transaction>::commit+0x19ab>
+ 18c15bd:	mov    %rax,%r14
+ 18c15c0:	mov    %rax,%rdi
+ 18c15c3:	mov    %r12,%rsi
+ 18c15c6:	mov    %rbx,%rdx
+ 18c15c9:	call   *0x1434c19(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c15cf:	mov    0x170(%rsp),%r15
+ 18c15d7:	mov    0x168(%rsp),%r12
+ 18c15df:	mov    %rbx,0x20(%rsp)
+ 18c15e4:	jmp    18c11b9 <<litchi_odp::authoring::edit::Transaction>::commit+0x14a9>
+ 18c15e9:	cmp    $0xffffffffffffffff,%rbp
+ 18c15ed:	lea    0x238(%rsp),%r13
+ 18c15f5:	mov    0x38(%rsp),%rbx
+ 18c15fa:	mov    0x40(%rsp),%r12
+ 18c15ff:	jne    18c11b9 <<litchi_odp::authoring::edit::Transaction>::commit+0x14a9>
+ 18c1605:	jmp    18c1578 <<litchi_odp::authoring::edit::Transaction>::commit+0x1868>
+ 18c160a:	mov    $0x1,%r14d
+ 18c1610:	mov    0x170(%rsp),%r15
+ 18c1618:	mov    0x168(%rsp),%r12
+ 18c1620:	xor    %ebx,%ebx
+ 18c1622:	movq   $0x0,0x20(%rsp)
+ 18c162b:	jmp    18c11b9 <<litchi_odp::authoring::edit::Transaction>::commit+0x14a9>
+ 18c1630:	cmp    $0xffffffffffffffff,%rbp
+ 18c1634:	lea    0x238(%rsp),%r13
+ 18c163c:	mov    0x40(%rsp),%r14
+ 18c1641:	mov    0x38(%rsp),%rbx
+ 18c1646:	jne    18c11b9 <<litchi_odp::authoring::edit::Transaction>::commit+0x14a9>
+ 18c164c:	jmp    18c1578 <<litchi_odp::authoring::edit::Transaction>::commit+0x1868>
+ 18c1651:	mov    0x790(%rdx),%rbx
+ 18c1658:	lock incq (%rbx)
+ 18c165c:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1662:	mov    %rbx,0x520(%rsp)
+ 18c166a:	mov    0x798(%rdx),%r14
+ 18c1671:	lock incq (%r14)
+ 18c1675:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c167b:	lea    0x778(%rdx),%rsi
+ 18c1682:	mov    %r14,0x180(%rsp)
+ 18c168a:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c168e:	je     18c16cc <<litchi_odp::authoring::edit::Transaction>::commit+0x19bc>
+ 18c1690:	lea    0x230(%rsp),%rdi
+ 18c1698:	call   *0x1434cba(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c169e:	mov    0x230(%rsp),%r15
+ 18c16a6:	movups 0x238(%rsp),%xmm0
+ 18c16ae:	movaps %xmm0,0x5c0(%rsp)
+ 18c16b6:	jmp    18c16d3 <<litchi_odp::authoring::edit::Transaction>::commit+0x19c3>
+ 18c16b8:	xor    %r15d,%r15d
+ 18c16bb:	mov    %r15,%rdi
+ 18c16be:	mov    %rbx,%rsi
+ 18c16c1:	call   *0x1434b81(%rip)        # 2cf6248 <_DYNAMIC+0x2b0>
+ 18c16c7:	jmp    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c16cc:	mov    $0xffffffffffffffff,%r15
+ 18c16d3:	mov    0x8(%rsp),%rcx
+ 18c16d8:	mov    0x7e0(%rcx),%rax
+ 18c16df:	mov    %rax,0x270(%rsp)
+ 18c16e7:	movups 0x7a0(%rcx),%xmm0
+ 18c16ee:	movups 0x7b0(%rcx),%xmm1
+ 18c16f5:	movups 0x7c0(%rcx),%xmm2
+ 18c16fc:	movups 0x7d0(%rcx),%xmm3
+ 18c1703:	movaps %xmm3,0x260(%rsp)
+ 18c170b:	movaps %xmm2,0x250(%rsp)
+ 18c1713:	movaps %xmm1,0x240(%rsp)
+ 18c171b:	movaps %xmm0,0x230(%rsp)
+ 18c1723:	movzbl 0x7e8(%rcx),%ebp
+ 18c172a:	movaps 0x5c0(%rsp),%xmm0
+ 18c1732:	movaps %xmm0,0xc70(%rsp)
+ 18c173a:	lea    0xc0(%rsp),%rdi
+ 18c1742:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c1747:	mov    %r15,0xc0(%rsp)
+ 18c174f:	movaps 0xc70(%rsp),%xmm0
+ 18c1757:	lea    0xc8(%rsp),%rcx
+ 18c175f:	movups %xmm0,(%rcx)
+ 18c1762:	mov    %rbx,0xd8(%rsp)
+ 18c176a:	mov    %r14,0xe0(%rsp)
+ 18c1772:	mov    0x270(%rsp),%rax
+ 18c177a:	mov    %rax,0x60(%rcx)
+ 18c177e:	movaps 0x230(%rsp),%xmm0
+ 18c1786:	movaps 0x240(%rsp),%xmm1
+ 18c178e:	movaps 0x250(%rsp),%xmm2
+ 18c1796:	movaps 0x260(%rsp),%xmm3
+ 18c179e:	movups %xmm3,0x50(%rcx)
+ 18c17a2:	movups %xmm2,0x40(%rcx)
+ 18c17a6:	movups %xmm1,0x30(%rcx)
+ 18c17aa:	movups %xmm0,0x20(%rcx)
+ 18c17ae:	mov    %bpl,0x130(%rsp)
+ 18c17b6:	lock incq (%rbx)
+ 18c17ba:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c17c0:	mov    0xd8(%rsp),%rbx
+ 18c17c8:	mov    0x10(%rsp),%rax
+ 18c17cd:	lock decq (%rax)
+ 18c17d1:	jne    18c17de <<litchi_odp::authoring::edit::Transaction>::commit+0x1ace>
+ 18c17d3:	lea    0x10(%rsp),%rdi
+ 18c17d8:	call   *0x1434f32(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c17de:	mov    %rbx,0x10(%rsp)
+ 18c17e3:	mov    0x70(%rsp),%rax
+ 18c17e8:	test   %rax,%rax
+ 18c17eb:	je     18c1814 <<litchi_odp::authoring::edit::Transaction>::commit+0x1b04>
+ 18c17ed:	lock decq (%rax)
+ 18c17f1:	jne    18c17fe <<litchi_odp::authoring::edit::Transaction>::commit+0x1aee>
+ 18c17f3:	lea    0x70(%rsp),%rdi
+ 18c17f8:	call   *0x1434f12(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c17fe:	mov    0x78(%rsp),%rax
+ 18c1803:	lock decq (%rax)
+ 18c1807:	jne    18c1814 <<litchi_odp::authoring::edit::Transaction>::commit+0x1b04>
+ 18c1809:	lea    0x78(%rsp),%rdi
+ 18c180e:	call   *0x1434efc(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1814:	movq   $0x0,0x70(%rsp)
+ 18c181d:	mov    0x138(%rsp),%rax
+ 18c1825:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c1829:	je     18c1a53 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d43>
+ 18c182f:	mov    0x8(%rsp),%rax
+ 18c1834:	mov    0x4b8(%rax),%rax
+ 18c183b:	test   %rax,%rax
+ 18c183e:	je     18c1a53 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d43>
+ 18c1844:	mov    0x8(%rsp),%rdx
+ 18c1849:	movzbl 0x8a0(%rdx),%ecx
+ 18c1850:	or     0x2c(%rsp),%cl
+ 18c1854:	or     0x30(%rsp),%cl
+ 18c1858:	cmp    $0x1,%cl
+ 18c185b:	jne    18c189b <<litchi_odp::authoring::edit::Transaction>::commit+0x1b8b>
+ 18c185d:	mov    0x4b0(%rdx),%rbx
+ 18c1864:	shl    $0x5,%rax
+ 18c1868:	lea    (%rax,%rax,4),%r14
+ 18c186c:	lea    0x238(%rsp),%r12
+ 18c1874:	mov    (%rbx),%rax
+ 18c1877:	sub    $0x2,%rax
+ 18c187b:	mov    $0x4,%ecx
+ 18c1880:	cmovae %rax,%rcx
+ 18c1884:	lea    0xa0(%rbx),%rbp
+ 18c188b:	lea    -0x1552062(%rip),%rdx        # 36f830 <anon.27ebc01334d26e52e912787017a60f97.393.llvm.17599591043162483340+0xc29>
+ 18c1892:	movslq (%rdx,%rcx,4),%rax
+ 18c1896:	add    %rdx,%rax
+ 18c1899:	jmp    *%rax
+ 18c189b:	mov    0x4d8(%rdx),%rbx
+ 18c18a2:	lock incq (%rbx)
+ 18c18a6:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c18ac:	mov    %rbx,0x520(%rsp)
+ 18c18b4:	mov    0x4e0(%rdx),%r14
+ 18c18bb:	lock incq (%r14)
+ 18c18bf:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c18c5:	lea    0x4c0(%rdx),%rsi
+ 18c18cc:	mov    %r14,0x180(%rsp)
+ 18c18d4:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c18d8:	je     18c1902 <<litchi_odp::authoring::edit::Transaction>::commit+0x1bf2>
+ 18c18da:	lea    0x230(%rsp),%rdi
+ 18c18e2:	call   *0x1434a70(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c18e8:	mov    0x230(%rsp),%r15
+ 18c18f0:	movups 0x238(%rsp),%xmm0
+ 18c18f8:	movaps %xmm0,0x5c0(%rsp)
+ 18c1900:	jmp    18c1909 <<litchi_odp::authoring::edit::Transaction>::commit+0x1bf9>
+ 18c1902:	mov    $0xffffffffffffffff,%r15
+ 18c1909:	mov    0x8(%rsp),%rcx
+ 18c190e:	mov    0x528(%rcx),%rax
+ 18c1915:	mov    %rax,0x270(%rsp)
+ 18c191d:	movups 0x4e8(%rcx),%xmm0
+ 18c1924:	movups 0x4f8(%rcx),%xmm1
+ 18c192b:	movups 0x508(%rcx),%xmm2
+ 18c1932:	movups 0x518(%rcx),%xmm3
+ 18c1939:	movaps %xmm3,0x260(%rsp)
+ 18c1941:	movaps %xmm2,0x250(%rsp)
+ 18c1949:	movaps %xmm1,0x240(%rsp)
+ 18c1951:	movaps %xmm0,0x230(%rsp)
+ 18c1959:	movzbl 0x530(%rcx),%ebp
+ 18c1960:	movaps 0x5c0(%rsp),%xmm0
+ 18c1968:	movaps %xmm0,0xc70(%rsp)
+ 18c1970:	lea    0xc0(%rsp),%rdi
+ 18c1978:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c197d:	mov    %r15,0xc0(%rsp)
+ 18c1985:	movaps 0xc70(%rsp),%xmm0
+ 18c198d:	lea    0xc8(%rsp),%rcx
+ 18c1995:	movups %xmm0,(%rcx)
+ 18c1998:	mov    %rbx,0xd8(%rsp)
+ 18c19a0:	mov    %r14,0xe0(%rsp)
+ 18c19a8:	mov    0x270(%rsp),%rax
+ 18c19b0:	mov    %rax,0x60(%rcx)
+ 18c19b4:	movaps 0x230(%rsp),%xmm0
+ 18c19bc:	movaps 0x240(%rsp),%xmm1
+ 18c19c4:	movaps 0x250(%rsp),%xmm2
+ 18c19cc:	movaps 0x260(%rsp),%xmm3
+ 18c19d4:	movups %xmm3,0x50(%rcx)
+ 18c19d8:	movups %xmm2,0x40(%rcx)
+ 18c19dc:	movups %xmm1,0x30(%rcx)
+ 18c19e0:	movups %xmm0,0x20(%rcx)
+ 18c19e4:	mov    %bpl,0x130(%rsp)
+ 18c19ec:	lock incq (%rbx)
+ 18c19f0:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c19f6:	mov    0xd8(%rsp),%rbx
+ 18c19fe:	mov    0x10(%rsp),%rax
+ 18c1a03:	lock decq (%rax)
+ 18c1a07:	jne    18c1a14 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d04>
+ 18c1a09:	lea    0x10(%rsp),%rdi
+ 18c1a0e:	call   *0x1434cfc(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1a14:	mov    %rbx,0x10(%rsp)
+ 18c1a19:	mov    0x70(%rsp),%rax
+ 18c1a1e:	test   %rax,%rax
+ 18c1a21:	je     18c1a4a <<litchi_odp::authoring::edit::Transaction>::commit+0x1d3a>
+ 18c1a23:	lock decq (%rax)
+ 18c1a27:	jne    18c1a34 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d24>
+ 18c1a29:	lea    0x70(%rsp),%rdi
+ 18c1a2e:	call   *0x1434cdc(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1a34:	mov    0x78(%rsp),%rax
+ 18c1a39:	lock decq (%rax)
+ 18c1a3d:	jne    18c1a4a <<litchi_odp::authoring::edit::Transaction>::commit+0x1d3a>
+ 18c1a3f:	lea    0x78(%rsp),%rdi
+ 18c1a44:	call   *0x1434cc6(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1a4a:	movq   $0x0,0x70(%rsp)
+ 18c1a53:	mov    0x8(%rsp),%rax
+ 18c1a58:	add    $0x538,%rax
+ 18c1a5e:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c1a62:	je     18c1ed5 <<litchi_odp::authoring::edit::Transaction>::commit+0x21c5>
+ 18c1a68:	mov    0x8(%rsp),%rax
+ 18c1a6d:	mov    0x578(%rax),%rax
+ 18c1a74:	test   %rax,%rax
+ 18c1a77:	je     18c1ed5 <<litchi_odp::authoring::edit::Transaction>::commit+0x21c5>
+ 18c1a7d:	mov    0x8(%rsp),%rsi
+ 18c1a82:	movzbl 0x8a0(%rsi),%ecx
+ 18c1a89:	or     0x2c(%rsp),%cl
+ 18c1a8d:	mov    0x144(%rsp),%edx
+ 18c1a94:	or     0x30(%rsp),%dl
+ 18c1a98:	or     %cl,%dl
+ 18c1a9a:	cmp    $0x1,%dl
+ 18c1a9d:	jne    18c1cd9 <<litchi_odp::authoring::edit::Transaction>::commit+0x1fc9>
+ 18c1aa3:	mov    0x570(%rsi),%rbx
+ 18c1aaa:	shl    $0x4,%rax
+ 18c1aae:	lea    (%rax,%rax,4),%r12
+ 18c1ab2:	lea    0x5f8(%rsi),%rax
+ 18c1ab9:	mov    %rax,0x60(%rsp)
+ 18c1abe:	lea    0x238(%rsp),%r14
+ 18c1ac6:	lea    0x230(%rsp),%r13
+ 18c1ace:	jmp    18c1ae7 <<litchi_odp::authoring::edit::Transaction>::commit+0x1dd7>
+ 18c1ad0:	add    $0x50,%rbx
+ 18c1ad4:	movq   $0x0,0x70(%rsp)
+ 18c1add:	add    $0xffffffffffffffb0,%r12
+ 18c1ae1:	je     18c1ed5 <<litchi_odp::authoring::edit::Transaction>::commit+0x21c5>
+ 18c1ae7:	mov    0x60(%rsp),%rcx
+ 18c1aec:	mov    0x10(%rcx),%rax
+ 18c1af0:	mov    %rax,0x5d0(%rsp)
+ 18c1af8:	movups (%rcx),%xmm0
+ 18c1afb:	movaps %xmm0,0x5c0(%rsp)
+ 18c1b03:	mov    %r13,%rbp
+ 18c1b06:	mov    %r13,%rdi
+ 18c1b09:	lea    0xc0(%rsp),%rsi
+ 18c1b11:	lea    0x5c0(%rsp),%rdx
+ 18c1b19:	mov    %rbx,%rcx
+ 18c1b1c:	call   18c67e0 <litchi_odp::authoring::edit::apply_chart_operation>
+ 18c1b21:	mov    0x230(%rsp),%rcx
+ 18c1b29:	mov    0x238(%rsp),%r13
+ 18c1b31:	mov    0x240(%rsp),%r15
+ 18c1b39:	mov    0x248(%rsp),%rax
+ 18c1b41:	cmp    $0xffffffffffffffff,%rcx
+ 18c1b45:	jne    18c2693 <<litchi_odp::authoring::edit::Transaction>::commit+0x2983>
+ 18c1b4b:	cmp    $0x8000000,%rax
+ 18c1b51:	ja     18c26c0 <<litchi_odp::authoring::edit::Transaction>::commit+0x29b0>
+ 18c1b57:	mov    %r13,0x5c0(%rsp)
+ 18c1b5f:	mov    %r15,0x5c8(%rsp)
+ 18c1b67:	mov    %rax,0x5d0(%rsp)
+ 18c1b6f:	mov    %rbp,%r13
+ 18c1b72:	mov    %rbp,%rdi
+ 18c1b75:	lea    0x5c0(%rsp),%rsi
+ 18c1b7d:	call   *0x1434f45(%rip)        # 2cf6ac8 <_DYNAMIC+0xb30>
+ 18c1b83:	mov    0x230(%rsp),%r15
+ 18c1b8b:	movups (%r14),%xmm0
+ 18c1b8f:	movups 0x10(%r14),%xmm1
+ 18c1b94:	movups 0x20(%r14),%xmm2
+ 18c1b99:	movaps %xmm0,0x940(%rsp)
+ 18c1ba1:	movaps %xmm1,0x950(%rsp)
+ 18c1ba9:	movaps %xmm2,0x960(%rsp)
+ 18c1bb1:	cmp    $0xfffffffffffffffe,%r15
+ 18c1bb5:	je     18c26ef <<litchi_odp::authoring::edit::Transaction>::commit+0x29df>
+ 18c1bbb:	movups 0x30(%r14),%xmm0
+ 18c1bc0:	movups 0x40(%r14),%xmm1
+ 18c1bc5:	movups 0x50(%r14),%xmm2
+ 18c1bca:	movups 0x60(%r14),%xmm3
+ 18c1bcf:	movaps %xmm3,0xb70(%rsp)
+ 18c1bd7:	movaps %xmm2,0xb60(%rsp)
+ 18c1bdf:	movaps %xmm1,0xb50(%rsp)
+ 18c1be7:	movaps %xmm0,0xb40(%rsp)
+ 18c1bef:	lea    0xc0(%rsp),%rdi
+ 18c1bf7:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c1bfc:	mov    %r15,0xc0(%rsp)
+ 18c1c04:	movaps 0x940(%rsp),%xmm0
+ 18c1c0c:	movaps 0x950(%rsp),%xmm1
+ 18c1c14:	movaps 0x960(%rsp),%xmm2
+ 18c1c1c:	lea    0xc8(%rsp),%rax
+ 18c1c24:	movups %xmm2,0x20(%rax)
+ 18c1c28:	movups %xmm1,0x10(%rax)
+ 18c1c2c:	movups %xmm0,(%rax)
+ 18c1c2f:	movaps 0xb40(%rsp),%xmm0
+ 18c1c37:	movaps 0xb50(%rsp),%xmm1
+ 18c1c3f:	movaps 0xb60(%rsp),%xmm2
+ 18c1c47:	movaps 0xb70(%rsp),%xmm3
+ 18c1c4f:	lea    0xf8(%rsp),%rax
+ 18c1c57:	movups %xmm3,0x30(%rax)
+ 18c1c5b:	movups %xmm2,0x20(%rax)
+ 18c1c5f:	movups %xmm1,0x10(%rax)
+ 18c1c63:	movups %xmm0,(%rax)
+ 18c1c66:	mov    0xd8(%rsp),%rax
+ 18c1c6e:	lock incq (%rax)
+ 18c1c72:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1c78:	mov    0xd8(%rsp),%r15
+ 18c1c80:	mov    0x10(%rsp),%rax
+ 18c1c85:	lock decq (%rax)
+ 18c1c89:	jne    18c1c96 <<litchi_odp::authoring::edit::Transaction>::commit+0x1f86>
+ 18c1c8b:	lea    0x10(%rsp),%rdi
+ 18c1c90:	call   *0x1434a7a(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1c96:	mov    %r15,0x10(%rsp)
+ 18c1c9b:	mov    0x70(%rsp),%rax
+ 18c1ca0:	test   %rax,%rax
+ 18c1ca3:	je     18c1ad0 <<litchi_odp::authoring::edit::Transaction>::commit+0x1dc0>
+ 18c1ca9:	lock decq (%rax)
+ 18c1cad:	jne    18c1cba <<litchi_odp::authoring::edit::Transaction>::commit+0x1faa>
+ 18c1caf:	lea    0x70(%rsp),%rdi
+ 18c1cb4:	call   *0x1434a56(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1cba:	mov    0x78(%rsp),%rax
+ 18c1cbf:	lock decq (%rax)
+ 18c1cc3:	jne    18c1ad0 <<litchi_odp::authoring::edit::Transaction>::commit+0x1dc0>
+ 18c1cc9:	lea    0x78(%rsp),%rdi
+ 18c1cce:	call   *0x1434a3c(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1cd4:	jmp    18c1ad0 <<litchi_odp::authoring::edit::Transaction>::commit+0x1dc0>
+ 18c1cd9:	mov    0x598(%rsi),%rbx
+ 18c1ce0:	lock incq (%rbx)
+ 18c1ce4:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1cea:	mov    %rbx,0x520(%rsp)
+ 18c1cf2:	mov    0x5a0(%rsi),%r14
+ 18c1cf9:	lock incq (%r14)
+ 18c1cfd:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1d03:	add    $0x580,%rsi
+ 18c1d0a:	mov    %r14,0x180(%rsp)
+ 18c1d12:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c1d16:	je     18c1d84 <<litchi_odp::authoring::edit::Transaction>::commit+0x2074>
+ 18c1d18:	lea    0x230(%rsp),%rdi
+ 18c1d20:	call   *0x1434632(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c1d26:	mov    0x230(%rsp),%r15
+ 18c1d2e:	movups 0x238(%rsp),%xmm0
+ 18c1d36:	movaps %xmm0,0x5c0(%rsp)
+ 18c1d3e:	jmp    18c1d8b <<litchi_odp::authoring::edit::Transaction>::commit+0x207b>
+ 18c1d40:	lea    -0x15520aa(%rip),%rsi        # 36fc9d <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x39b>
+ 18c1d47:	mov    $0x38,%edx
+ 18c1d4c:	mov    0x18(%rsp),%rdi
+ 18c1d51:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c1d56:	mov    $0x1,%r15b
+ 18c1d59:	test   %r14,%r14
+ 18c1d5c:	je     18c40ff <<litchi_odp::authoring::edit::Transaction>::commit+0x43ef>
+ 18c1d62:	jmp    18c272e <<litchi_odp::authoring::edit::Transaction>::commit+0x2a1e>
+ 18c1d67:	movaps 0x8b0(%rsp),%xmm0
+ 18c1d6f:	movaps 0x8c0(%rsp),%xmm1
+ 18c1d77:	movaps 0x8d0(%rsp),%xmm2
+ 18c1d7f:	jmp    18c40e4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43d4>
+ 18c1d84:	mov    $0xffffffffffffffff,%r15
+ 18c1d8b:	mov    0x8(%rsp),%rcx
+ 18c1d90:	mov    0x5e8(%rcx),%rax
+ 18c1d97:	mov    %rax,0x270(%rsp)
+ 18c1d9f:	movups 0x5a8(%rcx),%xmm0
+ 18c1da6:	movups 0x5b8(%rcx),%xmm1
+ 18c1dad:	movups 0x5c8(%rcx),%xmm2
+ 18c1db4:	movups 0x5d8(%rcx),%xmm3
+ 18c1dbb:	movaps %xmm3,0x260(%rsp)
+ 18c1dc3:	movaps %xmm2,0x250(%rsp)
+ 18c1dcb:	movaps %xmm1,0x240(%rsp)
+ 18c1dd3:	movaps %xmm0,0x230(%rsp)
+ 18c1ddb:	movzbl 0x5f0(%rcx),%ebp
+ 18c1de2:	movaps 0x5c0(%rsp),%xmm0
+ 18c1dea:	movaps %xmm0,0xc70(%rsp)
+ 18c1df2:	lea    0xc0(%rsp),%rdi
+ 18c1dfa:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c1dff:	mov    %r15,0xc0(%rsp)
+ 18c1e07:	movaps 0xc70(%rsp),%xmm0
+ 18c1e0f:	lea    0xc8(%rsp),%rcx
+ 18c1e17:	movups %xmm0,(%rcx)
+ 18c1e1a:	mov    %rbx,0xd8(%rsp)
+ 18c1e22:	mov    %r14,0xe0(%rsp)
+ 18c1e2a:	mov    0x270(%rsp),%rax
+ 18c1e32:	mov    %rax,0x60(%rcx)
+ 18c1e36:	movaps 0x230(%rsp),%xmm0
+ 18c1e3e:	movaps 0x240(%rsp),%xmm1
+ 18c1e46:	movaps 0x250(%rsp),%xmm2
+ 18c1e4e:	movaps 0x260(%rsp),%xmm3
+ 18c1e56:	movups %xmm3,0x50(%rcx)
+ 18c1e5a:	movups %xmm2,0x40(%rcx)
+ 18c1e5e:	movups %xmm1,0x30(%rcx)
+ 18c1e62:	movups %xmm0,0x20(%rcx)
+ 18c1e66:	mov    %bpl,0x130(%rsp)
+ 18c1e6e:	lock incq (%rbx)
+ 18c1e72:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c1e78:	mov    0xd8(%rsp),%rbx
+ 18c1e80:	mov    0x10(%rsp),%rax
+ 18c1e85:	lock decq (%rax)
+ 18c1e89:	jne    18c1e96 <<litchi_odp::authoring::edit::Transaction>::commit+0x2186>
+ 18c1e8b:	lea    0x10(%rsp),%rdi
+ 18c1e90:	call   *0x143487a(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1e96:	mov    %rbx,0x10(%rsp)
+ 18c1e9b:	mov    0x70(%rsp),%rax
+ 18c1ea0:	test   %rax,%rax
+ 18c1ea3:	je     18c1ecc <<litchi_odp::authoring::edit::Transaction>::commit+0x21bc>
+ 18c1ea5:	lock decq (%rax)
+ 18c1ea9:	jne    18c1eb6 <<litchi_odp::authoring::edit::Transaction>::commit+0x21a6>
+ 18c1eab:	lea    0x70(%rsp),%rdi
+ 18c1eb0:	call   *0x143485a(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1eb6:	mov    0x78(%rsp),%rax
+ 18c1ebb:	lock decq (%rax)
+ 18c1ebf:	jne    18c1ecc <<litchi_odp::authoring::edit::Transaction>::commit+0x21bc>
+ 18c1ec1:	lea    0x78(%rsp),%rdi
+ 18c1ec6:	call   *0x1434844(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c1ecc:	movq   $0x0,0x70(%rsp)
+ 18c1ed5:	mov    0x8(%rsp),%rax
+ 18c1eda:	add    $0x7f0,%rax
+ 18c1ee0:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c1ee4:	je     18c232c <<litchi_odp::authoring::edit::Transaction>::commit+0x261c>
+ 18c1eea:	mov    0x8(%rsp),%rax
+ 18c1eef:	mov    0x800(%rax),%rax
+ 18c1ef6:	test   %rax,%rax
+ 18c1ef9:	je     18c232c <<litchi_odp::authoring::edit::Transaction>::commit+0x261c>
+ 18c1eff:	mov    0x8(%rsp),%rdx
+ 18c1f04:	movzbl 0x8a0(%rdx),%ecx
+ 18c1f0b:	or     0x2c(%rsp),%cl
+ 18c1f0f:	mov    0x144(%rsp),%esi
+ 18c1f16:	or     0x30(%rsp),%sil
+ 18c1f1b:	mov    0x160(%rsp),%edi
+ 18c1f22:	or     %sil,%dil
+ 18c1f25:	or     %cl,%dil
+ 18c1f28:	cmp    $0x1,%dil
+ 18c1f2c:	jne    18c2156 <<litchi_odp::authoring::edit::Transaction>::commit+0x2446>
+ 18c1f32:	mov    0x7f8(%rdx),%rbx
+ 18c1f39:	imul   $0xb0,%rax,%r14
+ 18c1f40:	lea    0x238(%rsp),%r13
+ 18c1f48:	lea    0x230(%rsp),%r15
+ 18c1f50:	jmp    18c1f7d <<litchi_odp::authoring::edit::Transaction>::commit+0x226d>
+ 18c1f52:	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18c1f60:	add    $0xb0,%rbx
+ 18c1f67:	movq   $0x0,0x70(%rsp)
+ 18c1f70:	add    $0xffffffffffffff50,%r14
+ 18c1f77:	je     18c232c <<litchi_odp::authoring::edit::Transaction>::commit+0x261c>
+ 18c1f7d:	mov    %r14,0x60(%rsp)
+ 18c1f82:	mov    %r15,%rbp
+ 18c1f85:	mov    %r15,%rdi
+ 18c1f88:	lea    0xc0(%rsp),%rsi
+ 18c1f90:	mov    %rbx,%rdx
+ 18c1f93:	call   1825040 <litchi_odp::content::apply>
+ 18c1f98:	mov    0x230(%rsp),%rcx
+ 18c1fa0:	mov    0x238(%rsp),%r14
+ 18c1fa8:	mov    0x240(%rsp),%r12
+ 18c1fb0:	mov    0x248(%rsp),%rax
+ 18c1fb8:	cmp    $0xffffffffffffffff,%rcx
+ 18c1fbc:	jne    18c21bd <<litchi_odp::authoring::edit::Transaction>::commit+0x24ad>
+ 18c1fc2:	cmp    $0x8000000,%rax
+ 18c1fc8:	ja     18c270c <<litchi_odp::authoring::edit::Transaction>::commit+0x29fc>
+ 18c1fce:	mov    %r14,0x5c0(%rsp)
+ 18c1fd6:	mov    %r12,0x5c8(%rsp)
+ 18c1fde:	mov    %rax,0x5d0(%rsp)
+ 18c1fe6:	mov    %rbp,%r15
+ 18c1fe9:	mov    %rbp,%rdi
+ 18c1fec:	lea    0x5c0(%rsp),%rsi
+ 18c1ff4:	call   *0x1434ace(%rip)        # 2cf6ac8 <_DYNAMIC+0xb30>
+ 18c1ffa:	mov    0x230(%rsp),%r12
+ 18c2002:	movups 0x0(%r13),%xmm0
+ 18c2007:	movups 0x10(%r13),%xmm1
+ 18c200c:	movups 0x20(%r13),%xmm2
+ 18c2011:	movaps %xmm0,0x970(%rsp)
+ 18c2019:	movaps %xmm1,0x980(%rsp)
+ 18c2021:	movaps %xmm2,0x990(%rsp)
+ 18c2029:	cmp    $0xfffffffffffffffe,%r12
+ 18c202d:	je     18c2744 <<litchi_odp::authoring::edit::Transaction>::commit+0x2a34>
+ 18c2033:	movups 0x30(%r13),%xmm0
+ 18c2038:	movups 0x40(%r13),%xmm1
+ 18c203d:	movups 0x50(%r13),%xmm2
+ 18c2042:	movups 0x60(%r13),%xmm3
+ 18c2047:	movaps %xmm3,0xbb0(%rsp)
+ 18c204f:	movaps %xmm2,0xba0(%rsp)
+ 18c2057:	movaps %xmm1,0xb90(%rsp)
+ 18c205f:	movaps %xmm0,0xb80(%rsp)
+ 18c2067:	lea    0xc0(%rsp),%rdi
+ 18c206f:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c2074:	mov    %r12,0xc0(%rsp)
+ 18c207c:	movaps 0x970(%rsp),%xmm0
+ 18c2084:	movaps 0x980(%rsp),%xmm1
+ 18c208c:	movaps 0x990(%rsp),%xmm2
+ 18c2094:	lea    0xc8(%rsp),%rax
+ 18c209c:	movups %xmm2,0x20(%rax)
+ 18c20a0:	movups %xmm1,0x10(%rax)
+ 18c20a4:	movups %xmm0,(%rax)
+ 18c20a7:	movaps 0xb80(%rsp),%xmm0
+ 18c20af:	movaps 0xb90(%rsp),%xmm1
+ 18c20b7:	movaps 0xba0(%rsp),%xmm2
+ 18c20bf:	movaps 0xbb0(%rsp),%xmm3
+ 18c20c7:	lea    0xf8(%rsp),%rax
+ 18c20cf:	movups %xmm3,0x30(%rax)
+ 18c20d3:	movups %xmm2,0x20(%rax)
+ 18c20d7:	movups %xmm1,0x10(%rax)
+ 18c20db:	movups %xmm0,(%rax)
+ 18c20de:	mov    0xd8(%rsp),%rax
+ 18c20e6:	lock incq (%rax)
+ 18c20ea:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c20f0:	mov    0xd8(%rsp),%r12
+ 18c20f8:	mov    0x10(%rsp),%rax
+ 18c20fd:	lock decq (%rax)
+ 18c2101:	jne    18c210e <<litchi_odp::authoring::edit::Transaction>::commit+0x23fe>
+ 18c2103:	lea    0x10(%rsp),%rdi
+ 18c2108:	call   *0x1434602(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c210e:	mov    %r12,0x10(%rsp)
+ 18c2113:	mov    0x70(%rsp),%rax
+ 18c2118:	test   %rax,%rax
+ 18c211b:	mov    0x60(%rsp),%r14
+ 18c2120:	je     18c1f60 <<litchi_odp::authoring::edit::Transaction>::commit+0x2250>
+ 18c2126:	lock decq (%rax)
+ 18c212a:	jne    18c2137 <<litchi_odp::authoring::edit::Transaction>::commit+0x2427>
+ 18c212c:	lea    0x70(%rsp),%rdi
+ 18c2131:	call   *0x14345d9(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c2137:	mov    0x78(%rsp),%rax
+ 18c213c:	lock decq (%rax)
+ 18c2140:	jne    18c1f60 <<litchi_odp::authoring::edit::Transaction>::commit+0x2250>
+ 18c2146:	lea    0x78(%rsp),%rdi
+ 18c214b:	call   *0x14345bf(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c2151:	jmp    18c1f60 <<litchi_odp::authoring::edit::Transaction>::commit+0x2250>
+ 18c2156:	mov    0x820(%rdx),%rbx
+ 18c215d:	lock incq (%rbx)
+ 18c2161:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c2167:	mov    %rbx,0x520(%rsp)
+ 18c216f:	mov    0x828(%rdx),%r14
+ 18c2176:	lock incq (%r14)
+ 18c217a:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c2180:	lea    0x808(%rdx),%rsi
+ 18c2187:	mov    %r14,0x180(%rsp)
+ 18c218f:	cmpq   $0xffffffffffffffff,(%rsi)
+ 18c2193:	je     18c21db <<litchi_odp::authoring::edit::Transaction>::commit+0x24cb>
+ 18c2195:	lea    0x230(%rsp),%rdi
+ 18c219d:	call   *0x14341b5(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c21a3:	mov    0x230(%rsp),%r15
+ 18c21ab:	movups 0x238(%rsp),%xmm0
+ 18c21b3:	movaps %xmm0,0x5c0(%rsp)
+ 18c21bb:	jmp    18c21e2 <<litchi_odp::authoring::edit::Transaction>::commit+0x24d2>
+ 18c21bd:	movups 0x250(%rsp),%xmm0
+ 18c21c5:	mov    0x18(%rsp),%rdx
+ 18c21ca:	movups %xmm0,0x28(%rdx)
+ 18c21ce:	mov    %r14,0x10(%rdx)
+ 18c21d2:	mov    %r12,0x18(%rdx)
+ 18c21d6:	jmp    18c26ac <<litchi_odp::authoring::edit::Transaction>::commit+0x299c>
+ 18c21db:	mov    $0xffffffffffffffff,%r15
+ 18c21e2:	mov    0x8(%rsp),%rcx
+ 18c21e7:	mov    0x870(%rcx),%rax
+ 18c21ee:	mov    %rax,0x270(%rsp)
+ 18c21f6:	movups 0x830(%rcx),%xmm0
+ 18c21fd:	movups 0x840(%rcx),%xmm1
+ 18c2204:	movups 0x850(%rcx),%xmm2
+ 18c220b:	movups 0x860(%rcx),%xmm3
+ 18c2212:	movaps %xmm3,0x260(%rsp)
+ 18c221a:	movaps %xmm2,0x250(%rsp)
+ 18c2222:	movaps %xmm1,0x240(%rsp)
+ 18c222a:	movaps %xmm0,0x230(%rsp)
+ 18c2232:	movzbl 0x878(%rcx),%ebp
+ 18c2239:	movaps 0x5c0(%rsp),%xmm0
+ 18c2241:	movaps %xmm0,0xc70(%rsp)
+ 18c2249:	lea    0xc0(%rsp),%rdi
+ 18c2251:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c2256:	mov    %r15,0xc0(%rsp)
+ 18c225e:	movaps 0xc70(%rsp),%xmm0
+ 18c2266:	lea    0xc8(%rsp),%rcx
+ 18c226e:	movups %xmm0,(%rcx)
+ 18c2271:	mov    %rbx,0xd8(%rsp)
+ 18c2279:	mov    %r14,0xe0(%rsp)
+ 18c2281:	mov    0x270(%rsp),%rax
+ 18c2289:	mov    %rax,0x60(%rcx)
+ 18c228d:	movaps 0x230(%rsp),%xmm0
+ 18c2295:	movaps 0x240(%rsp),%xmm1
+ 18c229d:	movaps 0x250(%rsp),%xmm2
+ 18c22a5:	movaps 0x260(%rsp),%xmm3
+ 18c22ad:	movups %xmm3,0x50(%rcx)
+ 18c22b1:	movups %xmm2,0x40(%rcx)
+ 18c22b5:	movups %xmm1,0x30(%rcx)
+ 18c22b9:	movups %xmm0,0x20(%rcx)
+ 18c22bd:	mov    %bpl,0x130(%rsp)
+ 18c22c5:	lock incq (%rbx)
+ 18c22c9:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c22cf:	mov    0xd8(%rsp),%rbx
+ 18c22d7:	mov    0x10(%rsp),%rax
+ 18c22dc:	lock decq (%rax)
+ 18c22e0:	jne    18c22ed <<litchi_odp::authoring::edit::Transaction>::commit+0x25dd>
+ 18c22e2:	lea    0x10(%rsp),%rdi
+ 18c22e7:	call   *0x1434423(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c22ed:	mov    %rbx,0x10(%rsp)
+ 18c22f2:	mov    0x70(%rsp),%rax
+ 18c22f7:	test   %rax,%rax
+ 18c22fa:	je     18c2323 <<litchi_odp::authoring::edit::Transaction>::commit+0x2613>
+ 18c22fc:	lock decq (%rax)
+ 18c2300:	jne    18c230d <<litchi_odp::authoring::edit::Transaction>::commit+0x25fd>
+ 18c2302:	lea    0x70(%rsp),%rdi
+ 18c2307:	call   *0x1434403(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c230d:	mov    0x78(%rsp),%rax
+ 18c2312:	lock decq (%rax)
+ 18c2316:	jne    18c2323 <<litchi_odp::authoring::edit::Transaction>::commit+0x2613>
+ 18c2318:	lea    0x78(%rsp),%rdi
+ 18c231d:	call   *0x14343ed(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c2323:	movq   $0x0,0x70(%rsp)
+ 18c232c:	mov    0x130(%rsp),%rax
+ 18c2334:	mov    %rax,0xa10(%rsp)
+ 18c233c:	movups 0x120(%rsp),%xmm0
+ 18c2344:	movaps %xmm0,0xa00(%rsp)
+ 18c234c:	movups 0x110(%rsp),%xmm0
+ 18c2354:	movaps %xmm0,0x9f0(%rsp)
+ 18c235c:	movups 0x100(%rsp),%xmm0
+ 18c2364:	movaps %xmm0,0x9e0(%rsp)
+ 18c236c:	movups 0xc0(%rsp),%xmm0
+ 18c2374:	movups 0xd0(%rsp),%xmm1
+ 18c237c:	movups 0xe0(%rsp),%xmm2
+ 18c2384:	movups 0xf0(%rsp),%xmm3
+ 18c238c:	movaps %xmm3,0x9d0(%rsp)
+ 18c2394:	movaps %xmm2,0x9c0(%rsp)
+ 18c239c:	movaps %xmm1,0x9b0(%rsp)
+ 18c23a4:	movaps %xmm0,0x9a0(%rsp)
+ 18c23ac:	mov    0x8(%rsp),%rax
+ 18c23b1:	mov    0x3f8(%rax),%rbx
+ 18c23b8:	lock incq (%rbx)
+ 18c23bc:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c23c2:	mov    %rbx,0x180(%rsp)
+ 18c23ca:	mov    0x400(%rax),%r14
+ 18c23d1:	lock incq (%r14)
+ 18c23d5:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c23db:	lea    0x3e0(%rax),%r12
+ 18c23e2:	mov    %r14,0xc70(%rsp)
+ 18c23ea:	cmpq   $0xffffffffffffffff,(%r12)
+ 18c23ef:	je     18c241c <<litchi_odp::authoring::edit::Transaction>::commit+0x270c>
+ 18c23f1:	lea    0x230(%rsp),%rdi
+ 18c23f9:	mov    %r12,%rsi
+ 18c23fc:	call   *0x1433f56(%rip)        # 2cf6358 <_DYNAMIC+0x3c0>
+ 18c2402:	mov    0x230(%rsp),%rax
+ 18c240a:	movups 0x238(%rsp),%xmm0
+ 18c2412:	movaps %xmm0,0x5c0(%rsp)
+ 18c241a:	jmp    18c2423 <<litchi_odp::authoring::edit::Transaction>::commit+0x2713>
+ 18c241c:	mov    $0xffffffffffffffff,%rax
+ 18c2423:	mov    0x8(%rsp),%rdx
+ 18c2428:	mov    0x448(%rdx),%rcx
+ 18c242f:	mov    %rcx,0xc58(%rsp)
+ 18c2437:	movups 0x408(%rdx),%xmm0
+ 18c243e:	movups 0x418(%rdx),%xmm1
+ 18c2445:	movups 0x428(%rdx),%xmm2
+ 18c244c:	movups 0x438(%rdx),%xmm3
+ 18c2453:	movups %xmm3,0xc48(%rsp)
+ 18c245b:	movups %xmm2,0xc38(%rsp)
+ 18c2463:	movups %xmm1,0xc28(%rsp)
+ 18c246b:	movups %xmm0,0xc18(%rsp)
+ 18c2473:	movzbl 0x450(%rdx),%ecx
+ 18c247a:	mov    %rbx,0xc08(%rsp)
+ 18c2482:	mov    %r14,0xc10(%rsp)
+ 18c248a:	mov    %rax,0xbf0(%rsp)
+ 18c2492:	movaps 0x5c0(%rsp),%xmm0
+ 18c249a:	movups %xmm0,0xbf8(%rsp)
+ 18c24a2:	mov    %cl,0xc60(%rsp)
+ 18c24a9:	mov    0x164(%rsp),%r14d
+ 18c24b1:	test   %r14b,%r14b
+ 18c24b4:	jne    18c24e7 <<litchi_odp::authoring::edit::Transaction>::commit+0x27d7>
+ 18c24b6:	mov    $0x1,%r15b
+ 18c24b9:	lea    0x230(%rsp),%rdi
+ 18c24c1:	lea    0xbf0(%rsp),%rdx
+ 18c24c9:	mov    $0x1,%bl
+ 18c24cb:	mov    $0x1,%bpl
+ 18c24ce:	mov    %rdx,%rsi
+ 18c24d1:	xor    %ecx,%ecx
+ 18c24d3:	call   18c7f60 <litchi_odp::authoring::edit::validate_compact_xml_parts_against>
+ 18c24d8:	cmpq   $0xffffffffffffffff,0x230(%rsp)
+ 18c24e1:	jne    18c2628 <<litchi_odp::authoring::edit::Transaction>::commit+0x2918>
+ 18c24e7:	mov    $0x1,%bpl
+ 18c24ea:	sub    $0x8,%rsp
+ 18c24ee:	lea    0x238(%rsp),%rdi
+ 18c24f6:	mov    $0x8000000,%esi
+ 18c24fb:	mov    $0x200,%edx
+ 18c2500:	mov    $0xf4240,%ecx
+ 18c2505:	mov    $0x3d090,%r8d
+ 18c250b:	mov    $0x1000000,%r9d
+ 18c2511:	push   $0x8000000
+ 18c2516:	mov    $0x1,%r15b
+ 18c2519:	mov    $0x1,%bl
+ 18c251b:	call   *0x143a417(%rip)        # 2cfc938 <_DYNAMIC+0x69a0>
+ 18c2521:	add    $0x10,%rsp
+ 18c2525:	cmpl   $0x1,0x230(%rsp)
+ 18c252d:	je     18c259e <<litchi_odp::authoring::edit::Transaction>::commit+0x288e>
+ 18c252f:	movups 0x238(%rsp),%xmm0
+ 18c2537:	movups 0x248(%rsp),%xmm1
+ 18c253f:	movups 0x258(%rsp),%xmm2
+ 18c2547:	movaps %xmm2,0x5e0(%rsp)
+ 18c254f:	movaps %xmm1,0x5d0(%rsp)
+ 18c2557:	movaps %xmm0,0x5c0(%rsp)
+ 18c255f:	cmpq   $0x0,0x70(%rsp)
+ 18c2565:	je     18c259e <<litchi_odp::authoring::edit::Transaction>::commit+0x288e>
+ 18c2567:	lea    0x70(%rsp),%rdi
+ 18c256c:	lea    0x9a0(%rsp),%rsi
+ 18c2574:	lea    0xbf0(%rsp),%rdx
+ 18c257c:	lea    0x5c0(%rsp),%rcx
+ 18c2584:	mov    $0x8000000,%r8d
+ 18c258a:	mov    $0x10000,%r9d
+ 18c2590:	mov    $0x1,%r15b
+ 18c2593:	mov    $0x1,%bl
+ 18c2595:	call   18b20e0 <<litchi_odp::authoring::mutable::PublicationAuditProof>::covers>
+ 18c259a:	test   %al,%al
+ 18c259c:	jne    18c25d0 <<litchi_odp::authoring::edit::Transaction>::commit+0x28c0>
+ 18c259e:	lea    0x230(%rsp),%rdi
+ 18c25a6:	lea    0x9a0(%rsp),%rsi
+ 18c25ae:	lea    0xbf0(%rsp),%rdx
+ 18c25b6:	mov    $0x1,%r15b
+ 18c25b9:	mov    $0x1,%bl
+ 18c25bb:	mov    $0x1,%ecx
+ 18c25c0:	call   18c7f60 <litchi_odp::authoring::edit::validate_compact_xml_parts_against>
+ 18c25c5:	cmpq   $0xffffffffffffffff,0x230(%rsp)
+ 18c25ce:	jne    18c2628 <<litchi_odp::authoring::edit::Transaction>::commit+0x2918>
+ 18c25d0:	lea    0x230(%rsp),%rdi
+ 18c25d8:	lea    0x9a0(%rsp),%rdx
+ 18c25e0:	mov    $0x1,%r15b
+ 18c25e3:	mov    $0x1,%bl
+ 18c25e5:	mov    0x8(%rsp),%rsi
+ 18c25ea:	call   18aeb10 <<litchi_odp::authoring::mutable::MutablePresentation>::verify_embedded_media>
+ 18c25ef:	cmpq   $0xffffffffffffffff,0x230(%rsp)
+ 18c25f8:	jne    18c2628 <<litchi_odp::authoring::edit::Transaction>::commit+0x2918>
+ 18c25fa:	lea    0x230(%rsp),%rdi
+ 18c2602:	lea    0x9a0(%rsp),%rdx
+ 18c260a:	mov    $0x1,%r15b
+ 18c260d:	mov    $0x1,%bl
+ 18c260f:	mov    0x8(%rsp),%rsi
+ 18c2614:	call   18ae400 <<litchi_odp::authoring::mutable::MutablePresentation>::verify_removed_media>
+ 18c2619:	cmpq   $0xffffffffffffffff,0x230(%rsp)
+ 18c2622:	je     18c27f2 <<litchi_odp::authoring::edit::Transaction>::commit+0x2ae2>
+ 18c2628:	movups 0x230(%rsp),%xmm0
+ 18c2630:	movups 0x240(%rsp),%xmm1
+ 18c2638:	movups 0x250(%rsp),%xmm2
+ 18c2640:	mov    0x18(%rsp),%rax
+ 18c2645:	movups %xmm2,0x28(%rax)
+ 18c2649:	movups %xmm1,0x18(%rax)
+ 18c264d:	movups %xmm0,0x8(%rax)
+ 18c2651:	movq   $0xfffffffffffffffe,(%rax)
+ 18c2658:	mov    $0x1,%r15b
+ 18c265b:	lea    0xbf0(%rsp),%rdi
+ 18c2663:	mov    $0x1,%r12b
+ 18c2666:	mov    $0x1,%bpl
+ 18c2669:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c266e:	mov    $0x1,%r15b
+ 18c2671:	lea    0x9a0(%rsp),%rdi
+ 18c2679:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c267e:	xor    %ebx,%ebx
+ 18c2680:	mov    0x70(%rsp),%rax
+ 18c2685:	test   %rax,%rax
+ 18c2688:	jne    18c410b <<litchi_odp::authoring::edit::Transaction>::commit+0x43fb>
+ 18c268e:	jmp    18c4135 <<litchi_odp::authoring::edit::Transaction>::commit+0x4425>
+ 18c2693:	movups 0x250(%rsp),%xmm0
+ 18c269b:	mov    0x18(%rsp),%rdx
+ 18c26a0:	movups %xmm0,0x28(%rdx)
+ 18c26a4:	mov    %r13,0x10(%rdx)
+ 18c26a8:	mov    %r15,0x18(%rdx)
+ 18c26ac:	mov    %rax,0x20(%rdx)
+ 18c26b0:	mov    %rcx,0x8(%rdx)
+ 18c26b4:	movq   $0xfffffffffffffffe,(%rdx)
+ 18c26bb:	jmp    18c40fc <<litchi_odp::authoring::edit::Transaction>::commit+0x43ec>
+ 18c26c0:	lea    -0x1552b45(%rip),%rsi        # 36fb82 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x280>
+ 18c26c7:	mov    $0x37,%edx
+ 18c26cc:	mov    0x18(%rsp),%rdi
+ 18c26d1:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c26d6:	test   %r13,%r13
+ 18c26d9:	je     18c4786 <<litchi_odp::authoring::edit::Transaction>::commit+0x4a76>
+ 18c26df:	mov    $0x1,%edx
+ 18c26e4:	mov    %r15,%rdi
+ 18c26e7:	mov    %r13,%rsi
+ 18c26ea:	jmp    18c4780 <<litchi_odp::authoring::edit::Transaction>::commit+0x4a70>
+ 18c26ef:	movaps 0x940(%rsp),%xmm0
+ 18c26f7:	movaps 0x950(%rsp),%xmm1
+ 18c26ff:	movaps 0x960(%rsp),%xmm2
+ 18c2707:	jmp    18c40e4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43d4>
+ 18c270c:	lea    -0x1552b4e(%rip),%rsi        # 36fbc5 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x2c3>
+ 18c2713:	mov    $0x42,%edx
+ 18c2718:	mov    0x18(%rsp),%rdi
+ 18c271d:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c2722:	mov    $0x1,%r15b
+ 18c2725:	test   %r14,%r14
+ 18c2728:	je     18c40ff <<litchi_odp::authoring::edit::Transaction>::commit+0x43ef>
+ 18c272e:	mov    $0x1,%edx
+ 18c2733:	mov    %r12,%rdi
+ 18c2736:	mov    %r14,%rsi
+ 18c2739:	call   *0x1433af1(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c273f:	jmp    18c40ff <<litchi_odp::authoring::edit::Transaction>::commit+0x43ef>
+ 18c2744:	movaps 0x970(%rsp),%xmm0
+ 18c274c:	movaps 0x980(%rsp),%xmm1
+ 18c2754:	movaps 0x990(%rsp),%xmm2
+ 18c275c:	jmp    18c40e4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43d4>
+ 18c2761:	mov    0x18(%rsp),%rax
+ 18c2766:	mov    0x170(%rsp),%rcx
+ 18c276e:	mov    %rcx,0x28(%rax)
+ 18c2772:	mov    0x168(%rsp),%rcx
+ 18c277a:	mov    %rcx,0x30(%rax)
+ 18c277e:	mov    0x20(%rsp),%rcx
+ 18c2783:	mov    %rcx,0x10(%rax)
+ 18c2787:	mov    %r14,0x18(%rax)
+ 18c278b:	mov    %rbx,0x20(%rax)
+ 18c278f:	mov    %rbp,0x8(%rax)
+ 18c2793:	jmp    18c40f5 <<litchi_odp::authoring::edit::Transaction>::commit+0x43e5>
+ 18c2798:	mov    0x20(%rsp),%rbx
+ 18c279d:	lea    -0x1552b9d(%rip),%rsi        # 36fc07 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x305>
+ 18c27a4:	mov    $0x3c,%edx
+ 18c27a9:	mov    0x18(%rsp),%rdi
+ 18c27ae:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c27b3:	mov    $0x1,%r15b
+ 18c27b6:	test   %rbx,%rbx
+ 18c27b9:	je     18c40ff <<litchi_odp::authoring::edit::Transaction>::commit+0x43ef>
+ 18c27bf:	mov    $0x1,%edx
+ 18c27c4:	mov    %r14,%rdi
+ 18c27c7:	mov    %rbx,%rsi
+ 18c27ca:	call   *0x1433a60(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c27d0:	jmp    18c40ff <<litchi_odp::authoring::edit::Transaction>::commit+0x43ef>
+ 18c27d5:	movaps 0x8e0(%rsp),%xmm0
+ 18c27dd:	movaps 0x8f0(%rsp),%xmm1
+ 18c27e5:	movaps 0x900(%rsp),%xmm2
+ 18c27ed:	jmp    18c40e4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43d4>
+ 18c27f2:	mov    0x138(%rsp),%rax
+ 18c27fa:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c27fe:	je     18c28d3 <<litchi_odp::authoring::edit::Transaction>::commit+0x2bc3>
+ 18c2804:	lea    0x230(%rsp),%rdi
+ 18c280c:	lea    0x9a0(%rsp),%rsi
+ 18c2814:	mov    $0x1,%r15b
+ 18c2817:	mov    $0x1,%bl
+ 18c2819:	call   *0x143a0f9(%rip)        # 2cfc918 <_DYNAMIC+0x6980>
+ 18c281f:	mov    0x230(%rsp),%rax
+ 18c2827:	movups 0x238(%rsp),%xmm0
+ 18c282f:	movaps %xmm0,0x5c0(%rsp)
+ 18c2837:	mov    0x248(%rsp),%rcx
+ 18c283f:	mov    %rcx,0x5d0(%rsp)
+ 18c2847:	cmp    $0xffffffffffffffff,%rax
+ 18c284b:	je     18c2886 <<litchi_odp::authoring::edit::Transaction>::commit+0x2b76>
+ 18c284d:	movups 0x250(%rsp),%xmm0
+ 18c2855:	mov    0x18(%rsp),%rdx
+ 18c285a:	movups %xmm0,0x28(%rdx)
+ 18c285e:	mov    0x5d0(%rsp),%rcx
+ 18c2866:	mov    %rcx,0x20(%rdx)
+ 18c286a:	movaps 0x5c0(%rsp),%xmm0
+ 18c2872:	movups %xmm0,0x10(%rdx)
+ 18c2876:	mov    %rax,0x8(%rdx)
+ 18c287a:	movq   $0xfffffffffffffffe,(%rdx)
+ 18c2881:	jmp    18c2658 <<litchi_odp::authoring::edit::Transaction>::commit+0x2948>
+ 18c2886:	mov    0x5d0(%rsp),%rdx
+ 18c288e:	mov    0x8(%rsp),%rax
+ 18c2893:	cmp    0x4a0(%rax),%rdx
+ 18c289a:	jne    18c2bea <<litchi_odp::authoring::edit::Transaction>::commit+0x2eda>
+ 18c28a0:	mov    0x5c8(%rsp),%rdi
+ 18c28a8:	mov    0x8(%rsp),%rax
+ 18c28ad:	mov    0x498(%rax),%rsi
+ 18c28b4:	call   18d8440 <<litchi_odf_common::rdf::model::Graph as core::slice::cmp::SlicePartialEq<litchi_odf_common::rdf::model::Graph>>::equal_same_length>
+ 18c28b9:	test   %al,%al
+ 18c28bb:	je     18c2bea <<litchi_odp::authoring::edit::Transaction>::commit+0x2eda>
+ 18c28c1:	lea    0x5c0(%rsp),%rdi
+ 18c28c9:	mov    $0x1,%r15b
+ 18c28cc:	mov    $0x1,%bl
+ 18c28ce:	call   18ba410 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odf_common::rdf::model::Graph>>>
+ 18c28d3:	mov    0x8(%rsp),%rax
+ 18c28d8:	add    $0x538,%rax
+ 18c28de:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c28e2:	je     18c2a78 <<litchi_odp::authoring::edit::Transaction>::commit+0x2d68>
+ 18c28e8:	lea    0xc70(%rsp),%rdi
+ 18c28f0:	lea    0x9a0(%rsp),%rsi
+ 18c28f8:	mov    $0x1,%r15b
+ 18c28fb:	mov    $0x1,%bl
+ 18c28fd:	call   18c8cd0 <<litchi_odf_common::core::package::OwnedPackage as core::clone::Clone>::clone>
+ 18c2902:	mov    0x8(%rsp),%rcx
+ 18c2907:	mov    0x608(%rcx),%rax
+ 18c290e:	mov    %rax,0x530(%rsp)
+ 18c2916:	movups 0x5f8(%rcx),%xmm0
+ 18c291d:	movaps %xmm0,0x520(%rsp)
+ 18c2925:	lea    0x230(%rsp),%rdi
+ 18c292d:	lea    0xc70(%rsp),%rsi
+ 18c2935:	lea    0x520(%rsp),%rdx
+ 18c293d:	mov    $0x1,%r15b
+ 18c2940:	mov    $0x1,%bl
+ 18c2942:	call   *0x143a460(%rip)        # 2cfcda8 <_DYNAMIC+0x6e10>
+ 18c2948:	mov    0x230(%rsp),%rax
+ 18c2950:	movups 0x238(%rsp),%xmm0
+ 18c2958:	movaps %xmm0,0x180(%rsp)
+ 18c2960:	movups 0x248(%rsp),%xmm0
+ 18c2968:	movaps %xmm0,0x190(%rsp)
+ 18c2970:	movups 0x258(%rsp),%xmm0
+ 18c2978:	movaps %xmm0,0x1a0(%rsp)
+ 18c2980:	cmp    $0xfffffffffffffffe,%rax
+ 18c2984:	je     18c2bcd <<litchi_odp::authoring::edit::Transaction>::commit+0x2ebd>
+ 18c298a:	movups 0x2c8(%rsp),%xmm0
+ 18c2992:	movups %xmm0,0x658(%rsp)
+ 18c299a:	movups 0x2b8(%rsp),%xmm0
+ 18c29a2:	movups %xmm0,0x648(%rsp)
+ 18c29aa:	movups 0x2a8(%rsp),%xmm0
+ 18c29b2:	movups %xmm0,0x638(%rsp)
+ 18c29ba:	movups 0x268(%rsp),%xmm0
+ 18c29c2:	movups 0x278(%rsp),%xmm1
+ 18c29ca:	movups 0x288(%rsp),%xmm2
+ 18c29d2:	movups 0x298(%rsp),%xmm3
+ 18c29da:	movups %xmm3,0x628(%rsp)
+ 18c29e2:	movups %xmm2,0x618(%rsp)
+ 18c29ea:	movups %xmm1,0x608(%rsp)
+ 18c29f2:	movups %xmm0,0x5f8(%rsp)
+ 18c29fa:	movaps 0x180(%rsp),%xmm0
+ 18c2a02:	movaps 0x190(%rsp),%xmm1
+ 18c2a0a:	movaps 0x1a0(%rsp),%xmm2
+ 18c2a12:	movups %xmm0,0x5c8(%rsp)
+ 18c2a1a:	movups %xmm1,0x5d8(%rsp)
+ 18c2a22:	movups %xmm2,0x5e8(%rsp)
+ 18c2a2a:	mov    %rax,0x5c0(%rsp)
+ 18c2a32:	mov    0x640(%rsp),%rdi
+ 18c2a3a:	mov    0x648(%rsp),%rsi
+ 18c2a42:	add    $0x10,%rdi
+ 18c2a46:	mov    0x8(%rsp),%rax
+ 18c2a4b:	mov    0x558(%rax),%rdx
+ 18c2a52:	mov    0x560(%rax),%rcx
+ 18c2a59:	call   18c5ce0 <litchi_odp::authoring::edit::root_charts_equal>
+ 18c2a5e:	test   %al,%al
+ 18c2a60:	je     18c2c83 <<litchi_odp::authoring::edit::Transaction>::commit+0x2f73>
+ 18c2a66:	lea    0x5c0(%rsp),%rdi
+ 18c2a6e:	mov    $0x1,%r15b
+ 18c2a71:	mov    $0x1,%bl
+ 18c2a73:	call   18baf30 <core::ptr::drop_glue::<litchi_odp::charts::snapshot::Snapshot>>
+ 18c2a78:	mov    0x2c(%rsp),%eax
+ 18c2a7c:	or     0x30(%rsp),%al
+ 18c2a80:	je     18c2c1c <<litchi_odp::authoring::edit::Transaction>::commit+0x2f0c>
+ 18c2a86:	lea    0xc70(%rsp),%rdi
+ 18c2a8e:	lea    0x9a0(%rsp),%rsi
+ 18c2a96:	mov    $0x1,%r15b
+ 18c2a99:	mov    $0x1,%bl
+ 18c2a9b:	call   18c8cd0 <<litchi_odf_common::core::package::OwnedPackage as core::clone::Clone>::clone>
+ 18c2aa0:	lea    0x230(%rsp),%rdi
+ 18c2aa8:	lea    0xc70(%rsp),%rsi
+ 18c2ab0:	mov    $0x1,%r15b
+ 18c2ab3:	mov    $0x1,%bl
+ 18c2ab5:	call   *0x143a305(%rip)        # 2cfcdc0 <_DYNAMIC+0x6e28>
+ 18c2abb:	mov    0x230(%rsp),%rbx
+ 18c2ac3:	movups 0x238(%rsp),%xmm0
+ 18c2acb:	movaps %xmm0,0x180(%rsp)
+ 18c2ad3:	movups 0x248(%rsp),%xmm0
+ 18c2adb:	movaps %xmm0,0x190(%rsp)
+ 18c2ae3:	movups 0x258(%rsp),%xmm0
+ 18c2aeb:	movaps %xmm0,0x1a0(%rsp)
+ 18c2af3:	cmp    $0xffffffffffffffff,%rbx
+ 18c2af7:	je     18c2bcd <<litchi_odp::authoring::edit::Transaction>::commit+0x2ebd>
+ 18c2afd:	lea    0x268(%rsp),%rsi
+ 18c2b05:	lea    0x5f8(%rsp),%rdi
+ 18c2b0d:	mov    $0x2b0,%edx
+ 18c2b12:	call   *0x14336d0(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c2b18:	movaps 0x180(%rsp),%xmm0
+ 18c2b20:	movaps 0x190(%rsp),%xmm1
+ 18c2b28:	movaps 0x1a0(%rsp),%xmm2
+ 18c2b30:	movups %xmm0,0x5c8(%rsp)
+ 18c2b38:	movups %xmm1,0x5d8(%rsp)
+ 18c2b40:	movups %xmm2,0x5e8(%rsp)
+ 18c2b48:	mov    %rbx,0x5c0(%rsp)
+ 18c2b50:	mov    0x8(%rsp),%rcx
+ 18c2b55:	lea    0x610(%rcx),%rax
+ 18c2b5c:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c2b60:	je     18c2e5e <<litchi_odp::authoring::edit::Transaction>::commit+0x314e>
+ 18c2b66:	cmpq   $0xffffffffffffffff,0x650(%rsp)
+ 18c2b6f:	je     18c2cb0 <<litchi_odp::authoring::edit::Transaction>::commit+0x2fa0>
+ 18c2b75:	mov    $0x1,%r15b
+ 18c2b78:	mov    0x658(%rsp),%rsi
+ 18c2b80:	mov    0x660(%rsp),%rdx
+ 18c2b88:	lea    0x230(%rsp),%rdi
+ 18c2b90:	call   *0x143a21a(%rip)        # 2cfcdb0 <_DYNAMIC+0x6e18>
+ 18c2b96:	mov    0x230(%rsp),%rax
+ 18c2b9e:	cmp    $0xffffffffffffffff,%rax
+ 18c2ba2:	je     18c2cd4 <<litchi_odp::authoring::edit::Transaction>::commit+0x2fc4>
+ 18c2ba8:	mov    0x248(%rsp),%rcx
+ 18c2bb0:	mov    %rcx,0xc80(%rsp)
+ 18c2bb8:	movups 0x238(%rsp),%xmm0
+ 18c2bc0:	movaps %xmm0,0xc70(%rsp)
+ 18c2bc8:	jmp    18c2ed0 <<litchi_odp::authoring::edit::Transaction>::commit+0x31c0>
+ 18c2bcd:	movaps 0x180(%rsp),%xmm0
+ 18c2bd5:	movaps 0x190(%rsp),%xmm1
+ 18c2bdd:	movaps 0x1a0(%rsp),%xmm2
+ 18c2be5:	jmp    18c2640 <<litchi_odp::authoring::edit::Transaction>::commit+0x2930>
+ 18c2bea:	lea    0x5c0(%rsp),%rdi
+ 18c2bf2:	mov    $0x1,%r15b
+ 18c2bf5:	mov    $0x1,%bl
+ 18c2bf7:	call   18ba410 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odf_common::rdf::model::Graph>>>
+ 18c2bfc:	lea    -0x1552ebd(%rip),%rsi        # 36fd46 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x444>
+ 18c2c03:	mov    $0x40,%edx
+ 18c2c08:	mov    $0x1,%r15b
+ 18c2c0b:	mov    $0x1,%bl
+ 18c2c0d:	mov    0x18(%rsp),%rdi
+ 18c2c12:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c2c17:	jmp    18c2658 <<litchi_odp::authoring::edit::Transaction>::commit+0x2948>
+ 18c2c1c:	movq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c2c28:	mov    0x8(%rsp),%rcx
+ 18c2c2d:	lea    0x610(%rcx),%rax
+ 18c2c34:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c2c38:	je     18c2e5e <<litchi_odp::authoring::edit::Transaction>::commit+0x314e>
+ 18c2c3e:	mov    $0x1,%r15b
+ 18c2c41:	lea    0x230(%rsp),%rdi
+ 18c2c49:	call   18bc690 <<litchi_odp::authoring::edit::Transaction>::commit::{closure#6}>
+ 18c2c4e:	movups 0x230(%rsp),%xmm0
+ 18c2c56:	movups 0x240(%rsp),%xmm1
+ 18c2c5e:	movups 0x250(%rsp),%xmm2
+ 18c2c66:	mov    0x18(%rsp),%rax
+ 18c2c6b:	movups %xmm1,0x18(%rax)
+ 18c2c6f:	movups %xmm2,0x28(%rax)
+ 18c2c73:	movups %xmm0,0x8(%rax)
+ 18c2c77:	movq   $0xfffffffffffffffe,(%rax)
+ 18c2c7e:	jmp    18c2f04 <<litchi_odp::authoring::edit::Transaction>::commit+0x31f4>
+ 18c2c83:	lea    -0x1552f04(%rip),%rsi        # 36fd86 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x484>
+ 18c2c8a:	mov    $0x3c,%edx
+ 18c2c8f:	mov    0x18(%rsp),%rdi
+ 18c2c94:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c2c99:	lea    0x5c0(%rsp),%rdi
+ 18c2ca1:	mov    $0x1,%r15b
+ 18c2ca4:	mov    $0x1,%bl
+ 18c2ca6:	call   18baf30 <core::ptr::drop_glue::<litchi_odp::charts::snapshot::Snapshot>>
+ 18c2cab:	jmp    18c2658 <<litchi_odp::authoring::edit::Transaction>::commit+0x2948>
+ 18c2cb0:	movq   $0x0,0x238(%rsp)
+ 18c2cbc:	movq   $0x8,0x240(%rsp)
+ 18c2cc8:	movq   $0x0,0x248(%rsp)
+ 18c2cd4:	mov    0x248(%rsp),%rdx
+ 18c2cdc:	mov    %rdx,0xc80(%rsp)
+ 18c2ce4:	mov    0x238(%rsp),%rax
+ 18c2cec:	mov    %rax,0xc70(%rsp)
+ 18c2cf4:	mov    0x240(%rsp),%rax
+ 18c2cfc:	mov    %rax,0xc78(%rsp)
+ 18c2d04:	mov    0x8(%rsp),%rax
+ 18c2d09:	cmp    0x638(%rax),%rdx
+ 18c2d10:	jne    18c2f56 <<litchi_odp::authoring::edit::Transaction>::commit+0x3246>
+ 18c2d16:	mov    0xc78(%rsp),%rdi
+ 18c2d1e:	mov    0x8(%rsp),%rax
+ 18c2d23:	mov    0x630(%rax),%rsi
+ 18c2d2a:	call   18efd30 <<litchi_odp::model::page_layout::Layout as core::slice::cmp::SlicePartialEq<litchi_odp::model::page_layout::Layout>>::equal_same_length>
+ 18c2d2f:	test   %al,%al
+ 18c2d31:	je     18c2f56 <<litchi_odp::authoring::edit::Transaction>::commit+0x3246>
+ 18c2d37:	lea    0xc70(%rsp),%rdi
+ 18c2d3f:	call   18bac00 <core::ptr::drop_glue::<litchi_odp::model::page_layout::Collection>>
+ 18c2d44:	mov    $0x1,%r15b
+ 18c2d47:	lea    0x230(%rsp),%rdi
+ 18c2d4f:	lea    0x5c0(%rsp),%rsi
+ 18c2d57:	call   *0x143a07b(%rip)        # 2cfcdd8 <_DYNAMIC+0x6e40>
+ 18c2d5d:	mov    0x230(%rsp),%rax
+ 18c2d65:	movups 0x238(%rsp),%xmm0
+ 18c2d6d:	movaps %xmm0,0xc70(%rsp)
+ 18c2d75:	mov    0x248(%rsp),%rcx
+ 18c2d7d:	mov    %rcx,0xc80(%rsp)
+ 18c2d85:	cmp    $0xffffffffffffffff,%rax
+ 18c2d89:	jne    18c2ed0 <<litchi_odp::authoring::edit::Transaction>::commit+0x31c0>
+ 18c2d8f:	mov    0xc78(%rsp),%rdi
+ 18c2d97:	mov    0xc80(%rsp),%rsi
+ 18c2d9f:	mov    0x8(%rsp),%rax
+ 18c2da4:	mov    0x660(%rax),%rdx
+ 18c2dab:	mov    0x668(%rax),%rcx
+ 18c2db2:	call   18c62f0 <litchi_odp::authoring::edit::root_masters_equal>
+ 18c2db7:	test   %al,%al
+ 18c2db9:	je     18c33eb <<litchi_odp::authoring::edit::Transaction>::commit+0x36db>
+ 18c2dbf:	lea    0xc70(%rsp),%rdi
+ 18c2dc7:	call   18ba070 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::package::layout_master::MasterPage>>>
+ 18c2dcc:	mov    0x5c8(%rsp),%rsi
+ 18c2dd4:	mov    0x5d0(%rsp),%rdx
+ 18c2ddc:	lea    0x230(%rsp),%rdi
+ 18c2de4:	call   *0x1439fce(%rip)        # 2cfcdb8 <_DYNAMIC+0x6e20>
+ 18c2dea:	mov    0x230(%rsp),%rax
+ 18c2df2:	movups 0x238(%rsp),%xmm0
+ 18c2dfa:	movaps %xmm0,0xc70(%rsp)
+ 18c2e02:	mov    0x248(%rsp),%rcx
+ 18c2e0a:	mov    %rcx,0xc80(%rsp)
+ 18c2e12:	cmp    $0xffffffffffffffff,%rax
+ 18c2e16:	jne    18c2ed0 <<litchi_odp::authoring::edit::Transaction>::commit+0x31c0>
+ 18c2e1c:	mov    0xc78(%rsp),%rdi
+ 18c2e24:	mov    0xc80(%rsp),%rsi
+ 18c2e2c:	mov    0x8(%rsp),%rax
+ 18c2e31:	mov    0x690(%rax),%rdx
+ 18c2e38:	mov    0x698(%rax),%rcx
+ 18c2e3f:	call   18c7bd0 <litchi_odp::authoring::edit::root_design_pages_equal>
+ 18c2e44:	test   %al,%al
+ 18c2e46:	je     18c33fd <<litchi_odp::authoring::edit::Transaction>::commit+0x36ed>
+ 18c2e4c:	lea    0xc70(%rsp),%rdi
+ 18c2e54:	call   18bacc0 <core::ptr::drop_glue::<litchi_odp::model::page_metadata::Collection>>
+ 18c2e59:	mov    0x8(%rsp),%rcx
+ 18c2e5e:	lea    0x730(%rcx),%rax
+ 18c2e65:	cmpq   $0xffffffffffffffff,(%rax)
+ 18c2e69:	je     18c2fe5 <<litchi_odp::authoring::edit::Transaction>::commit+0x32d5>
+ 18c2e6f:	cmpq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c2e78:	je     18c2f7e <<litchi_odp::authoring::edit::Transaction>::commit+0x326e>
+ 18c2e7e:	mov    $0x1,%r15b
+ 18c2e81:	mov    0x5c8(%rsp),%rsi
+ 18c2e89:	mov    0x5d0(%rsp),%rdx
+ 18c2e91:	lea    0x230(%rsp),%rdi
+ 18c2e99:	call   18fd1a0 <litchi_odp::annotation::codec::annotations>
+ 18c2e9e:	mov    0x230(%rsp),%rax
+ 18c2ea6:	movups 0x238(%rsp),%xmm0
+ 18c2eae:	movaps %xmm0,0xc70(%rsp)
+ 18c2eb6:	mov    0x248(%rsp),%rcx
+ 18c2ebe:	mov    %rcx,0xc80(%rsp)
+ 18c2ec6:	cmp    $0xffffffffffffffff,%rax
+ 18c2eca:	je     18c2fa8 <<litchi_odp::authoring::edit::Transaction>::commit+0x3298>
+ 18c2ed0:	movups 0x250(%rsp),%xmm0
+ 18c2ed8:	mov    0x18(%rsp),%rdx
+ 18c2edd:	movups %xmm0,0x28(%rdx)
+ 18c2ee1:	mov    0xc80(%rsp),%rcx
+ 18c2ee9:	mov    %rcx,0x20(%rdx)
+ 18c2eed:	movaps 0xc70(%rsp),%xmm0
+ 18c2ef5:	movups %xmm0,0x10(%rdx)
+ 18c2ef9:	mov    %rax,0x8(%rdx)
+ 18c2efd:	movq   $0xfffffffffffffffe,(%rdx)
+ 18c2f04:	mov    $0x1,%r15b
+ 18c2f07:	cmpq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c2f10:	je     18c2f22 <<litchi_odp::authoring::edit::Transaction>::commit+0x3212>
+ 18c2f12:	lea    0x5c0(%rsp),%rdi
+ 18c2f1a:	mov    %r15d,%ebx
+ 18c2f1d:	call   18bafc0 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c2f22:	mov    $0x1,%bpl
+ 18c2f25:	lea    0xbf0(%rsp),%rdi
+ 18c2f2d:	mov    %r15d,%r12d
+ 18c2f30:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c2f35:	test   %r15b,%r15b
+ 18c2f38:	jne    18c266e <<litchi_odp::authoring::edit::Transaction>::commit+0x295e>
+ 18c2f3e:	xor    %r15d,%r15d
+ 18c2f41:	xor    %ebx,%ebx
+ 18c2f43:	mov    0x70(%rsp),%rax
+ 18c2f48:	test   %rax,%rax
+ 18c2f4b:	jne    18c410b <<litchi_odp::authoring::edit::Transaction>::commit+0x43fb>
+ 18c2f51:	jmp    18c4135 <<litchi_odp::authoring::edit::Transaction>::commit+0x4425>
+ 18c2f56:	lea    0xc70(%rsp),%rdi
+ 18c2f5e:	call   18bac00 <core::ptr::drop_glue::<litchi_odp::model::page_layout::Collection>>
+ 18c2f63:	mov    $0x3d,%edx
+ 18c2f68:	lea    -0x15531ad(%rip),%rsi        # 36fdc2 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x4c0>
+ 18c2f6f:	mov    $0x1,%r15b
+ 18c2f72:	mov    0x18(%rsp),%rdi
+ 18c2f77:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c2f7c:	jmp    18c2f07 <<litchi_odp::authoring::edit::Transaction>::commit+0x31f7>
+ 18c2f7e:	mov    $0x1,%r15b
+ 18c2f81:	lea    0x230(%rsp),%rdi
+ 18c2f89:	call   18bc710 <<litchi_odp::authoring::edit::Transaction>::commit::{closure#7}>
+ 18c2f8e:	jmp    18c2c4e <<litchi_odp::authoring::edit::Transaction>::commit+0x2f3e>
+ 18c2f93:	mov    $0x8,%edi
+ 18c2f98:	mov    $0x10,%esi
+ 18c2f9d:	call   *0x143329d(%rip)        # 2cf6240 <_DYNAMIC+0x2a8>
+ 18c2fa3:	jmp    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c2fa8:	mov    0xc78(%rsp),%rdi
+ 18c2fb0:	mov    0xc80(%rsp),%rsi
+ 18c2fb8:	mov    0x8(%rsp),%rax
+ 18c2fbd:	mov    0x750(%rax),%rdx
+ 18c2fc4:	mov    0x758(%rax),%rcx
+ 18c2fcb:	call   18c7700 <litchi_odp::authoring::edit::root_annotations_equal>
+ 18c2fd0:	test   %al,%al
+ 18c2fd2:	je     18c33cd <<litchi_odp::authoring::edit::Transaction>::commit+0x36bd>
+ 18c2fd8:	lea    0xc70(%rsp),%rdi
+ 18c2fe0:	call   18b9e70 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::annotation::model::Info>>>
+ 18c2fe5:	movzbl 0x37(%rsp),%eax
+ 18c2fea:	xor    $0x1,%al
+ 18c2fec:	or     0x2b(%rsp),%r14b
+ 18c2ff1:	or     %al,%r14b
+ 18c2ff4:	mov    %r14d,%r15d
+ 18c2ff7:	not    %r14b
+ 18c2ffa:	and    $0x1,%r14b
+ 18c2ffe:	lea    0x238(%rsp),%rbx
+ 18c3006:	lea    0xf70(%rsp),%rsi
+ 18c300e:	mov    $0x98,%edx
+ 18c3013:	mov    %rbx,%rdi
+ 18c3016:	call   *0x14331cc(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c301c:	mov    %r14b,0x230(%rsp)
+ 18c3024:	test   $0x1,%r15b
+ 18c3028:	je     18c3156 <<litchi_odp::authoring::edit::Transaction>::commit+0x3446>
+ 18c302e:	mov    0xa10(%rsp),%rax
+ 18c3036:	mov    %rax,0x1f0(%rsp)
+ 18c303e:	movaps 0xa00(%rsp),%xmm0
+ 18c3046:	movaps %xmm0,0x1e0(%rsp)
+ 18c304e:	movaps 0x9f0(%rsp),%xmm0
+ 18c3056:	movaps %xmm0,0x1d0(%rsp)
+ 18c305e:	movaps 0x9e0(%rsp),%xmm0
+ 18c3066:	movaps %xmm0,0x1c0(%rsp)
+ 18c306e:	movaps 0x9a0(%rsp),%xmm0
+ 18c3076:	movaps 0x9b0(%rsp),%xmm1
+ 18c307e:	movaps 0x9c0(%rsp),%xmm2
+ 18c3086:	movaps 0x9d0(%rsp),%xmm3
+ 18c308e:	movaps %xmm3,0x1b0(%rsp)
+ 18c3096:	movaps %xmm2,0x1a0(%rsp)
+ 18c309e:	movaps %xmm1,0x190(%rsp)
+ 18c30a6:	movaps %xmm0,0x180(%rsp)
+ 18c30ae:	xor    %r15d,%r15d
+ 18c30b1:	lea    0xc70(%rsp),%rdi
+ 18c30b9:	lea    0x180(%rsp),%rsi
+ 18c30c1:	call   18bcff0 <<litchi_odp::authoring::edit::Snapshot>::from_owned_package>
+ 18c30c6:	mov    0xc70(%rsp),%rax
+ 18c30ce:	movups 0xc78(%rsp),%xmm0
+ 18c30d6:	movaps %xmm0,0xbc0(%rsp)
+ 18c30de:	movups 0xc88(%rsp),%xmm0
+ 18c30e6:	movaps %xmm0,0xbd0(%rsp)
+ 18c30ee:	movups 0xc98(%rsp),%xmm0
+ 18c30f6:	movaps %xmm0,0xbe0(%rsp)
+ 18c30fe:	cmp    $0xfffffffffffffffe,%rax
+ 18c3102:	jne    18c3188 <<litchi_odp::authoring::edit::Transaction>::commit+0x3478>
+ 18c3108:	movaps 0xbc0(%rsp),%xmm0
+ 18c3110:	movaps 0xbd0(%rsp),%xmm1
+ 18c3118:	movaps 0xbe0(%rsp),%xmm2
+ 18c3120:	mov    0x18(%rsp),%rax
+ 18c3125:	movups %xmm2,0x28(%rax)
+ 18c3129:	movups %xmm1,0x18(%rax)
+ 18c312d:	movups %xmm0,0x8(%rax)
+ 18c3131:	movq   $0xfffffffffffffffe,(%rax)
+ 18c3138:	cmpq   $0xfffffffffffffffe,0x238(%rsp)
+ 18c3141:	je     18c314e <<litchi_odp::authoring::edit::Transaction>::commit+0x343e>
+ 18c3143:	xor    %r15d,%r15d
+ 18c3146:	mov    %rbx,%rdi
+ 18c3149:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c314e:	xor    %r15d,%r15d
+ 18c3151:	jmp    18c2f07 <<litchi_odp::authoring::edit::Transaction>::commit+0x31f7>
+ 18c3156:	cmpq   $0xfffffffffffffffe,0x238(%rsp)
+ 18c315f:	je     18c3424 <<litchi_odp::authoring::edit::Transaction>::commit+0x3714>
+ 18c3165:	lea    0x520(%rsp),%rdi
+ 18c316d:	lea    0xf70(%rsp),%rsi
+ 18c3175:	mov    $0x98,%edx
+ 18c317a:	call   *0x1433068(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c3180:	mov    $0x1,%r15b
+ 18c3183:	jmp    18c3236 <<litchi_odp::authoring::edit::Transaction>::commit+0x3526>
+ 18c3188:	movups 0xcf8(%rsp),%xmm0
+ 18c3190:	movups %xmm0,0x5a8(%rsp)
+ 18c3198:	movups 0xce8(%rsp),%xmm0
+ 18c31a0:	movups %xmm0,0x598(%rsp)
+ 18c31a8:	movups 0xca8(%rsp),%xmm0
+ 18c31b0:	movups 0xcb8(%rsp),%xmm1
+ 18c31b8:	movups 0xcc8(%rsp),%xmm2
+ 18c31c0:	movups 0xcd8(%rsp),%xmm3
+ 18c31c8:	movups %xmm3,0x588(%rsp)
+ 18c31d0:	movups %xmm2,0x578(%rsp)
+ 18c31d8:	movups %xmm1,0x568(%rsp)
+ 18c31e0:	movups %xmm0,0x558(%rsp)
+ 18c31e8:	movaps 0xbc0(%rsp),%xmm0
+ 18c31f0:	movaps 0xbd0(%rsp),%xmm1
+ 18c31f8:	movaps 0xbe0(%rsp),%xmm2
+ 18c3200:	movups %xmm0,0x528(%rsp)
+ 18c3208:	movups %xmm1,0x538(%rsp)
+ 18c3210:	movups %xmm2,0x548(%rsp)
+ 18c3218:	mov    %rax,0x520(%rsp)
+ 18c3220:	cmpq   $0xfffffffffffffffe,0x238(%rsp)
+ 18c3229:	je     18c3233 <<litchi_odp::authoring::edit::Transaction>::commit+0x3523>
+ 18c322b:	mov    %rbx,%rdi
+ 18c322e:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3233:	xor    %r15d,%r15d
+ 18c3236:	lea    0x180(%rsp),%rdi
+ 18c323e:	mov    $0x98,%edx
+ 18c3243:	mov    %r12,%rsi
+ 18c3246:	call   *0x1432f9c(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c324c:	lea    0x230(%rsp),%rdi
+ 18c3254:	lea    0x520(%rsp),%rsi
+ 18c325c:	call   18c8b30 <<litchi_odp::authoring::edit::Snapshot as core::clone::Clone>::clone>
+ 18c3261:	mov    0x58(%rsp),%rax
+ 18c3266:	mov    %rax,0xc80(%rsp)
+ 18c326e:	movups 0x48(%rsp),%xmm0
+ 18c3273:	movaps %xmm0,0xc70(%rsp)
+ 18c327b:	lea    0xc70(%rsp),%rdi
+ 18c3283:	call   18c8a80 <<alloc::sync::Arc<[litchi_odp::authoring::edit::Domain]> as core::convert::From<alloc::vec::Vec<litchi_odp::authoring::edit::Domain>>>::from>
+ 18c3288:	mov    %rax,%rbx
+ 18c328b:	mov    %rdx,%r14
+ 18c328e:	lea    0xc70(%rsp),%rbp
+ 18c3296:	lea    0x180(%rsp),%rsi
+ 18c329e:	mov    0x1432f43(%rip),%r13        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c32a5:	mov    $0x98,%edx
+ 18c32aa:	mov    %rbp,%rdi
+ 18c32ad:	call   *%r13
+ 18c32b0:	lea    0xd08(%rsp),%rdi
+ 18c32b8:	lea    0x230(%rsp),%rsi
+ 18c32c0:	mov    $0x98,%edx
+ 18c32c5:	call   *%r13
+ 18c32c8:	lea    0x230(%rsp),%r12
+ 18c32d0:	lea    0x520(%rsp),%rsi
+ 18c32d8:	mov    $0x98,%edx
+ 18c32dd:	mov    %r12,%rdi
+ 18c32e0:	call   *%r13
+ 18c32e3:	lea    0x2c8(%rsp),%rdi
+ 18c32eb:	mov    $0x130,%edx
+ 18c32f0:	mov    %rbp,%rsi
+ 18c32f3:	call   *%r13
+ 18c32f6:	mov    $0x1c8,%edx
+ 18c32fb:	mov    0x18(%rsp),%rbp
+ 18c3300:	mov    %rbp,%rdi
+ 18c3303:	mov    %r12,%rsi
+ 18c3306:	call   *%r13
+ 18c3309:	mov    %rbx,0x1c8(%rbp)
+ 18c3310:	mov    %r14,0x1d0(%rbp)
+ 18c3317:	movb   $0x1,0x1d8(%rbp)
+ 18c331e:	cmpq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c3327:	je     18c333a <<litchi_odp::authoring::edit::Transaction>::commit+0x362a>
+ 18c3329:	xor    %ebx,%ebx
+ 18c332b:	lea    0x5c0(%rsp),%rdi
+ 18c3333:	xor    %ebp,%ebp
+ 18c3335:	call   18bafc0 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c333a:	xor    %r12d,%r12d
+ 18c333d:	lea    0xbf0(%rsp),%rdi
+ 18c3345:	xor    %ebp,%ebp
+ 18c3347:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c334c:	test   %r15b,%r15b
+ 18c334f:	je     18c3361 <<litchi_odp::authoring::edit::Transaction>::commit+0x3651>
+ 18c3351:	xor    %r15d,%r15d
+ 18c3354:	lea    0x9a0(%rsp),%rdi
+ 18c335c:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c3361:	xor    %r15d,%r15d
+ 18c3364:	lea    0x70(%rsp),%rdi
+ 18c3369:	xor    %ebx,%ebx
+ 18c336b:	xor    %ebp,%ebp
+ 18c336d:	call   18b9860 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::mutable::PublicationAuditProof>>>
+ 18c3372:	mov    0x10(%rsp),%rax
+ 18c3377:	lock decq (%rax)
+ 18c337b:	jne    18c338a <<litchi_odp::authoring::edit::Transaction>::commit+0x367a>
+ 18c337d:	xor    %ebp,%ebp
+ 18c337f:	lea    0x10(%rsp),%rdi
+ 18c3384:	call   *0x1433386(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c338a:	mov    0x8(%rsp),%rdi
+ 18c338f:	call   18bb100 <core::ptr::drop_glue::<litchi_odp::authoring::mutable::MutablePresentation>>
+ 18c3394:	mov    0x138(%rsp),%rdi
+ 18c339c:	call   18b9630 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>>
+ 18c33a1:	mov    0x158(%rsp),%rdi
+ 18c33a9:	call   18b8ce0 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>>
+ 18c33ae:	mov    0x150(%rsp),%rdi
+ 18c33b6:	call   18b8f10 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>>
+ 18c33bb:	mov    0x148(%rsp),%rdi
+ 18c33c3:	call   18b9500 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>>
+ 18c33c8:	jmp    18c3ffc <<litchi_odp::authoring::edit::Transaction>::commit+0x42ec>
+ 18c33cd:	lea    0xc70(%rsp),%rdi
+ 18c33d5:	call   18b9e70 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::annotation::model::Info>>>
+ 18c33da:	mov    $0x41,%edx
+ 18c33df:	lea    -0x15535e7(%rip),%rsi        # 36fdff <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x4fd>
+ 18c33e6:	jmp    18c2f6f <<litchi_odp::authoring::edit::Transaction>::commit+0x325f>
+ 18c33eb:	lea    0xc70(%rsp),%rdi
+ 18c33f3:	call   18ba070 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::package::layout_master::MasterPage>>>
+ 18c33f8:	jmp    18c2f63 <<litchi_odp::authoring::edit::Transaction>::commit+0x3253>
+ 18c33fd:	lea    0xc70(%rsp),%rdi
+ 18c3405:	call   18bacc0 <core::ptr::drop_glue::<litchi_odp::model::page_metadata::Collection>>
+ 18c340a:	jmp    18c2f63 <<litchi_odp::authoring::edit::Transaction>::commit+0x3253>
+ 18c340f:	mov    $0x1,%edi
+ 18c3414:	mov    $0x3c,%esi
+ 18c3419:	call   *0x1432e29(%rip)        # 2cf6248 <_DYNAMIC+0x2b0>
+ 18c341f:	jmp    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c3424:	mov    $0x1,%r15b
+ 18c3427:	lea    -0x15535ee(%rip),%rdi        # 36fe40 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x53e>
+ 18c342e:	lea    0x13f275b(%rip),%rdx        # 2cb5b90 <anon.1b97c32948dde543278b46da31d56e67.9.llvm.17217241823208096775+0x30>
+ 18c3435:	mov    $0xbd,%esi
+ 18c343a:	call   *0x1433338(%rip)        # 2cf6778 <_DYNAMIC+0x7e0>
+ 18c3440:	jmp    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c3445:	mov    %rax,%r13
+ 18c3448:	lea    0xc70(%rsp),%rdi
+ 18c3450:	call   18ba070 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::package::layout_master::MasterPage>>>
+ 18c3455:	jmp    18c348a <<litchi_odp::authoring::edit::Transaction>::commit+0x377a>
+ 18c3457:	mov    %rax,%r13
+ 18c345a:	mov    $0x1,%bpl
+ 18c345d:	xor    %r15d,%r15d
+ 18c3460:	mov    $0x1,%r14b
+ 18c3463:	jmp    18c351f <<litchi_odp::authoring::edit::Transaction>::commit+0x380f>
+ 18c3468:	mov    %rax,%r13
+ 18c346b:	lea    0xc70(%rsp),%rdi
+ 18c3473:	call   18b9e70 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::annotation::model::Info>>>
+ 18c3478:	jmp    18c348a <<litchi_odp::authoring::edit::Transaction>::commit+0x377a>
+ 18c347a:	mov    %rax,%r13
+ 18c347d:	lea    0xc70(%rsp),%rdi
+ 18c3485:	call   18bac00 <core::ptr::drop_glue::<litchi_odp::model::page_layout::Collection>>
+ 18c348a:	mov    $0x1,%r15b
+ 18c348d:	mov    $0x1,%r12b
+ 18c3490:	mov    $0x1,%bpl
+ 18c3493:	jmp    18c3978 <<litchi_odp::authoring::edit::Transaction>::commit+0x3c68>
+ 18c3498:	mov    %rax,%r13
+ 18c349b:	jmp    18c34e3 <<litchi_odp::authoring::edit::Transaction>::commit+0x37d3>
+ 18c349d:	mov    %rax,%r13
+ 18c34a0:	jmp    18c34d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x37c6>
+ 18c34a2:	mov    %rax,%r13
+ 18c34a5:	jmp    18c34c9 <<litchi_odp::authoring::edit::Transaction>::commit+0x37b9>
+ 18c34a7:	mov    %rax,%r13
+ 18c34aa:	jmp    18c34bc <<litchi_odp::authoring::edit::Transaction>::commit+0x37ac>
+ 18c34ac:	mov    %rax,%r13
+ 18c34af:	mov    0x138(%rsp),%rdi
+ 18c34b7:	call   18b9630 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>>
+ 18c34bc:	mov    0x158(%rsp),%rdi
+ 18c34c4:	call   18b8ce0 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>>
+ 18c34c9:	mov    0x150(%rsp),%rdi
+ 18c34d1:	call   18b8f10 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>>
+ 18c34d6:	mov    0x148(%rsp),%rdi
+ 18c34de:	call   18b9500 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>>
+ 18c34e3:	mov    0x178(%rsp),%rdi
+ 18c34eb:	call   18b9400 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ContentDraft>>>
+ 18c34f0:	jmp    18c3f87 <<litchi_odp::authoring::edit::Transaction>::commit+0x4277>
+ 18c34f5:	mov    %rax,%r13
+ 18c34f8:	lea    0x230(%rsp),%rdi
+ 18c3500:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3505:	xor    %r14d,%r14d
+ 18c3508:	jmp    18c3510 <<litchi_odp::authoring::edit::Transaction>::commit+0x3800>
+ 18c350a:	mov    %rax,%r13
+ 18c350d:	mov    $0x1,%r14b
+ 18c3510:	lea    0x180(%rsp),%rdi
+ 18c3518:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c351d:	xor    %ebp,%ebp
+ 18c351f:	lea    0x520(%rsp),%rdi
+ 18c3527:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c352c:	xor    %r12d,%r12d
+ 18c352f:	jmp    18c397b <<litchi_odp::authoring::edit::Transaction>::commit+0x3c6b>
+ 18c3534:	mov    %rax,%r13
+ 18c3537:	lea    0x5c0(%rsp),%rdi
+ 18c353f:	call   18baf30 <core::ptr::drop_glue::<litchi_odp::charts::snapshot::Snapshot>>
+ 18c3544:	jmp    18c3556 <<litchi_odp::authoring::edit::Transaction>::commit+0x3846>
+ 18c3546:	mov    %rax,%r13
+ 18c3549:	lea    0x5c0(%rsp),%rdi
+ 18c3551:	call   18ba410 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odf_common::rdf::model::Graph>>>
+ 18c3556:	mov    $0x1,%r15b
+ 18c3559:	mov    $0x1,%r12b
+ 18c355c:	mov    $0x1,%bpl
+ 18c355f:	mov    $0x1,%r14b
+ 18c3562:	jmp    18c3dd7 <<litchi_odp::authoring::edit::Transaction>::commit+0x40c7>
+ 18c3567:	mov    %rax,%r13
+ 18c356a:	mov    $0x1,%bpl
+ 18c356d:	mov    %r15d,%r12d
+ 18c3570:	jmp    18c3978 <<litchi_odp::authoring::edit::Transaction>::commit+0x3c68>
+ 18c3575:	mov    %rax,%r13
+ 18c3578:	test   %rbx,%rbx
+ 18c357b:	je     18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3581:	mov    $0x1,%edx
+ 18c3586:	mov    %r14,%rdi
+ 18c3589:	mov    %rbx,%rsi
+ 18c358c:	jmp    18c4090 <<litchi_odp::authoring::edit::Transaction>::commit+0x4380>
+ 18c3591:	mov    %rax,%r13
+ 18c3594:	test   %r14,%r14
+ 18c3597:	je     18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c359d:	jmp    18c3719 <<litchi_odp::authoring::edit::Transaction>::commit+0x3a09>
+ 18c35a2:	mov    %rax,%r12
+ 18c35a5:	test   %r13,%r13
+ 18c35a8:	je     18c35bb <<litchi_odp::authoring::edit::Transaction>::commit+0x38ab>
+ 18c35aa:	mov    $0x1,%edx
+ 18c35af:	mov    %r15,%rdi
+ 18c35b2:	mov    %r13,%rsi
+ 18c35b5:	call   *0x1432c75(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c35bb:	mov    $0x1,%bl
+ 18c35bd:	mov    $0x1,%bpl
+ 18c35c0:	mov    $0x1,%r14b
+ 18c35c3:	mov    %r12,%r13
+ 18c35c6:	mov    $0x1,%r15b
+ 18c35c9:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c35ce:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c35d3:	mov    %rax,%r13
+ 18c35d6:	mov    0x78(%rsp),%rax
+ 18c35db:	lock decq (%rax)
+ 18c35df:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c35e5:	lea    0x78(%rsp),%rdi
+ 18c35ea:	call   *0x1433120(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c35f0:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c35f5:	call   *0x1432c65(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c35fb:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3600:	mov    %rax,%r13
+ 18c3603:	mov    0x78(%rsp),%rax
+ 18c3608:	lock decq (%rax)
+ 18c360c:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3612:	lea    0x78(%rsp),%rdi
+ 18c3617:	call   *0x14330f3(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c361d:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3622:	call   *0x1432c38(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3628:	mov    %r13,0x5c0(%rsp)
+ 18c3630:	mov    %rax,%r13
+ 18c3633:	mov    %rbp,0x5c8(%rsp)
+ 18c363b:	mov    0x20(%rsp),%rax
+ 18c3640:	mov    %rax,0x5d0(%rsp)
+ 18c3648:	mov    0x40(%rsp),%rax
+ 18c364d:	mov    %rax,0x5d8(%rsp)
+ 18c3655:	mov    0x38(%rsp),%rax
+ 18c365a:	mov    %rax,0x5e0(%rsp)
+ 18c3662:	mov    %r15,0x5e8(%rsp)
+ 18c366a:	mov    %r12,0x5f0(%rsp)
+ 18c3672:	jmp    18c36c0 <<litchi_odp::authoring::edit::Transaction>::commit+0x39b0>
+ 18c3674:	jmp    18c3676 <<litchi_odp::authoring::edit::Transaction>::commit+0x3966>
+ 18c3676:	mov    %r13,0x5c0(%rsp)
+ 18c367e:	mov    %rax,%r13
+ 18c3681:	mov    %rbp,0x5c8(%rsp)
+ 18c3689:	mov    0x20(%rsp),%rax
+ 18c368e:	mov    %rax,0x5d0(%rsp)
+ 18c3696:	mov    %r14,0x5d8(%rsp)
+ 18c369e:	mov    0x38(%rsp),%rax
+ 18c36a3:	mov    %rax,0x5e0(%rsp)
+ 18c36ab:	mov    %r15,0x5e8(%rsp)
+ 18c36b3:	mov    0x40(%rsp),%rax
+ 18c36b8:	mov    %rax,0x5f0(%rsp)
+ 18c36c0:	lea    0xc70(%rsp),%rsi
+ 18c36c8:	mov    $0x2b0,%edx
+ 18c36cd:	lea    0x5f8(%rsp),%rdi
+ 18c36d5:	call   *0x1432b0d(%rip)        # 2cf61e8 <memcpy@GLIBC_2.14>
+ 18c36db:	jmp    18c3ea1 <<litchi_odp::authoring::edit::Transaction>::commit+0x4191>
+ 18c36e0:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c36e5:	mov    %rax,%r13
+ 18c36e8:	mov    0x78(%rsp),%rax
+ 18c36ed:	lock decq (%rax)
+ 18c36f1:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c36f7:	lea    0x78(%rsp),%rdi
+ 18c36fc:	call   *0x143300e(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3702:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3707:	call   *0x1432b53(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c370d:	mov    %rax,%r13
+ 18c3710:	test   %r14,%r14
+ 18c3713:	je     18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3719:	mov    $0x1,%edx
+ 18c371e:	mov    %r12,%rdi
+ 18c3721:	jmp    18c40a6 <<litchi_odp::authoring::edit::Transaction>::commit+0x4396>
+ 18c3726:	jmp    18c3b4d <<litchi_odp::authoring::edit::Transaction>::commit+0x3e3d>
+ 18c372b:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3730:	mov    %rax,%r13
+ 18c3733:	mov    0x78(%rsp),%rax
+ 18c3738:	lock decq (%rax)
+ 18c373c:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3742:	lea    0x78(%rsp),%rdi
+ 18c3747:	call   *0x1432fc3(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c374d:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3752:	call   *0x1432b08(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3758:	jmp    18c3b4d <<litchi_odp::authoring::edit::Transaction>::commit+0x3e3d>
+ 18c375d:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3762:	mov    %rax,%r13
+ 18c3765:	mov    0x78(%rsp),%rax
+ 18c376a:	lock decq (%rax)
+ 18c376e:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3774:	lea    0x78(%rsp),%rdi
+ 18c3779:	call   *0x1432f91(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c377f:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3784:	call   *0x1432ad6(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c378a:	mov    %rax,%r13
+ 18c378d:	lock decq (%r14)
+ 18c3791:	jne    18c37a1 <<litchi_odp::authoring::edit::Transaction>::commit+0x3a91>
+ 18c3793:	lea    0x180(%rsp),%rdi
+ 18c379b:	call   *0x14331d7(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c37a1:	mov    0x520(%rsp),%rax
+ 18c37a9:	lock decq (%rax)
+ 18c37ad:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c37b3:	lea    0x520(%rsp),%rdi
+ 18c37bb:	call   *0x1432f4f(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c37c1:	mov    $0x1,%bl
+ 18c37c3:	mov    $0x1,%bpl
+ 18c37c6:	mov    $0x1,%r14b
+ 18c37c9:	mov    $0x1,%r15b
+ 18c37cc:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c37d1:	call   *0x1432a89(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c37d7:	jmp    18c3b4d <<litchi_odp::authoring::edit::Transaction>::commit+0x3e3d>
+ 18c37dc:	mov    %rax,%r13
+ 18c37df:	lock decq (%r14)
+ 18c37e3:	jne    18c37f3 <<litchi_odp::authoring::edit::Transaction>::commit+0x3ae3>
+ 18c37e5:	lea    0x180(%rsp),%rdi
+ 18c37ed:	call   *0x1433185(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c37f3:	mov    0x520(%rsp),%rax
+ 18c37fb:	lock decq (%rax)
+ 18c37ff:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3805:	lea    0x520(%rsp),%rdi
+ 18c380d:	call   *0x1432efd(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3813:	mov    $0x1,%bl
+ 18c3815:	mov    $0x1,%bpl
+ 18c3818:	mov    $0x1,%r14b
+ 18c381b:	mov    $0x1,%r15b
+ 18c381e:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c3823:	call   *0x1432a37(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3829:	jmp    18c3b4d <<litchi_odp::authoring::edit::Transaction>::commit+0x3e3d>
+ 18c382e:	mov    %rax,%r13
+ 18c3831:	lock decq (%r14)
+ 18c3835:	jne    18c3845 <<litchi_odp::authoring::edit::Transaction>::commit+0x3b35>
+ 18c3837:	lea    0x180(%rsp),%rdi
+ 18c383f:	call   *0x1433133(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c3845:	mov    0x520(%rsp),%rax
+ 18c384d:	lock decq (%rax)
+ 18c3851:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3857:	lea    0x520(%rsp),%rdi
+ 18c385f:	call   *0x1432eab(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3865:	mov    $0x1,%bl
+ 18c3867:	mov    $0x1,%bpl
+ 18c386a:	mov    $0x1,%r14b
+ 18c386d:	mov    $0x1,%r15b
+ 18c3870:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c3875:	call   *0x14329e5(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c387b:	jmp    18c3b4d <<litchi_odp::authoring::edit::Transaction>::commit+0x3e3d>
+ 18c3880:	jmp    18c399e <<litchi_odp::authoring::edit::Transaction>::commit+0x3c8e>
+ 18c3885:	mov    %rax,%r13
+ 18c3888:	lock decq (%r14)
+ 18c388c:	jne    18c389c <<litchi_odp::authoring::edit::Transaction>::commit+0x3b8c>
+ 18c388e:	lea    0x180(%rsp),%rdi
+ 18c3896:	call   *0x14330dc(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c389c:	mov    0x520(%rsp),%rax
+ 18c38a4:	lock decq (%rax)
+ 18c38a8:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c38ae:	lea    0x520(%rsp),%rdi
+ 18c38b6:	call   *0x1432e54(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c38bc:	mov    $0x1,%bl
+ 18c38be:	mov    $0x1,%bpl
+ 18c38c1:	mov    $0x1,%r14b
+ 18c38c4:	mov    $0x1,%r15b
+ 18c38c7:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c38cc:	call   *0x143298e(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c38d2:	jmp    18c399e <<litchi_odp::authoring::edit::Transaction>::commit+0x3c8e>
+ 18c38d7:	mov    %rax,%r13
+ 18c38da:	lock decq (%r14)
+ 18c38de:	jne    18c38ee <<litchi_odp::authoring::edit::Transaction>::commit+0x3bde>
+ 18c38e0:	lea    0x180(%rsp),%rdi
+ 18c38e8:	call   *0x143308a(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c38ee:	mov    0x520(%rsp),%rax
+ 18c38f6:	lock decq (%rax)
+ 18c38fa:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3900:	lea    0x520(%rsp),%rdi
+ 18c3908:	call   *0x1432e02(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c390e:	mov    $0x1,%bl
+ 18c3910:	mov    $0x1,%bpl
+ 18c3913:	mov    $0x1,%r14b
+ 18c3916:	mov    $0x1,%r15b
+ 18c3919:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c391e:	call   *0x143293c(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3924:	mov    %rax,%r13
+ 18c3927:	jmp    18c3c7d <<litchi_odp::authoring::edit::Transaction>::commit+0x3f6d>
+ 18c392c:	mov    %rax,%r13
+ 18c392f:	mov    0x528(%rsp),%rax
+ 18c3937:	lock decq (%rax)
+ 18c393b:	jne    18c3c7d <<litchi_odp::authoring::edit::Transaction>::commit+0x3f6d>
+ 18c3941:	lea    0x528(%rsp),%rdi
+ 18c3949:	call   *0x1432dc1(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c394f:	jmp    18c3c7d <<litchi_odp::authoring::edit::Transaction>::commit+0x3f6d>
+ 18c3954:	call   *0x1432906(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c395a:	jmp    18c399e <<litchi_odp::authoring::edit::Transaction>::commit+0x3c8e>
+ 18c395c:	mov    %rax,%r13
+ 18c395f:	mov    $0x1,%bpl
+ 18c3962:	cmpq   $0xfffffffffffffffe,0x238(%rsp)
+ 18c396b:	je     18c3975 <<litchi_odp::authoring::edit::Transaction>::commit+0x3c65>
+ 18c396d:	mov    %rbx,%rdi
+ 18c3970:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3975:	xor    %r12d,%r12d
+ 18c3978:	mov    $0x1,%r14b
+ 18c397b:	cmpq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c3984:	je     18c3dd7 <<litchi_odp::authoring::edit::Transaction>::commit+0x40c7>
+ 18c398a:	lea    0x5c0(%rsp),%rdi
+ 18c3992:	call   18bafc0 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c3997:	jmp    18c3dd7 <<litchi_odp::authoring::edit::Transaction>::commit+0x40c7>
+ 18c399c:	jmp    18c399e <<litchi_odp::authoring::edit::Transaction>::commit+0x3c8e>
+ 18c399e:	mov    %rax,%r13
+ 18c39a1:	mov    %r15,0xc0(%rsp)
+ 18c39a9:	movaps 0xc70(%rsp),%xmm0
+ 18c39b1:	lea    0xc8(%rsp),%rcx
+ 18c39b9:	movups %xmm0,(%rcx)
+ 18c39bc:	mov    %rbx,0xd8(%rsp)
+ 18c39c4:	mov    %r14,0xe0(%rsp)
+ 18c39cc:	mov    0x270(%rsp),%rax
+ 18c39d4:	mov    %rax,0x60(%rcx)
+ 18c39d8:	movaps 0x230(%rsp),%xmm0
+ 18c39e0:	movaps 0x240(%rsp),%xmm1
+ 18c39e8:	movaps 0x250(%rsp),%xmm2
+ 18c39f0:	movaps 0x260(%rsp),%xmm3
+ 18c39f8:	movups %xmm3,0x50(%rcx)
+ 18c39fc:	movups %xmm2,0x40(%rcx)
+ 18c3a00:	movups %xmm1,0x30(%rcx)
+ 18c3a04:	movups %xmm0,0x20(%rcx)
+ 18c3a08:	mov    %bpl,0x130(%rsp)
+ 18c3a10:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c3a15:	mov    %rax,%r13
+ 18c3a18:	jmp    18c3c70 <<litchi_odp::authoring::edit::Transaction>::commit+0x3f60>
+ 18c3a1d:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3a22:	mov    %rax,%r13
+ 18c3a25:	mov    0x78(%rsp),%rax
+ 18c3a2a:	lock decq (%rax)
+ 18c3a2e:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3a34:	lea    0x78(%rsp),%rdi
+ 18c3a39:	call   *0x1432cd1(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3a3f:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3a44:	call   *0x1432816(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3a4a:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3a4f:	mov    %rax,%r13
+ 18c3a52:	mov    0x78(%rsp),%rax
+ 18c3a57:	lock decq (%rax)
+ 18c3a5b:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3a61:	lea    0x78(%rsp),%rdi
+ 18c3a66:	call   *0x1432ca4(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3a6c:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3a71:	call   *0x14327e9(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3a77:	mov    %rax,%r13
+ 18c3a7a:	lock decq (%r14)
+ 18c3a7e:	jne    18c3a8e <<litchi_odp::authoring::edit::Transaction>::commit+0x3d7e>
+ 18c3a80:	lea    0xc70(%rsp),%rdi
+ 18c3a88:	call   *0x1432eea(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c3a8e:	mov    0x180(%rsp),%rax
+ 18c3a96:	lock decq (%rax)
+ 18c3a9a:	mov    $0x1,%r14b
+ 18c3a9d:	jne    18c3ab8 <<litchi_odp::authoring::edit::Transaction>::commit+0x3da8>
+ 18c3a9f:	lea    0x180(%rsp),%rdi
+ 18c3aa7:	call   *0x1432c63(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3aad:	mov    $0x1,%bpl
+ 18c3ab0:	mov    $0x1,%r12b
+ 18c3ab3:	jmp    18c3de9 <<litchi_odp::authoring::edit::Transaction>::commit+0x40d9>
+ 18c3ab8:	mov    $0x1,%bpl
+ 18c3abb:	mov    $0x1,%r12b
+ 18c3abe:	jmp    18c3de9 <<litchi_odp::authoring::edit::Transaction>::commit+0x40d9>
+ 18c3ac3:	call   *0x1432797(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3ac9:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3ace:	mov    %rax,%r13
+ 18c3ad1:	mov    0x78(%rsp),%rax
+ 18c3ad6:	lock decq (%rax)
+ 18c3ada:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3ae0:	lea    0x78(%rsp),%rdi
+ 18c3ae5:	call   *0x1432c25(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3aeb:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3af0:	call   *0x143276a(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3af6:	mov    %rax,%r13
+ 18c3af9:	lea    0x5c0(%rsp),%rdi
+ 18c3b01:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3b06:	jmp    18c3c5a <<litchi_odp::authoring::edit::Transaction>::commit+0x3f4a>
+ 18c3b0b:	mov    %rax,%r13
+ 18c3b0e:	lock decq (%r14)
+ 18c3b12:	jne    18c3b22 <<litchi_odp::authoring::edit::Transaction>::commit+0x3e12>
+ 18c3b14:	lea    0x9a0(%rsp),%rdi
+ 18c3b1c:	call   *0x1432e56(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c3b22:	mov    0xc0(%rsp),%rax
+ 18c3b2a:	lock decq (%rax)
+ 18c3b2e:	jne    18c3c5a <<litchi_odp::authoring::edit::Transaction>::commit+0x3f4a>
+ 18c3b34:	lea    0xc0(%rsp),%rdi
+ 18c3b3c:	call   *0x1432bce(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3b42:	jmp    18c3c5a <<litchi_odp::authoring::edit::Transaction>::commit+0x3f4a>
+ 18c3b47:	call   *0x1432713(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3b4d:	mov    %rax,%r13
+ 18c3b50:	mov    %rbx,0x10(%rsp)
+ 18c3b55:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c3b5a:	jmp    18c3cf7 <<litchi_odp::authoring::edit::Transaction>::commit+0x3fe7>
+ 18c3b5f:	mov    %rax,%r13
+ 18c3b62:	xor    %ebx,%ebx
+ 18c3b64:	mov    %r15d,%ebp
+ 18c3b67:	mov    %r15d,%r14d
+ 18c3b6a:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c3b6f:	mov    %rax,%r13
+ 18c3b72:	mov    %ebp,%r14d
+ 18c3b75:	jmp    18c3de4 <<litchi_odp::authoring::edit::Transaction>::commit+0x40d4>
+ 18c3b7a:	mov    %rax,%r13
+ 18c3b7d:	mov    %r15,0x10(%rsp)
+ 18c3b82:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c3b87:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c3b8c:	mov    %rax,%r13
+ 18c3b8f:	mov    0x78(%rsp),%rax
+ 18c3b94:	lock decq (%rax)
+ 18c3b98:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3b9e:	lea    0x78(%rsp),%rdi
+ 18c3ba3:	call   *0x1432b67(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3ba9:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c3bae:	call   *0x14326ac(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3bb4:	mov    %rax,%r13
+ 18c3bb7:	lock decq (%r14)
+ 18c3bbb:	jne    18c3bcb <<litchi_odp::authoring::edit::Transaction>::commit+0x3ebb>
+ 18c3bbd:	lea    0x520(%rsp),%rdi
+ 18c3bc5:	call   *0x1432dad(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c3bcb:	mov    0xbf0(%rsp),%rax
+ 18c3bd3:	lock decq (%rax)
+ 18c3bd7:	jne    18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c3bdd:	lea    0xbf0(%rsp),%rdi
+ 18c3be5:	call   *0x1432b25(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3beb:	mov    $0x1,%bl
+ 18c3bed:	mov    $0x1,%bpl
+ 18c3bf0:	mov    $0x1,%r14b
+ 18c3bf3:	mov    $0x1,%r15b
+ 18c3bf6:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c3bfb:	call   *0x143265f(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3c01:	mov    %rax,%r13
+ 18c3c04:	lock decq (%r12)
+ 18c3c09:	jne    18c3c19 <<litchi_odp::authoring::edit::Transaction>::commit+0x3f09>
+ 18c3c0b:	lea    0xc70(%rsp),%rdi
+ 18c3c13:	call   *0x1432d5f(%rip)        # 2cf6978 <_DYNAMIC+0x9e0>
+ 18c3c19:	mov    0x180(%rsp),%rax
+ 18c3c21:	lock decq (%rax)
+ 18c3c25:	mov    $0x1,%bpl
+ 18c3c28:	jne    18c3f0c <<litchi_odp::authoring::edit::Transaction>::commit+0x41fc>
+ 18c3c2e:	lea    0x180(%rsp),%rdi
+ 18c3c36:	call   *0x1432ad4(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3c3c:	jmp    18c3f0c <<litchi_odp::authoring::edit::Transaction>::commit+0x41fc>
+ 18c3c41:	call   *0x1432619(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3c47:	mov    %rax,%r13
+ 18c3c4a:	jmp    18c3e7a <<litchi_odp::authoring::edit::Transaction>::commit+0x416a>
+ 18c3c4f:	mov    %rax,%r13
+ 18c3c52:	jmp    18c3e87 <<litchi_odp::authoring::edit::Transaction>::commit+0x4177>
+ 18c3c57:	mov    %rax,%r13
+ 18c3c5a:	mov    0x70(%rsp),%rax
+ 18c3c5f:	lock decq (%rax)
+ 18c3c63:	jne    18c3c70 <<litchi_odp::authoring::edit::Transaction>::commit+0x3f60>
+ 18c3c65:	lea    0x70(%rsp),%rdi
+ 18c3c6a:	call   *0x1432aa0(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3c70:	lea    0x520(%rsp),%rdi
+ 18c3c78:	call   18b9860 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::mutable::PublicationAuditProof>>>
+ 18c3c7d:	mov    $0x1,%bpl
+ 18c3c80:	lea    0x180(%rsp),%rdi
+ 18c3c88:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c3c8d:	jmp    18c3f0c <<litchi_odp::authoring::edit::Transaction>::commit+0x41fc>
+ 18c3c92:	mov    %rax,%r13
+ 18c3c95:	mov    %rbx,0xc0(%rsp)
+ 18c3c9d:	movaps 0x8e0(%rsp),%xmm0
+ 18c3ca5:	movaps 0x8f0(%rsp),%xmm1
+ 18c3cad:	movaps 0x900(%rsp),%xmm2
+ 18c3cb5:	lea    0xc8(%rsp),%rax
+ 18c3cbd:	movups %xmm2,0x20(%rax)
+ 18c3cc1:	movups %xmm1,0x10(%rax)
+ 18c3cc5:	movups %xmm0,(%rax)
+ 18c3cc8:	movaps 0xac0(%rsp),%xmm0
+ 18c3cd0:	movaps 0xad0(%rsp),%xmm1
+ 18c3cd8:	movaps 0xae0(%rsp),%xmm2
+ 18c3ce0:	movaps 0xaf0(%rsp),%xmm3
+ 18c3ce8:	jmp    18c41e6 <<litchi_odp::authoring::edit::Transaction>::commit+0x44d6>
+ 18c3ced:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3cf2:	jmp    18c3e9e <<litchi_odp::authoring::edit::Transaction>::commit+0x418e>
+ 18c3cf7:	mov    %rax,%r13
+ 18c3cfa:	mov    %r12,0x10(%rsp)
+ 18c3cff:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c3d04:	mov    %rax,%r13
+ 18c3d07:	mov    %r12,0xc0(%rsp)
+ 18c3d0f:	movaps 0x970(%rsp),%xmm0
+ 18c3d17:	movaps 0x980(%rsp),%xmm1
+ 18c3d1f:	movaps 0x990(%rsp),%xmm2
+ 18c3d27:	lea    0xc8(%rsp),%rax
+ 18c3d2f:	movups %xmm2,0x20(%rax)
+ 18c3d33:	movups %xmm1,0x10(%rax)
+ 18c3d37:	movups %xmm0,(%rax)
+ 18c3d3a:	movaps 0xb80(%rsp),%xmm0
+ 18c3d42:	movaps 0xb90(%rsp),%xmm1
+ 18c3d4a:	movaps 0xba0(%rsp),%xmm2
+ 18c3d52:	movaps 0xbb0(%rsp),%xmm3
+ 18c3d5a:	jmp    18c41e6 <<litchi_odp::authoring::edit::Transaction>::commit+0x44d6>
+ 18c3d5f:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3d64:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3d69:	mov    %rax,%r13
+ 18c3d6c:	mov    %r15,0xc0(%rsp)
+ 18c3d74:	movaps 0x940(%rsp),%xmm0
+ 18c3d7c:	movaps 0x950(%rsp),%xmm1
+ 18c3d84:	movaps 0x960(%rsp),%xmm2
+ 18c3d8c:	lea    0xc8(%rsp),%rax
+ 18c3d94:	movups %xmm2,0x20(%rax)
+ 18c3d98:	movups %xmm1,0x10(%rax)
+ 18c3d9c:	movups %xmm0,(%rax)
+ 18c3d9f:	movaps 0xb40(%rsp),%xmm0
+ 18c3da7:	movaps 0xb50(%rsp),%xmm1
+ 18c3daf:	movaps 0xb60(%rsp),%xmm2
+ 18c3db7:	movaps 0xb70(%rsp),%xmm3
+ 18c3dbf:	jmp    18c41e6 <<litchi_odp::authoring::edit::Transaction>::commit+0x44d6>
+ 18c3dc4:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3dc9:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3dce:	mov    %ebx,%r12d
+ 18c3dd1:	mov    %rax,%r13
+ 18c3dd4:	mov    %ebp,%r14d
+ 18c3dd7:	lea    0xbf0(%rsp),%rdi
+ 18c3ddf:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c3de4:	test   %r15b,%r15b
+ 18c3de7:	je     18c3df6 <<litchi_odp::authoring::edit::Transaction>::commit+0x40e6>
+ 18c3de9:	lea    0x9a0(%rsp),%rdi
+ 18c3df1:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c3df6:	xor    %ebx,%ebx
+ 18c3df8:	mov    %r12d,%r15d
+ 18c3dfb:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c3e00:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3e05:	mov    %rax,%r13
+ 18c3e08:	mov    %r12,0xc0(%rsp)
+ 18c3e10:	movaps 0x8b0(%rsp),%xmm0
+ 18c3e18:	movaps 0x8c0(%rsp),%xmm1
+ 18c3e20:	movaps 0x8d0(%rsp),%xmm2
+ 18c3e28:	lea    0xc8(%rsp),%rax
+ 18c3e30:	movups %xmm2,0x20(%rax)
+ 18c3e34:	movups %xmm1,0x10(%rax)
+ 18c3e38:	movups %xmm0,(%rax)
+ 18c3e3b:	movaps 0xa80(%rsp),%xmm0
+ 18c3e43:	movaps 0xa90(%rsp),%xmm1
+ 18c3e4b:	movaps 0xaa0(%rsp),%xmm2
+ 18c3e53:	movaps 0xab0(%rsp),%xmm3
+ 18c3e5b:	jmp    18c41e6 <<litchi_odp::authoring::edit::Transaction>::commit+0x44d6>
+ 18c3e60:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3e65:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c3e6a:	mov    %rax,%r13
+ 18c3e6d:	lea    0x230(%rsp),%rdi
+ 18c3e75:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3e7a:	lea    0xc70(%rsp),%rdi
+ 18c3e82:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3e87:	lea    0x180(%rsp),%rdi
+ 18c3e8f:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3e94:	xor    %ebp,%ebp
+ 18c3e96:	jmp    18c3f0c <<litchi_odp::authoring::edit::Transaction>::commit+0x41fc>
+ 18c3e98:	call   *0x14323c2(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3e9e:	mov    %rax,%r13
+ 18c3ea1:	mov    $0x1,%r15b
+ 18c3ea4:	lea    0x5c0(%rsp),%rdi
+ 18c3eac:	call   18bafc0 <core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>>
+ 18c3eb1:	mov    $0x1,%bl
+ 18c3eb3:	mov    $0x1,%bpl
+ 18c3eb6:	mov    $0x1,%r14b
+ 18c3eb9:	lea    0x70(%rsp),%rdi
+ 18c3ebe:	call   18b9860 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::mutable::PublicationAuditProof>>>
+ 18c3ec3:	test   %r15b,%r15b
+ 18c3ec6:	je     18c3ee0 <<litchi_odp::authoring::edit::Transaction>::commit+0x41d0>
+ 18c3ec8:	cmpq   $0xfffffffffffffffe,0xf70(%rsp)
+ 18c3ed1:	je     18c3ee0 <<litchi_odp::authoring::edit::Transaction>::commit+0x41d0>
+ 18c3ed3:	lea    0xf70(%rsp),%rdi
+ 18c3edb:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3ee0:	test   %bl,%bl
+ 18c3ee2:	je     18c3ef1 <<litchi_odp::authoring::edit::Transaction>::commit+0x41e1>
+ 18c3ee4:	lea    0xc0(%rsp),%rdi
+ 18c3eec:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c3ef1:	mov    0x10(%rsp),%rax
+ 18c3ef6:	lock decq (%rax)
+ 18c3efa:	jne    18c3f07 <<litchi_odp::authoring::edit::Transaction>::commit+0x41f7>
+ 18c3efc:	lea    0x10(%rsp),%rdi
+ 18c3f01:	call   *0x1432809(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c3f07:	test   %r14b,%r14b
+ 18c3f0a:	je     18c3f26 <<litchi_odp::authoring::edit::Transaction>::commit+0x4216>
+ 18c3f0c:	mov    0x48(%rsp),%rsi
+ 18c3f11:	test   %rsi,%rsi
+ 18c3f14:	je     18c3f26 <<litchi_odp::authoring::edit::Transaction>::commit+0x4216>
+ 18c3f16:	mov    0x50(%rsp),%rdi
+ 18c3f1b:	mov    $0x1,%edx
+ 18c3f20:	call   *0x143230a(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c3f26:	test   %bpl,%bpl
+ 18c3f29:	je     18c3f3c <<litchi_odp::authoring::edit::Transaction>::commit+0x422c>
+ 18c3f2b:	mov    0x8(%rsp),%rax
+ 18c3f30:	lea    0x3e0(%rax),%rdi
+ 18c3f37:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3f3c:	mov    0x8(%rsp),%rdi
+ 18c3f41:	call   18bb100 <core::ptr::drop_glue::<litchi_odp::authoring::mutable::MutablePresentation>>
+ 18c3f46:	mov    0x138(%rsp),%rdi
+ 18c3f4e:	call   18b9630 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>>
+ 18c3f53:	mov    0x158(%rsp),%rdi
+ 18c3f5b:	call   18b8ce0 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>>
+ 18c3f60:	mov    0x150(%rsp),%rdi
+ 18c3f68:	call   18b8f10 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>>
+ 18c3f6d:	mov    0x148(%rsp),%rdi
+ 18c3f75:	call   18b9500 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>>
+ 18c3f7a:	mov    0x178(%rsp),%rdi
+ 18c3f82:	call   18b9400 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ContentDraft>>>
+ 18c3f87:	mov    %r13,%rdi
+ 18c3f8a:	call   2c93cc0 <_Unwind_Resume@plt>
+ 18c3f8f:	call   *0x14322cb(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c3f95:	mov    0x48(%rsp),%rsi
+ 18c3f9a:	test   %rsi,%rsi
+ 18c3f9d:	je     18c3faf <<litchi_odp::authoring::edit::Transaction>::commit+0x429f>
+ 18c3f9f:	mov    0x50(%rsp),%rdi
+ 18c3fa4:	mov    $0x1,%edx
+ 18c3fa9:	call   *0x1432281(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c3faf:	mov    0x8(%rsp),%rbx
+ 18c3fb4:	lea    0x3e0(%rbx),%rdi
+ 18c3fbb:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c3fc0:	mov    %rbx,%rdi
+ 18c3fc3:	call   18bb100 <core::ptr::drop_glue::<litchi_odp::authoring::mutable::MutablePresentation>>
+ 18c3fc8:	mov    0x138(%rsp),%rdi
+ 18c3fd0:	call   18b9630 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>>
+ 18c3fd5:	mov    0x158(%rsp),%rdi
+ 18c3fdd:	call   18b8ce0 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>>
+ 18c3fe2:	mov    0x150(%rsp),%rdi
+ 18c3fea:	call   18b8f10 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>>
+ 18c3fef:	mov    0x148(%rsp),%rdi
+ 18c3ff7:	call   18b9500 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>>
+ 18c3ffc:	mov    0x178(%rsp),%rdi
+ 18c4004:	call   18b9400 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ContentDraft>>>
+ 18c4009:	mov    0x18(%rsp),%rax
+ 18c400e:	add    $0x1098,%rsp
+ 18c4015:	pop    %rbx
+ 18c4016:	pop    %r12
+ 18c4018:	pop    %r13
+ 18c401a:	pop    %r14
+ 18c401c:	pop    %r15
+ 18c401e:	pop    %rbp
+ 18c401f:	ret
+ 18c4020:	mov    %rax,%r13
+ 18c4023:	mov    %rbx,%rdi
+ 18c4026:	call   18bb100 <core::ptr::drop_glue::<litchi_odp::authoring::mutable::MutablePresentation>>
+ 18c402b:	jmp    18c4044 <<litchi_odp::authoring::edit::Transaction>::commit+0x4334>
+ 18c402d:	mov    %rax,%r13
+ 18c4030:	jmp    18c4078 <<litchi_odp::authoring::edit::Transaction>::commit+0x4368>
+ 18c4032:	mov    %rax,%r13
+ 18c4035:	jmp    18c406b <<litchi_odp::authoring::edit::Transaction>::commit+0x435b>
+ 18c4037:	mov    %rax,%r13
+ 18c403a:	jmp    18c405e <<litchi_odp::authoring::edit::Transaction>::commit+0x434e>
+ 18c403c:	mov    %rax,%r13
+ 18c403f:	jmp    18c4051 <<litchi_odp::authoring::edit::Transaction>::commit+0x4341>
+ 18c4041:	mov    %rax,%r13
+ 18c4044:	mov    0x138(%rsp),%rdi
+ 18c404c:	call   18b9630 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>>
+ 18c4051:	mov    0x158(%rsp),%rdi
+ 18c4059:	call   18b8ce0 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>>
+ 18c405e:	mov    0x150(%rsp),%rdi
+ 18c4066:	call   18b8f10 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>>
+ 18c406b:	mov    0x148(%rsp),%rdi
+ 18c4073:	call   18b9500 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>>
+ 18c4078:	mov    0x178(%rsp),%rdi
+ 18c4080:	call   18b9400 <core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ContentDraft>>>
+ 18c4085:	jmp    18c3f87 <<litchi_odp::authoring::edit::Transaction>::commit+0x4277>
+ 18c408a:	call   *0x14321d0(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c4090:	call   *0x143219a(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c4096:	mov    $0x1,%bl
+ 18c4098:	mov    $0x1,%bpl
+ 18c409b:	mov    $0x1,%r14b
+ 18c409e:	mov    $0x1,%r15b
+ 18c40a1:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c40a6:	mov    %r14,%rsi
+ 18c40a9:	jmp    18c4090 <<litchi_odp::authoring::edit::Transaction>::commit+0x4380>
+ 18c40ab:	mov    %rax,%r13
+ 18c40ae:	mov    %ebp,%r14d
+ 18c40b1:	test   %r14b,%r14b
+ 18c40b4:	jne    18c3f0c <<litchi_odp::authoring::edit::Transaction>::commit+0x41fc>
+ 18c40ba:	jmp    18c3f26 <<litchi_odp::authoring::edit::Transaction>::commit+0x4216>
+ 18c40bf:	ud2
+ 18c40c1:	mov    %rax,%r13
+ 18c40c4:	mov    $0x1,%r15b
+ 18c40c7:	mov    $0x1,%bl
+ 18c40c9:	mov    $0x1,%bpl
+ 18c40cc:	mov    $0x1,%r14b
+ 18c40cf:	jmp    18c3eb9 <<litchi_odp::authoring::edit::Transaction>::commit+0x41a9>
+ 18c40d4:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+ 18c40d6:	mov    %rax,%r13
+ 18c40d9:	movq   $0x0,0x70(%rsp)
+ 18c40e2:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c40e4:	mov    0x18(%rsp),%rax
+ 18c40e9:	movups %xmm2,0x28(%rax)
+ 18c40ed:	movups %xmm1,0x18(%rax)
+ 18c40f1:	movups %xmm0,0x8(%rax)
+ 18c40f5:	movq   $0xfffffffffffffffe,(%rax)
+ 18c40fc:	mov    $0x1,%r15b
+ 18c40ff:	mov    $0x1,%bl
+ 18c4101:	mov    0x70(%rsp),%rax
+ 18c4106:	test   %rax,%rax
+ 18c4109:	je     18c4135 <<litchi_odp::authoring::edit::Transaction>::commit+0x4425>
+ 18c410b:	lock decq (%rax)
+ 18c410f:	jne    18c411c <<litchi_odp::authoring::edit::Transaction>::commit+0x440c>
+ 18c4111:	lea    0x70(%rsp),%rdi
+ 18c4116:	call   *0x14325f4(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c411c:	mov    0x78(%rsp),%rax
+ 18c4121:	lock decq (%rax)
+ 18c4125:	jne    18c4135 <<litchi_odp::authoring::edit::Transaction>::commit+0x4425>
+ 18c4127:	mov    $0x1,%bpl
+ 18c412a:	lea    0x78(%rsp),%rdi
+ 18c412f:	call   *0x14325db(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c4135:	test   %r15b,%r15b
+ 18c4138:	je     18c4152 <<litchi_odp::authoring::edit::Transaction>::commit+0x4442>
+ 18c413a:	cmpq   $0xfffffffffffffffe,0xf70(%rsp)
+ 18c4143:	je     18c4152 <<litchi_odp::authoring::edit::Transaction>::commit+0x4442>
+ 18c4145:	lea    0xf70(%rsp),%rdi
+ 18c414d:	call   18bb070 <core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>>
+ 18c4152:	test   %bl,%bl
+ 18c4154:	je     18c4163 <<litchi_odp::authoring::edit::Transaction>::commit+0x4453>
+ 18c4156:	lea    0xc0(%rsp),%rdi
+ 18c415e:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c4163:	mov    0x10(%rsp),%rax
+ 18c4168:	lock decq (%rax)
+ 18c416c:	jne    18c3f95 <<litchi_odp::authoring::edit::Transaction>::commit+0x4285>
+ 18c4172:	mov    $0x1,%bpl
+ 18c4175:	lea    0x10(%rsp),%rdi
+ 18c417a:	call   *0x1432590(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c4180:	jmp    18c3f95 <<litchi_odp::authoring::edit::Transaction>::commit+0x4285>
+ 18c4185:	mov    %rax,%r13
+ 18c4188:	mov    0x78(%rsp),%rax
+ 18c418d:	lock decq (%rax)
+ 18c4191:	mov    $0x1,%bpl
+ 18c4194:	jne    18c41a9 <<litchi_odp::authoring::edit::Transaction>::commit+0x4499>
+ 18c4196:	lea    0x78(%rsp),%rdi
+ 18c419b:	call   *0x143256f(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c41a1:	mov    $0x1,%r14b
+ 18c41a4:	jmp    18c3ec3 <<litchi_odp::authoring::edit::Transaction>::commit+0x41b3>
+ 18c41a9:	mov    $0x1,%r14b
+ 18c41ac:	jmp    18c3ec3 <<litchi_odp::authoring::edit::Transaction>::commit+0x41b3>
+ 18c41b1:	call   *0x14320a9(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c41b7:	mov    %rax,%r13
+ 18c41ba:	mov    %ebp,%r14d
+ 18c41bd:	jmp    18c3ec3 <<litchi_odp::authoring::edit::Transaction>::commit+0x41b3>
+ 18c41c2:	mov    %rax,%r13
+ 18c41c5:	mov    $0x1,%bpl
+ 18c41c8:	mov    $0x1,%r14b
+ 18c41cb:	jmp    18c3ef1 <<litchi_odp::authoring::edit::Transaction>::commit+0x41e1>
+ 18c41d0:	mov    %rax,%r13
+ 18c41d3:	mov    $0x1,%bpl
+ 18c41d6:	mov    $0x1,%r14b
+ 18c41d9:	test   %bl,%bl
+ 18c41db:	jne    18c3ee4 <<litchi_odp::authoring::edit::Transaction>::commit+0x41d4>
+ 18c41e1:	jmp    18c3ef1 <<litchi_odp::authoring::edit::Transaction>::commit+0x41e1>
+ 18c41e6:	lea    0xf8(%rsp),%rax
+ 18c41ee:	movups %xmm3,0x30(%rax)
+ 18c41f2:	movups %xmm2,0x20(%rax)
+ 18c41f6:	movups %xmm1,0x10(%rax)
+ 18c41fa:	movups %xmm0,(%rax)
+ 18c41fd:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c4202:	mov    %r14,0x60(%rsp)
+ 18c4207:	mov    0x10(%rbx),%rdx
+ 18c420b:	mov    0x18(%rbx),%r12
+ 18c420f:	mov    0x28(%rbx),%r8
+ 18c4213:	mov    0x30(%rbx),%r9
+ 18c4217:	lea    0x230(%rsp),%rdi
+ 18c421f:	lea    0xc0(%rsp),%rsi
+ 18c4227:	mov    %rdx,0x228(%rsp)
+ 18c422f:	mov    %r12,%rcx
+ 18c4232:	call   *0x14386c8(%rip)        # 2cfc900 <_DYNAMIC+0x6968>
+ 18c4238:	mov    %rbp,0x20(%rsp)
+ 18c423d:	mov    0x238(%rsp),%r14
+ 18c4245:	mov    0x240(%rsp),%r15
+ 18c424d:	mov    0x248(%rsp),%r13
+ 18c4255:	mov    0x250(%rsp),%rbx
+ 18c425d:	mov    0x258(%rsp),%rbp
+ 18c4265:	mov    0x260(%rsp),%rax
+ 18c426d:	cmpb   $0x0,0x230(%rsp)
+ 18c4275:	je     18c42ac <<litchi_odp::authoring::edit::Transaction>::commit+0x459c>
+ 18c4277:	mov    %r14,0x5c0(%rsp)
+ 18c427f:	mov    %r15,0x5c8(%rsp)
+ 18c4287:	mov    %r13,0x5d0(%rsp)
+ 18c428f:	mov    %rbx,0x5d8(%rsp)
+ 18c4297:	mov    %rbp,0x5e0(%rsp)
+ 18c429f:	mov    %rax,0x5e8(%rsp)
+ 18c42a7:	jmp    18c436a <<litchi_odp::authoring::edit::Transaction>::commit+0x465a>
+ 18c42ac:	cmp    %r12,%rax
+ 18c42af:	jne    18c42cd <<litchi_odp::authoring::edit::Transaction>::commit+0x45bd>
+ 18c42b1:	mov    %rbp,%rdi
+ 18c42b4:	mov    0x228(%rsp),%rsi
+ 18c42bc:	mov    %r12,%rdx
+ 18c42bf:	call   *0x143218b(%rip)        # 2cf6450 <bcmp@GLIBC_2.2.5>
+ 18c42c5:	test   %eax,%eax
+ 18c42c7:	je     18c437c <<litchi_odp::authoring::edit::Transaction>::commit+0x466c>
+ 18c42cd:	call   *0x1431f4d(%rip)        # 2cf6220 <_DYNAMIC+0x288>
+ 18c42d3:	mov    $0x2e,%edi
+ 18c42d8:	mov    $0x1,%esi
+ 18c42dd:	call   *0x1431f45(%rip)        # 2cf6228 <_DYNAMIC+0x290>
+ 18c42e3:	test   %rax,%rax
+ 18c42e6:	je     18c43a4 <<litchi_odp::authoring::edit::Transaction>::commit+0x4694>
+ 18c42ec:	movups -0x155420c(%rip),%xmm0        # 3700e7 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x7e5>
+ 18c42f3:	movups %xmm0,0x1e(%rax)
+ 18c42f7:	movups -0x1554225(%rip),%xmm0        # 3700d9 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x7d7>
+ 18c42fe:	movups %xmm0,0x10(%rax)
+ 18c4302:	movups -0x1554240(%rip),%xmm0        # 3700c9 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x7c7>
+ 18c4309:	movups %xmm0,(%rax)
+ 18c430c:	movabs $0x8000000000000002,%rcx
+ 18c4316:	mov    %rcx,0x5c0(%rsp)
+ 18c431e:	movq   $0x2e,0x5c8(%rsp)
+ 18c432a:	mov    %rax,0x5d0(%rsp)
+ 18c4332:	movq   $0x2e,0x5d8(%rsp)
+ 18c433e:	test   %rbx,%rbx
+ 18c4341:	je     18c4354 <<litchi_odp::authoring::edit::Transaction>::commit+0x4644>
+ 18c4343:	mov    $0x1,%edx
+ 18c4348:	mov    %rbp,%rdi
+ 18c434b:	mov    %rbx,%rsi
+ 18c434e:	call   *0x1431edc(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c4354:	test   %r14,%r14
+ 18c4357:	je     18c436a <<litchi_odp::authoring::edit::Transaction>::commit+0x465a>
+ 18c4359:	mov    $0x1,%edx
+ 18c435e:	mov    %r15,%rdi
+ 18c4361:	mov    %r14,%rsi
+ 18c4364:	call   *0x1431ec6(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c436a:	lea    0x238(%rsp),%r12
+ 18c4372:	mov    0x20(%rsp),%rbp
+ 18c4377:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c437c:	test   %rbx,%rbx
+ 18c437f:	je     18c4392 <<litchi_odp::authoring::edit::Transaction>::commit+0x4682>
+ 18c4381:	mov    $0x1,%edx
+ 18c4386:	mov    %rbp,%rdi
+ 18c4389:	mov    %rbx,%rsi
+ 18c438c:	call   *0x1431e9e(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c4392:	mov    0x20(%rsp),%rbx
+ 18c4397:	lea    0x238(%rsp),%r12
+ 18c439f:	jmp    18c458d <<litchi_odp::authoring::edit::Transaction>::commit+0x487d>
+ 18c43a4:	mov    $0x1,%edi
+ 18c43a9:	mov    $0x2e,%esi
+ 18c43ae:	call   *0x1431e94(%rip)        # 2cf6248 <_DYNAMIC+0x2b0>
+ 18c43b4:	jmp    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c43b9:	mov    %rax,%r13
+ 18c43bc:	test   %rbx,%rbx
+ 18c43bf:	je     18c43d2 <<litchi_odp::authoring::edit::Transaction>::commit+0x46c2>
+ 18c43c1:	mov    $0x1,%edx
+ 18c43c6:	mov    %rbp,%rdi
+ 18c43c9:	mov    %rbx,%rsi
+ 18c43cc:	call   *0x1431e5e(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c43d2:	test   %r14,%r14
+ 18c43d5:	je     18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c43db:	mov    $0x1,%edx
+ 18c43e0:	mov    %r15,%rdi
+ 18c43e3:	jmp    18c40a6 <<litchi_odp::authoring::edit::Transaction>::commit+0x4396>
+ 18c43e8:	mov    %r14,0x60(%rsp)
+ 18c43ed:	mov    0x10(%rbx),%rdx
+ 18c43f1:	mov    0x18(%rbx),%rcx
+ 18c43f5:	mov    0x28(%rbx),%r8
+ 18c43f9:	mov    0x30(%rbx),%r9
+ 18c43fd:	lea    0x5c0(%rsp),%rdi
+ 18c4405:	lea    0xc0(%rsp),%rsi
+ 18c440d:	call   *0x14384dd(%rip)        # 2cfc8f0 <_DYNAMIC+0x6958>
+ 18c4413:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c4418:	mov    %r14,0x60(%rsp)
+ 18c441d:	mov    0x10(%rbx),%rdx
+ 18c4421:	mov    0x18(%rbx),%rcx
+ 18c4425:	lea    0x5c0(%rsp),%rdi
+ 18c442d:	lea    0xc0(%rsp),%rsi
+ 18c4435:	call   *0x14384a5(%rip)        # 2cfc8e0 <_DYNAMIC+0x6948>
+ 18c443b:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c4440:	mov    %r14,0x60(%rsp)
+ 18c4445:	lea    0x8(%rbx),%r8
+ 18c4449:	mov    0x90(%rbx),%rdx
+ 18c4450:	mov    0x98(%rbx),%rcx
+ 18c4457:	lea    0x230(%rsp),%rdi
+ 18c445f:	lea    0xc0(%rsp),%rsi
+ 18c4467:	call   *0x1438463(%rip)        # 2cfc8d0 <_DYNAMIC+0x6938>
+ 18c446d:	cmpq   $0xffffffffffffffff,0x230(%rsp)
+ 18c4476:	je     18c44ad <<litchi_odp::authoring::edit::Transaction>::commit+0x479d>
+ 18c4478:	movups 0x230(%rsp),%xmm0
+ 18c4480:	movups 0x240(%rsp),%xmm1
+ 18c4488:	movups 0x250(%rsp),%xmm2
+ 18c4490:	movaps %xmm2,0x5e0(%rsp)
+ 18c4498:	movaps %xmm1,0x5d0(%rsp)
+ 18c44a0:	movaps %xmm0,0x5c0(%rsp)
+ 18c44a8:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c44ad:	mov    0x10(%r12),%rax
+ 18c44b2:	lea    0x5c8(%rsp),%rcx
+ 18c44ba:	mov    %rax,0x10(%rcx)
+ 18c44be:	movups (%r12),%xmm0
+ 18c44c3:	movups %xmm0,(%rcx)
+ 18c44c6:	movq   $0xffffffffffffffff,0x5c0(%rsp)
+ 18c44d2:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c44d7:	mov    %r14,0x60(%rsp)
+ 18c44dc:	mov    0x88(%rbx),%rdx
+ 18c44e3:	mov    0x90(%rbx),%rcx
+ 18c44ea:	mov    0x98(%rbx),%r8
+ 18c44f1:	lea    0x5c0(%rsp),%rdi
+ 18c44f9:	lea    0xc0(%rsp),%rsi
+ 18c4501:	mov    %rbx,%r9
+ 18c4504:	call   *0x14383ee(%rip)        # 2cfc8f8 <_DYNAMIC+0x6960>
+ 18c450a:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c450c:	mov    %r14,0x60(%rsp)
+ 18c4511:	mov    0x10(%rbx),%rdx
+ 18c4515:	mov    0x18(%rbx),%rcx
+ 18c4519:	mov    0x20(%rbx),%r8
+ 18c451d:	lea    0x5c0(%rsp),%rdi
+ 18c4525:	lea    0xc0(%rsp),%rsi
+ 18c452d:	call   *0x14383b5(%rip)        # 2cfc8e8 <_DYNAMIC+0x6950>
+ 18c4533:	jmp    18c4560 <<litchi_odp::authoring::edit::Transaction>::commit+0x4850>
+ 18c4535:	mov    %r14,0x60(%rsp)
+ 18c453a:	mov    0x10(%rbx),%rdx
+ 18c453e:	mov    0x18(%rbx),%rcx
+ 18c4542:	mov    0x20(%rbx),%r8
+ 18c4546:	mov    0x28(%rbx),%r9
+ 18c454a:	lea    0x5c0(%rsp),%rdi
+ 18c4552:	lea    0xc0(%rsp),%rsi
+ 18c455a:	call   *0x1438378(%rip)        # 2cfc8d8 <_DYNAMIC+0x6940>
+ 18c4560:	mov    0x5c0(%rsp),%rax
+ 18c4568:	mov    0x5c8(%rsp),%r14
+ 18c4570:	mov    0x5d0(%rsp),%r15
+ 18c4578:	mov    0x5d8(%rsp),%r13
+ 18c4580:	cmp    $0xffffffffffffffff,%rax
+ 18c4584:	jne    18c47bb <<litchi_odp::authoring::edit::Transaction>::commit+0x4aab>
+ 18c458a:	mov    %rbp,%rbx
+ 18c458d:	cmp    $0x8000000,%r13
+ 18c4594:	ja     18c475a <<litchi_odp::authoring::edit::Transaction>::commit+0x4a4a>
+ 18c459a:	mov    %r14,0x5c0(%rsp)
+ 18c45a2:	mov    %r15,0x5c8(%rsp)
+ 18c45aa:	mov    %r13,0x5d0(%rsp)
+ 18c45b2:	lea    0x230(%rsp),%rdi
+ 18c45ba:	lea    0x5c0(%rsp),%rsi
+ 18c45c2:	call   *0x1432500(%rip)        # 2cf6ac8 <_DYNAMIC+0xb30>
+ 18c45c8:	mov    0x230(%rsp),%r14
+ 18c45d0:	movups (%r12),%xmm0
+ 18c45d5:	movups 0x10(%r12),%xmm1
+ 18c45db:	movups 0x20(%r12),%xmm2
+ 18c45e1:	movaps %xmm0,0x910(%rsp)
+ 18c45e9:	movaps %xmm1,0x920(%rsp)
+ 18c45f1:	movaps %xmm2,0x930(%rsp)
+ 18c45f9:	cmp    $0xfffffffffffffffe,%r14
+ 18c45fd:	je     18c479e <<litchi_odp::authoring::edit::Transaction>::commit+0x4a8e>
+ 18c4603:	movups 0x30(%r12),%xmm0
+ 18c4609:	movups 0x40(%r12),%xmm1
+ 18c460f:	movups 0x50(%r12),%xmm2
+ 18c4615:	movups 0x60(%r12),%xmm3
+ 18c461b:	movaps %xmm3,0xb30(%rsp)
+ 18c4623:	movaps %xmm2,0xb20(%rsp)
+ 18c462b:	movaps %xmm1,0xb10(%rsp)
+ 18c4633:	movaps %xmm0,0xb00(%rsp)
+ 18c463b:	lea    0xc0(%rsp),%rdi
+ 18c4643:	call   18bb7f0 <core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>>
+ 18c4648:	mov    %r14,0xc0(%rsp)
+ 18c4650:	movaps 0x910(%rsp),%xmm0
+ 18c4658:	movaps 0x920(%rsp),%xmm1
+ 18c4660:	movaps 0x930(%rsp),%xmm2
+ 18c4668:	lea    0xc8(%rsp),%rax
+ 18c4670:	movups %xmm2,0x20(%rax)
+ 18c4674:	movups %xmm1,0x10(%rax)
+ 18c4678:	movups %xmm0,(%rax)
+ 18c467b:	movaps 0xb00(%rsp),%xmm0
+ 18c4683:	movaps 0xb10(%rsp),%xmm1
+ 18c468b:	movaps 0xb20(%rsp),%xmm2
+ 18c4693:	movaps 0xb30(%rsp),%xmm3
+ 18c469b:	lea    0xf8(%rsp),%rax
+ 18c46a3:	movups %xmm3,0x30(%rax)
+ 18c46a7:	movups %xmm2,0x20(%rax)
+ 18c46ab:	movups %xmm1,0x10(%rax)
+ 18c46af:	movups %xmm0,(%rax)
+ 18c46b2:	mov    0xd8(%rsp),%rax
+ 18c46ba:	lock incq (%rax)
+ 18c46be:	jle    18c40bf <<litchi_odp::authoring::edit::Transaction>::commit+0x43af>
+ 18c46c4:	mov    0xd8(%rsp),%r14
+ 18c46cc:	mov    0x10(%rsp),%rax
+ 18c46d1:	lock decq (%rax)
+ 18c46d5:	jne    18c46e2 <<litchi_odp::authoring::edit::Transaction>::commit+0x49d2>
+ 18c46d7:	lea    0x10(%rsp),%rdi
+ 18c46dc:	call   *0x143202e(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c46e2:	mov    %r14,0x10(%rsp)
+ 18c46e7:	mov    0x70(%rsp),%rax
+ 18c46ec:	test   %rax,%rax
+ 18c46ef:	mov    0x60(%rsp),%r14
+ 18c46f4:	je     18c471d <<litchi_odp::authoring::edit::Transaction>::commit+0x4a0d>
+ 18c46f6:	lock decq (%rax)
+ 18c46fa:	jne    18c4707 <<litchi_odp::authoring::edit::Transaction>::commit+0x49f7>
+ 18c46fc:	lea    0x70(%rsp),%rdi
+ 18c4701:	call   *0x1432009(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c4707:	mov    0x78(%rsp),%rax
+ 18c470c:	lock decq (%rax)
+ 18c4710:	jne    18c471d <<litchi_odp::authoring::edit::Transaction>::commit+0x4a0d>
+ 18c4712:	lea    0x78(%rsp),%rdi
+ 18c4717:	call   *0x1431ff3(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c471d:	movq   $0x0,0x70(%rsp)
+ 18c4726:	add    $0xffffffffffffff60,%r14
+ 18c472d:	je     18c1a53 <<litchi_odp::authoring::edit::Transaction>::commit+0x1d43>
+ 18c4733:	lea    0xa0(%rbx),%rbp
+ 18c473a:	mov    (%rbx),%rax
+ 18c473d:	sub    $0x2,%rax
+ 18c4741:	mov    $0x4,%ecx
+ 18c4746:	cmovae %rax,%rcx
+ 18c474a:	lea    -0x1554f21(%rip),%rdx        # 36f830 <anon.27ebc01334d26e52e912787017a60f97.393.llvm.17599591043162483340+0xc29>
+ 18c4751:	movslq (%rdx,%rcx,4),%rax
+ 18c4755:	add    %rdx,%rax
+ 18c4758:	jmp    *%rax
+ 18c475a:	lea    -0x1554a50(%rip),%rsi        # 36fd11 <anon.1b97c32948dde543278b46da31d56e67.7.llvm.17217241823208096775+0x40f>
+ 18c4761:	mov    $0x35,%edx
+ 18c4766:	mov    0x18(%rsp),%rdi
+ 18c476b:	call   18bbca0 <litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>>
+ 18c4770:	test   %r14,%r14
+ 18c4773:	je     18c4786 <<litchi_odp::authoring::edit::Transaction>::commit+0x4a76>
+ 18c4775:	mov    $0x1,%edx
+ 18c477a:	mov    %r15,%rdi
+ 18c477d:	mov    %r14,%rsi
+ 18c4780:	call   *0x1431aaa(%rip)        # 2cf6230 <_DYNAMIC+0x298>
+ 18c4786:	mov    $0x1,%bl
+ 18c4788:	mov    $0x1,%r15b
+ 18c478b:	mov    0x70(%rsp),%rax
+ 18c4790:	test   %rax,%rax
+ 18c4793:	jne    18c410b <<litchi_odp::authoring::edit::Transaction>::commit+0x43fb>
+ 18c4799:	jmp    18c4135 <<litchi_odp::authoring::edit::Transaction>::commit+0x4425>
+ 18c479e:	movaps 0x910(%rsp),%xmm0
+ 18c47a6:	movaps 0x920(%rsp),%xmm1
+ 18c47ae:	movaps 0x930(%rsp),%xmm2
+ 18c47b6:	jmp    18c40e4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43d4>
+ 18c47bb:	lea    0x5c8(%rsp),%rcx
+ 18c47c3:	movups 0x18(%rcx),%xmm0
+ 18c47c7:	mov    0x18(%rsp),%rcx
+ 18c47cc:	movups %xmm0,0x28(%rcx)
+ 18c47d0:	mov    %r14,0x10(%rcx)
+ 18c47d4:	mov    %r15,0x18(%rcx)
+ 18c47d8:	mov    %r13,0x20(%rcx)
+ 18c47dc:	mov    %rax,0x8(%rcx)
+ 18c47e0:	movq   $0xfffffffffffffffe,(%rcx)
+ 18c47e7:	jmp    18c40fc <<litchi_odp::authoring::edit::Transaction>::commit+0x43ec>
+ 18c47ec:	mov    %rax,%r13
+ 18c47ef:	test   %r14,%r14
+ 18c47f2:	je     18c4096 <<litchi_odp::authoring::edit::Transaction>::commit+0x4386>
+ 18c47f8:	jmp    18c43db <<litchi_odp::authoring::edit::Transaction>::commit+0x46cb>
+ 18c47fd:	jmp    18c40d6 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c6>
+ 18c4802:	mov    %rax,%r13
+ 18c4805:	mov    0x78(%rsp),%rax
+ 18c480a:	lock decq (%rax)
+ 18c480e:	jne    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c4814:	lea    0x78(%rsp),%rdi
+ 18c4819:	call   *0x1431ef1(%rip)        # 2cf6710 <_DYNAMIC+0x778>
+ 18c481f:	jmp    18c40d9 <<litchi_odp::authoring::edit::Transaction>::commit+0x43c9>
+ 18c4824:	call   *0x1431a36(%rip)        # 2cf6260 <_DYNAMIC+0x2c8>
+ 18c482a:	mov    %rax,%r13
+ 18c482d:	mov    %r14,0x10(%rsp)
+ 18c4832:	jmp    18c40c4 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b4>
+ 18c4837:	mov    %rax,%r13
+ 18c483a:	mov    %r14,0xc0(%rsp)
+ 18c4842:	movaps 0x910(%rsp),%xmm0
+ 18c484a:	movaps 0x920(%rsp),%xmm1
+ 18c4852:	movaps 0x930(%rsp),%xmm2
+ 18c485a:	lea    0xc8(%rsp),%rax
+ 18c4862:	movups %xmm2,0x20(%rax)
+ 18c4866:	movups %xmm1,0x10(%rax)
+ 18c486a:	movups %xmm0,(%rax)
+ 18c486d:	movaps 0xb00(%rsp),%xmm0
+ 18c4875:	movaps 0xb10(%rsp),%xmm1
+ 18c487d:	movaps 0xb20(%rsp),%xmm2
+ 18c4885:	movaps 0xb30(%rsp),%xmm3
+ 18c488d:	jmp    18c41e6 <<litchi_odp::authoring::edit::Transaction>::commit+0x44d6>
+ 18c4892:	jmp    18c40c1 <<litchi_odp::authoring::edit::Transaction>::commit+0x43b1>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

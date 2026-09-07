@@ -1,5 +1,39 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0463 evidence (2026-09-07)
+
+0463 retains a private writer-origin proof for the ordinary ODP publication
+path after the frozen 3% gate passes. The private ODP serializer records proof
+accounting around the existing common `PackageWriter` audit path, which is
+unchanged. The A1/B1/B2/A2 evidence contains 24
+reports and 720 samples. Normal p50 candidate-minus-baseline deltas are
+-10.0491% / -8.9678% for tiny, -6.9642% / -7.3050% for medium, and
+-7.3657% / -6.8199% for large in R1/R2. All normal and allocator bootstrap
+upper bounds are below zero; no adverse >5% elapsed or RSS flag or allocation
+increase review flag is present.
+
+Allocator bytes fall by 2,087,682 / 11,072,106 / 20,202,090 for
+tiny/medium/large in both repeats. Every lane reduces allocation calls by
+1,039, reallocations by 93 and deallocations by 946; peak above entry changes
+are 0 / -49,674 / -15,438 bytes and retained-live deltas remain zero. The proof
+is eligible only for the exact writer/source owners and conservative audit
+bounds; candidate reopen/readback, source precheck, media/domain checks,
+no-op and patch behavior remain. The source review reports 381 ODP tests and
+warning-denied Clippy passing.
+
+Supplementary phase clocks exclude setup, warmups and checks; whole-process
+counters include them. The proof changes the commit validation path, whose p50
+phase delta is -12.6863% / -13.0797%; other phase movement is diagnostic. The
+full non-iWork goal remains open, counts remain 439 selectors / 36 defaults,
+0460 remains accepted, and iWork is untouched. The harness and final gates are
+complete: 387 harness tests pass with one ignored, for 768 passed ODP/harness
+tests in total. Warning-denied rustdoc, scoped formatting, boundaries,
+precleanup and source replay, fresh-copy portable replay, resealed +1ns tamper
+rejection, and owned cleanup of four executables totaling 233,058,712 bytes
+pass. See the [0463
+comparison summary](results/change-0463/summary.json), [phase summary](results/change-0463/phase-summary.json),
+[source review](results/change-0463/source-review.md), and [proof design](results/change-0463/proof-design.md).
+
 ## Current audit: 0462 evidence (2026-09-07)
 
 0462 records partial normal-lifecycle improvements from a private seventeen-key
