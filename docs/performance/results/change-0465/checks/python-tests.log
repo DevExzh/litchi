@@ -1,0 +1,34 @@
+.FF....................................................................................................................................................................
+======================================================================
+FAIL: test_catalog_hashes_are_reproducible (tools.test_corpus_manifest_v2.CorpusManifestV2Tests.test_catalog_hashes_are_reproducible)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_corpus_manifest_v2.py", line 100, in test_catalog_hashes_are_reproducible
+    self.assertEqual(self.v2["content_set_sha256"], EXPECTED_CONTENT_SET_SHA256)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5' != 'f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71'
+- 0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5
++ f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71
+
+
+======================================================================
+FAIL: test_catalog_shape_and_bindings (tools.test_corpus_manifest_v2.CorpusManifestV2Tests.test_catalog_shape_and_bindings)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_corpus_manifest_v2.py", line 78, in test_catalog_shape_and_bindings
+    self.assertEqual(len(self.v2["corpora"]), 28)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 31 != 28
+
+----------------------------------------------------------------------
+Ran 167 tests in 0.701s
+
+FAILED (failures=2)
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmpmi8fx0qm/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

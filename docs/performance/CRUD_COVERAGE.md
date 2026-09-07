@@ -1,5 +1,22 @@
 # Performance CRUD coverage
 
+## 2026-09-07: change 0465 checks ordinary ODP append in the default matrix
+
+0465 promotes the existing `odp_existing_append_lifecycle` scenario to the
+37th default case. Preflight preserves the prior 198 row identities; the
+checked identity is 201 rows across 31 deterministic corpora, and the checked
+catalog is `d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f`.
+The taxonomy remains 15 categories and 33 mappings, now with 11 measured and
+22 correctness-only mappings. The mixed append-incremental category contains
+exactly one measured ODP row and two correctness-only fresh-streaming rows;
+both full-report validators pass this invariant.
+
+Two normal full-matrix runs retain 6,030 samples and two ODP-only allocator
+runs retain 90 samples. The ordinary append remains a fully materialized
+lifecycle; no independent native producer, bounded-memory streaming, speedup
+or scaling claim follows. The sealed precleanup verifier, five resealed
+negative probes, fresh-copy portable verification and owned cleanup pass.
+
 ## 2026-09-07: change 0457 measures bounded existing ODP tail publication
 
 [0457](results/change-0457/README.md) adds the opt-in

@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0465: checked ODP default stays within ADR boundaries
+
+0465 promotes the existing materialized ODP append case to the checked 37th
+default and records matching Rust/Python catalog metadata. It changes no
+production API, dependency, executor, source ownership, timing boundary or
+preservation oracle. The checked identity is 201 rows across 31 corpora, with
+the catalog SHA-256 `d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f`.
+
+All four formal lane receipts and both full-report CRUD validators pass. The
+353-test harness, warning-denied Clippy, rustdoc, scoped formatting, latest
+Python and boundary checks pass. The sealed precleanup verifier, five resealed
+negative probes, fresh-copy portable verification and owned cleanup pass. The
+descriptive result makes no regression, speedup, independent native-producer,
+bounded-memory streaming or scaling claim.
+
 ## Change 0464: descriptive PPTX pair evidence preserves ADR boundaries
 
 0464 is harness-only descriptive evidence for a private pair-lifecycle runner;

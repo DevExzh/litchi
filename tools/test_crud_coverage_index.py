@@ -23,7 +23,7 @@ CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
 EXPECTED_CATALOG_SHA256 = (
-    "679d39548de0150b9fdfcdd2628ca3adc1bbd3c041a21d7a95ab70095c2d0ba9"
+    "d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f"
 )
 
 
@@ -109,6 +109,8 @@ class CrudCoverageIndexTests(unittest.TestCase):
             if category["status"] != "measured":
                 continue
             for scenario in category["scenarios"]:
+                if scenario["status"] != "measured":
+                    continue
                 for identifier in scenario["corpus"]["ids"]:
                     results.append(
                         {
@@ -205,6 +207,33 @@ class CrudCoverageIndexTests(unittest.TestCase):
         index["categories"][0]["scenarios"][0]["status"] = "correctness-only"
         with self.assertRaises(ValidationError):
             self.validate(index)
+
+    def test_mixed_append_category_keeps_untimed_rows_out_of_report(self) -> None:
+        category = self.index["categories"][5]
+        self.assertEqual(category["status"], "measured")
+        measured = [row["selector"] for row in category["scenarios"]
+                    if row["status"] == "measured"]
+        self.assertEqual(measured, ["odp_existing_append_lifecycle"])
+        report = self.measured_report()
+        cases = {row["case"] for row in report["results"]}
+        self.assertNotIn("xlsx_streaming_create", cases)
+        self.assertNotIn("rtf_streaming_create", cases)
+        self.assertEqual(self.validate(self.index, report=report), (15, 33))
+
+    def test_mixed_category_cannot_hide_unsupported_status(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["categories"][5]["scenarios"][0] = {
+            "status": "unsupported", "reason": "unsupported test scenario"
+        }
+        with self.assertRaisesRegex(ValidationError, "status differs"):
+            self.validate(index)
+
+    def test_measured_append_cannot_omit_report_row(self) -> None:
+        report = self.measured_report()
+        report["results"] = [row for row in report["results"]
+                             if row["case"] != "odp_existing_append_lifecycle"]
+        with self.assertRaisesRegex(ValidationError, "missing measured row.*odp_existing_append"):
+            self.validate(self.index, report=report)
 
     def test_measured_status_requires_retained_timing_artifact(self) -> None:
         index = copy.deepcopy(self.index)

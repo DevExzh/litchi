@@ -1,0 +1,1162 @@
+#!/usr/bin/env python3
+"""Fail-closed portable verifier for the 0465 default ODP evidence bundle.
+
+The verifier authenticates the complete sealed bundle, the checked default
+catalog and policy, source/build/check receipts, direct capture receipts and
+the four retained report lanes.  It delegates report shape and operation
+metric validation to the repository's ``tools.perf_compare`` validator, then
+applies the ODP append semantic and retention invariants here.  It never
+builds or captures.  ``--precleanup`` additionally checks live binaries and
+the final current source tree; ordinary and ``--portable`` runs remain valid
+after those binaries have been removed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import importlib.util
+import json
+import math
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Any, Mapping
+
+
+ROOT = Path(__file__).resolve().parent
+
+
+def _repository_root() -> Path:
+    for candidate in (ROOT, *ROOT.parents):
+        if (candidate / "tools" / "perf_compare.py").is_file():
+            return candidate
+    # A portable copy may retain only the bundle; archived verifier-tools are
+    # loaded explicitly by the semantic and catalog checks below.
+    return ROOT
+
+
+REPO = _repository_root()
+CHANGE = 465
+SCHEMA = "litchi-0465-verification-v1"
+SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+RETRY_RE = re.compile(r"^(.*)-r([0-9]+)$")
+ODP_CASE = "odp_existing_append_lifecycle"
+ODP_GENERATOR = "litchi-odp-existing-append-lifecycle-v1"
+DEFAULT_CASE_COUNT = 37
+DEFAULT_RESULT_COUNT = 201
+ODP_SHAPES = {"tiny": 64, "medium": 4096, "large": 8192}
+REPEATS = ("R1", "R2")
+INSTRUMENTATIONS = ("normal", "allocator")
+REQUIRED_CHECKS = (
+    "harness-clippy",
+    "harness-tests",
+    "doc",
+    "fmt",
+    "boundaries",
+    "python-tests",
+    "promote",
+)
+CHECKED_NAMES = (
+    "perf-regression-default-manifest-v1.json",
+    "perf-corpus-manifest-v2.json",
+    "perf-regression-policy-v1.json",
+    "crud-coverage-index-v1.json",
+)
+EXPECTED_LANES = {
+    "preflight": {"binary": "normal", "case_mode": "default", "samples": 1, "warmup": 0, "expected_rows": DEFAULT_RESULT_COUNT, "repeat": "preflight"},
+    "R1-normal": {"binary": "normal", "case_mode": "default", "samples": 15, "warmup": 3, "expected_rows": DEFAULT_RESULT_COUNT, "repeat": "R1"},
+    "R1-allocator": {"binary": "allocator", "case_mode": "selection", "case": ODP_CASE, "samples": 15, "warmup": 3, "expected_rows": 3, "repeat": "R1"},
+    "R2-allocator": {"binary": "allocator", "case_mode": "selection", "case": ODP_CASE, "samples": 15, "warmup": 3, "expected_rows": 3, "repeat": "R2"},
+    "R2-normal": {"binary": "normal", "case_mode": "default", "samples": 15, "warmup": 3, "expected_rows": DEFAULT_RESULT_COUNT, "repeat": "R2"},
+}
+ODP_GATE_FIELDS = (
+    "source_manifest_bindings_verified",
+    "output_manifest_bindings_verified",
+    "untouched_members_verified",
+    "opaque_member_compressed_identity_verified",
+    "patch_replay_verified",
+    "inverse_patch_verified",
+    "stale_source_refusal_verified",
+    "exact_noop_verified",
+    "source_semantic_reopen_verified",
+    "output_semantic_reopen_verified",
+    "append_exactly_one_verified",
+    "source_unchanged_verified",
+    "runtime_output_digest_verified",
+    "runtime_sink_length_verified",
+)
+ALLOCATOR_VECTOR_FIELDS = (
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after",
+    "region_peak_live_bytes",
+)
+
+
+class VerificationError(ValueError):
+    pass
+
+
+def fail(message: str) -> None:
+    raise VerificationError(message)
+
+
+def load(path: Path, label: str) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        fail(f"{label}: invalid JSON ({error})")
+    raise AssertionError("unreachable")
+
+
+def obj(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        fail(f"{label}: expected object")
+    return value
+
+
+def text(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        fail(f"{label}: expected non-empty string")
+    return value
+
+
+def integer(value: Any, label: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        fail(f"{label}: expected integer >= {minimum}")
+    return value
+
+
+def digest(value: Any, label: str) -> str:
+    value = text(value, label).lower()
+    if SHA256_RE.fullmatch(value) is None:
+        fail(f"{label}: expected lowercase SHA-256")
+    return value
+
+
+def sha_file(path: Path) -> str:
+    result = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                result.update(block)
+    except OSError as error:
+        fail(f"cannot hash {path}: {error}")
+    return result.hexdigest()
+
+
+def regular(path: Path, label: str) -> Path:
+    if path.is_symlink() or not path.is_file():
+        fail(f"{label}: missing, symlinked, or non-regular file")
+    return path
+
+
+def safe_relative(value: Any, label: str) -> Path:
+    raw = text(value, label)
+    path = Path(raw)
+    if path.is_absolute() or ".." in path.parts or path.as_posix() != raw:
+        fail(f"{label}: expected a relative traversal-free path")
+    return path
+
+
+def bundle_path(value: Any, label: str) -> Path:
+    relative = safe_relative(value, label)
+    path = ROOT / relative
+    for ancestor in (ROOT, *path.parents):
+        if ancestor.is_symlink():
+            fail(f"{label}: symlinked ancestor")
+    try:
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to(ROOT.resolve()):
+            fail(f"{label}: path escapes bundle")
+    except OSError as error:
+        fail(f"{label}: cannot resolve path ({error})")
+    return regular(path, label)
+
+
+def artifact(value: Any, label: str, *, require_local: bool = True) -> dict[str, Any]:
+    row = obj(value, label)
+    path_value = text(row.get("path"), f"{label}.path")
+    expected_bytes = integer(row.get("bytes"), f"{label}.bytes")
+    expected_sha = digest(row.get("sha256"), f"{label}.sha256")
+    if require_local:
+        path = bundle_path(path_value, f"{label}.path")
+        if path.stat().st_size != expected_bytes or sha_file(path) != expected_sha:
+            fail(f"{label}: artifact identity differs")
+    return {"path": path_value, "bytes": expected_bytes, "sha256": expected_sha}
+
+
+def canonical(value: Any) -> bytes:
+    try:
+        return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        fail(f"cannot canonicalize JSON: {error}")
+    raise AssertionError("unreachable")
+
+
+def json_sha(value: Any) -> str:
+    return hashlib.sha256(canonical(value)).hexdigest()
+
+
+def _archived_module(filename: str, module_name: str) -> Any:
+    candidates = (
+        ROOT / "verifier-tools" / "tools" / filename,
+        ROOT / "verifier-tools" / filename,
+        REPO / "tools" / filename,
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+    fail(f"archived verifier tool is unavailable: {filename}")
+
+
+def verify_sum_file() -> int:
+    path = regular(ROOT / "SHA256SUMS", "SHA256SUMS")
+    rows: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        fail(f"SHA256SUMS: cannot read ({error})")
+    for index, line in enumerate(lines, 1):
+        fields = line.split("  ", 1)
+        if len(fields) != 2 or SHA256_RE.fullmatch(fields[0]) is None:
+            fail(f"SHA256SUMS: malformed line {index}")
+        name = fields[1]
+        relative = safe_relative(name, f"SHA256SUMS line {index}")
+        if name == "SHA256SUMS" or name in rows:
+            fail(f"SHA256SUMS: duplicate or self entry {name}")
+        member = ROOT / relative
+        regular(member, f"SHA256SUMS.{name}")
+        if sha_file(member) != fields[0]:
+            fail(f"SHA256SUMS: hash differs for {name}")
+        rows[name] = fields[0]
+    actual: set[str] = set()
+    for member in ROOT.rglob("*"):
+        if member.is_symlink():
+            fail(f"bundle contains symlink {member.relative_to(ROOT)}")
+        if member.is_file() and member != path:
+            actual.add(member.relative_to(ROOT).as_posix())
+    if set(rows) != actual:
+        fail(f"SHA256SUMS: exact coverage differs (missing={sorted(actual - set(rows))[:3]}, extra={sorted(set(rows) - actual)[:3]})")
+    return len(rows)
+
+
+def source_record(value: Any, label: str) -> tuple[dict[str, str], dict[str, Any]]:
+    row = obj(value, label)
+    path = bundle_path(row.get("path"), f"{label}.path")
+    expected_sha = digest(row.get("sha256"), f"{label}.sha256")
+    expected_files = integer(row.get("files"), f"{label}.files", 1)
+    if sha_file(path) != expected_sha:
+        fail(f"{label}: source manifest hash differs")
+    manifest = obj(load(path, label), label)
+    if len(manifest) != expected_files:
+        fail(f"{label}: source manifest file count differs")
+    result: dict[str, str] = {}
+    for name, value in manifest.items():
+        candidate = Path(name)
+        if candidate.is_absolute() or ".." in candidate.parts or candidate.as_posix() != name or not name.endswith((".rs", ".toml", ".lock")):
+            fail(f"{label}: unsafe source path {name!r}")
+        result[name] = digest(value, f"{label}.files[{name}]")
+    return result, {"path": str(row["path"]), "sha256": expected_sha, "files": expected_files}
+
+
+def _catalog_content_set(catalog: Mapping[str, Any], label: str) -> dict[str, Any]:
+    corpora = catalog.get("corpora")
+    bindings = catalog.get("case_bindings")
+    if not isinstance(corpora, list) or not isinstance(bindings, list):
+        fail(f"{label}: corpus/binding arrays are missing")
+    content_corpora: list[dict[str, Any]] = []
+    for index, raw in enumerate(corpora):
+        corpus = obj(raw, f"{label}.corpora[{index}]")
+        corpus_id = text(corpus.get("id"), f"{label}.corpora[{index}].id")
+        bytes_value = obj(corpus.get("bytes"), f"{label}.corpora[{index}].bytes")
+        archive_sha = digest(bytes_value.get("archive_sha256"), f"{label}.corpora[{index}].bytes.archive_sha256")
+        members = obj(corpus.get("members"), f"{label}.corpora[{index}].members")
+        items = members.get("items")
+        if not isinstance(items, list):
+            fail(f"{label}.corpora[{index}].members.items: expected array")
+        content_members: list[dict[str, Any]] = []
+        for member_index, raw_member in enumerate(items):
+            member = obj(raw_member, f"{label}.corpora[{index}].members.items[{member_index}]")
+            content_members.append({
+                "ordinal": integer(member.get("ordinal"), f"{label}.corpora[{index}].members.items[{member_index}].ordinal"),
+                "name": text(member.get("name"), f"{label}.corpora[{index}].members.items[{member_index}].name"),
+                "sha256": digest(member.get("sha256"), f"{label}.corpora[{index}].members.items[{member_index}].sha256"),
+            })
+        content_corpora.append({"id": corpus_id, "archive_sha256": archive_sha, "members": content_members})
+    content_bindings: list[dict[str, Any]] = []
+    for index, raw in enumerate(bindings):
+        binding = obj(raw, f"{label}.case_bindings[{index}]")
+        content_bindings.append({
+            "case": text(binding.get("case"), f"{label}.case_bindings[{index}].case"),
+            "corpus_id": text(binding.get("corpus_id"), f"{label}.case_bindings[{index}].corpus_id"),
+            "role": text(binding.get("role"), f"{label}.case_bindings[{index}].role"),
+        })
+    return {"corpora": content_corpora, "case_bindings": content_bindings}
+
+
+def _generated_catalog(identity: Mapping[str, Any], catalog: Mapping[str, Any]) -> dict[str, Any]:
+    """Regenerate the checked catalog with the repository or archived tool."""
+    try:
+        catalog_tool = _archived_module("generate_corpus_manifest_v2.py", "litchi_0465_catalog_tool")
+    except VerificationError:
+        sys.path.insert(0, str(REPO))
+        from tools import generate_corpus_manifest_v2 as catalog_tool
+    build = obj(catalog.get("build"), "checked catalog.build")
+    return catalog_tool.generate(
+        dict(identity),
+        build.get("git_revision"),
+        worktree_dirty=build.get("git_worktree_dirty"),
+    )
+
+
+def check_checked_catalog(*, precleanup: bool = False) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    names = CHECKED_NAMES
+    checked = ROOT / "checked"
+    if not checked.is_dir() or checked.is_symlink():
+        fail("checked: missing or unsafe directory")
+    children = list(checked.iterdir())
+    if any(child.is_symlink() or child.is_dir() for child in children):
+        fail("checked: unexpected directory or symlink")
+    actual = {path.name for path in checked.iterdir() if path.is_file() and not path.is_symlink()}
+    if actual != set(names):
+        fail(f"checked: exact file set differs (actual={sorted(actual)})")
+    values: dict[str, dict[str, Any]] = {}
+    for name in names:
+        checked_path = regular(checked / name, f"checked/{name}")
+        root_paths = {
+            "perf-regression-default-manifest-v1.json": REPO / "docs/performance/results/perf-regression-default-manifest-v1.json",
+            "perf-corpus-manifest-v2.json": REPO / "docs/performance/results/perf-corpus-manifest-v2.json",
+            "perf-regression-policy-v1.json": REPO / "docs/performance/perf-regression-policy-v1.json",
+            "crud-coverage-index-v1.json": REPO / "docs/performance/crud-coverage-index-v1.json",
+        }
+        root_path = root_paths[name]
+        if precleanup and root_path.is_file() and checked_path.read_bytes() != root_path.read_bytes():
+            fail(f"checked/{name}: does not equal repository checked artifact")
+        values[name] = obj(load(checked_path, f"checked/{name}"), f"checked/{name}")
+    identity = values[names[0]]
+    catalog = values[names[1]]
+    policy = values[names[2]]
+    index = values[names[3]]
+    if identity.get("result_count") != DEFAULT_RESULT_COUNT or identity.get("case_count") != DEFAULT_CASE_COUNT:
+        fail("checked default identity counts differ")
+    cases = identity.get("default_cases")
+    if not isinstance(cases, list) or len(cases) != DEFAULT_CASE_COUNT or len(set(cases)) != DEFAULT_CASE_COUNT or ODP_CASE not in cases:
+        fail("checked default identity cases differ")
+    if catalog.get("manifest_version") != 2 or catalog.get("manifest_kind") != "corpus-catalog" or catalog.get("catalog_id") != "litchi-perf-corpus-v2":
+        fail("checked corpus catalog identity differs")
+    if catalog.get("canonicalization") != {"algorithm": "sorted-json-utf8-compact-v1", "hash": "sha256"}:
+        fail("checked corpus catalog canonicalization differs")
+    build = obj(catalog.get("build"), "checked catalog.build")
+    revision = text(build.get("git_revision"), "checked catalog.build.git_revision")
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None or type(build.get("git_worktree_dirty")) is not bool:
+        fail("checked catalog build identity differs")
+    catalog_without_hash = copy.deepcopy(catalog)
+    catalog_without_hash.pop("catalog_sha256", None)
+    if digest(catalog.get("catalog_sha256"), "catalog.catalog_sha256") != json_sha(catalog_without_hash):
+        fail("checked catalog_sha256 does not recompute")
+    corpora = catalog.get("corpora")
+    bindings = catalog.get("case_bindings")
+    if not isinstance(corpora, list) or not corpora or not isinstance(bindings, list) or len(bindings) != DEFAULT_RESULT_COUNT:
+        fail("checked corpus catalog corpus/binding cardinality differs")
+    content_set = _catalog_content_set(catalog, "checked catalog")
+    if digest(catalog.get("content_set_sha256"), "catalog.content_set_sha256") != json_sha(content_set):
+        fail("checked catalog content_set_sha256 does not recompute")
+    try:
+        if _generated_catalog(identity, catalog) != catalog:
+            fail("checked catalog differs from Python generator output")
+    except VerificationError:
+        raise
+    except Exception as error:
+        fail(f"checked catalog generation failed: {error}")
+    if policy.get("expected_result_count") != DEFAULT_RESULT_COUNT or policy.get("required_cases") != cases:
+        fail("checked regression policy does not bind default identity")
+    if index.get("checked_catalog", {}).get("catalog_sha256") != catalog.get("catalog_sha256") or index.get("checked_catalog", {}).get("content_set_sha256") != catalog.get("content_set_sha256"):
+        fail("checked CRUD index does not bind catalog")
+    return identity, catalog, policy, index
+
+
+def _identity_result_keys_sha(identity: Mapping[str, Any]) -> str:
+    keys: list[tuple[str, str]] = []
+    corpora = obj(identity.get("corpora"), "identity.corpora")
+    case_corpora = obj(identity.get("case_corpora"), "identity.case_corpora")
+    for case in identity.get("default_cases", []):
+        names = case_corpora.get(case)
+        if not isinstance(names, list):
+            fail(f"identity.case_corpora[{case}]: expected array")
+        for name in names:
+            if name not in corpora:
+                fail(f"identity.case_corpora[{case}] references unknown corpus")
+            keys.append((case, json.dumps(corpora[name], ensure_ascii=False, sort_keys=True, separators=(",", ":"))))
+    digest_value = hashlib.sha256()
+    for case, corpus_json in sorted(keys):
+        digest_value.update(case.encode("utf-8"))
+        digest_value.update(b"\0")
+        digest_value.update(corpus_json.encode("utf-8"))
+        digest_value.update(b"\n")
+    return digest_value.hexdigest()
+
+
+def check_identity_transition(identity: Mapping[str, Any]) -> None:
+    old_path = ROOT / "inputs" / "perf-regression-default-manifest-v1.json"
+    if not old_path.is_file():
+        fail("old default identity input is missing")
+    old = obj(load(old_path, "inputs/perf-regression-default-manifest-v1.json"), "old default identity")
+    expected = copy.deepcopy(old)
+    expected["default_cases"] = list(old["default_cases"]) + [ODP_CASE]
+    expected["case_count"] = DEFAULT_CASE_COUNT
+    expected["result_count"] = DEFAULT_RESULT_COUNT
+    preflight = obj(load(ROOT / "captures" / "preflight" / "report.json", "captures/preflight/report.json"), "captures/preflight/report.json")
+    odp_rows = [obj(row, "preflight ODP row") for row in preflight.get("results", []) if isinstance(row, dict) and row.get("case") == ODP_CASE]
+    if len(odp_rows) != 3:
+        fail("preflight identity does not contain three ODP rows")
+    expected["case_corpora"] = copy.deepcopy(old["case_corpora"])
+    expected["corpora"] = copy.deepcopy(old["corpora"])
+    expected["case_corpora"][ODP_CASE] = [text(obj(row.get("corpus"), "preflight ODP corpus").get("name"), "preflight ODP corpus.name") for row in odp_rows]
+    for row in odp_rows:
+        corpus = obj(row.get("corpus"), "preflight ODP corpus")
+        name = text(corpus.get("name"), "preflight ODP corpus.name")
+        expected["corpora"][name] = corpus
+    expected["result_keys_sha256"] = _identity_result_keys_sha(expected)
+    if dict(identity) != expected:
+        fail("checked default identity differs from the permitted old-matrix plus ODP transition")
+
+
+def check_policy_transition(policy: Mapping[str, Any], identity: Mapping[str, Any]) -> None:
+    old_path = ROOT / "inputs" / "perf-regression-policy-v1.json"
+    if not old_path.is_file():
+        fail("old regression policy input is missing")
+    expected = obj(load(old_path, "inputs/perf-regression-policy-v1.json"), "old regression policy")
+    expected = copy.deepcopy(expected)
+    expected["policy_id"] = "litchi-hosted-default-matrix-v3"
+    expected["expected_result_count"] = DEFAULT_RESULT_COUNT
+    expected["expected_result_keys_sha256"] = identity["result_keys_sha256"]
+    expected["required_cases"] = identity["default_cases"]
+    if dict(policy) != expected:
+        fail("checked regression policy contains changes outside the permitted ODP transition")
+
+
+def check_index_transition(index: Mapping[str, Any], catalog: Mapping[str, Any]) -> None:
+    old_path = ROOT / "inputs" / "crud-coverage-index-v1.json"
+    if not old_path.is_file():
+        fail("old CRUD coverage index input is missing")
+    old = obj(load(old_path, "inputs/crud-coverage-index-v1.json"), "old CRUD coverage index")
+    expected = copy.deepcopy(old)
+    expected["checked_catalog"] = copy.deepcopy(expected["checked_catalog"])
+    for key in ("catalog_id", "catalog_sha256", "content_set_sha256"):
+        expected["checked_catalog"][key] = catalog[key]
+    category = copy.deepcopy(expected["categories"][5])
+    category["status"] = "measured"
+    category["measurement"] = copy.deepcopy(expected["categories"][0]["measurement"])
+    odp_corpora = [corpus for corpus in catalog["corpora"] if corpus.get("legacy_v1", {}).get("generator") == ODP_GENERATOR]
+    odp_ids = sorted(corpus["id"] for corpus in odp_corpora)
+    odp_shapes = sorted(corpus["legacy_v1"]["shape"] for corpus in odp_corpora)
+    for scenario in category["scenarios"]:
+        if scenario["selector"] != ODP_CASE:
+            continue
+        scenario["status"] = "measured"
+        scenario["corpus"] = {"kind": "checked-catalog", "case": ODP_CASE, "ids": odp_ids, "shapes": odp_shapes}
+    expected["categories"][5] = category
+    if dict(index) != expected:
+        fail("checked CRUD coverage index contains changes outside the permitted ODP transition")
+    category_counts: dict[str, int] = {}
+    scenario_counts: dict[str, int] = {}
+    for value in index["categories"]:
+        category_counts[value["status"]] = category_counts.get(value["status"], 0) + 1
+        for scenario in value["scenarios"]:
+            scenario_counts[scenario["status"]] = scenario_counts.get(scenario["status"], 0) + 1
+    if category_counts != {"measured": 6, "correctness-only": 8, "unsupported": 1} or scenario_counts != {"measured": 11, "correctness-only": 22, "unsupported": 1}:
+        fail("checked CRUD coverage status counts differ")
+
+
+def check_protocol() -> dict[str, Any]:
+    protocol = obj(load(ROOT / "protocol.json", "protocol.json"), "protocol.json")
+    if protocol.get("change") != CHANGE or protocol.get("schema") != "litchi-0465-capture-v1":
+        fail("protocol identity differs")
+    if protocol.get("status") != "frozen":
+        fail("protocol must be frozen")
+    if protocol.get("cpu") != 2 or protocol.get("workers") != 1:
+        fail("protocol CPU/worker configuration differs")
+    if protocol.get("formal_order") != ["R1-normal", "R1-allocator", "R2-allocator", "R2-normal"]:
+        fail("protocol formal lane order differs")
+    cases = protocol.get("default_cases")
+    if not isinstance(cases, list) or len(cases) != DEFAULT_CASE_COUNT or len(set(cases)) != DEFAULT_CASE_COUNT or ODP_CASE not in cases:
+        fail("protocol default case list differs")
+    lanes = protocol.get("lanes")
+    if not isinstance(lanes, dict) or set(lanes) != set(EXPECTED_LANES):
+        fail("protocol lane set differs")
+    for name, expected in EXPECTED_LANES.items():
+        if lanes.get(name) != expected:
+            fail(f"protocol lane definition differs: {name}")
+    manifest = obj(protocol.get("default_manifest"), "protocol.default_manifest")
+    if manifest.get("path") != "checked/perf-regression-default-manifest-v1.json" or manifest.get("case_count") != DEFAULT_CASE_COUNT or manifest.get("result_count") != DEFAULT_RESULT_COUNT:
+        fail("protocol checked default manifest contract differs")
+    binding = obj(protocol.get("binding"), "protocol.binding")
+    if binding.get("path") != "binding.json" or binding.get("schema") != "litchi-0465-binaries-v1":
+        fail("protocol binding contract differs")
+    if binding.get("required_binary_fields") != ["path", "sha256", "bytes", "build_receipt", "build_receipt_sha256", "source"] or binding.get("source_fields") != ["path", "sha256", "files"]:
+        fail("protocol binding field contract differs")
+    runner = obj(protocol.get("runner"), "protocol.runner")
+    helper = obj(protocol.get("helper"), "protocol.helper")
+    for name, record, path in (("runner", runner, ROOT / "capture.py"), ("helper", helper, ROOT / "check.py")):
+        if record.get("path") != path.name or digest(record.get("sha256"), f"protocol.{name}.sha256") != sha_file(path):
+            fail(f"protocol.{name} does not bind {path.name}")
+    execution = obj(protocol.get("execution"), "protocol.execution")
+    if execution.get("serialized_lanes") is not True or execution.get("fresh_child_per_sample") is not False or execution.get("fresh_process_per_lane") is not True:
+        fail("protocol process lifecycle differs")
+    artifacts = obj(protocol.get("artifacts"), "protocol.artifacts")
+    if artifacts.get("lane_directories") != ["captures/preflight", "captures/R1-normal", "captures/R1-allocator", "captures/R2-allocator", "captures/R2-normal"] or artifacts.get("required_per_lane") != ["report.json", "corpus-catalog.json", "resource.log", "workload.log", "receipt.json"]:
+        fail("protocol artifact contract differs")
+    return protocol
+
+
+def _binding_rows(binding: Mapping[str, Any], label: str) -> dict[str, dict[str, Any]]:
+    if isinstance(binding.get("binaries"), dict):
+        raw = binding["binaries"]
+    elif all(name in binding for name in ("normal", "allocator")):
+        raw = {name: binding[name] for name in ("normal", "allocator")}
+    else:
+        fail(f"{label}: no normal/allocator binary map")
+    result: dict[str, dict[str, Any]] = {}
+    for mode in ("normal", "allocator"):
+        row = obj(raw.get(mode), f"{label}.{mode}")
+        path = text(row.get("path"), f"{label}.{mode}.path")
+        if not Path(path).is_absolute() or Path(path) != Path(path).resolve():
+            fail(f"{label}.{mode}.path must be canonical absolute")
+        result[mode] = row
+        integer(row.get("bytes"), f"{label}.{mode}.bytes", 1)
+        digest(row.get("sha256"), f"{label}.{mode}.sha256")
+    return result
+
+
+def check_bindings(precleanup: bool, protocol: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    candidates = sorted(path for path in ROOT.glob("*binding.json") if path.is_file() and path.name not in {"protocol-binding.json"})
+    if not candidates:
+        fail("no binary binding JSON found")
+    chosen = None
+    for path in candidates:
+        value = obj(load(path, path.name), path.name)
+        try:
+            rows = _binding_rows(value, path.name)
+        except VerificationError:
+            continue
+        chosen = (path, value, rows)
+        break
+    if chosen is None:
+        fail("no binding contains both normal and allocator binaries")
+    path, binding, rows = chosen
+    if path.name != "binding.json" or binding.get("schema") != "litchi-0465-binaries-v1" or binding.get("change") not in (None, CHANGE):
+        fail("binary binding change differs")
+    revision = text(binding.get("revision"), "binding.revision")
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        fail("binding.revision is not a commit SHA")
+    if set(binding.get("binaries", {})) != {"normal", "allocator"}:
+        fail("binary binding must contain exactly normal and allocator")
+    if "protocol_sha256" in binding and digest(binding["protocol_sha256"], "binding.protocol_sha256") != sha_file(ROOT / "protocol.json"):
+        fail("binary binding does not bind protocol")
+    source_records: dict[str, dict[str, Any]] = {}
+    for mode, row in rows.items():
+        required = {"path", "sha256", "bytes", "build_receipt", "build_receipt_sha256", "source"}
+        if not required <= set(row):
+            fail(f"binding.{mode}: required identity fields are missing")
+        source_map, source_identity = source_record(row["source"], f"binding.{mode}.source")
+        source_records[mode] = source_identity
+        if precleanup:
+            live = Path(row["path"])
+            if live.is_symlink() or not live.is_file() or live.stat().st_size != row["bytes"] or sha_file(live) != row["sha256"]:
+                fail(f"binding.{mode}: live binary identity differs")
+        receipt_value = text(row["build_receipt"], f"binding.{mode}.build_receipt")
+        receipt_path = bundle_path(receipt_value, f"binding.{mode}.build_receipt")
+        if digest(row["build_receipt_sha256"], f"binding.{mode}.build_receipt_sha256") != sha_file(receipt_path):
+            fail(f"binding.{mode}: build receipt hash differs")
+        build = obj(load(receipt_path, f"binding.{mode}.build_receipt"), f"binding.{mode}.build_receipt")
+        if build.get("status") != "pass" or build.get("exit_code") != 0 or build.get("source_unchanged") is not True:
+            fail(f"binding.{mode}: build receipt is not passing")
+        if build.get("driver_sha256") != sha_file(ROOT / "check.py"):
+            fail(f"binding.{mode}: build receipt driver differs")
+        if build.get("source_before") != row["source"] or build.get("source_after") != row["source"]:
+            fail(f"binding.{mode}: build receipt source custody differs")
+    if source_records["normal"] != source_records["allocator"] or rows["normal"]["source"] != rows["allocator"]["source"]:
+        fail("normal and allocator bindings must share one source epoch")
+    return binding, rows
+
+
+def check_current_sources(source_map: Mapping[str, str]) -> None:
+    try:
+        names = set(subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=REPO).decode().split("\0"))
+    except (OSError, subprocess.CalledProcessError, UnicodeError) as error:
+        fail(f"cannot enumerate current sources: {error}")
+    names.add("Cargo.lock")
+    current = {name for name in names if name.endswith((".rs", ".toml", ".lock")) and (REPO / name).is_file()}
+    if current != set(source_map):
+        fail("current source manifest coverage differs")
+    for name, expected in source_map.items():
+        path = REPO / name
+        regular(path, f"current source {name}")
+        if sha_file(path) != expected:
+            fail(f"current source changed: {name}")
+
+
+def check_source_archive(source_map: Mapping[str, str]) -> None:
+    record = obj(load(ROOT / "source-code.json", "source-code.json"), "source-code.json")
+    if record.get("schema") != "litchi-0465-source-code-v1":
+        fail("source-code.json schema differs")
+    files = record.get("files")
+    if not isinstance(files, list) or {item.get("source") for item in files if isinstance(item, dict)} != {
+        "tools/perf-baseline/src/lib.rs",
+        "tools/perf-baseline/src/corpus_manifest.rs",
+    } or len(files) != 2:
+        fail("source-code.json changed-file set differs")
+    for index, raw in enumerate(files):
+        item = obj(raw, f"source-code.json.files[{index}]")
+        source = text(item.get("source"), f"source-code.json.files[{index}].source")
+        archive_path = bundle_path(item.get("path"), f"source-code.json.files[{index}].path")
+        expected_bytes = integer(item.get("bytes"), f"source-code.json.files[{index}].bytes", 1)
+        expected_sha = digest(item.get("sha256"), f"source-code.json.files[{index}].sha256")
+        if not source.endswith(".rs") or archive_path.suffix != ".txt" or archive_path.stat().st_size != expected_bytes or sha_file(archive_path) != expected_sha:
+            fail(f"source-code.json.files[{index}]: archive identity differs")
+        if source not in source_map or expected_sha != source_map[source]:
+            # The archive stores the source bytes as text, so its digest is
+            # the final source manifest digest for each reviewed Rust file.
+            fail(f"source-code.json.files[{index}]: final source identity differs")
+
+
+def _check_receipt_logs(directory: Path, label: str, expected_driver: str | None = None) -> dict[str, dict[str, Any]]:
+    if not directory.is_dir() or directory.is_symlink():
+        fail(f"{label}: missing or unsafe directory")
+    receipts: dict[str, dict[str, Any]] = {}
+    referenced_logs: set[str] = set()
+    referenced_sources: set[str] = set()
+    for path in sorted(directory.glob("*.json")):
+        receipt = obj(load(path, f"{label}/{path.name}"), f"{label}/{path.name}")
+        if receipt.get("status") == "running":
+            fail(f"{label}/{path.name}: still running")
+        if receipt.get("change") not in (None, CHANGE):
+            fail(f"{label}/{path.name}: change differs")
+        if expected_driver is not None:
+            if digest(receipt.get("driver_sha256"), f"{label}/{path.name}.driver_sha256") != sha_file(ROOT / expected_driver):
+                fail(f"{label}/{path.name}: driver hash differs")
+        status = receipt.get("status")
+        if status not in {"pass", "failed"}:
+            fail(f"{label}/{path.name}: unsupported status {status!r}")
+        if status == "pass" and receipt.get("exit_code") != 0:
+            fail(f"{label}/{path.name}: passing receipt has nonzero exit")
+        if status == "failed" and receipt.get("exit_code") == 0:
+            fail(f"{label}/{path.name}: failed receipt has zero exit")
+        if receipt.get("source_unchanged") is not True:
+            fail(f"{label}/{path.name}: source custody is not unchanged")
+        before = receipt.get("source_before")
+        after = receipt.get("source_after")
+        before_map, before_identity = source_record(before, f"{label}/{path.name}.source_before")
+        after_map, after_identity = source_record(after, f"{label}/{path.name}.source_after")
+        if before_identity != after_identity or before_map != after_map:
+            fail(f"{label}/{path.name}: source_before/source_after differ")
+        referenced_sources.add(before_identity["path"])
+        if "log" in receipt:
+            log = artifact(receipt["log"], f"{label}/{path.name}.log")
+            referenced_logs.add(log["path"])
+        receipts[path.stem] = receipt
+    actual_logs = {path.relative_to(ROOT).as_posix() for path in directory.iterdir() if path.is_file() and path.suffix in {".log", ".gz"}}
+    if actual_logs != referenced_logs:
+        fail(f"{label}: log coverage differs")
+    return receipts
+
+
+def check_required_gates(protocol: Mapping[str, Any], expected_source: Mapping[str, Any]) -> dict[str, str]:
+    receipts = _check_receipt_logs(ROOT / "checks", "checks", "check.py")
+    selected: dict[str, str] = {}
+    configured = protocol.get("required_checks", REQUIRED_CHECKS)
+    if isinstance(configured, dict):
+        names = list(configured)
+    elif isinstance(configured, (list, tuple)):
+        names = configured
+    else:
+        fail("protocol.required_checks malformed")
+    if len(names) != len(set(names)) or set(names) != set(REQUIRED_CHECKS):
+        fail("required check set differs")
+    for name in names:
+        if not isinstance(name, str) or not name:
+            fail("protocol.required_checks contains invalid name")
+        candidates = [key for key in receipts if key == name or RETRY_RE.fullmatch(key) and RETRY_RE.fullmatch(key).group(1) == name]
+        passing = [key for key in candidates if receipts[key].get("status") == "pass"]
+        if not passing:
+            fail(f"required check {name} has no passing receipt")
+        selected_name = max(passing, key=lambda key: (int(RETRY_RE.fullmatch(key).group(2)) if RETRY_RE.fullmatch(key) else 0, key))
+        if receipts[selected_name].get("source_before") != expected_source or receipts[selected_name].get("source_after") != expected_source:
+            fail(f"required check {name} does not use the final bound source epoch")
+        selected[name] = selected_name
+    return selected
+
+
+def _capture_path(repeat: str, instrumentation: str) -> Path:
+    for candidate in (ROOT / "captures" / repeat / instrumentation, ROOT / "captures" / f"{repeat}-{instrumentation}"):
+        if candidate.is_dir():
+            return candidate
+    fail(f"missing capture lane {repeat}/{instrumentation}")
+    raise AssertionError("unreachable")
+
+
+def _check_artifact_rows(directory: Path, receipt: Mapping[str, Any], label: str) -> None:
+    rows = receipt.get("artifacts", receipt.get("artifact_hashes"))
+    if rows is None:
+        return
+    if isinstance(rows, dict):
+        rows = list(rows.items())
+    if not isinstance(rows, list):
+        fail(f"{label}.artifacts: expected array or object")
+    seen: set[str] = set()
+    for index, value in enumerate(rows):
+        if isinstance(value, tuple):
+            name, raw = value
+            row = obj(raw, f"{label}.artifacts.{name}")
+        else:
+            row = obj(value, f"{label}.artifacts[{index}]")
+        path = artifact(row, f"{label}.artifacts[{index}]")
+        relative = Path(path["path"])
+        if relative.parts[: len(directory.relative_to(ROOT).parts)] != directory.relative_to(ROOT).parts:
+            fail(f"{label}.artifacts[{index}]: escapes lane directory")
+        if path["path"] in seen:
+            fail(f"{label}: duplicate artifact")
+        seen.add(path["path"])
+
+
+def check_capture_receipt(
+    directory: Path,
+    repeat: str,
+    instrumentation: str,
+    protocol: Mapping[str, Any],
+    bindings: Mapping[str, dict[str, Any]],
+) -> dict[str, Any]:
+    label = str(directory.relative_to(ROOT))
+    receipt_path = regular(directory / "receipt.json", f"{label}/receipt.json")
+    receipt = obj(load(receipt_path, f"{label}/receipt.json"), f"{label}/receipt.json")
+    expected_lane = "preflight" if repeat == "preflight" else f"{repeat}-{instrumentation}"
+    if receipt.get("schema") != "litchi-0465-capture-v1" or receipt.get("change") != CHANGE or receipt.get("status") != "pass" or receipt.get("exit_code") != 0:
+        fail(f"{label}: capture receipt is not passing")
+    if receipt.get("lane") != expected_lane or receipt.get("lane_definition") != protocol.get("lanes", {}).get(expected_lane):
+        fail(f"{label}: receipt lane identity differs")
+    for field, path in (("protocol_sha256", ROOT / "protocol.json"), ("runner_sha256", ROOT / "capture.py"), ("helper_sha256", ROOT / "check.py"), ("binding_sha256", ROOT / "binding.json")):
+        if digest(receipt.get(field), f"{label}.{field}") != sha_file(path):
+            fail(f"{label}: {field} binding differs")
+    binary = obj(receipt.get("binary"), f"{label}.binary")
+    mode = "normal" if expected_lane == "preflight" else instrumentation
+    bound = obj(bindings.get(mode), f"binding.{mode}")
+    if binary.get("name") != mode or binary.get("path") != bound.get("path") or binary.get("sha256") != bound.get("sha256") or binary.get("bytes") != bound.get("bytes"):
+        fail(f"{label}: binary identity differs from binding")
+    if receipt.get("source_before") != bound.get("source") or receipt.get("source_after") != bound.get("source") or receipt.get("source_before") != receipt.get("source_after"):
+        fail(f"{label}: source custody differs from binding")
+    if "protocol_sha256" in receipt and digest(receipt["protocol_sha256"], f"{label}.protocol_sha256") != sha_file(ROOT / "protocol.json"):
+        fail(f"{label}: protocol binding differs")
+    _check_artifact_rows(directory, receipt, label)
+    report = regular(directory / "report.json", f"{label}/report.json")
+    catalog = regular(directory / "corpus-catalog.json", f"{label}/corpus-catalog.json")
+    artifact_hashes = receipt.get("artifact_hashes")
+    if not isinstance(artifact_hashes, dict):
+        fail(f"{label}: artifact_hashes is missing")
+    expected_names = {"report", "corpus_catalog", "resource_log", "workload_log"}
+    if set(artifact_hashes) != expected_names:
+        fail(f"{label}: artifact_hashes names differ")
+    expected_paths = {
+        "report": report,
+        "corpus_catalog": catalog,
+        "resource_log": directory / "resource.log",
+        "workload_log": directory / "workload.log",
+    }
+    for name, path in expected_paths.items():
+        regular(path, f"{label}/{path.name}")
+        row = obj(artifact_hashes[name], f"{label}.artifact_hashes.{name}")
+        if row.get("path") != str(path.relative_to(ROOT)) or row.get("bytes") != path.stat().st_size or row.get("sha256") != sha_file(path):
+            fail(f"{label}.artifact_hashes.{name}: identity differs")
+    validation = obj(receipt.get("report_validation"), f"{label}.report_validation")
+    expected_rows = protocol["lanes"][expected_lane]["expected_rows"]
+    if validation.get("expected_rows") != expected_rows or validation.get("report_rows") != expected_rows or validation.get("catalog_case_bindings") != expected_rows or validation.get("validated") is not True:
+        fail(f"{label}: report validation receipt differs")
+    return {"receipt": receipt, "report_path": report, "catalog_path": catalog}
+
+
+def check_preflight(protocol: Mapping[str, Any], bindings: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
+    directory = ROOT / "captures" / "preflight"
+    if not directory.is_dir() or directory.is_symlink():
+        fail("captures/preflight: missing or unsafe directory")
+    return check_capture_receipt(directory, "preflight", "normal", protocol, bindings)
+
+
+def _checked_catalog_reference(catalog: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: catalog[key] for key in ("manifest_version", "catalog_id", "catalog_sha256", "content_set_sha256")}
+
+
+def _check_selection_catalog(selection: Mapping[str, Any], full: Mapping[str, Any], label: str) -> None:
+    if selection.get("manifest_version") != 2 or selection.get("manifest_kind") != "corpus-catalog" or selection.get("catalog_id") != full.get("catalog_id") or selection.get("canonicalization") != full.get("canonicalization"):
+        fail(f"{label}: allocator catalog identity differs")
+    selection_without_hash = copy.deepcopy(dict(selection))
+    selection_without_hash.pop("catalog_sha256", None)
+    if digest(selection.get("catalog_sha256"), f"{label}.catalog_sha256") != json_sha(selection_without_hash):
+        fail(f"{label}: allocator catalog_sha256 does not recompute")
+    if digest(selection.get("content_set_sha256"), f"{label}.content_set_sha256") != json_sha(_catalog_content_set(selection, label)):
+        fail(f"{label}: allocator content_set_sha256 does not recompute")
+    if selection.get("build") != full.get("build"):
+        fail(f"{label}: allocator catalog build identity differs")
+    full_corpora = {obj(value, f"{label}.full.corpora[{index}]").get("id"): value for index, value in enumerate(full.get("corpora", []))}
+    selection_corpora = selection.get("corpora")
+    if not isinstance(selection_corpora, list) or len(selection_corpora) != 3:
+        fail(f"{label}: allocator catalog must contain three ODP corpora")
+    selected_ids = []
+    for index, value in enumerate(selection_corpora):
+        item_label = f"{label}.corpora[{index}]"
+        selected_ids.append(text(obj(value, item_label).get("id"), f"{item_label}.id"))
+    if len(set(selected_ids)) != 3 or set(selected_ids) - set(full_corpora):
+        fail(f"{label}: allocator corpus set differs from checked catalog")
+    if any(obj(full_corpora[corpus_id], f"{label}.full[{corpus_id}]").get("legacy_v1", {}).get("generator") != ODP_GENERATOR for corpus_id in selected_ids):
+        fail(f"{label}: allocator catalog contains a non-ODP corpus")
+    if {json_sha(value) for value in selection_corpora} != {json_sha(full_corpora[corpus_id]) for corpus_id in selected_ids}:
+        fail(f"{label}: allocator corpus records differ from checked catalog")
+    bindings = selection.get("case_bindings")
+    if not isinstance(bindings, list) or len(bindings) != 3:
+        fail(f"{label}: allocator case binding set differs")
+    if any(obj(value, f"{label}.case_bindings[{index}]").get("case") != ODP_CASE for index, value in enumerate(bindings)):
+        fail(f"{label}: allocator case binding set differs")
+    if {obj(value, f"{label}.case_bindings[{index}]").get("corpus_id") for index, value in enumerate(bindings)} != set(selected_ids):
+        fail(f"{label}: allocator case bindings do not cover selected corpora")
+
+
+def _validate_report_semantics(report: Mapping[str, Any], label: str, *, expected_cases: list[str], minimum_samples: int, allocator: bool, policy_template: Mapping[str, Any]) -> None:
+    try:
+        try:
+            perf_compare = _archived_module("perf_compare.py", "litchi_0465_perf_compare")
+        except VerificationError:
+            sys.path.insert(0, str(REPO))
+            from tools import perf_compare
+        policy = copy.deepcopy(dict(policy_template))
+        policy["require_clean_worktree"] = False
+        policy["require_distinct_revisions"] = False
+        policy["minimum_samples"] = minimum_samples
+        policy["expected_result_count"] = len(report.get("results", []))
+        policy["required_cases"] = expected_cases
+        policy["expected_result_keys_sha256"] = perf_compare.report_result_key_manifest_sha256(report, policy["expected_result_count"])
+        configuration = obj(report.get("configuration"), f"{label}.configuration")
+        expected_configuration = obj(policy.get("expected_configuration"), f"{label}.policy.expected_configuration")
+        expected_configuration["samples_per_case"] = minimum_samples
+        # The Rust report keeps three legacy top-level source vectors as
+        # explicit empty arrays for selectors without source-backed reads.
+        # They are not operation metrics; the strict operation-metric envelope
+        # below still validates every measured vector.  Exclude only these
+        # legacy globs from the comparator's optional metric collection so an
+        # empty not-applicable vector is not mistaken for a short sample set.
+        for metric_class in policy.get("metric_classes", []):
+            if metric_class.get("name") == "work":
+                metric_class["path_globs"] = [
+                    pattern
+                    for pattern in metric_class.get("path_globs", [])
+                    if pattern not in {"source/*read_calls", "source/*read_bytes", "source/*max_in_flight*", "source/*maximum_in_flight*", "*read_calls", "*read_bytes", "*max_in_flight*", "*maximum_in_flight*"}
+                ]
+        # The one-sample preflight deliberately has no formal warmup.  The
+        # checked policy does not pin warmup, so no second override is needed.
+        if allocator:
+            policy["allocator_evidence_scope"] = "operation"
+            # The allocator lane is a separate operation-scoped observation;
+            # filesystem identity fields belong only to normal latency lanes.
+            for field in ("filesystem_cache_states", "filesystem_fresh_child_per_sample", "filesystem_process_isolated", "filesystem_root_selected"):
+                expected_configuration.pop(field, None)
+            policy["tool_identity"] = report.get("tool")
+        perf_compare.compare_reports(report, report, policy)
+    except Exception as error:
+        fail(f"{label}: repository semantic validator rejected report: {error}")
+
+
+def _member_identity(value: Any, label: str) -> dict[str, Any]:
+    row = obj(value, label)
+    path = text(row.get("path"), f"{label}.path")
+    for field in ("media_type", "compression_method"):
+        text(row.get(field), f"{label}.{field}")
+    if type(row.get("data_descriptor")) is not bool:
+        fail(f"{label}.data_descriptor: expected boolean")
+    for field in ("crc32", "decoded_bytes", "compressed_bytes"):
+        integer(row.get(field), f"{label}.{field}")
+    for field in ("decoded_sha256", "compressed_sha256"):
+        digest(row.get(field), f"{label}.{field}")
+    return row
+
+
+def _check_sink(row: Mapping[str, Any], output_bytes: int, label: str) -> None:
+    sink = obj(row.get("sink"), f"{label}.sink")
+    if sink.get("accepted_bytes") != output_bytes or sink.get("write_calls") != 1 or sink.get("largest_write") != output_bytes:
+        fail(f"{label}.sink: accepted bytes/write calls do not match output")
+    buckets = obj(sink.get("write_size_buckets"), f"{label}.sink.write_size_buckets")
+    selected = "bytes_0" if output_bytes == 0 else "bytes_1_to_512" if output_bytes <= 512 else "bytes_513_to_4096" if output_bytes <= 4096 else "bytes_4097_to_16384" if output_bytes <= 16384 else "bytes_16385_to_65536" if output_bytes <= 65536 else "bytes_over_65536"
+    for key in ("bytes_0", "bytes_1_to_512", "bytes_513_to_4096", "bytes_4097_to_16384", "bytes_16385_to_65536", "bytes_over_65536"):
+        if buckets.get(key) != (1 if key == selected else 0):
+            fail(f"{label}.sink.write_size_buckets.{key}: differs from one sequential output write")
+
+
+def _check_odp_row(row: Mapping[str, Any], label: str, expected_samples: int, instrumentation: str) -> dict[str, Any]:
+    corpus = obj(row.get("corpus"), f"{label}.corpus")
+    shape = text(corpus.get("shape"), f"{label}.corpus.shape")
+    if shape not in ODP_SHAPES or corpus.get("generator") != ODP_GENERATOR:
+        fail(f"{label}.corpus: ODP generator/shape differs")
+    elapsed = obj(row.get("elapsed_ns"), f"{label}.elapsed_ns")
+    samples = elapsed.get("samples")
+    order = elapsed.get("sample_order")
+    if elapsed.get("unit") != "ns" or not isinstance(samples, list) or len(samples) != expected_samples or not isinstance(order, list) or sorted(order) != list(range(expected_samples)):
+        fail(f"{label}.elapsed_ns: expected {expected_samples} samples and complete order")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in samples):
+        fail(f"{label}.elapsed_ns.samples: invalid timing value")
+    source = obj(row.get("source"), f"{label}.source")
+    append = obj(source.get("odp_append"), f"{label}.source.odp_append")
+    if append.get("role") != "existing_append" or append.get("corpus_generator") != ODP_GENERATOR or append.get("shape") != shape:
+        fail(f"{label}.source.odp_append: role/generator differs")
+    for key in ODP_GATE_FIELDS:
+        if append.get(key) is not True:
+            fail(f"{label}.source.odp_append.{key}: required gate is not true")
+    for key in ("source_archive_sha256", "output_archive_sha256", "source_content_xml_sha256", "output_content_xml_sha256", "opaque_sha256", "opaque_member_compressed_sha256", "source_semantic_sha256", "output_semantic_sha256", "source_order_sha256", "output_order_sha256", "source_text_projection_sha256", "output_text_projection_sha256"):
+        digest(append.get(key), f"{label}.source.odp_append.{key}")
+    for left, right in (("source_content_xml_sha256", "output_content_xml_sha256"), ("source_semantic_sha256", "output_semantic_sha256"), ("source_order_sha256", "output_order_sha256"), ("source_text_projection_sha256", "output_text_projection_sha256")):
+        if append[left] == append[right]:
+            fail(f"{label}.source.odp_append: {left}/{right} unexpectedly match")
+    source_bytes = integer(append.get("source_archive_bytes"), f"{label}.source.odp_append.source_archive_bytes", 1)
+    output_bytes = integer(append.get("output_archive_bytes"), f"{label}.source.odp_append.output_archive_bytes", 1)
+    if corpus.get("archive_sha256") != append["source_archive_sha256"] or corpus.get("archive_bytes") != source_bytes:
+        fail(f"{label}: corpus/source archive identity differs")
+    source_content_bytes = integer(append.get("source_content_xml_bytes"), f"{label}.source.odp_append.source_content_xml_bytes", 1)
+    output_content_bytes = integer(append.get("output_content_xml_bytes"), f"{label}.source.odp_append.output_content_xml_bytes", 1)
+    source_count = integer(append.get("source_slide_count"), f"{label}.source.odp_append.source_slide_count", 1)
+    output_count = integer(append.get("output_slide_count"), f"{label}.source.odp_append.output_slide_count", 1)
+    if source_count != ODP_SHAPES[shape] or output_count != source_count + 1 or append.get("append_count") != 1:
+        fail(f"{label}: append slide counts differ")
+    lifecycle = append.get("lifecycle_ns")
+    outputs = append.get("output_sha256")
+    if not isinstance(lifecycle, list) or not isinstance(outputs, list) or len(lifecycle) != expected_samples or len(outputs) != expected_samples:
+        fail(f"{label}.source.odp_append: lifecycle/output vectors differ")
+    if [lifecycle[index] for index in order] != samples:
+        fail(f"{label}.source.odp_append.lifecycle_ns: does not align to elapsed samples")
+    output_sha = digest(append["output_archive_sha256"], f"{label}.source.odp_append.output_archive_sha256")
+    if any(digest(value, f"{label}.source.odp_append.output_sha256[{index}]") != output_sha for index, value in enumerate(outputs)):
+        fail(f"{label}.source.odp_append.output_sha256: nondeterministic output")
+    if row.get("output_sha256") != output_sha:
+        fail(f"{label}.output_sha256: differs from append output identity")
+    _check_sink(row, output_bytes, label)
+    raw_source_members = append.get("source_members")
+    raw_output_members = append.get("output_members")
+    if not isinstance(raw_source_members, list) or not isinstance(raw_output_members, list):
+        fail(f"{label}: source/output member arrays are missing")
+    source_members = [_member_identity(value, f"{label}.source.odp_append.source_members[{index}]") for index, value in enumerate(raw_source_members)]
+    output_members = [_member_identity(value, f"{label}.source.odp_append.output_members[{index}]") for index, value in enumerate(raw_output_members)]
+    if append.get("source_member_count") != len(source_members) or append.get("output_member_count") != len(output_members) or append.get("source_member_count") != 6 or append.get("output_member_count") != 6 or append.get("manifest_entry_count") != 5:
+        fail(f"{label}: member/manifest counts differ")
+    source_by_path = {row["path"]: row for row in source_members}
+    output_by_path = {row["path"]: row for row in output_members}
+    if len(source_by_path) != 6 or set(source_by_path) != set(output_by_path):
+        fail(f"{label}: source/output member path sets differ")
+    source_content = source_by_path.get("content.xml")
+    output_content = output_by_path.get("content.xml")
+    if source_content is None or output_content is None:
+        fail(f"{label}: content.xml member is missing")
+    if source_content["decoded_sha256"] != append["source_content_xml_sha256"] or output_content["decoded_sha256"] != append["output_content_xml_sha256"] or source_content["decoded_bytes"] != source_content_bytes or output_content["decoded_bytes"] != output_content_bytes:
+        fail(f"{label}: content.xml identity differs from append summary")
+    if source_content["decoded_sha256"] == output_content["decoded_sha256"] or source_content["decoded_bytes"] == output_content["decoded_bytes"]:
+        fail(f"{label}: append did not change content.xml")
+    for path, source_member in source_by_path.items():
+        output_member = output_by_path[path]
+        if path == "content.xml":
+            continue
+        if source_member != output_member:
+            fail(f"{label}: untouched member identity changed: {path}")
+    opaque_path = append.get("opaque_member_path")
+    if opaque_path != "Opaque/litchi-perf-odp-existing-append-opaque.bin" or source_by_path[opaque_path] != output_by_path[opaque_path]:
+        fail(f"{label}: opaque member identity differs")
+    if append.get("opaque_bytes") != source_by_path[opaque_path]["decoded_bytes"] or append.get("opaque_sha256") != source_by_path[opaque_path]["decoded_sha256"] or append.get("opaque_member_compressed_bytes") != source_by_path[opaque_path]["compressed_bytes"] or append.get("opaque_member_compressed_sha256") != source_by_path[opaque_path]["compressed_sha256"]:
+        fail(f"{label}: opaque member summary differs")
+    metrics = row.get("operation_metrics")
+    if not isinstance(metrics, dict):
+        fail(f"{label}.operation_metrics: missing")
+    has_allocation = "allocation" in metrics
+    if instrumentation == "normal" and has_allocation:
+        fail(f"{label}: normal report exposes allocator fields")
+    if instrumentation == "allocator":
+        allocation = obj(metrics.get("allocation"), f"{label}.operation_metrics.allocation")
+        for key in ALLOCATOR_VECTOR_FIELDS:
+            vector = obj(allocation.get(key), f"{label}.operation_metrics.allocation.{key}")
+            values = vector.get("values")
+            if vector.get("status") != "measured" or not isinstance(values, list) or len(values) != expected_samples:
+                fail(f"{label}.operation_metrics.allocation.{key}: expected measured vector")
+    return {"shape": shape, "source_archive_sha256": append["source_archive_sha256"], "output_archive_sha256": output_sha, "output_archive_bytes": output_bytes}
+
+
+def _check_report(report_path: Path, catalog_path: Path, label: str, repeat: str, instrumentation: str, cases: list[str], expected_result_count: int, expected_samples: int, expected_warmup: int, identity: Mapping[str, Any], catalog: Mapping[str, Any], policy: Mapping[str, Any]) -> dict[str, Any]:
+    report = obj(load(report_path, label), label)
+    if report.get("schema_version") != 1:
+        fail(f"{label}: report schema_version differs")
+    config = obj(report.get("configuration"), f"{label}.configuration")
+    if config.get("cases") != cases or config.get("samples_per_case") != expected_samples or config.get("warmup_iterations_per_case") != expected_warmup:
+        fail(f"{label}.configuration: case/sample identity differs")
+    rows = report.get("results")
+    if not isinstance(rows, list) or len(rows) != expected_result_count:
+        fail(f"{label}.results: expected {expected_result_count} rows")
+    sidecar = obj(load(catalog_path, f"{label}/catalog.json"), f"{label}/catalog.json")
+    if instrumentation == "normal":
+        if report.get("corpus_catalog") != _checked_catalog_reference(catalog):
+            fail(f"{label}.corpus_catalog: does not bind checked catalog")
+        if sidecar != catalog:
+            fail(f"{label}/catalog.json: differs from checked catalog")
+    else:
+        report_reference = obj(report.get("corpus_catalog"), f"{label}.corpus_catalog")
+        if report_reference != _checked_catalog_reference(sidecar):
+            fail(f"{label}.corpus_catalog: does not bind allocator sidecar")
+        _check_selection_catalog(sidecar, catalog, f"{label}/catalog.json")
+    if expected_samples >= 3:
+        _validate_report_semantics(report, label, expected_cases=cases, minimum_samples=expected_samples, allocator=instrumentation == "allocator", policy_template=policy)
+    seen_keys: set[tuple[str, bytes]] = set()
+    seen_cases: set[str] = set()
+    for index, row in enumerate(rows):
+        value = obj(row, f"{label}.results[{index}]")
+        case = text(value.get("case"), f"{label}.results[{index}].case")
+        corpus_identity = canonical(obj(value.get("corpus"), f"{label}.results[{index}].corpus"))
+        key = (case, corpus_identity)
+        if key in seen_keys:
+            fail(f"{label}: duplicate result key {case}")
+        seen_keys.add(key)
+        seen_cases.add(case)
+        if case == ODP_CASE:
+            _check_odp_row(value, f"{label}.results[{index}]", expected_samples, instrumentation)
+        elif instrumentation == "allocator":
+            fail(f"{label}: allocator report contains non-ODP case {case}")
+    if instrumentation == "allocator" and seen_cases != {ODP_CASE}:
+        fail(f"{label}: allocator report must contain only ODP append rows")
+    if instrumentation == "normal" and seen_cases != set(cases):
+        fail(f"{label}: full normal case set differs")
+    return report
+
+
+def check_captures(protocol: Mapping[str, Any], identity: Mapping[str, Any], catalog: Mapping[str, Any], policy: Mapping[str, Any], bindings: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
+    cases = identity["default_cases"]
+    lanes: dict[str, Any] = {}
+    for repeat in REPEATS:
+        for instrumentation in INSTRUMENTATIONS:
+            directory = _capture_path(repeat, instrumentation)
+            artifacts = check_capture_receipt(directory, repeat, instrumentation, protocol, bindings)
+            lane_cases = cases if instrumentation == "normal" else [ODP_CASE]
+            result_count = DEFAULT_RESULT_COUNT if instrumentation == "normal" else 3
+            report = _check_report(artifacts["report_path"], artifacts["catalog_path"], str(artifacts["report_path"].relative_to(ROOT)), repeat, instrumentation, lane_cases, result_count, 15, 3, identity, catalog, policy)
+            tool = obj(report.get("tool"), f"{directory}.report.tool")
+            expected_instrumentation = "system_allocator_operation_scoped" if instrumentation == "allocator" else "none"
+            if tool.get("instrumentation") != expected_instrumentation:
+                fail(f"{directory}: report tool instrumentation differs")
+            lanes[f"{repeat}-{instrumentation}"] = report
+    preflight = check_preflight(protocol, bindings)
+    preflight_report = _check_report(preflight["report_path"], preflight["catalog_path"], "captures/preflight/report.json", "preflight", "normal", cases, DEFAULT_RESULT_COUNT, 1, 0, identity, catalog, policy)
+    lanes["preflight"] = preflight_report
+    # Every full normal report must preserve the exact case/corpus identity
+    # established by the one-sample preflight.
+    preflight_keys = {(row["case"], canonical(row["corpus"])) for row in preflight_report["results"]}
+    for key, report in lanes.items():
+        if key == "preflight" or key.endswith("-allocator"):
+            continue
+        observed = {(row["case"], canonical(row["corpus"])) for row in report["results"]}
+        if observed != preflight_keys:
+            fail(f"{key}: case/corpus identities differ from preflight")
+    return lanes
+
+
+def check_summary(lanes: Mapping[str, Any]) -> None:
+    path = regular(ROOT / "summary.json", "summary.json")
+    spec = importlib.util.spec_from_file_location("litchi_0465_summary", ROOT / "summarize.py")
+    if spec is None or spec.loader is None:
+        fail("cannot load summarize.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        expected = module.build_summary(ROOT)
+    except Exception as error:
+        fail(f"summary recomputation failed: {error}")
+    actual = obj(load(path, "summary.json"), "summary.json")
+    if actual != expected:
+        fail("summary.json: deterministic recomputation differs")
+
+
+def check_live_sources(bindings: Mapping[str, dict[str, Any]]) -> None:
+    source_maps: list[dict[str, str]] = []
+    for mode, row in bindings.items():
+        for key in ("source_manifest", "source"):
+            if key in row:
+                source_maps.append(source_record(row[key], f"binding.{mode}.{key}")[0])
+                break
+    if source_maps:
+        # A current binding may have one final source epoch. Historical build
+        # receipts are still authenticated independently; use the latest map
+        # explicitly advertised by the binding for the live check.
+        check_current_sources(source_maps[-1])
+
+
+def verify(*, precleanup: bool, portable: bool) -> dict[str, Any]:
+    if precleanup and portable:
+        fail("--precleanup and --portable are mutually exclusive")
+    sealed_files = verify_sum_file()
+    protocol = check_protocol()
+    identity, catalog, policy, _index = check_checked_catalog(precleanup=precleanup)
+    check_identity_transition(identity)
+    check_policy_transition(policy, identity)
+    check_index_transition(_index, catalog)
+    binding, bindings = check_bindings(precleanup, protocol)
+    final_source_map, _final_source_identity = source_record(bindings["normal"]["source"], "binding.normal.source")
+    check_source_archive(final_source_map)
+    selected = check_required_gates(protocol, bindings["normal"]["source"])
+    lanes = check_captures(protocol, identity, catalog, policy, bindings)
+    check_summary(lanes)
+    if precleanup:
+        check_live_sources(bindings)
+    return {
+        "schema": SCHEMA,
+        "change": CHANGE,
+        "status": "pass",
+        "portable": portable,
+        "precleanup": precleanup,
+        "sealed_files": sealed_files,
+        "selected_checks": selected,
+        "full_normal_reports": 2,
+        "full_normal_results": DEFAULT_RESULT_COUNT,
+        "allocator_reports": 2,
+        "allocator_results": 3,
+        "preflight_results": DEFAULT_RESULT_COUNT,
+        "binding_modes": sorted(bindings),
+        "summary_schema": "litchi-0465-summary-v1",
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--precleanup", action="store_true")
+    group.add_argument("--portable", action="store_true")
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    precleanup = bool(args.precleanup)
+    portable = not precleanup
+    if args.portable:
+        portable = True
+    try:
+        result = verify(precleanup=precleanup, portable=portable)
+    except (OSError, KeyError, TypeError, ValueError, VerificationError) as error:
+        result = {"schema": SCHEMA, "change": CHANGE, "status": "fail", "portable": portable, "precleanup": precleanup, "error": str(error)}
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
+    return 0 if result.get("status") == "pass" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,53 @@
+{
+  "schema": "litchi-0465-precleanup-v1",
+  "change": 465,
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0465/verify.py",
+    "--precleanup"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "cdb7327a5477f935259b598ff7085b6340a481e1e2d92879778cdeee112b68b5",
+  "driver_sha256": "a85d2d8cd7113029de67fbba3134eaa616f5ad32eb49bb48aeeb0dd9de73b97b",
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 9462,
+    "sha256": "de22cb0709d8a17f751faae318d5d1cb17cb704f4464990eecad4f9711be4d65",
+    "members": 97
+  },
+  "started_utc": "2026-09-07T20:19:56.543930+00:00",
+  "exit_code": 0,
+  "stdout": "{\n  \"allocator_reports\": 2,\n  \"allocator_results\": 3,\n  \"binding_modes\": [\n    \"allocator\",\n    \"normal\"\n  ],\n  \"change\": 465,\n  \"full_normal_reports\": 2,\n  \"full_normal_results\": 201,\n  \"portable\": false,\n  \"precleanup\": true,\n  \"preflight_results\": 201,\n  \"schema\": \"litchi-0465-verification-v1\",\n  \"sealed_files\": 97,\n  \"selected_checks\": {\n    \"boundaries\": \"boundaries\",\n    \"doc\": \"doc\",\n    \"fmt\": \"fmt-r1\",\n    \"harness-clippy\": \"harness-clippy\",\n    \"harness-tests\": \"harness-tests\",\n    \"promote\": \"promote\",\n    \"python-tests\": \"python-tests-r1\"\n  },\n  \"status\": \"pass\",\n  \"summary_schema\": \"litchi-0465-summary-v1\"\n}\n",
+  "stderr": "",
+  "verifier_output": {
+    "allocator_reports": 2,
+    "allocator_results": 3,
+    "binding_modes": [
+      "allocator",
+      "normal"
+    ],
+    "change": 465,
+    "full_normal_reports": 2,
+    "full_normal_results": 201,
+    "portable": false,
+    "precleanup": true,
+    "preflight_results": 201,
+    "schema": "litchi-0465-verification-v1",
+    "sealed_files": 97,
+    "selected_checks": {
+      "boundaries": "boundaries",
+      "doc": "doc",
+      "fmt": "fmt-r1",
+      "harness-clippy": "harness-clippy",
+      "harness-tests": "harness-tests",
+      "promote": "promote",
+      "python-tests": "python-tests-r1"
+    },
+    "status": "pass",
+    "summary_schema": "litchi-0465-summary-v1"
+  },
+  "finished_utc": "2026-09-07T20:19:58.410739+00:00"
+}

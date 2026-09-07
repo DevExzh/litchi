@@ -1,0 +1,187 @@
+{
+  "schema": "litchi-0465-capture-v1",
+  "change": 465,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T19:42:27Z",
+  "purpose": "Serialized descriptive baseline evidence for the expanded default matrix and the allocator-instrumented existing-ODP append selector.",
+  "comparison": {
+    "kind": "descriptive_baseline",
+    "optimization_claim": false,
+    "result_basis": "The former 36-case/198-row default list gains odp_existing_append_lifecycle with three semantic shapes, producing 37 cases and 201 rows."
+  },
+  "claims": {
+    "allowed": [
+      "Descriptive measurements from the retained normal binary over the frozen default matrix",
+      "Descriptive measurements from the retained allocator binary over odp_existing_append_lifecycle",
+      "Per-report timing, corpus identity, allocator fields where the allocator binary emits them, and GNU time resource evidence",
+      "Input binary, binding, protocol, helper, and source-custody identities recorded by immutable lane receipts"
+    ],
+    "withheld": [
+      "Optimization, speedup, regression, or normal-versus-allocator comparison claims",
+      "Network, physical-I/O, cold-cache, or worker-scaling claims",
+      "Allocator measurements for the normal binary"
+    ]
+  },
+  "cpu": 2,
+  "workers": 1,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "formal_order": [
+    "R1-normal",
+    "R1-allocator",
+    "R2-allocator",
+    "R2-normal"
+  ],
+  "lanes": {
+    "preflight": {
+      "binary": "normal",
+      "case_mode": "default",
+      "samples": 1,
+      "warmup": 0,
+      "expected_rows": 201,
+      "repeat": "preflight"
+    },
+    "R1-normal": {
+      "binary": "normal",
+      "case_mode": "default",
+      "samples": 15,
+      "warmup": 3,
+      "expected_rows": 201,
+      "repeat": "R1"
+    },
+    "R1-allocator": {
+      "binary": "allocator",
+      "case_mode": "selection",
+      "case": "odp_existing_append_lifecycle",
+      "samples": 15,
+      "warmup": 3,
+      "expected_rows": 3,
+      "repeat": "R1"
+    },
+    "R2-allocator": {
+      "binary": "allocator",
+      "case_mode": "selection",
+      "case": "odp_existing_append_lifecycle",
+      "samples": 15,
+      "warmup": 3,
+      "expected_rows": 3,
+      "repeat": "R2"
+    },
+    "R2-normal": {
+      "binary": "normal",
+      "case_mode": "default",
+      "samples": 15,
+      "warmup": 3,
+      "expected_rows": 201,
+      "repeat": "R2"
+    }
+  },
+  "default_cases": [
+    "zip_index",
+    "zip_read_one",
+    "opc_open",
+    "opc_open_owned",
+    "opc_noop_save",
+    "opc_mutated_save",
+    "opc_source_open",
+    "opc_source_open_main_read",
+    "opc_source_cached_main_read",
+    "opc_source_concurrent_same_part",
+    "cfb_open",
+    "cfb_list_streams",
+    "cfb_read_one",
+    "cfb_create_stream_borrowed",
+    "cfb_create_stream_owned",
+    "cfb_shared_open",
+    "cfb_shared_read_one",
+    "cfb_shared_concurrent_reads",
+    "doc_fresh_write_to",
+    "xls_fresh_write_to",
+    "ppt_fresh_write_to",
+    "xlsx_open_owned",
+    "xlsx_list_sheets",
+    "xlsx_first_cell",
+    "xlsx_full_cell_scan",
+    "xlsx_narrow_column_range_scan",
+    "xlsx_noop_commit",
+    "xlsx_noop_commit_save",
+    "xlsx_one_cell_commit",
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit",
+    "xlsx_one_percent_commit_save",
+    "xlsx_source_open",
+    "xlsx_source_list_sheets",
+    "xlsx_source_first_cell",
+    "xlsx_source_narrow_column_range_scan",
+    "odp_existing_append_lifecycle"
+  ],
+  "default_manifest": {
+    "path": "checked/perf-regression-default-manifest-v1.json",
+    "case_count": 37,
+    "result_count": 201,
+    "preflight_policy": "The preflight lane uses default_cases in this frozen protocol and may run before this checked record exists.",
+    "formal_policy": "Every formal lane requires this checked record, which is created from the successful preflight evidence."
+  },
+  "binding": {
+    "path": "binding.json",
+    "schema": "litchi-0465-binaries-v1",
+    "sha256": "bound-at-capture",
+    "required_binary_fields": [
+      "path",
+      "sha256",
+      "bytes",
+      "build_receipt",
+      "build_receipt_sha256",
+      "source"
+    ],
+    "source_fields": [
+      "path",
+      "sha256",
+      "files"
+    ],
+    "preflight": "A normal-only binding is sufficient for preflight; formal allocator lanes require both normal and allocator entries."
+  },
+  "runner": {
+    "path": "capture.py",
+    "sha256": "1cb954b5734c1d55deaf0c3f8134a7ac071ce9d4424b94d4d0639c6d4be71d58"
+  },
+  "helper": {
+    "path": "check.py",
+    "sha256": "2005018458015c239e1e4267252a1fff14e9a997093f07f410c109b491836bb7"
+  },
+  "execution": {
+    "wrapper": "/usr/bin/time -v -o RESOURCE taskset -c 2",
+    "workload_output": "WORKLOAD_LOG",
+    "report_option": "--json REPORT",
+    "catalog_option": "--corpus-manifest CORPUS_CATALOG",
+    "worker_option": "--workers 1",
+    "serialized_lanes": true,
+    "fresh_child_per_sample": false,
+    "fresh_process_per_lane": true
+  },
+  "artifacts": {
+    "lane_directories": [
+      "captures/preflight",
+      "captures/R1-normal",
+      "captures/R1-allocator",
+      "captures/R2-allocator",
+      "captures/R2-normal"
+    ],
+    "required_per_lane": [
+      "report.json",
+      "corpus-catalog.json",
+      "resource.log",
+      "workload.log",
+      "receipt.json"
+    ],
+    "receipt_policy": "Lane receipts are created with exclusive file creation after validation and are never overwritten."
+  },
+  "reproduction": {
+    "preflight": "python3 -B docs/performance/results/change-0465/capture.py --lane preflight",
+    "formal": "Run the four direct capture.py lane commands in formal_order; the runner imports check.py for source custody.",
+    "source_policy": "The runner imports change-0465/check.py and records sources() before and after every lane; the records must be identical."
+  }
+}

@@ -17,10 +17,10 @@ V1_PATH = ROOT / "docs/performance/results/perf-regression-default-manifest-v1.j
 V2_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SCHEMA_PATH = ROOT / "docs/performance/schemas/corpus-manifest-v2.schema.json"
 EXPECTED_RESULT_KEYS_SHA256 = (
-    "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f"
+    "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670"
 )
 EXPECTED_CONTENT_SET_SHA256 = (
-    "f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71"
+    "0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5"
 )
 
 
@@ -75,7 +75,7 @@ class CorpusManifestV2Tests(unittest.TestCase):
     def test_catalog_shape_and_bindings(self):
         self.assertEqual(self.v2["manifest_version"], 2)
         self.assertEqual(self.v2["manifest_kind"], "corpus-catalog")
-        self.assertEqual(len(self.v2["corpora"]), 28)
+        self.assertEqual(len(self.v2["corpora"]), 31)
         self.assertEqual(len(self.v2["case_bindings"]), self.v1["result_count"])
         ids = [corpus["id"] for corpus in self.v2["corpora"]]
         self.assertEqual(ids, sorted(ids))
@@ -121,6 +121,11 @@ class CorpusManifestV2Tests(unittest.TestCase):
                 "litchi-perf.xlsx-integer-grid-v1",
                 "none",
             ),
+            "litchi-odp-existing-append-lifecycle-v1": (
+                "odp",
+                "litchi-perf.odp-existing-append-v1",
+                "none",
+            ),
         }
         self.assertEqual(set(FAMILY_MAP), set(expected_families))
         self.assertEqual(
@@ -145,10 +150,13 @@ class CorpusManifestV2Tests(unittest.TestCase):
             self.assertEqual(generator["algorithm_id"], algorithm_id)
             self.assertEqual(generator["seed_spec"], seed_spec)
             self.assertEqual(generator["parameters"]["family"], family)
-            self.assertEqual(
-                corpus["provenance"]["source_path"],
-                "tools/perf-baseline/src/lib.rs",
+            expected_source_path = (
+                "tools/perf-baseline/src/odp_existing_append.rs"
+                if corpus["generator"]["id"]
+                == "litchi-odp-existing-append-lifecycle-v1"
+                else "tools/perf-baseline/src/lib.rs"
             )
+            self.assertEqual(corpus["provenance"]["source_path"], expected_source_path)
             self.assertEqual(corpus["provenance"]["source_kind"], "generated")
             self.assertIsNone(corpus["provenance"]["source_sha256"])
         self.assertEqual(seen, set(expected_families))
@@ -175,6 +183,12 @@ class CorpusManifestV2Tests(unittest.TestCase):
                     parameters["one_percent_update_count"],
                     corpus["legacy_v1"]["xlsx"]["one_percent_update_count"],
                 )
+            elif generator["id"] == "litchi-odp-existing-append-lifecycle-v1":
+                self.assertEqual(generator["seed_spec"], "none")
+                self.assertEqual(parameters["base_generator"], "litchi-odp-buffered-slides-v1")
+                self.assertEqual(parameters["append_count"], 1)
+                self.assertEqual(parameters["opaque_payload_bytes"], 65_536)
+                self.assertIn("variant=0", parameters["opaque_payload_formula"])
             else:
                 self.assertEqual(generator["id"], "litchi-legacy-writer-v1")
                 self.assertEqual(generator["seed_spec"], "none")
@@ -191,8 +205,25 @@ class CorpusManifestV2Tests(unittest.TestCase):
             self.assertIsNone(corpus["provenance"]["source_sha256"])
 
     def test_generator_reproduces_checked_catalog(self):
-        generated = generate(self.v1, self.v2["build"]["git_revision"])
+        generated = generate(
+            self.v1,
+            self.v2["build"]["git_revision"],
+            worktree_dirty=self.v2["build"]["git_worktree_dirty"],
+        )
         self.assertEqual(generated, self.v2)
+
+    def test_generator_worktree_dirty_override_is_backward_compatible(self):
+        self.assertIsNone(generate(self.v1, None)["build"]["git_worktree_dirty"])
+        self.assertFalse(
+            generate(self.v1, "clean-revision")["build"]["git_worktree_dirty"]
+        )
+        self.assertTrue(
+            generate(
+                self.v1,
+                "dirty-revision",
+                worktree_dirty=True,
+            )["build"]["git_worktree_dirty"]
+        )
 
     def test_migration_keeps_unknowns_explicit(self):
         for corpus in self.v2["corpora"]:
