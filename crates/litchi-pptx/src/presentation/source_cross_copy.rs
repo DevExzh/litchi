@@ -13,9 +13,10 @@ use std::sync::{Arc, Mutex};
 
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::xml_splice::authored_xml_requires_source_proof;
 use litchi_opc::{
-    PackURI, PartData, PartView, Relationships, RetainedPrecompressedPart, SourceBackedPackage,
-    SourceLineage, SourceTopologyPlan, TargetMode,
+    AuthoredXmlFragment, PackURI, PartData, PartView, Relationships, RetainedPrecompressedPart,
+    SourceBackedPackage, SourceLineage, SourceTopologyPlan, SourceXmlPart, TargetMode,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -105,6 +106,8 @@ pub struct SourceBackedCrossSlideCopyPlan {
     layout_relationship_type: String,
     source_slide_original_xml: Option<Vec<u8>>,
     source_slide_xml: Vec<u8>,
+    source_slide_source_xml: Option<SourceXmlPart>,
+    destination_presentation_source_xml: Option<SourceXmlPart>,
     target_presentation_xml: Vec<u8>,
     images: Vec<PreparedImage>,
     image_relationships: Vec<PreparedImageRelationship>,
@@ -364,6 +367,9 @@ impl SourceBackedCrossSlideCopySnapshot {
     }
 
     /// Producer-visible name retained by the copied slide.
+    ///
+    /// Empty when the source has no producer name; the source attribute spelling
+    /// is preserved without assigning a generated name.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.source_name
@@ -376,6 +382,8 @@ impl SourceBackedPresentationEditor {
     /// `source_position` selects the source slide, `destination_slide_position`
     /// selects an existing destination slide whose registered layout is reused,
     /// and `insertion_position` selects the destination slide-list position.
+    /// Unnamed slides keep their absent or empty producer names. Nonempty name
+    /// collisions are refused until an explicit resolver is supplied.
     pub fn plan_cross_slide_copy(
         &self,
         source: &SourceBackedPresentation,
@@ -413,6 +421,8 @@ impl SourceBackedPresentationEditor {
             layout_relationship_type: prepared.layout_relationship_type,
             source_slide_original_xml: prepared.source_slide_original_xml,
             source_slide_xml: prepared.source_slide_xml,
+            source_slide_source_xml: prepared.source_slide_source_xml,
+            destination_presentation_source_xml: prepared.destination_presentation_source_xml,
             target_presentation_xml: prepared.target_presentation_xml,
             images: prepared.images,
             image_relationships: prepared.image_relationships,
@@ -508,6 +518,8 @@ struct Prepared {
     layout_relationship_type: String,
     source_slide_original_xml: Option<Vec<u8>>,
     source_slide_xml: Vec<u8>,
+    source_slide_source_xml: Option<SourceXmlPart>,
+    destination_presentation_source_xml: Option<SourceXmlPart>,
     target_presentation_xml: Vec<u8>,
     images: Vec<PreparedImage>,
     image_relationships: Vec<PreparedImageRelationship>,
@@ -540,6 +552,14 @@ impl Prepared {
             && self.layout_relationship_type == plan.layout_relationship_type
             && self.source_slide_original_xml == plan.source_slide_original_xml
             && self.source_slide_xml == plan.source_slide_xml
+            && source_xml_proofs_match(
+                self.source_slide_source_xml.as_ref(),
+                plan.source_slide_source_xml.as_ref(),
+            )
+            && source_xml_proofs_match(
+                self.destination_presentation_source_xml.as_ref(),
+                plan.destination_presentation_source_xml.as_ref(),
+            )
             && self.target_presentation_xml == plan.target_presentation_xml
             && self.images == plan.images
             && self.image_relationships == plan.image_relationships
@@ -556,18 +576,22 @@ impl Prepared {
         execution_context: Option<&ExecutionContext>,
     ) -> Result<SourceTopologyPlan> {
         let mut topology = SourceTopologyPlan::new();
-        topology.try_replace_part(
-            clone_pack_uri(
-                &self.presentation_uri,
-                "source-backed topology presentation URI",
-            )?,
-            self.target_presentation_xml,
+        let presentation_uri = clone_pack_uri(
+            &self.presentation_uri,
+            "source-backed topology presentation URI",
         )?;
-        topology.try_add_part(
-            clone_pack_uri(&self.target_slide_uri, "source-backed topology slide URI")?,
-            ct::PML_SLIDE,
-            self.source_slide_xml,
-        )?;
+        if let Some(source_xml) = self.destination_presentation_source_xml {
+            topology.try_replace_source_xml_part(presentation_uri, source_xml)?;
+        } else {
+            topology.try_replace_part(presentation_uri, self.target_presentation_xml)?;
+        }
+        let target_slide_uri =
+            clone_pack_uri(&self.target_slide_uri, "source-backed topology slide URI")?;
+        if let Some(source_xml) = self.source_slide_source_xml {
+            topology.try_add_source_xml_part(target_slide_uri, source_xml)?;
+        } else {
+            topology.try_add_part(target_slide_uri, ct::PML_SLIDE, self.source_slide_xml)?;
+        }
         topology.try_add_internal_relationship(
             self.presentation_uri,
             self.presentation_relationship_id,
@@ -1308,12 +1332,11 @@ fn prepare(
         execution_context,
     )?;
     let source_name = crate::namespace::presentation_name(source_slide_data.as_bytes())?
-        .filter(|name| !name.is_empty())
         .ok_or_else(|| Error::SlideCopyPlan {
             kind: SlideCopyRefusal::AmbiguousTopology,
-            detail: "source slide name is missing or empty".into(),
+            detail: "source slide common data is missing".into(),
         })?;
-    if names.contains(&normalize_name(&source_name)?) {
+    if !source_name.is_empty() && names.contains(&normalize_name(&source_name)?) {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
             "source slide name collides with a destination slide name",
@@ -1344,6 +1367,19 @@ fn prepare(
         slide_id,
         &presentation_relationship_id,
     )?;
+    let destination_presentation_source_xml = if requires_source_xml_proof(
+        &destination_presentation_view,
+        destination_presentation_data.as_bytes(),
+    )? {
+        let source_xml = destination_presentation_view.source_xml()?;
+        Some(stage_inserted_source_xml(
+            source_xml,
+            destination_presentation_data.as_bytes(),
+            &target_presentation_xml,
+        )?)
+    } else {
+        None
+    };
     if validate_xml(
         &target_presentation_xml,
         b"presentation",
@@ -1878,6 +1914,27 @@ fn prepare(
         &chart_relationships,
         execution_context,
     )?;
+    let source_slide_source_xml =
+        if requires_source_xml_proof(&source_slide_view, source_slide_data.as_bytes())? {
+            let source_xml = source_slide_view.source_xml()?;
+            let staged = stage_rewritten_source_xml(
+                source_xml,
+                source_slide_data.as_bytes(),
+                &direct_graphics.images,
+                &image_relationships,
+                &direct_graphics.charts,
+                &chart_relationships,
+                execution_context,
+            )?;
+            if staged.bytes() != source_slide_xml.as_slice() {
+                return Err(invalid(
+                    "source slide XML proof differs from staged relationship rewrite",
+                ));
+            }
+            Some(staged)
+        } else {
+            None
+        };
     let planned_bytes = source_slide_xml
         .len()
         .checked_add(target_presentation_xml.len())
@@ -1940,6 +1997,8 @@ fn prepare(
         layout_relationship_type,
         source_slide_original_xml,
         source_slide_xml,
+        source_slide_source_xml,
+        destination_presentation_source_xml,
         target_presentation_xml,
         images,
         image_relationships,
@@ -3232,6 +3291,146 @@ fn rewrite_references<'a>(
     Ok(references)
 }
 
+fn source_xml_proofs_match(left: Option<&SourceXmlPart>, right: Option<&SourceXmlPart>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            left.partname().is_equivalent_to(right.partname())
+                && left.content_type() == right.content_type()
+                && left.bytes() == right.bytes()
+        },
+        _ => false,
+    }
+}
+
+fn requires_source_xml_proof(part: &PartView<'_>, xml: &[u8]) -> Result<bool> {
+    authored_xml_requires_source_proof(part.partname(), part.content_type(), xml)
+        .map_err(Error::from)
+}
+
+fn stage_inserted_source_xml(
+    source_xml: SourceXmlPart,
+    source_bytes: &[u8],
+    target_bytes: &[u8],
+) -> Result<SourceXmlPart> {
+    if source_xml.bytes() != source_bytes {
+        return Err(Error::StaleSource);
+    }
+    if target_bytes.len() <= source_bytes.len() {
+        return Err(invalid(
+            "staged source XML is not one inserted compact fragment",
+        ));
+    }
+    let inserted_len = target_bytes
+        .len()
+        .checked_sub(source_bytes.len())
+        .ok_or_else(|| invalid("source XML insertion length underflow"))?;
+    let mut boundaries = Vec::new();
+    let mut reader = NsReader::from_reader(source_bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("source XML insertion boundary exceeds usize"))?;
+        let event = reader.read_event().map_err(|error| {
+            invalid(format!("source XML insertion boundary is invalid: {error}"))
+        })?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("source XML insertion boundary exceeds usize"))?;
+        match event {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                boundaries.push(start);
+                boundaries.push(end);
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    boundaries.sort_unstable();
+    boundaries.dedup();
+    let mut candidate = None;
+    for insertion in boundaries {
+        let target_end = insertion
+            .checked_add(inserted_len)
+            .ok_or_else(|| invalid("source XML insertion range overflows"))?;
+        if target_end > target_bytes.len()
+            || source_bytes.get(..insertion) != target_bytes.get(..insertion)
+            || source_bytes.get(insertion..) != target_bytes.get(target_end..)
+        {
+            continue;
+        }
+        let fragment = target_bytes
+            .get(insertion..target_end)
+            .ok_or_else(|| invalid("staged source XML insertion range is invalid"))?;
+        let Ok(fragment) = AuthoredXmlFragment::markup(fragment.to_vec()) else {
+            continue;
+        };
+        if candidate.replace((insertion, fragment)).is_some() {
+            return Err(invalid(
+                "staged source XML has ambiguous element-boundary insertion",
+            ));
+        }
+    }
+    let Some((insertion, fragment)) = candidate else {
+        return Err(invalid(
+            "staged source XML has no validated element-boundary insertion",
+        ));
+    };
+    let proof = source_xml.checked_range(insertion..insertion, &[])?;
+    let mut publication = source_xml.into_publication()?;
+    publication.replace(proof, fragment)?;
+    let staged = publication.finish()?;
+    if staged.bytes() != target_bytes {
+        return Err(invalid("source XML insertion proof changed staged bytes"));
+    }
+    Ok(staged)
+}
+
+fn stage_rewritten_source_xml(
+    source_xml: SourceXmlPart,
+    source_bytes: &[u8],
+    image_references: &[EmbeddedImageReference],
+    image_relationships: &[PreparedImageRelationship],
+    chart_references: &[EmbeddedChartReference],
+    chart_relationships: &[PreparedChartRelationship],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<SourceXmlPart> {
+    if source_xml.bytes() != source_bytes {
+        return Err(Error::StaleSource);
+    }
+    let references = rewrite_references(image_references, chart_references, execution_context)?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(references.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed slide XML source proofs",
+            source,
+        })?;
+    for reference in references {
+        check_execution(execution_context)?;
+        if reference.end < reference.start || reference.end > source_bytes.len() {
+            return Err(invalid("source slide relationship range is invalid"));
+        }
+        let target_relationship_id = mapped_relationship_id(
+            reference.relationship_id,
+            image_relationships,
+            chart_relationships,
+            execution_context,
+        )?;
+        let escaped = escaped_relationship_id(target_relationship_id)?;
+        let expected = source_bytes
+            .get(reference.start..reference.end)
+            .ok_or_else(|| invalid("source slide relationship range is invalid"))?;
+        let proof = source_xml.checked_range(reference.start..reference.end, expected)?;
+        edits.push((proof, escaped));
+    }
+    let mut publication = source_xml.into_publication()?;
+    for (proof, replacement) in edits {
+        publication.replace(proof, AuthoredXmlFragment::text(replacement)?)?;
+    }
+    Ok(publication.finish()?)
+}
+
 fn mapped_relationship_id<'a>(
     source_relationship_id: &str,
     image_relationships: &'a [PreparedImageRelationship],
@@ -4417,13 +4616,15 @@ fn destination_names(
             });
         }
         let data = view.data()?;
-        let name = crate::namespace::presentation_name(data.as_bytes())?
-            .filter(|name| !name.is_empty())
-            .ok_or_else(|| Error::SlideCopyPlan {
+        let name = crate::namespace::presentation_name(data.as_bytes())?.ok_or_else(|| {
+            Error::SlideCopyPlan {
                 kind: SlideCopyRefusal::AmbiguousTopology,
-                detail: "destination slide name is missing or empty".into(),
-            })?;
-        if !names.insert(normalize_name(&name)?) {
+                detail: "destination slide common data is missing".into(),
+            }
+        })?;
+        // An absent or empty optional name is not a shared slide identity.
+        // Position, native slide ID, relationship and source checks identify it.
+        if !name.is_empty() && !names.insert(normalize_name(&name)?) {
             return refusal(
                 SlideCopyRefusal::AmbiguousTopology,
                 "destination contains duplicate slide names",

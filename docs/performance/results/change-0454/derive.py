@@ -144,6 +144,37 @@ def external_budget_summary(point: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def validate_sample_counters(
+    report: dict[str, Any],
+    protocol: dict[str, Any],
+    *,
+    warmup_key: str,
+    label: str,
+) -> list[dict[str, Any]]:
+    """Require the report counters and retained rows to describe one lane."""
+    samples = report.get("samples_raw")
+    if not isinstance(samples, list):
+        raise ValueError(f"{label} report samples_raw is not a list")
+    if report.get("samples") != protocol["samples"]:
+        raise ValueError(f"{label} report sample count differs from the protocol")
+    if report.get(warmup_key) != protocol["warmups"]:
+        raise ValueError(f"{label} report warmup count differs from the protocol")
+    if len(samples) != report["samples"]:
+        raise ValueError(f"{label} report samples_raw length differs from samples")
+    for number, sample in enumerate(samples):
+        timing = sample.get("timings", sample)
+        try:
+            api_sum = timing["api_sum_ns"]
+            components = [timing[name] for name in ("open_ns", "plan_ns", "publication_ns")]
+        except (KeyError, TypeError) as error:
+            raise ValueError(f"{label} sample {number} is missing timing counters") from error
+        if any(type(value) is not int or value <= 0 for value in [*components, api_sum]):
+            raise ValueError(f"{label} sample {number} has a non-positive timing counter")
+        if api_sum != sum(components):
+            raise ValueError(f"{label} sample {number} api_sum_ns is not the phase sum")
+    return samples
+
+
 def provider_io_work(report: dict[str, Any]) -> dict[str, Any]:
     first = report["samples_raw"][0]
     phases = {phase["label"]: phase for phase in first["phases"]}
@@ -232,16 +263,16 @@ def provider_row(index: int, lane: dict[str, Any], protocol: dict[str, Any]) -> 
     if not report_path.is_file() or not receipt_path.is_file():
         raise FileNotFoundError(f"missing provider capture lane {index}")
     receipt = load(receipt_path)
-    if receipt["status"] != "pass" or receipt["lane"] != index:
+    if receipt["status"] != "pass" or receipt["lane"] != index or receipt.get("pilot") is not False:
         raise ValueError(f"provider receipt {index} is not a passing lane receipt")
     report = load(report_path)
     if report["schema"] != "pptx_provider_lifecycle_v1":
         raise ValueError(f"unexpected provider report schema in lane {index}")
     if report["provider"] != lane["provider"] or report["corpus"] != lane["corpus"]:
         raise ValueError(f"provider lane {index} identity differs from the protocol")
-    if report["samples"] != protocol["samples"] or report["warmup"] != protocol["warmups"]:
-        raise ValueError(f"provider lane {index} sample count differs from the protocol")
-    samples = report["samples_raw"]
+    samples = validate_sample_counters(
+        report, protocol, warmup_key="warmup", label=f"provider lane {index}"
+    )
     return {
         "lane": index,
         **lane,
@@ -266,16 +297,17 @@ def external_row(index: int, lane: dict[str, Any], protocol: dict[str, Any]) -> 
     if not report_path.is_file() or not receipt_path.is_file():
         raise FileNotFoundError(f"missing external capture lane {index}")
     receipt = load(receipt_path)
-    if receipt["status"] != "pass" or receipt["lane"] != index:
+    if receipt["status"] != "pass" or receipt["lane"] != index or receipt.get("pilot") is not False:
         raise ValueError(f"external receipt {index} is not a passing lane receipt")
     report = load(report_path)
     if report["schema"] != "pptx-external-cross-copy-v1":
         raise ValueError(f"unexpected external report schema in lane {index}")
     if report["provider"] != lane["provider"]:
         raise ValueError(f"external lane {index} provider differs from the protocol")
-    if report["samples"] != protocol["samples"] or report["warmups"] != protocol["warmups"]:
-        raise ValueError(f"external lane {index} sample count differs from the protocol")
-    first = report["samples_raw"][0]
+    samples = validate_sample_counters(
+        report, protocol, warmup_key="warmups", label=f"external lane {index}"
+    )
+    first = samples[0]
     return {
         "lane": index,
         **lane,
@@ -295,7 +327,7 @@ def external_row(index: int, lane: dict[str, Any], protocol: dict[str, Any]) -> 
         "io_work": external_io_work(report),
         "scope": report["timing_scope"],
         "range_scope": report["range_scope"],
-        "samples": len(report["samples_raw"]),
+        "samples": len(samples),
         "warmups": report["warmups"],
     }
 

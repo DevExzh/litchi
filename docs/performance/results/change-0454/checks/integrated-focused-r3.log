@@ -1,0 +1,35 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `release` profile [optimized] target(s) in 5m 47s
+     Running unittests src/lib.rs (target/release/deps/litchi_opc-50b80583e5858d5b)
+
+running 11 tests
+test packuri::tests::rejects_ambiguous_or_noncanonical_part_names ... ok
+test source_backed::tests::topology_appends_default_namespace_noncanonical_relationships_losslessly ... FAILED
+test source_backed::tests::topology_appends_prefixed_noncanonical_relationships_losslessly_and_reopens ... ok
+test source_backed::tests::topology_exact_external_replacement_preserves_noncanonical_source ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_cancellation ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_limits_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_memory_admission ... ok
+test source_backed::tests::topology_noncanonical_relationship_parser_rejects_dtd_namespace_and_root_forms ... ok
+test source_backed::tests::topology_noncanonical_relationship_remove_refuses_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_replace_refuses_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_unknown_markup_refuses_before_output ... ok
+
+failures:
+
+---- source_backed::tests::topology_appends_default_namespace_noncanonical_relationships_losslessly stdout ----
+
+thread 'source_backed::tests::topology_appends_default_namespace_noncanonical_relationships_losslessly' (3394664) panicked at crates/litchi-opc/src/source_backed.rs:11803:86:
+called `Result::unwrap()` on an `Err` value: InvalidPackUri("Internal relationship target must not be an absolute URI, got 'https://before.invalid/'")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    source_backed::tests::topology_appends_default_namespace_noncanonical_relationships_losslessly
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 333 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-opc --lib`

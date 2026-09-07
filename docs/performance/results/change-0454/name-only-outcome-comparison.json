@@ -1,0 +1,30 @@
+{
+  "scope": "Historical optional-name-only candidate before OPC lexical append",
+  "rows_compared": 189,
+  "changed": [
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+      "slide": 0,
+      "before_stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+      "after_stderr": "Error: Opc(SourceBackedOverlayUnavailable { reason: \"existing relationships member 'ppt/_rels/presentation.xml.rels' is not canonical\" })\n"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 16,
+      "before_stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+      "after_stderr": "Error: Opc(SourceBackedOverlayUnavailable { reason: \"existing relationships member 'ppt/_rels/presentation.xml.rels' is not canonical\" })\n"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 17,
+      "before_stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+      "after_stderr": "Error: Opc(SourceBackedOverlayUnavailable { reason: \"existing relationships member 'ppt/_rels/presentation.xml.rels' is not canonical\" })\n"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 33,
+      "before_stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+      "after_stderr": "Error: Opc(SourceBackedOverlayUnavailable { reason: \"existing relationships member 'ppt/_rels/presentation.xml.rels' is not canonical\" })\n"
+    }
+  ]
+}

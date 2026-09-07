@@ -1,0 +1,72 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-pptx/tests/source_backed_cross_copy.rs:5593:
+         .checked_sub(original_presentation.len())
+         .ok_or_else(|| Error::Invalid("presentation proof did not insert bytes".into()))?;
+     assert!(inserted_len > 0);
+[31m-    assert_eq!(&output_presentation[..second], &original_presentation[..second]);
+[m[32m+    assert_eq!(
+[m[32m+        &output_presentation[..second],
+[m[32m+        &original_presentation[..second]
+[m[32m+    );
+[m     let output_suffix_start = second
+         .checked_add(inserted_len)
+         .ok_or_else(|| Error::Invalid("presentation proof insertion overflows".into()))?;
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/lib.rs:53:
+ #[cfg(feature = "sign")]
+ pub mod sign;
+ pub mod source_backed;
+[31m-pub mod xml_splice;
+[m /// Read-only, bounded OPC package validation.
+ pub mod validation;
+[32m+pub mod xml_splice;
+[m 
+ // Re-export commonly used types
+ pub use accounting::OpcOperationAccounting;
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/lib.rs:79:
+     SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
+     SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, VerifiedDecodedReaderError,
+ };
+[32m+#[cfg(feature = "performance-diagnostics")]
+[m[32m+pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
+[m[32m+pub use validation::{validate_read_at, validate_read_at_with_limits};
+[m pub use xml_splice::{
+     AuthoredXmlFragment, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
+     authored_xml_requires_source_proof,
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/lib.rs:85:
+ };
+[31m-#[cfg(feature = "performance-diagnostics")]
+[m[31m-pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
+[m[31m-pub use validation::{validate_read_at, validate_read_at_with_limits};
+[m 
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/tests/source_backed_topology.rs:789:
+     let error = package
+         .write_topology_to_stream(&mut output, plan)
+         .unwrap_err();
+[31m-    assert!(matches!(error, OpcError::SourceBackedOverlayUnavailable { .. }));
+[m[32m+    assert!(matches!(
+[m[32m+        error,
+[m[32m+        OpcError::SourceBackedOverlayUnavailable { .. }
+[m[32m+    ));
+[m     assert!(output.is_empty());
+ }
+ 
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/bin/pptx_native_copy_probe.rs:17:
+     let editor = SourceBackedPresentationEditor::from_path(&args[2])?;
+     let source_position: usize = args[1].parse()?;
+     let destination_position: usize = args[3].parse()?;
+[31m-    let insertion_position = destination_position
+[m[31m-        .checked_add(1)
+[m[31m-        .ok_or_else(|| {
+[m[31m-            std::io::Error::new(
+[m[31m-                std::io::ErrorKind::InvalidInput,
+[m[31m-                "destination position is too large for following-slot insertion",
+[m[31m-            )
+[m[31m-        })?;
+[m[32m+    let insertion_position = destination_position.checked_add(1).ok_or_else(|| {
+[m[32m+        std::io::Error::new(
+[m[32m+            std::io::ErrorKind::InvalidInput,
+[m[32m+            "destination position is too large for following-slot insertion",
+[m[32m+        )
+[m[32m+    })?;
+[m     match editor.plan_cross_slide_copy(
+         &source,
+         source_position,

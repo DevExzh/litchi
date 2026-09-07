@@ -1,0 +1,3479 @@
+{
+  "scope": "Local tracked and ignored unmodified files; image-bearing direct picture slides only. Same archive independently reopened for source/destination, no input rewrite. No native application or independent-pair claim.",
+  "files_inspected": 588,
+  "rows": [
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets1.pptx",
+      "sha256": "30ec5578a4ec6d82ba7bdfd253424cacdf1fd8af71427f0600c4a98ee6ec0d2b",
+      "bytes": 60484,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets1.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets1.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets2.pptx",
+      "sha256": "a867c24b7764d77ca83e1b80ee6ee9ae29d957853b6572a40e54925e548879b8",
+      "bytes": 111830,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets2.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets2.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets3.pptx",
+      "sha256": "bca7f44e82f6f637bc75a617f7fb18e1019b89772218345124a73cdf1f2f22ce",
+      "bytes": 60276,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets3.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextDistancesInsets3.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "2",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "3",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "4",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 5,
+      "slide_member": "ppt/slides/slide6.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "5",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "5"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 6,
+      "slide_member": "ppt/slides/slide7.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "6",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "6"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 7,
+      "slide_member": "ppt/slides/slide8.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "7",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "7"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 8,
+      "slide_member": "ppt/slides/slide9.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "8",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "8"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "9",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 10,
+      "slide_member": "ppt/slides/slide11.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "10",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "10"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 11,
+      "slide_member": "ppt/slides/slide12.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "11",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "11"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 12,
+      "slide_member": "ppt/slides/slide13.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "12",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "12"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "13",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+      "sha256": "c0e3f5c79cc055bc7e8c01bbb120b06c4cb9756dd4b59f41d11ce883e7c0594d",
+      "bytes": 511026,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "14",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_1.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "2",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "3",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "4",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+      "sha256": "6f7edbcdfe083546e1d145a5929c419c74d4fabfcd9622bb193c55b784155a6a",
+      "bytes": 213935,
+      "slide": 5,
+      "slide_member": "ppt/slides/slide6.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "5",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_2.pptx",
+        "5"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+      "sha256": "48958614e5768831710a90164d7cfd8ef44d2e4ac7206bea65a9b5bb4fc6c3a2",
+      "bytes": 251857,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+      "sha256": "48958614e5768831710a90164d7cfd8ef44d2e4ac7206bea65a9b5bb4fc6c3a2",
+      "bytes": 251857,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+      "sha256": "48958614e5768831710a90164d7cfd8ef44d2e4ac7206bea65a9b5bb4fc6c3a2",
+      "bytes": 251857,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "2",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_3.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_TopBottomMiddleAlignment.pptx",
+      "sha256": "a1b8641a30d059227dfd99202cc91dd925d94804d578c4d289fabf27270bf98a",
+      "bytes": 53632,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 6,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_TopBottomMiddleAlignment.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/TextFittingComparisonWithMSO_TopBottomMiddleAlignment.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/fdo71434.pptx",
+      "sha256": "8f7800f566e93a10f1bbddc04facbae813256baee3e503328efefe6d1c440af9",
+      "bytes": 155595,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/fdo71434.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/fdo71434.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapePlusImage.pptx",
+      "sha256": "5b4016ca717d6ca552e6bdf06f0b756f72c98c2ee3798a04d4de07baf9116d51",
+      "bytes": 36088,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapePlusImage.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapePlusImage.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapeTextInflateTop.pptx",
+      "sha256": "c44e46939a5f10e7d1c31693168a7f6da2d0fef69337f887a6acd42358285945",
+      "bytes": 32007,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapeTextInflateTop.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ShapeTextInflateTop.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/altdescription.pptx",
+      "sha256": "cc98df9900ffdbfb6a8c27e8f150e137148cf5a1ed07b4ba28b55ab068dabac5",
+      "bytes": 156788,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/altdescription.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/altdescription.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+      "sha256": "3724fa0ecbf42e7380ee8528fe0f784b23247a69d897c434c5cc7643822ad0e2",
+      "bytes": 34591,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+        "0"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: Opc(ContentTypeNotFound(\"/ppt/media/video.avi\"))\n"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+      "sha256": "3724fa0ecbf42e7380ee8528fe0f784b23247a69d897c434c5cc7643822ad0e2",
+      "bytes": 34591,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/bnc591147.pptx",
+        "1"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: Opc(ContentTypeNotFound(\"/ppt/media/video.avi\"))\n"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-position.pptx",
+      "sha256": "56025c102ed893688356f82207e14549a98e5bb1d394955a59bb805f0df22dd7",
+      "bytes": 28479,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-position.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-position.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-to-shape.pptx",
+      "sha256": "6d2392f37b8e0616625b59e6aceb43acffe77fbd936d593df9c1d1dc44a95c1c",
+      "bytes": 83338,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-to-shape.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/crop-to-shape.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/croppedTo0.pptx",
+      "sha256": "5daf65e6f34b276e4dfa945f1d6b47a8bf25da6f64048f6bdc124ec01bfdd069",
+      "bytes": 12974,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/croppedTo0.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/croppedTo0.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customshape-bitmapfill-srcrect.pptx",
+      "sha256": "f153bfab65b06059564ee0c7eb92955ad46f8d39c398f0203cac43b12f0bf17f",
+      "bytes": 34892,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customshape-bitmapfill-srcrect.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customshape-bitmapfill-srcrect.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+      "sha256": "cb8118434f9b91438dd83fc2abaaa1ae0f7cf8a0ed67ebeac91869351e41ff04",
+      "bytes": 44229,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+      "sha256": "cb8118434f9b91438dd83fc2abaaa1ae0f7cf8a0ed67ebeac91869351e41ff04",
+      "bytes": 44229,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/customxml.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/greysscale-graphic.pptx",
+      "sha256": "1c13969b5824b674b785dcea9a3c15139941fb6997865b57b11f7eb6884dd520",
+      "bytes": 156595,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/greysscale-graphic.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/greysscale-graphic.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+      "sha256": "225eca58abad3037a83cef73c90003295f86a55daa6af62e346be91c46b2e155",
+      "bytes": 17576,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+      "sha256": "225eca58abad3037a83cef73c90003295f86a55daa6af62e346be91c46b2e155",
+      "bytes": 17576,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/hyperlinkOnImage.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/mirrored-graphic.pptx",
+      "sha256": "18db09e598486c5e83c6dc74342e0bc9aef3253c8fec126c04ee06f50fd4a8cf",
+      "bytes": 173805,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/mirrored-graphic.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/mirrored-graphic.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration-non-media-shape.pptx",
+      "sha256": "5088b45f6e39576247448c26bc800923e7c46378d2b0a1c3989efa3e83ebee41",
+      "bytes": 30952,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration-non-media-shape.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration-non-media-shape.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration.pptx",
+      "sha256": "7aee0f0b7e2f766c075817bbe2494219e4d0cc65fee4af676da70042d7b005c1",
+      "bytes": 82099,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/narration.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf103473.pptx",
+      "sha256": "3116e01b1afaa8c5ad981f6a54a53b1c9136ac284b90034e1cede27114689f72",
+      "bytes": 26752,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf103473.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf103473.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf106867.pptx",
+      "sha256": "d46a098caa019a2219ac91592c6e1e444cc9cafb207895208390092ef70c28ed",
+      "bytes": 52203,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf106867.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf106867.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf112633.pptx",
+      "sha256": "a713241c150bf7ec1dc85ca37683a47ee37a98af0bba2b803bac4a188c40e344",
+      "bytes": 33697,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf112633.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf112633.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf113163.pptx",
+      "sha256": "8e746b8e6017f373af2233d4fd66807bef7fa79b38514cb8b1435edd96426f84",
+      "bytes": 44937,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf113163.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf113163.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf120573.pptx",
+      "sha256": "8bf22811d65dc8f2b0afdb7cf6892f1959edbf4ba3f9bbf9b83b95a6aa8b15f6",
+      "bytes": 243853,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf120573.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf120573.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf130058.pptx",
+      "sha256": "9b004183fa3d326fe949cf37d804abe71efdfbb9ccabb7935108a1b2b148d3ab",
+      "bytes": 40724,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf130058.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf130058.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf134174.pptx",
+      "sha256": "3f48df66cd20756da5f4fbf18b4b9a1b7c5ba8d5a3629de73bd75b693fee9325",
+      "bytes": 186296,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf134174.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf134174.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf140714.pptx",
+      "sha256": "9926c65245e18e7484d954d49cde912930460c52a1fa7203d773a0638269e5b5",
+      "bytes": 28384,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf140714.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf140714.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141058-1.pptx",
+      "sha256": "83d5afc8e580c30e922a1a1e685e93bc7ea98edfe657ac3aa538d47a193fac23",
+      "bytes": 62621,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141058-1.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141058-1.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "2",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "3",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "4",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 5,
+      "slide_member": "ppt/slides/slide6.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "5",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "5"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+      "sha256": "fd53eae0b1404565040a0c12e3fd1d48b1bdf954f171aa517b4678746c426231",
+      "bytes": 25376,
+      "slide": 6,
+      "slide_member": "ppt/slides/slide7.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "6",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf141704.pptx",
+        "6"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+      "sha256": "5809f88f8e4500f42582dd8a61ac9fb3dadb61b5cfc13ae854dd3eb69a6ee878",
+      "bytes": 309482,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+        "0"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: Opc(InvalidPackUri(\"PackURI contains a character outside RFC 3986 pchar, got '/ppt/media/Cort\u00e1zar.wav'\"))\n"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+      "sha256": "5809f88f8e4500f42582dd8a61ac9fb3dadb61b5cfc13ae854dd3eb69a6ee878",
+      "bytes": 309482,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+        "1",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf148478_transitionMusic.pptx",
+        "1"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: Opc(InvalidPackUri(\"PackURI contains a character outside RFC 3986 pchar, got '/ppt/media/Cort\u00e1zar.wav'\"))\n"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf149206.pptx",
+      "sha256": "0f7da86cfdf42dbce3bbdd09c420397169ae76595451bd183aadbdf2720a9136",
+      "bytes": 89796,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf149206.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf149206.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf152434.pptx",
+      "sha256": "bbf8f7850efd091a1115f7aa545486c425a1bf22f7f04d714fbcbe71a0182149",
+      "bytes": 25819,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf152434.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf152434.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf153008-srcRect-smallNegBound.pptx",
+      "sha256": "70f2a71b07d85067c9250c8485d4dfe0beedd1beeb590193becda8fbee008c8b",
+      "bytes": 23988,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf153008-srcRect-smallNegBound.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf153008-srcRect-smallNegBound.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156649.pptx",
+      "sha256": "465dab234a5b2c25733a2b98df741be4b9f8a0cdcc155fc643cb0812c42a930c",
+      "bytes": 32463,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156649.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156649.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156808.pptx",
+      "sha256": "0d57c775c27505280c33a81f712dab5fc63109bb87cfe1ec4a4b8c4569e9a871",
+      "bytes": 19449,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156808.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156808.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156856.pptx",
+      "sha256": "ee8fc56b8186e1528b4a1e9ed7b6f99d2fa370e51644673ffda0a33dfe5049d4",
+      "bytes": 59374,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156856.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf156856.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157635.pptx",
+      "sha256": "69ab485d66268c0dd80c2baf92a452ba4ded049c05d19121fdbff011b5eea89e",
+      "bytes": 34364,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157635.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157635.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157793.pptx",
+      "sha256": "a34f6efb632cda5a24627783828c413db5bf4b4c6dacc5149f31961692b06325",
+      "bytes": 42199,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157793.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf157793.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx",
+      "sha256": "2525665a1e430a9ee543faf456424bd7b994cce0a2d76470a5a07453e3e2ab39",
+      "bytes": 9579,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx",
+      "sha256": "33b86388804554e35cb3b07e81cf5db5cb6bb02e76716c71f233b57325c2d199",
+      "bytes": 18696,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
+      "sha256": "f717ca4657257b538466c772eca2a4d4886cb5b919c2ad5f044377fcee124fc8",
+      "bytes": 35202,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf79007.pptx",
+      "sha256": "92f1444626599416dabdb5ac97831e48edbd5829c5fad7b4dc8d5310bf299c9d",
+      "bytes": 46828,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf79007.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf79007.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf89928-blackWhiteEffectThreshold.pptx",
+      "sha256": "726e6dbcc8d982b13d11b6b70651d095828bf4965e0b467b3e35349ba7969252",
+      "bytes": 36640,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf89928-blackWhiteEffectThreshold.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf89928-blackWhiteEffectThreshold.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+      "bytes": 29956,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+        "0",
+        "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "PUBLISHED bytes=42948 slides=2 name=\"\"\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "4",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "9",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 11,
+      "slide_member": "ppt/slides/slide12.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "11",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "11"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 12,
+      "slide_member": "ppt/slides/slide13.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "12",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "12"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "13",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 18,
+      "slide_member": "ppt/slides/slide19.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "18",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "18"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+      "sha256": "a387861a0066ad11ba85aba9572830c1ec1ab9a24380728ead34d2b5b26662c0",
+      "bytes": 648274,
+      "slide": 27,
+      "slide_member": "ppt/slides/slide28.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "27",
+        "3rdparty/poi/test-data/slideshow/2411-Performance_Up.pptx",
+        "27"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/54542_cropped_bitmap.pptx",
+      "sha256": "fa219615dae3cd01f62e8449f7b477bebadd53d3cfba3348ada6377098d8c65e",
+      "bytes": 100030,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/54542_cropped_bitmap.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/54542_cropped_bitmap.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/56812.pptx",
+      "sha256": "36545b1502bc7149de9ec537ae2a7e83e6c8baf24c7f72e9944d863c41072b65",
+      "bytes": 58308,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/56812.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/56812.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 10,
+      "slide_member": "ppt/slides/slide11.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "10",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "10"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "13",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 22,
+      "slide_member": "ppt/slides/slide23.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "22",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "22"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 23,
+      "slide_member": "ppt/slides/slide24.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "23",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "23"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 24,
+      "slide_member": "ppt/slides/slide25.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "24",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "24"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 25,
+      "slide_member": "ppt/slides/slide26.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "25",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "25"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/60810.pptx",
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "bytes": 874522,
+      "slide": 27,
+      "slide_member": "ppt/slides/slide28.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "27",
+        "3rdparty/poi/test-data/slideshow/60810.pptx",
+        "27"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/EmbeddedAudio.pptx",
+      "sha256": "c5ae4274e2bf5504a56aef9c8d7c5d2381ece69c9bf68f7749ad5eae3e675edb",
+      "bytes": 90047,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/EmbeddedAudio.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/EmbeddedAudio.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/EmbeddedVideo.pptx",
+      "sha256": "7940e3b1a339db11f00b65399a2fe77e0e85a5da3a30ac8d6c8a0a77527b2ab2",
+      "bytes": 201418,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/EmbeddedVideo.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/EmbeddedVideo.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+      "sha256": "3691e1902a2590f34ed9b846a84469d9095e1556f7d3d81cb1c4a429145fd596",
+      "bytes": 743904,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+      "sha256": "3691e1902a2590f34ed9b846a84469d9095e1556f7d3d81cb1c4a429145fd596",
+      "bytes": 743904,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+      "sha256": "3691e1902a2590f34ed9b846a84469d9095e1556f7d3d81cb1c4a429145fd596",
+      "bytes": 743904,
+      "slide": 8,
+      "slide_member": "ppt/slides/slide9.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "8",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "8"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+      "sha256": "3691e1902a2590f34ed9b846a84469d9095e1556f7d3d81cb1c4a429145fd596",
+      "bytes": 743904,
+      "slide": 10,
+      "slide_member": "ppt/slides/slide11.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "10",
+        "3rdparty/poi/test-data/slideshow/LIBRE_OFFICE-100610-0.pptx",
+        "10"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+      "sha256": "0089e34825a40c63c3001b866a0f769fceaae7f0748a8f444db513305d9baa70",
+      "bytes": 612132,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "3",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+      "sha256": "0089e34825a40c63c3001b866a0f769fceaae7f0748a8f444db513305d9baa70",
+      "bytes": 612132,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "4",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+      "sha256": "0089e34825a40c63c3001b866a0f769fceaae7f0748a8f444db513305d9baa70",
+      "bytes": 612132,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "9",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+      "sha256": "0089e34825a40c63c3001b866a0f769fceaae7f0748a8f444db513305d9baa70",
+      "bytes": 612132,
+      "slide": 10,
+      "slide_member": "ppt/slides/slide11.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "10",
+        "3rdparty/poi/test-data/slideshow/aascu.org_hbcu_leadershipsummit_cooper_.pptx",
+        "10"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aascu.org_workarea_downloadasset.aspx_id=5864.pptx",
+      "sha256": "5df09eff2c5fbb2bea72971421dc5507d68cab10ce3af8791969fdee35e76991",
+      "bytes": 403643,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aascu.org_workarea_downloadasset.aspx_id=5864.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/aascu.org_workarea_downloadasset.aspx_id=5864.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+      "sha256": "cfdb76d2090c69e5437d19e50ff5c02527e7d1b76b7a17cbb9794b3d5b9f9d79",
+      "bytes": 830765,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "1",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+      "sha256": "cfdb76d2090c69e5437d19e50ff5c02527e7d1b76b7a17cbb9794b3d5b9f9d79",
+      "bytes": 830765,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+      "sha256": "cfdb76d2090c69e5437d19e50ff5c02527e7d1b76b7a17cbb9794b3d5b9f9d79",
+      "bytes": 830765,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "9",
+        "3rdparty/poi/test-data/slideshow/ae.ac.uaeu.faculty_nafaachbili_GeomLec1.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+      "sha256": "71000335a83a16ded97f6d43c1e49ccfee71becf3338cb9b87296466be9ebbd4",
+      "bytes": 955496,
+      "slide": 11,
+      "slide_member": "ppt/slides/slide12.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "11",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "11"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+      "sha256": "71000335a83a16ded97f6d43c1e49ccfee71becf3338cb9b87296466be9ebbd4",
+      "bytes": 955496,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "14",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+      "sha256": "71000335a83a16ded97f6d43c1e49ccfee71becf3338cb9b87296466be9ebbd4",
+      "bytes": 955496,
+      "slide": 15,
+      "slide_member": "ppt/slides/slide16.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "15",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "15"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+      "sha256": "71000335a83a16ded97f6d43c1e49ccfee71becf3338cb9b87296466be9ebbd4",
+      "bytes": 955496,
+      "slide": 16,
+      "slide_member": "ppt/slides/slide17.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "16",
+        "3rdparty/poi/test-data/slideshow/alterman_security.pptx",
+        "16"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/aptia.pptx",
+      "sha256": "c212ee4e7f66b2aaf42eef65babfafea62d9022e7fdc9739c8ea9593f20f0b70",
+      "bytes": 398175,
+      "slide": 8,
+      "slide_member": "ppt/slides/slide9.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/aptia.pptx",
+        "8",
+        "3rdparty/poi/test-data/slideshow/aptia.pptx",
+        "8"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "3",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 6,
+      "slide_member": "ppt/slides/slide7.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "6",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "6"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 7,
+      "slide_member": "ppt/slides/slide8.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "7",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "7"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 11,
+      "slide_member": "ppt/slides/slide12.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "11",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "11"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "13",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "14",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 16,
+      "slide_member": "ppt/slides/slide17.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "16",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "16"
+      ],
+      "exit_code": 0,
+      "stdout": "PUBLISHED bytes=2053307 slides=35 name=\"\"\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 17,
+      "slide_member": "ppt/slides/slide18.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "17",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "17"
+      ],
+      "exit_code": 0,
+      "stdout": "PUBLISHED bytes=1956034 slides=35 name=\"\"\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 20,
+      "slide_member": "ppt/slides/slide21.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "20",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "20"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 21,
+      "slide_member": "ppt/slides/slide22.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "21",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "21"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 22,
+      "slide_member": "ppt/slides/slide23.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "22",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "22"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 23,
+      "slide_member": "ppt/slides/slide24.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "23",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "23"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 24,
+      "slide_member": "ppt/slides/slide25.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "24",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "24"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 25,
+      "slide_member": "ppt/slides/slide26.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "25",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "25"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 29,
+      "slide_member": "ppt/slides/slide30.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "29",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "29"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "bytes": 1949517,
+      "slide": 33,
+      "slide_member": "ppt/slides/slide34.xml",
+      "pictures": 3,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "33",
+        "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+        "33"
+      ],
+      "exit_code": 0,
+      "stdout": "PUBLISHED bytes=2106988 slides=35 name=\"\"\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "4",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 6,
+      "slide_member": "ppt/slides/slide7.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "6",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "6"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 12,
+      "slide_member": "ppt/slides/slide13.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "12",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "12"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "13",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "14",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+      "sha256": "426582c9408e74cd061f2b4dc01fd6b8ddfbb55dda4fdf419e3dca313d107a7f",
+      "bytes": 536086,
+      "slide": 26,
+      "slide_member": "ppt/slides/slide27.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "26",
+        "3rdparty/poi/test-data/slideshow/au.asn.aes.www_conferences_2011_presentations_Fri_20Room4Level4_20930_20Maloney.pptx",
+        "26"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/bug60499.pptx",
+      "sha256": "fb15c4bb4db27e7ccbd31d59a2a30583359707f062dd800bc1c14031bb4094cb",
+      "bytes": 40792,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/bug60499.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/bug60499.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Invalid(\"source slide image event is not a start tag\")\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/bug62513.pptx",
+      "sha256": "cd841112bd5b53f21e8434d080af8b2eeca78a07bc820e9ea0b97a0962c85c79",
+      "bytes": 384775,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/bug62513.pptx",
+        "4",
+        "3rdparty/poi/test-data/slideshow/bug62513.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/bug62736.pptx",
+      "sha256": "7066ae7ebe852c8f24ee370cbc5aae90e683e5d78495221bdfb46fd830905f51",
+      "bytes": 50926,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/bug62736.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/bug62736.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/bug65523.pptx",
+      "sha256": "a37c15125aa21ac5226bac07f4459a200cf8070040c06093c1dc1db19e28c12c",
+      "bytes": 50285,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/bug65523.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/bug65523.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/bug65673.pptx",
+      "sha256": "4a9a363ec7ddad02eaab1e3649ef79fdabd4e0e3a879f9c4c7a345565c2e88c0",
+      "bytes": 35014,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/bug65673.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/bug65673.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "1",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "3",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 7,
+      "slide_member": "ppt/slides/slide8.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "7",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "7"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 2,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "9",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 21,
+      "slide_member": "ppt/slides/slide22.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "21",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "21"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 22,
+      "slide_member": "ppt/slides/slide23.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "22",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "22"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 23,
+      "slide_member": "ppt/slides/slide24.xml",
+      "pictures": 17,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "23",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "23"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+      "sha256": "54ef61cc914b0bb017f70eabe956a3e25948172ba989772dcfd6a69c2ad1620e",
+      "bytes": 2059644,
+      "slide": 27,
+      "slide_member": "ppt/slides/slide28.xml",
+      "pictures": 4,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "27",
+        "3rdparty/poi/test-data/slideshow/ca.ubc.cs.people_~emhill_presentations_HowWeRefactor.pptx",
+        "27"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+      "sha256": "5d6aa3a226c6257592e3d97d4a4a4e4832c16411116d97e70676f38dc5a525c5",
+      "bytes": 10314,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+      "sha256": "5d6aa3a226c6257592e3d97d4a4a4e4832c16411116d97e70676f38dc5a525c5",
+      "bytes": 10314,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "1",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+      "sha256": "5d6aa3a226c6257592e3d97d4a4a4e4832c16411116d97e70676f38dc5a525c5",
+      "bytes": 10314,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/crop-to-0.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "14",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 27,
+      "slide_member": "ppt/slides/slide28.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "27",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "27"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 35,
+      "slide_member": "ppt/slides/slide36.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "35",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "35"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+      "sha256": "9baa7f4554cbaddfcebcc431432268ea34f20c02787172bb0a7d12d640e7e84f",
+      "bytes": 1046067,
+      "slide": 42,
+      "slide_member": "ppt/slides/slide43.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "42",
+        "3rdparty/poi/test-data/slideshow/customGeo.pptx",
+        "42"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+      "sha256": "dfbe5d5ba7ca5f718858250dedb30c1da3e3a28cb1ecfebd9ca96d4e58fa7051",
+      "bytes": 178541,
+      "slide": 13,
+      "slide_member": "ppt/slides/slide14.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "13",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "13"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+      "sha256": "dfbe5d5ba7ca5f718858250dedb30c1da3e3a28cb1ecfebd9ca96d4e58fa7051",
+      "bytes": 178541,
+      "slide": 14,
+      "slide_member": "ppt/slides/slide15.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "14",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "14"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+      "sha256": "dfbe5d5ba7ca5f718858250dedb30c1da3e3a28cb1ecfebd9ca96d4e58fa7051",
+      "bytes": 178541,
+      "slide": 16,
+      "slide_member": "ppt/slides/slide17.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "16",
+        "3rdparty/poi/test-data/slideshow/ececapstonespring2012.pptx",
+        "16"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/layouts.pptx",
+      "sha256": "9c3d53afa3115de2ba72ec77637a616aeed505a6ff3b30a46db871c4edd32be5",
+      "bytes": 62901,
+      "slide": 8,
+      "slide_member": "ppt/slides/slide9.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/layouts.pptx",
+        "8",
+        "3rdparty/poi/test-data/slideshow/layouts.pptx",
+        "8"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/missing-blip-fill.pptx",
+      "sha256": "00b19b1ba0f3b399dd3c3c0de906b8cfeca5cda9425d481c2d75f5d74790c004",
+      "bytes": 40732,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/missing-blip-fill.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/missing-blip-fill.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+      "sha256": "0ce76411a6e2fe3a5b8acf42722b973131a91b93cb5c3118a5a9c481b063e386",
+      "bytes": 11793,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+      "sha256": "0ce76411a6e2fe3a5b8acf42722b973131a91b93cb5c3118a5a9c481b063e386",
+      "bytes": 11793,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "1",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+      "sha256": "0ce76411a6e2fe3a5b8acf42722b973131a91b93cb5c3118a5a9c481b063e386",
+      "bytes": 11793,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+      "sha256": "0ce76411a6e2fe3a5b8acf42722b973131a91b93cb5c3118a5a9c481b063e386",
+      "bytes": 11793,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "3",
+        "3rdparty/poi/test-data/slideshow/picture-transparency.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+      "bytes": 68822,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/shapes.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/shapes.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/themes.pptx",
+      "sha256": "3ea86e4ee84a8bca6b99fe3a9f2a9a9186c0655df28ff92a2d02da24926c64ba",
+      "bytes": 322325,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/themes.pptx",
+        "4",
+        "3rdparty/poi/test-data/slideshow/themes.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "0",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 1,
+      "slide_member": "ppt/slides/slide2.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "1",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "1"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 2,
+      "slide_member": "ppt/slides/slide3.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "2",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "2"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 3,
+      "slide_member": "ppt/slides/slide4.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "3",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "3"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 5,
+      "slide_member": "ppt/slides/slide6.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "5",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "5"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 6,
+      "slide_member": "ppt/slides/slide7.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "6",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "6"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 7,
+      "slide_member": "ppt/slides/slide8.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "7",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "7"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 8,
+      "slide_member": "ppt/slides/slide9.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "8",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "8"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 9,
+      "slide_member": "ppt/slides/slide10.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "9",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "9"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 10,
+      "slide_member": "ppt/slides/slide11.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "10",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "10"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 11,
+      "slide_member": "ppt/slides/slide12.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "11",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "11"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+      "sha256": "0b8ce6084798af3e3a70a72fada352a5fdcc479d4e310421738128062cb27449",
+      "bytes": 625680,
+      "slide": 12,
+      "slide_member": "ppt/slides/slide13.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "12",
+        "3rdparty/poi/test-data/slideshow/tika-2605.pptx",
+        "12"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx",
+      "sha256": "fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034",
+      "bytes": 53239,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx",
+        "0",
+        "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/office-interop/litchi-changed/shapes-litchi.pptx",
+      "sha256": "41cc73dc78e6506900628ec4518a8dee85544f164f5ecb4134c5240c414928df",
+      "bytes": 61466,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/office-interop/litchi-changed/shapes-litchi.pptx",
+        "0",
+        "test-data/office-interop/litchi-changed/shapes-litchi.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/ooxml/pptx/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+      "bytes": 68822,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/ooxml/pptx/shapes.pptx",
+        "0",
+        "test-data/ooxml/pptx/shapes.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/poi/test-data/slideshow/EmbeddedAudio.pptx",
+      "sha256": "c5ae4274e2bf5504a56aef9c8d7c5d2381ece69c9bf68f7749ad5eae3e675edb",
+      "bytes": 90047,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/poi/test-data/slideshow/EmbeddedAudio.pptx",
+        "0",
+        "test-data/poi/test-data/slideshow/EmbeddedAudio.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/poi/test-data/slideshow/EmbeddedVideo.pptx",
+      "sha256": "7940e3b1a339db11f00b65399a2fe77e0e85a5da3a30ac8d6c8a0a77527b2ab2",
+      "bytes": 201418,
+      "slide": 0,
+      "slide_member": "ppt/slides/slide1.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/poi/test-data/slideshow/EmbeddedVideo.pptx",
+        "0",
+        "test-data/poi/test-data/slideshow/EmbeddedVideo.pptx",
+        "0"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }\n",
+      "stderr": ""
+    },
+    {
+      "path": "test-data/poi/test-data/slideshow/bug62513.pptx",
+      "sha256": "cd841112bd5b53f21e8434d080af8b2eeca78a07bc820e9ea0b97a0962c85c79",
+      "bytes": 384775,
+      "slide": 4,
+      "slide_member": "ppt/slides/slide5.xml",
+      "pictures": 1,
+      "argv": [
+        "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+        "test-data/poi/test-data/slideshow/bug62513.pptx",
+        "4",
+        "test-data/poi/test-data/slideshow/bug62513.pptx",
+        "4"
+      ],
+      "exit_code": 0,
+      "stdout": "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })\n",
+      "stderr": ""
+    }
+  ],
+  "scan_errors": [
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/fail/ofz35597-1.pptx",
+      "error": "Bad CRC-32 for file 'ppt/slides/slide1.xml'"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/fail/ofz46160-1.pptx",
+      "error": "Bad CRC-32 for file 'ppt/slides/slide1.xml'"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/Divino_Revelado.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIFuzzer-5205835528404992.pptx",
+      "error": "Bad magic number for central directory"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-4838644450394112.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-4986044400861184.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-5463285576892416.pptx",
+      "error": "Bad magic number for central directory"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-5471515212382208.pptx",
+      "error": "Bad magic number for central directory"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-5611274456596480.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-6071540680032256.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-6254434927378432.pptx",
+      "error": "File is not a zip file"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-6372932378820608.pptx",
+      "error": "Bad magic number for central directory"
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/clusterfuzz-testcase-minimized-POIXSLFFuzzer-6435650376957952.pptx",
+      "error": "Bad magic number for central directory"
+    }
+  ],
+  "outcomes": {
+    "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }": 72,
+    "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }": 55,
+    "Error: Opc(ContentTypeNotFound(\"/ppt/media/video.avi\"))": 2,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }": 6,
+    "Error: Opc(InvalidPackUri(\"PackURI contains a character outside RFC 3986 pchar, got '/ppt/media/Cort\u00e1zar.wav'\"))": 2,
+    "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }": 8,
+    "PUBLISHED bytes=42948 slides=2 name=\"\"": 1,
+    "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }": 8,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }": 5,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }": 9,
+    "PUBLISHED bytes=2053307 slides=35 name=\"\"": 1,
+    "PUBLISHED bytes=1956034 slides=35 name=\"\"": 1,
+    "PUBLISHED bytes=2106988 slides=35 name=\"\"": 1,
+    "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })": 17,
+    "REFUSED Invalid(\"source slide image event is not a start tag\")": 1
+  }
+}

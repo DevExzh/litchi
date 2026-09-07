@@ -1,0 +1,699 @@
+#!/usr/bin/env python3
+"""Validate candidate-only external PPTX evidence with an independent ZIP oracle."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+import posixpath
+import re
+import struct
+import zipfile
+from pathlib import Path
+from typing import Any
+import xml.etree.ElementTree as ET
+
+
+ROOT = Path(__file__).resolve().parent
+FIXTURE = "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+FIXTURE_BYTES = 29956
+OUTPUT_LIMIT = 1024 * 1024
+PML = "ppt/presentation.xml"
+RELS = "ppt/_rels/presentation.xml.rels"
+CONTENT_TYPES = "[Content_Types].xml"
+PKG_RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+SOURCE_SLIDE = "ppt/slides/slide1.xml"
+SOURCE_SLIDE_RELS = "ppt/slides/_rels/slide1.xml.rels"
+SOURCE_IMAGE = "ppt/media/image1.png"
+COPIED_SLIDE = "ppt/slides/slide2.xml"
+COPIED_SLIDE_RELS = "ppt/slides/_rels/slide2.xml.rels"
+COPIED_IMAGE = "ppt/media/image1-copy1.png"
+EXPECTED_ADDED = [COPIED_IMAGE, COPIED_SLIDE_RELS, COPIED_SLIDE]
+COUNTERS = {
+    "logical_calls",
+    "requested_bytes",
+    "returned_bytes",
+    "short_reads",
+    "delayed_calls",
+    "transfer_paced_calls",
+    "transfer_delay_ns",
+}
+SNAPSHOT_FIELDS = COUNTERS | {
+    "min_request_bytes",
+    "max_request_bytes",
+    "request_size_counts",
+}
+BUDGET_FIELDS = {"memory", "objects", "depth", "input_bytes", "output_bytes", "work"}
+ORACLE_FLAGS = [
+    "untouched_raw_records_checked",
+    "exact_slide_and_image_checked",
+    "relationship_lexical_prefix_suffix_checked",
+    "presentation_and_content_types_prefix_suffix_checked",
+    "copied_image_relationship_target_checked",
+    "semantic_reopen_checked",
+    "eager_reopen_checked",
+]
+DETAIL_FIELDS = {
+    "output_sha256",
+    "output_bytes",
+    "output_member_order",
+    "added_members",
+    "source_slide_sha256",
+    "image_sha256",
+    "metadata_sha256",
+    "copied_slide_sha256",
+    "copied_image_sha256",
+    "oracle",
+}
+P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+class VerificationError(ValueError):
+    """The report or output does not satisfy the frozen external contract."""
+
+
+def fail(message: str) -> None:
+    raise VerificationError(message)
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        fail(message)
+
+
+def sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def load_json(path: Path) -> Any:
+    def duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            require(key not in value, f"{path.name}: duplicate JSON key {key}")
+            value[key] = item
+        return value
+
+    try:
+        return json.loads(
+            path.read_bytes(),
+            object_pairs_hook=duplicate_pairs,
+            parse_constant=lambda value: fail(f"{path.name}: non-finite JSON value {value}"),
+        )
+    except VerificationError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        fail(f"cannot read JSON {path}: {error}")
+
+
+def text(value: Any, label: str, *, empty: bool = False) -> str:
+    require(isinstance(value, str) and (empty or value), f"{label}: expected text")
+    return value
+
+
+def integer(value: Any, label: str) -> int:
+    require(isinstance(value, int) and not isinstance(value, bool) and value >= 0, f"{label}: expected unsigned integer")
+    return value
+
+
+def digest(value: Any, label: str) -> str:
+    value = text(value, label)
+    require(re.fullmatch(r"[0-9a-f]{64}", value) is not None, f"{label}: expected SHA-256")
+    return value
+
+
+def local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def parse_xml(raw: bytes, label: str) -> ET.Element:
+    try:
+        return ET.fromstring(raw)
+    except ET.ParseError as error:
+        fail(f"{label}: invalid XML: {error}")
+
+
+def resolve_target(base: str, target: str, label: str) -> str:
+    target = text(target, f"{label}.target")
+    if target.startswith("/"):
+        result = target[1:]
+    else:
+        result = posixpath.normpath(posixpath.join(posixpath.dirname(base), target))
+    require(result and not result.startswith("../") and result != "..", f"{label}: target escapes package")
+    return result
+
+
+def relationships(raw: bytes, label: str) -> dict[str, dict[str, str | None]]:
+    root = parse_xml(raw, label)
+    require(root.tag == f"{{{PKG_RELS_NS}}}Relationships", f"{label}: wrong root")
+    result: dict[str, dict[str, str | None]] = {}
+    for index, child in enumerate(root):
+        prefix = f"{label}.Relationship[{index}]"
+        require(child.tag == f"{{{PKG_RELS_NS}}}Relationship", f"{prefix}: unexpected child")
+        rid = text(child.attrib.get("Id"), f"{prefix}.Id")
+        require(rid not in result, f"{prefix}: duplicate relationship ID")
+        result[rid] = {
+            "type": text(child.attrib.get("Type"), f"{prefix}.Type"),
+            "target": text(child.attrib.get("Target"), f"{prefix}.Target"),
+            "target_mode": child.attrib.get("TargetMode"),
+        }
+    return result
+
+
+def slide_order(raw: bytes, rels: dict[str, dict[str, str | None]], label: str) -> list[str]:
+    root = parse_xml(raw, label)
+    require(root.tag == f"{{{P_NS}}}presentation", f"{label}: wrong root")
+    nodes = root.findall(f".//{{{P_NS}}}sldIdLst/{{{P_NS}}}sldId")
+    result: list[str] = []
+    for index, node in enumerate(nodes):
+        rid = text(node.attrib.get(f"{{{R_NS}}}id"), f"{label}.sldId[{index}].r:id")
+        require(rid in rels, f"{label}.sldId[{index}]: missing relationship")
+        relation = rels[rid]
+        require(relation["type"].endswith("/slide"), f"{label}.sldId[{index}]: not a slide relationship")
+        result.append(resolve_target(PML, relation["target"] or "", f"{label}.sldId[{index}]"))
+    return result
+
+
+def content_overrides(raw: bytes, label: str) -> dict[str, str]:
+    root = parse_xml(raw, label)
+    require(root.tag == f"{{{CONTENT_TYPES_NS}}}Types", f"{label}: wrong root")
+    result: dict[str, str] = {}
+    for index, child in enumerate(root):
+        if child.tag != f"{{{CONTENT_TYPES_NS}}}Override":
+            continue
+        prefix = f"{label}.Override[{index}]"
+        part = text(child.attrib.get("PartName"), f"{prefix}.PartName")
+        content_type = text(child.attrib.get("ContentType"), f"{prefix}.ContentType")
+        require(part not in result, f"{prefix}: duplicate part")
+        result[part] = content_type
+    return result
+
+
+def raw_local_record(raw: bytes, info: zipfile.ZipInfo, label: str) -> bytes:
+    offset = info.header_offset
+    require(offset >= 0 and offset + 30 <= len(raw), f"{label}: local header outside archive")
+    fields = struct.unpack_from("<I5H3I2H", raw, offset)
+    require(fields[0] == 0x04034B50, f"{label}: missing local signature")
+    name_length, extra_length = fields[9], fields[10]
+    name_start = offset + 30
+    data_start = name_start + name_length + extra_length
+    require(data_start <= len(raw), f"{label}: local name/extra outside archive")
+    name_bytes = raw[name_start : name_start + name_length]
+    expected_name = info.filename.encode("utf-8") if info.flag_bits & 0x800 else info.filename.encode("cp437")
+    require(name_bytes == expected_name, f"{label}: local member name differs")
+    data_end = data_start + info.compress_size
+    require(data_end <= len(raw), f"{label}: compressed payload outside archive")
+    if fields[2] & 0x08:
+        descriptor_length = 24 if info.file_size >= 0xFFFFFFFF or info.compress_size >= 0xFFFFFFFF else 16
+        if raw[data_end : data_end + 4] != b"PK\x07\x08":
+            descriptor_length -= 4
+        data_end += descriptor_length
+        require(data_end <= len(raw), f"{label}: data descriptor outside archive")
+    return raw[offset:data_end]
+
+
+def raw_central_records(raw: bytes, label: str) -> tuple[list[str], dict[str, bytes]]:
+    eocd = raw.rfind(b"PK\x05\x06")
+    require(eocd >= 0 and eocd + 22 <= len(raw), f"{label}: missing EOCD")
+    fields = struct.unpack_from("<I4H2IH", raw, eocd)
+    require(fields[0] == 0x06054B50 and fields[1] == fields[2] == 0, f"{label}: unsupported ZIP disk layout")
+    count, central_size, central_offset, comment_length = fields[4], fields[5], fields[6], fields[7]
+    require(eocd + 22 + comment_length == len(raw), f"{label}: trailing bytes after EOCD")
+    require(central_offset + central_size <= len(raw), f"{label}: central directory outside archive")
+    cursor = central_offset
+    order: list[str] = []
+    records: dict[str, bytes] = {}
+    for index in range(count):
+        prefix = f"{label}.central[{index}]"
+        require(cursor + 46 <= len(raw), f"{prefix}: truncated central record")
+        fields = struct.unpack_from("<I6H3I5H2I", raw, cursor)
+        require(fields[0] == 0x02014B50, f"{prefix}: missing central signature")
+        name_length, extra_length, comment_length = fields[10], fields[11], fields[12]
+        end = cursor + 46 + name_length + extra_length + comment_length
+        require(end <= len(raw), f"{prefix}: central record outside archive")
+        name_bytes = raw[cursor + 46 : cursor + 46 + name_length]
+        encoding = "utf-8" if fields[3] & 0x800 else "cp437"
+        try:
+            name = name_bytes.decode(encoding)
+        except UnicodeDecodeError as error:
+            fail(f"{prefix}: invalid member name: {error}")
+        require(name not in records, f"{prefix}: duplicate member name")
+        record = bytearray(raw[cursor:end])
+        record[42:46] = b"\0\0\0\0"
+        records[name] = bytes(record)
+        order.append(name)
+        cursor = end
+    require(cursor == central_offset + central_size, f"{label}: central directory size mismatch")
+    return order, records
+
+
+def zip_snapshot(raw: bytes, label: str) -> dict[str, Any]:
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            require(len(names) == len(set(names)), f"{label}: duplicate member names")
+            payloads = {name: archive.read(name) for name in names}
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
+        fail(f"{label}: invalid ZIP: {error}")
+    central_order, central = raw_central_records(raw, label)
+    require(central_order == names, f"{label}: standard ZIP order differs from raw central order")
+    local = {info.filename: raw_local_record(raw, info, f"{label}.{info.filename}") for info in infos}
+    return {"order": names, "payloads": payloads, "local": local, "central": central}
+
+
+def prefix_suffix(source: bytes, output: bytes, closing: bytes, label: str, *, before_whitespace: bool = False) -> None:
+    boundary = source.rfind(closing)
+    require(boundary >= 0, f"{label}: source closing element missing")
+    if before_whitespace:
+        while boundary and source[boundary - 1] in b" \t\r\n":
+            boundary -= 1
+    require(output.startswith(source[:boundary]), f"{label}: source prefix changed")
+    require(output.endswith(source[boundary:]), f"{label}: source suffix changed")
+
+
+def independent_oracle(source_raw: bytes, output_raw: bytes) -> dict[str, Any]:
+    source = zip_snapshot(source_raw, "fixture")
+    require(len(output_raw) <= OUTPUT_LIMIT, "output artifact: exceeds sink limit")
+    output = zip_snapshot(output_raw, "output artifact")
+    require(len(source["order"]) == 34, "fixture: expected 34 members")
+    require(len(output["order"]) == 37, "output artifact: expected 37 members")
+    for name in (PML, RELS, CONTENT_TYPES, SOURCE_SLIDE, SOURCE_SLIDE_RELS, SOURCE_IMAGE):
+        require(name in source["payloads"], f"fixture: missing {name}")
+    require(set(output["order"]) == set(source["order"]) | set(EXPECTED_ADDED), "output artifact: member set differs")
+    require([name for name in output["order"] if name in source["payloads"]] == source["order"], "output artifact: source member order changed")
+    added = sorted(set(output["order"]) - set(source["order"]))
+    require(added == EXPECTED_ADDED, "output artifact: added member names differ")
+    for name in source["order"]:
+        if name in {PML, RELS, CONTENT_TYPES}:
+            continue
+        require(output["payloads"][name] == source["payloads"][name], f"unchanged payload changed: {name}")
+        require(output["local"][name] == source["local"][name], f"unchanged local record changed: {name}")
+        require(output["central"][name] == source["central"][name], f"unchanged central record changed: {name}")
+    require(output["payloads"][COPIED_SLIDE] == source["payloads"][SOURCE_SLIDE], "copied slide payload differs")
+    require(output["payloads"][COPIED_IMAGE] == source["payloads"][SOURCE_IMAGE], "copied image payload differs")
+    prefix_suffix(source["payloads"][RELS], output["payloads"][RELS], b"</Relationships>", RELS)
+    prefix_suffix(source["payloads"][PML], output["payloads"][PML], b"</p:sldIdLst>", PML)
+    prefix_suffix(source["payloads"][CONTENT_TYPES], output["payloads"][CONTENT_TYPES], b"</Types>", CONTENT_TYPES, before_whitespace=True)
+
+    source_presentation_rels = relationships(source["payloads"][RELS], "fixture presentation relationships")
+    output_presentation_rels = relationships(output["payloads"][RELS], "output presentation relationships")
+    for rid, relation in source_presentation_rels.items():
+        require(output_presentation_rels.get(rid) == relation, f"presentation relationship changed: {rid}")
+    new_slide_relations = {rid: relation for rid, relation in output_presentation_rels.items() if rid not in source_presentation_rels}
+    require(len(new_slide_relations) == 1, "expected one new presentation relationship")
+    new_slide_relation = next(iter(new_slide_relations.values()))
+    require(new_slide_relation["type"].endswith("/slide"), "new presentation relationship is not a slide")
+    require(new_slide_relation["target_mode"] is None, "new presentation relationship is external")
+    require(resolve_target(PML, new_slide_relation["target"] or "", "new presentation relationship") == COPIED_SLIDE, "new presentation relationship target differs")
+    require(slide_order(source["payloads"][PML], source_presentation_rels, "fixture slides") == [SOURCE_SLIDE], "fixture slide order differs")
+    require(slide_order(output["payloads"][PML], output_presentation_rels, "output slides") == [SOURCE_SLIDE, COPIED_SLIDE], "output slide order differs")
+
+    source_slide_rels = relationships(source["payloads"][SOURCE_SLIDE_RELS], "fixture slide relationships")
+    output_slide_rels = relationships(output["payloads"][COPIED_SLIDE_RELS], "output copied slide relationships")
+    source_image_rels = {rid: relation for rid, relation in source_slide_rels.items() if relation["type"].endswith("/image")}
+    output_image_rels = {rid: relation for rid, relation in output_slide_rels.items() if relation["type"].endswith("/image")}
+    require(len(source_image_rels) == len(output_image_rels) == 1, "expected one copied image relationship")
+    source_image_rid, source_image_relation = next(iter(source_image_rels.items()))
+    output_image_rid, output_image_relation = next(iter(output_image_rels.items()))
+    require(source_image_rid == output_image_rid, "copied image relationship ID changed")
+    require(source_image_relation["target_mode"] is None and output_image_relation["target_mode"] is None, "image relationship is external")
+    require(resolve_target(SOURCE_SLIDE, source_image_relation["target"] or "", "fixture image relationship") == SOURCE_IMAGE, "fixture image relationship target differs")
+    require(resolve_target(COPIED_SLIDE, output_image_relation["target"] or "", "copied image relationship") == COPIED_IMAGE, "copied image relationship target differs")
+    require(set(output_slide_rels) == set(source_slide_rels), "copied slide relationship IDs differ")
+    for rid, relation in source_slide_rels.items():
+        if rid != source_image_rid:
+            require(output_slide_rels.get(rid) == relation, f"copied slide relationship changed: {rid}")
+    output_slide_root = parse_xml(output["payloads"][COPIED_SLIDE], "copied slide")
+    require(output_slide_root.tag == f"{{{P_NS}}}sld", "copied slide: wrong root")
+    embeds = [node.attrib.get(f"{{{R_NS}}}embed") for node in output_slide_root.iter() if local_name(node.tag) == "blip"]
+    require(embeds == [output_image_rid], "copied slide image embedding differs")
+
+    source_types = content_overrides(source["payloads"][CONTENT_TYPES], "fixture content types")
+    output_types = content_overrides(output["payloads"][CONTENT_TYPES], "output content types")
+    for part, content_type in source_types.items():
+        require(output_types.get(part) == content_type, f"content type changed: {part}")
+    require(set(output_types) == set(source_types) | {"/ppt/slides/slide2.xml", "/" + COPIED_IMAGE}, "content type member set differs")
+    require(output_types.get("/ppt/slides/slide2.xml") == source_types.get("/ppt/slides/slide1.xml"), "copied slide content type differs")
+    require(output_types.get("/" + COPIED_IMAGE) == "image/png", "copied image content type differs")
+
+    oracle = {
+        "original_members": len(source["order"]),
+        "output_members": len(output["order"]),
+        "added_members": added,
+        "source_slide_sha256": sha(source["payloads"][SOURCE_SLIDE]),
+        "image_sha256": sha(source["payloads"][SOURCE_IMAGE]),
+        **{flag: True for flag in ORACLE_FLAGS},
+    }
+    return {
+        "output_sha256": sha(output_raw),
+        "output_bytes": len(output_raw),
+        "output_member_order": output["order"],
+        "added_members": added,
+        "source_slide_sha256": sha(source["payloads"][SOURCE_SLIDE]),
+        "image_sha256": sha(source["payloads"][SOURCE_IMAGE]),
+        "metadata_sha256": {name: sha(output["payloads"][name]) for name in (PML, RELS, CONTENT_TYPES)},
+        "copied_slide_sha256": sha(output["payloads"][COPIED_SLIDE]),
+        "copied_image_sha256": sha(output["payloads"][COPIED_IMAGE]),
+        "oracle": oracle,
+    }
+
+
+def expected_record(details: dict[str, Any]) -> dict[str, Any]:
+    require(set(details) == DETAIL_FIELDS, "independent oracle returned an unexpected detail set")
+    return {"schema": "pptx-external-expected-v1", "fixture_bytes": FIXTURE_BYTES, "fixture_sha256": FIXTURE, **details}
+
+
+def freeze_or_load_expected(details: dict[str, Any], *, create: bool) -> tuple[dict[str, Any], bytes]:
+    path = ROOT / "external-expected.json"
+    expected = expected_record(details)
+    if not path.exists() and create:
+        try:
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(expected, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+        except FileExistsError:
+            pass
+    require(path.exists(), "external-expected.json: missing frozen expectation")
+    frozen_raw = path.read_bytes()
+    frozen = load_json(path)
+    require(frozen == expected, "external-expected.json differs from independently validated output")
+    return expected, frozen_raw
+
+
+def check_snapshot(row: Any, previous: dict[str, Any], provider: str, label: str) -> dict[str, Any]:
+    require(isinstance(row, dict) and set(row) == SNAPSHOT_FIELDS, f"{label}: snapshot fields differ")
+    for key in COUNTERS:
+        integer(row[key], f"{label}.{key}")
+        require(row[key] >= previous.get(key, 0), f"{label}.{key}: counter moved backwards")
+    calls = row["logical_calls"]
+    require(calls > 0, f"{label}: no logical calls")
+    histogram = row["request_size_counts"]
+    require(isinstance(histogram, list) and len(histogram) == 18, f"{label}.request_size_counts: wrong length")
+    previous_histogram = previous.get("request_size_counts", [0] * 18)
+    for index, count in enumerate(histogram):
+        integer(count, f"{label}.request_size_counts[{index}]")
+        require(count >= previous_histogram[index], f"{label}.request_size_counts[{index}]: counter moved backwards")
+    calls_delta = calls - previous.get("logical_calls", 0)
+    require(sum(histogram) == calls, f"{label}: histogram total differs from calls")
+    require(sum(histogram[index] - previous_histogram[index] for index in range(18)) == calls_delta, f"{label}: histogram interval differs from calls")
+    minimum = integer(row["min_request_bytes"], f"{label}.min_request_bytes")
+    maximum = integer(row["max_request_bytes"], f"{label}.max_request_bytes")
+    require(0 < minimum <= maximum, f"{label}: invalid request bounds")
+    if "min_request_bytes" in previous:
+        require(minimum <= previous["min_request_bytes"], f"{label}.min_request_bytes: cumulative minimum moved upwards")
+        require(maximum >= previous["max_request_bytes"], f"{label}.max_request_bytes: cumulative maximum moved downwards")
+    require(calls * minimum <= row["requested_bytes"] <= calls * maximum, f"{label}: request bounds disagree with bytes")
+    requested_delta = row["requested_bytes"] - previous.get("requested_bytes", 0)
+    returned_delta = row["returned_bytes"] - previous.get("returned_bytes", 0)
+    short_delta = row["short_reads"] - previous.get("short_reads", 0)
+    require(0 < row["returned_bytes"] <= row["requested_bytes"], f"{label}: invalid returned bytes")
+    require(short_delta <= calls_delta, f"{label}: too many short reads")
+    if returned_delta < requested_delta:
+        require(short_delta > 0, f"{label}: short return without short-read counter")
+    else:
+        require(returned_delta == requested_delta and short_delta == 0, f"{label}: short-read accounting mismatch")
+    require(row["transfer_paced_calls"] == row["transfer_delay_ns"] == 0, f"{label}: unexpected transfer pacing")
+    delayed_delta = row["delayed_calls"] - previous.get("delayed_calls", 0)
+    require(delayed_delta == (calls_delta if provider == "range" else 0), f"{label}: delay accounting mismatch")
+    if provider == "range":
+        require(returned_delta <= calls_delta * 256, f"{label}: range cap exceeded")
+    else:
+        require(returned_delta == requested_delta and short_delta == 0, f"{label}: bytes provider short read")
+    return row
+
+
+def check_budget(row: Any, label: str) -> dict[str, int]:
+    require(isinstance(row, dict) and set(row) == BUDGET_FIELDS, f"{label}: budget fields differ")
+    result = {key: integer(row[key], f"{label}.{key}") for key in BUDGET_FIELDS}
+    require(result["memory"] <= 32 * 1024 * 1024, f"{label}: memory limit exceeded")
+    require(result["objects"] <= 100_000 and result["depth"] <= 256, f"{label}: object/depth limit exceeded")
+    require(max(result["input_bytes"], result["output_bytes"], result["work"]) <= 64 * 1024 * 1024, f"{label}: cumulative limit exceeded")
+    return result
+
+
+def stable_sample(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "opened": row["opened"],
+        "planned": row["planned"],
+        "published": row["published"],
+        "final_source_budget": row["final_source_budget"],
+        "final_destination_budget": row["final_destination_budget"],
+        "output_sha256": row["output_sha256"],
+        "output_bytes": row["output_bytes"],
+        "write_calls": row["write_calls"],
+        "maximum_write_request": row["maximum_write_request"],
+        "oracle": row["oracle"],
+    }
+
+
+def check_report_header(report: Any) -> tuple[str, int, int]:
+    require(isinstance(report, dict), "report: expected object")
+    require(report.get("schema") == "pptx-external-cross-copy-v1", "report: wrong schema")
+    require(integer(report.get("fixture_bytes"), "report.fixture_bytes") == FIXTURE_BYTES, "report: fixture size differs")
+    require(digest(report.get("fixture_sha256"), "report.fixture_sha256") == FIXTURE, "report: fixture hash differs")
+    provider = text(report.get("provider"), "report.provider")
+    require(provider in {"bytes", "range"}, "report.provider: unsupported provider")
+    require(report.get("allocator") == "Rust system allocator", "report.allocator: unexpected allocator")
+    require(report.get("instrumentation") == "none", "report.instrumentation: unexpected instrumentation")
+    require(integer(report.get("memory_budget_per_owner"), "report.memory_budget_per_owner") == 32 * 1024 * 1024, "report: memory budget differs")
+    require(integer(report.get("cache_bytes"), "report.cache_bytes") == 1024 * 1024, "report: cache size differs")
+    require(integer(report.get("cache_entries"), "report.cache_entries") == 128, "report: cache entry limit differs")
+    require(integer(report.get("output_limit"), "report.output_limit") == OUTPUT_LIMIT, "report: output limit differs")
+    samples = integer(report.get("samples"), "report.samples")
+    warmups = integer(report.get("warmups"), "report.warmups")
+    require((samples, warmups) in {(1, 0), (30, 3)}, "report: unsupported sample protocol")
+    require(re.fullmatch(r"[0-9a-f]{64}", text(report.get("binary_sha256"), "report.binary_sha256")) is not None, "report.binary_sha256: invalid hash")
+    require(re.fullmatch(r"[0-9a-f]{40}", text(report.get("source_revision"), "report.source_revision")) is not None, "report.source_revision: invalid revision")
+    require(integer(report.get("binary_bytes"), "report.binary_bytes") > 0, "report.binary_bytes: empty binary")
+    require("no known native producer/save chain or native application run" in text(report.get("scope"), "report.scope"), "report.scope: provenance overclaim")
+    require("oracles and drops excluded" in text(report.get("timing_scope"), "report.timing_scope"), "report.timing_scope: unexpected scope")
+    require("no physical network/cold I/O claim" in text(report.get("range_scope"), "report.range_scope"), "report.range_scope: unexpected claim")
+    return provider, samples, warmups
+
+
+def verify_samples(report: dict[str, Any], details: dict[str, Any]) -> dict[str, Any]:
+    samples = integer(report.get("samples"), "report.samples")
+    rows = report.get("samples_raw")
+    require(isinstance(rows, list) and len(rows) == samples and rows, "report.samples_raw: wrong sample count")
+    identity: dict[str, Any] | None = None
+    stable: dict[str, Any] | None = None
+    for index, row in enumerate(rows):
+        require(isinstance(row, dict), f"report.samples_raw[{index}]: expected object")
+        for key in ("open_ns", "plan_ns", "publication_ns", "api_sum_ns"):
+            value = integer(row.get(key), f"report.samples_raw[{index}].{key}")
+            require(value > 0, f"report.samples_raw[{index}].{key}: expected positive duration")
+        require(row["api_sum_ns"] == row["open_ns"] + row["plan_ns"] + row["publication_ns"], f"report.samples_raw[{index}]: API sum mismatch")
+        require(row.get("output_sha256") == details["output_sha256"], f"report.samples_raw[{index}]: output hash differs from artifact")
+        require(row.get("output_bytes") == details["output_bytes"], f"report.samples_raw[{index}]: output size differs from artifact")
+        require(integer(row.get("write_calls"), f"report.samples_raw[{index}].write_calls") > 0, f"report.samples_raw[{index}]: no writes")
+        require(0 < integer(row.get("maximum_write_request"), f"report.samples_raw[{index}].maximum_write_request") <= row["output_bytes"], f"report.samples_raw[{index}]: invalid write bound")
+        require(row.get("final_memory_objects_depth_zero_checked") is True, f"report.samples_raw[{index}]: live gauges were not checked")
+        for owner in ("source", "destination"):
+            previous: dict[str, Any] = {}
+            for phase in ("opened", "planned", "published"):
+                phase_row = row.get(phase)
+                require(isinstance(phase_row, dict), f"report.samples_raw[{index}].{phase}: expected object")
+                previous = check_snapshot(phase_row.get(owner), previous, report["provider"], f"report.samples_raw[{index}].{phase}.{owner}")
+            planned_budget = check_budget(row["planned"][owner + "_budget"], f"report.samples_raw[{index}].planned.{owner}_budget")
+            published_budget = check_budget(row["published"][owner + "_budget"], f"report.samples_raw[{index}].published.{owner}_budget")
+            final_budget = check_budget(row["final_" + owner + "_budget"], f"report.samples_raw[{index}].final_{owner}_budget")
+            for key in ("input_bytes", "output_bytes", "work"):
+                require(planned_budget[key] <= published_budget[key] <= final_budget[key], f"report.samples_raw[{index}]: {owner} {key} budget moved backwards")
+            require(final_budget["memory"] == final_budget["objects"] == final_budget["depth"] == 0, f"report.samples_raw[{index}]: {owner} live budget retained")
+        require(row.get("oracle") == details["oracle"], f"report.samples_raw[{index}]: Rust oracle differs from independent oracle")
+        current = {key: row[key] for key in ("output_sha256", "output_bytes", "oracle")}
+        if identity is None:
+            identity = current
+            stable = stable_sample(row)
+        else:
+            require(current == identity, f"report.samples_raw[{index}]: output identity changed")
+            require(stable_sample(row) == stable, f"report.samples_raw[{index}]: read/budget counters changed")
+    return {"identity": identity, "stable": stable, "samples": samples}
+
+
+def verify(path: str | Path) -> dict[str, Any]:
+    report_path = Path(path)
+    require(report_path.exists() and report_path.is_file() and not report_path.is_symlink(), "report: unavailable")
+    report = load_json(report_path)
+    provider, samples, _warmups = check_report_header(report)
+
+    fixture_path = Path(text(report.get("fixture_path"), "report.fixture_path"))
+    require(fixture_path.exists() and fixture_path.is_file() and not fixture_path.is_symlink(), "report.fixture_path: fixture is unavailable")
+    require(fixture_path.stat().st_size == FIXTURE_BYTES, "report.fixture_path: unexpected file size")
+    fixture_raw = fixture_path.read_bytes()
+    require(len(fixture_raw) == FIXTURE_BYTES and sha(fixture_raw) == FIXTURE, "report.fixture_path: fixture identity differs")
+    artifact = report.get("output_artifact")
+    require(isinstance(artifact, dict), "report.output_artifact: expected object")
+    artifact_path = report_path.with_suffix(".pptx").resolve()
+    reported_artifact_path = Path(text(artifact.get("path"), "report.output_artifact.path")).resolve()
+    require(reported_artifact_path == artifact_path, "report.output_artifact.path: not the report sibling")
+    require(artifact_path.exists() and artifact_path.is_file() and not artifact_path.is_symlink(), "report.output_artifact.path: artifact is unavailable")
+    require(artifact_path.stat().st_size <= OUTPUT_LIMIT, "report.output_artifact.path: exceeds sink limit")
+    output_raw = artifact_path.read_bytes()
+    output_sha = sha(output_raw)
+    require(integer(artifact.get("bytes"), "report.output_artifact.bytes") == len(output_raw), "report.output_artifact.bytes: size mismatch")
+    require(digest(artifact.get("sha256"), "report.output_artifact.sha256") == output_sha, "report.output_artifact.sha256: hash mismatch")
+
+    details = independent_oracle(fixture_raw, output_raw)
+    sample_result = verify_samples(report, details)
+    expected, expected_raw = freeze_or_load_expected(details, create=True)
+    require(expected["fixture_bytes"] == FIXTURE_BYTES and expected["fixture_sha256"] == FIXTURE, "external-expected.json: fixture identity differs")
+    return {
+        "status": "pass",
+        "verification_mode": "reparse",
+        "driver_sha256": sha(Path(__file__).read_bytes()),
+        "samples": samples,
+        "provider": provider,
+        "output_identity": sample_result["identity"],
+        "output_artifact": str(artifact_path),
+        "fixture_identity": {"bytes": FIXTURE_BYTES, "sha256": FIXTURE},
+        "expected_sha256": sha(expected_raw),
+        "oracle_details_sha256": sha(json.dumps(details, sort_keys=True, separators=(",", ":")).encode()),
+        "oracle": details["oracle"],
+    }
+
+
+def load_frozen_details() -> tuple[dict[str, Any], bytes]:
+    path = ROOT / "external-expected.json"
+    require(path.exists() and path.is_file() and not path.is_symlink(), "external-expected.json: frozen snapshot is unavailable")
+    raw = path.read_bytes()
+    frozen = load_json(path)
+    require(isinstance(frozen, dict), "external-expected.json: expected object")
+    require(set(frozen) == {"schema", "fixture_bytes", "fixture_sha256"} | DETAIL_FIELDS, "external-expected.json: fields differ")
+    require(frozen.get("schema") == "pptx-external-expected-v1", "external-expected.json: wrong schema")
+    require(integer(frozen.get("fixture_bytes"), "external-expected.json.fixture_bytes") == FIXTURE_BYTES, "external-expected.json: fixture size differs")
+    require(digest(frozen.get("fixture_sha256"), "external-expected.json.fixture_sha256") == FIXTURE, "external-expected.json: fixture hash differs")
+    details = {key: frozen[key] for key in DETAIL_FIELDS}
+    digest(details["output_sha256"], "external-expected.json.output_sha256")
+    require(0 < integer(details["output_bytes"], "external-expected.json.output_bytes") <= OUTPUT_LIMIT, "external-expected.json.output_bytes: invalid size")
+    require(details["added_members"] == EXPECTED_ADDED, "external-expected.json.added_members: names differ")
+    require(isinstance(details["output_member_order"], list) and all(isinstance(name, str) for name in details["output_member_order"]) and len(details["output_member_order"]) == 37, "external-expected.json.output_member_order: unexpected order")
+    require(len(set(details["output_member_order"])) == len(details["output_member_order"]), "external-expected.json.output_member_order: duplicate name")
+    for key in ("source_slide_sha256", "image_sha256", "copied_slide_sha256", "copied_image_sha256"):
+        digest(details[key], f"external-expected.json.{key}")
+    require(isinstance(details["metadata_sha256"], dict) and set(details["metadata_sha256"]) == {PML, RELS, CONTENT_TYPES}, "external-expected.json.metadata_sha256: fields differ")
+    for key, value in details["metadata_sha256"].items():
+        digest(value, f"external-expected.json.metadata_sha256.{key}")
+    require(isinstance(details["oracle"], dict), "external-expected.json.oracle: expected object")
+    require(set(details["oracle"]) == {"original_members", "output_members", "added_members", "source_slide_sha256", "image_sha256", *ORACLE_FLAGS}, "external-expected.json.oracle: fields differ")
+    require(details["oracle"]["added_members"] == EXPECTED_ADDED, "external-expected.json.oracle.added_members: names differ")
+    for flag in ORACLE_FLAGS:
+        require(details["oracle"][flag] is True, f"external-expected.json.oracle.{flag}: check is not true")
+    return details, raw
+
+
+def retained_artifact(row: Any, label: str) -> tuple[Path, bytes]:
+    require(isinstance(row, dict), f"{label}: expected artifact object")
+    relative = Path(text(row.get("path"), f"{label}.path"))
+    require(not relative.is_absolute() and ".." not in relative.parts, f"{label}.path: expected bundle-relative path")
+    candidate = ROOT / relative
+    require(not candidate.is_symlink(), f"{label}: symlink evidence is not accepted")
+    path = candidate.resolve()
+    require(path.is_relative_to(ROOT.resolve()), f"{label}: artifact escapes evidence bundle")
+    require(path.is_file() and not path.is_symlink(), f"{label}: artifact is unavailable")
+    raw = path.read_bytes()
+    require(integer(row.get("bytes"), f"{label}.bytes") == len(raw), f"{label}.bytes: size mismatch")
+    require(digest(row.get("sha256"), f"{label}.sha256") == sha(raw), f"{label}.sha256: hash mismatch")
+    return path, raw
+
+
+def verify_replay_attestation(
+    report_path: str | Path,
+    receipt_path: str | Path,
+    oracle_log_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Validate retained report/oracle custody after fixture/artifact cleanup.
+
+    This mode deliberately never opens the fixture or output artifact.  It
+    validates the frozen independent-oracle identity, report rows, and the
+    retained passing oracle log bound to this verifier revision.
+    """
+    report_path = Path(report_path)
+    require(report_path.exists() and report_path.is_file() and not report_path.is_symlink(), "replay report: unavailable")
+    report = load_json(report_path)
+    provider, samples, _warmups = check_report_header(report)
+    details, expected_raw = load_frozen_details()
+    artifact = report.get("output_artifact")
+    require(isinstance(artifact, dict), "replay report.output_artifact: expected object")
+    artifact_path = report_path.with_suffix(".pptx").resolve()
+    require(Path(text(artifact.get("path"), "replay report.output_artifact.path")).resolve() == artifact_path, "replay report.output_artifact.path: not the report sibling")
+    require(integer(artifact.get("bytes"), "replay report.output_artifact.bytes") == details["output_bytes"], "replay report.output_artifact.bytes: differs from frozen identity")
+    require(digest(artifact.get("sha256"), "replay report.output_artifact.sha256") == details["output_sha256"], "replay report.output_artifact.sha256: differs from frozen identity")
+    sample_result = verify_samples(report, details)
+
+    receipt_path = Path(receipt_path)
+    receipt = load_json(receipt_path)
+    require(isinstance(receipt, dict), "replay receipt: expected object")
+    require(receipt.get("status") == "pass" and receipt.get("suite") == "external", "replay receipt: not a passing external capture")
+    require(integer(receipt.get("exit_code"), "replay receipt.exit_code") == 0, "replay receipt: workload failed")
+    require(integer(receipt.get("oracle_exit_code"), "replay receipt.oracle_exit_code") == 0, "replay receipt: oracle failed")
+    require(receipt.get("source_unchanged") is True, "replay receipt: source changed")
+    driver_sha256 = sha(Path(__file__).read_bytes())
+    require(digest(receipt.get("external_oracle_sha256"), "replay receipt.external_oracle_sha256") == driver_sha256, "replay receipt: oracle driver differs")
+    binary = receipt.get("binary")
+    require(isinstance(binary, dict), "replay receipt.binary: expected object")
+    require(digest(binary.get("sha256"), "replay receipt.binary.sha256") == report["binary_sha256"], "replay receipt.binary: report hash differs")
+    require(integer(binary.get("bytes"), "replay receipt.binary.bytes") == report["binary_bytes"], "replay receipt.binary: report size differs")
+    require(text(receipt.get("revision"), "replay receipt.revision") == report["source_revision"], "replay receipt.revision: report revision differs")
+    fixture = receipt.get("fixture")
+    require(isinstance(fixture, dict), "replay receipt.fixture: expected identity")
+    require(text(fixture.get("path"), "replay receipt.fixture.path") == text(report.get("fixture_path"), "replay report.fixture_path"), "replay receipt.fixture.path: report path differs")
+    require(integer(fixture.get("bytes"), "replay receipt.fixture.bytes") == FIXTURE_BYTES, "replay receipt.fixture.bytes: differs")
+    require(digest(fixture.get("sha256"), "replay receipt.fixture.sha256") == FIXTURE, "replay receipt.fixture.sha256: differs")
+
+    artifacts = receipt.get("artifacts")
+    require(isinstance(artifacts, dict), "replay receipt.artifacts: expected object")
+    report_artifact_path, report_raw = retained_artifact(artifacts.get("report"), "replay receipt.artifacts.report")
+    require(report_artifact_path == report_path.resolve(), "replay receipt.artifacts.report: path differs")
+    require(report_raw == report_path.read_bytes(), "replay receipt.artifacts.report: report changed")
+    output_record = artifacts.get("output_artifact")
+    require(isinstance(output_record, dict), "replay receipt.artifacts.output_artifact: missing retained identity")
+    require(Path(text(output_record.get("path"), "replay output artifact.path")).resolve() == artifact_path, "replay output artifact.path: differs")
+    require(integer(output_record.get("bytes"), "replay output artifact.bytes") == details["output_bytes"], "replay output artifact.bytes: differs")
+    require(digest(output_record.get("sha256"), "replay output artifact.sha256") == details["output_sha256"], "replay output artifact.sha256: differs")
+    oracle_record_path, oracle_raw = retained_artifact(artifacts.get("oracle"), "replay receipt.artifacts.oracle")
+    if oracle_log_path is not None:
+        require(oracle_record_path == Path(oracle_log_path).resolve(), "replay oracle log path differs from receipt")
+    oracle_record = load_json(oracle_record_path)
+    require(isinstance(oracle_record, dict), "replay oracle log: expected object")
+    require(oracle_record.get("status") == "pass" and oracle_record.get("verification_mode") == "reparse", "replay oracle log: missing original independent verification")
+    require(digest(oracle_record.get("driver_sha256"), "replay oracle log.driver_sha256") == driver_sha256, "replay oracle log: driver differs")
+    require(oracle_record.get("provider") == provider and oracle_record.get("samples") == samples, "replay oracle log: report lane differs")
+    require(oracle_record.get("fixture_identity") == {"bytes": FIXTURE_BYTES, "sha256": FIXTURE}, "replay oracle log: fixture identity differs")
+    require(oracle_record.get("expected_sha256") == sha(expected_raw), "replay oracle log: frozen expectation differs")
+    require(oracle_record.get("oracle_details_sha256") == sha(json.dumps(details, sort_keys=True, separators=(",", ":")).encode()), "replay oracle log: oracle detail digest differs")
+    require(oracle_record.get("output_identity") == sample_result["identity"], "replay oracle log: output identity differs")
+    require(oracle_record.get("oracle") == details["oracle"], "replay oracle log: independent oracle flags differ")
+    require(Path(text(oracle_record.get("output_artifact"), "replay oracle log.output_artifact")).resolve() == artifact_path, "replay oracle log: artifact path differs")
+    return {
+        "status": "pass",
+        "verification_mode": "replay-attestation",
+        "historical": True,
+        "reparsed": False,
+        "provider": provider,
+        "samples": samples,
+        "report": str(report_path.resolve()),
+        "oracle_log": str(oracle_record_path),
+        "oracle_log_sha256": sha(oracle_raw),
+        "expected_sha256": sha(expected_raw),
+        "output_identity": sample_result["identity"],
+    }
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("report")
+    parser.add_argument("--replay-attestation", action="store_true")
+    parser.add_argument("--receipt")
+    parser.add_argument("--oracle-log")
+    arguments = parser.parse_args()
+    if arguments.replay_attestation:
+        require(arguments.receipt, "--replay-attestation requires --receipt")
+        print(json.dumps(verify_replay_attestation(arguments.report, arguments.receipt, arguments.oracle_log), sort_keys=True))
+    else:
+        require(arguments.receipt is None and arguments.oracle_log is None, "--receipt/--oracle-log require --replay-attestation")
+        print(json.dumps(verify(arguments.report), sort_keys=True))

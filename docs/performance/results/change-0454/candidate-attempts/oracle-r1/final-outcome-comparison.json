@@ -1,0 +1,67 @@
+{
+  "scope": "Historical baseline versus final candidate; same unmodified corpus and self-pair selectors, no application roundtrip or speedup claim.",
+  "rows_compared": 189,
+  "changed": [
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+      "slide": 0,
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+      "before": {
+        "exit_code": 0,
+        "stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+        "stderr": ""
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "PUBLISHED bytes=42948 slides=2 name=\"\"\n",
+        "stderr": ""
+      }
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 16,
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "before": {
+        "exit_code": 0,
+        "stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+        "stderr": ""
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "PUBLISHED bytes=2053307 slides=35 name=\"\"\n",
+        "stderr": ""
+      }
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 17,
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "before": {
+        "exit_code": 0,
+        "stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+        "stderr": ""
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "PUBLISHED bytes=1956034 slides=35 name=\"\"\n",
+        "stderr": ""
+      }
+    },
+    {
+      "path": "3rdparty/poi/test-data/slideshow/at.ecodesign.www_downloads_Vertiefungsvortrag_elektronik.pptx",
+      "slide": 33,
+      "sha256": "4c9630fe85061c2bcb9d5638ad810fc18e8d7ae301a96d446f72b40995773578",
+      "before": {
+        "exit_code": 0,
+        "stdout": "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }\n",
+        "stderr": ""
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "PUBLISHED bytes=2106988 slides=35 name=\"\"\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "unchanged": 185
+}

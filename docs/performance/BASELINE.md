@@ -1,5 +1,56 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0454: source-proven unnamed-slide PPTX copy
+
+0454 is a measured capability prerequisite. Its
+historical path crossed three typed refusal boundaries: the baseline stopped
+at the optional producer-visible slide name; the name-only historical
+intermediate candidate then stopped at a noncanonical relationship XML
+lexical form; and ordinary authored XML stopped at the compactness gate for
+formatted `ppt/presentation.xml` (`FormattingWhitespace`, offset 55). The
+copied slide XML also needs its original spelling preserved.
+
+The final native inventory has 189 image-bearing direct-picture rows from 588
+files: four self-pair cases publish and 185 outcomes remain unchanged. Each
+case reopens the same unmodified archive independently as source and
+destination. The pinned LibreOffice QA fixture additionally passes exact
+ZIP/XML preservation checks through external bytes/range captures. This is
+not a native application roundtrip or an independent source/destination pair.
+
+The candidate keeps XML opaque at the OPC owner. `source_xml` captures the
+exact Part bytes; `checked_range` binds an edit to source bytes and provenance;
+`AuthoredXmlFragment` audits only a compact generated fragment; and the splice
+publication rechecks source freshness, Part identity, XML validity and output
+limits. The resulting prefix and suffix remain byte exact, including original
+whitespace and literal namespace grammar. Ordinary authored replacement and
+addition paths keep their compactness gate. Source and destination limits,
+bounded fragment/topology admissions, cancellation, and managed resource
+accounting remain in force. An empty/no-op topology plan remains an exact
+source copy, so it does not normalize XML. Memory, Objects and Depth are live
+gauges; InputBytes, OutputBytes and Work remain cumulative consumed counters
+where their owner defines them.
+
+The formal [measurements](results/change-0454/measurements.md) and
+[machine-readable rows](results/change-0454/measurements.json) retain 30
+samples after 3 warmups per lane on CPU 2 with one worker. Matched whole-API
+p50 movement stays within about 1.3%, and no RSS comparison exceeds 5%. All
+15 absolute review flags remain visible: the three positive range/media-rich
+R2 tail flags are `open_source.p99` +5.84%, `open_destination.p99` +9.93%,
+and `open.p99` +7.87%; the range/media-rich R1 `open_source.p99` flag is
+-8.97% and does not repeat. Logical read/work counters remain consistent;
+scheduler or sleep variability is a plausible inference for tail behavior,
+not a demonstrated cause.
+
+The release-gate epoch passes the build, format, strict, harness, OPC, PPTX,
+documentation, workspace, boundary, oracle and native checks: 497 OPC tests,
+854 PPTX tests and 381 aggregate harness tests pass. The isolated ASAN fuzzer
+passes 1,000 runs; final evidence verification and owned cleanup also pass. The external
+fixture is candidate-only while the baseline retains its typed refusal, so
+0454 makes no speedup or baseline comparison claim. Native-application
+roundtrip, distinct-package, cold-cache/physical-I/O, allocator and scaling
+evidence remain unmeasured. The full non-iWork goal remains open; see the
+[0454 bundle](results/change-0454/README.md).
+
 ## Change 0453: PPTX plans share decoded payloads with allocator evidence
 
 [0453](changes/0453-pptx-shared-decoded-payload.md) removes 16,777,408 planning allocated and retained bytes in both media-rich

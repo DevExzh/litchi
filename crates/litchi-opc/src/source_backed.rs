@@ -5,7 +5,7 @@
 //! positional source until a caller explicitly asks for one.
 
 use crate::accounting::OpcOperationAccounting;
-use crate::constants::{content_type, relationship_type};
+use crate::constants::{content_type, namespace, relationship_type};
 use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
@@ -19,6 +19,7 @@ use crate::pkgreader::{
     ValidationCatalogPhase, is_xml_id,
 };
 use crate::rel::{Relationships, TargetMode};
+use crate::xml_splice::SourceXmlPart;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{
@@ -26,13 +27,15 @@ use litchi_core::{
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
 use soapberry_zip::office::{EntryId, IndexedArchive};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Read, Write};
+use std::mem::size_of;
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -53,6 +56,11 @@ const MAX_SOURCE_TOPOLOGY_PARTS: usize = 64;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
 const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT: usize = 4096;
+const MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
+const QUICK_XML_MAX_SAFE_DEPTH: usize = (u16::MAX as usize) - 1;
+const XML_NAMESPACE_URI: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE_URI: &str = "http://www.w3.org/2000/xmlns/";
 
 #[cfg(test)]
 #[derive(Debug)]
@@ -127,6 +135,7 @@ impl Drop for TestCacheAdmissionBypassGuard<'_> {
 struct PendingOverlay {
     target: usize,
     replacement: Arc<Vec<u8>>,
+    source_xml: Option<SourceXmlPart>,
 }
 
 /// A bounded source-backed OPC publication plan.
@@ -148,6 +157,7 @@ pub struct SourceTopologyPlan {
 struct TopologyReplacement {
     partname: PackURI,
     replacement: Arc<Vec<u8>>,
+    source_xml: Option<SourceXmlPart>,
 }
 
 #[derive(Debug)]
@@ -160,6 +170,7 @@ struct TopologyPartAddition {
 #[derive(Debug)]
 enum TopologyPartPayload {
     Decoded(Arc<Vec<u8>>),
+    SourceXml(Arc<SourceXmlPart>),
     Precompressed(Box<AuthorizedPrecompressedPart>),
 }
 
@@ -452,6 +463,974 @@ struct TopologyRelationshipChange {
     operation: TopologyRelationshipOperation,
 }
 
+#[derive(Debug)]
+struct ParsedSourceRelationshipDocument {
+    root_close_start: usize,
+    root_prefix: Vec<u8>,
+    event_count: u64,
+}
+
+fn relationship_manifest_append_error(member_name: &str, detail: &str) -> OpcError {
+    OpcError::InvalidRelationshipsManifest(format!(
+        "relationships member '{member_name}' cannot be appended safely: {detail}"
+    ))
+}
+
+fn relationship_xml_whitespace(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+}
+
+fn relationship_namespace_declaration_name(name: &str) -> bool {
+    name == "xmlns" || name.strip_prefix("xmlns:").is_some_and(is_xml_id)
+}
+
+fn decode_relationship_attribute(
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+    decoder: quick_xml::Decoder,
+    limits: ReadLimits,
+    member_name: &str,
+) -> Result<String> {
+    let raw_attribute_bytes = attribute
+        .key
+        .0
+        .len()
+        .checked_add(attribute.value.as_ref().len())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "relationship attribute byte length overflows",
+            )
+        })?;
+    limits.check(
+        ReadResource::XmlAttributeBytes,
+        raw_attribute_bytes as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    if attribute.value.as_ref().contains(&b'<') {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "relationship attribute contains a literal '<'",
+        ));
+    }
+    limits.check(
+        ReadResource::XmlAttributeBytes,
+        attribute.value.as_ref().len() as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    let value = attribute
+        .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+        .map(|value| value.to_string())
+        .map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid relationship attribute value: {error}"),
+            )
+        })?;
+    limits.check(
+        ReadResource::XmlAttributeBytes,
+        value.len() as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    if !value.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "relationship attribute contains a forbidden XML character",
+        ));
+    }
+    Ok(value)
+}
+
+fn validate_relationship_namespace_declaration(
+    key: &[u8],
+    value: &str,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    let name = decoder.decode(key).map_err(|error| {
+        relationship_manifest_append_error(
+            member_name,
+            &format!("invalid namespace declaration name: {error}"),
+        )
+    })?;
+    if !relationship_namespace_declaration_name(&name) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "namespace declaration name is not a valid NCName",
+        ));
+    }
+    let prefix = name.strip_prefix("xmlns:");
+    if prefix == Some("xmlns")
+        || value == XMLNS_NAMESPACE_URI
+        || (prefix == Some("xml")) != (value == XML_NAMESPACE_URI)
+        || (prefix.is_some() && value.is_empty())
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "namespace declaration uses a reserved or empty binding",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_relationship_qname(
+    raw: &[u8],
+    decoder: quick_xml::Decoder,
+    kind: &str,
+    member_name: &str,
+) -> Result<String> {
+    let name = decoder.decode(raw).map_err(|error| {
+        relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is not valid UTF-8: {error}"),
+        )
+    })?;
+    let mut parts = name.split(':');
+    let Some(prefix_or_local) = parts.next() else {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is empty"),
+        ));
+    };
+    let valid = if !is_xml_id(prefix_or_local) {
+        false
+    } else {
+        match parts.next() {
+            None => true,
+            Some(local) => is_xml_id(local) && parts.next().is_none(),
+        }
+    };
+    if !valid {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is not a valid XML QName"),
+        ));
+    }
+    if name
+        .split_once(':')
+        .is_some_and(|(prefix, _)| prefix == "xmlns")
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName uses the reserved xmlns prefix"),
+        ));
+    }
+    Ok(name.into_owned())
+}
+
+fn relationship_xml10_character(value: char) -> bool {
+    matches!(value, '\u{9}' | '\u{a}' | '\u{d}')
+        || ('\u{20}'..='\u{d7ff}').contains(&value)
+        || ('\u{e000}'..='\u{fffd}').contains(&value)
+        || ('\u{10000}'..='\u{10ffff}').contains(&value)
+}
+
+fn validate_relationship_comment(
+    comment: &quick_xml::events::BytesText<'_>,
+    member_name: &str,
+) -> Result<()> {
+    let bytes = comment.as_ref();
+    if bytes.windows(2).any(|pair| pair == b"--") || bytes.last() == Some(&b'-') {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "comments containing '--' are not well-formed",
+        ));
+    }
+    let value = comment.decode().map_err(|error| {
+        relationship_manifest_append_error(member_name, &format!("invalid comment: {error}"))
+    })?;
+    if !value.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "comment contains a forbidden XML character",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_relationship_pi(
+    instruction: &quick_xml::events::BytesPI<'_>,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    let target = validate_relationship_qname(
+        instruction.target(),
+        decoder,
+        "processing-instruction target",
+        member_name,
+    )?;
+    if target.eq_ignore_ascii_case("xml") {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "processing-instruction target 'xml' is reserved",
+        ));
+    }
+    let content = decoder.decode(instruction.content()).map_err(|error| {
+        relationship_manifest_append_error(member_name, &format!("invalid PI content: {error}"))
+    })?;
+    if !content.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "processing-instruction contains a forbidden XML character",
+        ));
+    }
+    Ok(())
+}
+
+fn inspect_relationship_append_root_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    limits: ReadLimits,
+    member_name: &str,
+) -> Result<()> {
+    let mut attribute_count = 0usize;
+    let mut seen_keys: Vec<&[u8]> = Vec::new();
+    for attribute_result in element.attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationships root attribute count overflows",
+            )
+        })?;
+        if attribute_count > MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "Relationships root has too many attributes",
+            ));
+        }
+        let attribute = attribute_result.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid root attribute: {error}"),
+            )
+        })?;
+        let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
+        let key = attribute.key.0;
+        if seen_keys.contains(&key) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "the Relationships root repeats an attribute",
+            ));
+        }
+        seen_keys
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship root attributes",
+                source,
+            })?;
+        seen_keys.push(key);
+        let key_name = decoder.decode(key).map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid root attribute name: {error}"),
+            )
+        })?;
+        if !relationship_namespace_declaration_name(&key_name) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "the Relationships root has an unsupported attribute",
+            ));
+        }
+        validate_relationship_namespace_declaration(key, &value, decoder, member_name)?;
+    }
+    Ok(())
+}
+
+fn inspect_relationship_append_child(
+    element: &quick_xml::events::BytesStart<'_>,
+    opc_namespace: bool,
+    decoder: quick_xml::Decoder,
+    limits: ReadLimits,
+    member_name: &str,
+) -> Result<(String, String, String, TargetMode)> {
+    if !opc_namespace || element.local_name().as_ref() != b"Relationship" {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "only direct Relationship children in the OPC namespace are supported",
+        ));
+    }
+    validate_relationship_qname(
+        element.name().as_ref(),
+        decoder,
+        "Relationship element",
+        member_name,
+    )?;
+
+    let mut id_attribute = None;
+    let mut type_attribute = None;
+    let mut target_attribute = None;
+    let mut target_mode = TargetMode::Internal;
+    let mut target_mode_seen = false;
+    let mut attribute_count = 0usize;
+    let mut seen_keys: Vec<&[u8]> = Vec::new();
+    for attribute_result in element.attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship attribute count overflows",
+            )
+        })?;
+        if attribute_count > MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "Relationship has too many attributes",
+            ));
+        }
+        let attribute = attribute_result.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid Relationship attribute: {error}"),
+            )
+        })?;
+        let key = attribute.key.0;
+        if seen_keys.contains(&key) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "a Relationship repeats an attribute",
+            ));
+        }
+        seen_keys
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC Relationship attributes",
+                source,
+            })?;
+        seen_keys.push(key);
+        let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
+        match key {
+            b"Id" if id_attribute.is_none() => id_attribute = Some(value),
+            b"Type" if type_attribute.is_none() => type_attribute = Some(value),
+            b"Target" if target_attribute.is_none() => target_attribute = Some(value),
+            b"TargetMode" if !target_mode_seen => {
+                target_mode = TargetMode::parse(&value)?;
+                target_mode_seen = true;
+            },
+            name if decoder
+                .decode(name)
+                .ok()
+                .is_some_and(|name| relationship_namespace_declaration_name(&name)) =>
+            {
+                validate_relationship_namespace_declaration(key, &value, decoder, member_name)?;
+            },
+            _ => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "a Relationship has an unsupported or duplicate attribute",
+                ));
+            },
+        }
+    }
+    let id = id_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(member_name, "Relationship requires a non-empty Id")
+        })?;
+    let relationship_type = type_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship requires a non-empty Type",
+            )
+        })?;
+    let target = target_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship requires a non-empty Target",
+            )
+        })?;
+    if !is_xml_id(&id) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "Relationship Id is not an XML ID",
+        ));
+    }
+    limits.check(
+        ReadResource::RelationshipTargetBytes,
+        target.len() as u64,
+        limits.max_relationship_target_bytes() as u64,
+    )?;
+    if relationship_type.chars().any(char::is_whitespace)
+        || relationship_type.chars().any(char::is_control)
+        || target.chars().any(char::is_control)
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "Relationship Type or Target is not a valid URI reference",
+        ));
+    }
+    Ok((id, relationship_type, target, target_mode))
+}
+
+fn validate_source_relationship_identity(
+    member_name: &str,
+    expected: &Relationships,
+    relationship_ids: &mut HashSet<String>,
+    relationship_count: &mut usize,
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_mode: TargetMode,
+    limits: ReadLimits,
+) -> Result<()> {
+    let Some(original) = expected.get(&id) else {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship set differs from the opened catalog",
+        ));
+    };
+    if relationship_ids.contains(&id) {
+        return Err(OpcError::DuplicateRelationshipId(id));
+    }
+    if *relationship_count >= expected.len() {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship count differs from the opened catalog",
+        ));
+    }
+    if original.reltype() != relationship_type
+        || original.target_ref() != target
+        || original.target_mode() != target_mode
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship set differs from the opened catalog",
+        ));
+    }
+    *relationship_count = (*relationship_count).checked_add(1).ok_or_else(|| {
+        overlay_unavailable("relationship append relationship count overflows usize")
+    })?;
+    limits.check(
+        ReadResource::RelationshipsPerPart,
+        *relationship_count as u64,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    // The parser reserves the full expected catalog size before reading any
+    // child. The count guard above proves this insertion cannot grow beyond
+    // that checked capacity.
+    relationship_ids.insert(id);
+    Ok(())
+}
+
+fn relationship_xml_working_memory_bound(
+    declared_bytes: u64,
+    relationship_slots: usize,
+) -> Result<u64> {
+    // The first source_bytes term below is the retained source payload and
+    // the second is the quick-xml input/transient buffer. Keeping both terms
+    // explicit is important: read_entry does not have a separate payload
+    // reservation on this path. The remaining terms cover the resolver's
+    // namespace binding Vec, opened-element state Vec, decoded attribute
+    // scratch, and the HashSet bucket storage used to compare the source
+    // catalog. quick-xml keeps the first two namespace bindings even for a
+    // namespace-free `<a/>`, so the fixed term covers that minimum state; each
+    // input-derived slot uses a conservative private-type footprint.
+    const FIXED_BYTES: usize = 4096;
+    const NAMESPACE_BINDING_BYTES: usize = 64;
+    const OPEN_ELEMENT_BYTES: usize = 2 * size_of::<usize>();
+    // Raw attribute keys (2 * usize), expanded-name bookkeeping
+    // (4 * usize), and quick-xml attribute ranges/positions (2 * usize),
+    // doubled for Vec growth/transient coexistence.
+    const ATTRIBUTE_BYTES: usize =
+        2 * (2 * size_of::<usize>() + 4 * size_of::<usize>() + 2 * size_of::<usize>());
+    const HASH_BUCKET_BYTES: usize = 64;
+    const MIN_NAMESPACE_DECLARATION_BYTES: usize = 7;
+    const MIN_OPEN_ELEMENT_BYTES: usize = 3;
+    const MIN_ATTRIBUTE_BYTES: usize = 4;
+    let source_bytes = usize::try_from(declared_bytes)
+        .map_err(|_| overlay_unavailable("relationship XML memory bound exceeds usize"))?
+        .max(1);
+    let namespace_slots = source_bytes
+        .checked_div(MIN_NAMESPACE_DECLARATION_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship namespace bound overflows"))?;
+    let open_element_slots = source_bytes
+        .checked_div(MIN_OPEN_ELEMENT_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship depth bound overflows"))?;
+    let attribute_slots = source_bytes
+        .checked_div(MIN_ATTRIBUTE_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship attribute bound overflows"))?;
+    let amount = FIXED_BYTES
+        // Retained source payload: read_entry is performed after this
+        // reservation and no other source-payload charge covers it.
+        .checked_add(source_bytes)
+        // quick-xml's input/transient buffer, which may coexist with the
+        // retained source Vec while the source is audited.
+        .and_then(|amount| amount.checked_add(source_bytes))
+        .and_then(|amount| {
+            namespace_slots
+                .checked_mul(NAMESPACE_BINDING_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            open_element_slots
+                .checked_mul(OPEN_ELEMENT_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            attribute_slots
+                .checked_mul(ATTRIBUTE_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            relationship_slots
+                .checked_add(1)
+                .and_then(|slots| slots.checked_mul(HASH_BUCKET_BYTES))
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .ok_or_else(|| overlay_unavailable("relationship XML memory bound overflows"))?;
+    u64::try_from(amount)
+        .map_err(|_| overlay_unavailable("relationship XML memory bound exceeds u64"))
+}
+
+fn parse_noncanonical_relationship_source<F>(
+    bytes: &[u8],
+    member_name: &str,
+    expected: &Relationships,
+    limits: ReadLimits,
+    mut check_progress: F,
+) -> Result<ParsedSourceRelationshipDocument>
+where
+    F: FnMut() -> Result<()>,
+{
+    std::str::from_utf8(bytes).map_err(|_| {
+        relationship_manifest_append_error(member_name, "relationships XML is not UTF-8")
+    })?;
+
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader.config_mut().trim_markup_names_in_closing_tags = false;
+    reader.resolver_mut().set_max_declarations_per_element(
+        MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT,
+    );
+    // NsReader's resolver increments a u16 nesting counter before returning
+    // each start event. Keep one slot below its maximum so a deeper event is
+    // refused by our policy check before that counter can wrap.
+    let xml_depth_limit = limits.max_xml_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+    let mut relationship_ids = HashSet::new();
+    relationship_ids
+        .try_reserve(expected.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC relationship append IDs",
+            source,
+        })?;
+    let mut relationship_count = 0usize;
+    let mut root_close_start = None;
+    let mut root_prefix = Vec::new();
+    let mut events = 0u64;
+
+    loop {
+        check_progress()?;
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
+        limits.check(
+            ReadResource::XmlEvents,
+            events,
+            limits.max_xml_events() as u64,
+        )?;
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| overlay_unavailable("relationship XML event position exceeds usize"))?;
+        let decoder = reader.decoder();
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let opc_namespace = matches!(resolved_namespace,
+            ResolveResult::Bound(Namespace(value))
+                if value == namespace::OPC_RELATIONSHIPS.as_bytes());
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            overlay_unavailable("relationship XML event end position exceeds usize")
+        })?;
+        if event_end < event_start || event_end > bytes.len() {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "the relationships XML event range is invalid",
+            ));
+        }
+        if matches!(event, Event::Empty(_)) {
+            let element_depth = depth
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("relationship XML depth overflows"))?;
+            limits.check(
+                ReadResource::XmlDepth,
+                element_depth as u64,
+                xml_depth_limit as u64,
+            )?;
+        }
+        match event {
+            Event::Start(element) => {
+                if root_closed {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "content appears after the Relationships root",
+                    ));
+                }
+                if depth == 0 {
+                    if root_seen {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "multiple root elements are not supported",
+                        ));
+                    }
+                    if element.local_name().as_ref() != b"Relationships" || !opc_namespace {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "root must be Relationships in the OPC namespace",
+                        ));
+                    }
+                    let root_name = validate_relationship_qname(
+                        element.name().as_ref(),
+                        decoder,
+                        "Relationships root",
+                        member_name,
+                    )?;
+                    inspect_relationship_append_root_attributes(
+                        &element,
+                        decoder,
+                        limits,
+                        member_name,
+                    )?;
+                    let name = root_name.as_bytes();
+                    if let Some(colon) = name.iter().position(|byte| *byte == b':') {
+                        root_prefix
+                            .try_reserve_exact(colon.checked_add(1).ok_or_else(|| {
+                                overlay_unavailable(
+                                    "the Relationships root QName prefix length overflows",
+                                )
+                            })?)
+                            .map_err(|source| OpcError::Allocation {
+                                resource: "source-backed OPC relationship append prefix",
+                                source,
+                            })?;
+                        root_prefix.extend_from_slice(&name[..=colon]);
+                    }
+                    root_seen = true;
+                    depth = 1;
+                    limits.check(ReadResource::XmlDepth, depth as u64, xml_depth_limit as u64)?;
+                } else if depth == 1 {
+                    let (id, relationship_type, target, target_mode) =
+                        inspect_relationship_append_child(
+                            &element,
+                            opc_namespace,
+                            decoder,
+                            limits,
+                            member_name,
+                        )?;
+                    validate_source_relationship_identity(
+                        member_name,
+                        expected,
+                        &mut relationship_ids,
+                        &mut relationship_count,
+                        id,
+                        relationship_type,
+                        target,
+                        target_mode,
+                        limits,
+                    )?;
+                    depth = 2;
+                    limits.check(ReadResource::XmlDepth, depth as u64, xml_depth_limit as u64)?;
+                } else {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "nested relationship content is not supported",
+                    ));
+                }
+            },
+            Event::Empty(element) => {
+                if root_closed || depth == 0 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "the Relationships root must have an explicit close boundary",
+                    ));
+                }
+                if depth != 1 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "nested relationship content is not supported",
+                    ));
+                }
+                let (id, relationship_type, target, target_mode) =
+                    inspect_relationship_append_child(
+                        &element,
+                        opc_namespace,
+                        decoder,
+                        limits,
+                        member_name,
+                    )?;
+                validate_source_relationship_identity(
+                    member_name,
+                    expected,
+                    &mut relationship_ids,
+                    &mut relationship_count,
+                    id,
+                    relationship_type,
+                    target,
+                    target_mode,
+                    limits,
+                )?;
+            },
+            Event::End(element) => {
+                validate_relationship_qname(
+                    element.name().as_ref(),
+                    decoder,
+                    "Relationships closing",
+                    member_name,
+                )?;
+                match depth {
+                    2 => {
+                        if !opc_namespace || element.local_name().as_ref() != b"Relationship" {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "Relationship closing element is outside the OPC namespace",
+                            ));
+                        }
+                        depth = 1;
+                    },
+                    1 => {
+                        if !opc_namespace || element.local_name().as_ref() != b"Relationships" {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "Relationships closing element is outside the OPC namespace",
+                            ));
+                        }
+                        if bytes
+                            .get(event_start..event_end)
+                            .is_none_or(|closing| !closing.starts_with(b"</"))
+                        {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "the Relationships root close boundary is ambiguous",
+                            ));
+                        }
+                        root_close_start = Some(event_start);
+                        root_closed = true;
+                        depth = 0;
+                    },
+                    _ => {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "an XML closing element is out of place",
+                        ));
+                    },
+                }
+            },
+            Event::Text(text) => {
+                if text.as_ref().windows(3).any(|window| window == b"]]>") {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "relationships text contains the forbidden ']]>' sequence",
+                    ));
+                }
+                let decoded = text.decode().map_err(|error| {
+                    relationship_manifest_append_error(
+                        member_name,
+                        &format!("invalid relationships text: {error}"),
+                    )
+                })?;
+                if !decoded.chars().all(relationship_xml10_character) {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "relationships text contains a forbidden XML character",
+                    ));
+                }
+                if !relationship_xml_whitespace(text.as_ref()) {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "non-whitespace text is not supported in a relationships member",
+                    ));
+                }
+            },
+            Event::Comment(comment) => {
+                validate_relationship_comment(&comment, member_name)?;
+                if depth == 2 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "content inside a Relationship is not supported",
+                    ));
+                }
+            },
+            Event::PI(instruction) => {
+                validate_relationship_pi(&instruction, decoder, member_name)?;
+                if depth == 2 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "content inside a Relationship is not supported",
+                    ));
+                }
+            },
+            Event::Decl(declaration) => {
+                if root_seen || declaration_seen || events != 1 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "the XML declaration is out of place",
+                    ));
+                }
+                crate::xml_splice::validate_source_declaration(&declaration, member_name)?;
+                declaration_seen = true;
+            },
+            Event::DocType(_) => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "DTDs are not permitted in relationships members",
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "unsupported XML content is not safe to append",
+                ));
+            },
+            Event::Eof => {
+                if !root_seen || !root_closed || depth != 0 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "missing or unclosed Relationships root",
+                    ));
+                }
+                break;
+            },
+        }
+    }
+
+    if relationship_count != expected.len() {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship count differs from the opened catalog",
+        ));
+    }
+    Ok(ParsedSourceRelationshipDocument {
+        root_close_start: root_close_start.ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "the Relationships root close boundary is unavailable",
+            )
+        })?,
+        root_prefix,
+        event_count: events,
+    })
+}
+
+fn relationship_append_fragment_len(
+    root_prefix_len: usize,
+    r_id: &str,
+    reltype: &str,
+    target_ref: &str,
+    target_mode: TargetMode,
+) -> Result<usize> {
+    let escaped_id_len = escaped_xml_attribute_len(r_id)?;
+    let escaped_type_len = escaped_xml_attribute_len(reltype)?;
+    let escaped_target_len = escaped_xml_attribute_len(target_ref)?;
+    let mut length = 1usize
+        .checked_add(root_prefix_len)
+        .and_then(|value| value.checked_add(b"Relationship Id=\"".len()))
+        .and_then(|value| value.checked_add(escaped_id_len))
+        .and_then(|value| value.checked_add(b"\" Type=\"".len()))
+        .and_then(|value| value.checked_add(escaped_type_len))
+        .and_then(|value| value.checked_add(b"\" Target=\"".len()))
+        .and_then(|value| value.checked_add(escaped_target_len))
+        .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?;
+    length = if target_mode == TargetMode::External {
+        length
+            .checked_add(b"\" TargetMode=\"External\"/>".len())
+            .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?
+    } else {
+        length
+            .checked_add(b"\"/>".len())
+            .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?
+    };
+    Ok(length)
+}
+
+const CANONICAL_RELATIONSHIPS_HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+const CANONICAL_RELATIONSHIPS_FOOTER: &[u8] = b"</Relationships>";
+const CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES: usize = 4096;
+
+fn canonical_relationship_xml_len(relationships: &Relationships) -> Result<usize> {
+    relationships.iter().try_fold(
+        CANONICAL_RELATIONSHIPS_HEADER
+            .len()
+            .checked_add(CANONICAL_RELATIONSHIPS_FOOTER.len())
+            .ok_or_else(|| {
+                overlay_unavailable("canonical relationship XML length overflows usize")
+            })?,
+        |length, relationship| {
+            length
+                .checked_add(relationship_append_fragment_len(
+                    0,
+                    relationship.r_id(),
+                    relationship.reltype(),
+                    relationship.target_ref(),
+                    relationship.target_mode(),
+                )?)
+                .ok_or_else(|| {
+                    overlay_unavailable("canonical relationship XML length overflows usize")
+                })
+        },
+    )
+}
+
+fn canonical_relationship_serializer_memory_bound(
+    relationships: &Relationships,
+    serialized_len: usize,
+) -> Result<u64> {
+    // try_to_xml_bytes first materializes one pointer per relationship for
+    // sorting, then appends independently reserved literal/escaped fragments.
+    // Charge the exact final XML bytes, one equally sized transient allowance
+    // for Vec growth/coexisting old storage, the sorted reference Vec, and a
+    // fixed allocator/state allowance before invoking that serializer. A
+    // source relationship payload is charged separately by
+    // relationship_xml_working_memory_bound before this helper is called.
+    let reference_bytes = relationships
+        .len()
+        .checked_mul(size_of::<&crate::rel::Relationship>())
+        .ok_or_else(|| {
+            overlay_unavailable("canonical relationship reference storage overflows usize")
+        })?;
+    let amount = CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES
+        .checked_add(serialized_len)
+        .and_then(|amount| amount.checked_add(serialized_len))
+        .and_then(|amount| amount.checked_add(reference_bytes))
+        .and_then(|amount| amount.checked_add(size_of::<Vec<&crate::rel::Relationship>>()))
+        .ok_or_else(|| {
+            overlay_unavailable("canonical relationship serializer memory overflows usize")
+        })?;
+    u64::try_from(amount)
+        .map_err(|_| overlay_unavailable("canonical relationship serializer memory exceeds u64"))
+}
+
+fn append_relationship_fragment(
+    output: &mut Vec<u8>,
+    root_prefix: &[u8],
+    r_id: &str,
+    reltype: &str,
+    target_ref: &str,
+    target_mode: TargetMode,
+) -> Result<()> {
+    append_relationship_xml_bytes(output, b"<")?;
+    append_relationship_xml_bytes(output, root_prefix)?;
+    append_relationship_xml_bytes(output, b"Relationship Id=\"")?;
+    push_xml_escaped(output, r_id)?;
+    append_relationship_xml_bytes(output, b"\" Type=\"")?;
+    push_xml_escaped(output, reltype)?;
+    append_relationship_xml_bytes(output, b"\" Target=\"")?;
+    push_xml_escaped(output, target_ref)?;
+    if target_mode == TargetMode::External {
+        append_relationship_xml_bytes(output, b"\" TargetMode=\"External\"/>")?;
+    } else {
+        append_relationship_xml_bytes(output, b"\"/>")?;
+    }
+    Ok(())
+}
+
 impl SourceTopologyPlan {
     /// Construct an empty topology plan.
     #[must_use]
@@ -510,7 +1489,81 @@ impl SourceTopologyPlan {
         self.replacements.push(TopologyReplacement {
             partname,
             replacement: Arc::new(replacement),
+            source_xml: None,
         });
+        Ok(())
+    }
+
+    /// Replace one existing XML Part with a source-authorized payload.
+    ///
+    /// The source payload may be an exact copy or a checked splice assembled
+    /// from exact source ranges and compact generated fragments.  The target
+    /// URI must be the same Part identity that issued the proof; ordinary
+    /// [`Self::try_replace_part`] remains the strict authored-byte path.
+    pub fn try_replace_source_xml_part(
+        &mut self,
+        partname: PackURI,
+        source_xml: SourceXmlPart,
+    ) -> Result<()> {
+        if !source_xml.partname().is_equivalent_to(&partname) {
+            return Err(overlay_unavailable(
+                "source XML replacement Part identity differs from target",
+            ));
+        }
+        if !xml_minifier::audit::package::is_xml_part(partname.as_str(), source_xml.content_type())
+        {
+            return Err(overlay_unavailable(
+                "source XML replacement is not an XML-classified Part",
+            ));
+        }
+        self.validate_replacement_name(&partname)?;
+        self.replacements
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacements",
+                source,
+            })?;
+        let replacement = source_xml.payload_arc();
+        self.replacements.push(TopologyReplacement {
+            partname,
+            replacement,
+            source_xml: Some(source_xml),
+        });
+        Ok(())
+    }
+
+    fn validate_replacement_name(&self, partname: &PackURI) -> Result<()> {
+        if partname.as_str() == PACKAGE_URI {
+            return Err(OpcError::InvalidPackUri(
+                "the package root is not a Part URI".to_string(),
+            ));
+        }
+        let operation_count = self
+            .replacements
+            .len()
+            .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
+            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
+        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "topology replacement set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
+            )));
+        }
+        if self
+            .replacements
+            .iter()
+            .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .additions
+                .iter()
+                .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
         Ok(())
     }
 
@@ -544,6 +1597,40 @@ impl SourceTopologyPlan {
         payload: Arc<Vec<u8>>,
     ) -> Result<()> {
         self.try_add_part_with_payload(partname, content_type, || payload)
+    }
+
+    /// Add an XML Part whose bytes were issued by another source-backed
+    /// package, preserving its exact source lexical form or checked splice.
+    ///
+    /// The source content type is retained.  The destination publisher
+    /// rechecks source freshness, context, limits, and XML well-formedness;
+    /// only the ordinary authored compactness audit is skipped for this
+    /// source-authorized payload.
+    pub fn try_add_source_xml_part(
+        &mut self,
+        partname: PackURI,
+        source_xml: SourceXmlPart,
+    ) -> Result<()> {
+        self.validate_addition_name(&partname)?;
+        if !xml_minifier::audit::package::is_xml_part(partname.as_str(), source_xml.content_type())
+        {
+            return Err(overlay_unavailable(
+                "source XML addition is not an XML-classified Part",
+            ));
+        }
+        let content_type = ContentType::new(source_xml.content_type().to_string())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::SourceXml(Arc::new(source_xml)),
+        });
+        Ok(())
     }
 
     /// Add a new Part using a source-authorized, strictly verified compressed
@@ -957,6 +2044,8 @@ struct TopologyRelationshipPublication {
     xml: Vec<u8>,
     existing_entry: Option<EntryId>,
     relationship_count: usize,
+    source_event_count: Option<u64>,
+    memory_reservations: Vec<Arc<Reservation>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1583,7 +2672,7 @@ impl ZipReaderAt for SourceReader {
 }
 
 #[derive(Clone)]
-struct SourceSnapshot {
+pub(crate) struct SourceSnapshot {
     source: Arc<dyn ReadAt>,
     version: SourceVersion,
     length: u64,
@@ -1730,6 +2819,26 @@ impl SourceSnapshot {
 
     fn monitor_publication(&self) {
         self.monitor_reads.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn ensure_current_public(&self) -> Result<()> {
+        self.ensure_current()
+    }
+
+    pub(crate) fn context_ref(&self) -> Option<&ExecutionContext> {
+        self.context.as_ref()
+    }
+
+    pub(crate) fn lineage(&self) -> &SourceLineage {
+        &self.lineage
+    }
+
+    pub(crate) fn snapshot_lineage(&self) -> SourceLineage {
+        self.lineage.clone()
+    }
+
+    pub(crate) const fn version(&self) -> SourceVersion {
+        self.version
     }
 }
 
@@ -2303,6 +3412,15 @@ impl<'package> PartView<'package> {
         self.package.read_part(self.index)
     }
 
+    /// Capture this XML Part as an opaque source-preserving publication proof.
+    ///
+    /// Original whitespace and lexical forms remain exact.  Use
+    /// [`SourceXmlPart::into_publication`] when compact generated fragments
+    /// must be inserted at checked source ranges.
+    pub fn source_xml(&self) -> Result<SourceXmlPart> {
+        self.package.source_xml_part(self.index)
+    }
+
     /// Capture this Part's verified Store/Deflate payload for a new OPC
     /// member while proving it decodes to `expected_decoded`.
     ///
@@ -2807,6 +3925,10 @@ impl PartData {
     #[must_use]
     pub fn shares_allocation_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.payload.bytes, &other.payload.bytes)
+    }
+
+    pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.payload.bytes)
     }
 }
 
@@ -4545,6 +5667,45 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
 
+    /// Capture one XML Part as a provenance-bearing source publication value.
+    ///
+    /// The returned value retains the exact decoded source allocation and may
+    /// later be spliced with compact generated fragments.  Source XML is a
+    /// distinct publication class: its original formatting and lexical forms
+    /// are validated for bounded well-formedness, never normalized or passed
+    /// through the authored compactness audit.
+    pub(crate) fn source_xml_part(&self, index: usize) -> Result<SourceXmlPart> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "source XML publication refuses encrypted ZIP members",
+            ));
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let part = self
+            .parts
+            .get(index)
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        if !xml_minifier::audit::package::is_xml_part(part.partname.as_str(), &part.content_type) {
+            return Err(overlay_unavailable(
+                "source XML publication requires an XML-classified Part",
+            ));
+        }
+        let data = self.read_part(index)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        SourceXmlPart::from_source_parts(
+            self.source.clone(),
+            self.limits,
+            &part.partname,
+            &part.content_type,
+            data,
+        )
+    }
+
     /// Resolve a catalog part by OPC part-name equivalence.
     ///
     /// The exact hash lookup is the common path. OPC part names compare
@@ -5110,8 +6271,11 @@ impl SourceBackedPackage {
     /// source ZIP records. The content-types manifest retains its original
     /// bytes and member spelling; only required new `Override` elements are
     /// inserted immediately before the parsed `Types` closing tag. Existing
-    /// relationship members are changed only when their source bytes are
-    /// exactly the current canonical [`Relationships::to_xml`] form.
+    /// Existing canonical relationship members use the generated
+    /// [`Relationships::to_xml`] form. A noncanonical existing member can be
+    /// changed only by an add-only lexical splice that proves the original
+    /// relationship set and retains every source byte; replacement and
+    /// removal still require canonical source bytes.
     ///
     /// An empty plan is an exact source copy, including signed packages and
     /// physical details unsupported by the rewrite preservation primitive.
@@ -5126,6 +6290,11 @@ impl SourceBackedPackage {
         let introduces_signature = plan.introduces_signature_infrastructure();
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "topology publication refuses encrypted ZIP members",
+            ));
+        }
 
         let SourceTopologyPlan {
             mut replacements,
@@ -5152,6 +6321,9 @@ impl SourceBackedPackage {
             }
             if let TopologyPartPayload::Precompressed(payload) = &addition.payload {
                 payload.check_for_publication(addition.content_type.as_str())?;
+            }
+            if let TopologyPartPayload::SourceXml(payload) = &addition.payload {
+                payload.check_for_publication(addition.content_type.as_str(), self.limits)?;
             }
         }
         self.check_topology_progress()?;
@@ -5219,9 +6391,20 @@ impl SourceBackedPackage {
             let target = self
                 .part_index(&replacement.partname)
                 .ok_or_else(|| OpcError::PartNotFound(replacement.partname.to_string()))?;
+            if let Some(source_xml) = replacement.source_xml.as_ref() {
+                let destination_original = self.read_part(target)?;
+                source_xml.check_for_replacement(
+                    &self.source,
+                    &self.parts[target].partname,
+                    self.parts[target].content_type.as_str(),
+                    destination_original.as_bytes(),
+                    self.limits,
+                )?;
+            }
             pending_replacements.push(PendingOverlay {
                 target,
                 replacement: Arc::clone(&replacement.replacement),
+                source_xml: replacement.source_xml.clone(),
             });
         }
         let mut pending_removals = Vec::new();
@@ -5441,10 +6624,11 @@ impl SourceBackedPackage {
             }
         }
 
-        // Group relationship changes by owner and produce canonical XML.
-        // The member itself is appended only when the source has no such
-        // member; an existing member is regenerated in place after a strict
-        // canonical-source check.
+        // Group relationship changes by owner. A new member and a canonical
+        // existing member use the established generated XML path. A
+        // noncanonical existing member is changed only by the narrow
+        // add-only lexical splice below; all replacement/removal operations
+        // remain fail-closed because their source markup is not modeled.
         let mut relationship_publications = Vec::new();
         relationship_publications
             .try_reserve_exact(relationships.len())
@@ -5465,6 +6649,11 @@ impl SourceBackedPackage {
                 None
             } else {
                 self.part_index(&owner)
+            };
+            let source_owner_relationships = if owner.as_str() == PACKAGE_URI {
+                Some(&self.package_relationships)
+            } else {
+                owner_index.map(|index| &self.parts[index].relationships)
             };
             let (mut owner_relationships, owner_base) = if owner.as_str() == PACKAGE_URI {
                 (self.package_relationships.clone(), "/".to_string())
@@ -5600,38 +6789,337 @@ impl SourceBackedPackage {
             }
             let existing_entry =
                 self.source_entry_id_case_insensitive(&member_name, &physical_members)?;
-            let xml = owner_relationships.try_to_xml_bytes()?;
-            self.limits.check(
-                ReadResource::RelationshipXmlBytes,
-                xml.len() as u64,
-                self.limits.max_relationship_xml_bytes() as u64,
-            )?;
-            validate_overlay_xml(relationship_uri.as_str(), &xml)?;
-            if let Some(entry_id) = existing_entry {
+            let (xml, source_event_count, memory_reservations) = if let Some(entry_id) =
+                existing_entry
+            {
+                let metadata = self.archive.metadata_for(entry_id)?;
+                let declared_bytes = metadata.uncompressed_size();
+                self.limits.check(
+                    ReadResource::RelationshipXmlBytes,
+                    declared_bytes,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                self.limits.check(
+                    ReadResource::ArchiveEntryBytes,
+                    declared_bytes,
+                    self.limits.max_archive_entry_bytes(),
+                )?;
+                let source_relationships = source_owner_relationships.ok_or_else(|| {
+                    overlay_unavailable(
+                        "existing relationships member has no source relationship catalog",
+                    )
+                })?;
+                // `read_entry` materializes the source XML before the
+                // lexical form is classified. Reserve its declared
+                // capacity and a conservative source-sized parser working
+                // bound first. The bound covers the resolver's namespace
+                // metadata, owned prefix/URI bytes, identity set buckets,
+                // decoded attributes, and a transient output-sized Vec.
+                let source_memory_bound = relationship_xml_working_memory_bound(
+                    declared_bytes,
+                    source_relationships.len(),
+                )?;
+                let source_memory_reservation =
+                    self.reserve_topology_memory(source_memory_bound)?;
                 let original = self
                     .archive
                     .read_entry(entry_id)
                     .map_err(map_preservation_error)?;
-                self.source.ensure_current()?;
-                let canonical = if owner.as_str() == PACKAGE_URI {
-                    self.package_relationships.try_to_xml_bytes()?
-                } else if let Some(index) = owner_index {
-                    self.parts[index].relationships.try_to_xml_bytes()?
-                } else {
-                    Relationships::for_source(&owner).try_to_xml_bytes()?
-                };
-                if original.as_slice() != canonical.as_slice() {
-                    return Err(overlay_unavailable(format!(
-                        "existing relationships member '{}' is not canonical",
-                        member_name
+                self.check_topology_progress()?;
+                if original.len() as u64 != declared_bytes {
+                    return Err(OpcError::ZipError(format!(
+                        "source-backed OPC relationships member '{}' declared {declared_bytes} uncompressed bytes but read {}",
+                        member_name,
+                        original.len()
                     )));
                 }
-            }
+                let original_is_canonical = {
+                    let source_canonical_len =
+                        canonical_relationship_xml_len(source_relationships)?;
+                    let source_canonical_len_u64 =
+                        u64::try_from(source_canonical_len).map_err(|_| {
+                            overlay_unavailable("canonical relationship XML length exceeds u64")
+                        })?;
+                    self.limits.check(
+                        ReadResource::RelationshipXmlBytes,
+                        source_canonical_len_u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    // Keep this reservation scoped to the comparison buffer.
+                    // The source payload/parser reservation remains retained
+                    // for the noncanonical splice or generated publication.
+                    let _source_serialization_memory = self.reserve_topology_memory(
+                        canonical_relationship_serializer_memory_bound(
+                            source_relationships,
+                            source_canonical_len,
+                        )?,
+                    )?;
+                    let canonical = source_relationships.try_to_xml_bytes()?;
+                    if canonical.len() != source_canonical_len {
+                        return Err(overlay_unavailable(
+                            "canonical relationship XML length changed during generation",
+                        ));
+                    }
+                    original.as_slice() == canonical.as_slice()
+                };
+                if original_is_canonical {
+                    let canonical_len = canonical_relationship_xml_len(&owner_relationships)?;
+                    let canonical_len_u64 = u64::try_from(canonical_len).map_err(|_| {
+                        overlay_unavailable("canonical relationship XML length exceeds u64")
+                    })?;
+                    self.limits.check(
+                        ReadResource::RelationshipXmlBytes,
+                        canonical_len_u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    let canonical_memory_reservation = self.reserve_topology_memory(
+                        canonical_relationship_serializer_memory_bound(
+                            &owner_relationships,
+                            canonical_len,
+                        )?,
+                    )?;
+                    let xml = owner_relationships.try_to_xml_bytes()?;
+                    if xml.len() != canonical_len {
+                        return Err(overlay_unavailable(
+                            "canonical relationship XML length changed during generation",
+                        ));
+                    }
+                    self.limits.check(
+                        ReadResource::RelationshipXmlBytes,
+                        xml.len() as u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+                    let mut memory_reservations = Vec::new();
+                    memory_reservations.try_reserve_exact(2).map_err(|source| {
+                        OpcError::Allocation {
+                            resource: "source-backed OPC canonical relationship reservations",
+                            source,
+                        }
+                    })?;
+                    if let Some(reservation) = source_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    if let Some(reservation) = canonical_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    (xml, None, memory_reservations)
+                } else {
+                    let append_only = relationships[group_start..group_end].iter().all(|change| {
+                        matches!(&change.operation, TopologyRelationshipOperation::Add { .. })
+                    });
+                    if !append_only {
+                        return Err(overlay_unavailable(format!(
+                            "existing relationships member '{}' is not canonical",
+                            member_name
+                        )));
+                    }
+
+                    let parsed = parse_noncanonical_relationship_source(
+                        &original,
+                        &member_name,
+                        source_relationships,
+                        self.limits,
+                        || self.check_topology_progress(),
+                    )?;
+                    let mut append_len = 0usize;
+                    for (index, change) in relationships[group_start..group_end].iter().enumerate()
+                    {
+                        if index & 0x3f == 0 {
+                            self.check_topology_progress()?;
+                        }
+                        let TopologyRelationshipOperation::Add { reltype, target } =
+                            &change.operation
+                        else {
+                            unreachable!("noncanonical relationship append is add-only");
+                        };
+                        let (target_ref, target_mode) =
+                            Self::topology_relationship_target_ref(target, &owner_base)?;
+                        self.validate_topology_relationship_field_limits(
+                            &change.r_id,
+                            reltype,
+                            &target_ref,
+                        )?;
+                        let fragment_len = relationship_append_fragment_len(
+                            parsed.root_prefix.len(),
+                            &change.r_id,
+                            reltype,
+                            &target_ref,
+                            target_mode,
+                        )?;
+                        append_len = append_len.checked_add(fragment_len).ok_or_else(|| {
+                            overlay_unavailable("relationship append XML length overflows usize")
+                        })?;
+                    }
+                    if append_len == 0 {
+                        return Err(overlay_unavailable(
+                            "noncanonical relationship append has no generated children",
+                        ));
+                    }
+                    let old_len = original.len();
+                    let new_len = old_len.checked_add(append_len).ok_or_else(|| {
+                        overlay_unavailable("relationship append XML length overflows usize")
+                    })?;
+                    let new_len_u64 = u64::try_from(new_len).map_err(|_| {
+                        overlay_unavailable("relationship append XML length exceeds u64")
+                    })?;
+                    self.limits.check(
+                        ReadResource::RelationshipXmlBytes,
+                        new_len_u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    self.limits.check(
+                        ReadResource::ArchiveEntryBytes,
+                        new_len_u64,
+                        self.limits.max_archive_entry_bytes(),
+                    )?;
+                    // Keep the original source allocation reserved while a
+                    // growth of the retained Vec may transiently coexist
+                    // with its new allocation. The second reservation covers
+                    // the final XML Vec, parser working state, duplicate-ID
+                    // buckets, and the temporary generated fragment buffer.
+                    let append_working_memory = relationship_xml_working_memory_bound(
+                        new_len_u64,
+                        owner_relationships.len(),
+                    )?
+                    .checked_add(new_len_u64)
+                    .and_then(|bytes| {
+                        u64::try_from(append_len)
+                            .ok()
+                            .and_then(|fragment| bytes.checked_add(fragment))
+                    })
+                    .ok_or_else(|| {
+                        overlay_unavailable("relationship append XML memory bound exceeds u64")
+                    })?;
+                    let append_memory_reservation =
+                        self.reserve_topology_memory(append_working_memory)?;
+                    let mut inserted = Vec::new();
+                    inserted.try_reserve_exact(append_len).map_err(|source| {
+                        OpcError::Allocation {
+                            resource: "source-backed OPC relationship append XML",
+                            source,
+                        }
+                    })?;
+                    for (index, change) in relationships[group_start..group_end].iter().enumerate()
+                    {
+                        if index & 0x3f == 0 {
+                            self.check_topology_progress()?;
+                        }
+                        let TopologyRelationshipOperation::Add { reltype, target } =
+                            &change.operation
+                        else {
+                            unreachable!("noncanonical relationship append is add-only");
+                        };
+                        let (target_ref, target_mode) =
+                            Self::topology_relationship_target_ref(target, &owner_base)?;
+                        append_relationship_fragment(
+                            &mut inserted,
+                            &parsed.root_prefix,
+                            &change.r_id,
+                            reltype,
+                            &target_ref,
+                            target_mode,
+                        )?;
+                    }
+                    debug_assert_eq!(inserted.len(), append_len);
+                    if inserted.len() != append_len {
+                        return Err(overlay_unavailable(
+                            "relationship append XML length changed during generation",
+                        ));
+                    }
+                    let mut xml = original;
+                    xml.try_reserve_exact(append_len)
+                        .map_err(|source| OpcError::Allocation {
+                            resource: "source-backed OPC relationship append member",
+                            source,
+                        })?;
+                    xml.resize(new_len, 0);
+                    xml.copy_within(
+                        parsed.root_close_start..old_len,
+                        parsed.root_close_start + append_len,
+                    );
+                    xml[parsed.root_close_start..parsed.root_close_start + append_len]
+                        .copy_from_slice(&inserted);
+                    drop(inserted);
+
+                    // Reparse the candidate against the complete updated
+                    // catalog before the publication plan can be handed
+                    // to the ZIP writer. This proves the splice did not
+                    // alter source semantics and that every generated
+                    // child inherits the root namespace correctly.
+                    let _ = parse_noncanonical_relationship_source(
+                        &xml,
+                        &member_name,
+                        &owner_relationships,
+                        self.limits,
+                        || self.check_topology_progress(),
+                    )?;
+                    self.limits.check(
+                        ReadResource::RelationshipXmlBytes,
+                        xml.len() as u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    let mut memory_reservations = Vec::new();
+                    memory_reservations.try_reserve_exact(2).map_err(|source| {
+                        OpcError::Allocation {
+                            resource: "source-backed OPC relationship append reservations",
+                            source,
+                        }
+                    })?;
+                    if let Some(reservation) = source_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    if let Some(reservation) = append_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    (xml, Some(parsed.event_count), memory_reservations)
+                }
+            } else {
+                let canonical_len = canonical_relationship_xml_len(&owner_relationships)?;
+                let canonical_len_u64 = u64::try_from(canonical_len).map_err(|_| {
+                    overlay_unavailable("canonical relationship XML length exceeds u64")
+                })?;
+                self.limits.check(
+                    ReadResource::RelationshipXmlBytes,
+                    canonical_len_u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                let canonical_memory_reservation =
+                    self.reserve_topology_memory(canonical_relationship_serializer_memory_bound(
+                        &owner_relationships,
+                        canonical_len,
+                    )?)?;
+                let xml = owner_relationships.try_to_xml_bytes()?;
+                if xml.len() != canonical_len {
+                    return Err(overlay_unavailable(
+                        "canonical relationship XML length changed during generation",
+                    ));
+                }
+                self.limits.check(
+                    ReadResource::RelationshipXmlBytes,
+                    xml.len() as u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+                let mut memory_reservations = Vec::new();
+                memory_reservations.try_reserve_exact(1).map_err(|source| {
+                    OpcError::Allocation {
+                        resource: "source-backed OPC canonical relationship reservations",
+                        source,
+                    }
+                })?;
+                if let Some(reservation) = canonical_memory_reservation {
+                    memory_reservations.push(reservation);
+                }
+                (xml, None, memory_reservations)
+            };
             relationship_publications.push(TopologyRelationshipPublication {
                 member_name,
                 xml,
                 existing_entry,
                 relationship_count,
+                source_event_count,
+                memory_reservations,
             });
             group_start = group_end;
         }
@@ -5844,6 +7332,43 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology changed members",
                 source,
             })?;
+        let reservation_capacity =
+            relationship_publications
+                .len()
+                .checked_mul(2)
+                .ok_or_else(|| {
+                    overlay_unavailable(
+                        "source-backed OPC relationship append reservation count overflows",
+                    )
+                })?;
+        let mut topology_relationship_memory_reservations = Vec::new();
+        topology_relationship_memory_reservations
+            .try_reserve_exact(reservation_capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship append reservations",
+                source,
+            })?;
+        let mut source_xml_tokens = Vec::new();
+        source_xml_tokens
+            .try_reserve_exact(
+                pending_replacements
+                    .iter()
+                    .filter(|replacement| replacement.source_xml.is_some())
+                    .count()
+                    .checked_add(
+                        additions
+                            .iter()
+                            .filter(|addition| {
+                                matches!(&addition.payload, TopologyPartPayload::SourceXml(_))
+                            })
+                            .count(),
+                    )
+                    .ok_or_else(|| overlay_unavailable("source XML token count overflows usize"))?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC XML source tokens",
+                source,
+            })?;
         if !signed_replacements_are_noop {
             for replacement in &pending_replacements {
                 self.check_topology_progress()?;
@@ -5856,7 +7381,12 @@ impl SourceBackedPackage {
                     continue;
                 }
                 let part = &self.parts[replacement.target];
-                if xml_minifier::audit::package::is_xml_part(
+                if replacement.source_xml.is_some() {
+                    // The source proof already validated the complete
+                    // assembled XML with source-compatible rules. Its
+                    // original whitespace and lexical forms intentionally do
+                    // not pass through the authored compactness audit.
+                } else if xml_minifier::audit::package::is_xml_part(
                     part.partname.as_str(),
                     &part.content_type,
                 ) {
@@ -5869,6 +7399,9 @@ impl SourceBackedPackage {
                         &replacement.replacement,
                     )),
                 });
+                if let Some(source_xml) = replacement.source_xml.as_ref() {
+                    source_xml_tokens.push(source_xml.clone());
+                }
             }
         }
         for (index, publication) in relationship_publications.iter_mut().enumerate() {
@@ -5881,6 +7414,10 @@ impl SourceBackedPackage {
                     replacement: ChangedOverlayPayload::Owned(std::mem::take(&mut publication.xml)),
                 });
             }
+            // New relationship members retain their generated serializer
+            // reservation until the appended entry has been handed to the
+            // ZIP writer, just like changed existing members.
+            topology_relationship_memory_reservations.append(&mut publication.memory_reservations);
         }
         if let Some(content_types) = &content_types_replacement {
             changed.push(ChangedOverlay {
@@ -5948,17 +7485,33 @@ impl SourceBackedPackage {
         let mut transfer_sources = Vec::new();
         transfer_sources
             .try_reserve_exact(
-                additions
-                    .iter()
-                    .filter(|addition| {
-                        matches!(&addition.payload, TopologyPartPayload::Precompressed(_))
-                    })
-                    .count(),
+                source_xml_tokens
+                    .len()
+                    .checked_add(
+                        additions
+                            .iter()
+                            .filter(|addition| {
+                                matches!(
+                                    &addition.payload,
+                                    TopologyPartPayload::Precompressed(_)
+                                        | TopologyPartPayload::SourceXml(_)
+                                )
+                            })
+                            .count(),
+                    )
+                    .ok_or_else(|| {
+                        overlay_unavailable("source-backed OPC source guard count overflows")
+                    })?,
             )
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC precompressed source guards",
                 source,
             })?;
+        for source_xml in &source_xml_tokens {
+            source_xml.check_for_publication(source_xml.content_type(), self.limits)?;
+            source_xml.source.monitor_publication();
+            transfer_sources.push(source_xml.source_snapshot());
+        }
         for (index, addition) in additions.iter().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
@@ -5974,6 +7527,17 @@ impl SourceBackedPackage {
                     soapberry_zip::RegeneratedEntry::new_shared(
                         addition.partname.membername(),
                         Arc::clone(payload),
+                    )
+                    .compression_method(soapberry_zip::CompressionMethod::Deflate)
+                },
+                TopologyPartPayload::SourceXml(payload) => {
+                    payload.check_for_publication(addition.content_type.as_str(), self.limits)?;
+                    payload.source.monitor_publication();
+                    source_xml_tokens.push(payload.as_ref().clone());
+                    transfer_sources.push(payload.source_snapshot());
+                    soapberry_zip::RegeneratedEntry::new_shared(
+                        addition.partname.membername(),
+                        payload.payload_arc(),
                     )
                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
                 },
@@ -6447,6 +8011,7 @@ impl SourceBackedPackage {
                 part_overlays.push(PendingOverlay {
                     target,
                     replacement: Arc::new(replacement),
+                    source_xml: None,
                 });
                 continue;
             }
@@ -6479,6 +8044,7 @@ impl SourceBackedPackage {
             part_overlays.push(PendingOverlay {
                 target,
                 replacement: Arc::new(replacement),
+                source_xml: None,
             });
             relationship_overlays.push((
                 target,
@@ -6749,6 +8315,7 @@ impl SourceBackedPackage {
             overlays.push(PendingOverlay {
                 target,
                 replacement: into_shared(replacement),
+                source_xml: None,
             });
         }
         let mut omitted_members = Vec::new();
@@ -7157,12 +8724,21 @@ impl SourceBackedPackage {
                     .archive
                     .entry_id(name)
                     .ok_or_else(|| OpcError::PartNotFound(name.to_string()))?;
-                let xml = self
-                    .archive
-                    .read_entry(entry)
-                    .map_err(map_preservation_error)?;
-                self.source.ensure_current()?;
-                let events = relationship_xml_event_count(&xml, self.limits)?;
+                let selected_publication = relationship_publications
+                    .iter()
+                    .find(|publication| publication.existing_entry == Some(entry));
+                let events = if let Some(events) =
+                    selected_publication.and_then(|publication| publication.source_event_count)
+                {
+                    events
+                } else {
+                    let xml = self
+                        .archive
+                        .read_entry(entry)
+                        .map_err(map_preservation_error)?;
+                    self.source.ensure_current()?;
+                    relationship_xml_event_count(&xml, self.limits)?
+                };
                 relationship_event_total = checked_overlay_total(
                     relationship_event_total,
                     events,
@@ -7233,6 +8809,12 @@ impl SourceBackedPackage {
                 TopologyPartPayload::Decoded(payload) => (
                     u64::try_from(payload.len())
                         .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                    None,
+                ),
+                TopologyPartPayload::SourceXml(payload) => (
+                    u64::try_from(payload.bytes().len()).map_err(|_| {
+                        overlay_unavailable("topology XML Part length overflows u64")
+                    })?,
                     None,
                 ),
                 TopologyPartPayload::Precompressed(payload) => {
@@ -7405,6 +8987,8 @@ impl SourceBackedPackage {
             let payload_bytes = match &addition.payload {
                 TopologyPartPayload::Decoded(payload) => u64::try_from(payload.len())
                     .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                TopologyPartPayload::SourceXml(payload) => u64::try_from(payload.bytes().len())
+                    .map_err(|_| overlay_unavailable("topology XML Part length overflows u64"))?,
                 TopologyPartPayload::Precompressed(payload) => payload.compressed_size(),
             };
             let member_name_bytes = u64::try_from(addition.partname.membername().len())
@@ -10924,6 +12508,455 @@ mod tests {
                 .unwrap();
         }
         relationships.try_to_xml_bytes().unwrap()
+    }
+
+    #[test]
+    fn canonical_relationship_length_matches_fallible_serializer() {
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut relationships = Relationships::for_source(&owner);
+        relationships
+            .try_add_relationship(
+                "urn:test:a&b".to_string(),
+                "https://example.invalid/?q=a&b=2".to_string(),
+                "rId2".to_string(),
+                TargetMode::External,
+            )
+            .unwrap();
+        relationships
+            .try_add_relationship(
+                "urn:internal".to_string(),
+                "target.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+
+        let serialized = relationships.try_to_xml_bytes().unwrap();
+        assert_eq!(
+            canonical_relationship_xml_len(&relationships).unwrap(),
+            serialized.len()
+        );
+    }
+
+    #[test]
+    fn topology_canonical_relationship_publication_honors_memory_admission() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let source = topology_relationship_archive(&canonical_document_relationships(&[]));
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        for index in 0..64 {
+            plan.try_add_external_relationship(
+                owner.clone(),
+                format!("rBudget{index}"),
+                HYPERLINK,
+                format!("https://example.invalid/{}", "x".repeat(2048)),
+            )
+            .unwrap();
+        }
+        let (budget, _cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Memory
+        ));
+        assert!(output.is_empty());
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn topology_canonical_relationship_publication_honors_tight_limit_before_output() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let source = topology_relationship_archive(&canonical_document_relationships(&[]));
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut expected = Relationships::for_source(&owner);
+        expected
+            .try_add_relationship(
+                HYPERLINK.to_string(),
+                "https://example.invalid/".to_string(),
+                "rLimit".to_string(),
+                TargetMode::External,
+            )
+            .unwrap();
+        let limit = canonical_relationship_xml_len(&expected)
+            .unwrap()
+            .checked_sub(1)
+            .expect("canonical relationship XML is nonempty");
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(limit)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source)),
+            limits,
+        )
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_external_relationship(owner, "rLimit", HYPERLINK, "https://example.invalid/")
+            .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            }
+        ));
+        assert!(output.is_empty());
+    }
+
+    fn noncanonical_document_relationships() -> &'static [u8] {
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<!--preserve-before-->
+<r:Relationships xmlns="urn:litchi:unused" xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
+  <?preserve instruction?>
+  <r:Relationship TargetMode='External'
+      Target='https://before.invalid/?a=1&amp;b=2#fragment'
+      Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink'
+      Id='rExisting'></r:Relationship>
+  <!--preserve-between-->
+  <r:Relationship Id='rInternal' Target="./target.xml" Type="urn:litchi:test" />
+  <?preserve-after?>
+</r:Relationships>
+<!--preserve-tail-->"#
+    }
+
+    fn noncanonical_relationship_append_plan() -> SourceTopologyPlan {
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_external_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rAdded",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://added.invalid/?q=two#fragment",
+        )
+        .unwrap();
+        plan
+    }
+
+    #[test]
+    fn topology_appends_prefixed_noncanonical_relationships_losslessly_and_reopens() {
+        let relationships = noncanonical_document_relationships();
+        let source = topology_relationship_archive(relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut output = Vec::new();
+        package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap();
+
+        let close = b"</r:Relationships>";
+        let close_start = relationships
+            .windows(close.len())
+            .position(|window| window == close)
+            .unwrap();
+        let generated = br#"<r:Relationship Id="rAdded" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://added.invalid/?q=two#fragment" TargetMode="External"/>"#;
+        let mut expected_relationships = Vec::new();
+        expected_relationships.extend_from_slice(&relationships[..close_start]);
+        expected_relationships.extend_from_slice(generated);
+        expected_relationships.extend_from_slice(&relationships[close_start..]);
+
+        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            archive.read("word/_rels/document.xml.rels").unwrap(),
+            expected_relationships
+        );
+
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output.clone())))
+                .unwrap();
+        let relationships = reopened.part(&owner).unwrap().rels();
+        assert_eq!(
+            relationships.get("rExisting").unwrap().target_ref(),
+            "https://before.invalid/?a=1&b=2#fragment"
+        );
+        assert_eq!(
+            relationships.get("rAdded").unwrap().target_ref(),
+            "https://added.invalid/?q=two#fragment"
+        );
+        assert_eq!(
+            relationships.get("rAdded").unwrap().target_mode(),
+            TargetMode::External
+        );
+        let reopened_owned = OpcPackage::from_bytes(&output).unwrap();
+        assert_eq!(
+            reopened_owned
+                .get_part(&owner)
+                .unwrap()
+                .rels()
+                .get("rAdded")
+                .unwrap()
+                .target_ref(),
+            "https://added.invalid/?q=two#fragment"
+        );
+    }
+
+    #[test]
+    fn topology_appends_default_namespace_noncanonical_relationships_losslessly() {
+        let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <!--preserve-->
+  <Relationship Target="https://before.invalid/" Type="urn:litchi:test" Id="rExisting" TargetMode="External" />
+</Relationships>"#;
+        let source = topology_relationship_archive(relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut output = Vec::new();
+        package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap();
+
+        let close = b"</Relationships>";
+        let close_start = relationships
+            .windows(close.len())
+            .position(|window| window == close)
+            .unwrap();
+        let generated = br#"<Relationship Id="rAdded" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://added.invalid/?q=two#fragment" TargetMode="External"/>"#;
+        let mut expected_relationships = Vec::new();
+        expected_relationships.extend_from_slice(&relationships[..close_start]);
+        expected_relationships.extend_from_slice(generated);
+        expected_relationships.extend_from_slice(&relationships[close_start..]);
+
+        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            archive.read("word/_rels/document.xml.rels").unwrap(),
+            expected_relationships
+        );
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        assert_eq!(
+            reopened
+                .part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .rels()
+                .get("rAdded")
+                .unwrap()
+                .target_mode(),
+            TargetMode::External
+        );
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_replace_refuses_before_output() {
+        let source = topology_relationship_archive(noncanonical_document_relationships());
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_external_relationship(
+            owner,
+            "rExisting",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://replacement.invalid/",
+        )
+        .unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::SourceBackedOverlayUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_remove_refuses_before_output() {
+        let source = topology_relationship_archive(noncanonical_document_relationships());
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_remove_external_relationship(owner, "rExisting")
+            .unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::SourceBackedOverlayUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_unknown_markup_refuses_before_output() {
+        let relationships = br#"<Relationships foo="unknown" xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rExisting" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://before.invalid/" TargetMode="External">opaque</Relationship></Relationships>"#;
+        let source = topology_relationship_archive(relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap_err();
+        assert!(matches!(error, OpcError::InvalidRelationshipsManifest(_)));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_parser_rejects_dtd_namespace_and_root_forms() {
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut expected = Relationships::for_source(&owner);
+        expected
+            .try_add_relationship(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                    .to_string(),
+                "https://before.invalid/".to_string(),
+                "rExisting".to_string(),
+                TargetMode::External,
+            )
+            .unwrap();
+        let unsafe_sources: &[&[u8]] = &[
+            br#"<!DOCTYPE Relationships><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rExisting" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://before.invalid/" TargetMode="External"/></Relationships>"#,
+            br#"<Relationships xmlns="urn:litchi:wrong"><Relationship Id="rExisting" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://before.invalid/" TargetMode="External"/></Relationships>"#,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+        ];
+        for source in unsafe_sources {
+            assert!(
+                parse_noncanonical_relationship_source(
+                    source,
+                    "word/_rels/document.xml.rels",
+                    &expected,
+                    ReadLimits::default(),
+                    || Ok(()),
+                )
+                .is_err()
+            );
+        }
+        let canonical = String::from_utf8(expected.try_to_xml_bytes().unwrap()).unwrap();
+        assert!(
+            parse_noncanonical_relationship_source(
+                canonical.as_bytes(),
+                "word/_rels/document.xml.rels",
+                &expected,
+                ReadLimits::default(),
+                || Ok(()),
+            )
+            .is_ok()
+        );
+        for (before, after) in [
+            ("encoding=\"UTF-8\"", "encoding=\"UTF-16\""),
+            ("version=\"1.0\"", "version=\"1.&#48;\""),
+        ] {
+            let invalid = canonical.replace(before, after);
+            assert!(
+                parse_noncanonical_relationship_source(
+                    invalid.as_bytes(),
+                    "word/_rels/document.xml.rels",
+                    &expected,
+                    ReadLimits::default(),
+                    || Ok(()),
+                )
+                .is_err()
+            );
+        }
+        let shallow = ReadLimits::builder()
+            .max_xml_depth(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            parse_noncanonical_relationship_source(
+                canonical.as_bytes(),
+                "word/_rels/document.xml.rels",
+                &expected,
+                shallow,
+                || Ok(()),
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_append_honors_limits_before_output() {
+        let relationships = noncanonical_document_relationships();
+        let source = topology_relationship_archive(relationships);
+        let relationship_limit = relationships.len().max(root_relationships().len());
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(relationship_limit)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source)),
+            limits,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_append_honors_memory_admission() {
+        let relationships = noncanonical_document_relationships();
+        let source = topology_relationship_archive(relationships);
+        let (_budget, _cancellation_source, context) =
+            managed_context_with_cancellation((relationships.len() as u64).saturating_mul(2) - 1);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Memory
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_append_honors_cancellation() {
+        let source = topology_relationship_archive(noncanonical_document_relationships());
+        let (_budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        cancellation_source.cancel();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
+            .unwrap_err();
+        assert!(matches!(error, OpcError::Cancelled));
+        assert!(output.is_empty());
     }
 
     #[test]

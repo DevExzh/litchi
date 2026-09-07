@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "removed_path": "/tmp/0454-canonical-memory.patch",
+  "retained_path": "docs/performance/results/change-0454/candidate/canonical-memory.patch.txt",
+  "bytes": 17368,
+  "sha256": "96fda993140eff1c8fa4db46c02b0fa173b8661d612109bcb5133e6c39e7e13c",
+  "removed_utc": "2026-09-07T06:11:18.303380+00:00"
+}

@@ -1,0 +1,19 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `release` profile [optimized] target(s) in 32.63s
+     Running tests/source_backed_cross_copy.rs (target/release/deps/source_backed_cross_copy-283669e18f437276)
+
+running 1 test
+test source_backed_cross_copy_preserves_absent_and_empty_slide_names ... FAILED
+
+failures:
+
+---- source_backed_cross_copy_preserves_absent_and_empty_slide_names stdout ----
+Error: SlideCopyPlan { kind: AmbiguousTopology, detail: "destination slide name is missing or empty" }
+
+
+failures:
+    source_backed_cross_copy_preserves_absent_and_empty_slide_names
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 55 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p litchi-pptx --test source_backed_cross_copy`

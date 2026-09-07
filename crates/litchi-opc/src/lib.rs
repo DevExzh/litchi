@@ -55,6 +55,7 @@ pub mod sign;
 pub mod source_backed;
 /// Read-only, bounded OPC package validation.
 pub mod validation;
+pub mod xml_splice;
 
 // Re-export commonly used types
 pub use accounting::OpcOperationAccounting;
@@ -81,3 +82,7 @@ pub use source_backed::{
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
 pub use validation::{validate_read_at, validate_read_at_with_limits};
+pub use xml_splice::{
+    AuthoredXmlFragment, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
+    authored_xml_requires_source_proof,
+};

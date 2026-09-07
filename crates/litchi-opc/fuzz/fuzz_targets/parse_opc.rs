@@ -1,7 +1,13 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use litchi_opc::{OpcPackage, ReadLimits, SourceBackedPackage};
+use litchi_opc::{
+    AuthoredXmlFragment, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan,
+};
+
+fn source_xml_insertion(bytes: &[u8]) -> Option<usize> {
+    bytes.windows(2).rposition(|window| window == b"</")
+}
 
 fuzz_target!(|data: &[u8]| {
     // Bound both eager parsing and verified compressed/decoded materialization.
@@ -28,6 +34,8 @@ fuzz_target!(|data: &[u8]| {
         .build()
         .unwrap();
     if let Ok(package) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
+        let mut source_xml_mutated = false;
+        let mut plan = SourceTopologyPlan::new();
         for part in package.iter_parts() {
             // Capture first so malformed captures are not filtered out by a
             // successful ordinary decode. Repeat through the warm cache path.
@@ -43,6 +51,49 @@ fuzz_target!(|data: &[u8]| {
                 drop(first);
                 drop(second);
             }
+
+            // Exercise the opaque source-XML proof, one bounded insertion, and
+            // topology replacement/addition. The insertion point is chosen
+            // immediately before the final closing tag when the source has
+            // one; malformed/self-closing XML simply takes the next part.
+            if !source_xml_mutated
+                && let Ok(source_xml) = part.source_xml()
+                && let Some(insertion) = source_xml_insertion(source_xml.bytes())
+                && let Ok(proof) = source_xml.checked_range(insertion..insertion, &[])
+                && let Ok(fragment) = AuthoredXmlFragment::markup(b"<litchi-fuzz/>".to_vec())
+                && let Ok(mut publication) = source_xml.into_publication()
+                && publication.replace(proof, fragment).is_ok()
+                && let Ok(edited) = publication.finish()
+            {
+                source_xml_mutated = true;
+                let target = part.partname().clone();
+                if plan
+                    .try_replace_source_xml_part(target, edited.clone())
+                    .is_ok()
+                {
+                    // A fixed, package-local URI keeps the edit bounded. A
+                    // collision is harmless and still exercises the guarded
+                    // addition path.
+                    if let Ok(copy_name) = PackURI::new("/litchi-fuzz-source-copy.xml") {
+                        let _ = plan.try_add_source_xml_part(copy_name, edited);
+                    }
+                }
+            }
+        }
+        // Exercise lossless relationship appends on mutated source XML. This
+        // external reference is inert; no resource is fetched. The input,
+        // member, decoded-byte and relationship limits above remain in force,
+        // and the discard sink does not retain an archive-sized output buffer.
+        if plan
+            .try_add_external_relationship(
+                PackURI::new("/").unwrap(),
+                "rIdLitchiFuzzAppend",
+                "urn:litchi:fuzz:external",
+                "https://example.invalid/fuzz",
+            )
+            .is_ok()
+        {
+            let _ = package.write_topology_to_stream(std::io::sink(), plan);
         }
     }
     // Primary entrypoint: parse a ZIP-backed OPC package from a byte slice.

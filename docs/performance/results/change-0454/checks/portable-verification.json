@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0454-portable-bo53gmro/docs/performance/results/change-0454/verify.py",
+    "--cleanup"
+  ],
+  "cwd": "/tmp/litchi-goal-0454-portable-bo53gmro",
+  "exit_code": 0,
+  "started_utc": "2026-09-07T07:42:06.380663+00:00",
+  "finished_utc": "2026-09-07T07:43:37.213988+00:00",
+  "verifier_sha256": "e222e6e0d5e0ae9a8aede5dbbc0cf74d4d728aff36fb38f2d49e9dd7e628491b",
+  "mode": "separate evidence copy; original binaries, fixture, raw outputs and fuzz directory absent",
+  "stdout": "{\"build_identities\": 7, \"change\": 454, \"cleanup\": true, \"cleanup_receipts\": 3, \"custody_restoration\": {\"intermediate_protocol_sha256\": \"932d4ccb85820a460fe40ff5a43dd3eb0e1466182fe2cc4aaa0a84df8c868363\", \"present\": true, \"receipts\": 18}, \"failed_attempts\": 25, \"final_readiness\": {\"external_lanes\": 2, \"external_rows\": 2, \"provider_lanes\": 16, \"provider_rows\": 16, \"release_gates\": {\"fuzz_source_after\": {\"files\": 6672, \"path\": \"sources/c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5.json\", \"sha256\": \"c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5\"}, \"fuzz_source_before\": {\"files\": 6672, \"path\": \"sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json\", \"sha256\": \"654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf\"}, \"passed\": 14, \"receipts\": [\"final-strict-r7.json\", \"final-harness-strict-r4.json\", \"final-pptx-r4.json\", \"final-opc-r4.json\", \"final-harness-r3.json\", \"final-doc-r2.json\", \"final-workspace-r2.json\", \"final-format-r2.json\", \"final-boundaries.json\", \"fuzz-lock-r2.json\", \"fuzz-build-r2.json\", \"fuzz-smoke.json\", \"final-fuzz-strict.json\", \"final-fuzz-format.json\"], \"required\": 14}}, \"fixture\": {\"fixture_members\": 34, \"fixture_present\": false}, \"inventories\": {\"baseline_rows\": 189, \"final_changed\": 4, \"integrated_changed\": 4, \"name_only_changed\": 4, \"name_only_rows\": 189}, \"passed_receipts\": 67, \"precleanup\": false, \"receipts\": 92, \"reports\": {\"external_reports\": 4, \"lifecycle_reports\": 16}, \"source_files\": 10, \"status\": \"pass\"}\n",
+  "stderr": "",
+  "temporary_directory_absent": true
+}

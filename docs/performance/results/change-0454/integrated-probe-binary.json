@@ -1,0 +1,12 @@
+{
+  "path": "/tmp/litchi-goal-0454-native-copy/integrated-probe",
+  "build_path": "target/release/examples/native_cross_copy_probe_0454",
+  "bytes": 2149728,
+  "sha256": "e8a3fdec67edf299dbdf55ea1a4575ba7eeaa9ceaa904a9a749b98def6e6d370",
+  "revision": "3ebebf91cb4bea50e97dd535274a03ba70b543a7",
+  "source_manifest": {
+    "path": "sources/af4fea5ace50685be7de9053df7113738161cdde5d01f0a1854698b59e4c690f.json",
+    "sha256": "af4fea5ace50685be7de9053df7113738161cdde5d01f0a1854698b59e4c690f",
+    "files": 6670
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "status": "pass",
+  "files_removed": 8,
+  "bytes_removed": 4355982,
+  "artifact_manifest_sha256": "891b997dd6ea375ab778e62d8a18050bc81cf672b2f9e2c7357fd8152f65d7ae",
+  "driver_sha256": "b92a97fd177d7e271c39bf0cd902514952fb1ef26e76791a0b04ea45ba524588"
+}

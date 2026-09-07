@@ -1,0 +1,36 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0277]: can't compare `[u8]` with `&[u8]`
+   --> crates/litchi-opc/src/source_backed.rs:754:43
+    |
+754 | ...                   if *value == namespace::OPC_RELATIONSHIPS.as_bytes()
+    |                                 ^^ no implementation for `[u8] == &[u8]`
+    |
+    = help: the trait `PartialEq<&[u8]>` is not implemented for `[u8]`
+help: consider dereferencing here
+    |
+754 |                                 if *value == *namespace::OPC_RELATIONSHIPS.as_bytes()
+    |                                              +
+
+error[E0599]: no method named `part` found for struct `package::OpcPackage` in the current scope
+     --> crates/litchi-opc/src/source_backed.rs:11793:18
+      |
+11792 | /             reopened_owned
+11793 | |                 .part(&owner)
+      | |_________________-^^^^
+      |
+     ::: crates/litchi-opc/src/package.rs:106:1
+      |
+  106 |   pub struct OpcPackage {
+      |   --------------------- method `part` not found for this struct
+      |
+help: there is a method `add_part` with a similar name
+      |
+11793 |                 .add_part(&owner)
+      |                  ++++
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-opc` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-opc` (lib test) due to 2 previous errors

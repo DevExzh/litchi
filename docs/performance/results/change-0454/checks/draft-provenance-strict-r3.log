@@ -1,0 +1,73 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: large size difference between variants
+   --> crates/litchi-opc/src/source_backed.rs:171:1
+    |
+171 | / enum TopologyPartPayload {
+172 | |     Decoded(Arc<Vec<u8>>),
+    | |     --------------------- the second-largest variant contains at least 8 bytes
+173 | |     SourceXml(SourceXmlPart),
+    | |     ------------------------ the largest variant contains at least 384 bytes
+174 | |     Precompressed(Box<AuthorizedPrecompressedPart>),
+175 | | }
+    | |_^ the entire enum is at least 392 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#large_enum_variant
+    = note: `-D clippy::large-enum-variant` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+173 -     SourceXml(SourceXmlPart),
+173 +     SourceXml(Box<SourceXmlPart>),
+    |
+
+error: redundant closure
+   --> crates/litchi-opc/src/source_backed.rs:489:26
+    |
+489 |             .is_some_and(|prefix| is_xml_id(prefix))
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `is_xml_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::redundant_closure)]`
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/litchi-opc/src/source_backed.rs:713:12
+    |
+713 |         if seen_keys.iter().any(|known| *known == key) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `seen_keys.contains(&key)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+    = note: `-D clippy::manual-contains` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_contains)]`
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/litchi-opc/src/source_backed.rs:790:12
+    |
+790 |         if seen_keys.iter().any(|known| *known == key) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `seen_keys.contains(&key)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+
+error: use of `extend` instead of `append` for adding the full range of a second vector
+    --> crates/litchi-opc/src/source_backed.rs:7274:17
+     |
+7274 | /                 topology_relationship_memory_reservations
+7275 | |                     .extend(publication.memory_reservations.drain(..));
+     | |______________________________________________________________________^ help: try: `topology_relationship_memory_reservations.append(&mut publication.memory_reservations)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#extend_with_drain
+     = note: `-D clippy::extend-with-drain` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::extend_with_drain)]`
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/litchi-opc/src/xml_splice.rs:988:12
+    |
+988 |         if seen_keys.iter().any(|known| *known == key) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `seen_keys.contains(&key)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+
+error: could not compile `litchi-opc` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib) due to 6 previous errors
+error: could not compile `litchi-opc` (lib test) due to 6 previous errors

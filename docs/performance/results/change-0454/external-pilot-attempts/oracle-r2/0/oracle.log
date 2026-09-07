@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-verifier.py", line 698, in <module>
+    print(json.dumps(verify(arguments.report), sort_keys=True))
+                     ~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-verifier.py", line 540, in verify
+    details = independent_oracle(fixture_raw, output_raw)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-verifier.py", line 286, in independent_oracle
+    require(set(output["order"]) == set(source["order"]) | set(EXPECTED_ADDED), "output artifact: member set differs")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-verifier.py", line 85, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-verifier.py", line 80, in fail
+    raise VerificationError(message)
+VerificationError: output artifact: member set differs

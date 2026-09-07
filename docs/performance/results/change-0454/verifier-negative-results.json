@@ -1,0 +1,52 @@
+{
+  "schema": "change0454_verifier_negative_results_v1",
+  "status": "pass",
+  "attestation": "Retrospective attestation reconstructed from completed tool results in this session; this is not an original redirected log.",
+  "results": [
+    {
+      "name": "final-readiness-mutations",
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0454/verify-mutations.py"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "passed_cases": [
+        "missing-final-receipt",
+        "running-final-receipt",
+        "changed-final-log",
+        "incomplete-provider-lane",
+        "report-identity-mismatch",
+        "report-oracle-mismatch",
+        "missing-final-gate",
+        "failed-final-gate",
+        "stale-final-gate-source",
+        "non-fuzz-source-amendment"
+      ],
+      "tool_output": "{\"rejected\": [\"missing-final-receipt\", \"running-final-receipt\", \"changed-final-log\", \"incomplete-provider-lane\", \"report-identity-mismatch\", \"report-oracle-mismatch\", \"missing-final-gate\", \"failed-final-gate\", \"stale-final-gate-source\", \"non-fuzz-source-amendment\"], \"status\": \"pass\"}\n",
+      "output_provenance": "Completed functions.exec/write_stdin result for verifier-mutations session 30263."
+    },
+    {
+      "name": "renderer-outside-allowed-block",
+      "argv": [
+        "python3",
+        "-B",
+        "-"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "passed_cases": [
+        "renderer-outside-allowed-block"
+      ],
+      "tool_output": "{'status': 'pass', 'rejected': 'renderer-outside-allowed-block'}\n",
+      "output_provenance": "Completed functions.exec/write_stdin result for focused mutation session 66350."
+    }
+  ]
+}

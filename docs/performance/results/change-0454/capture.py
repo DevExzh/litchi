@@ -159,7 +159,10 @@ def main() -> int:
     if expected_source is not None and before != expected_source:
         raise RuntimeError("capture source epoch differs from the bound build manifest")
 
-    directory_name = "provider-runs" if args.suite == "provider" else "external-runs"
+    if args.pilot:
+        directory_name = "provider-pilots" if args.suite == "provider" else "external-pilots"
+    else:
+        directory_name = "provider-runs" if args.suite == "provider" else "external-runs"
     directory = ROOT / directory_name / str(args.lane)
     if directory.exists():
         raise RuntimeError(f"capture directory already exists: {directory}")
@@ -172,10 +175,6 @@ def main() -> int:
         workload = provider_command(binary, lane, report, dict(protocol, samples=samples, warmups=warmups), build)
     else:
         workload = external_command(binary, lane, report, dict(protocol, samples=samples, warmups=warmups), build)
-    if args.suite == "external":
-        workload[2] = str(samples)
-        workload[3] = str(warmups)
-
     cpu = str(protocol["cpu"])
     argv = ["taskset", "-c", cpu, "/usr/bin/time", "-v", "-o", str(resource), *workload]
     record: dict[str, object] = {
@@ -186,6 +185,7 @@ def main() -> int:
         "lane_definition": lane,
         "pilot": args.pilot,
         "status": "running",
+        "revision": build["revision"],
         "argv": argv,
         "binary": binary_record_value,
         "build_manifest": {
@@ -195,11 +195,19 @@ def main() -> int:
         "source_before": before,
         "capture_source_manifest": capture_source,
         "protocol_sha256": sha_path(ROOT / "protocol.json"),
+        "driver_sha256": sha_path(Path(__file__)),
         "capture_sha256": sha_path(Path(__file__)),
         "provider_oracle_sha256": sha_path(ROOT / "verify-report.py"),
         "external_oracle_sha256": sha_path(ROOT / "external-verifier.py"),
         "started_utc": now(),
     }
+    if args.suite == "external":
+        fixture = load(ROOT / "external-fixture.json")
+        record["fixture"] = {
+            "path": fixture["path"],
+            "bytes": fixture["bytes"],
+            "sha256": fixture["sha256"],
+        }
     receipt = directory / "receipt.json"
     receipt.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     try:
@@ -226,15 +234,16 @@ def main() -> int:
         if not record["source_unchanged"] or record["status"] == "running":
             record["status"] = "failed"
         record["finished_utc"] = now()
+        artifact_paths = [
+            ("report", report),
+            ("resource", resource),
+            ("workload", workload_log),
+            ("oracle", oracle_log),
+        ]
+        if args.suite == "external":
+            artifact_paths.append(("output_artifact", report.with_suffix(".pptx")))
         record["artifacts"] = {
-            name: artifact(path)
-            for name, path in (
-                ("report", report),
-                ("resource", resource),
-                ("workload", workload_log),
-                ("oracle", oracle_log),
-            )
-            if path.exists()
+            name: artifact(path) for name, path in artifact_paths if path.exists()
         }
         receipt.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     if record["status"] != "pass":

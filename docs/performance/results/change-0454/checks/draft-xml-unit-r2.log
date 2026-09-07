@@ -1,0 +1,13 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 33.98s
+     Running unittests src/lib.rs (target/release/deps/litchi_opc-9f9df855e77b652d)
+
+running 5 tests
+test xml_splice::tests::authored_classifier_keeps_compact_fast_path_and_requires_source_for_whitespace ... ok
+test xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually ... ok
+test xml_splice::tests::insertion_and_replacement_ranges_touching_are_conflicts ... ok
+test xml_splice::tests::source_validator_allows_unprefixed_xml_and_utf8_declaration ... ok
+test xml_splice::tests::source_validator_rejects_namespace_and_lexical_ambiguities ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.00s
+

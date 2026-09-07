@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "removed_path": "/tmp/0454-fragment-capacity.patch",
+  "retained_path": "docs/performance/results/change-0454/candidate/fragment-capacity.patch.txt",
+  "bytes": 565,
+  "sha256": "ae6fbab79278008259195e07d1a3b5676876e6f4db52bc5e8d9a4c486772e863",
+  "recorded_utc": "2026-09-07T06:19:41.012234+00:00"
+}

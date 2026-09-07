@@ -2016,7 +2016,7 @@ fn source_backed_cross_copy_reports_partial_short_and_zero_sink_progress() -> Te
 }
 
 #[test]
-fn source_backed_cross_copy_refuses_missing_name_and_duplicate_ids() -> TestResult {
+fn source_backed_cross_copy_accepts_missing_name_and_refuses_duplicate_ids() -> TestResult {
     let source_bytes = source_fixture()?;
     let destination_bytes = destination_fixture()?;
     let missing_name = rewrite_member(&source_bytes, "ppt/slides/slide1.xml", |bytes| {
@@ -2035,7 +2035,21 @@ fn source_backed_cross_copy_refuses_missing_name_and_duplicate_ids() -> TestResu
             .ok_or_else(|| Error::Invalid("unterminated fixture name".into()))?;
         Ok(format!("{}{}", &xml[..start], &xml[end..]).into_bytes())
     })?;
-    assert!(plan_refused(&missing_name, &destination_bytes)?);
+    let output = publish(&missing_name, &destination_bytes, 0, 1, 1)?;
+    let source_slide = read_zip_member_bytes(&missing_name, "ppt/slides/slide1.xml")?;
+    let before = raw_archive(&destination_bytes)?;
+    let after = raw_archive(&output)?;
+    let copied_slide = after
+        .members
+        .iter()
+        .find(|(name, _)| {
+            name.starts_with("ppt/slides/slide")
+                && name.ends_with(".xml")
+                && !before.members.contains_key(*name)
+        })
+        .ok_or_else(|| Error::Invalid("copied unnamed slide is missing".into()))?;
+    assert_eq!(copied_slide.1.payload, source_slide);
+    open_source(&output)?;
 
     let duplicate_ids = rewrite_member(&source_bytes, PRESENTATION_XML, |bytes| {
         let xml =
@@ -5382,5 +5396,220 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
             assert_eq!(destination_budget.used(Resource::Objects), 0);
         }
     }
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_preserves_absent_and_empty_slide_names() -> TestResult {
+    for source_attribute in ["", r#"name="""#] {
+        for destination_attribute in ["", r#"name="""#] {
+            let source_bytes = replace_text_member(
+                &source_fixture()?,
+                "ppt/slides/slide1.xml",
+                r#"name="Source One""#,
+                source_attribute,
+            )?;
+            let destination_bytes = replace_text_member(
+                &destination_fixture()?,
+                "ppt/slides/slide1.xml",
+                r#"name="Destination First""#,
+                destination_attribute,
+            )?;
+            let destination_bytes = replace_text_member(
+                &destination_bytes,
+                "ppt/slides/slide2.xml",
+                r#"name="Destination Last""#,
+                destination_attribute,
+            )?;
+            let original_slide = read_zip_member_bytes(&source_bytes, "ppt/slides/slide1.xml")?;
+            let before = raw_archive(&destination_bytes)?;
+            for insertion in [0, 2] {
+                let source = open_source(&source_bytes)?;
+                let editor = open_editor(&destination_bytes)?;
+                let plan = editor.plan_cross_slide_copy(&source, 0, 1, insertion)?;
+                let mut output = Vec::new();
+                let published = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+                assert_eq!(published.name(), "");
+                assert_eq!(published.destination_slide_count(), 3);
+                let projection = slide_projection(&output)?;
+                assert_eq!(
+                    projection[insertion].0,
+                    source.slide(0).unwrap().text_and_name()?.0
+                );
+                assert!(projection.iter().all(|(_, name)| name.is_empty()));
+                let after = raw_archive(&output)?;
+                let copied = after
+                    .members
+                    .iter()
+                    .filter(|(name, _)| {
+                        name.starts_with("ppt/slides/slide")
+                            && name.ends_with(".xml")
+                            && !before.members.contains_key(*name)
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(copied.len(), 1);
+                assert_eq!(
+                    copied[0].1.payload, original_slide,
+                    "optional-name spelling is preserved exactly"
+                );
+                for (name, member) in &before.members {
+                    if !matches!(
+                        name.as_str(),
+                        CONTENT_TYPES_XML | PRESENTATION_XML | PRESENTATION_RELATIONSHIPS
+                    ) {
+                        assert_eq!(
+                            after.members[name].payload, member.payload,
+                            "untouched payload {name}"
+                        );
+                        assert_eq!(
+                            after.members[name].local, member.local,
+                            "untouched local record {name}"
+                        );
+                        assert_eq!(
+                            after.members[name].central, member.central,
+                            "untouched central record {name}"
+                        );
+                    }
+                }
+                assert_eq!(
+                    output,
+                    publish(&source_bytes, &destination_bytes, 0, 1, insertion)?
+                );
+                assert_eq!(source.slide(0).unwrap().name()?, "");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_unnamed_slides_keep_nonempty_name_conflicts() -> TestResult {
+    let destination = replace_text_member(
+        &destination_fixture()?,
+        "ppt/slides/slide2.xml",
+        r#"name="Destination Last""#,
+        "",
+    )?;
+    let source = replace_text_member(
+        &source_fixture()?,
+        "ppt/slides/slide1.xml",
+        r#"name="Source One""#,
+        r#"name="destination FIRST""#,
+    )?;
+    expect_plan_refusal(
+        "named collision beside unnamed slide",
+        &source,
+        &destination,
+        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+    )?;
+    let source = replace_text_member(
+        &source_fixture()?,
+        "ppt/slides/slide1.xml",
+        r#"name="Source One""#,
+        "",
+    )?;
+    let duplicate = replace_text_member(
+        &destination_fixture()?,
+        "ppt/slides/slide2.xml",
+        r#"name="Destination Last""#,
+        r#"name="destination FIRST""#,
+    )?;
+    expect_plan_refusal(
+        "duplicate nonempty destination names",
+        &source,
+        &duplicate,
+        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+    )?;
+    publish(&source, &destination_fixture()?, 0, 1, 1)?;
+    publish(&source_fixture()?, &destination, 0, 1, 1)?;
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data() -> TestResult {
+    let missing_common = |bytes: &[u8]| -> TestResult<Vec<u8>> {
+        let bytes = replace_text_member(
+            bytes,
+            "ppt/slides/slide1.xml",
+            "<p:cSld",
+            "<p:missingCommon",
+        )?;
+        replace_text_member(
+            &bytes,
+            "ppt/slides/slide1.xml",
+            "</p:cSld>",
+            "</p:missingCommon>",
+        )
+    };
+    let source = source_fixture()?;
+    let destination = destination_fixture()?;
+    for (source_bytes, destination_bytes) in [
+        (missing_common(&source)?, destination.clone()),
+        (source, missing_common(&destination)?),
+    ] {
+        let source = open_source(&source_bytes)?;
+        let editor = open_editor(&destination_bytes)?;
+        match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
+            Err(Error::SlideCopyPlan {
+                kind: litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+                detail,
+            }) => assert!(detail.contains("common data is missing")),
+            Err(error) => panic!("unexpected structural refusal: {error:?}"),
+            Ok(_) => panic!("missing common slide data must be refused"),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_preserves_noncompact_source_xml_with_checked_splices() -> TestResult {
+    let source = replace_text_member(
+        &source_fixture()?,
+        "ppt/slides/slide1.xml",
+        r#"name="Source One""#,
+        r#"name="Source One" "#,
+    )?;
+    let destination = replace_text_member(
+        &destination_fixture()?,
+        PRESENTATION_XML,
+        "<p:sldIdLst>",
+        "<p:sldIdLst>\n",
+    )?;
+    let original_presentation = read_zip_member_bytes(&destination, PRESENTATION_XML)?;
+    let output = publish(&source, &destination, 0, 1, 1)?;
+    let output_presentation = read_zip_member_bytes(&output, PRESENTATION_XML)?;
+    let marker = b"<p:sldId id=\"";
+    let first = original_presentation
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .ok_or_else(|| Error::Invalid("missing first presentation slide binding".into()))?;
+    let second = original_presentation[first + marker.len()..]
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .map(|offset| first + marker.len() + offset)
+        .ok_or_else(|| Error::Invalid("missing second presentation slide binding".into()))?;
+    let inserted_len = output_presentation
+        .len()
+        .checked_sub(original_presentation.len())
+        .ok_or_else(|| Error::Invalid("presentation proof did not insert bytes".into()))?;
+    assert!(inserted_len > 0);
+    assert_eq!(
+        &output_presentation[..second],
+        &original_presentation[..second]
+    );
+    let output_suffix_start = second
+        .checked_add(inserted_len)
+        .ok_or_else(|| Error::Invalid("presentation proof insertion overflows".into()))?;
+    assert_eq!(
+        &output_presentation[output_suffix_start..],
+        &original_presentation[second..]
+    );
+    let inserted = &output_presentation[second..output_suffix_start];
+    assert!(inserted.starts_with(b"<p:sldId "));
+    assert!(inserted.ends_with(b"/>") || inserted.ends_with(b" />"));
+
+    let source_slide = read_zip_member_bytes(&source, "ppt/slides/slide1.xml")?;
+    let (_, copied_slide, _) = copied_slide_parts(&output)?;
+    assert_eq!(copied_slide.as_bytes(), source_slide.as_slice());
     Ok(())
 }

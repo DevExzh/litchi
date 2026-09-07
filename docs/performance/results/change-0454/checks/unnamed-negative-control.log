@@ -1,0 +1,23 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error[E0369]: binary operation `==` cannot be applied to type `&RawMember`
+    --> crates/litchi-pptx/tests/source_backed_cross_copy.rs:5446:25
+     |
+5446 |                         assert_eq!(&after.members[name], member, "untouched member {name}");
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |                         |
+     |                         &RawMember
+     |                         &RawMember
+     |
+note: an implementation of `PartialEq` might be missing for `RawMember`
+    --> crates/litchi-pptx/tests/source_backed_cross_copy.rs:2276:1
+     |
+2276 | struct RawMember {
+     | ^^^^^^^^^^^^^^^^ must implement `PartialEq`
+help: consider annotating `RawMember` with `#[derive(PartialEq)]`
+     |
+2276 + #[derive(PartialEq)]
+2277 | struct RawMember {
+     |
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `litchi-pptx` (test "source_backed_cross_copy") due to 1 previous error

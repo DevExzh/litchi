@@ -710,7 +710,7 @@ fn noncanonical_content_types_are_preserved_while_new_overrides_are_sorted() {
 }
 
 #[test]
-fn noncanonical_existing_relationships_are_refused_before_output() {
+fn noncanonical_existing_relationships_allow_append_preserving_source() {
     let source = source_bytes(false, true, true);
     let mut plan = SourceTopologyPlan::new();
     plan.try_add_part(
@@ -729,12 +729,69 @@ fn noncanonical_existing_relationships_are_refused_before_output() {
 
     let package = open(&source);
     let mut output = Vec::new();
+    package.write_topology_to_stream(&mut output, plan).unwrap();
+
+    let original_relationships = zip_member(&source, "word/_rels/document.xml.rels");
+    let close = b"</Relationships>";
+    let close_start = original_relationships
+        .windows(close.len())
+        .position(|window| window == close)
+        .unwrap();
+    let generated = br#"<Relationship Id="rId2" Type="http://example.invalid/relationships/custom" Target="../custom/new.xml"/>"#;
+    let mut expected_relationships = Vec::new();
+    expected_relationships.extend_from_slice(&original_relationships[..close_start]);
+    expected_relationships.extend_from_slice(generated);
+    expected_relationships.extend_from_slice(&original_relationships[close_start..]);
+    assert_eq!(
+        zip_member(&output, "word/_rels/document.xml.rels"),
+        expected_relationships,
+        "append preserves every original relationship byte and inserts before the root close"
+    );
+    assert_eq!(zip_member(&output, "custom/new.xml"), b"<new/>");
+
+    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let relationships = reopened
+        .get_part(&pack("/word/document.xml"))
+        .unwrap()
+        .rels();
+    assert_eq!(
+        relationships
+            .get("rId1")
+            .unwrap()
+            .target_partname()
+            .unwrap(),
+        pack("/custom/existing.xml")
+    );
+    assert_eq!(
+        relationships
+            .get("rId2")
+            .unwrap()
+            .target_partname()
+            .unwrap(),
+        pack("/custom/new.xml")
+    );
+}
+
+#[test]
+fn noncanonical_existing_relationship_replacements_are_refused_before_output() {
+    let source = source_bytes(false, true, true);
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_internal_relationship(
+        pack("/word/document.xml"),
+        "rId1",
+        CUSTOM_REL,
+        pack("/custom/untouched.xml"),
+    )
+    .unwrap();
+
+    let package = open(&source);
+    let mut output = Vec::new();
     let error = package
         .write_topology_to_stream(&mut output, plan)
         .unwrap_err();
     assert!(matches!(
         error,
-        OpcError::DuplicatePartName(_) | OpcError::SourceBackedOverlayUnavailable { .. }
+        OpcError::SourceBackedOverlayUnavailable { .. }
     ));
     assert!(output.is_empty());
 }

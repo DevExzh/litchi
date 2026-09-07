@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0454-native-copy",
+  "temporary_directory_absent": true,
+  "files_removed": 11,
+  "bytes_removed": 202045612,
+  "artifact_manifest_sha256": "537df032f7dc1a2b7225e34b850bf5e7c4473e3396d014c985177c8bad18a6f8",
+  "driver_sha256": "065946e141539c420457cf5a475cdf8360b9165a0c53b7b2ca59e1de9664f364"
+}

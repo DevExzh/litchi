@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "url": "https://git.libreoffice.org/core/+/39ee11db03368a18bc1746a6312307c4cf1b4bdc/sd/qa/unit/data/smoketest.pptx?format=TEXT",
+  "commit": "39ee11db03368a18bc1746a6312307c4cf1b4bdc",
+  "git_blob": "e0cfe49009c9d735b5dd6ea774dda2e7a6710ae8",
+  "path": "/tmp/litchi-goal-0454-native-copy/external-smoketest.pptx",
+  "bytes": 29956,
+  "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+  "driver_sha256": "781f2aee19cf8f8d22555ea0401dcb75150f0da38e252e7ab952386000f5d829",
+  "scope": "Unmodified official LibreOffice QA fixture; original producer/save chain unknown. Fetched artifact remains outside tracked source; no new fixture license or native application claim."
+}

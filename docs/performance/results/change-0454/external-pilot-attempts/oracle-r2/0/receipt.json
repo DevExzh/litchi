@@ -1,0 +1,99 @@
+{
+  "change": 454,
+  "schema": "pptx_change0454_capture_v1",
+  "suite": "external",
+  "lane": 0,
+  "lane_definition": {
+    "suite": "external",
+    "fixture": "libreoffice-smoketest",
+    "provider": "bytes",
+    "build": "candidate",
+    "build_manifest": "candidate-build.json",
+    "repeat": "descriptive"
+  },
+  "pilot": true,
+  "status": "failed",
+  "revision": "b524ca57176b1dea082f4c04464e5754b0358149",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-pilots/0/resource.log",
+    "/tmp/litchi-goal-0454-native-copy/candidate-external",
+    "/tmp/litchi-goal-0454-native-copy/external-smoketest.pptx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0454/external-pilots/0/report.json",
+    "1",
+    "0",
+    "b524ca57176b1dea082f4c04464e5754b0358149",
+    "bytes"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0454-native-copy/candidate-external",
+    "bytes": 7682864,
+    "sha256": "389cbff44a31bad8979f93c8e1b2c4ffe47b38d2b7068e9814b87160fd6ecc1a"
+  },
+  "build_manifest": {
+    "path": "candidate-build.json",
+    "sha256": "e097cbce21dbd88578cd3078072ed8c4fd0ceb6700edfad71816d8e835439ef4"
+  },
+  "source_before": {
+    "path": "sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json",
+    "sha256": "654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf",
+    "files": 6672
+  },
+  "capture_source_manifest": {
+    "path": "sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json",
+    "sha256": "654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf",
+    "files": 6672
+  },
+  "protocol_sha256": "6abf3e0ef70381c8170b63bdb489e6c5e54f5d5d3438c8ebbd33b43620d61e76",
+  "driver_sha256": "9df016f763e8dff9b9aa17f7a364b5ea6764c28ee8aaf8e36b48309a7f4cfcc0",
+  "capture_sha256": "9df016f763e8dff9b9aa17f7a364b5ea6764c28ee8aaf8e36b48309a7f4cfcc0",
+  "provider_oracle_sha256": "436e0f9a926e2713ff030c9b9ed9c32b4312d0a6734096729b631074c0872316",
+  "external_oracle_sha256": "1f23a4e92dc2c00f3bb0f265ec80c63bff493134c037f4b82b1fc121a867e200",
+  "started_utc": "2026-09-07T06:37:23.990826+00:00",
+  "fixture": {
+    "path": "/tmp/litchi-goal-0454-native-copy/external-smoketest.pptx",
+    "bytes": 29956,
+    "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+  },
+  "exit_code": 0,
+  "oracle_exit_code": 1,
+  "source_after": {
+    "path": "sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json",
+    "sha256": "654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf",
+    "files": 6672
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-07T06:37:24.222207+00:00",
+  "artifacts": {
+    "report": {
+      "path": "external-pilots/0/report.json",
+      "bytes": 7857,
+      "sha256": "114274e82f3992870cf56a7ef26cd6088ba9a9156e40b1d8b7cf91c71b1a018b"
+    },
+    "resource": {
+      "path": "external-pilots/0/resource.log",
+      "bytes": 969,
+      "sha256": "259a3f37afa49622e3bc19751c991e7cf61b0a0924948adf10d5c5592841bd59"
+    },
+    "workload": {
+      "path": "external-pilots/0/workload.log",
+      "bytes": 40,
+      "sha256": "2e55932ce7499243f196bb3437c8c36bd8cf3644d708b26cbe7c2aeb5bac6e4e"
+    },
+    "oracle": {
+      "path": "external-pilots/0/oracle.log",
+      "bytes": 1140,
+      "sha256": "7a77490913041fe1ee48125ac60426093644308b5ce6792a3df22c281a75d1f2"
+    },
+    "output_artifact": {
+      "path": "external-pilots/0/report.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"base": {"checked_cache_deltas": 150, "checked_read_deltas": 360, "corpus": "media-rich", "provider": "bytes", "samples": 30, "schema": "pptx_provider_lifecycle_v1", "status": "valid"}, "instrumentation": "none", "status": "pass", "transfer_bytes_per_second": null, "transfer_delay_policy": "separate-sleeps"}

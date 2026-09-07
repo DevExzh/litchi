@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "change": 454,
+  "verified_utc": "2026-09-07T07:14:33.410606+00:00",
+  "verifier_sha256": "1779355b58ddd8dc5f3614dde5dcedaafccc0a430be82fa3a214588d6f42504e",
+  "receipts": 92,
+  "passed_receipts": 67,
+  "failed_attempts": 25,
+  "reports": {
+    "external_reports": 4,
+    "lifecycle_reports": 16
+  }
+}

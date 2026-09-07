@@ -1,0 +1,15 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: usage of `size_of::<T>()` to obtain the size of `T` in bits
+  --> crates/litchi-opc/src/xml_splice.rs:92:49
+   |
+92 |             .and_then(|bytes| bytes.checked_add(8 * size_of::<usize>()))
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `(usize::BITS as usize)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_bits
+   = note: `-D clippy::manual-bits` implied by `-D clippy::all`
+   = help: to override `-D clippy::all` add `#[allow(clippy::manual_bits)]`
+
+error: could not compile `litchi-opc` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib) due to 1 previous error
+error: could not compile `litchi-opc` (lib test) due to 1 previous error

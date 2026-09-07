@@ -1,0 +1,65 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0616]: field `source` of struct `source_backed::SourceSnapshot` is private
+   --> crates/litchi-opc/src/xml_splice.rs:153:35
+    |
+153 |         consume_work(&self.source.source, expected_source.len())?;
+    |                                   ^^^^^^ private field
+
+error[E0616]: field `source` of struct `source_backed::SourceSnapshot` is private
+   --> crates/litchi-opc/src/xml_splice.rs:154:69
+    |
+154 |         let expected_reservation = reserve_edit_memory(&self.source.source, expected_source.len())?;
+    |                                                                     ^^^^^^ private field
+
+error[E0433]: cannot find type `XmlVersion` in this scope
+   --> crates/litchi-opc/src/xml_splice.rs:801:43
+    |
+801 |             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+    |                                           ^^^^^^^^^^ use of undeclared type `XmlVersion`
+
+error[E0597]: `attribute.key` does not live long enough
+   --> crates/litchi-opc/src/source_backed.rs:679:19
+    |
+658 |     let mut seen_keys: Vec<&[u8]> = Vec::new();
+    |         ------------- variable `seen_keys` declared here
+...
+672 |         let attribute = attribute_result.map_err(|error| {
+    |             --------- binding `attribute` declared here
+...
+679 |         let key = attribute.key.as_ref();
+    |                   ^^^^^^^^^^^^^ borrowed value does not live long enough
+680 |         if seen_keys.iter().any(|known| *known == key) {
+    |            --------- borrow later used here
+...
+706 |     }
+    |     - `attribute.key` dropped here while still borrowed
+    |
+    = note: `seen_keys` is a collection that stores borrowed references, but `attribute.key` does not live long enough to be stored in it
+    = help: buffer reuse with borrowed references requires unsafe code or restructuring
+
+error[E0597]: `attribute.key` does not live long enough
+   --> crates/litchi-opc/src/source_backed.rs:756:19
+    |
+736 |     let mut seen_keys: Vec<&[u8]> = Vec::new();
+    |         ------------- variable `seen_keys` declared here
+...
+750 |         let attribute = attribute_result.map_err(|error| {
+    |             --------- binding `attribute` declared here
+...
+756 |         let key = attribute.key.as_ref();
+    |                   ^^^^^^^^^^^^^ borrowed value does not live long enough
+757 |         if seen_keys.iter().any(|known| *known == key) {
+    |            --------- borrow later used here
+...
+793 |     }
+    |     - `attribute.key` dropped here while still borrowed
+    |
+    = note: `seen_keys` is a collection that stores borrowed references, but `attribute.key` does not live long enough to be stored in it
+    = help: buffer reuse with borrowed references requires unsafe code or restructuring
+
+Some errors have detailed explanations: E0433, E0597, E0616.
+For more information about an error, try `rustc --explain E0433`.
+error: could not compile `litchi-opc` (lib) due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib) due to 5 previous errors
+error: could not compile `litchi-opc` (lib test) due to 5 previous errors

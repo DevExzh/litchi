@@ -1,0 +1,14 @@
+{
+  "status": "failed",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0454/verify.py",
+    "--cleanup"
+  ],
+  "exit_code": 1,
+  "stderr": "INVALID: external-pilots/0/report.json: external replay attestation rejected report: replay output artifact.path: differs\n",
+  "verifier_sha256": "1779355b58ddd8dc5f3614dde5dcedaafccc0a430be82fa3a214588d6f42504e",
+  "provenance": "Retrospective transcription of the completed root tool result; no redirected log was originally created.",
+  "recorded_utc": "2026-09-07T07:25:42.457135+00:00"
+}

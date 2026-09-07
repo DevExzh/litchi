@@ -1,0 +1,15 @@
+{
+  "revision": "3ebebf91cb4bea50e97dd535274a03ba70b543a7",
+  "sources": {
+    "crates/litchi-opc/src/source_backed.rs": "a166a96f970ed35247ee0b8dcfa0869bf3dd434b181aae40217825fd84560e13",
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "b5b745412b59a66fb0b5bdced92dd0ae46900f2eb67d8365bdf4edb9ad6f206d",
+    "crates/litchi-pptx/tests/source_backed_cross_copy.rs": "e192a72d2f95aa772be3c4d54f4062453dc928b061bbffe5928387377e331bb9",
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs": "3276e967bff7ba8f7f685da94a105a20d1efa5e0668de37665bb63d298c5aed7",
+    "tools/perf-baseline/src/bin/pptx_external_cross_copy.rs": null,
+    "crates/litchi-opc/src/lib.rs": "4ca32c69888901780cbb2de5a1d7943eb446613e4fbedf406a35dc6c19e424aa",
+    "crates/litchi-opc/src/xml_splice.rs": null,
+    "crates/litchi-opc/tests/source_backed_topology.rs": "271388d19be2e1d36e7ddc6f8c519abd43f3d2f748eb9d1157b5fcf44dbd18eb",
+    "tools/perf-baseline/src/bin/pptx_native_copy_probe.rs": null,
+    "crates/litchi-opc/tests/source_xml_publication.rs": null
+  }
+}

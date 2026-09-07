@@ -1,0 +1,26 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 33.96s
+     Running unittests src/lib.rs (target/release/deps/litchi_opc-9f9df855e77b652d)
+
+running 5 tests
+test xml_splice::tests::authored_classifier_keeps_compact_fast_path_and_requires_source_for_whitespace ... ok
+test xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually ... FAILED
+test xml_splice::tests::insertion_and_replacement_ranges_touching_are_conflicts ... ok
+test xml_splice::tests::source_validator_allows_unprefixed_xml_and_utf8_declaration ... ok
+test xml_splice::tests::source_validator_rejects_namespace_and_lexical_ambiguities ... ok
+
+failures:
+
+---- xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually stdout ----
+
+thread 'xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually' (3493617) panicked at crates/litchi-opc/src/xml_splice.rs:1315:14:
+called `Result::unwrap()` on an `Err` value: InvalidReadLimit { resource: RelationshipTargetBytes, value: 4096 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-opc --lib`
