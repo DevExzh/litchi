@@ -37,7 +37,7 @@ use crate::{MovieKind, MovieSelector, SlideSelector};
 
 mod budget;
 mod closure;
-use budget::MediaBudget;
+pub(in crate::package) use budget::{MediaBudget, MediaBudgetUsage};
 
 const MOVIE_DATA_FIELD: u32 = 14;
 const POSTER_IMAGE_DATA_FIELD: u32 = 15;
@@ -271,7 +271,7 @@ pub enum SlideMediaDataError {
 pub type SlideMediaData<'a> = &'a [u8];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct MediaSelection {
+pub(super) struct MediaSelection {
     slide_position: Position,
     movie_position: Position,
     slide_identifier: u64,
@@ -285,7 +285,7 @@ struct MediaSelection {
 }
 
 impl MediaSelection {
-    fn same_identity(&self, other: &Self) -> bool {
+    pub(super) fn same_identity(&self, other: &Self) -> bool {
         self.slide_position == other.slide_position
             && self.movie_position == other.movie_position
             && self.slide_identifier == other.slide_identifier
@@ -295,6 +295,14 @@ impl MediaSelection {
             && self.kind == other.kind
             && self.content_identifier == other.content_identifier
             && self.poster_identifier == other.poster_identifier
+    }
+
+    /// Report whether the selected MovieArchive carries a poster data edge.
+    /// The identifier itself remains private to the physical replacement
+    /// owner; sibling semantic adapters only need to distinguish an absent
+    /// optional poster from an invalid materialized asset.
+    pub(super) const fn has_poster(&self) -> bool {
+        self.poster_identifier.is_some()
     }
 
     const fn identifier(&self, part: MediaPart) -> Option<u64> {
@@ -1084,7 +1092,7 @@ fn copy_media_record(
     })
 }
 
-fn select_media(
+pub(super) fn select_media(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
@@ -1125,9 +1133,10 @@ fn select_media(
             amount: references.len(),
         })?;
     for identifier in references {
-        let Some((movie_component, movie)) = package.object_with_component(identifier) else {
+        let Some((_, movie)) = package.object_with_component(identifier) else {
             return Err(SlideMediaDataError::InvalidSource);
         };
+        budget.wire_work(movie.messages.len())?;
         let movie_count = movie
             .messages
             .iter()
@@ -1136,10 +1145,9 @@ fn select_media(
         if movie_count == 0 {
             continue;
         }
-        if movie_count != 1 || movie_component != component_name || movie.messages.len() != 1 {
+        if movie_count != 1 {
             return Err(SlideMediaDataError::InvalidSource);
         }
-        validate_selected_message_metadata(movie, 0)?;
         movies.push(identifier);
     }
     let movie_position = movie_selector.as_position();
@@ -1149,9 +1157,13 @@ fn select_media(
             .ok_or(SlideMediaDataError::MoviePositionNotFound {
                 position: movie_position,
             })?;
-    let movie = package
-        .object(movie_identifier)
+    let (movie_component, movie) = package
+        .object_with_component(movie_identifier)
         .ok_or(SlideMediaDataError::InvalidSource)?;
+    if movie_component != component_name || movie.messages.len() != 1 {
+        return Err(SlideMediaDataError::InvalidSource);
+    }
+    validate_selected_message_metadata(movie, 0)?;
     let movie_payload = movie
         .messages
         .first()
@@ -1185,7 +1197,7 @@ fn select_media(
         unique_movie_data_identifier(movie_payload, MOVIE_DATA_FIELD, limits, budget)?;
     let poster_identifier =
         unique_movie_data_identifier(movie_payload, POSTER_IMAGE_DATA_FIELD, limits, budget)?;
-    if content_identifier.is_none() || (kind == MovieKind::File && poster_identifier.is_none()) {
+    if content_identifier.is_none() {
         return Err(SlideMediaDataError::InvalidSource);
     }
     if part == MediaPart::Poster && poster_identifier.is_none() {
@@ -1388,7 +1400,7 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideMediaDataE
     }
 }
 
-fn read_selected_media<'a>(
+pub(super) fn read_selected_media<'a>(
     package: &'a Package,
     selection: &MediaSelection,
     part: MediaPart,
@@ -1410,12 +1422,16 @@ fn read_selected_media<'a>(
     if matches.next().is_some() || entry.is_opaque() {
         return Err(SlideMediaDataError::InvalidSource);
     }
+    // Bound the member and account for the digest pass before hashing its
+    // bytes.  The digest is part of source admission, so hostile entry data
+    // must not receive uncharged work or bypass the caller's residual cap.
+    budget.entry_bytes(entry.data().len())?;
+    budget.wire_work(entry.data().len())?;
     if record.materialized_length != Some(entry.data().len())
         || Sha1::digest(entry.data()).as_slice() != record.digest
     {
         return Err(SlideMediaDataError::InvalidSource);
     }
-    budget.entry_bytes(entry.data().len())?;
     Ok(entry.data())
 }
 
@@ -1625,9 +1641,73 @@ fn validated_media_record(
 /// component. ZIP entry lengths describe compressed bytes and therefore cannot
 /// safely cap the decompressed IWA stream. The catalog archive's exact encoded
 /// length is a source-preserving, allocation-free preflight for that stream.
+fn metadata_archive_inventory_work(archive: &Archive) -> Result<usize, SlideMediaDataError> {
+    let mut work = archive.objects.len();
+    for (object_index, object) in archive.objects.iter().enumerate() {
+        // `encoded_len_with_limits` checks duplicate object identifiers by
+        // scanning the preceding prefix. Account for that bounded lookup as
+        // well as the object/header/message inventory it traverses.
+        work = work
+            .checked_add(object_index)
+            .and_then(|value| value.checked_add(1))
+            .and_then(|value| value.checked_add(object.messages.len()))
+            .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
+            .and_then(|value| {
+                usize::try_from(object.header_length)
+                    .ok()
+                    .and_then(|header| value.checked_add(header))
+            })
+            .ok_or(SlideMediaDataError::InvalidSource)?;
+        for message in &object.messages {
+            work = work
+                .checked_add(message.data.len())
+                .and_then(|value| value.checked_add(1))
+                .ok_or(SlideMediaDataError::InvalidSource)?;
+        }
+        for info in &object.archive_info.message_infos {
+            work = work
+                .checked_add(info.versions.len())
+                .and_then(|value| value.checked_add(info.field_infos.len()))
+                .and_then(|value| value.checked_add(info.object_references.len()))
+                .and_then(|value| value.checked_add(info.data_references.len()))
+                .and_then(|value| value.checked_add(info.diff_merge_version.len()))
+                .and_then(|value| value.checked_add(usize::from(info.diff_field_path.is_some())))
+                .and_then(|value| value.checked_add(info.fields_to_remove.len()))
+                .and_then(|value| value.checked_add(info.diff_read_version.len()))
+                .ok_or(SlideMediaDataError::InvalidSource)?;
+            if let Some(path) = &info.diff_field_path {
+                work = work
+                    .checked_add(path.path.len())
+                    .ok_or(SlideMediaDataError::InvalidSource)?;
+            }
+            for path in &info.fields_to_remove {
+                work = work
+                    .checked_add(path.path.len())
+                    .ok_or(SlideMediaDataError::InvalidSource)?;
+            }
+            for field in &info.field_infos {
+                work = work
+                    .checked_add(1)
+                    .and_then(|value| value.checked_add(field.path.path.len()))
+                    .and_then(|value| value.checked_add(field.object_references.len()))
+                    .and_then(|value| value.checked_add(field.data_references.len()))
+                    .and_then(|value| value.checked_add(field.known_field_version.len()))
+                    .and_then(|value| {
+                        value.checked_add(usize::from(
+                            field.known_field_feature_identifier.is_some(),
+                        ))
+                    })
+                    .ok_or(SlideMediaDataError::InvalidSource)?;
+            }
+        }
+    }
+    Ok(work)
+}
+
 fn metadata_stream_profile(
     package: &Package,
     catalog: &SourceCatalog,
+    budget: &mut MediaBudget,
 ) -> Result<(usize, SnappyLimits, ArchiveLimits), SlideMediaDataError> {
     let metadata_component = catalog
         .components()
@@ -1637,13 +1717,24 @@ fn metadata_stream_profile(
         .limits()
         .effective_archive_limits()
         .map_err(|_| SlideMediaDataError::InvalidSource)?;
-    let stream_capacity = metadata_component
-        .archive()
+    let metadata_archive = metadata_component.archive();
+    // Precharge the complete object/header/reference/payload inventory before
+    // the archive preflight itself. This keeps encoded-length validation from
+    // becoming an uncharged traversal when a sibling residual work cap is
+    // already tight.
+    let inventory_work = metadata_archive_inventory_work(metadata_archive)?;
+    budget.wire_work(inventory_work)?;
+    let stream_capacity = metadata_archive
         .encoded_len_with_limits(archive_limits)
         .map_err(|_| SlideMediaDataError::InvalidSource)?;
     if stream_capacity == 0 {
         return Err(SlideMediaDataError::InvalidSource);
     }
+    // A newly constructed archive may not carry source offsets/header lengths
+    // in its provenance. Cover any stream bytes not represented by the
+    // inventory bound before the decompression passes begin.
+    let uncovered_work = stream_capacity.checked_sub(inventory_work).unwrap_or(0);
+    budget.wire_work(uncovered_work)?;
     let source_limits = package
         .limits()
         .snappy_limits()
@@ -1685,7 +1776,19 @@ fn metadata_facts(
     budget.entry_bytes(entry.data().len())?;
     budget.input_bytes(entry.data().len())?;
     let (stream_capacity, snappy_limits, _archive_limits) =
-        metadata_stream_profile(package, catalog)?;
+        metadata_stream_profile(package, catalog, budget)?;
+    // Account for the decoded-stream pass, canonical framing pass, and the
+    // archive/message census below before allocating or traversing them.
+    let stream_work = entry
+        .data()
+        .len()
+        .checked_add(
+            stream_capacity
+                .checked_mul(3)
+                .ok_or(SlideMediaDataError::InvalidSource)?,
+        )
+        .ok_or(SlideMediaDataError::InvalidSource)?;
+    budget.wire_work(stream_work)?;
     budget.entry_bytes(stream_capacity)?;
     budget.allocation(stream_capacity)?;
     let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
@@ -1881,7 +1984,20 @@ fn rewrite_metadata_entry(
     budget.entry_bytes(entry.data().len())?;
     budget.input_bytes(entry.data().len())?;
     let (stream_capacity, snappy_limits, archive_limits) =
-        metadata_stream_profile(package, catalog)?;
+        metadata_stream_profile(package, catalog, budget)?;
+    // The rewrite keeps the decoded stream live while parsing an owned
+    // Archive, checking canonical framing, and scanning its message census.
+    // Reserve all four stream-sized passes before decompression begins.
+    let stream_work = entry
+        .data()
+        .len()
+        .checked_add(
+            stream_capacity
+                .checked_mul(4)
+                .ok_or(SlideMediaDataError::InvalidSource)?,
+        )
+        .ok_or(SlideMediaDataError::InvalidSource)?;
+    budget.wire_work(stream_work)?;
     budget.entry_bytes(stream_capacity)?;
     budget.allocation(stream_capacity)?;
     let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
@@ -1914,6 +2030,7 @@ fn rewrite_metadata_entry(
     }
     let (object_index, message_index, payload) =
         location.ok_or(SlideMediaDataError::InvalidSource)?;
+    budget.wire_work(replacement.len())?;
     let replacement_digest: [u8; SHA1_BYTES] = Sha1::digest(replacement).into();
     let expected_length =
         u64::try_from(expected_length).map_err(|_| SlideMediaDataError::InvalidSource)?;
@@ -1958,6 +2075,7 @@ fn rewrite_metadata_entry(
     let serialized_capacity = archive
         .encoded_len_with_limits(archive_limits)
         .map_err(|_| SlideMediaDataError::InvalidSource)?;
+    budget.wire_work(serialized_capacity)?;
     budget.allocation(serialized_capacity)?;
     let serialized = archive
         .to_bytes_with_limits(archive_limits)
@@ -1967,6 +2085,7 @@ fn rewrite_metadata_entry(
     }
     let compressed_capacity = SnappyStream::maximum_compressed_len(serialized.len())
         .map_err(|_| SlideMediaDataError::InvalidSource)?;
+    budget.wire_work(compressed_capacity)?;
     budget.allocation(compressed_capacity)?;
     let compressed =
         SnappyStream::compress(&serialized).map_err(|_| SlideMediaDataError::InvalidSource)?;

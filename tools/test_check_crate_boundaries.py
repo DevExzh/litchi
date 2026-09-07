@@ -3316,6 +3316,98 @@ def add_keynote_audio_position_canonical_scaffold(root: Path) -> None:
     (root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_media_properties_canonical_scaffold(root: Path) -> None:
+    """Create the focused selector-first media-properties admission fixture."""
+
+    semantic = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct MediaProperties {\n"
+        "    hyperlink_url: Option<String>,\n"
+        "    locked: Option<bool>,\n"
+        "    aspect_ratio_locked: Option<bool>,\n"
+        "    accessibility_description: Option<String>,\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES
+        )
+        + "struct MediaPropertiesBudget;\n"
+        + "fn media_budget_for_package() { MediaPropertiesBudget::for_package(); }\n"
+        + "fn select_media(slide: SlideSelector, movie: MovieSelector) { let _ = (slide, movie); }\n"
+        + "fn candidate_reopen_readback_verify() { candidate; reopen; readback; verify; }\n"
+        + "fn exact_source_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
+        + "fn preserve_locality_and_unknown() { locality; unchanged; unknown; raw; preserve; }\n"
+        + "fn budget_property_report() {}\n"
+        + "fn budget_property_requirements() {}\n"
+        + "fn charge_prepublication() { codec_report; wire; fields; work; archive; snappy; zip; output; preview; }\n"
+        + "fn codec_properties_route() { decode_movie_properties_with_report; prepare_movie_properties_rewrite; }\n"
+        + "fn execute_prepared() { let prepared = prepare_movie_properties_rewrite(); let requirements = prepared.execution_requirements(); let output = prepared.execute(requirements); let _ = output; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MediaProperties, SlideMediaPropertiesError> { let _ = (slide, movie); todo!() }\n"
+        + "    pub fn edit_slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaProperties) -> Result<SlideMediaPropertiesEdit, SlideMediaPropertiesError> { let _ = (slide, movie, value); todo!() }\n"
+        + "    pub fn apply_slide_media_properties(&self, patch: &SlideMediaPropertiesPatch) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideMediaPropertiesEdit { pub fn set(self, value: MediaProperties) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> { todo!() } }\n",
+        encoding="utf-8",
+    )
+
+    package_export = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_media_properties;\n"
+        "pub use slide_media_properties::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_TYPES
+        )
+        + "pub fn decode_movie_properties() {}\n"
+        + "pub fn decode_movie_properties_with_report() {}\n"
+        + "pub fn prepare_movie_properties_rewrite() {}\n"
+        + "pub fn rewrite_movie_properties() {}\n"
+        + "fn preflight_duplicate_noncanonical_unknown_raw_preserve() { let _ = DecodeOptions; }\n"
+        + "fn bounded(max_message_bytes: usize, max_fields: usize, max_work_bytes: usize, execution_requirements: RewriteExecutionRequirements) { let _ = (max_message_bytes, max_fields, max_work_bytes, execution_requirements); }\n"
+        + "fn execute() { output; source; unknown; raw; hyperlink; locked; aspect_ratio_locked; accessibility_description; }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_MODULE};\n"
+        "#[doc(hidden)]\n"
+        f"mod {boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_GENERATED_MODULE} {{\n"
+        "    include!(\"buffa-keynote-media-properties/iwa_keynote_media_properties_buffa_protos.rs\");\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     """Activate the Wave111 geometry handoff with a complete fake bridge."""
 
@@ -18996,6 +19088,220 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_audio_position_codec_source_topology()",
             "+ audit_keynote_audio_position_completion_source_topology()",
             "+ audit_keynote_audio_position_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_media_properties_audits_are_dormant_until_owner_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            audits = (
+                boundaries.audit_keynote_media_properties_facade_source_topology,
+                boundaries.audit_keynote_media_properties_codec_source_topology,
+                boundaries.audit_keynote_media_properties_resource_source_topology,
+                boundaries.audit_iwa_keynote_media_properties_source_topology,
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_audio.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn slide_audio_properties() {}\n"
+                "pub fn set_slide_audio_properties() {}\n",
+                encoding="utf-8",
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+            add_keynote_media_properties_canonical_scaffold(root)
+            for audit in audits[:-1]:
+                self.assertEqual(audit(root), [], audit.__name__)
+            # Owner wiring alone does not prove that native iWork parity has
+            # been established, so raw compatibility methods remain dormant.
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "const MEDIA_PROPERTIES_NATIVE_VERIFIED: () = ();\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
+            self.assertTrue(any("slide_audio_properties" in item for item in violations), violations)
+            self.assertTrue(
+                any("set_slide_audio_properties" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_media_properties_facade_rejects_raw_values_and_missing_contracts(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_media_properties_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_properties(bytes: &[u8], movie_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_media_properties_facade_source_topology(root)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub struct SlideMediaPropertiesPatch;\n", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_media_properties_facade_source_topology(root)
+            self.assertTrue(any("SlideMediaPropertiesPatch" in item for item in violations), violations)
+
+    def test_keynote_media_properties_codec_rejects_eager_or_public_generated_views(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_media_properties_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            codec.write_text(
+                codec_source.replace(
+                    "pub fn decode_movie_properties_with_report() {}\n", ""
+                )
+                + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_media_properties_codec_source_topology(root)
+            self.assertTrue(any("decode_movie_properties_with_report" in item for item in violations), violations)
+            self.assertTrue(any("eager generated operation" in item for item in violations), violations)
+
+            codec.write_text(codec_source, encoding="utf-8")
+            codec_lib = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                codec_lib.read_text(encoding="utf-8").replace(
+                    "#[doc(hidden)]\npub mod keynote_media_properties_codec;",
+                    "pub mod keynote_media_properties_codec;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_media_properties_codec_source_topology(root)
+            self.assertTrue(any("hidden public module" in item for item in violations), violations)
+
+    def test_keynote_media_properties_resource_guard_rejects_unbounded_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_media_properties_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for marker in (
+                "budget_property_report",
+                "budget_property_requirements",
+            ):
+                with self.subTest(marker=marker):
+                    owner.write_text(
+                        complete.replace(marker, "missing_property_budget_marker"),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_keynote_media_properties_resource_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            (
+                                "property decode accounting" in item
+                                if marker == "budget_property_report"
+                                else "property rewrite accounting" in item
+                            )
+                            for item in violations
+                        ),
+                        violations,
+                    )
+            owner.write_text(complete, encoding="utf-8")
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "struct SecondBudget;\n"
+                + "fn unbounded() { saturating_add; }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_media_properties_resource_source_topology(root)
+            self.assertTrue(any("exactly one aggregate" in item for item in violations), violations)
+            self.assertTrue(any("checked resource accounting" in item for item in violations), violations)
+
+    def test_keynote_media_properties_host_retirement_waits_for_owner_and_rejects_raw_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_movies.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_properties(&self) {}\n"
+                "    pub fn set_slide_movie_properties(&mut self) {}\n"
+                "}\n"
+                "fn set_movie_properties() {}\n"
+                "fn update() { editor.set_slide_movie_properties(); set_movie_properties(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+
+            add_keynote_media_properties_canonical_scaffold(root)
+            # The focused owner is allowed to coexist with the compatibility
+            # methods until native open/save/reopen evidence activates the
+            # explicit deletion seam.
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "const MEDIA_PROPERTIES_COMPLETE: () = ();\n",
+                encoding="utf-8",
+            )
+            # Similar-looking source-built capability names do not prove a
+            # native open/save/reopen fixture and must leave retirement dormant.
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "MEDIA_PROPERTIES_COMPLETE", "MEDIA_PROPERTIES_NATIVE_VERIFIED"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
+            self.assertTrue(any("slide_movie_properties" in item for item in violations), violations)
+            self.assertTrue(any("set_movie_properties" in item for item in violations), violations)
+
+            host.write_text(
+                "fn focused() { package.slide_media_properties(slide, movie); }\n"
+                "fn focused_edit() { package.edit_slide_media_properties(slide, movie, value); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+            host.write_text(
+                "fn fallback() { movie_properties_for_identifier(identifier); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
+            self.assertTrue(any("identifier fallback" in item for item in violations), violations)
+
+    def test_keynote_media_properties_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_media_properties_source_topology()",
+            "+ audit_keynote_media_properties_facade_source_topology()",
+            "+ audit_keynote_media_properties_codec_source_topology()",
+            "+ audit_keynote_media_properties_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

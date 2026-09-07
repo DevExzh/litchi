@@ -459,14 +459,16 @@ fn drawable_size(size: tsp::Size) -> DrawableSize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::RawMessage;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawableFlipAxis, DrawablePoint};
+    use crate::wire::remove_repeated_length_delimited_field_where;
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use litchi_keynote::slide::media::geometry::MovieGeometry;
     use litchi_keynote::slide::media::{
         MediaLoopMode as KeynoteMediaLoopMode, MediaPlaybackSettings as KeynotePlaybackSettings,
-        MediaVolume as KeynoteMediaVolume,
+        MediaProperties as KeynoteMediaProperties, MediaVolume as KeynoteMediaVolume,
     };
     use litchi_keynote::slide::media::{Point as KeynotePoint, Size as KeynoteSize};
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
@@ -504,6 +506,47 @@ mod tests {
     fn replace_with_focused_movie_package(editor: &mut KeynoteEditor, package: &KeynotePackage) {
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn remove_movie_poster(
+        editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        poster_data_identifier: MediaAssetId,
+    ) {
+        let archive_name = editor
+            .slide_movie_graph(0, drawable_object_id)
+            .unwrap()
+            .archive_name;
+        let mut package = editor.package().clone();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                    .unwrap();
+                let message = &object.messages[message_index];
+                let data = remove_repeated_length_delimited_field_where(
+                    &message.data,
+                    POSTER_IMAGE_DATA_FIELD,
+                    |_| Ok(true),
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: MOVIE_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                object.archive_info.message_infos[message_index]
+                    .data_references
+                    .retain(|identifier| *identifier != poster_data_identifier.get());
+                Ok(())
+            })
+            .unwrap();
+        let bytes = package.to_bytes().unwrap();
         *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
     }
 
@@ -609,6 +652,239 @@ mod tests {
             aspect_ratio_locked: Some(false),
             accessibility_description: Some(description.to_owned()),
         }
+    }
+
+    fn raw_properties(properties: &KeynoteMediaProperties) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: properties.hyperlink_url().map(str::to_owned),
+            locked: properties.locked(),
+            aspect_ratio_locked: properties.aspect_ratio_locked(),
+            accessibility_description: properties.accessibility_description().map(str::to_owned),
+        }
+    }
+
+    fn assert_property_parity(
+        raw: &DrawableProperties,
+        focused: &KeynoteMediaProperties,
+        expected: &KeynoteMediaProperties,
+    ) {
+        assert_eq!(raw, &raw_properties(expected));
+        assert_eq!(raw.hyperlink_url.as_deref(), focused.hyperlink_url());
+        assert_eq!(raw.locked, focused.locked());
+        assert_eq!(raw.aspect_ratio_locked, focused.aspect_ratio_locked());
+        assert_eq!(
+            raw.accessibility_description.as_deref(),
+            focused.accessibility_description()
+        );
+        assert_eq!(focused, expected);
+    }
+
+    fn assert_movie_property_update_parity(
+        raw_editor: &mut KeynoteEditor,
+        focused_editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        baseline: &KeynoteSlideMovieInfo,
+        expected: KeynoteMediaProperties,
+    ) {
+        let raw_expected = raw_properties(&expected);
+        raw_editor
+            .set_slide_movie_properties(0, drawable_object_id, raw_expected.clone())
+            .unwrap();
+
+        let package = focused_movie_package(focused_editor);
+        let commit = package
+            .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap()
+            .set(expected.clone())
+            .unwrap()
+            .commit()
+            .unwrap();
+        replace_with_focused_movie_package(focused_editor, commit.package());
+
+        let raw_after = raw_editor
+            .slide_movie_properties(0, drawable_object_id)
+            .unwrap();
+        let focused_after = focused_movie_package(focused_editor)
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap();
+        assert_property_parity(&raw_after, &focused_after, &expected);
+
+        let raw_movie = raw_editor
+            .slide_movies(0)
+            .unwrap()
+            .into_iter()
+            .find(|movie| movie.drawable_object_id == drawable_object_id)
+            .unwrap();
+        let focused_movie = focused_editor
+            .slide_movies(0)
+            .unwrap()
+            .into_iter()
+            .find(|movie| movie.drawable_object_id == drawable_object_id)
+            .unwrap();
+        assert_eq!(raw_movie.kind, baseline.kind);
+        assert_eq!(focused_movie.kind, baseline.kind);
+        assert_eq!(
+            raw_movie.movie_data_identifier,
+            baseline.movie_data_identifier
+        );
+        assert_eq!(
+            focused_movie.movie_data_identifier,
+            baseline.movie_data_identifier
+        );
+        assert_eq!(
+            raw_movie.poster_image_data_identifier,
+            baseline.poster_image_data_identifier
+        );
+        assert_eq!(
+            focused_movie.poster_image_data_identifier,
+            baseline.poster_image_data_identifier
+        );
+        assert_eq!(raw_movie.geometry, baseline.geometry);
+        assert_eq!(focused_movie.geometry, baseline.geometry);
+        assert_eq!(raw_movie.playback, baseline.playback);
+        assert_eq!(focused_movie.playback, baseline.playback);
+        assert_eq!(raw_movie.original_size, baseline.original_size);
+        assert_eq!(focused_movie.original_size, baseline.original_size);
+        assert_eq!(raw_movie.natural_size, baseline.natural_size);
+        assert_eq!(focused_movie.natural_size, baseline.natural_size);
+
+        let movie_data_identifier = baseline.movie_data_identifier.unwrap();
+        assert_eq!(
+            raw_editor.extract_media(movie_data_identifier).unwrap(),
+            focused_editor.extract_media(movie_data_identifier).unwrap()
+        );
+        if let Some(poster_data_identifier) = baseline.poster_image_data_identifier {
+            assert_eq!(
+                raw_editor.extract_media(poster_data_identifier).unwrap(),
+                focused_editor
+                    .extract_media(poster_data_identifier)
+                    .unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn source_built_movie_properties_match_raw_and_focused_updates() {
+        let mut seed = KeynoteDocumentBuilder::new()
+            .title("Movie properties parity")
+            .build()
+            .unwrap();
+        let created = seed
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+        let baseline_bytes = seed.to_bytes().unwrap();
+        let baseline_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let baseline = baseline_editor.slide_movies(0).unwrap().remove(0);
+        let drawable_object_id = baseline.drawable_object_id;
+
+        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let raw_before = raw_editor
+            .slide_movie_properties(0, drawable_object_id)
+            .unwrap();
+        let focused_before = focused_movie_package(&focused_editor)
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap();
+        assert_eq!(raw_before.hyperlink_url, None);
+        assert_eq!(raw_before.locked, Some(false));
+        assert_eq!(raw_before.aspect_ratio_locked, Some(true));
+        assert_eq!(raw_before.accessibility_description, None);
+        assert_property_parity(
+            &raw_before,
+            &focused_before,
+            &KeynoteMediaProperties::new()
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(true)),
+        );
+
+        for expected in [
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some(String::new()))
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(false))
+                .with_accessibility_description(Some("媒体 🎬".to_owned())),
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some("opaque target 日本語".to_owned()))
+                .with_locked(Some(true))
+                .with_aspect_ratio_locked(Some(true))
+                .with_accessibility_description(Some("locked 🔒".to_owned())),
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some("second target".to_owned()))
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(false))
+                .with_accessibility_description(Some("unlocked again".to_owned())),
+            KeynoteMediaProperties::default(),
+        ] {
+            assert_movie_property_update_parity(
+                &mut raw_editor,
+                &mut focused_editor,
+                drawable_object_id,
+                &baseline,
+                expected,
+            );
+        }
+
+        assert_eq!(
+            raw_editor.to_bytes().unwrap(),
+            focused_editor.to_bytes().unwrap()
+        );
+        assert_eq!(created.kind, MovieKind::File);
+    }
+
+    #[test]
+    fn source_built_movie_properties_support_an_absent_poster() {
+        let mut seed = KeynoteDocumentBuilder::new()
+            .title("Movie properties without poster")
+            .build()
+            .unwrap();
+        let created = seed
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+        let poster_data_identifier = created.poster_image_data_identifier.unwrap();
+        remove_movie_poster(
+            &mut seed,
+            created.drawable_object_id,
+            poster_data_identifier,
+        );
+
+        let baseline_bytes = seed.to_bytes().unwrap();
+        let baseline_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let baseline = baseline_editor.slide_movies(0).unwrap().remove(0);
+        assert_eq!(baseline.kind, MovieKind::File);
+        assert_eq!(baseline.poster_image_data_identifier, None);
+        assert!(baseline.movie_data_identifier.is_some());
+
+        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let expected = KeynoteMediaProperties::new()
+            .with_hyperlink_url(Some("opaque target 日本語".to_owned()))
+            .with_locked(Some(false))
+            .with_aspect_ratio_locked(Some(true))
+            .with_accessibility_description(Some("No poster 🎬".to_owned()));
+        assert_movie_property_update_parity(
+            &mut raw_editor,
+            &mut focused_editor,
+            baseline.drawable_object_id,
+            &baseline,
+            expected,
+        );
+
+        let raw_after = raw_editor.slide_movies(0).unwrap().remove(0);
+        let focused_after = focused_editor.slide_movies(0).unwrap().remove(0);
+        assert_eq!(raw_after.poster_image_data_identifier, None);
+        assert_eq!(focused_after.poster_image_data_identifier, None);
+        assert_eq!(
+            raw_after.movie_data_identifier,
+            baseline.movie_data_identifier
+        );
+        assert_eq!(
+            focused_after.movie_data_identifier,
+            baseline.movie_data_identifier
+        );
+        assert_eq!(raw_after.playback, baseline.playback);
+        assert_eq!(focused_after.playback, baseline.playback);
+        assert_eq!(raw_after.geometry, baseline.geometry);
+        assert_eq!(focused_after.geometry, baseline.geometry);
     }
 
     #[test]

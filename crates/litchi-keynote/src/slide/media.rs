@@ -2,6 +2,10 @@
 
 use std::time::Duration;
 
+pub mod properties;
+
+pub use properties::MediaProperties;
+
 /// A slide-drawable position in document points.
 ///
 /// This is a Keynote-owned semantic value. Native geometry records are decoded

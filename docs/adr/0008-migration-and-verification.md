@@ -17826,3 +17826,54 @@ fuzz lock/artifact directories. `cargo clean` removed 16,005 files and 10.7 GiB,
 leaving approximately 62 GiB free. Both native position fixtures remain tracked.
 The monolith exit remains active; richer media properties/readers and creation
 still require focused owners.
+
+## 2026-09-07 focused Keynote media-properties source ownership
+
+This is a bounded source-ownership record. `litchi-keynote` now has the
+semantic `MediaProperties` value with four optional fields: hyperlink and
+accessibility-description strings, plus lock and aspect-ratio-lock booleans.
+The source-order typed `Package::{slide_media_properties,
+edit_slide_media_properties,apply_slide_media_properties}` API keeps native
+identifiers and wire values private. Its strict private 577-byte Buffa
+projection (`keynote_media_properties_codec`, SHA-256
+`3945a92dcc3f25333d6375eb68aaaf762ea00141cfd9055f71bf65cfb4f12b02`) keeps
+omitted values distinct from explicit empty strings and `false` values. Zero
+and absent geometry remain canonical optional geometry; positive geometry
+retains the existing ownership requirements.
+
+Exact no-op, inverse, replay, locality, and budget checks are in progress.
+The native CUA attempt still fails with ScreenCaptureKit error `-3802`
+(`Stream failed to start`), so there is no native media-properties fixture,
+save/actual-close/exact-reopen receipt, or retirement receipt. All four raw
+host APIs and their private helper remain retained with source-built parity
+oracles. Boundary retirement requires the
+`MEDIA_PROPERTIES_NATIVE_VERIFIED` marker, which is absent.
+
+### Current media-properties verification update (2026-09-07)
+
+The neutral media-properties codec passes 10 cases with Clippy `-D warnings`;
+the common checks pass 166 cases, the Keynote library passes 273 cases, and
+the new media-properties integration slice passes 17 cases, including
+unselected Audio B opaque-message preservation. Existing audio
+position and movie-geometry integration passes 13 and 27 cases respectively.
+The host-properties slice passes 10 cases, including all three raw-focused
+parity cases and the absent-file-poster case. Focused checks verify exact
+no-op, inverse, replay, double-inverse, locality, malformed-header,
+reference-limit, and budget behavior. Shared-metadata work is precharged
+before mutation, and sibling validation is selected-only. Graph validation
+covers styles, comments, captions, ownership, media content, and optional
+posters through the existing replacement owner and residual-cap checks.
+
+Python verification remains at 978 cases, and the full boundary scan passes
+64 packages, 238 internal edges, and 11 explicit debts. An optimized ASAN
+run completes 256 cases in 225 seconds without errors. The unoptimized
+startup 30-second timeout was diagnosed and is not counted as a pass; the
+root warm 64-case run remains pending after the final metadata-accounting
+changes.
+
+The native ScreenCaptureKit `-3802` stream failure remains, so no native
+media-properties fixture or native acceptance exists. The four raw host APIs
+and private helper remain retained, and the
+`MEDIA_PROPERTIES_NATIVE_VERIFIED` boundary marker is absent. Full hooks,
+cleanup, the final warm ASAN run, and the native gate remain pending for the
+root receipt.

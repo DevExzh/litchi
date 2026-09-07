@@ -24,6 +24,7 @@ mod slide_chart_title;
 mod slide_chart_value_axis;
 pub(crate) mod slide_delete;
 mod slide_media_lifecycle;
+mod slide_media_properties;
 mod slide_media_replacement;
 mod slide_movie_caption;
 mod slide_movie_geometry;
@@ -155,6 +156,10 @@ pub use slide_chart_value_axis::{
 pub use slide_media_lifecycle::{
     SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
     SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
+};
+pub use slide_media_properties::{
+    SlideMediaPropertiesCommit, SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit,
+    SlideMediaPropertiesError, SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
 };
 pub use slide_media_replacement::{
     MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
@@ -2831,9 +2836,14 @@ fn preflight_movie(
     })
     .map_err(|error| map_wire_preflight_error(error, "Keynote movie", path))?;
 
-    if movie.super_fields != 1 || movie.geometry_fields != 1 {
+    // Geometry is optional for media-property reads and edits.  When the
+    // envelope is present, the focused geometry APIs still validate its
+    // complete coordinates and dimensions; the package ingress only needs to
+    // reject duplicate envelopes here.
+    if movie.super_fields != 1 || movie.geometry_fields > 1 {
         return Err(ReadError::InvalidFormat(
-            "Keynote movie is missing a unique drawable geometry envelope".to_owned(),
+            "Keynote movie is missing a unique drawable envelope or has duplicate geometry"
+                .to_owned(),
         ));
     }
     if movie.position_fields > 0 && (movie.position_x.is_none() || movie.position_y.is_none()) {

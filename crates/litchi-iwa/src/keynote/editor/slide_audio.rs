@@ -261,7 +261,8 @@ mod tests {
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use litchi_keynote::slide::media::{
         MediaLoopMode as KeynoteMediaLoopMode,
-        MediaPlaybackSettings as KeynoteMediaPlaybackSettings, MediaVolume as KeynoteMediaVolume,
+        MediaPlaybackSettings as KeynoteMediaPlaybackSettings,
+        MediaProperties as KeynoteMediaProperties, MediaVolume as KeynoteMediaVolume,
         Point as KeynotePoint,
     };
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
@@ -278,6 +279,173 @@ mod tests {
             aspect_ratio_locked: Some(true),
             accessibility_description: Some(description.to_owned()),
         }
+    }
+
+    fn raw_properties(properties: &KeynoteMediaProperties) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: properties.hyperlink_url().map(str::to_owned),
+            locked: properties.locked(),
+            aspect_ratio_locked: properties.aspect_ratio_locked(),
+            accessibility_description: properties.accessibility_description().map(str::to_owned),
+        }
+    }
+
+    fn assert_property_parity(
+        raw: &DrawableProperties,
+        focused: &KeynoteMediaProperties,
+        expected: &KeynoteMediaProperties,
+    ) {
+        assert_eq!(raw, &raw_properties(expected));
+        assert_eq!(raw.hyperlink_url.as_deref(), focused.hyperlink_url());
+        assert_eq!(raw.locked, focused.locked());
+        assert_eq!(raw.aspect_ratio_locked, focused.aspect_ratio_locked());
+        assert_eq!(
+            raw.accessibility_description.as_deref(),
+            focused.accessibility_description()
+        );
+        assert_eq!(focused, expected);
+    }
+
+    fn assert_audio_property_update_parity(
+        raw_editor: &mut KeynoteEditor,
+        focused_editor: &mut KeynoteEditor,
+        drawable_object_id: u64,
+        baseline: &KeynoteSlideAudioInfo,
+        expected: KeynoteMediaProperties,
+    ) {
+        let raw_expected = raw_properties(&expected);
+        raw_editor
+            .set_slide_audio_properties(0, drawable_object_id, raw_expected.clone())
+            .unwrap();
+
+        let package = focused_audio_package(focused_editor);
+        let commit = package
+            .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap()
+            .set(expected.clone())
+            .unwrap()
+            .commit()
+            .unwrap();
+        replace_with_focused_audio_package(focused_editor, commit.package());
+
+        let raw_after = raw_editor
+            .slide_audio_properties(0, drawable_object_id)
+            .unwrap();
+        let focused_after = focused_audio_package(focused_editor)
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap();
+        assert_property_parity(&raw_after, &focused_after, &expected);
+
+        let raw_audio = raw_editor
+            .slide_audio(0)
+            .unwrap()
+            .into_iter()
+            .find(|audio| audio.drawable_object_id == drawable_object_id)
+            .unwrap();
+        let focused_audio = focused_editor
+            .slide_audio(0)
+            .unwrap()
+            .into_iter()
+            .find(|audio| audio.drawable_object_id == drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            raw_audio.audio_data_identifier,
+            baseline.audio_data_identifier
+        );
+        assert_eq!(
+            focused_audio.audio_data_identifier,
+            baseline.audio_data_identifier
+        );
+        assert_eq!(raw_audio.position, baseline.position);
+        assert_eq!(focused_audio.position, baseline.position);
+        assert_eq!(raw_audio.playback, baseline.playback);
+        assert_eq!(focused_audio.playback, baseline.playback);
+        assert_eq!(raw_audio.duration, baseline.duration);
+        assert_eq!(focused_audio.duration, baseline.duration);
+        assert_eq!(
+            raw_editor
+                .extract_media(baseline.audio_data_identifier)
+                .unwrap(),
+            focused_editor
+                .extract_media(baseline.audio_data_identifier)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn source_built_audio_properties_match_raw_and_focused_updates() {
+        let mut seed = KeynoteDocumentBuilder::new()
+            .title("Audio properties parity")
+            .build()
+            .unwrap();
+        let created = seed
+            .add_slide_audio(
+                0,
+                "audio.aiff",
+                AUDIO,
+                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
+            )
+            .unwrap();
+        let baseline_bytes = seed.to_bytes().unwrap();
+        let baseline_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let baseline = baseline_editor.slide_audio(0).unwrap().remove(0);
+        let drawable_object_id = baseline.drawable_object_id;
+
+        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let raw_before = raw_editor
+            .slide_audio_properties(0, drawable_object_id)
+            .unwrap();
+        let focused_before = focused_audio_package(&focused_editor)
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap();
+        assert_eq!(raw_before.hyperlink_url, None);
+        assert_eq!(raw_before.locked, Some(false));
+        assert_eq!(raw_before.aspect_ratio_locked, Some(true));
+        assert_eq!(raw_before.accessibility_description, None);
+        assert_property_parity(
+            &raw_before,
+            &focused_before,
+            &KeynoteMediaProperties::new()
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(true)),
+        );
+
+        for expected in [
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some(String::new()))
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(false))
+                .with_accessibility_description(Some("音声 🎵".to_owned())),
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some("opaque target 日本語".to_owned()))
+                .with_locked(Some(true))
+                .with_aspect_ratio_locked(Some(true))
+                .with_accessibility_description(Some("locked 🔒".to_owned())),
+            KeynoteMediaProperties::new()
+                .with_hyperlink_url(Some("second target".to_owned()))
+                .with_locked(Some(false))
+                .with_aspect_ratio_locked(Some(false))
+                .with_accessibility_description(Some("unlocked again".to_owned())),
+            KeynoteMediaProperties::default(),
+        ] {
+            assert_audio_property_update_parity(
+                &mut raw_editor,
+                &mut focused_editor,
+                drawable_object_id,
+                &baseline,
+                expected,
+            );
+        }
+
+        assert_eq!(
+            raw_editor.to_bytes().unwrap(),
+            focused_editor.to_bytes().unwrap()
+        );
+        assert_eq!(
+            created.audio_data_identifier,
+            baseline.audio_data_identifier
+        );
     }
 
     fn keynote_playback(value: MediaPlaybackSettings) -> KeynoteMediaPlaybackSettings {

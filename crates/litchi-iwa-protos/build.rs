@@ -111,6 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/image_adjustments_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSDImageAdjustmentsArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_movie_geometry_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_media_properties_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_graph_codec.rs");
@@ -158,6 +159,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_movie_playback_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_image_adjustments_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_movie_geometry_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_media_properties_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -491,6 +496,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_movie_geometry_projection_budget(&buffa_keynote_movie_geometry_out_directory)?;
+
+    // Media properties borrow only their four owned scalar fields. Geometry,
+    // references, and future fields remain in the strict codec's source spans.
+    let buffa_keynote_media_properties_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-media-properties");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNMoviePropertiesArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_media_properties_out_directory)
+        .include_file("iwa_keynote_media_properties_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_media_properties_projection_budget(
+        &buffa_keynote_media_properties_out_directory,
+    )?;
 
     // Keynote chart-title reads need only the two scalar fields from the
     // generated ChartNonStyleArchive extension. Keep the outer non-style
@@ -1424,6 +1450,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "63e1be8a4d18de6fccb3c5760332109416f8d827455ce6260c900d41b69f0ae2",
         ),
         (
+            "KNMoviePropertiesArchive.proto",
+            577,
+            "3945a92dcc3f25333d6375eb68aaaf762ea00141cfd9055f71bf65cfb4f12b02",
+        ),
+        (
             "KNPlaceholderTextOwnerArchive.proto",
             1108,
             "2f076952a2f963ab9fa410f2625f3eac7f5ee1f26f5b1c49f833266016f13d8c",
@@ -1791,6 +1822,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_movie_geometry_codec.rs",
             "crate::buffa_keynote_movie_geometry_generated::",
             "mod buffa_keynote_movie_geometry_generated {",
+        ),
+        (
+            "src/keynote_media_properties_codec.rs",
+            "crate::buffa_keynote_media_properties_generated::",
+            "mod buffa_keynote_media_properties_generated {",
         ),
         (
             "src/keynote_chart_title_codec.rs",
@@ -3484,6 +3520,82 @@ required DrawableArchive super = 1;\n\
             "derived Keynote movie-geometry projection/router drifted from canonical TSD MovieArchive geometry fields or introduced generated/production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_media_properties_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str = r#"
+syntax = "proto2";
+package LitchiIwaKeynoteMoviePropertiesProjection;
+message DrawableArchive {
+optional string hyperlink = 4;
+optional bool locked = 5;
+optional bool aspect_ratio_locked = 7;
+optional string accessibility_description = 8;
+}
+message MovieArchive {
+required DrawableArchive super = 1;
+}
+"#;
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let movie = proto_message_block(&tsd, "MovieArchive").unwrap_or_default();
+    let drawable = proto_message_block(&tsd, "DrawableArchive").unwrap_or_default();
+    let canonical_drawable_fields = [
+        "optional string hyperlink_url = 4;",
+        "optional bool locked = 5;",
+        "optional bool aspect_ratio_locked = 7;",
+        "optional string accessibility_description = 8;",
+    ];
+    let projection =
+        fs::read_to_string(projection_directory.join("KNMoviePropertiesArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let codec = fs::read_to_string("src/keynote_media_properties_codec.rs")?;
+    let production = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let owned_routes = [
+        "pub fn decode_movie_properties",
+        "pub fn prepare_movie_properties_rewrite",
+        "pub fn rewrite_movie_properties",
+    ];
+    if proto_field(movie, "required .TSD.DrawableArchive super = 1;") != 1
+        || !canonical_drawable_fields
+            .iter()
+            .all(|field| proto_field(drawable, field) == 1)
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 1024
+        || !owned_routes.iter().all(|route| production.contains(route))
+        || !has_exact_private_module_declaration(
+            &lib,
+            "mod buffa_keynote_media_properties_generated {",
+        )
+        || lib
+            .matches(
+                "\"/buffa-keynote-media-properties/iwa_keynote_media_properties_buffa_protos.rs\"",
+            )
+            .count()
+            != 1
+        || [
+            "prost",
+            "to_owned_message",
+            "encode_to_vec",
+            "try_encode",
+            ".encode(",
+        ]
+        .iter()
+        .any(|forbidden| production.contains(forbidden))
+    {
+        return Err("derived Keynote media-properties projection/router drifted from canonical TSD MovieArchive drawable fields or introduced generated production encoding".into());
     }
     Ok(())
 }
@@ -9260,6 +9372,44 @@ fn enforce_keynote_movie_geometry_projection_budget(
     {
         return Err(format!(
             "Keynote movie-geometry projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_media_properties_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 80 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote media-properties projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

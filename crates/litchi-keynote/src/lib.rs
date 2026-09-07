@@ -455,7 +455,9 @@ pub use package::{
 };
 pub use package::{
     MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
-    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
+    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch, SlideMediaPropertiesCommit,
+    SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit, SlideMediaPropertiesError,
+    SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
 };
 pub use package::{
     SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
@@ -473,7 +475,7 @@ pub use package::{
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::image::ImageSelector;
-pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
+pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
 pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};

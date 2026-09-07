@@ -1,0 +1,18 @@
+// Private lazy projection for the selected drawable properties of one
+// TSD.MovieArchive. The handwritten codec remains the wire-preservation and
+// canonical-field authority; unrelated MovieArchive/DrawableArchive fields
+// are deliberately left opaque here.
+syntax = "proto2";
+
+package LitchiIwaKeynoteMoviePropertiesProjection;
+
+message DrawableArchive {
+  optional string hyperlink = 4;
+  optional bool locked = 5;
+  optional bool aspect_ratio_locked = 7;
+  optional string accessibility_description = 8;
+}
+
+message MovieArchive {
+  required DrawableArchive super = 1;
+}
