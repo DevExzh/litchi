@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0459: measured rejection preserves existing contracts
+
+Accepted ADR hashes remain unchanged. The tested lookup reorder changes only
+the order of pure predicates and preserves lazy decoding, first-match/error
+order and lossless state. It fails the predeclared practical gate and is
+reverted. Diagnostic compiler flags and clocks remain outside production.
+The final source is byte-identical to the baseline. The independent
+[source review](results/change-0459/source-review.md) rejects added XML retention
+and keeps all readback/validation obligations for the next experiment.
+Whole-workspace formatting retains an unrelated Keynote failure; scoped ODP
+formatting passes, and iWork remains excluded.
+
 ## Change 0458: harness-only public API attribution
 
 Accepted ADR hashes match the carried-forward 0457 review. The new command

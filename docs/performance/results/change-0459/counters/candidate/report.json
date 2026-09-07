@@ -1,0 +1,3081 @@
+{
+  "schema": "litchi-odp-append-attribution-v1",
+  "mode": "lifecycle",
+  "scope": "lifecycle",
+  "repeat": "diagnostic",
+  "shape": "large",
+  "warmup": 3,
+  "samples": 100,
+  "checked_iteration_count": 103,
+  "corpus_generator": "litchi-odp-existing-append-lifecycle-v1",
+  "corpus": {
+    "name": "odp-existing-append-lifecycle-large",
+    "generator": "litchi-odp-existing-append-lifecycle-v1",
+    "package_format": "ODP/ODF/ZIP",
+    "shape": "large",
+    "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+    "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+    "entry_count": 8192,
+    "archive_member_count": 6,
+    "entry_bytes": 96,
+    "uncompressed_payload_bytes": 942078,
+    "archive_bytes": 105112,
+    "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+    "target_entry": "content.xml",
+    "target_payload_bytes": 6087143,
+    "target_payload_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+    "xlsx": null
+  },
+  "identity": {
+    "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+    "source_archive_bytes": 105112,
+    "expected_output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+    "expected_output_bytes": 105124
+  },
+  "allocator": {
+    "allocator": "Rust system allocator",
+    "instrumentation": "none"
+  },
+  "timing_scope": "input/title/body/sink construction outside; one Instant includes Snapshot::from_bytes, Snapshot::transaction, Transaction::add, Transaction::commit, and sink write_all; all hashes, gates, report assembly, and drops outside",
+  "phase_order": [
+    "snapshot_open",
+    "transaction",
+    "add",
+    "commit",
+    "publication"
+  ],
+  "phases": [
+    {
+      "name": "snapshot_open",
+      "scope": "Snapshot::from_bytes(input Vec)"
+    },
+    {
+      "name": "transaction",
+      "scope": "Snapshot::transaction()"
+    },
+    {
+      "name": "add",
+      "scope": "Transaction::add(title, body)"
+    },
+    {
+      "name": "commit",
+      "scope": "Transaction::commit() including Patch construction and readback"
+    },
+    {
+      "name": "publication",
+      "scope": "HashingDiscardSink::write_all(committed snapshot bytes)"
+    }
+  ],
+  "preflight_gates": {
+    "source_manifest_bindings_verified": true,
+    "output_manifest_bindings_verified": true,
+    "untouched_members_verified": true,
+    "opaque_member_compressed_identity_verified": true,
+    "patch_replay_verified": true,
+    "inverse_patch_verified": true,
+    "stale_source_refusal_verified": true,
+    "exact_noop_verified": true
+  },
+  "rows": [
+    {
+      "sample_index": 0,
+      "lifecycle_ns": 150127952,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 1,
+      "lifecycle_ns": 150558523,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 2,
+      "lifecycle_ns": 150289222,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 3,
+      "lifecycle_ns": 149886621,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 4,
+      "lifecycle_ns": 149743150,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 5,
+      "lifecycle_ns": 149881360,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 6,
+      "lifecycle_ns": 151502037,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 7,
+      "lifecycle_ns": 149712280,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 8,
+      "lifecycle_ns": 150542733,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 9,
+      "lifecycle_ns": 150453823,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 10,
+      "lifecycle_ns": 150468073,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 11,
+      "lifecycle_ns": 151027006,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 12,
+      "lifecycle_ns": 149764610,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 13,
+      "lifecycle_ns": 150698034,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 14,
+      "lifecycle_ns": 150014231,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 15,
+      "lifecycle_ns": 150553734,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 16,
+      "lifecycle_ns": 151286986,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 17,
+      "lifecycle_ns": 151464437,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 18,
+      "lifecycle_ns": 150280823,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 19,
+      "lifecycle_ns": 151165446,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 20,
+      "lifecycle_ns": 150571214,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 21,
+      "lifecycle_ns": 151219676,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 22,
+      "lifecycle_ns": 151390537,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 23,
+      "lifecycle_ns": 150972895,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 24,
+      "lifecycle_ns": 151359727,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 25,
+      "lifecycle_ns": 151025335,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 26,
+      "lifecycle_ns": 150478173,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 27,
+      "lifecycle_ns": 151257396,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 28,
+      "lifecycle_ns": 151401857,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 29,
+      "lifecycle_ns": 152062339,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 30,
+      "lifecycle_ns": 152205390,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 31,
+      "lifecycle_ns": 151081266,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 32,
+      "lifecycle_ns": 152016520,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 33,
+      "lifecycle_ns": 151375347,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 34,
+      "lifecycle_ns": 151055896,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 35,
+      "lifecycle_ns": 151501607,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 36,
+      "lifecycle_ns": 151017285,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 37,
+      "lifecycle_ns": 151378997,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 38,
+      "lifecycle_ns": 151156536,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 39,
+      "lifecycle_ns": 151495398,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 40,
+      "lifecycle_ns": 151020715,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 41,
+      "lifecycle_ns": 151146275,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 42,
+      "lifecycle_ns": 150871104,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 43,
+      "lifecycle_ns": 150351482,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 44,
+      "lifecycle_ns": 151339806,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 45,
+      "lifecycle_ns": 151091076,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 46,
+      "lifecycle_ns": 151374787,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 47,
+      "lifecycle_ns": 151761129,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 48,
+      "lifecycle_ns": 151380397,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 49,
+      "lifecycle_ns": 151897339,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 50,
+      "lifecycle_ns": 151434367,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 51,
+      "lifecycle_ns": 152094970,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 52,
+      "lifecycle_ns": 151783198,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 53,
+      "lifecycle_ns": 150842374,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 54,
+      "lifecycle_ns": 151366336,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 55,
+      "lifecycle_ns": 151697748,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 56,
+      "lifecycle_ns": 151203796,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 57,
+      "lifecycle_ns": 152523871,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 58,
+      "lifecycle_ns": 151173866,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 59,
+      "lifecycle_ns": 151453828,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 60,
+      "lifecycle_ns": 151537958,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 61,
+      "lifecycle_ns": 151652298,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 62,
+      "lifecycle_ns": 151294486,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 63,
+      "lifecycle_ns": 151775548,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 64,
+      "lifecycle_ns": 151485489,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 65,
+      "lifecycle_ns": 150791396,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 66,
+      "lifecycle_ns": 151632240,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 67,
+      "lifecycle_ns": 152075472,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 68,
+      "lifecycle_ns": 151900211,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 69,
+      "lifecycle_ns": 151432179,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 70,
+      "lifecycle_ns": 151458960,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 71,
+      "lifecycle_ns": 151215528,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 72,
+      "lifecycle_ns": 150910586,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 73,
+      "lifecycle_ns": 151008997,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 74,
+      "lifecycle_ns": 151014627,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 75,
+      "lifecycle_ns": 151059248,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 76,
+      "lifecycle_ns": 151628250,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 77,
+      "lifecycle_ns": 152293272,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 78,
+      "lifecycle_ns": 151162758,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 79,
+      "lifecycle_ns": 151353149,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 80,
+      "lifecycle_ns": 152085882,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 81,
+      "lifecycle_ns": 152384243,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 82,
+      "lifecycle_ns": 153079826,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 83,
+      "lifecycle_ns": 151926921,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 84,
+      "lifecycle_ns": 152650114,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 85,
+      "lifecycle_ns": 151546879,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 86,
+      "lifecycle_ns": 152004271,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 87,
+      "lifecycle_ns": 151635730,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 88,
+      "lifecycle_ns": 152273233,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 89,
+      "lifecycle_ns": 153241257,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 90,
+      "lifecycle_ns": 152326032,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 91,
+      "lifecycle_ns": 152074082,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 92,
+      "lifecycle_ns": 151534270,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 93,
+      "lifecycle_ns": 152370503,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 94,
+      "lifecycle_ns": 151934871,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 95,
+      "lifecycle_ns": 151353138,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 96,
+      "lifecycle_ns": 151853081,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 97,
+      "lifecycle_ns": 152134442,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 98,
+      "lifecycle_ns": 151830001,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 99,
+      "lifecycle_ns": 151904511,
+      "source_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "source_bytes": 105112,
+      "candidate_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "candidate_bytes": 105124,
+      "sink_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+      "sink": {
+        "accepted_bytes": 105124,
+        "write_calls": 1,
+        "largest_write": 105124,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 1
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    }
+  ]
+}

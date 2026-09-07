@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0459: rejected lookup experiment and resolved profiles
+
+A matched A1/B1/B2/A2 ordinary ODP append experiment retains 24 reports and 720
+samples. Local-name-first cached attribute comparisons fail the predeclared
+5% medium/large normal p50 gate and change no allocation metric; the production
+line is reverted. R1 normal changes span -0.994% to +0.078%; R2 includes six
+adverse timing flags. Separate whole-process counters and all raw rows remain
+in the [0459 bundle](results/change-0459/README.md).
+
+A distinct diagnostic build with frame pointers and unwind tables resolves
+94.62% / 91.60% of sampled periods to phase markers with fp/DWARF unwinding.
+This repairs the 0458 attribution limitation; its timings are not the ordinary
+baseline. Registry counts remain 439 selectors / 36 defaults.
+
 ## Change 0458: ordinary ODP append phase baseline
 
 The standalone `odp-append-attribution` command measures the same owned append

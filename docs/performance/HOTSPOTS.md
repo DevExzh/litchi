@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0459: source setup and candidate parsing dominate remaining work
+
+Resolved fp/DWARF profiles place candidate slide readback at about 59–60% of
+commit samples and serialization at 27–30%. Transaction setup spends about
+64% in staging metadata and 32–34% in source-fragment parsing. Family reopening
+is at most about 3%, so retaining its large XML owner is not justified.
+
+The local-name-first cached lookup experiment fails its practical latency gate
+and is reverted; allocation metrics are unchanged. The next transaction target
+is sharing tokenization/namespace maintenance between staging and fragment
+scans while preserving every state machine, error precedence and exact byte
+span. Initial/candidate slide parsing remains a larger independent target.
+See the [source review](results/change-0459/source-review.md) and
+[resolved profile](results/change-0459/diagnostic-summary.json). Inclusive
+sample shares overlap and do not authorize skipping validation or readback.
+
 ## Change 0458: ordinary ODP commit and setup phase costs
 
 Commit is the largest individual ordinary append phase on large sources:

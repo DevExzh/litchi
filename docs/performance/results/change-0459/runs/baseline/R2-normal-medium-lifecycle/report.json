@@ -1,0 +1,981 @@
+{
+  "schema": "litchi-odp-append-attribution-v1",
+  "mode": "lifecycle",
+  "scope": "lifecycle",
+  "repeat": "R2",
+  "shape": "medium",
+  "warmup": 3,
+  "samples": 30,
+  "checked_iteration_count": 33,
+  "corpus_generator": "litchi-odp-existing-append-lifecycle-v1",
+  "corpus": {
+    "name": "odp-existing-append-lifecycle-medium",
+    "generator": "litchi-odp-existing-append-lifecycle-v1",
+    "package_format": "ODP/ODF/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+    "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+    "entry_count": 4096,
+    "archive_member_count": 6,
+    "entry_bytes": 96,
+    "uncompressed_payload_bytes": 471038,
+    "archive_bytes": 54646,
+    "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+    "target_entry": "content.xml",
+    "target_payload_bytes": 3043815,
+    "target_payload_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+    "xlsx": null
+  },
+  "identity": {
+    "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+    "source_archive_bytes": 54646,
+    "expected_output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+    "expected_output_bytes": 54658
+  },
+  "allocator": {
+    "allocator": "Rust system allocator",
+    "instrumentation": "none"
+  },
+  "timing_scope": "input/title/body/sink construction outside; one Instant includes Snapshot::from_bytes, Snapshot::transaction, Transaction::add, Transaction::commit, and sink write_all; all hashes, gates, report assembly, and drops outside",
+  "phase_order": [
+    "snapshot_open",
+    "transaction",
+    "add",
+    "commit",
+    "publication"
+  ],
+  "phases": [
+    {
+      "name": "snapshot_open",
+      "scope": "Snapshot::from_bytes(input Vec)"
+    },
+    {
+      "name": "transaction",
+      "scope": "Snapshot::transaction()"
+    },
+    {
+      "name": "add",
+      "scope": "Transaction::add(title, body)"
+    },
+    {
+      "name": "commit",
+      "scope": "Transaction::commit() including Patch construction and readback"
+    },
+    {
+      "name": "publication",
+      "scope": "HashingDiscardSink::write_all(committed snapshot bytes)"
+    }
+  ],
+  "preflight_gates": {
+    "source_manifest_bindings_verified": true,
+    "output_manifest_bindings_verified": true,
+    "untouched_members_verified": true,
+    "opaque_member_compressed_identity_verified": true,
+    "patch_replay_verified": true,
+    "inverse_patch_verified": true,
+    "stale_source_refusal_verified": true,
+    "exact_noop_verified": true
+  },
+  "rows": [
+    {
+      "sample_index": 0,
+      "lifecycle_ns": 75381013,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 1,
+      "lifecycle_ns": 75668744,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 2,
+      "lifecycle_ns": 75212132,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 3,
+      "lifecycle_ns": 75601264,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 4,
+      "lifecycle_ns": 75351013,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 5,
+      "lifecycle_ns": 75085192,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 6,
+      "lifecycle_ns": 75500883,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 7,
+      "lifecycle_ns": 75344503,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 8,
+      "lifecycle_ns": 75840905,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 9,
+      "lifecycle_ns": 75223092,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 10,
+      "lifecycle_ns": 75647054,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 11,
+      "lifecycle_ns": 75860905,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 12,
+      "lifecycle_ns": 75238683,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 13,
+      "lifecycle_ns": 75342113,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 14,
+      "lifecycle_ns": 75675434,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 15,
+      "lifecycle_ns": 75128032,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 16,
+      "lifecycle_ns": 75257632,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 17,
+      "lifecycle_ns": 75396463,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 18,
+      "lifecycle_ns": 75795895,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 19,
+      "lifecycle_ns": 75461553,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 20,
+      "lifecycle_ns": 75125072,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 21,
+      "lifecycle_ns": 75188572,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 22,
+      "lifecycle_ns": 75390713,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 23,
+      "lifecycle_ns": 75154842,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 24,
+      "lifecycle_ns": 75041112,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 25,
+      "lifecycle_ns": 75472323,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 26,
+      "lifecycle_ns": 75384643,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 27,
+      "lifecycle_ns": 75193003,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 28,
+      "lifecycle_ns": 75522874,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 29,
+      "lifecycle_ns": 75308283,
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    }
+  ]
+}

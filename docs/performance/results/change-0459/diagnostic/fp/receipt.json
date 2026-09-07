@@ -1,0 +1,115 @@
+{
+  "started_utc": "2026-09-07T15:00:44.234298+00:00",
+  "binding_sha256": "45397fb5200f05e9537c9c6285542d3d08196fb480b192aee3e2698b283208ba",
+  "mode": "fp",
+  "status": "pass",
+  "workload": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/fp/resource.log",
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "fp",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/fp/perf.data",
+      "--",
+      "/tmp/litchi-goal-0459/diagnostic-target/release/litchi-perf-baseline",
+      "odp-append-attribution",
+      "--mode",
+      "phases",
+      "--shape",
+      "large",
+      "--warmup",
+      "3",
+      "--samples",
+      "100",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/fp/report.json"
+    ],
+    "exit_code": 0
+  },
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 5
+  },
+  "script": {
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/fp/perf.data"
+    ],
+    "exit_code": 0
+  },
+  "symbols": {
+    "argv": [
+      "nm",
+      "-C",
+      "/tmp/litchi-goal-0459/diagnostic-target/release/litchi-perf-baseline"
+    ],
+    "exit_code": 0
+  },
+  "finished_utc": "2026-09-07T15:01:01.178835+00:00",
+  "artifacts": [
+    {
+      "path": "diagnostic/fp/perf-script.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "diagnostic/fp/perf-script.stdout",
+      "bytes": 4638329,
+      "sha256": "f66ac609af0bc3f4cddd3f26e217a95af18abbb97c5367517e8ec49f7c8e9b7d"
+    },
+    {
+      "path": "diagnostic/fp/perf.data",
+      "bytes": 376560,
+      "sha256": "36700002e075a67b1956b516a966f289c02607aaa85bbb0b9fd40cc74e6e828c"
+    },
+    {
+      "path": "diagnostic/fp/report.json",
+      "bytes": 158855,
+      "sha256": "98b8d3f6ab063b87c832c858a3ad9f0ca37c03797fa3b8c524f0b7959c3d1a7e"
+    },
+    {
+      "path": "diagnostic/fp/resource.log",
+      "bytes": 1151,
+      "sha256": "43d308497b92c509d2d2a3d3d300e8dbebc8cf93acd6c5ce107039113745843c"
+    },
+    {
+      "path": "diagnostic/fp/symbols.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "diagnostic/fp/symbols.stdout",
+      "bytes": 8746645,
+      "sha256": "43acbc1a6129c07d2da218e04aaea42f66d0e5fad005d1e8ccde616a9dc5d130"
+    },
+    {
+      "path": "diagnostic/fp/workload.stderr",
+      "bytes": 178,
+      "sha256": "ff3fe41a42b9538252c1f2b6bbc3bef938126b3f020ffffb120d5b5ad9ed38ac"
+    },
+    {
+      "path": "diagnostic/fp/workload.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "binary": "/tmp/litchi-goal-0459/diagnostic-target/release/litchi-perf-baseline",
+  "sha256": "9af090bddd943d9be47a1e86a5331f3e1a5f15347a051eb2bbc5987a21138ec9",
+  "bytes": 57133720,
+  "build_receipt": {
+    "path": "checks/diagnostic-build.json",
+    "bytes": 1541,
+    "sha256": "46fa71cfbf405c44121b6814159619b5d16f42b71e93e1c44184b2a0279e6563"
+  },
+  "source": {
+    "path": "sources/28d1a0973bb2ff4a15d733b92c8ba23d2f1dbea3dfeb81fb61e290e4a7a28237.json",
+    "sha256": "28d1a0973bb2ff4a15d733b92c8ba23d2f1dbea3dfeb81fb61e290e4a7a28237",
+    "files": 7030
+  },
+  "revision": "36df468bdb97d363c800640a9a9096ae2ad9a7d7",
+  "driver_sha256": "849e344b7a57f816f95b6a345771d36fb305f8eee18a8f3313837420d2583a6e",
+  "oracle_sha256": "6d8c440db698acc21056d96dfc927ea0be47daa8f34357ad1a4178a812f11286",
+  "scope": "diagnostic build with force-frame-pointers and force-unwind-tables; distinct from ordinary timing binaries"
+}
