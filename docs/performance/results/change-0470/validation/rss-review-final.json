@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0470/rss_review.py"
+  ],
+  "started_utc": "2026-09-08T07:47:35.890649+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:47:36.028747+00:00",
+  "artifacts": {
+    "rss-review-final.stdout": {
+      "sha256": "0744a9231963e314dddeab5585a6a70a18635ef4384b238f6a9269648c6536d3",
+      "bytes": 50
+    },
+    "rss-review-final.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

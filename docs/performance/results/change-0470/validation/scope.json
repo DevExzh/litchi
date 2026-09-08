@@ -1,0 +1,16 @@
+{
+  "changed_files": [
+    "crates/litchi-xlsx/src/raw/compact.rs",
+    "crates/litchi-xlsx/src/raw/web.rs",
+    "crates/litchi-xlsx/src/raw/web/check.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs"
+  ],
+  "changed_source_sha256": {
+    "crates/litchi-xlsx/src/raw/compact.rs": "4db2ea5dc1b8be7873303aad9c2c67a5104d2acd54153498f5d2d91c28f88a52",
+    "crates/litchi-xlsx/src/raw/web.rs": "c3abb8b29b0054a0adb551032f36bc7e55d9beee6ab1e33fb8ab4e4ba15e5203",
+    "crates/litchi-xlsx/src/raw/web/check.rs": "7cc57ffda9cb07050939b6d65b669d1e4aeb8960837eb5dbbf35b074d141d009",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "328adb7780553627efb7cab693d776c46c2e044267799f14e87195a6b3fd9243"
+  },
+  "format_scope": "litchi-xlsx; pre-existing excluded iWork Keynote formatting discrepancy is recorded by change-0469",
+  "native_fuzz_scope": "Existing XLSX tests/fixtures; no new native Office execution or fuzz campaign claimed"
+}

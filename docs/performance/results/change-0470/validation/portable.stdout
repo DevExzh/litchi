@@ -1,0 +1,89 @@
+{
+  "binary_sha256": {
+    "candidate": "6ca3ace7edabc780490251ad9329ff4cc750718873c95ecd5a81bf347d3c12f7",
+    "control": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da"
+  },
+  "change": 470,
+  "chronology": {
+    "build_before_candidate_captures": true,
+    "capture_intervals_non_overlapping": true,
+    "capture_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2",
+      "A-full",
+      "B-full",
+      "A-heap",
+      "B-heap"
+    ],
+    "exports_after_captures": true
+  },
+  "dependencies": {
+    "guard_review": {
+      "bytes": 25432,
+      "path": "guard_review.py",
+      "sha256": "5b2d243b86c827e0ad8b7e1e883c6a296f3d4bbc256c377a0eb346efb174b5e4"
+    },
+    "perf_abba_summary": {
+      "bytes": 319636,
+      "path": "tools/perf_abba_summary.py",
+      "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+    },
+    "perf_compare": {
+      "bytes": 169266,
+      "path": "tools/perf_compare.py",
+      "sha256": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+    },
+    "report_policy": {
+      "bytes": 5353,
+      "path": "report-policy.json",
+      "sha256": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c"
+    },
+    "review": {
+      "bytes": 11866,
+      "path": "review.py",
+      "sha256": "b67b76fffbdfadc1a46723643bbcaebd755cdac8661724ca37771902aca9606d"
+    },
+    "rss_review": {
+      "bytes": 12297,
+      "path": "rss_review.py",
+      "sha256": "ff4916471531612a18a06c59ee4ba7f263f04f9d9174320eb4cc2685ca8c5518"
+    }
+  },
+  "lanes": [
+    "A1",
+    "B1",
+    "B2",
+    "A2",
+    "A-full",
+    "B-full",
+    "A-heap",
+    "B-heap"
+  ],
+  "live_state": {
+    "mode": "post-cleanup",
+    "roles": {
+      "candidate": {
+        "binary_absent": true,
+        "tree_absent": true
+      },
+      "control": {
+        "binary_absent": true,
+        "tree_absent": true
+      }
+    }
+  },
+  "mode": "post-cleanup",
+  "schema": "litchi-0470-verification-v1",
+  "sealed_files": 194,
+  "status": "pass",
+  "summary": {
+    "analyzer": {
+      "bytes": 18313,
+      "path": "analyze.py",
+      "sha256": "ccf515af81823e7ce37000fb8f969ddff214bbd388d747067868e201ff0455af"
+    },
+    "path": "summary.json"
+  }
+}

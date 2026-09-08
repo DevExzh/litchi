@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "docs/performance/results/change-0470",
+    "-p",
+    "test_evidence.py",
+    "-v"
+  ],
+  "started_utc": "2026-09-08T07:47:36.276180+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:47:36.457829+00:00",
+  "artifacts": {
+    "tests-final.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-final.stderr": {
+      "sha256": "3e04dc95383dbd33e3cdc314c29fef404b7687c6eb266b0525e6c7f88584a1d7",
+      "bytes": 2132
+    }
+  }
+}

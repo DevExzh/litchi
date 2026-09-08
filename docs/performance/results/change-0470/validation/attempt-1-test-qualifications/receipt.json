@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "name": "xlsx-fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-xlsx",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-08T07:03:26.574169+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T07:03:27.645921+00:00",
+      "log": "xlsx-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "xlsx-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features"
+      ],
+      "started_utc": "2026-09-08T07:03:27.646173+00:00",
+      "exit_code": 101,
+      "finished_utc": "2026-09-08T07:03:40.852684+00:00",
+      "log": "xlsx-tests.log",
+      "log_sha256": "7ebd7b67238080662c0b567e958c4b4bc1474e9ff4f0451ef20846e08d669dc4"
+    }
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}

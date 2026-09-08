@@ -1,0 +1,10 @@
+{
+  "verified_utc": "2026-09-08T07:38:57.094435+00:00",
+  "restored_from": "f0ab67b55d5148d566964359207f643c677cc9a2",
+  "clean": true,
+  "source_count": 6993,
+  "source_manifest_sha256": "9f533fa955199c4b23c3d846a5cdfd661269cf6875da7def6c0c1420879361d7",
+  "all_bound_sources_and_fixtures_match": true,
+  "candidate_binary_unchanged": true,
+  "action": "git restore --source=f0ab67b55d5148d566964359207f643c677cc9a2 --worktree -- crates/litchi-xlsx/src/raw/compact.rs crates/litchi-xlsx/src/raw/web/check.rs"
+}

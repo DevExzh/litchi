@@ -1,0 +1,23 @@
+	Command being timed: "/tmp/litchi-goal-0470/control --workers 1 --warmup 5 --samples 100 --case cfb_shared_read_one,opc_noop_save,cfb_read_one,opc_source_open,ppt_fresh_write_to --shape many-small,few-large,wide-root --writer-shape payload-heavy --json /home/zhuhe/code/litchi/docs/performance/results/change-0470/guard-A2/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0470/guard-A2/corpus-catalog.json"
+	User time (seconds): 2.64
+	System time (seconds): 0.37
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 101680
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 481089
+	Voluntary context switches: 31
+	Involuntary context switches: 56
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 9384
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

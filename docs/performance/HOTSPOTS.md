@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Current XLSX pass-reuse result and remaining leads (0470)
+
+[0470](changes/0470-xlsx-empty-web-proof.md) removes the later web-binding
+traversal for ordinary worksheets through a bounded proof during compaction.
+Unproven inputs keep the original reader and error phase. Whole-process
+allocation calls fall 19.753%; the six-row diagnostic latency probe improves,
+with no qualified latency or peak-memory claim. Repeated RSS is variable,
+and targeted PPT/CFB guard penalties remain explicit.
+
+The larger eager-parser and lossless snapshot traversals remain next leads.
+Their fusion must account for transformed MCE input, original-byte span identity,
+error priority and simultaneous temporary storage. A separate lifetime review
+also identifies the now-unused pre-compaction vector retained around grid
+parsing in both versions: measure releasing it promptly before pursuing another
+cache or increasing the existing 4,096-cell/1 MiB Store handoff. Keep the
+persistent payload-heavy PPT guard flag in subsequent matched comparisons.
+
 ## Current XLSX result and next lead (0469)
 
 [0469](changes/0469-xlsx-borrowed-compaction-events.md) retains borrowed events

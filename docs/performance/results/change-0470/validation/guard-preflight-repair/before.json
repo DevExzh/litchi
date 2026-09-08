@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-09-08T07:38:25.714074+00:00",
+  "phase": "guard-B1 before benchmark process creation",
+  "benchmark_started": false,
+  "cause": "Unassigned temporary checkout truncation; clean-source preflight refused the run.",
+  "worktree": "/tmp/litchi-goal-0468/profile-tree",
+  "revision": "f0ab67b55d5148d566964359207f643c677cc9a2",
+  "status": " M crates/litchi-xlsx/src/raw/compact.rs\n M crates/litchi-xlsx/src/raw/web/check.rs\n",
+  "files": {
+    "crates/litchi-xlsx/src/raw/compact.rs": {
+      "bytes": 16384,
+      "sha256": "a90d33f3d76468a81d6d4661a2b94dfefa62a95fb91183dd72be5cfdbd66e32a"
+    },
+    "crates/litchi-xlsx/src/raw/web/check.rs": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "df": "Filesystem      Size  Used Avail Use% Mounted on\ntmpfs            62G   46G   16G  75% /tmp\n",
+  "inodes": "Filesystem      Inodes  IUsed  IFree IUse% Mounted on\ntmpfs          1048576 233589 814987   23% /tmp\n"
+}

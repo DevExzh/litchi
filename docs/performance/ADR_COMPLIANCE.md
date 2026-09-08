@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0470: bounded worksheet web-validation reuse
+
+All 30 previously read ADR files retain their authenticated hashes. The
+[0470 source review](results/change-0470/source-review.md) maps the finite
+proof to ADR 0001/0003/0005/0006/0008 and the crate ownership records.
+Only ordinary worksheets whose emitted events prove empty web bindings may
+reuse compaction validation. Every ambiguous or web-bearing input invokes the
+unchanged reader on the exact output at the prior validation phase. No public
+API, source retention, Store handoff limit, dependency, runtime or unsafe code
+changes. All 1,257 XLSX tests and six applicable correctness gates pass.
+
 ## 0466: unchanged ordinary XLSX profiling
 
 All 30 ADR files match the prior complete review. The

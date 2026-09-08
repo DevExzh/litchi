@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0470/guard_review.py"
+  ],
+  "started_utc": "2026-09-08T07:47:36.028852+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:47:36.276064+00:00",
+  "artifacts": {
+    "guard-review-final.stdout": {
+      "sha256": "14ab3639f3f2ebbf52d728f2f62fcb2a995e033e22fc7b3cbb6abf3f8d4214eb",
+      "bytes": 44
+    },
+    "guard-review-final.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

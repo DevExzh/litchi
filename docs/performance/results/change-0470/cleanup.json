@@ -1,0 +1,15 @@
+{
+  "verified_utc": "2026-09-08T07:49:02.359860+00:00",
+  "removed": [
+    "/tmp/litchi-goal-0468/profile-tree",
+    "/tmp/litchi-goal-0468",
+    "/tmp/litchi-goal-0470/control",
+    "/tmp/litchi-goal-0470/candidate",
+    "/tmp/litchi-goal-0470"
+  ],
+  "preserved": [
+    "/home/zhuhe/code/litchi/target",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+  ],
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

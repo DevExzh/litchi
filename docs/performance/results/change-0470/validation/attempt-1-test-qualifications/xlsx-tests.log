@@ -1,0 +1,124 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/compact.rs:389:67
+    |
+389 |     fn pipeline_error(phase: &'static str, bytes: Vec<u8>, error: crate::Error) -> PipelineOutcome {
+    |                                                                   ^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+389 -     fn pipeline_error(phase: &'static str, bytes: Vec<u8>, error: crate::Error) -> PipelineOutcome {
+389 +     fn pipeline_error(phase: &'static str, bytes: Vec<u8>, error: Error) -> PipelineOutcome {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:262:37
+    |
+262 |     fn assert_result_parity(actual: crate::Result<Bindings>, expected: crate::Result<Bindings>) {
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+262 -     fn assert_result_parity(actual: crate::Result<Bindings>, expected: crate::Result<Bindings>) {
+262 +     fn assert_result_parity(actual: Result<Bindings>, expected: crate::Result<Bindings>) {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:262:72
+    |
+262 |     fn assert_result_parity(actual: crate::Result<Bindings>, expected: crate::Result<Bindings>) {
+    |                                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+262 -     fn assert_result_parity(actual: crate::Result<Bindings>, expected: crate::Result<Bindings>) {
+262 +     fn assert_result_parity(actual: crate::Result<Bindings>, expected: Result<Bindings>) {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:279:24
+    |
+279 |         let expected = super::super::read(&output);
+    |                        ^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+279 -         let expected = super::super::read(&output);
+279 +         let expected = read(&output);
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:377:17
+    |
+377 |         assert!(super::super::read(orphan.as_bytes()).is_err());
+    |                 ^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+377 -         assert!(super::super::read(orphan.as_bytes()).is_err());
+377 +         assert!(read(orphan.as_bytes()).is_err());
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:428:21
+    |
+428 |         for _ in 0..super::MAX_DEPTH {
+    |                     ^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+428 -         for _ in 0..super::MAX_DEPTH {
+428 +         for _ in 0..MAX_DEPTH {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:431:21
+    |
+431 |         for _ in 0..super::MAX_DEPTH {
+    |                     ^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+431 -         for _ in 0..super::MAX_DEPTH {
+431 +         for _ in 0..MAX_DEPTH {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:439:33
+    |
+439 |         assert!(output.len() <= super::MAX_XML_BYTES);
+    |                                 ^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+439 -         assert!(output.len() <= super::MAX_XML_BYTES);
+439 +         assert!(output.len() <= MAX_XML_BYTES);
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:440:36
+    |
+440 |         let oversized = vec![b' '; super::MAX_XML_BYTES + 1];
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+440 -         let oversized = vec![b' '; super::MAX_XML_BYTES + 1];
+440 +         let oversized = vec![b' '; MAX_XML_BYTES + 1];
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/raw/web/check.rs:441:56
+    |
+441 |         assert_result_parity(probe.finish(&oversized), super::super::read(&oversized));
+    |                                                        ^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+441 -         assert_result_parity(probe.finish(&oversized), super::super::read(&oversized));
+441 +         assert_result_parity(probe.finish(&oversized), read(&oversized));
+    |
+
+error: could not compile `litchi-xlsx` (lib test) due to 10 previous errors
+warning: build failed, waiting for other jobs to finish...
