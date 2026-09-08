@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "perf",
+    "report",
+    "--stdio",
+    "--no-children",
+    "--no-inline",
+    "-g",
+    "none",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/samples-fp/perf.data",
+    "--sort",
+    "symbol",
+    "--percent-limit",
+    "0.5"
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "DEBUGINFOD_URLS": ""
+  },
+  "started_utc": "2026-09-07T20:38:38.301099+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T20:38:38.374948+00:00"
+}

@@ -1,0 +1,57 @@
+{
+  "samples/perf.data": {
+    "original": {
+      "sha256": "12d71ce5461e52ea3bb5be92b9e3005d36862a7b1dd9125ebbf61da88c8fdba3",
+      "bytes": 254248144
+    },
+    "compressed": {
+      "path": "samples/perf.data.gz",
+      "sha256": "23c6e9a8928d38dd0182c2635ceebebb798bd36e503a328f1a624724f2c563df",
+      "bytes": 7436241
+    }
+  },
+  "samples/perf-script.txt": {
+    "original": {
+      "sha256": "95a842b2a759c96abd721008ff831c1125c8fb030080f532560d66002b10351b",
+      "bytes": 1249037
+    },
+    "compressed": {
+      "path": "samples/perf-script.txt.gz",
+      "sha256": "f0cdd6cd2e50a48218988d4f9f470713e62269161ced85e6413e7e7094a9a681",
+      "bytes": 154074
+    }
+  },
+  "samples-fp/perf.data": {
+    "original": {
+      "sha256": "dd358ecef30854ff8e22f3cb07edf6adcb06575260db5f1adff52e02764e9caf",
+      "bytes": 2843072
+    },
+    "compressed": {
+      "path": "samples-fp/perf.data.gz",
+      "sha256": "6cc285042bfb8410fbd89cdfc8051fcb59a42ee0720ebe5d998bae63689815a0",
+      "bytes": 284964
+    }
+  },
+  "samples-fp/perf-script.stdout": {
+    "original": {
+      "sha256": "287b240850421f87af03523241250b218bb087719404ff1168b3c71b30f88cab",
+      "bytes": 27275370
+    },
+    "compressed": {
+      "path": "samples-fp/perf-script.stdout.gz",
+      "sha256": "9030cec54497f068a8c6a074c42604ff2390ab7be5141e6e232de5d0d755a17a",
+      "bytes": 730671
+    }
+  },
+  "heaptrack/print.txt": {
+    "original": {
+      "sha256": "76d2be54ec94f58ba05efc73a00b72a6f6fb55dc77c79bd3c41877f54d899cbb",
+      "bytes": 521044
+    },
+    "compressed": {
+      "path": "heaptrack/print.txt.gz",
+      "sha256": "3fd19e7a19a09d79d9b76e1ec8119bbf0cf023d3c513c3ca46030b0366f40294",
+      "bytes": 18742
+    }
+  }
+}

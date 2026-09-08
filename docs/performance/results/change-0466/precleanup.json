@@ -1,0 +1,56 @@
+{
+  "status": "pass",
+  "verifier_sha256": "531fa35f40fd1cf9381793eeb18ef665add6f24092916c27604b8b60eb058422",
+  "source_files": 7032,
+  "binaries": [
+    {
+      "path": "/tmp/litchi-goal-0466/normal",
+      "bytes": 58346112,
+      "sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5"
+    },
+    {
+      "path": "/tmp/litchi-goal-0466/profile",
+      "bytes": 463587824,
+      "sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90"
+    }
+  ],
+  "verification": {
+    "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+    "build_revision": "161cf53b20d8bb65fe79d4567b9ea7768430de7b",
+    "case": "xlsx_one_percent_commit_save",
+    "change": 466,
+    "compressed_files": 5,
+    "corpus_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+    "heaptrack_samples": 5,
+    "lanes": [
+      "normal-r1",
+      "normal-r2",
+      "normal-r3",
+      "normal-r4",
+      "counters",
+      "samples",
+      "heaptrack"
+    ],
+    "normal_samples": 30,
+    "postprocess_commands": 3,
+    "profile_binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+    "profile_revision": "418edc42a365819837b393e42a49e4cd459d1624",
+    "profile_samples": 50,
+    "schema": "litchi-0466-verification-v1",
+    "sealed_files": 100,
+    "source_files": 7032,
+    "status": "pass",
+    "summaries": {
+      "summary-dwarf.json": {
+        "raw_stack_blocks": 15291,
+        "script": "samples/perf-script.txt.gz",
+        "weighted_event_period": 133775549774
+      },
+      "summary-fp.json": {
+        "raw_stack_blocks": 15483,
+        "script": "samples-fp/perf-script.stdout.gz",
+        "weighted_event_period": 135131742466
+      }
+    }
+  }
+}

@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Current dense XLSX investigation (0466)
+
+The unchanged ordinary `xlsx_one_percent_commit_save` dense-wide path is
+captured in [0466](changes/0466-xlsx-dense-commit-profile.md). Supplemental
+normal R3/R4 p50 is 399.470314/398.785007 ms (30 samples, three warmups,
+CPU 2); process maximum RSS is 109,728/109,724 KiB. Earlier observations
+remain retained with disclosed postprocessing overlap. CPU/Heaptrack totals
+include setup and verification; the separate frame-pointer build is diagnostic.
+Default coverage remains 37 cases, 201 rows and 31 corpora. No speedup claim.
+
 ## Change 0465: checked-default ODP append baseline
 
 0465 adds the existing `odp_existing_append_lifecycle` case to the checked

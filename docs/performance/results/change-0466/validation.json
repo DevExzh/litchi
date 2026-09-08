@@ -1,0 +1,30 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0466/test_analyze.py"
+      ],
+      "passed_tests": 11,
+      "status": "pass",
+      "driver_sha256": "70dbf795d165f0794d0cd7b91d02749ea30f3e4b12f5c78cbeda2f5bb2fa27f4",
+      "log": "parser-tests.log",
+      "log_sha256": "4c3b3b2f85f7f81206f2731efca1a5c61f58b2f6c54d820b4003b988757b84ec"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0466/tests_verify.py"
+      ],
+      "passed_tests": 7,
+      "status": "pass",
+      "driver_sha256": "f2d8c33dc3867e2786ee60aa1af79fb9e997dc1caa364fb12927254562fd1462",
+      "log": "verifier-tests.log",
+      "log_sha256": "f2b65e8fab8d1cc5ad25d59d6867af255da20609cc7ae845c97d80f1988fde05"
+    }
+  ],
+  "production_scope": "No production or harness Rust changed; existing0465 production/harness gates are not rerun or broadened by these18Pythonchecks."
+}

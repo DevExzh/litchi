@@ -1,0 +1,82 @@
+{
+  "schema": "litchi-0466-capture-v1",
+  "lane": "counters",
+  "revision": "418edc42a365819837b393e42a49e4cd459d1624",
+  "status_before": "?? docs/GOAL.md\n?? docs/performance/results/change-0466/\n",
+  "driver_sha256": "159d243b8e1d9bae692c1e54c00ce86c01f173b7052d798185d564ee01307007",
+  "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+  "original_build_binding": "../change-0465/binding.json",
+  "original_build_binding_sha256": "ef8d59bcba6606a43e1e0eee0f26c65ecf249d9ceeb7eeb2dff18e239288140e",
+  "source_manifest_sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+  "samples": 30,
+  "warmups": 3,
+  "cpu": 2,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/counters/resource.log",
+    "perf",
+    "stat",
+    "-x",
+    ";",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/counters/counters.csv",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,page-faults",
+    "--",
+    "/tmp/litchi-goal-0466/normal",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/counters/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/counters/corpus-catalog.json"
+  ],
+  "scope": "ordinary commit plus sequential write timer; external tools include whole-process setup, warmup, verification and teardown",
+  "started_utc": "2026-09-07T20:29:11.127574+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T20:29:30.601866+00:00",
+  "source_and_binary_unchanged": true,
+  "artifacts": {
+    "corpus-catalog.json": {
+      "sha256": "291fe8a4ebb14a1cc6b63b0441212276f68624e07e8f48b66998e1a64460720b",
+      "bytes": 6313
+    },
+    "counters.csv": {
+      "sha256": "20620237b692bfb2219a82a9f461f3833edfa9799f30bfa0bab6cccc1d0bc301",
+      "bytes": 311
+    },
+    "report.json": {
+      "sha256": "b31530e73c8650916b9e1e6bb06f01c2aef5fd875e9c507cfd7928f52850fd40",
+      "bytes": 22267
+    },
+    "resource.log": {
+      "sha256": "2bffd7b8e8cd644849e29e581438300be589d44b395f9cd500671eed23118d79",
+      "bytes": 1229
+    },
+    "started.json": {
+      "sha256": "3de11f31a6703984b13a7db2f6789de8c0ea27fa5c2794cd9eab65b2d422721a",
+      "bytes": 1726
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

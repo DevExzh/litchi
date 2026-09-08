@@ -1,0 +1,28 @@
+{
+  "recorded_utc": "2026-09-07T20:32:20.203808+00:00",
+  "status": "disclosed",
+  "postprocessors": [
+    {
+      "pid": 85345,
+      "argv": "perf report --stdio -i docs/performance/results/change-0466/samples/perf.data --percent-limit 1.0"
+    },
+    {
+      "pid": 85967,
+      "argv": "perf report --stdio -i docs/performance/results/change-0466/samples/perf.data --percent-limit 0.5 --sort symbol"
+    }
+  ],
+  "observation": "Root observed these two team-owned postprocessors live during the capture sequence; no precise overlap interval recorded. Their CPU usage and contribution to noise are not established.",
+  "action": "Root sent SIGINT then SIGTERM; ps verified both PIDs missing before normal-r3 started.",
+  "interpretation": "Retain initial normal-r1/r2, counters, sampled and heaptrack artifacts. Use supplemental normal-r3/r4 for current normal-latency observations. Profiles and counters remain descriptive, with overlap limitation; allocation stack counts do not establish operation-only allocation totals. No speedup claim.",
+  "supplemental_protocol": {
+    "lanes": [
+      "normal-r3",
+      "normal-r4"
+    ],
+    "same_binary": true,
+    "same_workload": true,
+    "samples": 30,
+    "warmups": 3,
+    "cpu": 2
+  }
+}

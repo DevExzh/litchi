@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0466: unchanged ordinary XLSX profiling
+
+All 30 ADR files match the prior complete review. The
+[0466 record](changes/0466-xlsx-dense-commit-profile.md) adds external,
+explicit profiling and source-path evidence under ADR 0005. ADR 0003 commit,
+patch and publication semantics, ADR 0006 validation/preservation, and the
+0001/0002/0010/0011/0024 ownership boundaries remain unchanged. A separate
+frame-pointer build has the same 7,032-source-file manifest. No production
+optimization, retention-limit change, new dependency, runtime, unsafe code,
+or native-acceptance claim is introduced. Profile-analysis verification is
+separate from the unchanged production gates retained in 0465.
+
 ## Change 0465: checked ODP default stays within ADR boundaries
 
 0465 promotes the existing materialized ODP append case to the checked 37th

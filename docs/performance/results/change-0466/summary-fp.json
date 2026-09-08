@@ -1,0 +1,3262 @@
+{
+  "disjoint_scopes": {
+    "categories": {
+      "edit_commit": {
+        "inclusive_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "__libc_start_call_main",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "__libc_start_main@@GLIBC_2.34",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "_start",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "litchi_perf_baseline::main",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "litchi_perf_baseline::run",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "main",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "std::rt::lang_start_internal",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8610,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 55.12955139888324,
+            "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+            "weighted_event_period": 74497523419
+          },
+          {
+            "raw_stack_blocks": 8516,
+            "share_of_subset_percent": 98.96830285125428,
+            "share_of_whole_process_percent": 54.56078138898466,
+            "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+            "weighted_event_period": 73728934594
+          },
+          {
+            "raw_stack_blocks": 2216,
+            "share_of_subset_percent": 25.832454531088256,
+            "share_of_whole_process_percent": 14.241316298309442,
+            "symbol": "litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+            "weighted_event_period": 19244538864
+          },
+          {
+            "raw_stack_blocks": 2200,
+            "share_of_subset_percent": 25.477573148638736,
+            "share_of_whole_process_percent": 14.045671784166869,
+            "symbol": "<litchi_xlsx::workbook::model::Worksheet>::store",
+            "weighted_event_period": 18980161023
+          },
+          {
+            "raw_stack_blocks": 2172,
+            "share_of_subset_percent": 25.44642608638072,
+            "share_of_whole_process_percent": 14.028500548470092,
+            "symbol": "litchi_xlsx::raw::worksheet::edit::package::rewrite::<litchi_xlsx::raw::worksheet::edit::model::Plan>",
+            "weighted_event_period": 18956957233
+          },
+          {
+            "raw_stack_blocks": 2195,
+            "share_of_subset_percent": 25.422716343842488,
+            "share_of_whole_process_percent": 14.015429473770935,
+            "symbol": "litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 18939294062
+          },
+          {
+            "raw_stack_blocks": 2052,
+            "share_of_subset_percent": 23.889611167209583,
+            "share_of_whole_process_percent": 13.170235467420158,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+            "weighted_event_period": 17797168674
+          },
+          {
+            "raw_stack_blocks": 2029,
+            "share_of_subset_percent": 23.550391164446985,
+            "share_of_whole_process_percent": 12.983225001641857,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 17544458173
+          },
+          {
+            "raw_stack_blocks": 1883,
+            "share_of_subset_percent": 22.033092506554,
+            "share_of_whole_process_percent": 12.14674505816418,
+            "symbol": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+            "weighted_event_period": 16414108250
+          },
+          {
+            "raw_stack_blocks": 1751,
+            "share_of_subset_percent": 20.392001725423157,
+            "share_of_whole_process_percent": 11.242019072478318,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start",
+            "weighted_event_period": 15191536261
+          },
+          {
+            "raw_stack_blocks": 1633,
+            "share_of_subset_percent": 19.01563574311657,
+            "share_of_whole_process_percent": 10.483234680825863,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+            "weighted_event_period": 14166177691
+          },
+          {
+            "raw_stack_blocks": 1370,
+            "share_of_subset_percent": 15.874962442018251,
+            "share_of_whole_process_percent": 8.751795579025861,
+            "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+            "weighted_event_period": 11826453863
+          },
+          {
+            "raw_stack_blocks": 1317,
+            "share_of_subset_percent": 15.380919330101683,
+            "share_of_whole_process_percent": 8.479431827709176,
+            "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+            "weighted_event_period": 11458403980
+          },
+          {
+            "raw_stack_blocks": 946,
+            "share_of_subset_percent": 11.251843076520514,
+            "share_of_whole_process_percent": 6.203090612192062,
+            "symbol": "litchi_xlsx::raw::compact::changed",
+            "weighted_event_period": 8382344431
+          },
+          {
+            "raw_stack_blocks": 792,
+            "share_of_subset_percent": 9.214893286303758,
+            "share_of_whole_process_percent": 5.08012933062507,
+            "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+            "weighted_event_period": 6864867284
+          },
+          {
+            "raw_stack_blocks": 759,
+            "share_of_subset_percent": 8.890866082550518,
+            "share_of_whole_process_percent": 4.901494586785565,
+            "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::start_cell",
+            "weighted_event_period": 6623475042
+          },
+          {
+            "raw_stack_blocks": 796,
+            "share_of_subset_percent": 8.815867586713608,
+            "share_of_whole_process_percent": 4.860148252474765,
+            "symbol": "litchi_xlsx::raw::web::read",
+            "weighted_event_period": 6567603020
+          },
+          {
+            "raw_stack_blocks": 736,
+            "share_of_subset_percent": 8.628788421388691,
+            "share_of_whole_process_percent": 4.757012347870364,
+            "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+            "weighted_event_period": 6428233675
+          },
+          {
+            "raw_stack_blocks": 717,
+            "share_of_subset_percent": 8.284407338333025,
+            "share_of_whole_process_percent": 4.56715660167916,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 6171678297
+          },
+          {
+            "raw_stack_blocks": 661,
+            "share_of_subset_percent": 7.752396548161015,
+            "share_of_whole_process_percent": 4.273861439663677,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 5775343434
+          },
+          {
+            "raw_stack_blocks": 513,
+            "share_of_subset_percent": 5.980595228570628,
+            "share_of_whole_process_percent": 3.297075320494003,
+            "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+            "weighted_event_period": 4455395331
+          },
+          {
+            "raw_stack_blocks": 464,
+            "share_of_subset_percent": 5.3357110834992065,
+            "share_of_whole_process_percent": 2.941553584273605,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 3974972614
+          },
+          {
+            "raw_stack_blocks": 418,
+            "share_of_subset_percent": 4.901342249276363,
+            "share_of_whole_process_percent": 2.7020879945499927,
+            "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+            "weighted_event_period": 3651378590
+          },
+          {
+            "raw_stack_blocks": 383,
+            "share_of_subset_percent": 4.486130741827634,
+            "share_of_whole_process_percent": 2.473183753136967,
+            "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::cell_address",
+            "weighted_event_period": 3342056300
+          },
+          {
+            "raw_stack_blocks": 286,
+            "share_of_subset_percent": 3.3048238693154777,
+            "share_of_whole_process_percent": 1.821934573676838,
+            "symbol": "litchi_ooxml_common::mce::codec::process_ooxml",
+            "weighted_event_period": 2462011936
+          },
+          {
+            "raw_stack_blocks": 281,
+            "share_of_subset_percent": 3.2909911920303,
+            "share_of_whole_process_percent": 1.8143086807430646,
+            "symbol": "<alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one",
+            "weighted_event_period": 2451706934
+          },
+          {
+            "raw_stack_blocks": 275,
+            "share_of_subset_percent": 3.218240200436696,
+            "share_of_whole_process_percent": 1.7742013854392713,
+            "symbol": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag",
+            "weighted_event_period": 2397509247
+          },
+          {
+            "raw_stack_blocks": 260,
+            "share_of_subset_percent": 3.0923205756024625,
+            "share_of_whole_process_percent": 1.7047824611450015,
+            "symbol": "litchi_xlsx::raw::compact::write_start",
+            "weighted_event_period": 2303702245
+          },
+          {
+            "raw_stack_blocks": 253,
+            "share_of_subset_percent": 2.935713141360904,
+            "share_of_whole_process_percent": 1.6184454851903292,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 2187033585
+          },
+          {
+            "raw_stack_blocks": 250,
+            "share_of_subset_percent": 2.93123882349499,
+            "share_of_whole_process_percent": 1.6159788138226907,
+            "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow",
+            "weighted_event_period": 2183700329
+          },
+          {
+            "raw_stack_blocks": 237,
+            "share_of_subset_percent": 2.7803097323792927,
+            "share_of_whole_process_percent": 1.5327722829601953,
+            "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value",
+            "weighted_event_period": 2071261894
+          }
+        ],
+        "leaf_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 1317,
+            "share_of_subset_percent": 15.25919148488197,
+            "share_of_whole_process_percent": 8.412323812712021,
+            "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+            "weighted_event_period": 11367719750
+          },
+          {
+            "raw_stack_blocks": 549,
+            "share_of_subset_percent": 6.409229578203999,
+            "share_of_whole_process_percent": 3.533379514588402,
+            "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+            "weighted_event_period": 4774717306
+          },
+          {
+            "raw_stack_blocks": 489,
+            "share_of_subset_percent": 5.697558313619677,
+            "share_of_whole_process_percent": 3.141038338988305,
+            "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+            "weighted_event_period": 4244539839
+          },
+          {
+            "raw_stack_blocks": 464,
+            "share_of_subset_percent": 5.3357110834992065,
+            "share_of_whole_process_percent": 2.941553584273605,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 3974972614
+          },
+          {
+            "raw_stack_blocks": 304,
+            "share_of_subset_percent": 3.5260634467347245,
+            "share_of_whole_process_percent": 1.9439029602248539,
+            "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+            "weighted_event_period": 2626829942
+          },
+          {
+            "raw_stack_blocks": 288,
+            "share_of_subset_percent": 3.3514937039681723,
+            "share_of_whole_process_percent": 1.8476634441594693,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+            "weighted_event_period": 2496779807
+          },
+          {
+            "raw_stack_blocks": 269,
+            "share_of_subset_percent": 3.152093545167573,
+            "share_of_whole_process_percent": 1.737735031124038,
+            "symbol": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+            "weighted_event_period": 2348231627
+          },
+          {
+            "raw_stack_blocks": 239,
+            "share_of_subset_percent": 2.8034030544260395,
+            "share_of_whole_process_percent": 1.545503527807666,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 2088465847
+          },
+          {
+            "raw_stack_blocks": 222,
+            "share_of_subset_percent": 2.5701500024787016,
+            "share_of_whole_process_percent": 1.4169121666448947,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 1914698100
+          },
+          {
+            "raw_stack_blocks": 212,
+            "share_of_subset_percent": 2.4628234816354495,
+            "share_of_whole_process_percent": 1.3577435371719808,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+            "weighted_event_period": 1834742500
+          },
+          {
+            "raw_stack_blocks": 206,
+            "share_of_subset_percent": 2.3997956333995916,
+            "share_of_whole_process_percent": 1.3229965671831834,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 1787788314
+          },
+          {
+            "raw_stack_blocks": 202,
+            "share_of_subset_percent": 2.337244759408906,
+            "share_of_whole_process_percent": 1.2885125509560378,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 1741189462
+          },
+          {
+            "raw_stack_blocks": 199,
+            "share_of_subset_percent": 2.203286357276913,
+            "share_of_whole_process_percent": 1.2146618847995578,
+            "symbol": "litchi_xlsx::raw::web::read",
+            "weighted_event_period": 1641393770
+          },
+          {
+            "raw_stack_blocks": 180,
+            "share_of_subset_percent": 2.113987771301324,
+            "share_of_whole_process_percent": 1.1654319749456696,
+            "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+            "weighted_event_period": 1574868535
+          },
+          {
+            "raw_stack_blocks": 164,
+            "share_of_subset_percent": 1.9511313857036017,
+            "share_of_whole_process_percent": 1.0756499801412098,
+            "symbol": "litchi_xlsx::raw::compact::changed",
+            "weighted_event_period": 1453544561
+          },
+          {
+            "raw_stack_blocks": 156,
+            "share_of_subset_percent": 1.817560395107931,
+            "share_of_whole_process_percent": 1.0020128922267721,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::finish",
+            "weighted_event_period": 1354037481
+          },
+          {
+            "raw_stack_blocks": 152,
+            "share_of_subset_percent": 1.7877547962357183,
+            "share_of_whole_process_percent": 0.9855811992767707,
+            "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+            "weighted_event_period": 1331833048
+          },
+          {
+            "raw_stack_blocks": 145,
+            "share_of_subset_percent": 1.6861598377371425,
+            "share_of_whole_process_percent": 0.9295723544126241,
+            "symbol": "_int_malloc",
+            "weighted_event_period": 1256147320
+          },
+          {
+            "raw_stack_blocks": 138,
+            "share_of_subset_percent": 1.6412624714020496,
+            "share_of_whole_process_percent": 0.9048206377621743,
+            "symbol": "litchi_xlsx::raw::compact::write_start",
+            "weighted_event_period": 1222699894
+          },
+          {
+            "raw_stack_blocks": 129,
+            "share_of_subset_percent": 1.508150061151498,
+            "share_of_whole_process_percent": 0.8314363631348042,
+            "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+            "weighted_event_period": 1123534445
+          },
+          {
+            "raw_stack_blocks": 128,
+            "share_of_subset_percent": 1.4660292099340506,
+            "share_of_whole_process_percent": 0.8082153268132343,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+            "weighted_event_period": 1092155454
+          },
+          {
+            "raw_stack_blocks": 126,
+            "share_of_subset_percent": 1.4647694620163627,
+            "share_of_whole_process_percent": 0.8075208334374562,
+            "symbol": "core::str::converts::from_utf8",
+            "weighted_event_period": 1091216973
+          },
+          {
+            "raw_stack_blocks": 104,
+            "share_of_subset_percent": 1.2100042023277504,
+            "share_of_whole_process_percent": 0.6670698886509243,
+            "symbol": "cfree@GLIBC_2.2.5",
+            "weighted_event_period": 901423164
+          },
+          {
+            "raw_stack_blocks": 96,
+            "share_of_subset_percent": 1.1185321830275488,
+            "share_of_whole_process_percent": 0.6166417747552232,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+            "weighted_event_period": 833278775
+          },
+          {
+            "raw_stack_blocks": 93,
+            "share_of_subset_percent": 1.10454079442611,
+            "share_of_whole_process_percent": 0.6089283849847756,
+            "symbol": "_int_free_merge_chunk",
+            "weighted_event_period": 822855537
+          },
+          {
+            "raw_stack_blocks": 94,
+            "share_of_subset_percent": 1.091856188862981,
+            "share_of_whole_process_percent": 0.6019354188411047,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+            "weighted_event_period": 813405820
+          },
+          {
+            "raw_stack_blocks": 93,
+            "share_of_subset_percent": 1.0890956219265027,
+            "share_of_whole_process_percent": 0.6004135306729583,
+            "symbol": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag",
+            "weighted_event_period": 811349266
+          },
+          {
+            "raw_stack_blocks": 91,
+            "share_of_subset_percent": 1.0457987906767088,
+            "share_of_whole_process_percent": 0.5765441818350155,
+            "symbol": "malloc",
+            "weighted_event_period": 779094199
+          },
+          {
+            "raw_stack_blocks": 89,
+            "share_of_subset_percent": 1.035871895579262,
+            "share_of_whole_process_percent": 0.5710715290999554,
+            "symbol": "<quick_xml::encoding::Decoder>::decode_cow",
+            "weighted_event_period": 771698908
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 1.0218023325670147,
+            "share_of_whole_process_percent": 0.5633150421275203,
+            "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::start_cell",
+            "weighted_event_period": 761217432
+          },
+          {
+            "raw_stack_blocks": 79,
+            "share_of_subset_percent": 0.9121026106845056,
+            "share_of_whole_process_percent": 0.5028380775678705,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw",
+            "weighted_event_period": 679493856
+          },
+          {
+            "raw_stack_blocks": 76,
+            "share_of_subset_percent": 0.8681797774166621,
+            "share_of_whole_process_percent": 0.4786236166256289,
+            "symbol": "litchi_xlsx::raw::worksheet::semantic::materialize",
+            "weighted_event_period": 646772433
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 0.865042665076893,
+            "share_of_whole_process_percent": 0.4768941406658351,
+            "symbol": "<quick_xml::name::QName>::local_name",
+            "weighted_event_period": 644435362
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 0.8627368850708398,
+            "share_of_whole_process_percent": 0.4756229744922529,
+            "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::cell_address",
+            "weighted_event_period": 642717613
+          },
+          {
+            "raw_stack_blocks": 73,
+            "share_of_subset_percent": 0.8412919936613015,
+            "share_of_whole_process_percent": 0.4638005020601967,
+            "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "weighted_event_period": 626741700
+          },
+          {
+            "raw_stack_blocks": 67,
+            "share_of_subset_percent": 0.7708543353449756,
+            "share_of_whole_process_percent": 0.42496853701452814,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+            "weighted_event_period": 574267389
+          },
+          {
+            "raw_stack_blocks": 66,
+            "share_of_subset_percent": 0.7601096815193983,
+            "share_of_whole_process_percent": 0.41904505756112437,
+            "symbol": "[unknown]",
+            "weighted_event_period": 566262888
+          },
+          {
+            "raw_stack_blocks": 60,
+            "share_of_subset_percent": 0.7024525769222203,
+            "share_of_whole_process_percent": 0.3872589544471152,
+            "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow",
+            "weighted_event_period": 523309773
+          },
+          {
+            "raw_stack_blocks": 57,
+            "share_of_subset_percent": 0.6716873971576609,
+            "share_of_whole_process_percent": 0.3702982488558537,
+            "symbol": "unlink_chunk.isra.0",
+            "weighted_event_period": 500390476
+          },
+          {
+            "raw_stack_blocks": 54,
+            "share_of_subset_percent": 0.6217647886021734,
+            "share_of_whole_process_percent": 0.3427761387125929,
+            "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+            "weighted_event_period": 463199369
+          }
+        ],
+        "observed_marker_symbols": [
+          "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit"
+        ],
+        "scope": {
+          "raw_stack_blocks": 8610,
+          "share_of_subset_percent": 100.0,
+          "share_of_whole_process_percent": 55.12955139888324,
+          "weighted_event_period": 74497523419
+        }
+      },
+      "overlap": {
+        "inclusive_period_weighted_ranking": [],
+        "leaf_period_weighted_ranking": [],
+        "observed_marker_symbols": [],
+        "scope": {
+          "raw_stack_blocks": 0,
+          "share_of_subset_percent": null,
+          "share_of_whole_process_percent": 0.0,
+          "weighted_event_period": 0
+        }
+      },
+      "prepare_open_or_oracle": {
+        "inclusive_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "__libc_start_call_main",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "__libc_start_main@@GLIBC_2.34",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "_start",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "litchi_perf_baseline::main",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "litchi_perf_baseline::run",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "main",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "std::rt::lang_start_internal",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 4046,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 26.563450162001406,
+            "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+            "weighted_event_period": 35895653063
+          },
+          {
+            "raw_stack_blocks": 3997,
+            "share_of_subset_percent": 98.80254627978043,
+            "share_of_whole_process_percent": 26.24536513981785,
+            "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+            "weighted_event_period": 35465819230
+          },
+          {
+            "raw_stack_blocks": 3934,
+            "share_of_subset_percent": 97.25559973718538,
+            "share_of_whole_process_percent": 25.834442765942807,
+            "symbol": "litchi_perf_baseline::verify_xlsx_cells",
+            "weighted_event_period": 34910532666
+          },
+          {
+            "raw_stack_blocks": 2087,
+            "share_of_subset_percent": 51.585855297021375,
+            "share_of_whole_process_percent": 13.702982962466434,
+            "symbol": "<litchi_xlsx::workbook::model::Worksheet>::store",
+            "weighted_event_period": 18517079647
+          },
+          {
+            "raw_stack_blocks": 2076,
+            "share_of_subset_percent": 51.313982335610916,
+            "share_of_whole_process_percent": 13.63076412385821,
+            "symbol": "litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 18419489072
+          },
+          {
+            "raw_stack_blocks": 1913,
+            "share_of_subset_percent": 47.28527573857001,
+            "share_of_whole_process_percent": 12.560600654779986,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 16973358529
+          },
+          {
+            "raw_stack_blocks": 828,
+            "share_of_subset_percent": 20.466056803887604,
+            "share_of_whole_process_percent": 5.436490799227581,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start",
+            "weighted_event_period": 7346424746
+          },
+          {
+            "raw_stack_blocks": 775,
+            "share_of_subset_percent": 19.15612814156533,
+            "share_of_whole_process_percent": 5.088528551853832,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+            "weighted_event_period": 6876217298
+          },
+          {
+            "raw_stack_blocks": 509,
+            "share_of_subset_percent": 12.582074489836675,
+            "share_of_whole_process_percent": 3.3422330864536582,
+            "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+            "weighted_event_period": 4516417807
+          },
+          {
+            "raw_stack_blocks": 389,
+            "share_of_subset_percent": 9.615342358982394,
+            "share_of_whole_process_percent": 2.5541666754340984,
+            "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+            "weighted_event_period": 3451489934
+          },
+          {
+            "raw_stack_blocks": 263,
+            "share_of_subset_percent": 6.499834004705541,
+            "share_of_whole_process_percent": 1.7265801664527762,
+            "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+            "weighted_event_period": 2333157864
+          },
+          {
+            "raw_stack_blocks": 195,
+            "share_of_subset_percent": 4.819908235026279,
+            "share_of_whole_process_percent": 1.2803339218654075,
+            "symbol": "litchi_perf_baseline::xlsx_address",
+            "weighted_event_period": 1730137538
+          },
+          {
+            "raw_stack_blocks": 191,
+            "share_of_subset_percent": 4.717740396108196,
+            "share_of_whole_process_percent": 1.2531946188928083,
+            "symbol": "<litchi_xlsx::cell::Store>::view",
+            "weighted_event_period": 1693463725
+          },
+          {
+            "raw_stack_blocks": 150,
+            "share_of_subset_percent": 3.707324532205573,
+            "share_of_whole_process_percent": 0.984793304456079,
+            "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+            "weighted_event_period": 1330768352
+          },
+          {
+            "raw_stack_blocks": 148,
+            "share_of_subset_percent": 3.6526052630909334,
+            "share_of_whole_process_percent": 0.9702579786758005,
+            "symbol": "alloc::fmt::format::format_inner",
+            "weighted_event_period": 1311126513
+          },
+          {
+            "raw_stack_blocks": 137,
+            "share_of_subset_percent": 3.38601081269315,
+            "share_of_whole_process_percent": 0.8994412947097238,
+            "symbol": "litchi_ooxml_common::mce::codec::process_ooxml",
+            "weighted_event_period": 1215430694
+          },
+          {
+            "raw_stack_blocks": 137,
+            "share_of_subset_percent": 3.3855687730965407,
+            "share_of_whole_process_percent": 0.8993238737417821,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 1215272021
+          },
+          {
+            "raw_stack_blocks": 137,
+            "share_of_subset_percent": 3.3853249274145956,
+            "share_of_whole_process_percent": 0.8992590999155866,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 1215184491
+          },
+          {
+            "raw_stack_blocks": 132,
+            "share_of_subset_percent": 3.2628348088399846,
+            "share_of_whole_process_percent": 0.866721498314643,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 1171215863
+          },
+          {
+            "raw_stack_blocks": 128,
+            "share_of_subset_percent": 3.163715015873536,
+            "share_of_whole_process_percent": 0.8403918615093218,
+            "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+            "weighted_event_period": 1135636166
+          },
+          {
+            "raw_stack_blocks": 105,
+            "share_of_subset_percent": 2.590966235849481,
+            "share_of_whole_process_percent": 0.6882500247741606,
+            "symbol": "core::fmt::write",
+            "weighted_event_period": 930044251
+          },
+          {
+            "raw_stack_blocks": 95,
+            "share_of_subset_percent": 2.3489770990379935,
+            "share_of_whole_process_percent": 0.6239693610197837,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 843180670
+          },
+          {
+            "raw_stack_blocks": 92,
+            "share_of_subset_percent": 2.2740580079915063,
+            "share_of_whole_process_percent": 0.6040682656078258,
+            "symbol": "<litchi_xlsx::workbook::model::Workbook>::from_bytes",
+            "weighted_event_period": 816287973
+          },
+          {
+            "raw_stack_blocks": 91,
+            "share_of_subset_percent": 2.2492881730914562,
+            "share_of_whole_process_percent": 0.5974885428589409,
+            "symbol": "<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits",
+            "weighted_event_period": 807396679
+          },
+          {
+            "raw_stack_blocks": 90,
+            "share_of_subset_percent": 2.2240505823890375,
+            "share_of_whole_process_percent": 0.5907845680306141,
+            "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+            "weighted_event_period": 798337481
+          },
+          {
+            "raw_stack_blocks": 88,
+            "share_of_subset_percent": 2.1751138881069476,
+            "share_of_whole_process_percent": 0.5777852936340602,
+            "symbol": "<litchi_opc::pkgreader::PackageReader>::from_phys_reader",
+            "weighted_event_period": 780771335
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "<alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter",
+            "weighted_event_period": 771881223
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "<litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>",
+            "weighted_event_period": 771881223
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "<soapberry_zip::office::ArchiveReadSession>::read_with_accounting",
+            "weighted_event_period": 771881223
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "<soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared",
+            "weighted_event_period": 771881223
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "<soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader",
+            "weighted_event_period": 771881223
+          },
+          {
+            "raw_stack_blocks": 87,
+            "share_of_subset_percent": 2.1503473460847227,
+            "share_of_whole_process_percent": 0.5712064455871352,
+            "symbol": "std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>",
+            "weighted_event_period": 771881223
+          }
+        ],
+        "leaf_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 1395,
+            "share_of_subset_percent": 34.501635424389605,
+            "share_of_whole_process_percent": 9.164824731033155,
+            "symbol": "litchi_perf_baseline::verify_xlsx_cells",
+            "weighted_event_period": 12384587353
+          },
+          {
+            "raw_stack_blocks": 285,
+            "share_of_subset_percent": 7.045763300534383,
+            "share_of_whole_process_percent": 1.8715978228700363,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+            "weighted_event_period": 2529122750
+          },
+          {
+            "raw_stack_blocks": 268,
+            "share_of_subset_percent": 6.625209244211599,
+            "share_of_whole_process_percent": 1.759884155714458,
+            "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+            "weighted_event_period": 2378162125
+          },
+          {
+            "raw_stack_blocks": 249,
+            "share_of_subset_percent": 6.153997212762731,
+            "share_of_whole_process_percent": 1.6347139825831838,
+            "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+            "weighted_event_period": 2209017489
+          },
+          {
+            "raw_stack_blocks": 191,
+            "share_of_subset_percent": 4.717740396108196,
+            "share_of_whole_process_percent": 1.2531946188928083,
+            "symbol": "<litchi_xlsx::cell::Store>::view",
+            "weighted_event_period": 1693463725
+          },
+          {
+            "raw_stack_blocks": 145,
+            "share_of_subset_percent": 3.5835107352480486,
+            "share_of_whole_process_percent": 0.9519040882075857,
+            "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+            "weighted_event_period": 1286324581
+          },
+          {
+            "raw_stack_blocks": 132,
+            "share_of_subset_percent": 3.2628348088399846,
+            "share_of_whole_process_percent": 0.866721498314643,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 1171215863
+          },
+          {
+            "raw_stack_blocks": 122,
+            "share_of_subset_percent": 3.015470795587013,
+            "share_of_whole_process_percent": 0.8010130819354634,
+            "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+            "weighted_event_period": 1082422935
+          },
+          {
+            "raw_stack_blocks": 94,
+            "share_of_subset_percent": 2.3242376522185855,
+            "share_of_whole_process_percent": 0.6173977103935555,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 834300284
+          },
+          {
+            "raw_stack_blocks": 93,
+            "share_of_subset_percent": 2.298491197672182,
+            "share_of_whole_process_percent": 0.6105585637716393,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+            "weighted_event_period": 825058426
+          },
+          {
+            "raw_stack_blocks": 66,
+            "share_of_subset_percent": 1.631297402424418,
+            "share_of_whole_process_percent": 0.4333288724870338,
+            "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::finish",
+            "weighted_event_period": 585564856
+          },
+          {
+            "raw_stack_blocks": 60,
+            "share_of_subset_percent": 1.4827476158906177,
+            "share_of_whole_process_percent": 0.39386892397536827,
+            "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+            "weighted_event_period": 532241940
+          },
+          {
+            "raw_stack_blocks": 53,
+            "share_of_subset_percent": 1.310322955190414,
+            "share_of_whole_process_percent": 0.34806698516326967,
+            "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+            "weighted_event_period": 470348982
+          },
+          {
+            "raw_stack_blocks": 49,
+            "share_of_subset_percent": 1.2109633560283555,
+            "share_of_whole_process_percent": 0.3216736475586919,
+            "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+            "weighted_event_period": 434683205
+          },
+          {
+            "raw_stack_blocks": 47,
+            "share_of_subset_percent": 1.1612002218442548,
+            "share_of_whole_process_percent": 0.3084548422106484,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 416820403
+          },
+          {
+            "raw_stack_blocks": 43,
+            "share_of_subset_percent": 1.0627871606916974,
+            "share_of_whole_process_percent": 0.28231293775848887,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 381494392
+          },
+          {
+            "raw_stack_blocks": 35,
+            "share_of_subset_percent": 0.8649673665361947,
+            "share_of_whole_process_percent": 0.22976517532741808,
+            "symbol": "<quick_xml::encoding::Decoder>::decode_cow",
+            "weighted_event_period": 310485685
+          },
+          {
+            "raw_stack_blocks": 33,
+            "share_of_subset_percent": 0.8155357348874875,
+            "share_of_whole_process_percent": 0.21663442849014966,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+            "weighted_event_period": 292741878
+          },
+          {
+            "raw_stack_blocks": 33,
+            "share_of_subset_percent": 0.814399056863316,
+            "share_of_whole_process_percent": 0.21633248758969642,
+            "symbol": "alloc::fmt::format::format_inner",
+            "weighted_event_period": 292333860
+          },
+          {
+            "raw_stack_blocks": 31,
+            "share_of_subset_percent": 0.766808322213586,
+            "share_of_whole_process_percent": 0.20369074650928506,
+            "symbol": "litchi_xlsx::raw::worksheet::semantic::materialize",
+            "weighted_event_period": 275250855
+          },
+          {
+            "raw_stack_blocks": 29,
+            "share_of_subset_percent": 0.7168268133982661,
+            "share_of_whole_process_percent": 0.19041393332491124,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+            "weighted_event_period": 257309666
+          },
+          {
+            "raw_stack_blocks": 28,
+            "share_of_subset_percent": 0.6921465436607259,
+            "share_of_whole_process_percent": 0.18385800217333223,
+            "symbol": "malloc",
+            "weighted_event_period": 248450522
+          },
+          {
+            "raw_stack_blocks": 28,
+            "share_of_subset_percent": 0.6917506433556093,
+            "share_of_whole_process_percent": 0.1837528373930914,
+            "symbol": "core::str::converts::from_utf8",
+            "weighted_event_period": 248308411
+          },
+          {
+            "raw_stack_blocks": 27,
+            "share_of_subset_percent": 0.6669974121373182,
+            "share_of_whole_process_percent": 0.17717752515493565,
+            "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+            "weighted_event_period": 239423077
+          },
+          {
+            "raw_stack_blocks": 26,
+            "share_of_subset_percent": 0.642819400987144,
+            "share_of_whole_process_percent": 0.17075501121289596,
+            "symbol": "<litchi_sheet::Cell>::from_a1",
+            "weighted_event_period": 230744222
+          },
+          {
+            "raw_stack_blocks": 25,
+            "share_of_subset_percent": 0.6176442691010081,
+            "share_of_whole_process_percent": 0.16406762760110416,
+            "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow",
+            "weighted_event_period": 221707444
+          },
+          {
+            "raw_stack_blocks": 24,
+            "share_of_subset_percent": 0.5934401294388842,
+            "share_of_whole_process_percent": 0.15763817302481464,
+            "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+            "weighted_event_period": 213019210
+          },
+          {
+            "raw_stack_blocks": 21,
+            "share_of_subset_percent": 0.5192357934619032,
+            "share_of_whole_process_percent": 0.1379269412195252,
+            "symbol": "litchi_perf_baseline::xlsx_address",
+            "weighted_event_period": 186383079
+          },
+          {
+            "raw_stack_blocks": 21,
+            "share_of_subset_percent": 0.5191363552376219,
+            "share_of_whole_process_percent": 0.13790052699637628,
+            "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>",
+            "weighted_event_period": 186347385
+          },
+          {
+            "raw_stack_blocks": 18,
+            "share_of_subset_percent": 0.4452396971842217,
+            "share_of_whole_process_percent": 0.11827102506297672,
+            "symbol": "core::fmt::write",
+            "weighted_event_period": 159821697
+          },
+          {
+            "raw_stack_blocks": 18,
+            "share_of_subset_percent": 0.44512512063667203,
+            "share_of_whole_process_percent": 0.118240589578871,
+            "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+            "weighted_event_period": 159780569
+          },
+          {
+            "raw_stack_blocks": 16,
+            "share_of_subset_percent": 0.39553667891432953,
+            "share_of_whole_process_percent": 0.10506818857584344,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw",
+            "weighted_event_period": 141980474
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 0.3708388109456361,
+            "share_of_whole_process_percent": 0.09850758272690265,
+            "symbol": "__rustc::__rust_alloc",
+            "weighted_event_period": 133115013
+          },
+          {
+            "raw_stack_blocks": 13,
+            "share_of_subset_percent": 0.32167405283683054,
+            "share_of_whole_process_percent": 0.08544772670940155,
+            "symbol": "<alloc::string::String as core::fmt::Write>::write_str",
+            "weighted_event_period": 115467002
+          },
+          {
+            "raw_stack_blocks": 12,
+            "share_of_subset_percent": 0.2965904167090874,
+            "share_of_whole_process_percent": 0.07878464752779073,
+            "symbol": "cfree@GLIBC_2.2.5",
+            "weighted_event_period": 106463067
+          },
+          {
+            "raw_stack_blocks": 11,
+            "share_of_subset_percent": 0.27214760747923156,
+            "share_of_whole_process_percent": 0.07229179407982489,
+            "symbol": "core::slice::sort::unstable::ipnsort::<litchi_xlsx::cell::Stored, <[litchi_xlsx::cell::Stored]>::sort_unstable_by_key<litchi_sheet::Cell, <litchi_xlsx::cell::Store>::from_unsorted::{closure#0}>::{closure#0}>",
+            "weighted_event_period": 97689161
+          },
+          {
+            "raw_stack_blocks": 11,
+            "share_of_subset_percent": 0.27214695001800754,
+            "share_of_whole_process_percent": 0.07229161943544031,
+            "symbol": "<litchi_xlsx::cell::Store>::from_unsorted",
+            "weighted_event_period": 97688925
+          },
+          {
+            "raw_stack_blocks": 11,
+            "share_of_subset_percent": 0.2720594547440119,
+            "share_of_whole_process_percent": 0.07226837767193837,
+            "symbol": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+            "weighted_event_period": 97657518
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.2473920055003402,
+            "share_of_whole_process_percent": 0.06571585208585866,
+            "symbol": "litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas",
+            "weighted_event_period": 88802976
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.24722187347936037,
+            "share_of_whole_process_percent": 0.06567065915125606,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+            "weighted_event_period": 88741906
+          }
+        ],
+        "observed_marker_symbols": [
+          "<litchi_xlsx::workbook::model::Workbook>::from_bytes",
+          "<litchi_xlsx::workbook::model::Workbook>::from_package_with_styles",
+          "litchi_perf_baseline::prepare_xlsx_updates",
+          "litchi_perf_baseline::verify_xlsx_cells"
+        ],
+        "scope": {
+          "raw_stack_blocks": 4046,
+          "share_of_subset_percent": 100.0,
+          "share_of_whole_process_percent": 26.563450162001406,
+          "weighted_event_period": 35895653063
+        }
+      },
+      "unclassified": {
+        "inclusive_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 426,
+            "share_of_subset_percent": 97.65835519297453,
+            "share_of_whole_process_percent": 2.6028137429552918,
+            "symbol": "__libc_start_call_main",
+            "weighted_event_period": 3517227564
+          },
+          {
+            "raw_stack_blocks": 426,
+            "share_of_subset_percent": 97.65835519297453,
+            "share_of_whole_process_percent": 2.6028137429552918,
+            "symbol": "__libc_start_main@@GLIBC_2.34",
+            "weighted_event_period": 3517227564
+          },
+          {
+            "raw_stack_blocks": 416,
+            "share_of_subset_percent": 96.08391334862377,
+            "share_of_whole_process_percent": 2.560851343917725,
+            "symbol": "_start",
+            "weighted_event_period": 3460523043
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "litchi_perf_baseline::main",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "litchi_perf_baseline::run",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "main",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "std::rt::lang_start_internal",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 415,
+            "share_of_subset_percent": 96.08391332085804,
+            "share_of_whole_process_percent": 2.5608513431777067,
+            "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+            "weighted_event_period": 3460523042
+          },
+          {
+            "raw_stack_blocks": 225,
+            "share_of_subset_percent": 55.45854899470039,
+            "share_of_whole_process_percent": 1.478094456972278,
+            "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+            "weighted_event_period": 1997374795
+          },
+          {
+            "raw_stack_blocks": 126,
+            "share_of_subset_percent": 26.083292179492407,
+            "share_of_whole_process_percent": 0.6951781157090908,
+            "symbol": "litchi_perf_baseline::current_executable_identity",
+            "weighted_event_period": 939406301
+          },
+          {
+            "raw_stack_blocks": 125,
+            "share_of_subset_percent": 25.875110670619193,
+            "share_of_whole_process_percent": 0.6896296125497487,
+            "symbol": "sha2::sha256::x86_sha::compress",
+            "weighted_event_period": 931908512
+          },
+          {
+            "raw_stack_blocks": 91,
+            "share_of_subset_percent": 22.30836614241391,
+            "share_of_whole_process_percent": 0.5945678878537017,
+            "symbol": "<litchi_opc::pkgwriter::PackageWriter>::to_bytes",
+            "weighted_event_period": 803449947
+          },
+          {
+            "raw_stack_blocks": 91,
+            "share_of_subset_percent": 22.30836614241391,
+            "share_of_whole_process_percent": 0.5945678878537017,
+            "symbol": "<litchi_xlsx::workbook::model::Workbook>::to_bytes",
+            "weighted_event_period": 803449947
+          },
+          {
+            "raw_stack_blocks": 84,
+            "share_of_subset_percent": 20.620737035669098,
+            "share_of_whole_process_percent": 0.5495887949397679,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 742668915
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 18.211178610643504,
+            "share_of_whole_process_percent": 0.48536866988526056,
+            "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec",
+            "weighted_event_period": 655887141
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 18.211178610643504,
+            "share_of_whole_process_percent": 0.48536866988526056,
+            "symbol": "<zlib_rs::stable::Deflate>::compress_uninit",
+            "weighted_event_period": 655887141
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 18.211178610643504,
+            "share_of_whole_process_percent": 0.48536866988526056,
+            "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "weighted_event_period": 655887141
+          },
+          {
+            "raw_stack_blocks": 74,
+            "share_of_subset_percent": 18.211178610643504,
+            "share_of_whole_process_percent": 0.48536866988526056,
+            "symbol": "zlib_rs::deflate::deflate",
+            "weighted_event_period": 655887141
+          },
+          {
+            "raw_stack_blocks": 69,
+            "share_of_subset_percent": 16.979824966490263,
+            "share_of_whole_process_percent": 0.45255033927640437,
+            "symbol": "zlib_rs::deflate::longest_match::longest_match",
+            "weighted_event_period": 611539159
+          },
+          {
+            "raw_stack_blocks": 66,
+            "share_of_subset_percent": 16.269926506855043,
+            "share_of_whole_process_percent": 0.4336299564459728,
+            "symbol": "<alloc::sync::Arc<litchi_xlsx::workbook::model::Inner>>::drop_slow",
+            "weighted_event_period": 585971716
+          },
+          {
+            "raw_stack_blocks": 65,
+            "share_of_subset_percent": 16.0232285024679,
+            "share_of_whole_process_percent": 0.42705490247430106,
+            "symbol": "<alloc::sync::Arc<litchi_xlsx::workbook::model::SheetData>>::drop_slow",
+            "weighted_event_period": 577086731
+          },
+          {
+            "raw_stack_blocks": 65,
+            "share_of_subset_percent": 16.0232285024679,
+            "share_of_whole_process_percent": 0.42705490247430106,
+            "symbol": "core::ptr::drop_glue::<alloc::boxed::Box<[alloc::sync::Arc<litchi_xlsx::workbook::model::SheetData>]>>",
+            "weighted_event_period": 577086731
+          },
+          {
+            "raw_stack_blocks": 62,
+            "share_of_subset_percent": 14.048222862514406,
+            "share_of_whole_process_percent": 0.37441658174969633,
+            "symbol": "litchi_perf_baseline::build_xlsx_corpus",
+            "weighted_event_period": 505955651
+          },
+          {
+            "raw_stack_blocks": 56,
+            "share_of_subset_percent": 13.80344605158089,
+            "share_of_whole_process_percent": 0.3678927318835421,
+            "symbol": "core::ptr::drop_glue::<litchi_xlsx::cell::Store>",
+            "weighted_event_period": 497139859
+          },
+          {
+            "raw_stack_blocks": 44,
+            "share_of_subset_percent": 10.824432648205514,
+            "share_of_whole_process_percent": 0.2884953571127734,
+            "symbol": "_int_free_chunk",
+            "weighted_event_period": 389848803
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.110121239998634,
+            "share_of_whole_process_percent": 0.24280512114505867,
+            "symbol": "<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status",
+            "weighted_event_period": 328106791
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.110121239998634,
+            "share_of_whole_process_percent": 0.24280512114505867,
+            "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<alloc::vec::Vec<u8>>>",
+            "weighted_event_period": 328106791
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.110121239998634,
+            "share_of_whole_process_percent": 0.24280512114505867,
+            "symbol": "<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all",
+            "weighted_event_period": 328106791
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.110121239998634,
+            "share_of_whole_process_percent": 0.24280512114505867,
+            "symbol": "soapberry_zip::preserve::generated_entry",
+            "weighted_event_period": 328106791
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.101057370644872,
+            "share_of_whole_process_percent": 0.24256354874020186,
+            "symbol": "<flate2::zio::Writer<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>, flate2::mem::Compress>>::write_with_status",
+            "weighted_event_period": 327780350
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.101057370644872,
+            "share_of_whole_process_percent": 0.24256354874020186,
+            "symbol": "<litchi_opc::phys_pkg::PhysPkgWriter>::write",
+            "weighted_event_period": 327780350
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.101057370644872,
+            "share_of_whole_process_percent": 0.24256354874020186,
+            "symbol": "<soapberry_zip::office::StreamingArchiveWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::write_deflated_with_accounting",
+            "weighted_event_period": 327780350
+          },
+          {
+            "raw_stack_blocks": 37,
+            "share_of_subset_percent": 9.101057370644872,
+            "share_of_whole_process_percent": 0.24256354874020186,
+            "symbol": "<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>> as std::io::Write>::write_all",
+            "weighted_event_period": 327780350
+          },
+          {
+            "raw_stack_blocks": 27,
+            "share_of_subset_percent": 6.650150124554825,
+            "share_of_whole_process_percent": 0.1772413850581865,
+            "symbol": "_int_free_merge_chunk",
+            "weighted_event_period": 239509372
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 4.0971875317704045,
+            "share_of_whole_process_percent": 0.10919921796844123,
+            "symbol": "<litchi_opc::pkgwriter::PackageWriter>::validate_authored_xml",
+            "weighted_event_period": 147562806
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 4.0971875317704045,
+            "share_of_whole_process_percent": 0.10919921796844123,
+            "symbol": "<litchi_opc::pkgwriter::PublicationPlan>::from_package",
+            "weighted_event_period": 147562806
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 4.0971875317704045,
+            "share_of_whole_process_percent": 0.10919921796844123,
+            "symbol": "xml_minifier::audit::verify_authored",
+            "weighted_event_period": 147562806
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 4.0971875317704045,
+            "share_of_whole_process_percent": 0.10919921796844123,
+            "symbol": "xml_minifier::audit::verify_with_policy",
+            "weighted_event_period": 147562806
+          },
+          {
+            "raw_stack_blocks": 25,
+            "share_of_subset_percent": 4.087715117614759,
+            "share_of_whole_process_percent": 0.10894675693021712,
+            "symbol": "[unknown]",
+            "weighted_event_period": 147221651
+          }
+        ],
+        "leaf_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 125,
+            "share_of_subset_percent": 25.875110670619193,
+            "share_of_whole_process_percent": 0.6896296125497487,
+            "symbol": "sha2::sha256::x86_sha::compress",
+            "weighted_event_period": 931908512
+          },
+          {
+            "raw_stack_blocks": 83,
+            "share_of_subset_percent": 20.374635827664424,
+            "share_of_whole_process_percent": 0.5430296469274272,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 733805424
+          },
+          {
+            "raw_stack_blocks": 67,
+            "share_of_subset_percent": 16.487155947558822,
+            "share_of_whole_process_percent": 0.43941960723950757,
+            "symbol": "zlib_rs::deflate::longest_match::longest_match",
+            "weighted_event_period": 593795372
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 4.070970056224355,
+            "share_of_whole_process_percent": 0.10850046356568677,
+            "symbol": "cfree@GLIBC_2.2.5",
+            "weighted_event_period": 146618567
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 3.7001277422470995,
+            "share_of_whole_process_percent": 0.09861668588601946,
+            "symbol": "_int_free_merge_chunk",
+            "weighted_event_period": 133262446
+          },
+          {
+            "raw_stack_blocks": 21,
+            "share_of_subset_percent": 3.592071557115724,
+            "share_of_whole_process_percent": 0.09573674670298171,
+            "symbol": "[unknown]",
+            "weighted_event_period": 129370734
+          },
+          {
+            "raw_stack_blocks": 14,
+            "share_of_subset_percent": 3.4433686904434784,
+            "share_of_whole_process_percent": 0.09177348248225467,
+            "symbol": "unlink_chunk.isra.0",
+            "weighted_event_period": 124015106
+          },
+          {
+            "raw_stack_blocks": 9,
+            "share_of_subset_percent": 2.219303547751027,
+            "share_of_whole_process_percent": 0.05914940675031316,
+            "symbol": "core::ptr::drop_glue::<litchi_xlsx::cell::Value>",
+            "weighted_event_period": 79929624
+          },
+          {
+            "raw_stack_blocks": 9,
+            "share_of_subset_percent": 2.1819255300481335,
+            "share_of_whole_process_percent": 0.05815319891976683,
+            "symbol": "xml_minifier::audit::verify_with_policy",
+            "weighted_event_period": 78583431
+          },
+          {
+            "raw_stack_blocks": 8,
+            "share_of_subset_percent": 1.9730923319643057,
+            "share_of_whole_process_percent": 0.05258732678436356,
+            "symbol": "core::ptr::drop_glue::<litchi_xlsx::cell::Cell>",
+            "weighted_event_period": 71062171
+          },
+          {
+            "raw_stack_blocks": 8,
+            "share_of_subset_percent": 1.9647438463824944,
+            "share_of_whole_process_percent": 0.052364820958187556,
+            "symbol": "_int_free_maybe_trim",
+            "weighted_event_period": 70761495
+          },
+          {
+            "raw_stack_blocks": 7,
+            "share_of_subset_percent": 1.716192369132442,
+            "share_of_whole_process_percent": 0.045740367786311735,
+            "symbol": "_int_free_chunk",
+            "weighted_event_period": 61809756
+          },
+          {
+            "raw_stack_blocks": 6,
+            "share_of_subset_percent": 1.3034975084012028,
+            "share_of_whole_process_percent": 0.03474112606208122,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 46946289
+          },
+          {
+            "raw_stack_blocks": 5,
+            "share_of_subset_percent": 1.2319097637561334,
+            "share_of_whole_process_percent": 0.032833152440969425,
+            "symbol": "litchi_perf_baseline::xlsx_address",
+            "weighted_event_period": 44368011
+          },
+          {
+            "raw_stack_blocks": 5,
+            "share_of_subset_percent": 1.231630607208755,
+            "share_of_whole_process_percent": 0.03282571229417895,
+            "symbol": "<litchi_xlsx::workbook::model::Worksheet>::store",
+            "weighted_event_period": 44357957
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.9864546362866652,
+            "share_of_whole_process_percent": 0.02629122392093702,
+            "symbol": "<litchi_xlsx::cell::Store>::view",
+            "weighted_event_period": 35527789
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.9857892030447247,
+            "share_of_whole_process_percent": 0.026273488635679354,
+            "symbol": "<litchi_xlsx::cell::Cells as core::iter::traits::iterator::Iterator>::next",
+            "weighted_event_period": 35503823
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.9853145758295979,
+            "share_of_whole_process_percent": 0.02626083875809467,
+            "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "weighted_event_period": 35486729
+          },
+          {
+            "raw_stack_blocks": 3,
+            "share_of_subset_percent": 0.7394398805674665,
+            "share_of_whole_process_percent": 0.019707727817319182,
+            "symbol": "core::ptr::drop_glue::<litchi_xlsx::cell::Store>",
+            "weighted_event_period": 26631396
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.49312604268017735,
+            "share_of_whole_process_percent": 0.01314291274270262,
+            "symbol": "<i32 as alloc::string::SpecToString>::spec_to_string",
+            "weighted_event_period": 17760247
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.4883171865963655,
+            "share_of_whole_process_percent": 0.013014745964979335,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+            "weighted_event_period": 17587053
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.47114989190419315,
+            "share_of_whole_process_percent": 0.012557199137922347,
+            "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "weighted_event_period": 16968762
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.24661129204404902,
+            "share_of_whole_process_percent": 0.006572742893650419,
+            "symbol": "__rustc::__rust_dealloc",
+            "weighted_event_period": 8881862
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.24636612073776787,
+            "share_of_whole_process_percent": 0.006566208529600298,
+            "symbol": "zlib_rs::deflate::compare256::compare256_slice",
+            "weighted_event_period": 8873032
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.24630289819366794,
+            "share_of_whole_process_percent": 0.006564523507296546,
+            "symbol": "zlib_rs::deflate::compare256::avx2::compare256",
+            "weighted_event_period": 8870755
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.24619630559516134,
+            "share_of_whole_process_percent": 0.00656168257597283,
+            "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "weighted_event_period": 8866916
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.24397974041376488,
+            "share_of_whole_process_percent": 0.006502606152814825,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+            "weighted_event_period": 8787085
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.22881857451224097,
+            "share_of_whole_process_percent": 0.006098527148107706,
+            "symbol": "<litchi_xlsx::workbook::edit::semantic::worksheet::WorksheetEdit>::set::<alloc::string::String, i32>",
+            "weighted_event_period": 8241046
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.2267381446552722,
+            "share_of_whole_process_percent": 0.006043079036041178,
+            "symbol": "xml_minifier::audit::inspect_attributes",
+            "weighted_event_period": 8166118
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.22232453359353424,
+            "share_of_whole_process_percent": 0.005925446422786009,
+            "symbol": "__GI___readdir64",
+            "weighted_event_period": 8007159
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.18663547686343568,
+            "share_of_whole_process_percent": 0.004974253182364791,
+            "symbol": "<alloc::string::String as core::fmt::Display>::fmt",
+            "weighted_event_period": 6721795
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.18607083318455303,
+            "share_of_whole_process_percent": 0.004959204164547889,
+            "symbol": "core::fmt::write",
+            "weighted_event_period": 6701459
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.1850855388499332,
+            "share_of_whole_process_percent": 0.004932943865263338,
+            "symbol": "__cxa_atexit",
+            "weighted_event_period": 6665973
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.18479771939796147,
+            "share_of_whole_process_percent": 0.0049252728326763,
+            "symbol": "<litchi_xlsx::workbook::edit::semantic::worksheet::NewSheet>::set::<alloc::string::String, i32>",
+            "weighted_event_period": 6655607
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.1825572479317736,
+            "share_of_whole_process_percent": 0.004865559253522014,
+            "symbol": "<litchi_xlsx::cell::Store>::entry",
+            "weighted_event_period": 6574915
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.18171006028769085,
+            "share_of_whole_process_percent": 0.0048429798066480295,
+            "symbol": "<usize as core::fmt::Display>::fmt",
+            "weighted_event_period": 6544403
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.17903580498027644,
+            "share_of_whole_process_percent": 0.004771704917238361,
+            "symbol": "<litchi_xlsx::cell::Value>::validate_for_write",
+            "weighted_event_period": 6448088
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.1764769162388414,
+            "share_of_whole_process_percent": 0.004703504805023285,
+            "symbol": "litchi_perf_baseline::xlsx_value",
+            "weighted_event_period": 6355928
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.11042976545852747,
+            "share_of_whole_process_percent": 0.002943200411258434,
+            "symbol": "__strncmp_evex",
+            "weighted_event_period": 3977198
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.004356802398923543,
+            "share_of_whole_process_percent": 0.00011611853524310197,
+            "symbol": "_dl_relocate_object_no_relro",
+            "weighted_event_period": 156913
+          }
+        ],
+        "observed_marker_symbols": [],
+        "scope": {
+          "raw_stack_blocks": 443,
+          "share_of_subset_percent": 100.0,
+          "share_of_whole_process_percent": 2.6652238180871355,
+          "weighted_event_period": 3601563386
+        }
+      },
+      "workbook_write_to": {
+        "inclusive_period_weighted_ranking": [],
+        "leaf_period_weighted_ranking": [],
+        "observed_marker_symbols": [],
+        "scope": {
+          "raw_stack_blocks": 0,
+          "share_of_subset_percent": null,
+          "share_of_whole_process_percent": 0.0,
+          "weighted_event_period": 0
+        }
+      },
+      "writer_write_to_stream": {
+        "inclusive_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "__libc_start_call_main",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "__libc_start_main@@GLIBC_2.34",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "_start",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "litchi_perf_baseline::main",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "litchi_perf_baseline::run",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "main",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "std::rt::lang_start_internal",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 2384,
+            "share_of_subset_percent": 100.0,
+            "share_of_whole_process_percent": 15.641774621028217,
+            "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+            "weighted_event_period": 21137002598
+          },
+          {
+            "raw_stack_blocks": 1965,
+            "share_of_subset_percent": 82.44292000346756,
+            "share_of_whole_process_percent": 12.895535737936987,
+            "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>",
+            "weighted_event_period": 17425962143
+          },
+          {
+            "raw_stack_blocks": 1964,
+            "share_of_subset_percent": 82.40093382799706,
+            "share_of_whole_process_percent": 12.888968354997901,
+            "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+            "weighted_event_period": 17417087524
+          },
+          {
+            "raw_stack_blocks": 1964,
+            "share_of_subset_percent": 82.40093382799706,
+            "share_of_whole_process_percent": 12.888968354997901,
+            "symbol": "soapberry_zip::preserve::generated_entry",
+            "weighted_event_period": 17417087524
+          },
+          {
+            "raw_stack_blocks": 1963,
+            "share_of_subset_percent": 82.35894785596128,
+            "share_of_whole_process_percent": 12.882401003879615,
+            "symbol": "<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all",
+            "weighted_event_period": 17408212948
+          },
+          {
+            "raw_stack_blocks": 1958,
+            "share_of_subset_percent": 82.14935071561655,
+            "share_of_whole_process_percent": 12.849616291574772,
+            "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec",
+            "weighted_event_period": 17363910395
+          },
+          {
+            "raw_stack_blocks": 1958,
+            "share_of_subset_percent": 82.14935071561655,
+            "share_of_whole_process_percent": 12.849616291574772,
+            "symbol": "<zlib_rs::stable::Deflate>::compress_uninit",
+            "weighted_event_period": 17363910395
+          },
+          {
+            "raw_stack_blocks": 1958,
+            "share_of_subset_percent": 82.14935071561655,
+            "share_of_whole_process_percent": 12.849616291574772,
+            "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "weighted_event_period": 17363910395
+          },
+          {
+            "raw_stack_blocks": 1958,
+            "share_of_subset_percent": 82.14935071561655,
+            "share_of_whole_process_percent": 12.849616291574772,
+            "symbol": "zlib_rs::deflate::deflate",
+            "weighted_event_period": 17363910395
+          },
+          {
+            "raw_stack_blocks": 1957,
+            "share_of_subset_percent": 82.10736474358076,
+            "share_of_whole_process_percent": 12.843048940456486,
+            "symbol": "<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status",
+            "weighted_event_period": 17355035819
+          },
+          {
+            "raw_stack_blocks": 1730,
+            "share_of_subset_percent": 72.58281367884989,
+            "share_of_whole_process_percent": 11.35324012924654,
+            "symbol": "zlib_rs::deflate::longest_match::longest_match",
+            "weighted_event_period": 15341831213
+          },
+          {
+            "raw_stack_blocks": 419,
+            "share_of_subset_percent": 17.55707999653244,
+            "share_of_whole_process_percent": 2.7462388830912334,
+            "symbol": "<litchi_opc::pkgwriter::PackageWriter>::validate_authored_xml",
+            "weighted_event_period": 3711040455
+          },
+          {
+            "raw_stack_blocks": 419,
+            "share_of_subset_percent": 17.55707999653244,
+            "share_of_whole_process_percent": 2.7462388830912334,
+            "symbol": "<litchi_opc::pkgwriter::PublicationPlan>::from_package",
+            "weighted_event_period": 3711040455
+          },
+          {
+            "raw_stack_blocks": 419,
+            "share_of_subset_percent": 17.55707999653244,
+            "share_of_whole_process_percent": 2.7462388830912334,
+            "symbol": "xml_minifier::audit::verify_authored",
+            "weighted_event_period": 3711040455
+          },
+          {
+            "raw_stack_blocks": 413,
+            "share_of_subset_percent": 17.30565548752931,
+            "share_of_whole_process_percent": 2.706911628050937,
+            "symbol": "xml_minifier::audit::verify_with_policy",
+            "weighted_event_period": 3657896850
+          },
+          {
+            "raw_stack_blocks": 102,
+            "share_of_subset_percent": 4.273172176671178,
+            "share_of_whole_process_percent": 0.6683999610433914,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 903220514
+          },
+          {
+            "raw_stack_blocks": 27,
+            "share_of_subset_percent": 1.1333351400669587,
+            "share_of_whole_process_percent": 0.17727372831018817,
+            "symbol": "zlib_rs::deflate::flush_block_only",
+            "weighted_event_period": 239553078
+          },
+          {
+            "raw_stack_blocks": 26,
+            "share_of_subset_percent": 1.0911473891847985,
+            "share_of_whole_process_percent": 0.1706748153995198,
+            "symbol": "zlib_rs::deflate::compare256::avx2::compare256",
+            "weighted_event_period": 230635852
+          },
+          {
+            "raw_stack_blocks": 26,
+            "share_of_subset_percent": 1.0892730316539085,
+            "share_of_whole_process_percent": 0.17038163261894573,
+            "symbol": "xml_minifier::audit::inspect_attributes",
+            "weighted_event_period": 230239669
+          },
+          {
+            "raw_stack_blocks": 25,
+            "share_of_subset_percent": 1.0473257642545142,
+            "share_of_whole_process_percent": 0.1638203355926524,
+            "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "weighted_event_period": 221373274
+          },
+          {
+            "raw_stack_blocks": 19,
+            "share_of_subset_percent": 0.797390610227525,
+            "share_of_whole_process_percent": 0.12472604210103104,
+            "symbol": "zlib_rs::deflate::compare256::compare256_slice",
+            "weighted_event_period": 168544474
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 0.7120679826866338,
+            "share_of_whole_process_percent": 0.1113800690003455,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 150509828
+          },
+          {
+            "raw_stack_blocks": 17,
+            "share_of_subset_percent": 0.7117036169273787,
+            "share_of_whole_process_percent": 0.11132307572948662,
+            "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "weighted_event_period": 150432812
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 0.6284318241630373,
+            "share_of_whole_process_percent": 0.09829788958239866,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+            "weighted_event_period": 132831651
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 0.628292665359117,
+            "share_of_whole_process_percent": 0.09827612267592412,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+            "weighted_event_period": 132802237
+          },
+          {
+            "raw_stack_blocks": 11,
+            "share_of_subset_percent": 0.4611249326771739,
+            "share_of_whole_process_percent": 0.07212812269073164,
+            "symbol": "cfree@GLIBC_2.2.5",
+            "weighted_event_period": 97467989
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.41889848188966006,
+            "share_of_whole_process_percent": 0.06552315642808933,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+            "weighted_event_period": 88542583
+          },
+          {
+            "raw_stack_blocks": 7,
+            "share_of_subset_percent": 0.2931263631763121,
+            "share_of_whole_process_percent": 0.045850165082855394,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+            "weighted_event_period": 61958127
+          },
+          {
+            "raw_stack_blocks": 6,
+            "share_of_subset_percent": 0.25167553797355124,
+            "share_of_whole_process_percent": 0.03936652042608317,
+            "symbol": "[unknown]",
+            "weighted_event_period": 53196665
+          },
+          {
+            "raw_stack_blocks": 6,
+            "share_of_subset_percent": 0.2515831123805211,
+            "share_of_whole_process_percent": 0.03935206342312925,
+            "symbol": "<crc32fast::Hasher>::update",
+            "weighted_event_period": 53177129
+          }
+        ],
+        "leaf_period_weighted_ranking": [
+          {
+            "raw_stack_blocks": 1684,
+            "share_of_subset_percent": 70.65233463808651,
+            "share_of_whole_process_percent": 11.051278948584145,
+            "symbol": "zlib_rs::deflate::longest_match::longest_match",
+            "weighted_event_period": 14933785808
+          },
+          {
+            "raw_stack_blocks": 261,
+            "share_of_subset_percent": 10.937526824256295,
+            "share_of_whole_process_percent": 1.7108232949646747,
+            "symbol": "xml_minifier::audit::verify_with_policy",
+            "weighted_event_period": 2311865329
+          },
+          {
+            "raw_stack_blocks": 195,
+            "share_of_subset_percent": 8.181585799509868,
+            "share_of_whole_process_percent": 1.2797452111853833,
+            "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "weighted_event_period": 1729342003
+          },
+          {
+            "raw_stack_blocks": 38,
+            "share_of_subset_percent": 1.5924496079299768,
+            "share_of_whole_process_percent": 0.24908737862585445,
+            "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+            "weighted_event_period": 336596115
+          },
+          {
+            "raw_stack_blocks": 26,
+            "share_of_subset_percent": 1.0911473891847985,
+            "share_of_whole_process_percent": 0.1706748153995198,
+            "symbol": "zlib_rs::deflate::compare256::avx2::compare256",
+            "weighted_event_period": 230635852
+          },
+          {
+            "raw_stack_blocks": 24,
+            "share_of_subset_percent": 1.0073706903936674,
+            "share_of_whole_process_percent": 0.1575706529896734,
+            "symbol": "zlib_rs::deflate::flush_block_only",
+            "weighted_event_period": 212927969
+          },
+          {
+            "raw_stack_blocks": 19,
+            "share_of_subset_percent": 0.797390610227525,
+            "share_of_whole_process_percent": 0.12472604210103104,
+            "symbol": "zlib_rs::deflate::compare256::compare256_slice",
+            "weighted_event_period": 168544474
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 0.6284318241630373,
+            "share_of_whole_process_percent": 0.09829788958239866,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+            "weighted_event_period": 132831651
+          },
+          {
+            "raw_stack_blocks": 15,
+            "share_of_subset_percent": 0.628292665359117,
+            "share_of_whole_process_percent": 0.09827612267592412,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+            "weighted_event_period": 132802237
+          },
+          {
+            "raw_stack_blocks": 12,
+            "share_of_subset_percent": 0.502933353521273,
+            "share_of_whole_process_percent": 0.07866770165177661,
+            "symbol": "xml_minifier::audit::inspect_attributes",
+            "weighted_event_period": 106305036
+          },
+          {
+            "raw_stack_blocks": 11,
+            "share_of_subset_percent": 0.4611249326771739,
+            "share_of_whole_process_percent": 0.07212812269073164,
+            "symbol": "cfree@GLIBC_2.2.5",
+            "weighted_event_period": 97467989
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.4189212523840936,
+            "share_of_whole_process_percent": 0.06552671813750872,
+            "symbol": "<quick_xml::events::attributes::IterState>::next",
+            "weighted_event_period": 88547396
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.41889848188966006,
+            "share_of_whole_process_percent": 0.06552315642808933,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+            "weighted_event_period": 88542583
+          },
+          {
+            "raw_stack_blocks": 10,
+            "share_of_subset_percent": 0.41889394009147674,
+            "share_of_whole_process_percent": 0.06552244601025375,
+            "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "weighted_event_period": 88541623
+          },
+          {
+            "raw_stack_blocks": 7,
+            "share_of_subset_percent": 0.2931263631763121,
+            "share_of_whole_process_percent": 0.045850165082855394,
+            "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+            "weighted_event_period": 61958127
+          },
+          {
+            "raw_stack_blocks": 7,
+            "share_of_subset_percent": 0.29280513503771866,
+            "share_of_whole_process_percent": 0.045799919301397284,
+            "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "weighted_event_period": 61890229
+          },
+          {
+            "raw_stack_blocks": 6,
+            "share_of_subset_percent": 0.25167553797355124,
+            "share_of_whole_process_percent": 0.03936652042608317,
+            "symbol": "[unknown]",
+            "weighted_event_period": 53196665
+          },
+          {
+            "raw_stack_blocks": 6,
+            "share_of_subset_percent": 0.2515831123805211,
+            "share_of_whole_process_percent": 0.03935206342312925,
+            "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+            "weighted_event_period": 53177129
+          },
+          {
+            "raw_stack_blocks": 5,
+            "share_of_subset_percent": 0.20937545801403035,
+            "share_of_whole_process_percent": 0.032750037254300195,
+            "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+            "weighted_event_period": 44255696
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.16773954980426029,
+            "share_of_whole_process_percent": 0.026237442330709775,
+            "symbol": "xml_minifier::audit::check_attribute_layout",
+            "weighted_event_period": 35455113
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.16769071601171026,
+            "share_of_whole_process_percent": 0.026229803858940196,
+            "symbol": "__memcmp_evex_movbe",
+            "weighted_event_period": 35444791
+          },
+          {
+            "raw_stack_blocks": 4,
+            "share_of_subset_percent": 0.16744950867985886,
+            "share_of_whole_process_percent": 0.026192074751722604,
+            "symbol": "__memmove_avx512_unaligned_erms",
+            "weighted_event_period": 35393807
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.08398074380555555,
+            "share_of_whole_process_percent": 0.013136078671128116,
+            "symbol": "<zlib_rs::deflate::BitWriter>::send_bits_overflow",
+            "weighted_event_period": 17751012
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.08393984396670698,
+            "share_of_whole_process_percent": 0.013129681210515057,
+            "symbol": "zlib_rs::deflate::slide_hash::avx2::slide_hash_chain",
+            "weighted_event_period": 17742367
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.08385254208975236,
+            "share_of_whole_process_percent": 0.01311602564768189,
+            "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw",
+            "weighted_event_period": 17723914
+          },
+          {
+            "raw_stack_blocks": 2,
+            "share_of_subset_percent": 0.08374170328992074,
+            "share_of_whole_process_percent": 0.013098688492419575,
+            "symbol": "core::str::converts::from_utf8",
+            "weighted_event_period": 17700486
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.041983705867735824,
+            "share_of_whole_process_percent": 0.0065669966493866385,
+            "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+            "weighted_event_period": 8874097
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.04187819421869004,
+            "share_of_whole_process_percent": 0.0065504927550439655,
+            "symbol": "malloc",
+            "weighted_event_period": 8851795
+          },
+          {
+            "raw_stack_blocks": 1,
+            "share_of_subset_percent": 0.041875876009200654,
+            "share_of_whole_process_percent": 0.006550130145940391,
+            "symbol": "__rustc::__rust_dealloc",
+            "weighted_event_period": 8851305
+          }
+        ],
+        "observed_marker_symbols": [
+          "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>"
+        ],
+        "scope": {
+          "raw_stack_blocks": 2384,
+          "share_of_subset_percent": 100.0,
+          "share_of_whole_process_percent": 15.641774621028217,
+          "weighted_event_period": 21137002598
+        }
+      }
+    },
+    "category_descriptions": {
+      "edit_commit": "exact litchi_xlsx Edit::commit marker",
+      "overlap": "same-frame marker ambiguity retained explicitly",
+      "prepare_open_or_oracle": "setup, open/from_bytes, expected-output, or verification markers",
+      "unclassified": "accepted sample block with no configured marker",
+      "workbook_write_to": "Workbook::write_to aliases; zero means this wrapper was not retained",
+      "writer_write_to_stream": "PackageWriter::write_to_stream retained writer boundary; the Workbook::write_to wrapper may be inlined"
+    },
+    "classification": "one disjoint label per accepted sample block; the nearest marker in the leaf-to-root callchain wins, while same-frame ambiguity is overlap",
+    "marker_definitions": {
+      "edit_commit": [
+        "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+        "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+      ],
+      "prepare_open_or_oracle": [
+        "litchi_perf_baseline::prepare_xlsx_updates",
+        "litchi_perf_baseline::xlsx_expected_output",
+        "litchi_perf_baseline::verify_xlsx_cells",
+        "litchi_xlsx::workbook::model::Workbook::from_bytes",
+        "litchi_xlsx::workbook::model::Workbook::from_bytes_with_limits",
+        "<litchi_xlsx::workbook::model::Workbook>::from_bytes_with_limits",
+        "<litchi_xlsx::workbook::model::Workbook>::from_package_with_styles",
+        "litchi_xlsx::workbook::model::Workbook::from_package_with_styles",
+        "<litchi_xlsx::workbook::model::Workbook>::from_bytes"
+      ],
+      "workbook_write_to": [
+        "<litchi_xlsx::workbook::model::Workbook>::write_to",
+        "litchi_xlsx::workbook::model::Workbook::write_to",
+        "litchi_xlsx::writer::write_to"
+      ],
+      "writer_write_to_stream": [
+        "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>"
+      ]
+    },
+    "mixed_marker_stacks": {
+      "nearest_marker_resolution": true,
+      "period_by_marker_set": {},
+      "raw_stack_blocks": 0,
+      "weighted_event_period": 0
+    },
+    "partition": {
+      "blocks_partition_exact": true,
+      "classified_raw_stack_blocks": 15483,
+      "classified_weighted_event_period": 135131742466,
+      "periods_partition_exact": true,
+      "whole_process_raw_stack_blocks": 15483,
+      "whole_process_weighted_event_period": 135131742466
+    }
+  },
+  "exact_contexts": {
+    "markers": {
+      "attribute_lookup": "litchi_ooxml_common::xml::unqualified_attribute_value",
+      "commit": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+      "counting_sink_writer": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>",
+      "worksheet_parser": "<litchi_xlsx::raw::worksheet::model::Parser>::parse"
+    },
+    "rows": {
+      "attribute_lookup_under_commit": {
+        "raw_stack_blocks": 1317,
+        "share_of_subset_percent": 15.380919330101683,
+        "share_of_whole_process_percent": 8.479431827709176,
+        "weighted_event_period": 11458403980
+      },
+      "commit": {
+        "raw_stack_blocks": 8610,
+        "share_of_subset_percent": 55.12955139888324,
+        "share_of_whole_process_percent": 55.12955139888324,
+        "weighted_event_period": 74497523419
+      },
+      "counting_sink_writer": {
+        "raw_stack_blocks": 2384,
+        "share_of_subset_percent": 15.641774621028217,
+        "share_of_whole_process_percent": 15.641774621028217,
+        "weighted_event_period": 21137002598
+      },
+      "worksheet_parser_under_commit": {
+        "raw_stack_blocks": 4100,
+        "share_of_subset_percent": 47.65520729101917,
+        "share_of_whole_process_percent": 26.272101997746766,
+        "weighted_event_period": 35501949212
+      }
+    },
+    "scope": "whole-process exact ancestor contexts; inclusive rows overlap; not elapsed phases"
+  },
+  "inputs": {
+    "bundle_root": ".",
+    "normal_reports": [
+      {
+        "binary_identity": {
+          "binary_bytes": 58346112,
+          "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/tmp/litchi-goal-0466/normal",
+          "profile": "release"
+        },
+        "configuration": {
+          "cases": [
+            "xlsx_one_percent_commit_save"
+          ],
+          "corpus_shapes": [
+            "tiny",
+            "many-small",
+            "few-large",
+            "wide-root"
+          ],
+          "execution_workers": [
+            1
+          ],
+          "filesystem_cache_states": [
+            "warm",
+            "cold-requested"
+          ],
+          "filesystem_fresh_child_per_sample": true,
+          "filesystem_process_isolated": true,
+          "filesystem_root_selected": false,
+          "opc_cache_lock_diagnostics": false,
+          "payload_kinds": [
+            "compressible",
+            "incompressible"
+          ],
+          "range_simulation": {
+            "bandwidth_bytes_per_second": 52428800,
+            "fixed_latency_us": 100,
+            "max_physical_range_bytes": 4096,
+            "request_overhead_us": 25
+          },
+          "rtf_variants": [
+            "plain"
+          ],
+          "samples_per_case": 30,
+          "semantic_shapes": [
+            "tiny",
+            "medium",
+            "large"
+          ],
+          "warmup_iterations_per_case": 3,
+          "writer_shapes": [
+            "tiny",
+            "large",
+            "payload-heavy"
+          ],
+          "xlsb_shapes": [
+            "tiny",
+            "medium",
+            "large",
+            "sparse"
+          ],
+          "xlsx_cell_crud_shapes": [
+            "medium",
+            "dense-sparse"
+          ],
+          "xlsx_row_visibility_shapes": [
+            "medium",
+            "large"
+          ],
+          "xlsx_shapes": [
+            "dense-wide"
+          ]
+        },
+        "environment": {
+          "allocator": "Rust system allocator",
+          "cargo_build_target": null,
+          "cpu_affinity": "2",
+          "cpu_model": "AMD EPYC 9R45",
+          "filesystem_type": null,
+          "git_revision": "418edc42a365819837b393e42a49e4cd459d1624",
+          "git_worktree_dirty": true,
+          "kernel": "Linux 7.0.0-1011-aws",
+          "logical_cpus_available": 1,
+          "os": "linux",
+          "page_size_bytes": 4096,
+          "perf_event_paranoid": "1",
+          "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+          "rustflags": null,
+          "source_destination_same_device": null,
+          "storage_identifier": null,
+          "total_memory_bytes": 132553797632
+        },
+        "file": {
+          "bytes": 22265,
+          "compressed_bytes": 22265,
+          "compressed_sha256": "1300035c249fcc01c44055231df24dee3b3b810e350b1477ad58cc12ae1ecb9e",
+          "compression": null,
+          "outside_bundle": false,
+          "path": "normal-r3/report.json",
+          "sha256": "1300035c249fcc01c44055231df24dee3b3b810e350b1477ad58cc12ae1ecb9e"
+        },
+        "results": {
+          "cases": [
+            "xlsx_one_percent_commit_save"
+          ],
+          "count": 1,
+          "elapsed_sample_counts": [
+            30
+          ],
+          "elapsed_statistics": [
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "max_ns": 403522390,
+              "mean_ns": 399073028.2333333,
+              "min_ns": 396054262,
+              "p50_ns": 399470314,
+              "p95_ns": 401643834,
+              "p99_ns": 403522390,
+              "sample_count": 30
+            }
+          ]
+        },
+        "schema_version": 1,
+        "status": "parsed",
+        "tool": {
+          "binary": "litchi-perf-baseline",
+          "instrumentation": "none",
+          "name": "litchi-perf-baseline",
+          "profile": "release",
+          "target_arch": "x86_64",
+          "target_os": "linux",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "binary_identity": {
+          "binary_bytes": 58346112,
+          "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/tmp/litchi-goal-0466/normal",
+          "profile": "release"
+        },
+        "configuration": {
+          "cases": [
+            "xlsx_one_percent_commit_save"
+          ],
+          "corpus_shapes": [
+            "tiny",
+            "many-small",
+            "few-large",
+            "wide-root"
+          ],
+          "execution_workers": [
+            1
+          ],
+          "filesystem_cache_states": [
+            "warm",
+            "cold-requested"
+          ],
+          "filesystem_fresh_child_per_sample": true,
+          "filesystem_process_isolated": true,
+          "filesystem_root_selected": false,
+          "opc_cache_lock_diagnostics": false,
+          "payload_kinds": [
+            "compressible",
+            "incompressible"
+          ],
+          "range_simulation": {
+            "bandwidth_bytes_per_second": 52428800,
+            "fixed_latency_us": 100,
+            "max_physical_range_bytes": 4096,
+            "request_overhead_us": 25
+          },
+          "rtf_variants": [
+            "plain"
+          ],
+          "samples_per_case": 30,
+          "semantic_shapes": [
+            "tiny",
+            "medium",
+            "large"
+          ],
+          "warmup_iterations_per_case": 3,
+          "writer_shapes": [
+            "tiny",
+            "large",
+            "payload-heavy"
+          ],
+          "xlsb_shapes": [
+            "tiny",
+            "medium",
+            "large",
+            "sparse"
+          ],
+          "xlsx_cell_crud_shapes": [
+            "medium",
+            "dense-sparse"
+          ],
+          "xlsx_row_visibility_shapes": [
+            "medium",
+            "large"
+          ],
+          "xlsx_shapes": [
+            "dense-wide"
+          ]
+        },
+        "environment": {
+          "allocator": "Rust system allocator",
+          "cargo_build_target": null,
+          "cpu_affinity": "2",
+          "cpu_model": "AMD EPYC 9R45",
+          "filesystem_type": null,
+          "git_revision": "418edc42a365819837b393e42a49e4cd459d1624",
+          "git_worktree_dirty": true,
+          "kernel": "Linux 7.0.0-1011-aws",
+          "logical_cpus_available": 1,
+          "os": "linux",
+          "page_size_bytes": 4096,
+          "perf_event_paranoid": "1",
+          "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+          "rustflags": null,
+          "source_destination_same_device": null,
+          "storage_identifier": null,
+          "total_memory_bytes": 132553797632
+        },
+        "file": {
+          "bytes": 22266,
+          "compressed_bytes": 22266,
+          "compressed_sha256": "59df6a8c203d3a1a434c54fc8e97f96ee4fe4901902347f6cc986b24a05b1b91",
+          "compression": null,
+          "outside_bundle": false,
+          "path": "normal-r4/report.json",
+          "sha256": "59df6a8c203d3a1a434c54fc8e97f96ee4fe4901902347f6cc986b24a05b1b91"
+        },
+        "results": {
+          "cases": [
+            "xlsx_one_percent_commit_save"
+          ],
+          "count": 1,
+          "elapsed_sample_counts": [
+            30
+          ],
+          "elapsed_statistics": [
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "max_ns": 400758971,
+              "mean_ns": 399029414.40000004,
+              "min_ns": 397701937,
+              "p50_ns": 398785007,
+              "p95_ns": 400513689,
+              "p99_ns": 400758971,
+              "sample_count": 30
+            }
+          ]
+        },
+        "schema_version": 1,
+        "status": "parsed",
+        "tool": {
+          "binary": "litchi-perf-baseline",
+          "instrumentation": "none",
+          "name": "litchi-perf-baseline",
+          "profile": "release",
+          "target_arch": "x86_64",
+          "target_os": "linux",
+          "version": "0.1.0"
+        }
+      }
+    ],
+    "parser": {
+      "bytes": 33268,
+      "compressed_bytes": 33268,
+      "compressed_sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9",
+      "compression": null,
+      "outside_bundle": false,
+      "path": "analyze.py",
+      "sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9"
+    },
+    "perf_script": {
+      "bytes": 27275370,
+      "compressed_bytes": 730671,
+      "compressed_sha256": "9030cec54497f068a8c6a074c42604ff2390ab7be5141e6e232de5d0d755a17a",
+      "compression": "gzip",
+      "outside_bundle": false,
+      "path": "samples-fp/perf-script.stdout.gz",
+      "sha256": "287b240850421f87af03523241250b218bb087719404ff1168b3c71b30f88cab"
+    }
+  },
+  "limitations": [
+    "Sample periods are weighted cycles:u event periods, not wall time or elapsed phase duration.",
+    "The whole-process profile includes setup, warmups, retained workload, verification/oracle work, child processes, and teardown whenever sampled.",
+    "A missing marker means no matching frame was retained; it does not prove zero work.",
+    "Unknown, malformed, empty, unparsed, truncated, and lost coverage remain explicit denominators.",
+    "Inclusive scope rows are disjoint by sample classification, while rankings within each scope remain inclusive frame attribution."
+  ],
+  "purpose": "descriptive whole-process XLSX CPU attribution; no phase-time or operation-counter claim",
+  "sample_parser": {
+    "accepted_sample_blocks": 15483,
+    "accepted_weighted_event_period": 135131742466,
+    "coverage_rows_may_overlap": true,
+    "empty_stack_share_of_whole_process_percent": 0.0,
+    "empty_stack_weighted_event_period": 0,
+    "invalid_cycle_period": 0,
+    "known_frame_weighted_event_period": 135131742466,
+    "lost_period_is_unavailable": true,
+    "lost_sample_count": 0,
+    "parser_diagnostics": {
+      "accepted_cycle_period": 135131742466,
+      "block_separator_lines": 15483,
+      "cycle_headers": 15483,
+      "empty_stack_blocks": 0,
+      "empty_stack_period": 0,
+      "input_lines": 271300,
+      "invalid_cycle_event_headers": 0,
+      "invalid_cycle_period_headers": 0,
+      "invalid_sample_blocks": 0,
+      "invalid_sample_period": 0,
+      "lost_metadata_inside_block": 0,
+      "lost_metadata_lines": 0,
+      "lost_sample_count": 0,
+      "malformed_cycle_headers": 0,
+      "non_cycle_headers": 0,
+      "parsed_frame_lines": 240334,
+      "sample_blocks": 15483,
+      "sample_blocks_seen": 15483,
+      "total_weighted_event_period": 135131742466,
+      "truncated_period": 0,
+      "unknown_frame_blocks": 102,
+      "unknown_frame_lines": 392,
+      "unknown_frame_occurrence_period": 2667641897,
+      "unknown_frame_occurrences": 392,
+      "unknown_frame_period": 811107897,
+      "unparsed_frame_blocks": 0,
+      "unparsed_frame_lines": 0,
+      "unparsed_frame_period": 0,
+      "unquantified_lost_lines": 0,
+      "unterminated_blocks": 0,
+      "zero_or_negative_period_samples": 0
+    },
+    "resolved_frame_weighted_event_period": 135131742466,
+    "truncated_share_of_whole_process_percent": 0.0,
+    "truncated_weighted_event_period": 0,
+    "unknown_frame_share_of_whole_process_percent": 0.6002349131286306,
+    "unknown_frame_weighted_event_period": 811107897,
+    "unparsed_frame_share_of_whole_process_percent": 0.0,
+    "unparsed_frame_weighted_event_period": 0
+  },
+  "schema": "litchi-0466-xlsx-cpu-attribution-v1",
+  "timing_semantics": {
+    "callchain_order": "perf frames are leaf to caller/root",
+    "inclusive_overlap": "inclusive rows de-duplicate repeated ancestors within a stack but overlap across rows",
+    "normal_report_elapsed": "recorded harness elapsed samples are contextual inputs only; they are not converted into phase time or operation counters",
+    "operation_counter": false,
+    "phase_latency": false,
+    "weight": "cycles:u perf sample period"
+  },
+  "whole_process": {
+    "inclusive_period_weighted_ranking": [
+      {
+        "raw_stack_blocks": 15466,
+        "share_of_subset_percent": 99.93758992486815,
+        "share_of_whole_process_percent": 99.93758992486815,
+        "symbol": "__libc_start_call_main",
+        "weighted_event_period": 135047406644
+      },
+      {
+        "raw_stack_blocks": 15466,
+        "share_of_subset_percent": 99.93758992486815,
+        "share_of_whole_process_percent": 99.93758992486815,
+        "symbol": "__libc_start_main@@GLIBC_2.34",
+        "weighted_event_period": 135047406644
+      },
+      {
+        "raw_stack_blocks": 15456,
+        "share_of_subset_percent": 99.89562752583059,
+        "share_of_whole_process_percent": 99.89562752583059,
+        "symbol": "_start",
+        "weighted_event_period": 134990702123
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "litchi_perf_baseline::main",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "litchi_perf_baseline::run",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "main",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "std::rt::lang_start_internal",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15455,
+        "share_of_subset_percent": 99.89562752509057,
+        "share_of_whole_process_percent": 99.89562752509057,
+        "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+        "weighted_event_period": 134990702122
+      },
+      {
+        "raw_stack_blocks": 15122,
+        "share_of_subset_percent": 97.926015606803,
+        "share_of_whole_process_percent": 97.926015606803,
+        "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+        "weighted_event_period": 132329131217
+      },
+      {
+        "raw_stack_blocks": 8610,
+        "share_of_subset_percent": 55.12955139888324,
+        "share_of_whole_process_percent": 55.12955139888324,
+        "symbol": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+        "weighted_event_period": 74497523419
+      },
+      {
+        "raw_stack_blocks": 4292,
+        "share_of_subset_percent": 27.781480458927483,
+        "share_of_whole_process_percent": 27.781480458927483,
+        "symbol": "<litchi_xlsx::workbook::model::Worksheet>::store",
+        "weighted_event_period": 37541598627
+      },
+      {
+        "raw_stack_blocks": 4271,
+        "share_of_subset_percent": 27.64619359762915,
+        "share_of_whole_process_percent": 27.64619359762915,
+        "symbol": "litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+        "weighted_event_period": 37358783134
+      },
+      {
+        "raw_stack_blocks": 3934,
+        "share_of_subset_percent": 25.834442765942807,
+        "share_of_whole_process_percent": 25.834442765942807,
+        "symbol": "litchi_perf_baseline::verify_xlsx_cells",
+        "weighted_event_period": 34910532666
+      },
+      {
+        "raw_stack_blocks": 3942,
+        "share_of_subset_percent": 25.54382565642184,
+        "share_of_whole_process_percent": 25.54382565642184,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+        "weighted_event_period": 34517816702
+      },
+      {
+        "raw_stack_blocks": 2579,
+        "share_of_subset_percent": 16.678509871705895,
+        "share_of_whole_process_percent": 16.678509871705895,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start",
+        "weighted_event_period": 22537961007
+      },
+      {
+        "raw_stack_blocks": 2384,
+        "share_of_subset_percent": 15.641774621028217,
+        "share_of_whole_process_percent": 15.641774621028217,
+        "symbol": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>",
+        "weighted_event_period": 21137002598
+      },
+      {
+        "raw_stack_blocks": 2408,
+        "share_of_subset_percent": 15.571763232679695,
+        "share_of_whole_process_percent": 15.571763232679695,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+        "weighted_event_period": 21042394989
+      },
+      {
+        "raw_stack_blocks": 2216,
+        "share_of_subset_percent": 14.241316298309442,
+        "share_of_whole_process_percent": 14.241316298309442,
+        "symbol": "litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+        "weighted_event_period": 19244538864
+      },
+      {
+        "raw_stack_blocks": 2172,
+        "share_of_subset_percent": 14.028500548470092,
+        "share_of_whole_process_percent": 14.028500548470092,
+        "symbol": "litchi_xlsx::raw::worksheet::edit::package::rewrite::<litchi_xlsx::raw::worksheet::edit::model::Plan>",
+        "weighted_event_period": 18956957233
+      },
+      {
+        "raw_stack_blocks": 2032,
+        "share_of_subset_percent": 13.334984961460034,
+        "share_of_whole_process_percent": 13.334984961460034,
+        "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec",
+        "weighted_event_period": 18019797536
+      },
+      {
+        "raw_stack_blocks": 2032,
+        "share_of_subset_percent": 13.334984961460034,
+        "share_of_whole_process_percent": 13.334984961460034,
+        "symbol": "<zlib_rs::stable::Deflate>::compress_uninit",
+        "weighted_event_period": 18019797536
+      },
+      {
+        "raw_stack_blocks": 2032,
+        "share_of_subset_percent": 13.334984961460034,
+        "share_of_whole_process_percent": 13.334984961460034,
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+        "weighted_event_period": 18019797536
+      },
+      {
+        "raw_stack_blocks": 2032,
+        "share_of_subset_percent": 13.334984961460034,
+        "share_of_whole_process_percent": 13.334984961460034,
+        "symbol": "zlib_rs::deflate::deflate",
+        "weighted_event_period": 18019797536
+      },
+      {
+        "raw_stack_blocks": 2052,
+        "share_of_subset_percent": 13.170235467420158,
+        "share_of_whole_process_percent": 13.170235467420158,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+        "weighted_event_period": 17797168674
+      },
+      {
+        "raw_stack_blocks": 2001,
+        "share_of_subset_percent": 13.13177347614296,
+        "share_of_whole_process_percent": 13.13177347614296,
+        "symbol": "soapberry_zip::preserve::generated_entry",
+        "weighted_event_period": 17745194315
+      },
+      {
+        "raw_stack_blocks": 2000,
+        "share_of_subset_percent": 13.125206125024674,
+        "share_of_whole_process_percent": 13.125206125024674,
+        "symbol": "<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all",
+        "weighted_event_period": 17736319739
+      },
+      {
+        "raw_stack_blocks": 1994,
+        "share_of_subset_percent": 13.085854061601546,
+        "share_of_whole_process_percent": 13.085854061601546,
+        "symbol": "<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status",
+        "weighted_event_period": 17683142610
+      },
+      {
+        "raw_stack_blocks": 1965,
+        "share_of_subset_percent": 12.895535737936987,
+        "share_of_whole_process_percent": 12.895535737936987,
+        "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>",
+        "weighted_event_period": 17425962143
+      },
+      {
+        "raw_stack_blocks": 1964,
+        "share_of_subset_percent": 12.888968354997901,
+        "share_of_whole_process_percent": 12.888968354997901,
+        "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+        "weighted_event_period": 17417087524
+      },
+      {
+        "raw_stack_blocks": 1883,
+        "share_of_subset_percent": 12.14674505816418,
+        "share_of_whole_process_percent": 12.14674505816418,
+        "symbol": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+        "weighted_event_period": 16414108250
+      },
+      {
+        "raw_stack_blocks": 1827,
+        "share_of_subset_percent": 11.828225313546591,
+        "share_of_whole_process_percent": 11.828225313546591,
+        "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+        "weighted_event_period": 15983686969
+      },
+      {
+        "raw_stack_blocks": 1799,
+        "share_of_subset_percent": 11.805790468522945,
+        "share_of_whole_process_percent": 11.805790468522945,
+        "symbol": "zlib_rs::deflate::longest_match::longest_match",
+        "weighted_event_period": 15953370372
+      },
+      {
+        "raw_stack_blocks": 1633,
+        "share_of_subset_percent": 10.478375745478639,
+        "share_of_whole_process_percent": 10.478375745478639,
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+        "weighted_event_period": 14159611727
+      },
+      {
+        "raw_stack_blocks": 1181,
+        "share_of_subset_percent": 7.634296006059168,
+        "share_of_whole_process_percent": 7.634296006059168,
+        "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+        "weighted_event_period": 10316357218
+      },
+      {
+        "raw_stack_blocks": 946,
+        "share_of_subset_percent": 6.203090612192062,
+        "share_of_whole_process_percent": 6.203090612192062,
+        "symbol": "litchi_xlsx::raw::compact::changed",
+        "weighted_event_period": 8382344431
+      },
+      {
+        "raw_stack_blocks": 961,
+        "share_of_subset_percent": 6.166753844010186,
+        "share_of_whole_process_percent": 6.166753844010186,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+        "weighted_event_period": 8333241923
+      },
+      {
+        "raw_stack_blocks": 886,
+        "share_of_subset_percent": 5.741805652326443,
+        "share_of_whole_process_percent": 5.741805652326443,
+        "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+        "weighted_event_period": 7759002027
+      },
+      {
+        "raw_stack_blocks": 817,
+        "share_of_subset_percent": 5.297705432016627,
+        "share_of_whole_process_percent": 5.297705432016627,
+        "symbol": "<quick_xml::events::attributes::IterState>::next",
+        "weighted_event_period": 7158881661
+      },
+      {
+        "raw_stack_blocks": 759,
+        "share_of_subset_percent": 4.901494586785565,
+        "share_of_whole_process_percent": 4.901494586785565,
+        "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::start_cell",
+        "weighted_event_period": 6623475042
+      }
+    ],
+    "leaf_period_weighted_ranking": [
+      {
+        "raw_stack_blocks": 1751,
+        "share_of_subset_percent": 11.490698555823652,
+        "share_of_whole_process_percent": 11.490698555823652,
+        "symbol": "zlib_rs::deflate::longest_match::longest_match",
+        "weighted_event_period": 15527581180
+      },
+      {
+        "raw_stack_blocks": 1566,
+        "share_of_subset_percent": 10.047037795295205,
+        "share_of_whole_process_percent": 10.047037795295205,
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+        "weighted_event_period": 13576737239
+      },
+      {
+        "raw_stack_blocks": 1395,
+        "share_of_subset_percent": 9.164824731033155,
+        "share_of_whole_process_percent": 9.164824731033155,
+        "symbol": "litchi_perf_baseline::verify_xlsx_cells",
+        "weighted_event_period": 12384587353
+      },
+      {
+        "raw_stack_blocks": 817,
+        "share_of_subset_percent": 5.29326367030286,
+        "share_of_whole_process_percent": 5.29326367030286,
+        "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value",
+        "weighted_event_period": 7152879431
+      },
+      {
+        "raw_stack_blocks": 683,
+        "share_of_subset_percent": 4.377534533374615,
+        "share_of_whole_process_percent": 4.377534533374615,
+        "symbol": "__memcmp_evex_movbe",
+        "weighted_event_period": 5915438692
+      },
+      {
+        "raw_stack_blocks": 611,
+        "share_of_subset_percent": 3.942051420923768,
+        "share_of_whole_process_percent": 3.942051420923768,
+        "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+        "weighted_event_period": 5326962774
+      },
+      {
+        "raw_stack_blocks": 507,
+        "share_of_subset_percent": 3.288509989514931,
+        "share_of_whole_process_percent": 3.288509989514931,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>",
+        "weighted_event_period": 4443820850
+      },
+      {
+        "raw_stack_blocks": 449,
+        "share_of_subset_percent": 2.8958070484324394,
+        "share_of_whole_process_percent": 2.8958070484324394,
+        "symbol": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+        "weighted_event_period": 3913154523
+      },
+      {
+        "raw_stack_blocks": 310,
+        "share_of_subset_percent": 2.0013274783905426,
+        "share_of_whole_process_percent": 2.0013274783905426,
+        "symbol": "__memmove_avx512_unaligned_erms",
+        "weighted_event_period": 2704428694
+      },
+      {
+        "raw_stack_blocks": 305,
+        "share_of_subset_percent": 1.9683021009436201,
+        "share_of_whole_process_percent": 1.9683021009436201,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::start_cell",
+        "weighted_event_period": 2659800926
+      },
+      {
+        "raw_stack_blocks": 292,
+        "share_of_subset_percent": 1.8933431837036636,
+        "share_of_whole_process_percent": 1.8933431837036636,
+        "symbol": "<quick_xml::events::attributes::IterState>::next",
+        "weighted_event_period": 2558507635
+      },
+      {
+        "raw_stack_blocks": 288,
+        "share_of_subset_percent": 1.8476634441594693,
+        "share_of_whole_process_percent": 1.8476634441594693,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit::{closure#33}::{closure#0}>",
+        "weighted_event_period": 2496779807
+      },
+      {
+        "raw_stack_blocks": 287,
+        "share_of_subset_percent": 1.8460547717925406,
+        "share_of_whole_process_percent": 1.8460547717925406,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+        "weighted_event_period": 2494605980
+      },
+      {
+        "raw_stack_blocks": 270,
+        "share_of_subset_percent": 1.7689764938844417,
+        "share_of_whole_process_percent": 1.7689764938844417,
+        "symbol": "xml_minifier::audit::verify_with_policy",
+        "weighted_event_period": 2390448760
+      },
+      {
+        "raw_stack_blocks": 269,
+        "share_of_subset_percent": 1.737735031124038,
+        "share_of_whole_process_percent": 1.737735031124038,
+        "symbol": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+        "weighted_event_period": 2348231627
+      },
+      {
+        "raw_stack_blocks": 233,
+        "share_of_subset_percent": 1.5134989601089393,
+        "share_of_whole_process_percent": 1.5134989601089393,
+        "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+        "weighted_event_period": 2045217517
+      },
+      {
+        "raw_stack_blocks": 222,
+        "share_of_subset_percent": 1.435341764713806,
+        "share_of_whole_process_percent": 1.435341764713806,
+        "symbol": "<litchi_xlsx::raw::worksheet::model::Parser>::finish",
+        "weighted_event_period": 1939602337
+      },
+      {
+        "raw_stack_blocks": 206,
+        "share_of_subset_percent": 1.3400048840897627,
+        "share_of_whole_process_percent": 1.3400048840897627,
+        "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+        "weighted_event_period": 1810771949
+      },
+      {
+        "raw_stack_blocks": 199,
+        "share_of_subset_percent": 1.306006049943478,
+        "share_of_whole_process_percent": 1.306006049943478,
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+        "weighted_event_period": 1764828732
+      },
+      {
+        "raw_stack_blocks": 195,
+        "share_of_subset_percent": 1.2794858428137454,
+        "share_of_whole_process_percent": 1.2794858428137454,
+        "symbol": "<litchi_xlsx::cell::Store>::view",
+        "weighted_event_period": 1728991514
+      },
+      {
+        "raw_stack_blocks": 199,
+        "share_of_subset_percent": 1.2146618847995578,
+        "share_of_whole_process_percent": 1.2146618847995578,
+        "symbol": "litchi_xlsx::raw::web::read",
+        "weighted_event_period": 1641393770
+      },
+      {
+        "raw_stack_blocks": 172,
+        "share_of_subset_percent": 1.0969271497205442,
+        "share_of_whole_process_percent": 1.0969271497205442,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+        "weighted_event_period": 1482296771
+      },
+      {
+        "raw_stack_blocks": 164,
+        "share_of_subset_percent": 1.0756499801412098,
+        "share_of_whole_process_percent": 1.0756499801412098,
+        "symbol": "litchi_xlsx::raw::compact::changed",
+        "weighted_event_period": 1453544561
+      },
+      {
+        "raw_stack_blocks": 156,
+        "share_of_subset_percent": 1.0043723593229672,
+        "share_of_whole_process_percent": 1.0043723593229672,
+        "symbol": "core::str::converts::from_utf8",
+        "weighted_event_period": 1357225870
+      },
+      {
+        "raw_stack_blocks": 155,
+        "share_of_subset_percent": 0.9942091151070822,
+        "share_of_whole_process_percent": 0.9942091151070822,
+        "symbol": "_int_malloc",
+        "weighted_event_period": 1343492101
+      },
+      {
+        "raw_stack_blocks": 153,
+        "share_of_subset_percent": 0.9890745361596186,
+        "share_of_whole_process_percent": 0.9890745361596186,
+        "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+        "weighted_event_period": 1336553655
+      },
+      {
+        "raw_stack_blocks": 145,
+        "share_of_subset_percent": 0.9380549320741118,
+        "share_of_whole_process_percent": 0.9380549320741118,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+        "weighted_event_period": 1267609975
+      },
+      {
+        "raw_stack_blocks": 144,
+        "share_of_subset_percent": 0.9264831224351334,
+        "share_of_whole_process_percent": 0.9264831224351334,
+        "symbol": "cfree@GLIBC_2.2.5",
+        "weighted_event_period": 1251972787
+      },
+      {
+        "raw_stack_blocks": 138,
+        "share_of_subset_percent": 0.9048206377621743,
+        "share_of_whole_process_percent": 0.9048206377621743,
+        "symbol": "litchi_xlsx::raw::compact::write_start",
+        "weighted_event_period": 1222699894
+      },
+      {
+        "raw_stack_blocks": 124,
+        "share_of_subset_percent": 0.8008367044273734,
+        "share_of_whole_process_percent": 0.8008367044273734,
+        "symbol": "<quick_xml::encoding::Decoder>::decode_cow",
+        "weighted_event_period": 1082184593
+      },
+      {
+        "raw_stack_blocks": 120,
+        "share_of_subset_percent": 0.7669526767633917,
+        "share_of_whole_process_percent": 0.7669526767633917,
+        "symbol": "malloc",
+        "weighted_event_period": 1036396516
+      },
+      {
+        "raw_stack_blocks": 116,
+        "share_of_subset_percent": 0.7461439803854294,
+        "share_of_whole_process_percent": 0.7461439803854294,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+        "weighted_event_period": 1008277362
+      },
+      {
+        "raw_stack_blocks": 108,
+        "share_of_subset_percent": 0.7075450708707951,
+        "share_of_whole_process_percent": 0.7075450708707951,
+        "symbol": "_int_free_merge_chunk",
+        "weighted_event_period": 956117983
+      },
+      {
+        "raw_stack_blocks": 125,
+        "share_of_subset_percent": 0.6896296125497487,
+        "share_of_whole_process_percent": 0.6896296125497487,
+        "symbol": "sha2::sha256::x86_sha::compress",
+        "weighted_event_period": 931908512
+      },
+      {
+        "raw_stack_blocks": 107,
+        "share_of_subset_percent": 0.682314363134914,
+        "share_of_whole_process_percent": 0.682314363134914,
+        "symbol": "litchi_xlsx::raw::worksheet::semantic::materialize",
+        "weighted_event_period": 922023288
+      },
+      {
+        "raw_stack_blocks": 95,
+        "share_of_subset_percent": 0.6079062661437139,
+        "share_of_whole_process_percent": 0.6079062661437139,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw",
+        "weighted_event_period": 821474330
+      },
+      {
+        "raw_stack_blocks": 94,
+        "share_of_subset_percent": 0.6008595228499272,
+        "share_of_whole_process_percent": 0.6008595228499272,
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+        "weighted_event_period": 811951943
+      },
+      {
+        "raw_stack_blocks": 93,
+        "share_of_subset_percent": 0.6004135306729583,
+        "share_of_whole_process_percent": 0.6004135306729583,
+        "symbol": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag",
+        "weighted_event_period": 811349266
+      },
+      {
+        "raw_stack_blocks": 98,
+        "share_of_subset_percent": 0.5870249029013953,
+        "share_of_whole_process_percent": 0.5870249029013953,
+        "symbol": "[unknown]",
+        "weighted_event_period": 793256980
+      },
+      {
+        "raw_stack_blocks": 87,
+        "share_of_subset_percent": 0.5633150421275203,
+        "share_of_whole_process_percent": 0.5633150421275203,
+        "symbol": "<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner>::start_cell",
+        "weighted_event_period": 761217432
+      }
+    ],
+    "raw_stack_blocks": 15483,
+    "weighted_event_period": 135131742466
+  }
+}

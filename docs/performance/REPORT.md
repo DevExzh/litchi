@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Current investigation: dense XLSX commit/save (0466)
+
+[0466](changes/0466-xlsx-dense-commit-profile.md) retains same-source CPU,
+allocation and repeated normal timing evidence for the current dense XLSX
+lead. Supplemental normal p50 is 399.470314/398.785007 ms; process maximum
+RSS is 109,728/109,724 KiB. Initial observations and wrapper/postprocessing
+limitations remain disclosed. No production code changes or before/after
+improvement claim are made. The investigation identifies repeated worksheet
+and attribute work for the next measured implementation; the full goal is open.
+
 ## Change 0465: checked-default ODP append capture
 
 0465 adds `odp_existing_append_lifecycle` to the checked default run without
