@@ -1,0 +1,28 @@
+{
+  "allocation_prediction": {
+    "counts": {
+      "131072": {
+        "allocation_callbacks": 3145756,
+        "requested_bytes": 3145836
+      },
+      "64": {
+        "allocation_callbacks": 1564,
+        "requested_bytes": 1644
+      },
+      "8192": {
+        "allocation_callbacks": 196636,
+        "requested_bytes": 196716
+      }
+    },
+    "removed_allocation_callbacks_formula": "24*N+28",
+    "removed_requested_bytes_formula": "24*N+108",
+    "scope": "unchanged synthetic tail-copy lifecycle: two source-N scans and two candidate-(N+1) scans",
+    "status": "source-derived prediction; compare against formal allocator evidence before keeping"
+  },
+  "change": "Borrow XML event local names in DOCX source-backed plain paragraph scanner",
+  "expected": "Lower allocation callbacks and scanned-name requested bytes, with possible latency benefit; retained document XML/index and bounded-window limitations unchanged. Predictions are not measurements.",
+  "keep_rule": "Keep only with practical measured allocation/latency benefit and all correctness/custody gates; review every absolute timing/RSS change above 5%.",
+  "mechanism": "Each Start/Empty/End local name is consumed within its parser event lifetime; removing the separate checked byte clone removes one temporary allocation/deallocation per such event without changing scanner passes or validation order.",
+  "performance_claim": "none",
+  "prior_profile": "change-0479 source-backed scanner 68.037% of weighted sampled lifecycle periods; change-0480 changes no scanner code"
+}

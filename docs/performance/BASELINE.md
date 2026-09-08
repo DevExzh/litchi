@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0481: DOCX scanner name ownership comparison
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) retains 1,440 samples in
+A1/B1/B2/A2 order from fresh control/candidate normal and allocator binaries.
+Normal lifecycle means are 7.84–12.00% lower across the three sizes and both
+repeats. At 131,072 paragraphs, allocation callbacks fall from 3,653,984 to
+508,228; incremental peak heap remains 35,371,102 bytes. The record separates
+phase statistics, process RSS, operation allocation and wider PMU observations.
+
 ## 0480: DOCX publication target ownership comparison
 
 [0480](changes/0480-docx-shared-publication.md) retains 1,440 samples from fresh control/candidate normal and allocator

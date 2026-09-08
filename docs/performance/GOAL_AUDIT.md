@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0481: scanner allocation progress; full goal still open
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) removes measured unnecessary
+name allocation work and records lower normal lifecycle means in both repeats.
+It leaves peak operation heap and document-sized XML/index ownership unchanged.
+The [explicit-window contract](results/change-0481/window-contract.md) separates
+the first decoded-splice milestone from the required multi-paragraph producer,
+replay, durable inverse and large-stream scaling work. The broader non-iWork
+requirements remain open; this batch does not redefine the definition of done.
+
 ## DOCX publication duplicate payload removed; append bound open (0480)
 
 [0480](changes/0480-docx-shared-publication.md) removes one complete target XML copy at the existing OPC handoff.

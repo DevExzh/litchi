@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "input_seal_sha256": "492c5ba93fb8dce242fcfcec668375fde5700a3043f7f9c8f19e2efb0b69ac04",
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\"captures\": 48, \"closure\": {\"complete\": true, \"helpers\": 17, \"live_cleanup\": \"pass\"}, \"data_only\": false, \"profiles\": {\"arms\": 2, \"status\": \"pass\"}, \"protocol_sha256\": \"72b73ede53dbcc24a51164730bdb4431e8213ea2ecc73a1104c3ec9c5b39bda2\", \"rust_validation\": {\"receipts\": 24, \"required\": 22, \"required_success\": 22}, \"samples\": 1440, \"schema\": \"docx-borrowed-names-comparison-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"attempts\": 24, \"required\": 22, \"required_success\": 22}}\n",
+  "temporary_copy_removed": true
+}

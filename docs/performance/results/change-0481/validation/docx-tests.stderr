@@ -1,0 +1,5 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 34s
+     Running unittests src/lib.rs (target/release/deps/litchi_docx-c189324bef0acb54)
+     Running tests/source_backed_paragraph_copy.rs (target/release/deps/source_backed_paragraph_copy-700c355411ef3296)
+     Running tests/source_backed_paragraph_removal.rs (target/release/deps/source_backed_paragraph_removal-4485520c5ba9de5a)

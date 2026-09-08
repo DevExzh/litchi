@@ -1,0 +1,76 @@
+{
+  "artifacts": {
+    "candidate-r2-normal-64-phases.report.json": {
+      "bytes": 238318,
+      "sha256": "50d9571f1877c36d55f643fd5a65760713d851c09f1ac3a81f3867c6bb7e327b"
+    },
+    "candidate-r2-normal-64-phases.resource": {
+      "bytes": 978,
+      "sha256": "502629a76eb4d6f308fe4a28b2ba84945dfae9e31ef48950752e788377b2c1e3"
+    },
+    "candidate-r2-normal-64-phases.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "candidate-r2-normal-64-phases.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_gate": "candidate-normal-build.json",
+    "build_gate_sha256": "0792f608ba92f883c3478571e016f0ab3d0787e1d36957c40f67c9e1eb435bc3",
+    "bytes": 417422008,
+    "embedded_inputs": {
+      "bytes": 2045,
+      "path": "embedded-inputs.json",
+      "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0481/candidate-normal/docx_plain_paragraph_tail_append",
+    "sha256": "a7cd8b1b588dbba48f51663c1d5ce92e5ec0e91b4384fd1e60578cc0198965f9",
+    "source_manifest_sha256": "bcec8208a7ce40c82eb59f20868afc090a0c314fb6431909f17a757132ee88b8"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0481/captures/candidate-r2-normal-64-phases.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-0481/candidate-normal/docx_plain_paragraph_tail_append",
+      "--mode",
+      "phases",
+      "--counts",
+      "64",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0481/captures/candidate-r2-normal-64-phases.report.json"
+    ],
+    "arm": "candidate",
+    "count": 64,
+    "instrumentation": "normal",
+    "label": "candidate-r2-normal-64-phases",
+    "mode": "phases",
+    "repeat": 2
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T18:40:00.982897+00:00",
+  "protocol_sha256": "72b73ede53dbcc24a51164730bdb4431e8213ea2ecc73a1104c3ec9c5b39bda2",
+  "started_utc": "2026-09-08T18:40:00.953842+00:00"
+}

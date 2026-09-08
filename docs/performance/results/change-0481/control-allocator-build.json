@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "docx_plain_paragraph_tail_append",
+    "--features",
+    "allocator-metrics"
+  ],
+  "artifacts": {
+    "build-control-allocator.stderr": {
+      "bytes": 74,
+      "sha256": "b9a7a833dc2c4cfd96d04ea905991469415cd771566d425408db5d814c6577c6"
+    },
+    "build-control-allocator.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 417467144,
+    "path": "/tmp/litchi-goal-0481/control-allocator/docx_plain_paragraph_tail_append",
+    "sha256": "75023ee8d5fd2a96fdd5cfc9c2dd2ce0b1fa7d6f4b861f3d10e0d3b0bf8afad5"
+  },
+  "common_sha256": "8fb0ed37aa0380197e8ebc09b93e17f32e57effaaada31dbe3dbe442a56ccb43",
+  "copied_utc": "2026-09-08T18:33:54.947936+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "embedded_inputs": {
+    "bytes": 2045,
+    "path": "embedded-inputs.json",
+    "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+  },
+  "embedded_inputs_unchanged": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T18:33:53.943029+00:00",
+  "original_binary": {
+    "bytes": 417467144,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/docx_plain_paragraph_tail_append",
+    "sha256": "75023ee8d5fd2a96fdd5cfc9c2dd2ce0b1fa7d6f4b861f3d10e0d3b0bf8afad5"
+  },
+  "source_after": {
+    "files": 7048,
+    "path": "validation-sources/87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893.json",
+    "sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  },
+  "source_before": {
+    "files": 7048,
+    "path": "validation-sources/87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893.json",
+    "sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T18:33:53.620227+00:00",
+  "validation_gate": {
+    "path": "validation/build-control-allocator.json",
+    "sha256": "2277ad996ec5be3f827a93096a5df614786f82c451d24ba26e65fd7a0747117b"
+  }
+}

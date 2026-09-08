@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0481: per-event DOCX name copies removed
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) removes temporary local-name
+vectors from the measured source-backed scanner. Exact allocation removal is
+`24*N+28` callbacks and `24*N+108` requested bytes in the named tail-copy
+lifecycle; both repeats show lower normal means. Full XML/index retention,
+repeated scans and exact-one range growth remain. The separate
+[window contract](results/change-0481/window-contract.md) identifies the OPC
+decoded-splice replay and multi-paragraph producer work still required.
+
 ## One DOCX publication XML copy removed (0480)
 
 [0480](changes/0480-docx-shared-publication.md) passes the immutable target Arc into the existing shared OPC overlay
