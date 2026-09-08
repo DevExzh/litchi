@@ -510,6 +510,137 @@ fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
 }
 
 #[test]
+fn eager_cell_attributes_keep_fixed_fields_and_entity_decoding() {
+    let xml = format!(
+        r#"<worksheet xmlns="{S}" xmlns:future="urn:future"><sheetData><row r="1"><c r="A&#x31;" t="&#x73;" s="1" cm="2147483647" vm="2147483647" future:opaque="preserve"><v>0</v></c></row></sheetData></worksheet>"#
+    );
+    let strings = [Text::from("shared")];
+    let store = parse(xml.as_bytes(), || Ok(Some(&strings)))
+        .expect("entity-encoded cell attributes should parse");
+    assert!(matches!(
+        store.get(Address::from_a1("A1").expect("address")),
+        Some(Cell::Value(Value::Text(value))) if value.as_str() == "shared"
+    ));
+}
+
+#[test]
+fn eager_cell_attributes_preserve_raw_duplicate_checks() {
+    for (attribute, first, second) in [
+        ("r", "A1", "B1"),
+        ("s", "1", "2"),
+        ("cm", "1", "2"),
+        ("vm", "1", "2"),
+        ("t", "n", "str"),
+    ] {
+        let cell = if attribute == "r" {
+            format!(r#"<c {attribute}="{first}" {attribute}="{second}"/>"#)
+        } else {
+            format!(r#"<c r="A1" {attribute}="{first}" {attribute}="{second}"/>"#)
+        };
+        let body = format!(r#"<sheetData><row r="1">{cell}</row></sheetData>"#);
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        assert!(
+            parse(xml.as_bytes(), || Ok(None)).is_err(),
+            "accepted duplicate cell attribute {attribute}"
+        );
+    }
+
+    let ignored = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" future="one" future="two"/></row></sheetData></worksheet>"#
+    );
+    assert!(parse(ignored.as_bytes(), || Ok(None)).is_err());
+
+    let prefixed = format!(
+        r#"<worksheet xmlns="{S}" xmlns:x="urn:future"><sheetData><row r="1"><c r="A1" x:r="one" x:r="two"/></row></sheetData></worksheet>"#
+    );
+    assert!(parse(prefixed.as_bytes(), || Ok(None)).is_err());
+}
+
+#[test]
+fn eager_cell_attributes_preserve_decode_and_validation_precedence() {
+    let invalid_reference = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="not-a-reference" s="&missing;"/></row></sheetData></worksheet>"#
+    );
+    let error = parse(invalid_reference.as_bytes(), || Ok(None))
+        .expect_err("invalid coordinate should be rejected")
+        .to_string();
+    assert!(
+        error.contains("invalid cell reference"),
+        "unexpected error: {error}"
+    );
+
+    let invalid_style_before_invalid_type = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" s="not-a-style" t="&missing;"><v>7</v></c></row></sheetData></worksheet>"#
+    );
+    let error = parse(invalid_style_before_invalid_type.as_bytes(), || Ok(None))
+        .expect_err("invalid style should be rejected")
+        .to_string();
+    assert!(
+        error.contains("invalid worksheet cell style"),
+        "unexpected error: {error}"
+    );
+
+    for (attribute, expected) in [
+        ("cm=\"0\"", "cell metadata index is outside Office limits"),
+        (
+            "vm=\"2147483648\"",
+            "value metadata index is outside Office limits",
+        ),
+    ] {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" {attribute}/></row></sheetData></worksheet>"#
+        );
+        let error = parse(xml.as_bytes(), || Ok(None))
+            .expect_err("metadata bound should be rejected")
+            .to_string();
+        assert!(error.contains(expected), "unexpected error: {error}");
+    }
+
+    let invalid_reference_before_duplicate_unknown = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="not-a-reference" future="one" future="two"/></row></sheetData></worksheet>"#
+    );
+    let error = parse(
+        invalid_reference_before_duplicate_unknown.as_bytes(),
+        || Ok(None),
+    )
+    .expect_err("duplicate unknown attributes should be rejected")
+    .to_string();
+    assert!(
+        error.contains("duplicated attribute"),
+        "unexpected error: {error}"
+    );
+
+    let invalid_reference_before_duplicate_unknown_after_decode_error = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="&missing;" future="one" future="two"/></row></sheetData></worksheet>"#
+    );
+    let error = parse(
+        invalid_reference_before_duplicate_unknown_after_decode_error.as_bytes(),
+        || Ok(None),
+    )
+    .expect_err("invalid reference entity should be rejected")
+    .to_string();
+    assert!(
+        error.contains("OOXML decoding error")
+            && error.contains("missing")
+            && !error.contains("duplicated attribute"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn eager_cell_attributes_ignore_prefixed_fields_beside_unqualified_fields() {
+    let xml = format!(
+        r#"<worksheet xmlns="{S}" xmlns:x="urn:future"><sheetData><row r="1"><c r="A1" x:r="B1" x:s="not-a-style" future="opaque"><v>7</v></c></row></sheetData></worksheet>"#
+    );
+    let store = parse(xml.as_bytes(), || Ok(None))
+        .expect("prefixed and unknown cell attributes should be ignored");
+    assert!(matches!(
+        store.get(Address::from_a1("A1").expect("address")),
+        Some(Cell::Value(Value::Number(value))) if value.as_str() == "7"
+    ));
+}
+
+#[test]
 fn rejects_missing_shared_strings_bad_indexes_and_formula_markers() {
     let shared = format!(
         r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" t="s"><v>1</v></c></row></sheetData></worksheet>"#

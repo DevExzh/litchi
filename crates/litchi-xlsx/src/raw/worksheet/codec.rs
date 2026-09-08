@@ -4,8 +4,9 @@ use std::collections::HashSet;
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use litchi_sheet::{COLUMNS, Cell as Address, Column as ColumnIndex, ROWS, Rect, Row as RowIndex};
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesStart, Event, attributes::Attribute};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
@@ -166,6 +167,74 @@ pub(super) fn parse_processed_defaults(
     }
 
     Ok(defaults)
+}
+
+// Check the complete attribute list once, as the old first `r` lookup did.
+// Decode `r` at encounter time, but retain the other fields undecoded so their
+// errors still follow coordinate, style, cell-metadata and value-metadata checks.
+#[derive(Debug)]
+struct CellAttributeView<'a> {
+    reference: Option<String>,
+    style: Option<Attribute<'a>>,
+    cell_metadata: Option<Attribute<'a>>,
+    value_metadata: Option<Attribute<'a>>,
+    cell_type: Option<Attribute<'a>>,
+}
+
+fn scan_cell_attributes<'a>(
+    element: &'a BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<CellAttributeView<'a>> {
+    let mut attributes = CellAttributeView {
+        reference: None,
+        style: None,
+        cell_metadata: None,
+        value_metadata: None,
+        cell_type: None,
+    };
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))?;
+        if attribute.key.prefix().is_some() {
+            continue;
+        }
+        match attribute.key.local_name().as_ref() {
+            b"r" => {
+                attributes.reference = Some(decode_cell_attribute(attribute, decoder)?);
+            },
+            b"s" => attributes.style = Some(attribute),
+            b"cm" => attributes.cell_metadata = Some(attribute),
+            b"vm" => attributes.value_metadata = Some(attribute),
+            b"t" => attributes.cell_type = Some(attribute),
+            _ => {},
+        }
+    }
+    Ok(attributes)
+}
+
+fn decode_cell_attribute(
+    attribute: Attribute<'_>,
+    decoder: Decoder,
+) -> litchi_ooxml_common::xml::Result<String> {
+    attribute
+        .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+        .map(|value| value.into_owned())
+        .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+fn parse_cell_u32(
+    attribute: Option<Attribute<'_>>,
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    attribute
+        .map(|attribute| {
+            let value = decode_cell_attribute(attribute, decoder)?;
+            value
+                .parse::<u32>()
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
+        })
+        .transpose()
 }
 
 impl Parser {
@@ -673,7 +742,14 @@ impl Parser {
             .as_ref()
             .ok_or_else(|| invalid("worksheet cell outside a row"))?
             .number;
-        let column = match unqualified_attribute_value(element, b"r", decoder)? {
+        let CellAttributeView {
+            reference,
+            style,
+            cell_metadata,
+            value_metadata,
+            cell_type,
+        } = scan_cell_attributes(element, decoder)?;
+        let column = match reference {
             Some(reference) => {
                 let (reference_row, column) = parse_a1(&reference)?;
                 if reference_row != row {
@@ -695,17 +771,17 @@ impl Parser {
             .as_mut()
             .ok_or_else(|| invalid("worksheet cell outside a row"))?;
         pending_row.last_column = column;
-        let style = optional_u32(element, b"s", decoder, "worksheet cell style")?;
+        let style = parse_cell_u32(style, decoder, "worksheet cell style")?;
         if style.is_some_and(|style| style > MAX_CELL_STYLE) {
             return Err(invalid(format!(
                 "worksheet cell style exceeds {MAX_CELL_STYLE}"
             )));
         }
-        let cell_metadata = optional_u32(element, b"cm", decoder, "cell metadata index")?;
+        let cell_metadata = parse_cell_u32(cell_metadata, decoder, "cell metadata index")?;
         if cell_metadata.is_some_and(|index| !(1..=MAX_METADATA_INDEX).contains(&index)) {
             return Err(invalid("cell metadata index is outside Office limits"));
         }
-        let value_metadata = optional_u32(element, b"vm", decoder, "value metadata index")?;
+        let value_metadata = parse_cell_u32(value_metadata, decoder, "value metadata index")?;
         if value_metadata.is_some_and(|index| !(1..=MAX_METADATA_INDEX).contains(&index)) {
             return Err(invalid("value metadata index is outside Office limits"));
         }
@@ -715,7 +791,9 @@ impl Parser {
             style,
             cell_metadata,
             value_metadata,
-            cell_type: unqualified_attribute_value(element, b"t", decoder)?,
+            cell_type: cell_type
+                .map(|attribute| decode_cell_attribute(attribute, decoder))
+                .transpose()?,
             value: String::new(),
             value_bytes: 0,
             saw_value: false,
