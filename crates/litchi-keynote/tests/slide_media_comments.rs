@@ -20,7 +20,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
-use litchi_keynote::{MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{MediaPart, MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -29,6 +29,10 @@ const NATIVE_COMMENT_BASELINE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-baseline-native.key");
 const NATIVE_COMMENT_DUPLICATE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-duplicate-native.key");
+const NATIVE_AUDIO_COMMENT_DUPLICATE: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-audio-comment-duplicate-native.key");
+const NATIVE_AUDIO_COMMENT_REMOVAL: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-audio-comment-removal-native.key");
 const NATIVE_COMMENT_SHARED_REMOVAL: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-shared-removal-native.key");
 const NATIVE_COMMENT_FINAL_REMOVAL: &[u8] =
@@ -44,6 +48,10 @@ const NATIVE_COMMENT_ROOT: u64 = 2_653_723;
 const NATIVE_COMMENT_ROOT_CLONE: u64 = 2_653_826;
 const NATIVE_COMMENT_AUTHOR: u64 = 2_653_721;
 const NATIVE_COMMENT_AUTHOR_STORAGE: u64 = 2_652_381;
+const AUDIO_COMMENT_TEXT: &str = "programmatic native audio comment";
+const AUDIO_REPLY_TEXT: &str = "programmatic native audio reply";
+const SAVED_AUDIO_DUPLICATE_ENV: &str = "LITCHI_KEYNOTE_AUDIO_COMMENT_NATIVE_SAVED_DUPLICATE_PATH";
+const SAVED_AUDIO_REMOVAL_ENV: &str = "LITCHI_KEYNOTE_AUDIO_COMMENT_NATIVE_SAVED_REMOVAL_PATH";
 const NATIVE_SLIDE_MESSAGE_TYPE: u32 = 5;
 const NATIVE_MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
@@ -108,6 +116,57 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
     Ok(bytes)
 }
 
+fn sorted_media_payloads(
+    package: &Package,
+    positions: impl IntoIterator<Item = usize>,
+    part: MediaPart,
+) -> TestResult<Vec<Vec<u8>>> {
+    let mut payloads = positions
+        .into_iter()
+        .map(|position| {
+            package
+                .slide_media_data(
+                    SlideSelector::index(0),
+                    MovieSelector::index(position),
+                    part,
+                )
+                .map(|payload| payload.to_vec())
+                .map_err(Into::into)
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    payloads.sort();
+    Ok(payloads)
+}
+
+fn sorted_movie_payloads(
+    package: &Package,
+    positions: impl IntoIterator<Item = usize>,
+) -> TestResult<Vec<(Vec<u8>, Vec<u8>)>> {
+    let mut payloads = positions
+        .into_iter()
+        .map(|position| {
+            Ok((
+                package
+                    .slide_media_data(
+                        SlideSelector::index(0),
+                        MovieSelector::index(position),
+                        MediaPart::Content,
+                    )?
+                    .to_vec(),
+                package
+                    .slide_media_data(
+                        SlideSelector::index(0),
+                        MovieSelector::index(position),
+                        MediaPart::Poster,
+                    )?
+                    .to_vec(),
+            ))
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    payloads.sort();
+    Ok(payloads)
+}
+
 fn export_if_requested(package: &Package, name: &str) -> TestResult<()> {
     let Some(directory) = env::var_os("LITCHI_KEYNOTE_MEDIA_COMMENT_OUTPUT_DIR") else {
         return Ok(());
@@ -121,6 +180,13 @@ fn export_if_requested(package: &Package, name: &str) -> TestResult<()> {
         path.display()
     );
     Ok(())
+}
+
+fn read_fixture_override(environment: &str, fixture: &[u8]) -> TestResult<Vec<u8>> {
+    if let Some(path) = env::var_os(environment) {
+        return Ok(fs::read(path)?);
+    }
+    Ok(fixture.to_vec())
 }
 
 fn native_component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
@@ -662,8 +728,31 @@ fn native_media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
         .collect())
 }
 
+fn native_audio_ids(source: &[u8]) -> TestResult<Vec<u64>> {
+    Ok(native_media_ids(source)?
+        .into_iter()
+        .filter(|identifier| {
+            native_movie_archive(source, *identifier)
+                .ok()
+                .is_some_and(|movie| movie.audio_only == Some(true))
+        })
+        .collect())
+}
+
 fn native_commented_media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
     Ok(native_media_ids(source)?
+        .into_iter()
+        .filter(|identifier| {
+            native_movie_archive(source, *identifier)
+                .ok()
+                .and_then(|movie| movie.super_.comment)
+                .is_some()
+        })
+        .collect())
+}
+
+fn native_commented_audio_ids(source: &[u8]) -> TestResult<Vec<u64>> {
+    Ok(native_audio_ids(source)?
         .into_iter()
         .filter(|identifier| {
             native_movie_archive(source, *identifier)
@@ -844,13 +933,38 @@ fn assert_comment_graph_clone(
         .filter_map(|node| node.author)
         .collect::<BTreeSet<_>>();
     assert_eq!(candidate_author_ids, source_author_ids);
-    assert!(source_author_ids.contains(&NATIVE_COMMENT_AUTHOR));
     assert_eq!(
         native_annotation_author_ids(candidate)?,
         native_annotation_author_ids(source)?,
         "comment duplication must reuse annotation-author objects"
     );
     Ok(())
+}
+
+fn assert_audio_comment_shape(source: &[u8], audio_identifier: u64) -> TestResult<()> {
+    let graph = native_comment_graph(source, audio_identifier)?;
+    assert_eq!(graph.nodes.len(), 2);
+    let root = &graph.nodes[0];
+    let reply = &graph.nodes[1];
+    assert_eq!(root.text, AUDIO_COMMENT_TEXT);
+    assert_eq!(root.replies, vec![reply.identifier]);
+    assert_eq!(reply.text, AUDIO_REPLY_TEXT);
+    assert!(root.author.is_some());
+    assert_eq!(root.author, reply.author);
+    assert!(root.storage_uuid.is_some());
+    assert!(reply.storage_uuid.is_some());
+    assert_ne!(root.storage_uuid, reply.storage_uuid);
+    Ok(())
+}
+
+fn assert_comment_graph_semantics(expected: &CommentGraph, actual: &CommentGraph) {
+    assert_eq!(actual.nodes.len(), expected.nodes.len());
+    for (expected_node, actual_node) in expected.nodes.iter().zip(&actual.nodes) {
+        assert_eq!(actual_node.text, expected_node.text);
+        assert_eq!(actual_node.author, expected_node.author);
+        assert_eq!(actual_node.storage_uuid, expected_node.storage_uuid);
+        assert_eq!(actual_node.replies.len(), expected_node.replies.len());
+    }
 }
 
 fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Vec<u8>> {
@@ -1213,6 +1327,132 @@ fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestRe
         .package()
         .apply_slide_media_lifecycle(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph() -> TestResult {
+    // This permanent source was produced by the programmatic native probe
+    // recorded in ADR 0028.  It already contains Audio A's comment/reply, so
+    // this focused test does not need the deprecated host comment mutator to
+    // manufacture a source package.
+    let source_package = Package::from_bytes(NATIVE_AUDIO_COMMENT_REMOVAL)?;
+    let source = exact_bytes(&source_package)?;
+    source_package.validate()?;
+
+    let source_audio_ids = native_audio_ids(&source)?;
+    assert_eq!(source_audio_ids, vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B]);
+    let source_audio_comment_ids = native_commented_audio_ids(&source)?;
+    assert_eq!(source_audio_comment_ids, vec![NATIVE_AUDIO_A]);
+    assert_audio_comment_shape(&source, NATIVE_AUDIO_A)?;
+    let source_movie = native_commented_media_ids(&source)?
+        .into_iter()
+        .find(|identifier| *identifier != NATIVE_AUDIO_A)
+        .ok_or_else(|| io::Error::other("native commented movie is missing"))?;
+    assert_eq!(source_movie, NATIVE_COMMENT_MOVIE);
+    let source_movie_graph = native_comment_graph(&source, source_movie)?;
+    let source_audio_payloads = sorted_media_payloads(&source_package, [0, 1], MediaPart::Content)?;
+    let source_audio_a_payload = sorted_media_payloads(&source_package, [0], MediaPart::Content)?;
+    let source_movie_payloads = sorted_movie_payloads(&source_package, [2, 3])?;
+    let source_edges = native_external_edges(&source)?;
+    let source_author_ids = native_annotation_author_ids(&source)?;
+    let source_author_storage_ids = native_annotation_author_storage_ids(&source)?;
+
+    let duplicate =
+        source_package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))?;
+    assert!(!duplicate.patch().is_noop());
+    assert_eq!(exact_bytes(&source_package)?, source);
+    let duplicate_bytes = exact_bytes(duplicate.package())?;
+    duplicate.package().validate()?;
+
+    let duplicate_audio_ids = native_audio_ids(&duplicate_bytes)?;
+    assert_eq!(duplicate_audio_ids.len(), 3);
+    assert_eq!(&duplicate_audio_ids[..2], &source_audio_ids);
+    let clone_audio = *duplicate_audio_ids
+        .last()
+        .ok_or_else(|| io::Error::other("focused audio clone is missing"))?;
+    assert_ne!(clone_audio, NATIVE_AUDIO_A);
+    assert_eq!(native_commented_audio_ids(&duplicate_bytes)?.len(), 2);
+    assert_audio_comment_shape(&duplicate_bytes, NATIVE_AUDIO_A)?;
+    assert_audio_comment_shape(&duplicate_bytes, clone_audio)?;
+    assert_comment_graph_clone(&source, &duplicate_bytes, NATIVE_AUDIO_A, clone_audio)?;
+    assert_comment_graph_semantics(
+        &source_movie_graph,
+        &native_comment_graph(&duplicate_bytes, source_movie)?,
+    );
+    assert_eq!(native_external_edges(&duplicate_bytes)?, source_edges);
+    assert_eq!(
+        native_annotation_author_ids(&duplicate_bytes)?,
+        source_author_ids
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&duplicate_bytes)?,
+        source_author_storage_ids
+    );
+
+    let mut expected_duplicate_audio_payloads = source_audio_payloads.clone();
+    expected_duplicate_audio_payloads.extend(source_audio_a_payload);
+    expected_duplicate_audio_payloads.sort();
+    assert_eq!(
+        sorted_media_payloads(duplicate.package(), [0, 1, 4], MediaPart::Content)?,
+        expected_duplicate_audio_payloads
+    );
+    assert_eq!(
+        sorted_movie_payloads(duplicate.package(), [2, 3])?,
+        source_movie_payloads
+    );
+    export_if_requested(
+        duplicate.package(),
+        "focused-media-comment-duplicate-audio.key",
+    )?;
+
+    // The focused selector addresses the complete source-order media list;
+    // duplication appends the clone after the two existing movies.
+    let removed = duplicate
+        .package()
+        .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(4))?;
+    assert!(!removed.patch().is_noop());
+    assert_eq!(exact_bytes(duplicate.package())?, duplicate_bytes);
+    let removed_bytes = exact_bytes(removed.package())?;
+    removed.package().validate()?;
+    assert_eq!(native_audio_ids(&removed_bytes)?, source_audio_ids);
+    assert_eq!(
+        native_commented_audio_ids(&removed_bytes)?,
+        vec![NATIVE_AUDIO_A]
+    );
+    assert_audio_comment_shape(&removed_bytes, NATIVE_AUDIO_A)?;
+    assert!(!native_object_exists(&removed_bytes, clone_audio)?);
+    assert_comment_graph_semantics(
+        &source_movie_graph,
+        &native_comment_graph(&removed_bytes, source_movie)?,
+    );
+    assert_eq!(native_external_edges(&removed_bytes)?, source_edges);
+    assert_eq!(
+        native_annotation_author_ids(&removed_bytes)?,
+        source_author_ids
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&removed_bytes)?,
+        source_author_storage_ids
+    );
+    assert_eq!(
+        sorted_media_payloads(removed.package(), [0, 1], MediaPart::Content)?,
+        source_audio_payloads
+    );
+    assert_eq!(
+        sorted_movie_payloads(removed.package(), [2, 3])?,
+        source_movie_payloads
+    );
+    export_if_requested(removed.package(), "focused-media-comment-remove-audio.key")?;
+
+    let restored_duplicate = removed
+        .package()
+        .apply_slide_media_lifecycle(&removed.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_duplicate.package())?, duplicate_bytes);
+    let restored_source = restored_duplicate
+        .package()
+        .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_source.package())?, source);
     Ok(())
 }
 
@@ -1742,6 +1982,89 @@ fn duplicate_selected_native_commented_movie_rejects_deprecated_comment_referenc
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn native_saved_audio_comment_duplicate_fixture_has_strict_readback() -> TestResult {
+    let bytes = read_fixture_override(SAVED_AUDIO_DUPLICATE_ENV, NATIVE_AUDIO_COMMENT_DUPLICATE)?;
+    let package = Package::from_bytes(&bytes)?;
+    package.validate()?;
+    assert_eq!(exact_bytes(&package)?, bytes);
+
+    let source = Package::from_bytes(NATIVE_AUDIO_COMMENT_REMOVAL)?;
+    let source_audio_payloads = sorted_media_payloads(&source, [0, 1], MediaPart::Content)?;
+    let source_audio_a_payload = sorted_media_payloads(&source, [0], MediaPart::Content)?;
+    let source_movie_payloads = sorted_movie_payloads(&source, [2, 3])?;
+    assert_eq!(native_audio_ids(&bytes)?.len(), 3);
+    let audio_comments = native_commented_audio_ids(&bytes)?;
+    assert_eq!(audio_comments.len(), 2);
+    assert_audio_comment_shape(&bytes, NATIVE_AUDIO_A)?;
+    let clone_audio = audio_comments
+        .into_iter()
+        .find(|identifier| *identifier != NATIVE_AUDIO_A)
+        .ok_or_else(|| io::Error::other("native-saved audio clone has no comment"))?;
+    assert_audio_comment_shape(&bytes, clone_audio)?;
+    assert_comment_graph_clone(
+        NATIVE_AUDIO_COMMENT_REMOVAL,
+        &bytes,
+        NATIVE_AUDIO_A,
+        clone_audio,
+    )?;
+    assert_eq!(native_commented_media_ids(&bytes)?.len(), 3);
+    let movie_graph = native_comment_graph(NATIVE_COMMENT_BASELINE, NATIVE_COMMENT_MOVIE)?;
+    assert_comment_graph_semantics(
+        &movie_graph,
+        &native_comment_graph(&bytes, NATIVE_COMMENT_MOVIE)?,
+    );
+
+    let mut expected_audio_payloads = source_audio_payloads;
+    expected_audio_payloads.extend(source_audio_a_payload);
+    expected_audio_payloads.sort();
+    assert_eq!(
+        sorted_media_payloads(&package, [0, 1, 4], MediaPart::Content)?,
+        expected_audio_payloads
+    );
+    assert_eq!(
+        sorted_movie_payloads(&package, [2, 3])?,
+        source_movie_payloads
+    );
+    Ok(())
+}
+
+#[test]
+fn native_saved_audio_comment_removal_fixture_has_strict_readback() -> TestResult {
+    let bytes = read_fixture_override(SAVED_AUDIO_REMOVAL_ENV, NATIVE_AUDIO_COMMENT_REMOVAL)?;
+    let package = Package::from_bytes(&bytes)?;
+    package.validate()?;
+    assert_eq!(exact_bytes(&package)?, bytes);
+    assert_eq!(
+        native_audio_ids(&bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B]
+    );
+    assert_eq!(native_commented_audio_ids(&bytes)?, vec![NATIVE_AUDIO_A]);
+    assert_audio_comment_shape(&bytes, NATIVE_AUDIO_A)?;
+    assert_eq!(native_commented_media_ids(&bytes)?.len(), 2);
+    let source_audio_graph = native_comment_graph(NATIVE_AUDIO_COMMENT_REMOVAL, NATIVE_AUDIO_A)?;
+    assert_comment_graph_semantics(
+        &source_audio_graph,
+        &native_comment_graph(&bytes, NATIVE_AUDIO_A)?,
+    );
+    let baseline_movie_graph = native_comment_graph(NATIVE_COMMENT_BASELINE, NATIVE_COMMENT_MOVIE)?;
+    assert_comment_graph_semantics(
+        &baseline_movie_graph,
+        &native_comment_graph(&bytes, NATIVE_COMMENT_MOVIE)?,
+    );
+
+    let baseline = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
+    assert_eq!(
+        sorted_media_payloads(&package, [0, 1], MediaPart::Content)?,
+        sorted_media_payloads(&baseline, [0, 1], MediaPart::Content)?
+    );
+    assert_eq!(
+        sorted_movie_payloads(&package, [2, 3])?,
+        sorted_movie_payloads(&baseline, [2, 3])?
+    );
     Ok(())
 }
 

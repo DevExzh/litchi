@@ -5392,14 +5392,12 @@ mod drawable_order;
 mod keynote_object_catalog;
 mod named_paragraph_styles;
 mod placeholder_ownership;
-mod slide_audio;
 mod slide_charts;
 mod slide_create;
 mod slide_graph;
 mod slide_images;
 mod slide_layout_media;
 mod slide_layout_update;
-mod slide_movies;
 mod slide_shapes;
 mod slide_tables;
 mod text_box_create;
@@ -5413,11 +5411,9 @@ pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
     TextDelivery, TextDeliveryKind,
 };
-pub use slide_audio::KeynoteSlideAudioInfo;
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
 pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
-pub use slide_movies::KeynoteSlideMovieInfo;
 pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,

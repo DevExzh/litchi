@@ -11,10 +11,14 @@ use std::io;
 use std::time::Duration;
 
 use litchi_iwa::keynote::{BuildStart, KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa_archive::{iwa::Archive, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use prost::Message as _;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -34,14 +38,14 @@ struct SourceFixture {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostMovie {
+struct MovieSnapshot {
     content: Vec<u8>,
     poster: Vec<u8>,
     position: Option<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostAudio {
+struct AudioSnapshot {
     content: Vec<u8>,
     position: (u32, u32),
 }
@@ -63,9 +67,9 @@ struct BuildSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostSnapshot {
-    movies: Vec<HostMovie>,
-    audio: Vec<HostAudio>,
+struct MediaSnapshot {
+    movies: Vec<MovieSnapshot>,
+    audio: Vec<AudioSnapshot>,
     builds: Vec<BuildSnapshot>,
 }
 
@@ -85,6 +89,97 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(bytes)
 }
 
+/// Read only native media identities needed by the host build/comment oracle.
+/// The production test assertions select media through the focused semantic
+/// API; this generated-Prost projection remains private to the integration
+/// test so host graph correlations do not become a public raw-ID API.
+fn native_media_ids(source: &[u8]) -> Result<Vec<(u64, MovieKind)>, Box<dyn Error>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let mut movies = Vec::new();
+    let mut slides = Vec::new();
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            Ok(stream) => stream.into_bytes(),
+            Err(_) => continue,
+        };
+        let archive = match Archive::parse(&stream) {
+            Ok(archive) => archive,
+            Err(_) => continue,
+        };
+        for object in &archive.objects {
+            let Some(identifier) = object.archive_info.identifier else {
+                continue;
+            };
+            for message in &object.messages {
+                match message.type_ {
+                    5 => {
+                        if let Ok(slide) = kn::SlideArchive::decode(message.data.as_slice()) {
+                            slides.push((identifier, slide));
+                        }
+                    },
+                    3_007 => {
+                        if let Ok(movie) = tsd::MovieArchive::decode(message.data.as_slice()) {
+                            let kind = if movie.is_live_video == Some(true) {
+                                MovieKind::LiveVideo
+                            } else if movie.audio_only == Some(true) {
+                                MovieKind::Audio
+                            } else if movie.flags.is_some_and(|flags| flags & 1 != 0) {
+                                MovieKind::Placeholder
+                            } else {
+                                MovieKind::File
+                            };
+                            movies.push((identifier, movie, kind));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
+
+    let mut fallback = None;
+    for (slide_identifier, slide) in slides {
+        let candidate = slide
+            .owned_drawables
+            .into_iter()
+            .filter_map(|reference| {
+                movies
+                    .iter()
+                    .find(|(identifier, movie, _)| {
+                        *identifier == reference.identifier
+                            && movie
+                                .super_
+                                .parent
+                                .as_ref()
+                                .is_some_and(|parent| parent.identifier == slide_identifier)
+                    })
+                    .map(|(identifier, _, kind)| (*identifier, *kind))
+            })
+            .collect::<Vec<_>>();
+        if candidate.is_empty() {
+            continue;
+        }
+        let has_audio = candidate.iter().any(|(_, kind)| *kind == MovieKind::Audio);
+        let has_file = candidate.iter().any(|(_, kind)| *kind == MovieKind::File);
+        if has_audio && has_file {
+            return Ok(candidate);
+        }
+        fallback.get_or_insert(candidate);
+    }
+    fallback.ok_or_else(|| io::Error::other("native package has no slide-owned media").into())
+}
+
+fn last_native_media_id(source: &[u8], kind: MovieKind) -> Result<u64, Box<dyn Error>> {
+    native_media_ids(source)?
+        .into_iter()
+        .rev()
+        .find_map(|(identifier, actual)| (actual == kind).then_some(identifier))
+        .ok_or_else(|| io::Error::other("focused media creation produced no native media").into())
+}
+
 fn add_audio(
     editor: &mut KeynoteEditor,
     preferred_filename: &str,
@@ -96,12 +191,7 @@ fn add_audio(
         package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
     let bytes = package_bytes(commit.package())?;
     *editor = KeynoteEditor::from_bytes(&bytes)?;
-    editor
-        .slide_audio(0)?
-        .into_iter()
-        .last()
-        .map(|audio| audio.drawable_object_id)
-        .ok_or_else(|| io::Error::other("focused audio creation produced no host audio").into())
+    last_native_media_id(&bytes, MovieKind::Audio)
 }
 
 fn add_movie(
@@ -123,12 +213,7 @@ fn add_movie(
     )?;
     let bytes = package_bytes(commit.package())?;
     *editor = KeynoteEditor::from_bytes(&bytes)?;
-    editor
-        .slide_movies(0)?
-        .into_iter()
-        .last()
-        .map(|movie| movie.drawable_object_id)
-        .ok_or_else(|| io::Error::other("focused movie creation produced no host movie").into())
+    last_native_media_id(&bytes, MovieKind::File)
 }
 
 fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
@@ -170,35 +255,49 @@ fn focused_suffix_release_and_next_allocation_reopen_in_host() -> TestResult {
         assert!(released < old_watermark);
         let removed_host = KeynoteEditor::from_bytes(&removed_bytes)?;
         assert_eq!(released, package_watermark(&removed_host.to_bytes()?)?);
-        assert_eq!(removed_host.slide_movies(0)?.len(), 2);
-        assert_eq!(removed_host.slide_audio(0)?.len(), 2);
+        let removed_slide = removed
+            .package()
+            .show()?
+            .slides()
+            .first()
+            .ok_or_else(|| io::Error::other("removed package has no first slide"))?;
+        assert_eq!(
+            removed_slide
+                .movies()
+                .iter()
+                .filter(|movie| movie.kind() == MovieKind::File)
+                .count(),
+            2
+        );
+        assert_eq!(removed_slide.audio().count(), 2,);
 
         let repeated = removed
             .package()
             .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
-        let repeated_host = KeynoteEditor::from_bytes(&package_bytes(repeated.package())?)?;
-        let next_focused_id = if is_movie {
-            repeated_host
-                .slide_movies(0)?
-                .last()
-                .unwrap()
-                .drawable_object_id
+        let repeated_bytes = package_bytes(repeated.package())?;
+        let _repeated_host = KeynoteEditor::from_bytes(&repeated_bytes)?;
+        let desired_kind = if is_movie {
+            MovieKind::File
         } else {
-            repeated_host
-                .slide_audio(0)?
-                .last()
-                .unwrap()
-                .drawable_object_id
+            MovieKind::Audio
         };
+        let next_focused_id = last_native_media_id(&repeated_bytes, desired_kind)?;
         assert!(next_focused_id > released);
+        let repeated_slide = repeated
+            .package()
+            .show()?
+            .slides()
+            .first()
+            .ok_or_else(|| io::Error::other("repeated package has no first slide"))?;
         assert_eq!(
-            repeated_host.slide_movies(0)?.len(),
+            repeated_slide
+                .movies()
+                .iter()
+                .filter(|movie| movie.kind() == MovieKind::File)
+                .count(),
             if is_movie { 3 } else { 2 }
         );
-        assert_eq!(
-            repeated_host.slide_audio(0)?.len(),
-            if is_movie { 2 } else { 3 }
-        );
+        assert_eq!(repeated_slide.audio().count(), if is_movie { 2 } else { 3 });
         assert_eq!(package_bytes(&package)?, fixture.bytes);
         let restored = removed
             .package()
@@ -322,8 +421,21 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     // Reopen once before returning so this fixture itself proves that labels,
     // comments, and the extra build are accepted by the host reader.
     let reopened = KeynoteEditor::from_bytes(&bytes)?;
-    assert_eq!(reopened.slide_movies(0)?.len(), 2);
-    assert_eq!(reopened.slide_audio(0)?.len(), 2);
+    let reopened_package = Package::from_bytes(&bytes)?;
+    let reopened_slide = reopened_package
+        .show()?
+        .slides()
+        .first()
+        .ok_or_else(|| io::Error::other("reopened package has no first slide"))?;
+    assert_eq!(
+        reopened_slide
+            .movies()
+            .iter()
+            .filter(|movie| movie.kind() == MovieKind::File)
+            .count(),
+        2
+    );
+    assert_eq!(reopened_slide.audio().count(), 2);
     assert_eq!(reopened.slide_builds(0)?.len(), 5);
     assert_eq!(
         reopened
@@ -340,60 +452,70 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     })
 }
 
-fn host_snapshot(editor: &KeynoteEditor) -> Result<HostSnapshot, Box<dyn Error>> {
-    let movies = editor.slide_movies(0)?;
-    let audio = editor.slide_audio(0)?;
-    let movie_ids = movies
-        .iter()
-        .map(|movie| movie.drawable_object_id)
-        .collect::<Vec<_>>();
-    let audio_ids = audio
-        .iter()
-        .map(|clip| clip.drawable_object_id)
-        .collect::<Vec<_>>();
-
-    let movies = movies
-        .into_iter()
-        .map(|movie| {
-            let movie_data_identifier = movie.movie_data_identifier.ok_or_else(|| {
-                io::Error::other("host movie projection has no content data identifier")
-            })?;
-            let poster_data_identifier = movie.poster_image_data_identifier.ok_or_else(|| {
-                io::Error::other("host movie projection has no poster data identifier")
-            })?;
-            Ok(HostMovie {
-                content: editor.extract_media(movie_data_identifier)?,
-                poster: editor.extract_media(poster_data_identifier)?,
+fn semantic_snapshot(
+    package: &Package,
+    editor: &KeynoteEditor,
+) -> Result<MediaSnapshot, Box<dyn Error>> {
+    let slide = package
+        .show()?
+        .slides()
+        .first()
+        .ok_or_else(|| io::Error::other("focused package has no first slide"))?;
+    let mut movies = Vec::new();
+    let mut audio = Vec::new();
+    for (movie_position, movie) in slide.movies().iter().copied().enumerate() {
+        let content = package
+            .slide_media_data(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+                MediaPart::Content,
+            )?
+            .to_vec();
+        if movie.is_audio() {
+            let position = movie
+                .position()
+                .ok_or_else(|| io::Error::other("audio summary has no position"))?;
+            audio.push(AudioSnapshot {
+                content,
+                position: (position.x.to_bits(), position.y.to_bits()),
+            });
+        } else {
+            let poster = package
+                .slide_media_data(
+                    SlideSelector::index(0),
+                    MovieSelector::index(movie_position),
+                    MediaPart::Poster,
+                )?
+                .to_vec();
+            movies.push(MovieSnapshot {
+                content,
+                poster,
                 position: movie
-                    .geometry
-                    .position
+                    .position()
                     .map(|point| (point.x.to_bits(), point.y.to_bits())),
-            })
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let audio = audio
-        .into_iter()
-        .map(|clip| {
-            Ok(HostAudio {
-                content: editor.extract_media(clip.audio_data_identifier)?,
-                position: (clip.position.x.to_bits(), clip.position.y.to_bits()),
-            })
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+            });
+        }
+    }
 
+    let media_ids = native_media_ids(&editor.to_bytes()?)?;
     let mut builds = editor
         .slide_builds(0)?
         .into_iter()
         .map(|build| {
-            let target = movie_ids
+            let target = media_ids
                 .iter()
-                .position(|identifier| *identifier == build.drawable_object_id)
-                .map(MediaSlot::Movie)
-                .or_else(|| {
-                    audio_ids
+                .position(|(identifier, _)| *identifier == build.drawable_object_id)
+                .and_then(|media_index| {
+                    let kind = media_ids[media_index].1;
+                    let slot = media_ids[..media_index]
                         .iter()
-                        .position(|identifier| *identifier == build.drawable_object_id)
-                        .map(MediaSlot::Audio)
+                        .filter(|(_, candidate)| *candidate == kind)
+                        .count();
+                    match kind {
+                        MovieKind::File => Some(MediaSlot::Movie(slot)),
+                        MovieKind::Audio => Some(MediaSlot::Audio(slot)),
+                        _ => None,
+                    }
                 })
                 .ok_or_else(|| io::Error::other("host build targets unknown media"))?;
             let semantic = build.settings.semantic()?;
@@ -409,7 +531,7 @@ fn host_snapshot(editor: &KeynoteEditor) -> Result<HostSnapshot, Box<dyn Error>>
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
     builds.sort();
 
-    Ok(HostSnapshot {
+    Ok(MediaSnapshot {
         movies,
         audio,
         builds,
@@ -456,9 +578,28 @@ fn expected_builds_with_clone(
     expected
 }
 
-fn has_media_bytes(editor: &KeynoteEditor, expected: &[u8]) -> Result<bool, Box<dyn Error>> {
-    for asset in editor.media_assets()? {
-        if editor.extract_media(asset.data_identifier)? == expected {
+fn has_media_bytes(package: &Package, expected: &[u8]) -> Result<bool, Box<dyn Error>> {
+    let slide = package
+        .show()?
+        .slides()
+        .first()
+        .ok_or_else(|| io::Error::other("focused package has no first slide"))?;
+    for movie_position in 0..slide.movies().len() {
+        if package.slide_media_data(
+            SlideSelector::index(0),
+            MovieSelector::index(movie_position),
+            MediaPart::Content,
+        )? == expected
+        {
+            return Ok(true);
+        }
+        if !slide.movies()[movie_position].is_audio()
+            && package.slide_media_data(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+                MediaPart::Poster,
+            )? == expected
+        {
             return Ok(true);
         }
     }
@@ -544,7 +685,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     let package = Package::from_bytes(&fixture.bytes)?;
     let source_bytes = package_bytes(&package)?;
     let baseline_editor = host_from_package(&package)?;
-    let baseline = host_snapshot(&baseline_editor)?;
+    let baseline = semantic_snapshot(&package, &baseline_editor)?;
 
     assert_eq!(baseline.movies.len(), 2);
     assert_eq!(baseline.audio.len(), 2);
@@ -578,7 +719,8 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         "source snapshot was mutated"
     );
     let duplicate_movie_editor = host_from_package(duplicate_movie.package())?;
-    let duplicate_movie_state = host_snapshot(&duplicate_movie_editor)?;
+    let duplicate_movie_state =
+        semantic_snapshot(duplicate_movie.package(), &duplicate_movie_editor)?;
     let mut expected_movies = baseline.movies.clone();
     let mut cloned_movie = baseline.movies[0].clone();
     cloned_movie.position = offset_position(cloned_movie.position);
@@ -604,8 +746,8 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     assert_eq!(duplicate_movie.diagnostics().target_media_count(), 5);
     assert!(duplicate_movie.diagnostics().created_objects() > 0);
     assert_eq!(duplicate_movie.diagnostics().removed_objects(), 0);
-    assert!(has_media_bytes(&duplicate_movie_editor, MOVIE_A)?);
-    assert!(has_media_bytes(&duplicate_movie_editor, POSTER_A)?);
+    assert!(has_media_bytes(duplicate_movie.package(), MOVIE_A)?);
+    assert!(has_media_bytes(duplicate_movie.package(), POSTER_A)?);
 
     let duplicate_movie_inverse = duplicate_movie.patch().inverse();
     let restored_movie = duplicate_movie
@@ -629,7 +771,8 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     let duplicate_audio =
         package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
     let duplicate_audio_editor = host_from_package(duplicate_audio.package())?;
-    let duplicate_audio_state = host_snapshot(&duplicate_audio_editor)?;
+    let duplicate_audio_state =
+        semantic_snapshot(duplicate_audio.package(), &duplicate_audio_editor)?;
     assert_eq!(duplicate_audio_state.movies, baseline.movies);
     let mut expected_audio = baseline.audio.clone();
     let mut cloned_audio = baseline.audio[0].clone();
@@ -640,7 +783,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         duplicate_audio_state.builds,
         expected_builds_with_clone(&baseline.builds, MediaSlot::Audio(0), MediaSlot::Audio(2))
     );
-    assert!(has_media_bytes(&duplicate_audio_editor, AUDIO_A)?);
+    assert!(has_media_bytes(duplicate_audio.package(), AUDIO_A)?);
     assert_eq!(duplicate_audio.diagnostics().source_media_count(), 4);
     assert_eq!(duplicate_audio.diagnostics().target_media_count(), 5);
 
@@ -659,7 +802,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         .package()
         .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))?;
     let movie_shared_editor = host_from_package(movie_shared.package())?;
-    let movie_shared_state = host_snapshot(&movie_shared_editor)?;
+    let movie_shared_state = semantic_snapshot(movie_shared.package(), &movie_shared_editor)?;
     assert_eq!(movie_shared_state.movies.len(), 2);
     assert_eq!(movie_shared_state.audio.len(), 2);
     assert_eq!(movie_shared_state.movies[0].content, MOVIE_B);
@@ -673,8 +816,8 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
             .sum::<usize>(),
         5
     );
-    assert!(has_media_bytes(&movie_shared_editor, MOVIE_A)?);
-    assert!(has_media_bytes(&movie_shared_editor, POSTER_A)?);
+    assert!(has_media_bytes(movie_shared.package(), MOVIE_A)?);
+    assert!(has_media_bytes(movie_shared.package(), POSTER_A)?);
     assert_eq!(
         movie_labels(movie_shared.package(), 3)?,
         (
@@ -691,7 +834,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         .package()
         .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3))?;
     let movie_final_editor = host_from_package(movie_final.package())?;
-    let movie_final_state = host_snapshot(&movie_final_editor)?;
+    let movie_final_state = semantic_snapshot(movie_final.package(), &movie_final_editor)?;
     assert_eq!(movie_final_state.movies.len(), 1);
     assert_eq!(movie_final_state.movies[0].content, MOVIE_B);
     assert_eq!(movie_final_state.audio, baseline.audio);
@@ -708,12 +851,12 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
             .sum::<usize>(),
         3
     );
-    assert!(!has_media_bytes(&movie_final_editor, MOVIE_A)?);
-    assert!(!has_media_bytes(&movie_final_editor, POSTER_A)?);
-    assert!(has_media_bytes(&movie_final_editor, MOVIE_B)?);
-    assert!(has_media_bytes(&movie_final_editor, POSTER_B)?);
-    assert!(has_media_bytes(&movie_final_editor, AUDIO_A)?);
-    assert!(has_media_bytes(&movie_final_editor, AUDIO_B)?);
+    assert!(!has_media_bytes(movie_final.package(), MOVIE_A)?);
+    assert!(!has_media_bytes(movie_final.package(), POSTER_A)?);
+    assert!(has_media_bytes(movie_final.package(), MOVIE_B)?);
+    assert!(has_media_bytes(movie_final.package(), POSTER_B)?);
+    assert!(has_media_bytes(movie_final.package(), AUDIO_A)?);
+    assert!(has_media_bytes(movie_final.package(), AUDIO_B)?);
 
     let movie_final_inverse = movie_final.patch().inverse();
     let movie_shared_inverse = movie_shared.patch().inverse();
@@ -738,7 +881,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         .package()
         .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
     let audio_shared_editor = host_from_package(audio_shared.package())?;
-    let audio_shared_state = host_snapshot(&audio_shared_editor)?;
+    let audio_shared_state = semantic_snapshot(audio_shared.package(), &audio_shared_editor)?;
     assert_eq!(audio_shared_state.movies, baseline.movies);
     assert_eq!(audio_shared_state.audio[0].content, AUDIO_B);
     assert_eq!(audio_shared_state.audio[1].content, AUDIO_A);
@@ -747,13 +890,13 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         comment_text(&audio_shared_editor, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
-    assert!(has_media_bytes(&audio_shared_editor, AUDIO_A)?);
+    assert!(has_media_bytes(audio_shared.package(), AUDIO_A)?);
 
     let audio_final = audio_shared
         .package()
         .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(3))?;
     let audio_final_editor = host_from_package(audio_final.package())?;
-    let audio_final_state = host_snapshot(&audio_final_editor)?;
+    let audio_final_state = semantic_snapshot(audio_final.package(), &audio_final_editor)?;
     assert_eq!(audio_final_state.movies, baseline.movies);
     assert_eq!(audio_final_state.audio.len(), 1);
     assert_eq!(audio_final_state.audio[0].content, AUDIO_B);
@@ -770,12 +913,12 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
             .sum::<usize>(),
         4
     );
-    assert!(!has_media_bytes(&audio_final_editor, AUDIO_A)?);
-    assert!(has_media_bytes(&audio_final_editor, AUDIO_B)?);
-    assert!(has_media_bytes(&audio_final_editor, MOVIE_A)?);
-    assert!(has_media_bytes(&audio_final_editor, POSTER_A)?);
-    assert!(has_media_bytes(&audio_final_editor, MOVIE_B)?);
-    assert!(has_media_bytes(&audio_final_editor, POSTER_B)?);
+    assert!(!has_media_bytes(audio_final.package(), AUDIO_A)?);
+    assert!(has_media_bytes(audio_final.package(), AUDIO_B)?);
+    assert!(has_media_bytes(audio_final.package(), MOVIE_A)?);
+    assert!(has_media_bytes(audio_final.package(), POSTER_A)?);
+    assert!(has_media_bytes(audio_final.package(), MOVIE_B)?);
+    assert!(has_media_bytes(audio_final.package(), POSTER_B)?);
 
     let audio_final_inverse = audio_final.patch().inverse();
     let audio_shared_inverse = audio_shared.patch().inverse();
@@ -853,13 +996,10 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
     let duplicate =
         package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
     let duplicate_editor = host_from_package(duplicate.package())?;
-    let movies = duplicate_editor.slide_movies(0)?;
-    let cloned_movie = movies
-        .last()
-        .ok_or_else(|| io::Error::other("cloned movie missing"))?;
-    let cloned_comment =
-        drawable_comment_snapshot(&duplicate_editor, cloned_movie.drawable_object_id)?
-            .ok_or_else(|| io::Error::other("cloned movie comment missing"))?;
+    let cloned_movie_id =
+        last_native_media_id(&package_bytes(duplicate.package())?, MovieKind::File)?;
+    let cloned_comment = drawable_comment_snapshot(&duplicate_editor, cloned_movie_id)?
+        .ok_or_else(|| io::Error::other("cloned movie comment missing"))?;
     assert_cloned_comment(&source_comment, &cloned_comment);
     let restored = duplicate
         .package()
@@ -867,15 +1007,14 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
     assert_eq!(package_bytes(restored.package())?, before);
     let removed = package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
     let removed_editor = host_from_package(removed.package())?;
-    let remaining = host_snapshot(&removed_editor)?;
+    let remaining = semantic_snapshot(removed.package(), &removed_editor)?;
     assert_eq!(remaining.movies.len(), 1);
     assert_eq!(remaining.movies[0].content, MOVIE_A);
-    assert_eq!(remaining.audio, host_snapshot(&editor)?.audio);
+    assert_eq!(remaining.audio, semantic_snapshot(&package, &editor)?.audio);
     assert!(
-        removed_editor
-            .slide_movies(0)?
+        native_media_ids(&package_bytes(removed.package())?)?
             .iter()
-            .all(|movie| movie.drawable_object_id != fixture.movie_b_id)
+            .all(|(identifier, _)| *identifier != fixture.movie_b_id)
     );
     let restored_removed = removed
         .package()
@@ -919,13 +1058,10 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
     let duplicate =
         package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
     let duplicate_editor = host_from_package(duplicate.package())?;
-    let audio = duplicate_editor.slide_audio(0)?;
-    let cloned_audio = audio
-        .last()
-        .ok_or_else(|| io::Error::other("cloned audio missing"))?;
-    let cloned_comment =
-        drawable_comment_snapshot(&duplicate_editor, cloned_audio.drawable_object_id)?
-            .ok_or_else(|| io::Error::other("cloned audio comment missing"))?;
+    let cloned_audio_id =
+        last_native_media_id(&package_bytes(duplicate.package())?, MovieKind::Audio)?;
+    let cloned_comment = drawable_comment_snapshot(&duplicate_editor, cloned_audio_id)?
+        .ok_or_else(|| io::Error::other("cloned audio comment missing"))?;
     assert_cloned_comment(&comment, &cloned_comment);
     assert_eq!(
         drawable_comment_snapshot(&duplicate_editor, fixture.audio_a_id)?,
@@ -937,19 +1073,21 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
     assert_eq!(package_bytes(restored.package())?, before);
     let removed = package.remove_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
     let removed_editor = host_from_package(removed.package())?;
-    let remaining = host_snapshot(&removed_editor)?;
+    let remaining = semantic_snapshot(removed.package(), &removed_editor)?;
     assert_eq!(remaining.audio.len(), 1);
     assert_eq!(remaining.audio[0].content, AUDIO_B);
-    assert_eq!(remaining.movies, host_snapshot(&reopened)?.movies);
+    assert_eq!(
+        remaining.movies,
+        semantic_snapshot(&package, &reopened)?.movies
+    );
     assert_eq!(
         comment_text(&removed_editor, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert!(
-        removed_editor
-            .slide_audio(0)?
+        native_media_ids(&package_bytes(removed.package())?)?
             .iter()
-            .all(|audio| audio.drawable_object_id != fixture.audio_a_id)
+            .all(|(identifier, _)| *identifier != fixture.audio_a_id)
     );
     let restored_removed = removed
         .package()
@@ -1047,19 +1185,14 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
         let duplicate = package
             .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
         let duplicate_host = host_from_package(duplicate.package())?;
-        let clone_id = if source_index == 0 {
-            duplicate_host
-                .slide_movies(0)?
-                .last()
-                .unwrap()
-                .drawable_object_id
-        } else {
-            duplicate_host
-                .slide_audio(0)?
-                .last()
-                .unwrap()
-                .drawable_object_id
-        };
+        let clone_id = last_native_media_id(
+            &package_bytes(duplicate.package())?,
+            if source_index == 0 {
+                MovieKind::File
+            } else {
+                MovieKind::Audio
+            },
+        )?;
         let cloned_thread = drawable_comment_snapshot(&duplicate_host, clone_id)?
             .ok_or_else(|| io::Error::other("focused clone lost its comment thread"))?;
         assert_cloned_comment(source_thread, &cloned_thread);
@@ -1072,16 +1205,9 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
             .remove_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
         let removed_host = host_from_package(removed.package())?;
         assert!(
-            removed_host
-                .slide_movies(0)?
+            native_media_ids(&package_bytes(removed.package())?)?
                 .iter()
-                .all(|item| item.drawable_object_id != selected_id)
-        );
-        assert!(
-            removed_host
-                .slide_audio(0)?
-                .iter()
-                .all(|item| item.drawable_object_id != selected_id)
+                .all(|(identifier, _)| *identifier != selected_id)
         );
         assert_eq!(
             drawable_comment_snapshot(&removed_host, other_id)?,

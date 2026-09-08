@@ -7,11 +7,14 @@
 use std::{env, error::Error, fs, io, path::PathBuf, time::Duration};
 
 use litchi_iwa::keynote::{BuildStart, KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa_archive::{iwa::Archive, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point as HostPoint, Size};
+use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::{MovieKind, Point as FocusedPoint};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -29,10 +32,11 @@ struct SourceFixture {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostMovie {
+struct MovieSnapshot {
     content: Vec<u8>,
     poster: Vec<u8>,
     geometry: String,
+    transform: String,
     properties: String,
     playback: String,
     original_size: String,
@@ -40,7 +44,7 @@ struct HostMovie {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostAudio {
+struct AudioSnapshot {
     content: Vec<u8>,
     position: (u32, u32),
     properties: String,
@@ -59,9 +63,9 @@ struct HostBuild {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostSnapshot {
-    movies: Vec<HostMovie>,
-    audio: Vec<HostAudio>,
+struct MediaSnapshot {
+    movies: Vec<MovieSnapshot>,
+    audio: Vec<AudioSnapshot>,
     builds: Vec<HostBuild>,
     assets: Vec<Vec<u8>>,
     movie_b_comment: Option<String>,
@@ -79,6 +83,96 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     Ok(bytes)
+}
+
+/// Read only the native media identities needed to correlate host build and
+/// comment observations. This is a private test oracle; production callers
+/// continue to select media through the focused semantic package API.
+fn native_media_ids(source: &[u8]) -> TestResult<Vec<(u64, MovieKind)>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let mut movies = Vec::new();
+    let mut slides = Vec::new();
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            Ok(stream) => stream.into_bytes(),
+            Err(_) => continue,
+        };
+        let archive = match Archive::parse(&stream) {
+            Ok(archive) => archive,
+            Err(_) => continue,
+        };
+        for object in &archive.objects {
+            let Some(identifier) = object.archive_info.identifier else {
+                continue;
+            };
+            for message in &object.messages {
+                match message.type_ {
+                    5 => {
+                        if let Ok(slide) = kn::SlideArchive::decode(message.data.as_slice()) {
+                            slides.push((identifier, slide));
+                        }
+                    },
+                    3_007 => {
+                        if let Ok(movie) = tsd::MovieArchive::decode(message.data.as_slice()) {
+                            let kind = if movie.is_live_video == Some(true) {
+                                MovieKind::LiveVideo
+                            } else if movie.audio_only == Some(true) {
+                                MovieKind::Audio
+                            } else if movie.flags.is_some_and(|flags| flags & 1 != 0) {
+                                MovieKind::Placeholder
+                            } else {
+                                MovieKind::File
+                            };
+                            movies.push((identifier, movie, kind));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
+
+    let mut fallback = None;
+    for (slide_identifier, slide) in slides {
+        let candidate = slide
+            .owned_drawables
+            .into_iter()
+            .filter_map(|reference| {
+                movies
+                    .iter()
+                    .find(|(identifier, movie, _)| {
+                        *identifier == reference.identifier
+                            && movie
+                                .super_
+                                .parent
+                                .as_ref()
+                                .is_some_and(|parent| parent.identifier == slide_identifier)
+                    })
+                    .map(|(identifier, _, kind)| (*identifier, *kind))
+            })
+            .collect::<Vec<_>>();
+        if candidate.is_empty() {
+            continue;
+        }
+        let has_audio = candidate.iter().any(|(_, kind)| *kind == MovieKind::Audio);
+        let has_file = candidate.iter().any(|(_, kind)| *kind == MovieKind::File);
+        if has_audio && has_file {
+            return Ok(candidate);
+        }
+        fallback.get_or_insert(candidate);
+    }
+    fallback.ok_or_else(|| io::Error::other("native package has no slide-owned media").into())
+}
+
+fn last_native_media_id(source: &[u8], kind: MovieKind) -> TestResult<u64> {
+    native_media_ids(source)?
+        .into_iter()
+        .rev()
+        .find_map(|(identifier, actual)| (actual == kind).then_some(identifier))
+        .ok_or_else(|| io::Error::other("focused media creation produced no native media").into())
 }
 
 fn add_audio(
@@ -114,12 +208,7 @@ fn add_movie(
     )?;
     let bytes = package_bytes(commit.package())?;
     *editor = KeynoteEditor::from_bytes(&bytes)?;
-    editor
-        .slide_movies(0)?
-        .into_iter()
-        .last()
-        .map(|movie| movie.drawable_object_id)
-        .ok_or_else(|| io::Error::other("focused movie creation produced no host movie").into())
+    last_native_media_id(&bytes, MovieKind::File)
 }
 
 fn source_fixture() -> TestResult<SourceFixture> {
@@ -179,12 +268,13 @@ fn source_fixture() -> TestResult<SourceFixture> {
     second_build.set_start(BuildStart::AfterPrevious)?;
     editor.add_slide_build(0, movie_a_id, second_build)?;
 
-    let movie_b_id = editor
-        .slide_movies(0)?
+    let bytes = editor.to_bytes()?;
+    let movie_b_id = native_media_ids(&bytes)?
         .into_iter()
+        .filter(|(_, kind)| *kind == MovieKind::File)
         .nth(1)
-        .ok_or_else(|| io::Error::other("source-built movie B is missing"))?
-        .drawable_object_id;
+        .map(|(identifier, _)| identifier)
+        .ok_or_else(|| io::Error::other("source-built movie B is missing"))?;
     #[allow(deprecated)]
     editor.set_slide_drawable_comment(
         0,
@@ -193,71 +283,104 @@ fn source_fixture() -> TestResult<SourceFixture> {
     )?;
     let bytes = editor.to_bytes()?;
     let reopened = KeynoteEditor::from_bytes(&bytes)?;
-    let movie_b_id = reopened
-        .slide_movies(0)?
+    let movie_b_id = native_media_ids(&reopened.to_bytes()?)?
         .into_iter()
+        .filter(|(_, kind)| *kind == MovieKind::File)
         .nth(1)
-        .ok_or_else(|| io::Error::other("reopened movie B is missing"))?
-        .drawable_object_id;
+        .map(|(identifier, _)| identifier)
+        .ok_or_else(|| io::Error::other("reopened movie B is missing"))?;
     Ok(SourceFixture { bytes, movie_b_id })
 }
 
-fn host_snapshot(editor: &KeynoteEditor, movie_b_id: u64) -> TestResult<HostSnapshot> {
-    let movies = editor.slide_movies(0)?;
-    let movie_ids = movies
-        .iter()
-        .map(|movie| movie.drawable_object_id)
-        .collect::<Vec<_>>();
-    let audio = editor.slide_audio(0)?;
-    let audio_ids = audio
-        .iter()
-        .map(|audio| audio.drawable_object_id)
-        .collect::<Vec<_>>();
-    let movies = movies
-        .into_iter()
-        .map(|movie| {
-            let content = movie
-                .movie_data_identifier
-                .ok_or_else(|| io::Error::other("movie has no content data"))?;
-            let poster = movie
-                .poster_image_data_identifier
-                .ok_or_else(|| io::Error::other("movie has no poster data"))?;
-            Ok(HostMovie {
-                content: editor.extract_media(content)?,
-                poster: editor.extract_media(poster)?,
-                geometry: format!("{:?}", movie.geometry),
-                properties: format!("{:?}", movie.properties),
-                playback: format!("{:?}", movie.playback),
-                original_size: format!("{:?}", movie.original_size),
-                natural_size: format!("{:?}", movie.natural_size),
-            })
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let audio = audio
-        .into_iter()
-        .map(|audio| {
-            Ok(HostAudio {
-                content: editor.extract_media(audio.audio_data_identifier)?,
-                position: (audio.position.x.to_bits(), audio.position.y.to_bits()),
-                properties: format!("{:?}", audio.properties),
-                playback: format!("{:?}", audio.playback),
-                duration: u64::try_from(audio.duration.as_nanos())?,
-            })
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+fn semantic_snapshot(
+    package: &Package,
+    editor: &KeynoteEditor,
+    movie_b_id: u64,
+) -> TestResult<MediaSnapshot> {
+    let slide = package
+        .show()?
+        .slides()
+        .first()
+        .ok_or_else(|| io::Error::other("focused package has no first slide"))?;
+    let mut movies = Vec::new();
+    let mut audio = Vec::new();
+    let mut assets = Vec::new();
+    for (movie_position, movie) in slide.movies().iter().copied().enumerate() {
+        let content = package
+            .slide_media_data(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+                MediaPart::Content,
+            )?
+            .to_vec();
+        assets.push(content.clone());
+        let properties = package.slide_media_properties(
+            SlideSelector::index(0),
+            MovieSelector::index(movie_position),
+        )?;
+        if movie.is_audio() {
+            let position = movie
+                .position()
+                .ok_or_else(|| io::Error::other("audio summary has no position"))?;
+            audio.push(AudioSnapshot {
+                content,
+                position: (position.x.to_bits(), position.y.to_bits()),
+                properties: format!("{:?}", properties),
+                playback: format!("{:?}", movie.playback()),
+                duration: u64::try_from(
+                    movie
+                        .duration()
+                        .ok_or_else(|| io::Error::other("audio summary has no duration"))?
+                        .as_nanos(),
+                )?,
+            });
+        } else {
+            let poster = package
+                .slide_media_data(
+                    SlideSelector::index(0),
+                    MovieSelector::index(movie_position),
+                    MediaPart::Poster,
+                )?
+                .to_vec();
+            assets.push(poster.clone());
+            movies.push(MovieSnapshot {
+                content,
+                poster,
+                geometry: format!("{:?}", (movie.position(), movie.size())),
+                transform: format!("{:?}", movie.transform()),
+                properties: format!("{:?}", properties),
+                playback: format!("{:?}", movie.playback()),
+                original_size: format!("{:?}", movie.original_size()),
+                natural_size: format!("{:?}", movie.natural_size()),
+            });
+        }
+    }
+    assets.sort();
+    assets.dedup();
 
+    let media_ids = native_media_ids(&editor.to_bytes()?)?;
     let mut builds = editor
         .slide_builds(0)?
         .into_iter()
         .map(|build| -> TestResult<HostBuild> {
-            let target_kind = if movie_ids.contains(&build.drawable_object_id) {
-                MovieKind::File
-            } else if audio_ids.contains(&build.drawable_object_id) {
-                MovieKind::Audio
-            } else {
-                return Err(io::Error::other("build targets unknown media").into());
-            };
+            let (media_index, target_kind) = media_ids
+                .iter()
+                .position(|(identifier, _)| *identifier == build.drawable_object_id)
+                .and_then(|media_index| {
+                    let kind = media_ids[media_index].1;
+                    let slot = media_ids[..media_index]
+                        .iter()
+                        .filter(|(_, candidate)| *candidate == kind)
+                        .count();
+                    match kind {
+                        MovieKind::File => Some((slot, MovieKind::File)),
+                        MovieKind::Audio => Some((slot, MovieKind::Audio)),
+                        _ => None,
+                    }
+                })
+                .ok_or_else(|| io::Error::other("build targets unknown media"))?;
             let semantic = build.settings.semantic()?;
+            let _ = media_index;
             Ok(HostBuild {
                 target_kind,
                 effect: format!("{:?}", semantic.effect()),
@@ -268,6 +391,7 @@ fn host_snapshot(editor: &KeynoteEditor, movie_b_id: u64) -> TestResult<HostSnap
             })
         })
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+
     builds.sort_by(|left, right| {
         format!("{:?}", left.target_kind)
             .cmp(&format!("{:?}", right.target_kind))
@@ -277,13 +401,7 @@ fn host_snapshot(editor: &KeynoteEditor, movie_b_id: u64) -> TestResult<HostSnap
             .then(left.delay.cmp(&right.delay))
             .then(left.chunks.cmp(&right.chunks))
     });
-    let mut assets = editor
-        .media_assets()?
-        .into_iter()
-        .map(|asset| editor.extract_media(asset.data_identifier))
-        .collect::<Result<Vec<_>, _>>()?;
-    assets.sort();
-    Ok(HostSnapshot {
+    Ok(MediaSnapshot {
         movies,
         audio,
         builds,
@@ -313,7 +431,7 @@ fn source_built_audio_position_preserves_host_observations_and_opaque_state() ->
     let package = Package::from_bytes(&fixture.bytes)?;
     let source_bytes = package_bytes(&package)?;
     let baseline_editor = KeynoteEditor::from_bytes(&source_bytes)?;
-    let baseline = host_snapshot(&baseline_editor, fixture.movie_b_id)?;
+    let baseline = semantic_snapshot(&package, &baseline_editor, fixture.movie_b_id)?;
     assert_eq!(baseline.movies.len(), 2);
     assert_eq!(baseline.audio.len(), 2);
     assert_eq!(baseline.builds.len(), 5);
@@ -361,7 +479,7 @@ fn source_built_audio_position_preserves_host_observations_and_opaque_state() ->
     expected.audio[0].position = (audio_a_position.x.to_bits(), audio_a_position.y.to_bits());
     expected.audio[1].position = (audio_b_position.x.to_bits(), audio_b_position.y.to_bits());
     assert_eq!(
-        host_snapshot(&focused_editor, fixture.movie_b_id)?,
+        semantic_snapshot(focused.package(), &focused_editor, fixture.movie_b_id)?,
         expected
     );
 

@@ -379,9 +379,6 @@ pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::__decode_movie_playback_payload;
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
 pub use package::__decode_slide_drawable_projection;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]

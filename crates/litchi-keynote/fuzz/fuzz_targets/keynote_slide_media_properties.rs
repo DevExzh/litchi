@@ -7,17 +7,18 @@
 //! values remain distinct from explicit empty/false values, exact no-ops keep
 //! the source artifact byte-for-byte unchanged, failed source checks publish
 //! nothing, forward replay and inverse restoration are exact, and a reopened
-//! candidate remains fully valid.  The native seed deliberately uses the
-//! source-order selectors for both an audio movie (`0`) and a file movie (`2`)
-//! so the target covers the complete movie sibling list rather than a
+//! candidate remains fully valid.  The native seeds deliberately use
+//! source-order selectors for audio and file movies, and include a placeholder
+//! fixture whose properties are readable but whose mutation is rejected
+//! atomically.  This covers the complete movie sibling list rather than a
 //! kind-specific renumbering.
 
 use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_keynote::{
-    Limits, MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector,
-    slide::media::MediaProperties,
+    Limits, MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
+    SlideMediaPropertiesError, SlideSelector, slide::media::MediaProperties,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -38,10 +39,13 @@ const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
 const TARGET_INPUT: &[u8] = b"target-media-properties";
 const NATIVE_KEYNOTE: &[u8] =
     include_bytes!("../../../../test-data/iwork/keynote/media-comments-baseline-native.key");
+const NATIVE_PLACEHOLDER: &[u8] =
+    include_bytes!("../../../../test-data/iwork/keynote/media-properties-placeholder-native.key");
 
 fuzz_target!(|data: &[u8]| {
     exercise_arbitrary_input(data);
     exercise_seed(data);
+    exercise_placeholder_seed();
 });
 
 fn fuzz_options() -> ReadOptions {
@@ -95,8 +99,41 @@ fn exercise_seed(data: &[u8]) {
     exercise_package(native_package(), data);
 }
 
+fn placeholder_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        let package = Package::from_bytes_with_options(NATIVE_PLACEHOLDER, fuzz_options())
+            .unwrap_or_else(|error| {
+                panic!("native Keynote placeholder-properties seed must open: {error}")
+            });
+        verify_placeholder_contract(&package);
+        package
+    })
+}
+
+fn exercise_placeholder_seed() {
+    let package = placeholder_package();
+    let source_bytes = package_bytes(package);
+    let kinds = read_movie_inventory(package, &source_bytes)
+        .unwrap_or_else(|| panic!("native placeholder-properties inventory must be readable"));
+    assert_eq!(
+        kinds,
+        vec![
+            MovieKind::Audio,
+            MovieKind::Audio,
+            MovieKind::File,
+            MovieKind::File,
+            MovieKind::Placeholder,
+        ]
+    );
+    assert_eq!(package_bytes(package), source_bytes);
+}
+
 fn exercise_package(package: &Package, data: &[u8]) {
     let source_bytes = package_bytes(package);
+    let Some(movie_kinds) = read_movie_inventory(package, &source_bytes) else {
+        return;
+    };
     // MovieSelector is source-order over every MovieArchive sibling.  The
     // baseline has AudioA at 0 and FileA at 2; exercising both catches any
     // accidental kind-specific renumbering in the focused adapter.
@@ -104,8 +141,102 @@ fn exercise_package(package: &Package, data: &[u8]) {
         (MovieSelector::index(0), 0_usize, MovieSelector::index(2)),
         (MovieSelector::index(2), 16_usize, MovieSelector::index(0)),
     ] {
+        if !movie_kinds
+            .get(selector.as_index())
+            .is_some_and(|kind| matches!(kind, MovieKind::Audio | MovieKind::File))
+        {
+            continue;
+        }
         exercise_selected(package, data, selector, sibling, offset, &source_bytes);
     }
+}
+
+fn verify_placeholder_contract(package: &Package) {
+    let source_bytes = package_bytes(package);
+    package.validate().unwrap_or_else(|error| {
+        panic!("native placeholder-properties seed must validate: {error}")
+    });
+    let show = package
+        .show()
+        .unwrap_or_else(|error| panic!("native placeholder-properties show must decode: {error}"));
+    let slide = show
+        .slides()
+        .first()
+        .unwrap_or_else(|| panic!("native placeholder-properties seed must contain a slide"));
+    let movies = slide.movies();
+    assert_eq!(movies.len(), 5);
+    assert_eq!(
+        movies.iter().map(|movie| movie.kind()).collect::<Vec<_>>(),
+        vec![
+            MovieKind::Audio,
+            MovieKind::Audio,
+            MovieKind::File,
+            MovieKind::File,
+            MovieKind::Placeholder,
+        ]
+    );
+    assert_eq!(
+        movies[4]
+            .position()
+            .map(|position| (position.x, position.y)),
+        Some((321.0, 42.0))
+    );
+    assert_eq!(
+        movies[4].size().map(|size| (size.width, size.height)),
+        Some((640.0, 360.0))
+    );
+    assert_eq!(
+        package
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(4))
+            .unwrap_or_else(|error| panic!("native placeholder properties must read: {error}"))
+            .accessibility_description(),
+        Some("Native movie placeholder — accessible 北区")
+    );
+    let error =
+        package.edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(4));
+    assert!(matches!(
+        error,
+        Err(SlideMediaPropertiesError::WrongMediaKind)
+    ));
+    assert_eq!(package_bytes(package), source_bytes);
+}
+
+fn read_movie_inventory(package: &Package, source_bytes: &[u8]) -> Option<Vec<MovieKind>> {
+    let show = match package.show() {
+        Ok(show) => show,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+            return None;
+        },
+    };
+    let Some(slide) = show.slides().first() else {
+        observe_error("Keynote package has no slide");
+        assert_eq!(package_bytes(package), source_bytes);
+        return None;
+    };
+    let mut kinds = Vec::with_capacity(slide.movies().len());
+    for (index, movie) in slide.movies().iter().enumerate() {
+        kinds.push(movie.kind());
+        if package
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(index))
+            .is_err()
+        {
+            observe_error("movie properties read failed");
+            assert_eq!(package_bytes(package), source_bytes);
+            return None;
+        }
+        if matches!(movie.kind(), MovieKind::Placeholder | MovieKind::LiveVideo) {
+            let error = package
+                .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(index));
+            assert!(
+                matches!(error, Err(SlideMediaPropertiesError::WrongMediaKind)),
+                "non-file/audio movie properties must remain read-only"
+            );
+            assert_eq!(package_bytes(package), source_bytes);
+        }
+    }
+    Some(kinds)
 }
 
 fn exercise_selected(

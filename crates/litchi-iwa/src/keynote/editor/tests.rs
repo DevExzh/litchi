@@ -1,3 +1,6 @@
+mod audio_media;
+mod movie_media;
+
 use super::*;
 use std::time::Duration;
 
@@ -3004,6 +3007,104 @@ fn creates_slide_with_materialized_file_movie_placeholder_graph() {
     assert_eq!(created.body, None);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct MovieIdentityOracle {
+    drawable_object_id: u64,
+    kind: MovieKind,
+    movie_data_identifier: Option<MediaAssetId>,
+    poster_image_data_identifier: Option<MediaAssetId>,
+    original_size: Option<litchi_keynote::slide::media::Size>,
+    natural_size: Option<litchi_keynote::slide::media::Size>,
+}
+
+fn focused_movie_summaries(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+) -> Vec<litchi_keynote::slide::media::MovieInfo> {
+    let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    package
+        .show()
+        .unwrap()
+        .slides()
+        .get(slide_index)
+        .expect("focused package contains the requested slide")
+        .movies()
+        .to_vec()
+}
+
+#[allow(deprecated)]
+fn generated_movie_identities(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+) -> Vec<MovieIdentityOracle> {
+    let slide_id = editor
+        .slides()
+        .unwrap()
+        .get(slide_index)
+        .expect("generated oracle contains the requested slide")
+        .slide_id;
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    slide
+        .owned_drawables
+        .iter()
+        .filter(|reference| {
+            graph
+                .objects
+                .get(&reference.identifier)
+                .is_some_and(|messages| {
+                    messages
+                        .iter()
+                        .any(|message| message.type_ == TEST_MOVIE_MESSAGE_TYPE)
+                })
+        })
+        .map(|reference| {
+            let movie: tsd::MovieArchive = graph
+                .decode_type(
+                    reference.identifier,
+                    TEST_MOVIE_MESSAGE_TYPE,
+                    "TSD.MovieArchive",
+                )
+                .unwrap();
+            let kind = if movie.is_live_video == Some(true) {
+                MovieKind::LiveVideo
+            } else if movie.audio_only == Some(true) {
+                MovieKind::Audio
+            } else if movie.flags.is_some_and(|flags| flags & 1 != 0) {
+                MovieKind::Placeholder
+            } else {
+                MovieKind::File
+            };
+            MovieIdentityOracle {
+                drawable_object_id: reference.identifier,
+                kind,
+                movie_data_identifier: movie.movie_data.as_ref().map(|reference| {
+                    MediaAssetId::try_from(reference.identifier)
+                        .expect("generated movie data identifier is non-zero")
+                }),
+                poster_image_data_identifier: movie.poster_image_data.as_ref().map(|reference| {
+                    MediaAssetId::try_from(reference.identifier)
+                        .expect("generated poster data identifier is non-zero")
+                }),
+                original_size: movie
+                    .original_size
+                    .map(|size| litchi_keynote::slide::media::Size {
+                        width: size.width,
+                        height: size.height,
+                    }),
+                natural_size: movie
+                    .natural_size
+                    .map(|size| litchi_keynote::slide::media::Size {
+                        width: size.width,
+                        height: size.height,
+                    }),
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn static_layout_movies_remain_template_only_for_update_and_creation() {
     let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(0)).unwrap();
@@ -3047,23 +3148,23 @@ fn static_layout_movies_remain_template_only_for_update_and_creation() {
 #[test]
 fn hand_built_slide_movie_admission_rejection_is_transactional() {
     let editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
-    let movies = editor.slide_movies(0).unwrap();
-    assert_eq!(movies.len(), 1);
-    let original = movies[0].clone();
-    assert_eq!(original.kind, MovieKind::File);
-    assert_eq!(original.drawable_object_id, 70);
-    assert_eq!(original.movie_data_identifier, Some(asset_id(1)));
-    assert_eq!(original.poster_image_data_identifier, Some(asset_id(2)));
+    let identities = generated_movie_identities(&editor, 0);
+    assert_eq!(identities.len(), 1);
+    let identity = identities[0];
+    assert_eq!(identity.kind, MovieKind::File);
+    assert_eq!(identity.drawable_object_id, 70);
+    assert_eq!(identity.movie_data_identifier, Some(asset_id(1)));
+    assert_eq!(identity.poster_image_data_identifier, Some(asset_id(2)));
     assert_eq!(
-        original.original_size,
-        Some(DrawableSize {
+        identity.original_size,
+        Some(litchi_keynote::slide::media::Size {
             width: 800.0,
             height: 300.0,
         })
     );
     assert_eq!(
-        original.natural_size,
-        Some(DrawableSize {
+        identity.natural_size,
+        Some(litchi_keynote::slide::media::Size {
             width: 800.0,
             height: 300.0,
         })
@@ -3072,6 +3173,7 @@ fn hand_built_slide_movie_admission_rejection_is_transactional() {
 
     let baseline = editor.to_bytes().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&baseline).unwrap();
+    assert!(package.show().is_err());
     assert!(
         package
             .edit_slide_movie_geometry(SlideSelector::index(0), MovieSelector::index(0))
@@ -3118,7 +3220,10 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
         )
         .unwrap();
     reopen_focused_package(&mut editor, commit.package());
-    let created = editor.slide_movies(0).unwrap().remove(0);
+    let created = generated_movie_identities(&editor, 0)
+        .into_iter()
+        .next()
+        .expect("source-built movie has a generated identity");
     let source_chunk_id = editor
         .slide_builds(0)
         .unwrap()
@@ -3133,23 +3238,32 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let poster_data_id = created
         .poster_image_data_identifier
         .expect("source-built movie has poster media");
-    let movies = editor.slide_movies(0).unwrap();
+    let movies = focused_movie_summaries(&editor, 0);
+    let identities = generated_movie_identities(&editor, 0);
     assert_eq!(movies.len(), 1);
-    let original = movies[0].clone();
-    assert_eq!(original.kind, MovieKind::File);
-    assert_eq!(original.drawable_object_id, created.drawable_object_id);
-    assert_eq!(original.movie_data_identifier, Some(movie_data_id));
-    assert_eq!(original.poster_image_data_identifier, Some(poster_data_id));
+    assert_eq!(identities.len(), 1);
+    let original = movies[0];
+    let original_identity = identities[0];
+    assert_eq!(original.kind(), MovieKind::File);
     assert_eq!(
-        original.original_size,
-        Some(DrawableSize {
+        original_identity.drawable_object_id,
+        created.drawable_object_id
+    );
+    assert_eq!(original_identity.movie_data_identifier, Some(movie_data_id));
+    assert_eq!(
+        original_identity.poster_image_data_identifier,
+        Some(poster_data_id)
+    );
+    assert_eq!(
+        original.original_size(),
+        Some(litchi_keynote::slide::media::Size {
             width: 800.0,
             height: 300.0,
         })
     );
     assert_eq!(
-        original.natural_size,
-        Some(DrawableSize {
+        original.natural_size(),
+        Some(litchi_keynote::slide::media::Size {
             width: 800.0,
             height: 300.0,
         })
@@ -3170,19 +3284,22 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     restored.package().write_to(&mut restored_bytes).unwrap();
     assert_eq!(restored_bytes, baseline);
     reopen_focused_package(&mut editor, duplicate_commit.package());
-    let duplicate = editor.slide_movies(0).unwrap()[1].clone();
-    assert_ne!(duplicate.drawable_object_id, original.drawable_object_id);
+    let duplicate = generated_movie_identities(&editor, 0)[1];
+    assert_ne!(
+        duplicate.drawable_object_id,
+        original_identity.drawable_object_id
+    );
     assert_eq!(
         duplicate.movie_data_identifier,
-        original.movie_data_identifier
+        original_identity.movie_data_identifier
     );
     assert_eq!(
         duplicate.poster_image_data_identifier,
-        original.poster_image_data_identifier
+        original_identity.poster_image_data_identifier
     );
     assert_eq!(
-        duplicate.geometry.position,
-        Some(DrawablePoint { x: 110.0, y: 210.0 })
+        focused_movie_summaries(&editor, 0)[1].position(),
+        Some(litchi_keynote::slide::media::Point { x: 110.0, y: 210.0 })
     );
     let duplicate_build = editor
         .slide_builds(0)
@@ -3251,8 +3368,10 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
         .unwrap();
     assert_eq!(removed_duplicate.diagnostics().removed_data(), 0);
     reopen_focused_package(&mut editor, removed_duplicate.package());
-    let remaining = editor.slide_movies(0).unwrap();
+    let remaining = focused_movie_summaries(&editor, 0);
+    let remaining_identities = generated_movie_identities(&editor, 0);
     assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining_identities.as_slice(), &[original_identity]);
     assert_eq!(remaining[0], original);
     assert_eq!(editor.media_assets().unwrap().len(), 2);
     assert_eq!(editor.slide_builds(0).unwrap().len(), 1);
@@ -3267,7 +3386,8 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     assert_eq!(removed_original.patch().target_media_count(), 0);
     assert_eq!(removed_original.diagnostics().removed_data(), 2);
     reopen_focused_package(&mut editor, removed_original.package());
-    assert!(editor.slide_movies(0).unwrap().is_empty());
+    assert!(focused_movie_summaries(&editor, 0).is_empty());
+    assert!(generated_movie_identities(&editor, 0).is_empty());
     assert!(editor.slide_builds(0).unwrap().is_empty());
     assert!(editor.media_assets().unwrap().is_empty());
 }
@@ -3276,7 +3396,12 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.slide_movies(2).is_err());
+    assert!(
+        FocusedKeynotePackage::from_bytes(&before)
+            .unwrap()
+            .slide_movie_geometry(SlideSelector::index(2), MovieSelector::index(0))
+            .is_err()
+    );
     assert!(
         FocusedKeynotePackage::from_bytes(&before)
             .unwrap()
@@ -3312,9 +3437,16 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
         .unwrap()
         .id;
     placeholder.set_slide_layout(0, layout).unwrap();
-    let movie = placeholder.slide_movies(0).unwrap().remove(0);
-    assert_eq!(movie.kind, MovieKind::Placeholder);
+    let identities = generated_movie_identities(&placeholder, 0);
+    assert_eq!(identities.len(), 1);
+    assert_eq!(identities[0].kind, MovieKind::Placeholder);
     let before = placeholder.to_bytes().unwrap();
+    assert!(
+        FocusedKeynotePackage::from_bytes(&before)
+            .unwrap()
+            .show()
+            .is_err()
+    );
     assert!(
         FocusedKeynotePackage::from_bytes(&before)
             .unwrap()

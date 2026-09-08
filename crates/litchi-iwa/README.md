@@ -1074,17 +1074,15 @@ use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let audio = fs::read("narration.aiff")?;
-let mut keynote = KeynoteDocumentBuilder::new().build()?;
-keynote.add_slide_audio(
-    0,
+let keynote = KeynoteDocumentBuilder::new().build()?;
+let source = Package::from_bytes(&keynote.to_bytes()?)?;
+let created = source.add_slide_audio(
+    SlideSelector::index(0),
     "narration.aiff",
     &audio,
     SlideAudioOptions::new(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12))?,
 )?;
-keynote.save("created-with-audio-source.key")?;
-
-let source_bytes = fs::read("created-with-audio-source.key")?;
-let package = Package::from_bytes(&source_bytes)?;
+let package = created.package();
 let duplicate = package.duplicate_slide_audio(
     SlideSelector::index(0),
     MovieSelector::index(0),
@@ -1093,8 +1091,8 @@ duplicate.package().save("created-with-audio.key")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Audio creation remains on the host builder, while lifecycle mutation belongs to
-the focused package API. `Package::duplicate_slide_audio` uses the same typed
+The initial presentation builder remains in the host; audio creation and
+lifecycle mutation belong to the focused package API. `Package::duplicate_slide_audio` uses the same typed
 source-order selectors and returns a verified commit with a separate audio
 graph and Start Audio build that shares the embedded asset. Use
 `Package::remove_slide_audio` for typed removal; callers that already hold
@@ -1165,28 +1163,46 @@ native proofs were recorded before the final deletion check. Normal hooks,
 fuzzing, and the full scanner remain pending; no broader host-retirement claim
 follows from this slice.
 
-All source-built media exposes its shared `DrawableProperties` without
-normalizing unrelated native fields. Read the current value, update only the
-field you need, then write it back—for example,
-`body_movie_properties`/`set_body_movie_properties`,
-`sheet_audio_properties`/`set_sheet_audio_properties`, or
-`slide_movie_properties`/`set_slide_movie_properties`. The paired Pages,
-Numbers, and Keynote host APIs remain the compatibility surface for media
-creation, reading, properties, and replacement. They preserve unknown
-movie-archive fields; Keynote lifecycle duplication and removal use the focused
-`Package` commits above rather than raw identifiers.
+Keynote media discovery belongs to `litchi_keynote::Package`. Each slide's
+`movies()` slice contains audio, file movies, placeholders, and live video in
+source order; `audio()` and `video_movies()` provide filtered views. The typed
+summary retains optional position, displayed/original/natural size, transform,
+playback, and duration without native object identifiers. Keep the source
+position when constructing a `MovieSelector`; a filtered iterator's position
+is not a media selector.
 
-The same media APIs expose the archive-free
+```rust,no_run
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
+
+let package = Package::open("presentation.key")?;
+for (slide_position, slide) in package.slides()?.iter().enumerate() {
+    for (movie_position, movie) in slide.movies().iter().enumerate() {
+        let properties = package.slide_media_properties(
+            SlideSelector::index(slide_position),
+            MovieSelector::index(movie_position),
+        )?;
+        println!("{:?}: {:?}", movie.kind(), properties.accessibility_description());
+    }
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`slide_media_properties` preserves absent fields, explicit empty strings, and
+explicit false values. Read-only properties include placeholders and live
+video; property edits retain the bounded file-movie/audio profile. Use
+`edit_slide_media_properties` for changes and `slide_media_data` with a typed
+`MediaPart` for embedded bytes. Raw Keynote media listing APIs and their info
+types are retired. Pages and Numbers retain their existing host properties
+APIs until their concrete owners complete the corresponding migration.
+
+Pages and Numbers host media APIs expose the archive-free
 `litchi_iwa_common::media::playback::{MediaPlaybackSettings, MediaVolume,
-MediaLoopMode}` vocabulary for typed trim boundaries, poster position, repeat
-mode, and volume. Body and sheet media continue to use their matching host
-`*_playback_settings` methods. Keynote slide-media playback is owned by
-`litchi_keynote::Package::edit_slide_movie_playback_settings` and its typed
-`SlideSelector`/`MovieSelector` selectors; audio controls are included in that
-source-ordered media collection. The update preserves unrelated and unknown
-movie-archive fields; the common builders reject invalid levels and trim
-ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
-round-trip.
+MediaLoopMode}` vocabulary for trim boundaries, poster position, repeat mode,
+and volume. Keynote uses its format-owned semantic playback values through
+`litchi_keynote::Package::edit_slide_movie_playback_settings` and typed
+`SlideSelector`/`MovieSelector` selectors. Audio controls share that source-order
+collection. These updates preserve unrelated native fields and reject invalid
+volume levels and trim ranges while retaining unknown native repeat values.
 
 ### Edit existing documents through the migration host
 
