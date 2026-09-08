@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Public PPTX streaming measurement (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) adds only separate-harness
+code using the existing public writer. No production dependencies, preservation
+contracts or execution providers change. The non-seek sink retains zero output;
+finite XML counters are explicitly separated from measured heap and growing
+OPC/ZIP name/directory metadata. Exact authored-slide ownership includes a valid
+layout-retarget rejection; native/full-feature validation is not claimed. The
+[batch source review](results/change-0474/source-review.md) maps accepted ADRs,
+notes API limits and precise oracle scope. All 30 prior ADR hashes are unchanged.
+
 ## Public DOCX streaming measurement (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) adds opt-in harness coverage

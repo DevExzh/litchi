@@ -1,0 +1,10 @@
+{
+  "reason": "Initial seal refused generated Python bytecode; owned bundle bytecode removed before sealing.",
+  "removed": [
+    "__pycache__/analyze.cpython-314.pyc",
+    "__pycache__/report_checks.cpython-314.pyc",
+    "__pycache__/test_evidence.cpython-314.pyc",
+    "__pycache__/verify.cpython-314.pyc"
+  ],
+  "absent": true
+}

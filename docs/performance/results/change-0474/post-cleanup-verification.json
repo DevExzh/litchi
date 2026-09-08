@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0474/verify.py",
+    "--sealed"
+  ],
+  "exit_code": 0,
+  "note": "Receipt added after this verification; final reseal covers the receipt and is verified again.",
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\n  \"identity_shapes\": 3,\n  \"lanes\": 12,\n  \"live\": {\n    \"status\": \"not_checked\"\n  },\n  \"samples\": 360,\n  \"schema\": \"litchi-0474-verification-v1\",\n  \"sealed\": {\n    \"files\": 174,\n    \"status\": \"pass\"\n  },\n  \"shapes\": [\n    \"tiny\",\n    \"medium\",\n    \"large\"\n  ],\n  \"status\": \"pass\",\n  \"validation_receipts\": 16\n}\n",
+  "verified_seal_sha256": "167178c82ca00942db93998a1f24a354feb8cbb72499ceea3ec0b879759439cb",
+  "verified_utc": "2026-09-08T10:24:40.090798+00:00"
+}

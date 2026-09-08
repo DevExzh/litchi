@@ -1,0 +1,19 @@
+{
+  "allocator_peak_above_entry_bytes": {
+    "large": 8875092,
+    "medium": 681659,
+    "tiny": 435541
+  },
+  "constant_total_operation_memory_supported": false,
+  "decision": "retain_harness_and_descriptive_baseline",
+  "excluded_pilot_samples": 2,
+  "formal_lanes": 12,
+  "formal_samples": 360,
+  "full_goal_complete": false,
+  "next_work": "next-work.md",
+  "production_change": false,
+  "recorded_utc": "2026-09-08T10:21:03.588450+00:00",
+  "registered_latency_claim": false,
+  "schema": "litchi-0474-decision-v1",
+  "scope": "fresh plain PPTX creation only"
+}

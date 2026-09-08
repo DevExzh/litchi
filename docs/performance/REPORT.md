@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## Current result: PPTX streaming allocation growth (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) retains 360 fresh-process
+samples of public PPTX streaming creation. Peak operation heap is 435,541 /
+681,659 / 8,875,092 bytes for 8/256/8,192 slides, with zero live-byte change at
+exit in every allocator sample. The large case requests 6.81 GB of allocation
+work. Normal p50 is 1.035935/1.032350, 8.565925/8.493936 and
+259.277908/258.604302 ms in R1/R2; all normal repeat changes are below one
+percent. This establishes a growing structural-memory problem for further
+profiling. It is not a production speedup or constant-memory result. The default
+matrix remains unchanged and the full non-iWork goal remains open.
+
 ## Current result: DOCX streaming operation memory (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) retains 360 formal samples
