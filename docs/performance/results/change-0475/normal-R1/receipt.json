@@ -1,0 +1,41 @@
+{
+  "artifacts": {
+    "capture.json": {
+      "bytes": 1672,
+      "sha256": "0f75fd07d9dab7bbfcf552040bb386395f2d764a9b2c0c82d0a427266e7b2291"
+    },
+    "capture.started.json": {
+      "bytes": 1315,
+      "sha256": "5940a3696cec29515590c9ad1d1df71adb81b272bed1599da4deb3c9811cdc11"
+    },
+    "capture.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "capture.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "corpus-catalog.json": {
+      "bytes": 4916,
+      "sha256": "3a7d36a57a1a2b193533cce409c402472dc98021593fa11ef42058bdbec6ff8a"
+    },
+    "report.json": {
+      "bytes": 34455,
+      "sha256": "c960693ce833bd3f4f954779fce3fc5a4093ce3250c9450507780448632a1c6d"
+    },
+    "resource.log": {
+      "bytes": 1041,
+      "sha256": "05a06d9aa2daddf9fa61cf31ac5b4e24fac01943493c361d787399d9d6eba5a2"
+    }
+  },
+  "binary_unchanged": true,
+  "binding_sha256": "869633f4a09f0f5cbab49c49bb7cde9244d9fdd8d3bb2d36d4f6b992f629754d",
+  "clean_after": true,
+  "exit_code": 0,
+  "kind": "normal",
+  "lane": "normal-R1",
+  "protocol_sha256": "619317a34866d28ef62386adc4e9924dbb9fdb63650f1ceebb622b93fb7963ac",
+  "schema": "litchi-0475-capture-v1",
+  "source_unchanged": true
+}

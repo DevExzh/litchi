@@ -1,0 +1,74 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "verify.py",
+        "--sealed"
+      ],
+      "cwd": "/tmp/litchi-goal-0475-portable-wlfmos9l/bundle",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "finished_utc": "2026-09-08T11:14:47.450156+00:00",
+      "started_utc": "2026-09-08T11:14:35.710317+00:00",
+      "stderr": "",
+      "stdout": "{\n  \"chunked_originals\": 2,\n  \"compressed_originals\": 16,\n  \"cpu\": {\n    \"cpu-P1\": {\n      \"perf_script\": \"cpu-P1/perf-script.stdout.gz\",\n      \"schema\": \"litchi-0475-pptx-streaming-cpu-attribution-v1\"\n    },\n    \"cpu-P2\": {\n      \"perf_script\": \"cpu-P2/perf-script.stdout.gz\",\n      \"schema\": \"litchi-0475-pptx-streaming-cpu-attribution-v1\"\n    }\n  },\n  \"heap\": {\n    \"schema\": \"litchi-0475-heap-attribution-v1\",\n    \"traces\": 2\n  },\n  \"lanes\": 7,\n  \"live\": {\n    \"status\": \"not_checked\"\n  },\n  \"reports\": {\n    \"counters\": {\n      \"kind\": \"counters\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"cpu-P1\": {\n      \"kind\": \"cpu\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"cpu-P2\": {\n      \"kind\": \"cpu\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"heap-H1\": {\n      \"kind\": \"heap\",\n      \"samples\": 1,\n      \"warmups\": 0\n    },\n    \"heap-H2\": {\n      \"kind\": \"heap\",\n      \"samples\": 1,\n      \"warmups\": 0\n    },\n    \"normal-R1\": {\n      \"kind\": \"normal\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"normal-R2\": {\n      \"kind\": \"normal\",\n      \"samples\": 30,\n      \"warmups\": 3\n    }\n  },\n  \"reuse\": {\n    \"files\": 13,\n    \"prior_schema\": \"litchi-0474-verification-v1\"\n  },\n  \"samples\": 152,\n  \"schema\": \"litchi-0475-verification-v1\",\n  \"sealed\": {\n    \"files\": 228,\n    \"status\": \"pass\"\n  },\n  \"status\": \"pass\",\n  \"summary\": {\n    \"lanes\": 7,\n    \"status\": \"pass\"\n  },\n  \"supplement\": {\n    \"artifacts\": 4,\n    \"filter_token\": \"21pptx_streaming_create3run\",\n    \"schema\": \"litchi-0475-supplement-protocol-v1\"\n  }\n}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "replay.py"
+      ],
+      "cwd": "/tmp/litchi-goal-0475-portable-wlfmos9l/bundle",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "finished_utc": "2026-09-08T11:16:56.938079+00:00",
+      "started_utc": "2026-09-08T11:14:47.450205+00:00",
+      "stderr": "",
+      "stdout": "cpu-P1 exact replay passed\ncpu-P2 exact replay passed\nheap-H1 exact replay passed\nheap-H2 exact replay passed\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/tmp/litchi-goal-0475-portable-wlfmos9l/bundle",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "finished_utc": "2026-09-08T11:16:57.085672+00:00",
+      "started_utc": "2026-09-08T11:16:56.938115+00:00",
+      "stderr": "test_bad_counter_rows_rejected (test_analyze.CounterTests.test_bad_counter_rows_rejected) ... ok\ntest_scaled_reported_zero_and_unavailable_remain_distinct (test_analyze.CounterTests.test_scaled_reported_zero_and_unavailable_remain_distinct) ... ok\ntest_analyze_binds_report_without_claiming_phase_time (test_cpu_analyze.AttributionTests.test_analyze_binds_report_without_claiming_phase_time) ... ok\ntest_gzip_script_binding_uses_decompressed_identity (test_cpu_analyze.AttributionTests.test_gzip_script_binding_uses_decompressed_identity) ... ok\ntest_inclusive_ranking_deduplicates_repeated_ancestor (test_cpu_analyze.AttributionTests.test_inclusive_ranking_deduplicates_repeated_ancestor) ... ok\ntest_owner_families_are_independent_overlapping_lenses (test_cpu_analyze.AttributionTests.test_owner_families_are_independent_overlapping_lenses) ... ok\ntest_same_frame_context_ambiguity_remains_overlap (test_cpu_analyze.AttributionTests.test_same_frame_context_ambiguity_remains_overlap) ... ok\ntest_writer_and_preflight_contexts_partition_without_losing_samples (test_cpu_analyze.AttributionTests.test_writer_and_preflight_contexts_partition_without_losing_samples) ... ok\ntest_writer_marker_takes_precedence_over_preflight_marker (test_cpu_analyze.AttributionTests.test_writer_marker_takes_precedence_over_preflight_marker) ... ok\ntest_pid_tid_forms_and_event_colon_are_accepted (test_cpu_analyze.ParseSamplesTests.test_pid_tid_forms_and_event_colon_are_accepted) ... ok\ntest_unknown_unparsed_empty_lost_explicit_and_eof_truncation_are_visible (test_cpu_analyze.ParseSamplesTests.test_unknown_unparsed_empty_lost_explicit_and_eof_truncation_are_visible) ... ok\ntest_unresolved_address_symbols_are_unknown (test_cpu_analyze.ParseSamplesTests.test_unresolved_address_symbols_are_unknown) ... ok\ntest_wrong_event_malformed_and_nonpositive_periods_are_accounted (test_cpu_analyze.ParseSamplesTests.test_wrong_event_malformed_and_nonpositive_periods_are_accounted) ... ok\ntest_capture_receipt_hash_mutation_is_rejected (test_evidence.EvidenceMutationTests.test_capture_receipt_hash_mutation_is_rejected) ... ok\ntest_compressed_payload_mutation_is_rejected (test_evidence.EvidenceMutationTests.test_compressed_payload_mutation_is_rejected) ... ok\ntest_elapsed_mean_mutation_is_rejected (test_evidence.EvidenceMutationTests.test_elapsed_mean_mutation_is_rejected) ... ok\ntest_protocol_selector_mutation_is_rejected (test_evidence.EvidenceMutationTests.test_protocol_selector_mutation_is_rejected) ... ok\ntest_sink_counter_mutation_changes_producer_projection (test_evidence.EvidenceMutationTests.test_sink_counter_mutation_changes_producer_projection) ... ok\ntest_unsupported_counter_status_is_retained_and_unknown_event_rejected (test_evidence.EvidenceMutationTests.test_unsupported_counter_status_is_retained_and_unknown_event_rejected) ... ok\ntest_deflate_label_does_not_claim_initialization (test_heap_analyze.HeapAnalyzeTests.test_deflate_label_does_not_claim_initialization) ... ok\ntest_fast_run_projection_matches_full_writer_projection (test_heap_analyze.HeapAnalyzeTests.test_fast_run_projection_matches_full_writer_projection) ... ok\ntest_fast_scope_marks_whole_process_totals_unavailable (test_heap_analyze.HeapAnalyzeTests.test_fast_scope_marks_whole_process_totals_unavailable) ... ok\ntest_fast_selector_handles_chunk_boundary_and_prefix_ids (test_heap_analyze.HeapAnalyzeTests.test_fast_selector_handles_chunk_boundary_and_prefix_ids) ... ok\ntest_fast_selector_rejects_selected_malformed_and_unbalanced_records (test_heap_analyze.HeapAnalyzeTests.test_fast_selector_rejects_selected_malformed_and_unbalanced_records) ... ok\ntest_frames_include_inlined_groups_and_stack_rows_are_aligned (test_heap_analyze.HeapAnalyzeTests.test_frames_include_inlined_groups_and_stack_rows_are_aligned) ... ok\ntest_gzip_input_is_supported_and_binding_is_compressed (test_heap_analyze.HeapAnalyzeTests.test_gzip_input_is_supported_and_binding_is_compressed) ... ok\ntest_heaptrack_print_fallback_does_not_claim_requested_bytes (test_heap_analyze.HeapAnalyzeTests.test_heaptrack_print_fallback_does_not_claim_requested_bytes) ... ok\ntest_phase_requires_exact_run_or_build_function_ancestry (test_heap_analyze.HeapAnalyzeTests.test_phase_requires_exact_run_or_build_function_ancestry) ... ok\ntest_rejects_missing_trace_metadata_instead_of_inventing_phase (test_heap_analyze.HeapAnalyzeTests.test_rejects_missing_trace_metadata_instead_of_inventing_phase) ... ok\ntest_rejects_unknown_record_and_unaligned_deallocation (test_heap_analyze.HeapAnalyzeTests.test_rejects_unknown_record_and_unaligned_deallocation) ... ok\ntest_v3_parser_aligns_calls_requested_bytes_and_lifetimes (test_heap_analyze.HeapAnalyzeTests.test_v3_parser_aligns_calls_requested_bytes_and_lifetimes) ... ok\ntest_factored_filter_matches_exact_identifier_set (test_heap_filter.DescriptorFilterTests.test_factored_filter_matches_exact_identifier_set) ... ok\ntest_selected_malformed_tail_is_not_silently_skipped (test_heap_filter.DescriptorFilterTests.test_selected_malformed_tail_is_not_silently_skipped) ... ok\n\n----------------------------------------------------------------------\nRan 33 tests in 0.080s\n\nOK\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "replay.py"
+      ],
+      "cwd": "/tmp/litchi-goal-0475-portable-wlfmos9l/bundle",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "finished_utc": "2026-09-08T11:17:04.015805+00:00",
+      "started_utc": "2026-09-08T11:16:57.085872+00:00",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0475-portable-wlfmos9l/bundle/replay.py\", line 42, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0475-portable-wlfmos9l/bundle/replay.py\", line 30, in main\n    equal(owners.analyze(ROOT), json.loads((ROOT / 'owners.json').read_text()), 'compressor owners')\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0475-portable-wlfmos9l/bundle/replay.py\", line 15, in equal\n    raise ValueError(f'{label} attribution does not replay exactly')\nValueError: compressor owners attribution does not replay exactly\n",
+      "stdout": "cpu-P1 exact replay passed\ncpu-P2 exact replay passed\n"
+    }
+  ],
+  "completed": true,
+  "copied_root": "/tmp/litchi-goal-0475-portable-wlfmos9l",
+  "copied_root_removed": true,
+  "original_runtime_roots_absent": true,
+  "schema": "litchi-0475-portable-replay-v1",
+  "verified_seal_sha256": "50deb5abb2f598b0f8a2a8ab0fe07311b1f2e3ff89adf303e75d379219170016"
+}

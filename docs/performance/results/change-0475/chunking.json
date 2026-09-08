@@ -1,0 +1,52 @@
+{
+  "artifacts": [
+    {
+      "bytes": 135569270,
+      "parts": [
+        {
+          "bytes": 67108864,
+          "path": "heap-H1/heaptrack.zst.part-000",
+          "sha256": "2bd115f74c7d360b118e2745f2786ef6ef7fbc864d96caa547fc291209287722"
+        },
+        {
+          "bytes": 67108864,
+          "path": "heap-H1/heaptrack.zst.part-001",
+          "sha256": "403f87013fc534c918aa12db96db931471f2d4fccbd87c22d0a47aac8b7018a3"
+        },
+        {
+          "bytes": 1351542,
+          "path": "heap-H1/heaptrack.zst.part-002",
+          "sha256": "2c66015cb57397a30235bb1a787ccecc0bba8b4932793eefab4acebc10052803"
+        }
+      ],
+      "path": "heap-H1/heaptrack.zst",
+      "sha256": "d52736f242bcc29b61930c4398ee79164bfc49871ebf5a2df85ff22e5271c6ed"
+    },
+    {
+      "bytes": 135053985,
+      "parts": [
+        {
+          "bytes": 67108864,
+          "path": "heap-H2/heaptrack.zst.part-000",
+          "sha256": "949bb1b93e08e36d20799cddd6ca7f2ddf01fd1096d6e90a4c8780874e633d5a"
+        },
+        {
+          "bytes": 67108864,
+          "path": "heap-H2/heaptrack.zst.part-001",
+          "sha256": "25da0ffa1c5ab16c83a7d5d9ea7e24dfc6d000518762d97d5703c18a259a88f5"
+        },
+        {
+          "bytes": 836257,
+          "path": "heap-H2/heaptrack.zst.part-002",
+          "sha256": "693b20699fed52c053504c37d44e6b657f9cb7235e202f55f3699abfaee48fa8"
+        }
+      ],
+      "path": "heap-H2/heaptrack.zst",
+      "sha256": "9a78972b398bb405b3efec91d9975cf7d4e2309d40b9de23b18d154f269d5bc7"
+    }
+  ],
+  "chunk_bytes": 67108864,
+  "driver_sha256": "bc7f920feeebffdb9321676f58b80e9ae075646fe2652992f222a150aa0c3e02",
+  "recorded_utc": "2026-09-08T10:59:58.664966+00:00",
+  "schema": "litchi-0475-chunking-v1"
+}

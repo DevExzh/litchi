@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "perf",
+    "report",
+    "--stdio",
+    "--no-children",
+    "--no-inline",
+    "-g",
+    "none",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/cpu-P1/perf.data",
+    "--sort",
+    "symbol",
+    "--percent-limit",
+    "0.5"
+  ],
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "started_utc": "2026-09-08T10:46:54.970343+00:00"
+}

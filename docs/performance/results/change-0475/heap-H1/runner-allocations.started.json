@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H1/heaptrack.zst",
+    "-t",
+    "0",
+    "-m",
+    "0",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-l",
+    "0",
+    "--filter-bt-function",
+    "litchi_perf_baseline::pptx_streaming_create::run",
+    "-n",
+    "40",
+    "-F",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H1/allocation-stacks.txt",
+    "--flamegraph-cost-type",
+    "allocations"
+  ],
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "started_utc": "2026-09-08T10:47:36.268648+00:00"
+}

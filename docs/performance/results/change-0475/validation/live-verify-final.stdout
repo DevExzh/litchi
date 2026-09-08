@@ -1,0 +1,81 @@
+{
+  "chunked_originals": 2,
+  "compressed_originals": 16,
+  "cpu": {
+    "cpu-P1": {
+      "perf_script": "cpu-P1/perf-script.stdout.gz",
+      "schema": "litchi-0475-pptx-streaming-cpu-attribution-v1"
+    },
+    "cpu-P2": {
+      "perf_script": "cpu-P2/perf-script.stdout.gz",
+      "schema": "litchi-0475-pptx-streaming-cpu-attribution-v1"
+    }
+  },
+  "heap": {
+    "schema": "litchi-0475-heap-attribution-v1",
+    "traces": 2
+  },
+  "lanes": 7,
+  "live": {
+    "binary": "d205421b297b54a2f167ff0abde4b3814ef8c07c5883550b168d78d1af4f0935",
+    "source_files": 7034,
+    "status": "pass"
+  },
+  "reports": {
+    "counters": {
+      "kind": "counters",
+      "samples": 30,
+      "warmups": 3
+    },
+    "cpu-P1": {
+      "kind": "cpu",
+      "samples": 30,
+      "warmups": 3
+    },
+    "cpu-P2": {
+      "kind": "cpu",
+      "samples": 30,
+      "warmups": 3
+    },
+    "heap-H1": {
+      "kind": "heap",
+      "samples": 1,
+      "warmups": 0
+    },
+    "heap-H2": {
+      "kind": "heap",
+      "samples": 1,
+      "warmups": 0
+    },
+    "normal-R1": {
+      "kind": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    "normal-R2": {
+      "kind": "normal",
+      "samples": 30,
+      "warmups": 3
+    }
+  },
+  "reuse": {
+    "files": 13,
+    "prior_schema": "litchi-0474-verification-v1"
+  },
+  "samples": 152,
+  "schema": "litchi-0475-verification-v1",
+  "sealed": {
+    "files": 0,
+    "status": "skipped"
+  },
+  "status": "pass",
+  "summary": {
+    "lanes": 7,
+    "status": "pass"
+  },
+  "supplement": {
+    "artifacts": 4,
+    "filter_token": "21pptx_streaming_create3run",
+    "schema": "litchi-0475-supplement-protocol-v1"
+  }
+}

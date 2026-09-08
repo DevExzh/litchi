@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H2/heaptrack.zst",
+    "-t",
+    "0",
+    "-m",
+    "0",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-l",
+    "0",
+    "--filter-bt-function",
+    "21pptx_streaming_create3run",
+    "-n",
+    "100",
+    "-F",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H2/runner-mangled-stacks.txt",
+    "--flamegraph-cost-type",
+    "allocations"
+  ],
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "started_utc": "2026-09-08T10:57:30.474071+00:00",
+  "supplemental_driver_sha256": "966956bc1d7e62e2b1cdb773dbf54c038beb02613b4d468b6b6048f4d5ba1649",
+  "supplemental_protocol_sha256": "3cabbeb4eef838d11b33eb7db2dc7831621a201eb58470228e6e860b92a328a8"
+}

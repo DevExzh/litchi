@@ -1,0 +1,145 @@
+{
+  "heap_attribution_sha256": "9abcbbf2252eead9b9aef3f62543f6c52d3ecc2225b889503d36fa8c7cb03a6e",
+  "lanes": [
+    {
+      "combined_requested_bytes": 6778588800,
+      "combined_share_of_run_requested_bytes_percent": 99.54389065490294,
+      "lane": "heap-H1",
+      "owners": {
+        "flate2_output_buffer": {
+          "allocation_calls": 16421,
+          "requested_bytes": 538083328,
+          "requested_bytes_per_call": 32768,
+          "trace_ids": [
+            4826,
+            4865,
+            4424,
+            4463,
+            3907,
+            4058,
+            4127,
+            4168,
+            4207,
+            4245,
+            4280,
+            4321,
+            4360,
+            4525,
+            4562,
+            4597,
+            4632,
+            4681,
+            4724
+          ]
+        },
+        "zlib_rs_deflate_init": {
+          "allocation_calls": 16421,
+          "requested_bytes": 6240505472,
+          "requested_bytes_per_call": 380032,
+          "trace_ids": [
+            4825,
+            4864,
+            4423,
+            4462,
+            3906,
+            4057,
+            4126,
+            4167,
+            4206,
+            4244,
+            4279,
+            4320,
+            4359,
+            4524,
+            4561,
+            4596,
+            4631,
+            4680,
+            4723
+          ]
+        }
+      },
+      "run_context": {
+        "allocation_calls": 311120,
+        "deallocated_bytes": 6809648242,
+        "deallocation_calls": 311120,
+        "live_bytes_at_end": 0,
+        "outstanding_allocations": 0,
+        "peak_event_ordinal": 572708,
+        "peak_live_bytes": 8875780,
+        "requested_bytes": 6809648242
+      }
+    },
+    {
+      "combined_requested_bytes": 6778588800,
+      "combined_share_of_run_requested_bytes_percent": 99.54389065490294,
+      "lane": "heap-H2",
+      "owners": {
+        "flate2_output_buffer": {
+          "allocation_calls": 16421,
+          "requested_bytes": 538083328,
+          "requested_bytes_per_call": 32768,
+          "trace_ids": [
+            4828,
+            4867,
+            4426,
+            4465,
+            3909,
+            4060,
+            4129,
+            4170,
+            4209,
+            4247,
+            4282,
+            4323,
+            4362,
+            4527,
+            4564,
+            4599,
+            4634,
+            4683,
+            4726
+          ]
+        },
+        "zlib_rs_deflate_init": {
+          "allocation_calls": 16421,
+          "requested_bytes": 6240505472,
+          "requested_bytes_per_call": 380032,
+          "trace_ids": [
+            4827,
+            4866,
+            4425,
+            4464,
+            3908,
+            4059,
+            4128,
+            4169,
+            4208,
+            4246,
+            4281,
+            4322,
+            4361,
+            4526,
+            4563,
+            4598,
+            4633,
+            4682,
+            4725
+          ]
+        }
+      },
+      "run_context": {
+        "allocation_calls": 311120,
+        "deallocated_bytes": 6809648242,
+        "deallocation_calls": 311120,
+        "live_bytes_at_end": 0,
+        "outstanding_allocations": 0,
+        "peak_event_ordinal": 572708,
+        "peak_live_bytes": 8875780,
+        "requested_bytes": 6809648242
+      }
+    }
+  ],
+  "schema": "litchi-0475-compressor-owners-v1",
+  "scope": "Exact run ancestry includes observers and report setup outside the timed operation. Owner rows use disjoint captured initialization/buffer stacks, not nearest generic category labels. Independent category peaks are not additive."
+}

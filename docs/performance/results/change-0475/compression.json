@@ -1,0 +1,101 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3507448,
+      "compressed_bytes": 306367,
+      "compressed_path": "cpu-P1/perf.data.gz",
+      "compressed_sha256": "31c8e1b851a63c5480bb681482e6be7d8d796b8ae1938095547b7676639b4b19",
+      "path": "cpu-P1/perf.data",
+      "sha256": "ce20f0d4b0f824d5ac2087927f2df4cd18d3d3ece3567b20a9c27538bcfa13b6"
+    },
+    {
+      "bytes": 35072609,
+      "compressed_bytes": 734568,
+      "compressed_path": "cpu-P1/perf-script.stdout.gz",
+      "compressed_sha256": "696d9c02f44f66e2723a4cbee04d76fb4749a5d706dd5043893a50a90d038b13",
+      "path": "cpu-P1/perf-script.stdout",
+      "sha256": "54e71e428b78dda136cabfc2785282257d7b508f2f30a92c8ff5efa257f2565b"
+    },
+    {
+      "bytes": 3512664,
+      "compressed_bytes": 306565,
+      "compressed_path": "cpu-P2/perf.data.gz",
+      "compressed_sha256": "8cee03d1057acce549853808820a825dea278a61d56b4f36d8ad304c5672b455",
+      "path": "cpu-P2/perf.data",
+      "sha256": "3686f502e0f74aeecd0c57d7ff41f9a9474258911c49c202d80bd5e946f29cbe"
+    },
+    {
+      "bytes": 35124299,
+      "compressed_bytes": 731514,
+      "compressed_path": "cpu-P2/perf-script.stdout.gz",
+      "compressed_sha256": "a5a39395d715527af46f5c15395d05b241334a8e4bceaf15ec0b89255536881d",
+      "path": "cpu-P2/perf-script.stdout",
+      "sha256": "01ee5db911ccd28e1a20f94c1824fde9cbfccfaca63c81c75d3b5d6c6e6c2157"
+    },
+    {
+      "bytes": 6544534313,
+      "compressed_bytes": 96774306,
+      "compressed_path": "heap-H1/decoded.stdout.gz",
+      "compressed_sha256": "98b936a8085426c8999ee309c89238a71b8dd3ee566f817f7abe3eec856fbb92",
+      "path": "heap-H1/decoded.stdout",
+      "sha256": "b1056342e8b6f33295b076e21a0c73b26d2b95a9fb9c45b344dd3a177a50d7be"
+    },
+    {
+      "bytes": 556802,
+      "compressed_bytes": 25056,
+      "compressed_path": "heap-H1/print.stdout.gz",
+      "compressed_sha256": "252b7f477d7211d204df4d0943918fa7e80f4ca7a9597e8f658f00b5684aa536",
+      "path": "heap-H1/print.stdout",
+      "sha256": "81c2fee2baeaf91f923e9ab496d0b82487e891230a0e02ce02b367bc1aa79a34"
+    },
+    {
+      "bytes": 795,
+      "compressed_bytes": 462,
+      "compressed_path": "heap-H1/runner-allocations.stdout.gz",
+      "compressed_sha256": "65148d4121c0ca20f50f1abba8b35538cda0daceba798ddd4c36f359c36271fc",
+      "path": "heap-H1/runner-allocations.stdout",
+      "sha256": "865650b3d31bae884cf61ab0f979969d3c6fdb33e9ea357d77959f26a9f782ed"
+    },
+    {
+      "bytes": 0,
+      "compressed_bytes": 20,
+      "compressed_path": "heap-H1/allocation-stacks.txt.gz",
+      "compressed_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "path": "heap-H1/allocation-stacks.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 6544534798,
+      "compressed_bytes": 96789387,
+      "compressed_path": "heap-H2/decoded.stdout.gz",
+      "compressed_sha256": "d021866c370f0548b3087a0fa04f257bd652a4a08d9de05464e07f6f08691c40",
+      "path": "heap-H2/decoded.stdout",
+      "sha256": "ca3d1b0109d8af9aaccabfd3fc5e507e7843752bab422bcd344767021b47bf7e"
+    },
+    {
+      "bytes": 556644,
+      "compressed_bytes": 25087,
+      "compressed_path": "heap-H2/print.stdout.gz",
+      "compressed_sha256": "23f6d1a5da0342acd45f344a8aebdec60ea3f621d58dae2db330ebce850bb1c8",
+      "path": "heap-H2/print.stdout",
+      "sha256": "b359f8ab05f3fa173c876f5d93986a277d05fff5619b554ebfabd1a4f94c72c1"
+    },
+    {
+      "bytes": 795,
+      "compressed_bytes": 462,
+      "compressed_path": "heap-H2/runner-allocations.stdout.gz",
+      "compressed_sha256": "c75a6cbb09ebc7503bd921c66e95345e825b096142b8856a4ae7f18b3df1115e",
+      "path": "heap-H2/runner-allocations.stdout",
+      "sha256": "7c3f074fcd986d6890c8e8b4cfac879678812cd848f78fe757a8ec3bc53df27c"
+    },
+    {
+      "bytes": 0,
+      "compressed_bytes": 20,
+      "compressed_path": "heap-H2/allocation-stacks.txt.gz",
+      "compressed_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "path": "heap-H2/allocation-stacks.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "schema": "litchi-0475-compression-v1"
+}

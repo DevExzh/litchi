@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## PPTX allocation ownership investigated (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) adds repeated attribution
+to the 0474 memory-growth finding. Exact writer context is separated from
+materialized preflight, raw traces and the failed demangled Heaptrack filter
+are retained, and a separately declared mangled-symbol export corrects that
+filter. This advances diagnosis; it does not close bounded total memory,
+logical append, native breadth, arbitrary repackaging or scaling. The full
+non-iWork goal remains open.
+
 ## PPTX fresh streaming memory requirement remains open (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) adds a missing public

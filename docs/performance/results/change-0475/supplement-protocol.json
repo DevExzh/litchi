@@ -1,0 +1,8 @@
+{
+  "declared_utc": "2026-09-08T10:49:11.552039+00:00",
+  "driver_sha256": "966956bc1d7e62e2b1cdb773dbf54c038beb02613b4d468b6b6048f4d5ba1649",
+  "filter_token": "21pptx_streaming_create3run",
+  "reason": "Original demangled ::run filter produced no allocation stacks because Heaptrack retains Rustv0 mangled names. Exact run symbol is visible in H1 print.stdout. Preserve original outputs and supplement only exported analysis of the same raw traces.",
+  "schema": "litchi-0475-supplement-protocol-v1",
+  "scope": "Mangled-token filtered allocation-call stacks; printed global peak is not a writer peak; no recapture or timing change."
+}

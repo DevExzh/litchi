@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## PPTX streaming attribution (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) profiles the unchanged large
+public streaming case. All seven captures pass. Normal p50 is
+258.296564 / 254.160741 ms with repeat drift below 5%. CPU callchains
+consistently separate roughly 24% writer from 75% materialized preflight
+cycle weight. Deflate processing appears in about 51% of writer weight;
+initialization appears in about 5%. These are sampled weights, not phase
+latencies or a production speedup. Allocation attribution and transport
+correctness obligations remain in the evidence bundle; the full goal is open.
+
+Repeated exact-stack attribution assigns 99.543891% of run-context requested
+bytes to backend initialization plus encoder output buffers. This selects a
+measured allocation-work candidate; it does not establish a speedup or remove
+the persistent metadata-memory requirement.
+
 ## Current result: PPTX streaming allocation growth (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) retains 360 fresh-process

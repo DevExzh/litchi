@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## PPTX writer and preflight costs separated (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) retains repeated CPU and
+heap traces for the unchanged 8,192-slide streaming writer. Materialized
+preflight dominates whole-process CPU and allocation counts, so exact run
+ancestry is required. Within the writer, Deflate processing has roughly 51%
+of sampled cycle weight, while initialization has roughly 5%. Compressor
+state reuse is an allocation-work candidate, with independent members and
+error/budget behavior to preserve. Growing name/directory metadata remains
+a separate memory problem.
+
+Repeated exact-stack attribution assigns 99.543891% of run-context requested
+bytes to backend initialization plus encoder output buffers. This selects a
+measured allocation-work candidate; it does not establish a speedup or remove
+the persistent metadata-memory requirement.
+
 ## PPTX streaming metadata growth measured (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) measures operation peak

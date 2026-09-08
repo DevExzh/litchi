@@ -1,0 +1,45 @@
+{
+  "artifacts": {
+    "capture.json": {
+      "bytes": 1870,
+      "sha256": "45862c2b302240124749eaca09a8021b220506653af2a3f73cb6b66a5b0060cd"
+    },
+    "capture.started.json": {
+      "bytes": 1511,
+      "sha256": "141ee2c63446016c8e5dad1a4f3dc59a40d24e4987b27f8b05a729db5c5d6ac7"
+    },
+    "capture.stderr": {
+      "bytes": 188,
+      "sha256": "806b8cba690efae23dd5444e382aeb166cae93652427289b7e26467813da25e4"
+    },
+    "capture.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "corpus-catalog.json": {
+      "bytes": 4916,
+      "sha256": "3a7d36a57a1a2b193533cce409c402472dc98021593fa11ef42058bdbec6ff8a"
+    },
+    "perf.data": {
+      "bytes": 3512664,
+      "sha256": "3686f502e0f74aeecd0c57d7ff41f9a9474258911c49c202d80bd5e946f29cbe"
+    },
+    "report.json": {
+      "bytes": 34456,
+      "sha256": "8ba0cbb84d02bcf8f75f4504bca5e9cfabb99e93a4c47e7432df47c8070830a9"
+    },
+    "resource.log": {
+      "bytes": 1164,
+      "sha256": "cf11027b068326ff00cab1f3936ec2312f79ac59e2f2de577573deedabb32ab5"
+    }
+  },
+  "binary_unchanged": true,
+  "binding_sha256": "869633f4a09f0f5cbab49c49bb7cde9244d9fdd8d3bb2d36d4f6b992f629754d",
+  "clean_after": true,
+  "exit_code": 0,
+  "kind": "cpu",
+  "lane": "cpu-P2",
+  "protocol_sha256": "619317a34866d28ef62386adc4e9924dbb9fdb63650f1ceebb622b93fb7963ac",
+  "schema": "litchi-0475-capture-v1",
+  "source_unchanged": true
+}

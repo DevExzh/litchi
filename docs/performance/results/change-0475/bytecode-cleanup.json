@@ -1,0 +1,10 @@
+{
+  "owned_files": {
+    "__pycache__/heap_analyze.cpython-314.pyc": "08fbcb8c0b921696326ad7a554f33aae535ff54a06abd4deed6836fe647d3f7f",
+    "__pycache__/test_evidence.cpython-314.pyc": "5b4a20ec5a2cde7b840715fbcf36b5a8c33eb9ec71f647b32959520458cb06f0",
+    "__pycache__/test_heap_analyze.cpython-314.pyc": "7240af1a1e50b10d2e6cef99383782c32c0b779e6ada7674808681e4a0a86eb2",
+    "__pycache__/verify.cpython-314.pyc": "bab9cb1c5bebeab1c2a83c3f01de57b16c9afe8cb954fed7474e4be7c9b9f82f"
+  },
+  "path_absent_after": true,
+  "removed_utc": "2026-09-08T11:06:40.969435+00:00"
+}
