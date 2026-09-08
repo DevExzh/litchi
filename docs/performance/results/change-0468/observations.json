@@ -1,0 +1,174 @@
+{
+  "chronology_verified": true,
+  "inputs": {
+    "build.json": "ee07446b965c0d2ef403676a9ba49238d883d86ff83f59aa0cf5965d9e80627f",
+    "counters/capture.json": "1d3d106d8426144e6ab9982f4261522091ef7761bb78b834e1daa5af7cbf38f1",
+    "counters/counters.csv": "4ab4fc7f198f3226613472c0ae1f73b422a5ad612a7ef668c8cb7ff00353c072",
+    "counters/report.json": "fa6bcce87a80898224c5fe3e36964248eb44b943f299e33e1918a1888147df35",
+    "counters/resource.log": "c6a86cea8f77423c683e507b958b63a86d8fdf17a4e87ebaae7a423bb9a14fe7",
+    "normal-r1/capture.json": "ce1980eaaef1e0509dfa012742fac7881244ae524f4dbebab5400975abb43574",
+    "normal-r1/report.json": "5aa75f25a98c3f34ba9cc98d399d5194874666463fdba283e20cec9b86acc89c",
+    "normal-r1/resource.log": "8e8b0b5b993dbdff8668bc6fd9084e793c638d784af4cc055ccbe55bb18117e1",
+    "normal-r2/capture.json": "f96583fc77de9aefe71b305e6e294461174f94230bc59eb8da62486ba3691b54",
+    "normal-r2/report.json": "3c41f727e3affefa6c568b66922064023ccefe6c6bc0abc55aa788e86cc23390",
+    "normal-r2/resource.log": "16fc4959ab4c6c3a0ca757d224f2695833ce34e816354e42a8069472dc854296",
+    "samples-fp/capture.json": "9157a56e858660df888098e35388f6b489538f150f411ec42876595e02892dda",
+    "samples-fp/perf-script.json": "db40ed8f7e899501e3d46aa1e50e8ed20f557166c935d03d9282cfbd32f87f15",
+    "samples-fp/report.json": "863180f0771cf149599d77f6ff62956ee8bb3c3dc0b05fe8b37d4a272da1a34b",
+    "samples-fp/resource.log": "8961017c412cf58496deff34e3e85566a12aadb8cb52f6a60264a84512dc38ac",
+    "samples-fp/top-symbols.json": "460f1d86d8947dfbc545d6aa107990830f7e3ebf7c6fe1624d8aba796d2bad8b"
+  },
+  "normal_process_rss_drift_percent": 0.0036453776611322652,
+  "normal_same_build_drift_percent": {
+    "mean": 0.20393826757538758,
+    "p50": 0.11383339419914762,
+    "p95": 0.3754809601556053,
+    "p99": -0.08950241083075516
+  },
+  "runs": [
+    {
+      "lane": "normal-r1",
+      "process_max_rss_kib": 109728,
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 388095,
+        "largest_write": 65536,
+        "write_calls": 37,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 6,
+          "bytes_1_to_512": 31,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "statistics_ns": {
+        "mean": 382210889.56666666,
+        "p50": 382299942,
+        "p95": 384013879,
+        "p99": 386165017
+      }
+    },
+    {
+      "lane": "counters",
+      "process_max_rss_kib": 109736,
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 388095,
+        "largest_write": 65536,
+        "write_calls": 37,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 6,
+          "bytes_1_to_512": 31,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "statistics_ns": {
+        "mean": 382433345.26666665,
+        "p50": 382457634,
+        "p95": 384602701,
+        "p99": 384821180
+      }
+    },
+    {
+      "lane": "samples-fp",
+      "process_max_rss_kib": 517696,
+      "samples": 50,
+      "sink": {
+        "accepted_bytes": 388095,
+        "largest_write": 65536,
+        "write_calls": 37,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 6,
+          "bytes_1_to_512": 31,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "statistics_ns": {
+        "mean": 385421414.51999986,
+        "p50": 385354011,
+        "p95": 386928318,
+        "p99": 387880621
+      }
+    },
+    {
+      "lane": "normal-r2",
+      "process_max_rss_kib": 109732,
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 388095,
+        "largest_write": 65536,
+        "write_calls": 37,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 6,
+          "bytes_1_to_512": 31,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "statistics_ns": {
+        "mean": 382990363.8333334,
+        "p50": 382735127,
+        "p95": 385455778,
+        "p99": 385819390
+      }
+    }
+  ],
+  "schema": "litchi-0468-observations-v1",
+  "scope": "Descriptive same-build timing context; counters include setup, warmup, expected-output work, verification and teardown. GNU time wraps perf in instrumented lanes and its RSS includes profiler overhead. No cross-build speedup or operation-local counter claim.",
+  "whole_process_branch_miss_percent": 0.13252236531444778,
+  "whole_process_counters": {
+    "branch-misses:u": {
+      "raw_value": "84005741",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 84005741
+    },
+    "branches:u": {
+      "raw_value": "63389859365",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 63389859365
+    },
+    "cache-misses:u": {
+      "raw_value": "77131552",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 77131552
+    },
+    "cycles:u": {
+      "raw_value": "84959973821",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 84959973821
+    },
+    "instructions:u": {
+      "raw_value": "281833512110",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 281833512110
+    },
+    "page-faults": {
+      "raw_value": "556388",
+      "running_percent": 100.0,
+      "runtime_ns": 19458649364,
+      "unit": "",
+      "value": 556388
+    }
+  },
+  "whole_process_ipc": 3.3172504584781044
+}

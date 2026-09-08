@@ -1,0 +1,31 @@
+{
+  "build_cleanup_receipt": "cleanup-builds.json",
+  "completed_utc": "2026-09-08T05:50:01.636517+00:00",
+  "owned_temporary_root": "/tmp/litchi-goal-0468",
+  "owned_temporary_root_absent": true,
+  "portable_stage_removed": true,
+  "removed_scratch": [
+    {
+      "bytes": 2392,
+      "path": "/tmp/litchi-goal-0468/preseal-verify-binary-final.json",
+      "sha256": "59b913f55981c49bc44e4ddc517362c61c77b2b67d4b541928a5a57201073279"
+    },
+    {
+      "bytes": 2392,
+      "path": "/tmp/litchi-goal-0468/preseal-verify-final.json",
+      "sha256": "59b913f55981c49bc44e4ddc517362c61c77b2b67d4b541928a5a57201073279"
+    },
+    {
+      "bytes": 2325,
+      "path": "/tmp/litchi-goal-0468/preseal-verify.json",
+      "sha256": "f867fff1830192460cb24de52454cb8e430443009e393a7b5ecec18d3adf43bb"
+    },
+    {
+      "bytes": 0,
+      "path": "/tmp/litchi-goal-0468/cpu.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "schema": "litchi-0468-owned-cleanup-v1",
+  "user_goal_unchanged": true
+}

@@ -1,0 +1,21 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2719856,
+      "compressed_bytes": 275365,
+      "compressed_path": "samples-fp/perf.data.gz",
+      "compressed_sha256": "c9b05a4105f75f916ba0c28aa6fdf1958f89ac9f44cf482eff9f2e4102d9af3e",
+      "path": "samples-fp/perf.data",
+      "sha256": "6e9779824e5f2e7816e0a43c1a384f390ab2cea9e4a1372141d8486e85c2651c"
+    },
+    {
+      "bytes": 25683599,
+      "compressed_bytes": 696993,
+      "compressed_path": "samples-fp/perf-script.stdout.gz",
+      "compressed_sha256": "02f201c7316db66d8702684f12f37092dbcfd827a620019697037f93bb9d591e",
+      "path": "samples-fp/perf-script.stdout",
+      "sha256": "23f052e498e2fd142b11e886164c019f59d8ed6796ef015eb387b525c73bacb6"
+    }
+  ],
+  "schema": "litchi-0468-compression-v1"
+}

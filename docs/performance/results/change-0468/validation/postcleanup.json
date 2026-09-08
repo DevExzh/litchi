@@ -1,0 +1,7 @@
+{
+  "schema": "litchi-0468-postcleanup-v1",
+  "exit_code": 0,
+  "owned_temporary_root_absent": true,
+  "stdout_sha256": "163fb475cd6cbb17dbfa183187e59a1db1a1ff98e83849410b39eb3351fff92e",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

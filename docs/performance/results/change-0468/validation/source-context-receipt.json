@@ -1,0 +1,30 @@
+{
+  "analyzer_sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2",
+  "reason": "Replace replay dependency on mutable current transaction/web source with exact build-inventory-bound retained text snapshots.",
+  "records": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0468/test_analyze.py"
+      ],
+      "exit_code": 0,
+      "label": "source-context-analyzer-tests",
+      "stderr_sha256": "464e0ee629edf74de09ef21e4232fbcedc26588ff7cc23c470f47fe2da88c255",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0468/verify.py",
+        "--preseal"
+      ],
+      "exit_code": 0,
+      "label": "source-context-preseal",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "a32a4b2d0d32b684bf45308b3874849a1af3e6c185d784bf9d2f35f30784228c"
+    }
+  ],
+  "schema": "litchi-0468-retained-source-context-v1"
+}

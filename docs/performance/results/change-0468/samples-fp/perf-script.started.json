@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "perf",
+    "script",
+    "--no-inline",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0468/samples-fp/perf.data",
+    "-F",
+    "comm,pid,tid,time,event,period,ip,sym,dso"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "driver_sha256": "f94d8b8bdc8690a35806888aa8430b99c855cbaab0e759eb08db6f689337b03c",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "schema": "litchi-0468-command-v1",
+  "started_utc": "2026-09-08T05:26:51.121870+00:00"
+}

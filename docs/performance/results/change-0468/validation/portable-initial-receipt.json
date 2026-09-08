@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "docs/performance/results/change-0466/analyze.py": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+  },
+  "exit_code": 1,
+  "live_build_absent": true,
+  "schema": "litchi-0468-portable-replay-v1",
+  "stage_has_git": false,
+  "stage_seal_sha256": "b4412690cf31f3b1a5b1de5f384e63c17410e2e423d4811a3965bf7e28f8ed2d",
+  "stage_seal_unchanged": true,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "847128a4a11e99e28c3f6e09e23b568418e4515a95d4b4fc7c9e854ee0b36cdc"
+}

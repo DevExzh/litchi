@@ -1,0 +1,7 @@
+{
+  "correction": "Retain exact report-policy.json in bundle and require it; no fallback policy. The workload override is diagnostic schema validation, not a speedup policy.",
+  "initial_failure": "Verifier depended on omitted current repository regression policy; fallback had an invalid empty metric_classes list.",
+  "schema": "litchi-0468-portable-correction-v1",
+  "source_policy_path": "docs/performance/perf-regression-policy-v1.json",
+  "source_policy_sha256": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c"
+}

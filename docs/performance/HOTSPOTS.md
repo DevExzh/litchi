@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## Current measured next experiment (0468)
+
+[0468](changes/0468-xlsx-remaining-commit-profile.md) refreshes CPU attribution
+after the 0467 optimization. Eager parsing remains the largest sampled commit
+context (40.01%), followed by snapshot scanning (24.41%), compaction (13.27%)
+and web metadata validation (10.33%); these inclusive contexts overlap.
+The web reader traverses every changed worksheet even for ordinary cell edits,
+but skipping it would remove existing malformed-input and web-extension checks.
+
+The next bounded experiment is removing `into_owned()` from the compaction
+event loop: each borrowed event is consumed before the next read from the
+stable input. Retain the complete pass, attribute normalization, `xml:space`,
+entity/namespace handling and error ordering. This targets temporary copies
+without increasing Store retention. Entire-compaction elimination would bound
+sampled commit-context speedup near 1.153x; event borrowing removes only a
+fraction, and no end-to-end benefit is yet claimed. Full parse/validation-pass
+reuse remains the larger architectural lead; redundant pre-sort checks are
+not justified by this profile.
+
 ## Current dense XLSX result and next lead (0467)
 
 [0467](changes/0467-xlsx-cell-attributes.md) removes the five repeated checked
