@@ -1,0 +1,4 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/generated_name_policy.rs (target/debug/deps/generated_name_policy-0a2c00b22bb61b56)
+     Running tests/generated_name_proof.rs (target/debug/deps/generated_name_proof-95047c71a978a78c)

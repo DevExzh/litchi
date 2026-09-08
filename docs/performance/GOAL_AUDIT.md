@@ -1,5 +1,25 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Explicit public PPTX metadata window implemented (0478)
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) integrates a bounded
+checked name plan and caller-supplied central-directory scratch through the
+public fresh PPTX writer. The final evidence bundle records the matched policy
+comparison and the operation allocator window gate. Caller scratch storage is
+separate and grows with serialized directory bytes; this is not a constant-RSS
+or all-PPTX claim. Ordinary constructors retain their metadata indexes.
+The full non-iWork objective remains open, including logical append, broader
+CRUD and native/source coverage, arbitrary repackaging and measured parallel
+scaling. The [next batch](results/change-0478/next-work.md) starts with measurement
+of the existing DOCX append path before proposing a bounded implementation.
+
+The final 24-process, 720-sample matrix passes byte and reopen verification.
+All 180 spool allocator samples have a 432,436-byte operation peak, versus
+8,875,252 bytes for the 8,192-slide control. Scratch extents are 4,074, 40,842
+and 1,237,692 bytes at 8, 256 and 8,192 slides. Small-deck normal mean latency
+increases 3.11% and 3.31% in the two repeats; no registered 5% review threshold
+is crossed. This is an operation-heap result with separate caller storage.
+
 ## Central-directory scratch implemented; name indexes remain (0477)
 
 [0477](changes/0477-zip-central-directory-spool.md) removes growing central

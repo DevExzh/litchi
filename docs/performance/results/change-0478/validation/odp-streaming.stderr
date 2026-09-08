@@ -1,0 +1,3 @@
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Finished `release` profile [optimized + debuginfo] target(s) in 26.88s
+     Running tests/streaming_provider.rs (target/release/deps/streaming_provider-dffd40d6c48255e4)

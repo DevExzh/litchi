@@ -1,0 +1,125 @@
+   Compiling zeroize v1.9.0
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling generic-array v0.14.9
+   Compiling subtle v2.6.1
+   Compiling const-oid v0.9.6
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_core v1.0.229
+   Compiling litemap v0.7.3
+   Compiling writeable v0.5.5
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling getrandom v0.2.17
+   Compiling hybrid-array v0.4.14
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling digest v0.10.7
+   Compiling memchr v2.8.3
+   Compiling icu_properties_data v1.5.1
+   Compiling base64ct v1.6.0
+   Compiling smallvec v1.16.0
+   Compiling synstructure v0.13.2
+   Compiling pem-rfc7468 v0.7.0
+   Compiling rand_core v0.6.4
+   Compiling icu_normalizer_data v1.5.1
+   Compiling cpufeatures v0.3.1
+   Compiling rand_core v0.10.1
+   Compiling der v0.7.10
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling const-oid v0.10.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerofrom v0.1.4
+   Compiling zerovec-derive v0.10.4
+   Compiling yoke v0.7.4
+   Compiling displaydoc v0.2.6
+   Compiling icu_provider_macros v1.5.0
+   Compiling sha2 v0.10.9
+   Compiling spki v0.7.3
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling num-traits v0.2.19
+   Compiling getrandom v0.4.3
+   Compiling zerovec v0.10.4
+   Compiling chacha20 v0.10.2
+   Compiling serde v1.0.229
+   Compiling zmij v1.0.19
+   Compiling bitflags v2.13.1
+   Compiling quick-xml v0.41.0
+   Compiling utf8_iter v1.0.4
+   Compiling tinystr v0.7.6
+   Compiling icu_collections v1.5.0
+   Compiling utf16_iter v1.0.5
+   Compiling icu_locid v1.5.0
+   Compiling write16 v1.0.0
+   Compiling once_cell v1.21.4
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling rustix v1.1.4
+   Compiling icu_provider v1.5.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling icu_locid_transform v1.5.0
+   Compiling serde_json v1.0.149
+   Compiling chrono v0.4.45
+   Compiling icu_properties v1.5.1
+   Compiling thiserror v2.0.18
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling pkcs8 v0.10.2
+   Compiling zerocopy v0.8.56
+   Compiling ff v0.13.1
+   Compiling debug_unsafe v0.1.4
+   Compiling fast-float2 v0.2.4
+   Compiling base64 v0.22.1
+   Compiling tinyvec_macros v0.1.1
+   Compiling base16ct v0.2.0
+   Compiling tempfile v3.27.0
+   Compiling sec1 v0.7.3
+   Compiling tinyvec v1.12.0
+   Compiling icu_normalizer v1.5.0
+   Compiling atoi_simd v0.18.1
+   Compiling group v0.13.0
+   Compiling idna_adapter v1.2.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling crypto-bigint v0.5.5
+   Compiling percent-encoding v2.3.2
+   Compiling form_urlencoded v1.2.2
+   Compiling idna v1.1.0
+   Compiling elliptic-curve v0.13.8
+   Compiling unicode-normalization v0.1.25
+   Compiling hmac v0.12.1
+   Compiling rfc6979 v0.4.0
+   Compiling url v2.5.8
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling caseless v0.2.2
+   Compiling signature v2.2.0
+   Compiling ryu v1.0.22
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling p256 v0.13.2
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unused variable: `suffix`
+    --> crates/litchi-opc/src/phys_pkg.rs:1070:22
+     |
+1070 |         for (prefix, suffix) in patterns {
+     |                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_suffix`
+     |
+     = note: `-D unused-variables` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_variables)]`
+
+error: variable does not need to be mutable
+    --> crates/litchi-opc/src/phys_pkg.rs:1542:9
+     |
+1542 |         mut self,
+     |         ----^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `-D unused-mut` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi-opc` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib test) due to 2 previous errors

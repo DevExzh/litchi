@@ -1,0 +1,83 @@
+{
+  "artifacts": {
+    "r1-allocator-8-control.report.json": {
+      "bytes": 50451,
+      "sha256": "b605159a4e88d696f92faa8b5ca71933dfc572cc648f2f6a899abe4ae239cf23"
+    },
+    "r1-allocator-8-control.resource": {
+      "bytes": 1082,
+      "sha256": "d8619df3b91dc1c8f34274519fb10a608cff10237b8838a08471ab3aef984a26"
+    },
+    "r1-allocator-8-control.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "r1-allocator-8-control.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_gate": "allocator-build.json",
+    "build_gate_sha256": "a0862593aa0c4c5287605b819ed3a140e73cd0756c6bf55c4f29aec609a4fb23",
+    "bytes": 414504248,
+    "embedded_inputs": {
+      "bytes": 4980,
+      "path": "embedded-inputs.json",
+      "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+    "sha256": "3b70a4ec2acdfa1b3dcd44da466ac9cf11af8a7fc07cf6ee9c778afe86187d47",
+    "source_manifest_sha256": "69193b08c3c0f67a2aa71819f5602cd6f27fccb3d3cb059143f32abf2971df15"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-control.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+      "--mode",
+      "control",
+      "--counts",
+      "8",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--repeats",
+      "1",
+      "--max-spool-bytes",
+      "67108864",
+      "--spool-buffer-bytes",
+      "16384",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-control.report.json",
+      "--spool-dir",
+      "/tmp/litchi-goal-0478/spools/r1-allocator-8-control"
+    ],
+    "count": 8,
+    "instrumentation": "allocator",
+    "label": "r1-allocator-8-control",
+    "policy": "control",
+    "repeat": 1
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T15:31:14.711496+00:00",
+  "protocol_sha256": "33335a97f50aac8fe5c6bd9cb8708969ed6351786f821dd2a812a5cf8c5d9382",
+  "started_utc": "2026-09-08T15:31:14.666569+00:00"
+}

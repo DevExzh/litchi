@@ -1,0 +1,10 @@
+{
+  "gate_pid": 2117038,
+  "descendant_pids": [
+    2117060,
+    2117040
+  ],
+  "signal": "SIGTERM",
+  "reason": "Correct benchmark module declaration ordering found by required formatter before final source freeze.",
+  "utc": "2026-09-08T14:57:14.471331+00:00"
+}

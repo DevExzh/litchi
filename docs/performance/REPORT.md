@@ -1,5 +1,23 @@
 # Performance program phase report
 
+## Public PPTX generated-name metadata scratch implemented (0478)
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) adds an explicit provider
+route that releases completed ZIP/OPC name metadata and replays central records
+through a fixed buffer. A bounded symbolic plan checks the complete emitted
+name sequence before publication; ordinary constructors preserve their existing
+storage policy. The final paired normal/allocator matrix and review retain all
+individual timings, allocator observations, scratch extents and regression
+flags. The result is scoped to fresh plain-text creation with caller scratch,
+not total RSS, durable storage, arbitrary append or the full non-iWork goal.
+
+The final 24-process, 720-sample matrix passes byte and reopen verification.
+All 180 spool allocator samples have a 432,436-byte operation peak, versus
+8,875,252 bytes for the 8,192-slide control. Scratch extents are 4,074, 40,842
+and 1,237,692 bytes at 8, 256 and 8,192 slides. Small-deck normal mean latency
+increases 3.11% and 3.31% in the two repeats; no registered 5% review threshold
+is crossed. This is an operation-heap result with separate caller storage.
+
 ## Explicit ZIP central-directory spool implemented (0477)
 
 [0477](changes/0477-zip-central-directory-spool.md) adds caller-selected central

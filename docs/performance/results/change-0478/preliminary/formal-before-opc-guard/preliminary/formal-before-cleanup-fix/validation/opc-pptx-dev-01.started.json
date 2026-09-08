@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-pptx",
+    "--lib"
+  ],
+  "common_sha256": "1087f5baf8e17a12c48b6d90dfc87efcb22c25f8360a784a6b1135edaf398865",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "source_before": {
+    "files": 7045,
+    "path": "validation-sources/12ddb5ad1b50ae0e5a2954fc9c4f2fbd72f861e3a4465a83a74bd5e42f4880e6.json",
+    "sha256": "12ddb5ad1b50ae0e5a2954fc9c4f2fbd72f861e3a4465a83a74bd5e42f4880e6"
+  },
+  "started_utc": "2026-09-08T14:23:21.998111+00:00"
+}

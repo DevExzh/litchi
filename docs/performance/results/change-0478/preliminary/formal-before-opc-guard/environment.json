@@ -1,0 +1,90 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "cargo": {
+    "argv": [
+      "rustup",
+      "run",
+      "1.98.1",
+      "cargo",
+      "-V"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n"
+  },
+  "clock": {
+    "argv": [
+      "date",
+      "-u",
+      "--iso-8601=seconds"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "2026-09-08T14:27:52+00:00\n"
+  },
+  "cpu": {
+    "argv": [
+      "lscpu"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n"
+  },
+  "filesystem": {
+    "argv": [
+      "df",
+      "-T",
+      "/tmp/litchi-goal-0478"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\ntmpfs          tmpfs  64723536 49442936  15280600  77% /tmp\n"
+  },
+  "memory": "MemTotal:       129447068 kB\nMemFree:        12005044 kB\nMemAvailable:   69753320 kB\nBuffers:         1813496 kB\nCached:         100112556 kB\nSwapCached:            0 kB\nActive:         47021556 kB\nInactive:       62027444 kB\nActive(anon):   28282384 kB\nInactive(anon): 28307868 kB\nActive(file):   18739172 kB\nInactive(file): 33719576 kB\nUnevictable:       25072 kB\nMlocked:            8440 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              6904 kB\nWriteback:             0 kB\nAnonPages:       7148544 kB\nMapped:           561248 kB\nShmem:          49446336 kB\nKReclaimable:    6483488 kB\nSlab:            7962544 kB\nSReclaimable:    6483488 kB\nSUnreclaim:      1479056 kB\nKernelStack:       23968 kB\nPageTables:       105860 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    64723532 kB\nCommitted_AS:   64909240 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       41952 kB\nVmallocChunk:          0 kB\nPercpu:            29312 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:   1990656 kB\nFilePmdMapped:    172032 kB\nCmaTotal:              0 kB\nCmaFree:         1522260 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      217516 kB\nDirectMap2M:    17221632 kB\nDirectMap1G:    114294784 kB\n",
+  "platform": "Linux-7.0.0-1011-aws-x86_64-with-glibc2.43",
+  "toolchain": {
+    "argv": [
+      "rustup",
+      "run",
+      "1.98.1",
+      "rustc",
+      "-Vv"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n"
+  }
+}

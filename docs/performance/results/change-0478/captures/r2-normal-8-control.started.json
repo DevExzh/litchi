@@ -1,0 +1,63 @@
+{
+  "binary": {
+    "build_gate": "normal-build.json",
+    "build_gate_sha256": "018799b8d33e7d5e1acac9be17646f5398be84936db5f036e12d821020d1fe8f",
+    "bytes": 414496768,
+    "embedded_inputs": {
+      "bytes": 4980,
+      "path": "embedded-inputs.json",
+      "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+    "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969",
+    "source_manifest_sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-control.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+      "--mode",
+      "control",
+      "--counts",
+      "8",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--repeats",
+      "1",
+      "--max-spool-bytes",
+      "67108864",
+      "--spool-buffer-bytes",
+      "16384",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-control.report.json",
+      "--spool-dir",
+      "/tmp/litchi-goal-0478/spools/r2-normal-8-control"
+    ],
+    "count": 8,
+    "instrumentation": "normal",
+    "label": "r2-normal-8-control",
+    "policy": "control",
+    "repeat": 2
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "protocol_sha256": "fe8dcc8db0191f8b0731e794960a5a5653717365bb1922535bd3e7211841bf66",
+  "started_utc": "2026-09-08T16:21:48.135978+00:00"
+}

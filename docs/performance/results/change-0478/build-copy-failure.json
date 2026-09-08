@@ -1,0 +1,18 @@
+{
+  "build_gate": {
+    "path": "validation/build-allocator-opc-guard.json",
+    "sha256": "381fecf1c0bb24a304a2193f0a2d0b8daa1e85406d419b0dc1a42fa70fa4ec41"
+  },
+  "destination": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+  "driver_sha256": "99225e9ab3aa65a767b76b2aa727e6cdf86de632d3bc8f779d79fc3c03a4466f",
+  "errno": 122,
+  "error": "Disk quota exceeded",
+  "partial_destination": {
+    "bytes": 319131648,
+    "sha256": "3a81b353b227ddf2c6a657bd19dd414ede107b1b272ff13bc0aad47e5f7cb2fc"
+  },
+  "phase": "copy allocator binary after successful unchanged Cargo build",
+  "recorded_utc": "2026-09-08T16:05:04.671001+00:00",
+  "schema": "pptx-metadata-spool-build-copy-failure-v1",
+  "source": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/pptx_metadata_spool"
+}

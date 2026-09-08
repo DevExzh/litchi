@@ -1,0 +1,28 @@
+{
+  "allocator": {
+    "build_gate": "allocator-build.json",
+    "build_gate_sha256": "59ca1dd5b1715791b4aed0d0517e2d8194eb320e6bcd71151dc1422f828553e3",
+    "bytes": 414505112,
+    "embedded_inputs": {
+      "bytes": 4980,
+      "path": "embedded-inputs.json",
+      "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+    },
+    "path": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+    "sha256": "5fca7f05ec9e5ec70243250a7a45abdfe4948eb8b3fb3e0cc426488578eef5de",
+    "source_manifest_sha256": "d911e79d8e3ebeb795ab2dc00dd55963e017e3fc41c56f386a0e1d12b8c3a645"
+  },
+  "normal": {
+    "build_gate": "normal-build.json",
+    "build_gate_sha256": "71b7ae28ffb0b9196ae44e3531c0f2c63b47762afeb9e2572b59ee4551421013",
+    "bytes": 414498768,
+    "embedded_inputs": {
+      "bytes": 4980,
+      "path": "embedded-inputs.json",
+      "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+    },
+    "path": "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+    "sha256": "243668d9638126b4a2859ac5f072fe948b3f6ec14746333dabc539dafac2cd12",
+    "source_manifest_sha256": "d911e79d8e3ebeb795ab2dc00dd55963e017e3fc41c56f386a0e1d12b8c3a645"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--bin",
+    "pptx_metadata_spool"
+  ],
+  "artifacts": {
+    "harness-tests.stderr": {
+      "bytes": 1368,
+      "sha256": "80af966413d55d0aa4ef08ba9f7e2cf1df39c1fdfcafe97fa3f7f3fd22f5e863"
+    },
+    "harness-tests.stdout": {
+      "bytes": 34540,
+      "sha256": "ee6c29166adfb669d8f5fef0b8639dfb4e7eb9bfdbd9511a3a5dce5d886a2c53"
+    }
+  },
+  "common_sha256": "1087f5baf8e17a12c48b6d90dfc87efcb22c25f8360a784a6b1135edaf398865",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T15:51:30.022840+00:00",
+  "source_after": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_before": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T15:47:12.916474+00:00"
+}

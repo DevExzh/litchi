@@ -1,0 +1,95 @@
+{
+  "files": {
+    "crates/litchi-pptx/src/resources/generated/docProps/app.xml": {
+      "bytes": 1091,
+      "path": "embedded-resources/generated/docProps/app.xml",
+      "sha256": "568f9273e3401fa3525c9324d7b52a3a2d8001283b244215313d7fed42cf7c7b"
+    },
+    "crates/litchi-pptx/src/resources/generated/docProps/core.xml": {
+      "bytes": 344,
+      "path": "embedded-resources/generated/docProps/core.xml",
+      "sha256": "2fce7b01b3fdc2f3a263ad6cf4b108789f7a42c931b3e36a7eb179ac6e189160"
+    },
+    "crates/litchi-pptx/src/resources/generated/presProps.xml": {
+      "bytes": 647,
+      "path": "embedded-resources/generated/presProps.xml",
+      "sha256": "cfd822328fea5ebf7c0c25db1b7a37f02773c336cbef7805e34bdc676077a498"
+    },
+    "crates/litchi-pptx/src/resources/generated/presentation.xml": {
+      "bytes": 3195,
+      "path": "embedded-resources/generated/presentation.xml",
+      "sha256": "d7e8f2458c5d899885f885fe171047fd0d7d9895cc383c761702fe690298263c"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout1.xml": {
+      "bytes": 4356,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout1.xml",
+      "sha256": "1f96ea662f35cb152ba25023ee24d12928a5d4929c5546b268058922a3953786"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout10.xml": {
+      "bytes": 3020,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout10.xml",
+      "sha256": "62dfd9beb3e95ed4b183b198c8fd41a009b548897bbcaf8bbb8c3cf275ea4095"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout11.xml": {
+      "bytes": 3244,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout11.xml",
+      "sha256": "8fb5429c5ec640cbf713f740117d16eef5b6ea6f22b3f759df3f6ce5202e4fbc"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout2.xml": {
+      "bytes": 2965,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout2.xml",
+      "sha256": "6ce0b03f93b3964089aaf8032a7635e4dfad5d94e676332dffb9a9f3ddab8d36"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout3.xml": {
+      "bytes": 4439,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout3.xml",
+      "sha256": "84ecf26628a3f975d748d1cc4149c9c2add089c16d85a309ae628b890ae485fb"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout4.xml": {
+      "bytes": 4711,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout4.xml",
+      "sha256": "170ea5f9a0b0bd6c24318d68f8ea93b4f05630b6c1b358e5a6d7f454e83c38f8"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout5.xml": {
+      "bytes": 7221,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout5.xml",
+      "sha256": "cb01d334d088b7c8f57bcd7d4d9c9d6988958bea53ae1192e2df834756b09eb8"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout6.xml": {
+      "bytes": 2231,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout6.xml",
+      "sha256": "3e6b4598efba45fa7c176d65400292c736576040ffbe1693df83b2a4f53f810f"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout7.xml": {
+      "bytes": 1894,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout7.xml",
+      "sha256": "29d199f199384ca76451b7bfbd8d50eee64911ef51343b4ef4c2348f106949db"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout8.xml": {
+      "bytes": 4801,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout8.xml",
+      "sha256": "ef7f646694717306e391b3727e11873e6897ef0243ea9c74af5ea20360f5b86d"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideLayouts/slideLayout9.xml": {
+      "bytes": 4656,
+      "path": "embedded-resources/generated/slideLayouts/slideLayout9.xml",
+      "sha256": "56dcd88734893810bc5284543a75858cd2e1abc854e9e18d0a60f54c77e16832"
+    },
+    "crates/litchi-pptx/src/resources/generated/slideMasters/slideMaster1.xml": {
+      "bytes": 11985,
+      "path": "embedded-resources/generated/slideMasters/slideMaster1.xml",
+      "sha256": "2365a04f86b29d9c8bd87dd010ad6a71c5563dc14978fed4275999b13ec32347"
+    },
+    "crates/litchi-pptx/src/resources/generated/theme/theme1.xml": {
+      "bytes": 7653,
+      "path": "embedded-resources/generated/theme/theme1.xml",
+      "sha256": "cbbd07830e52bbf5e933ab2794e75d412861fed89cd4e5c220362ba98f034be0"
+    },
+    "crates/litchi-pptx/src/resources/generated/viewProps.xml": {
+      "bytes": 896,
+      "path": "embedded-resources/generated/viewProps.xml",
+      "sha256": "cff4675441164d5af2e69efc30e738ed8a4409a017edd5c33d6be769ef18de2a"
+    }
+  },
+  "schema": "pptx-embedded-inputs-v1"
+}

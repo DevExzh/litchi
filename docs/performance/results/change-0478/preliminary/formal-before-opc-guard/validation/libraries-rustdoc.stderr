@@ -1,0 +1,50 @@
+    Checking stable_deref_trait v1.2.1
+    Checking zerofrom v0.1.4
+    Checking writeable v0.5.5
+    Checking litemap v0.7.3
+    Checking smallvec v1.16.0
+    Checking yoke v0.7.4
+    Checking icu_locid_transform_data v1.5.1
+    Checking zeroize v1.9.0
+    Checking icu_properties_data v1.5.1
+    Checking icu_normalizer_data v1.5.1
+    Checking zerovec v0.10.4
+    Checking bitflags v2.13.1
+    Checking block-buffer v0.12.1
+    Checking utf8_iter v1.0.4
+    Checking utf16_iter v1.0.5
+    Checking digest v0.11.3
+    Checking write16 v1.0.0
+    Checking rustix v1.1.4
+    Checking thiserror v2.0.18
+    Checking sha2 v0.11.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking tinystr v0.7.6
+    Checking icu_collections v1.5.0
+    Checking tinyvec_macros v0.1.1
+    Checking icu_locid v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking tinyvec v1.12.0
+    Checking icu_provider v1.5.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking icu_locid_transform v1.5.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking tempfile v3.27.0
+    Checking percent-encoding v2.3.2
+    Checking form_urlencoded v1.2.2
+    Checking unicode-normalization v0.1.25
+    Checking icu_properties v1.5.1
+    Checking ryu v1.0.22
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking caseless v0.2.2
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking icu_normalizer v1.5.0
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.65s
+   Generated /home/zhuhe/code/litchi/target/doc/litchi_opc/index.html and 2 other files

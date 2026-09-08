@@ -1,0 +1,10 @@
+
+running 5 tests
+test pptx_metadata_spool::tests::physical_entry_count_is_fixed_members_plus_two_per_slide ... ok
+test pptx_metadata_spool::tests::default_cli_is_control_only_with_existing_shapes ... ok
+test pptx_metadata_spool::tests::hashing_sink_is_fixed_and_deterministic ... ok
+test pptx_metadata_spool::tests::both_mode_deduplicates_and_requires_spool_directory ... ok
+test pptx_metadata_spool::tests::physical_oracle_rejects_corrupted_static_payload ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 368 filtered out; finished in 0.06s
+

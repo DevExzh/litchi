@@ -1,0 +1,8 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.20s
+     Running tests/streaming_metadata_spool.rs (target/debug/deps/streaming_metadata_spool-f5d05b1e3ed20945)
+error: test failed, to rerun pass `-p litchi-pptx --test streaming_metadata_spool`

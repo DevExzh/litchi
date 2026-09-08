@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "docs/performance/results/change-0478",
+    "-p",
+    "test_evidence.py"
+  ],
+  "exit_code": 0,
+  "helpers": {
+    "analyze.py": "3a960fa741775eda5b65cde59c67669241bd9d0ea1ed4bf7cfc6e4d6f2571214",
+    "build-driver-initial.py": "581eb08c4ecf8e3419d4b8a48c42f3abb1c975085a3873196a453edfb48378f0",
+    "build.py": "99225e9ab3aa65a767b76b2aa727e6cdf86de632d3bc8f779d79fc3c03a4466f",
+    "capture.py": "9888fd0c72f645bb14accdcd1c246008d46b678d339d727e608f0addea3e6687",
+    "cleanup.py": "a61fe96a733a1fda9188b908ba6e6e1e780661f917b75a50af939a434bb2c47a",
+    "common.py": "1087f5baf8e17a12c48b6d90dfc87efcb22c25f8360a784a6b1135edaf398865",
+    "gate.py": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+    "ledger.py": "bad8b8472c9c5e4b42c48ca04a68ea79cda63926e6121f94de993647f2cb52d7",
+    "live.py": "f9c10b696af8a68592fb6d27abd3c0c6903f5afb73fc27771a1081766663ad3d",
+    "pilots.py": "1bc417a80131518ec6553f3c54935f1e0e57ac9c10308daf65ce9d548240a5e4",
+    "portable.py": "214e5c60feae5816aa1fce5396594db8658f903f0a6857c3095c7747d32b1861",
+    "recover-copy.py": "66f3b7b5e52ea3cd76e9aa07b07eba3dd8ded1dfb09f9d1dc760ed01f5916948",
+    "run-gates.py": "c73da2b41e6d3505869c4fc1734a722ce79dcb14a1f244210bcebf9c2d22f860",
+    "test_evidence.py": "42a54aeb4d24cf8e3193ced7fe1d94dc61e0e4f17eea2a867fb712a2cf975689",
+    "verify.py": "7a1a4d6c850c3df022065158d8e17de6ddbebe927d5a7c9b209f24c2eba1f083"
+  },
+  "schema": "pptx-metadata-spool-evidence-validation-v1",
+  "status": "pass",
+  "stderr": ".....................\n----------------------------------------------------------------------\nRan 21 tests in 0.164s\n\nOK\n",
+  "stdout": "",
+  "syntax": "pass"
+}

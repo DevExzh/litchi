@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0478: public PPTX metadata-storage policies
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) compares the ordinary
+public PPTX streaming constructor with its generated-plan explicit-file-spool
+route on the same deterministic 8/256/8,192-slide corpus. Normal and allocator
+builds remain separate. The final matrix has two reversed process repeats,
+30 samples and three warmups per process, pinned to CPU 2 with a 16 KiB replay
+buffer and 64 MiB scratch quota. The retained environment identifies `/tmp` as
+tmpfs. Whole-process RSS includes materialized oracles and setup; the operation
+allocator region covers the writer lifecycle. Final numbers and complete
+mean/p50/p95/p99 comparisons are in the linked change and `summary.json`.
+Two earlier matrices are retained and authenticated as preliminary evidence
+after the harness cleanup and OPC percent-boundary corrections; their 1,440
+samples are excluded from final totals.
+
+The final 24-process, 720-sample matrix passes byte and reopen verification.
+All 180 spool allocator samples have a 432,436-byte operation peak, versus
+8,875,252 bytes for the 8,192-slide control. Scratch extents are 4,074, 40,842
+and 1,237,692 bytes at 8, 256 and 8,192 slides. Small-deck normal mean latency
+increases 3.11% and 3.31% in the two repeats; no registered 5% review threshold
+is crossed. This is an operation-heap result with separate caller storage.
+
 ## 0477: central-directory storage policies
 
 [0477](changes/0477-zip-central-directory-spool.md) retains 1,440 samples from

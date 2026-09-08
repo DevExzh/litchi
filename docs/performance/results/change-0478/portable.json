@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "{\"captures\": 24, \"data_only\": false, \"preliminary\": {\"attempt\": \"formal-before-opc-guard\", \"captures\": 24, \"prior\": {\"attempt\": \"formal-before-cleanup-fix\", \"captures\": 24, \"protocol_sha256\": \"a0a64f6fd87e49914ea139784b0cc09a20d91040523f3c46229dd34a4aebc757\", \"samples\": 720, \"status\": \"authenticated\", \"validation\": {\"failed\": 15, \"successful\": 17, \"total\": 32}}, \"protocol_sha256\": \"33335a97f50aac8fe5c6bd9cb8708969ed6351786f821dd2a812a5cf8c5d9382\", \"samples\": 720, \"status\": \"authenticated\", \"validation\": {\"failed\": 15, \"successful\": 23, \"total\": 38}}, \"protocol_sha256\": \"fe8dcc8db0191f8b0731e794960a5a5653717365bb1922535bd3e7211841bf66\", \"rust_validation\": {\"receipts\": 59, \"required_success\": 21, \"retained_nonzero_attempts\": 15}, \"samples\": 720, \"schema\": \"pptx-metadata-spool-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"failed\": 15, \"successful\": 44, \"total\": 59}}\n"
+  },
+  "original_runtime_binaries_absent": true,
+  "probes": {
+    "allocator_live_exit": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0478-portable-3k4lrhnc/bundle/captures/r1-allocator-8-spool.report.json.operations[0].allocation: operation did not return to the same live-byte level\n",
+      "stdout": ""
+    },
+    "final_gate_exclusion": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation.required.harness-tests: source exclusions are not allowed\n",
+      "stdout": ""
+    },
+    "instrumentation": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0478-portable-3k4lrhnc/bundle/captures/r1-normal-8-control.report.json: instrumentation identity differs\n",
+      "stdout": ""
+    },
+    "output_digest": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0478-portable-3k4lrhnc/bundle/captures/r1-normal-8-control.report.json.operations[0]: output oracle failed\n",
+      "stdout": ""
+    },
+    "required_gate_omitted": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation.required: final gate set differs\n",
+      "stdout": ""
+    },
+    "spool_extent": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0478-portable-3k4lrhnc/bundle/captures/r1-normal-8-spool.report.json.operations[0]: scratch extent differs from independently derived extent 4074\n",
+      "stdout": ""
+    },
+    "summary_arithmetic": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: summary.rows.r1-normal-8-control.elapsed_ns.mean: numeric value differs\n",
+      "stdout": ""
+    }
+  },
+  "status": "pass",
+  "temporary_copy_removed": true,
+  "validation_seal_sha256": "20efb1e3a3631f08b5aac559585282d1820870e9e9597128ce552b72ed41043a"
+}

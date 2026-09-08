@@ -1,0 +1,7490 @@
+{
+  "captures": 24,
+  "identities": {
+    "256": [
+      "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      274398,
+      11776,
+      "147697c24b54b91e37e9906330802f40a2c4f9da1af6b564ca92eca6faad4f3b",
+      "4c4a1a185cd33c9a3362bed00bd9e77cd64f898976a57b56220ea62bb3a614ee",
+      549,
+      274398,
+      "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2"
+    ],
+    "8": [
+      "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      36259,
+      368,
+      "f3444404ef5130757c79ae624a161a38bc7c2f7ed053b47315ccf31067573a4e",
+      "bbc9f0e6cf3b3c48cd991dca9dded766cec7c93f762dd74b1559a34cdc05a966",
+      53,
+      36259,
+      "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5"
+    ],
+    "8192": [
+      "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      7940406,
+      376832,
+      "1bf460386d6f8962d4a04444a5e2b3971e6548fc1273cc933a6beefff9bf1417",
+      "521f638a72f55371d0d40ddf01dac1577f1e584f58ae535bb0cc01f90b76e1f9",
+      16421,
+      7940406,
+      "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527"
+    ]
+  },
+  "memory_gate": {
+    "baseline_count": 8,
+    "baseline_minimum_peaks": [
+      432436,
+      432436
+    ],
+    "counts": [
+      8,
+      256,
+      8192
+    ],
+    "global_maximum": 432436,
+    "global_minimum": 432436,
+    "instrumentation": "allocator",
+    "lane_maximum_peaks": {
+      "r1-allocator-256-spool": 432436,
+      "r1-allocator-8-spool": 432436,
+      "r1-allocator-8192-spool": 432436,
+      "r2-allocator-256-spool": 432436,
+      "r2-allocator-8-spool": 432436,
+      "r2-allocator-8192-spool": 432436
+    },
+    "metric": "allocator operation incremental peak live bytes",
+    "policy": "spool",
+    "range_percent": 0.0,
+    "repeats": [
+      1,
+      2
+    ],
+    "smallest_count_baseline_minimum": 432436,
+    "status": "pass",
+    "threshold_percent": 1,
+    "within_threshold": true,
+    "zero_failed_allocations": true,
+    "zero_live_exit_delta": true
+  },
+  "pairs": [
+    {
+      "count": 8,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": 3.113333532158275,
+        "elapsed_p50": 3.2730907707686456,
+        "elapsed_p95": 2.9924111291789846,
+        "elapsed_p99": 2.9727428801932754,
+        "process_max_rss_kib": 0.0
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 8,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": 3.3105601963862648,
+        "elapsed_p50": 3.1880459657799447,
+        "elapsed_p95": 3.246824162574918,
+        "elapsed_p99": 4.794387611572825,
+        "process_max_rss_kib": -0.2952755905511811
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    },
+    {
+      "count": 256,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -0.3724282482245806,
+        "elapsed_p50": -0.29400602492307953,
+        "elapsed_p95": -1.7691981075884982,
+        "elapsed_p99": -1.7055360640148016,
+        "process_max_rss_kib": 0.3525264394829612
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 256,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -2.7145811340244985,
+        "elapsed_p50": -2.889318501961265,
+        "elapsed_p95": -2.714950106554245,
+        "elapsed_p99": -3.0604281656270307,
+        "process_max_rss_kib": -3.6236119228521333
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    },
+    {
+      "count": 8192,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -1.864385488833348,
+        "elapsed_p50": -1.0284420251419246,
+        "elapsed_p95": -3.1113530391083692,
+        "elapsed_p99": -2.7360807209218736,
+        "process_max_rss_kib": -3.231576900641649
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 8192,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -2.3727312798568847,
+        "elapsed_p50": -1.4930363449841646,
+        "elapsed_p95": -3.7024634977731345,
+        "elapsed_p99": -3.9929107680388554,
+        "process_max_rss_kib": -2.0261747082939134
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    },
+    {
+      "count": 8,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -27.41176470588235,
+        "incremental_peak_live_bytes": -0.74936711184964,
+        "process_max_rss_kib": 0.19860973187686196,
+        "requested_bytes": -4.8352026780816155
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 8,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -27.41176470588235,
+        "incremental_peak_live_bytes": -0.74936711184964,
+        "process_max_rss_kib": -0.7881773399014779,
+        "requested_bytes": -4.8352026780816155
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    },
+    {
+      "count": 256,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -35.628246215051384,
+        "incremental_peak_live_bytes": -36.576129441978004,
+        "process_max_rss_kib": 0.4697592483852026,
+        "requested_bytes": -39.098472204753676
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 256,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -35.628246215051384,
+        "incremental_peak_live_bytes": -36.576129441978004,
+        "process_max_rss_kib": -2.9411764705882355,
+        "requested_bytes": -39.098472204753676
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    },
+    {
+      "count": 8192,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -35.4035369023523,
+        "incremental_peak_live_bytes": -95.12762003828173,
+        "process_max_rss_kib": 3.37205096258189,
+        "requested_bytes": -57.42826667016247
+      },
+      "positive_review_flags": [],
+      "repeat": 1
+    },
+    {
+      "count": 8192,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "allocation_calls": -35.4035369023523,
+        "incremental_peak_live_bytes": -95.12762003828173,
+        "process_max_rss_kib": -1.879268822298551,
+        "requested_bytes": -57.42826667016247
+      },
+      "positive_review_flags": [],
+      "repeat": 2
+    }
+  ],
+  "repeat_drifts": [
+    {
+      "absolute_review_flags": [],
+      "count": 8,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -0.4470873434299569,
+        "elapsed_p50": -0.4158815671912458,
+        "elapsed_p95": -0.0020749538868800664,
+        "elapsed_p99": -0.2836723665712394,
+        "process_max_rss_kib": 0.49455984174085066
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -0.25667075805875256,
+        "elapsed_p50": -0.4978885243654866,
+        "elapsed_p95": 0.24494106569510246,
+        "elapsed_p99": 1.4803645793737277,
+        "process_max_rss_kib": 0.19782393669634027
+      },
+      "policy": "spool"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 256,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": 1.9997030674575356,
+        "elapsed_p50": 2.225685075522906,
+        "elapsed_p95": 0.5804382548931006,
+        "elapsed_p99": 1.0547583636730624,
+        "process_max_rss_kib": 0.5287896592244419
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 256,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -0.3982164511010719,
+        "elapsed_p50": -0.4352140878373087,
+        "elapsed_p95": -0.38793570423024964,
+        "elapsed_p99": -0.33818167032968416,
+        "process_max_rss_kib": -3.4543325526932085
+      },
+      "policy": "spool"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8192,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": 0.03587793029094627,
+        "elapsed_p50": 0.526077158714385,
+        "elapsed_p95": 0.6036095881971996,
+        "elapsed_p99": 0.8868070138573904,
+        "process_max_rss_kib": -1.3494069609177524
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8192,
+      "instrumentation": "normal",
+      "percent_changes": {
+        "elapsed_mean": -0.482311289295805,
+        "elapsed_p50": 0.054185582996988516,
+        "elapsed_p95": -0.01016558229325009,
+        "elapsed_p99": -0.4168374552585369,
+        "process_max_rss_kib": -0.12055939559556342
+      },
+      "policy": "spool"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": 0.7944389275074478
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": -0.19821605550049554
+      },
+      "policy": "spool"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 256,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": -0.17615971814445097
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 256,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": -3.565166569257744
+      },
+      "policy": "spool"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8192,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": 1.8005707166110687
+      },
+      "policy": "control"
+    },
+    {
+      "absolute_review_flags": [],
+      "count": 8192,
+      "instrumentation": "allocator",
+      "percent_changes": {
+        "process_max_rss_kib": -3.3709175738724726
+      },
+      "policy": "spool"
+    }
+  ],
+  "rows": {
+    "r1-allocator-256-control": {
+      "allocation_calls": {
+        "maximum": 9049,
+        "mean": 9049,
+        "mean_t95_interval": [
+          9049.0,
+          9049.0
+        ],
+        "minimum": 9049,
+        "n": 30,
+        "p50": 9049,
+        "p95": 9049,
+        "p99": 9049
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-256-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-256-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-256-control"
+        ],
+        "count": 256,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-256-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 1415242,
+        "mean": 1415242,
+        "mean_t95_interval": [
+          1415242.0,
+          1415242.0
+        ],
+        "minimum": 1415242,
+        "n": 30,
+        "p50": 1415242,
+        "p95": 1415242,
+        "p99": 1415242
+      },
+      "elapsed_ns": {
+        "maximum": 6574170,
+        "mean": 6494872.7,
+        "mean_t95_interval": [
+          6468504.243279868,
+          6521241.156720133
+        ],
+        "minimum": 6417560,
+        "n": 30,
+        "p50": 6436750,
+        "p95": 6571580,
+        "p99": 6574170
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 681819,
+        "mean": 681819,
+        "mean_t95_interval": [
+          681819.0,
+          681819.0
+        ],
+        "minimum": 681819,
+        "n": 30,
+        "p50": 681819,
+        "p95": 681819,
+        "p99": 681819
+      },
+      "normal_timing": false,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 3850,
+        "mean": 3850,
+        "mean_t95_interval": [
+          3850.0,
+          3850.0
+        ],
+        "minimum": 3850,
+        "n": 30,
+        "p50": 3850,
+        "p95": 3850,
+        "p99": 3850
+      },
+      "process_max_rss_kib": 6812,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 6975488,
+          "mean": 6975488,
+          "mean_t95_interval": [
+            6975488.0,
+            6975488.0
+          ],
+          "minimum": 6975488,
+          "n": 30,
+          "p50": 6975488,
+          "p95": 6975488,
+          "p99": 6975488
+        },
+        "rchar": {
+          "maximum": 1981,
+          "mean": 1979.8666666666666,
+          "mean_t95_interval": [
+            1979.6122393478968,
+            1980.1210939854363
+          ],
+          "minimum": 1979,
+          "n": 30,
+          "p50": 1980,
+          "p95": 1981,
+          "p99": 1981
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6333333333333333,
+          "mean_t95_interval": [
+            0.45033539299360603,
+            0.8163312736730606
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 1415242,
+        "mean": 1415242,
+        "mean_t95_interval": [
+          1415242.0,
+          1415242.0
+        ],
+        "minimum": 1415242,
+        "n": 30,
+        "p50": 1415242,
+        "p95": 1415242,
+        "p99": 1415242
+      },
+      "scratch_bytes": null
+    },
+    "r1-allocator-256-spool": {
+      "allocation_calls": {
+        "maximum": 5825,
+        "mean": 5825,
+        "mean_t95_interval": [
+          5825.0,
+          5825.0
+        ],
+        "minimum": 5825,
+        "n": 30,
+        "p50": 5825,
+        "p95": 5825,
+        "p99": 5825
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-256-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-256-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-256-spool"
+        ],
+        "count": 256,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-256-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 861904,
+        "mean": 861904,
+        "mean_t95_interval": [
+          861904.0,
+          861904.0
+        ],
+        "minimum": 861904,
+        "n": 30,
+        "p50": 861904,
+        "p95": 861904,
+        "p99": 861904
+      },
+      "elapsed_ns": {
+        "maximum": 6339160,
+        "mean": 6241306.8,
+        "mean_t95_interval": [
+          6212767.602382138,
+          6269845.997617861
+        ],
+        "minimum": 6160789,
+        "n": 30,
+        "p50": 6185160,
+        "p95": 6335029,
+        "p99": 6339160
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 2755,
+        "mean": 2755,
+        "mean_t95_interval": [
+          2755.0,
+          2755.0
+        ],
+        "minimum": 2755,
+        "n": 30,
+        "p50": 2755,
+        "p95": 2755,
+        "p99": 2755
+      },
+      "process_max_rss_kib": 6844,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 7266304,
+          "mean": 7266304,
+          "mean_t95_interval": [
+            7266304.0,
+            7266304.0
+          ],
+          "minimum": 7266304,
+          "n": 30,
+          "p50": 7266304,
+          "p95": 7266304,
+          "p99": 7266304
+        },
+        "rchar": {
+          "maximum": 42829,
+          "mean": 42826.4,
+          "mean_t95_interval": [
+            42825.76759492103,
+            42827.03240507897
+          ],
+          "minimum": 42825,
+          "n": 30,
+          "p50": 42825,
+          "p95": 42829,
+          "p99": 42829
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 21,
+          "mean": 21,
+          "mean_t95_interval": [
+            21.0,
+            21.0
+          ],
+          "minimum": 21,
+          "n": 30,
+          "p50": 21,
+          "p95": 21,
+          "p99": 21
+        },
+        "syscw": {
+          "maximum": 549,
+          "mean": 549,
+          "mean_t95_interval": [
+            549.0,
+            549.0
+          ],
+          "minimum": 549,
+          "n": 30,
+          "p50": 549,
+          "p95": 549,
+          "p99": 549
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6,
+          "mean_t95_interval": [
+            0.4139627401057371,
+            0.7860372598942629
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 40842,
+          "mean": 40842,
+          "mean_t95_interval": [
+            40842.0,
+            40842.0
+          ],
+          "minimum": 40842,
+          "n": 30,
+          "p50": 40842,
+          "p95": 40842,
+          "p99": 40842
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 861904,
+        "mean": 861904,
+        "mean_t95_interval": [
+          861904.0,
+          861904.0
+        ],
+        "minimum": 861904,
+        "n": 30,
+        "p50": 861904,
+        "p95": 861904,
+        "p99": 861904
+      },
+      "scratch_bytes": {
+        "maximum": 40842,
+        "mean": 40842,
+        "mean_t95_interval": [
+          40842.0,
+          40842.0
+        ],
+        "minimum": 40842,
+        "n": 30,
+        "p50": 40842,
+        "p95": 40842,
+        "p99": 40842
+      }
+    },
+    "r1-allocator-8-control": {
+      "allocation_calls": {
+        "maximum": 850,
+        "mean": 850,
+        "mean_t95_interval": [
+          850.0,
+          850.0
+        ],
+        "minimum": 850,
+        "n": 30,
+        "p50": 850,
+        "p95": 850,
+        "p99": 850
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-8-control"
+        ],
+        "count": 8,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-8-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 499462,
+        "mean": 499462,
+        "mean_t95_interval": [
+          499462.0,
+          499462.0
+        ],
+        "minimum": 499462,
+        "n": 30,
+        "p50": 499462,
+        "p95": 499462,
+        "p99": 499462
+      },
+      "elapsed_ns": {
+        "maximum": 922953,
+        "mean": 910377.7,
+        "mean_t95_interval": [
+          908416.3228375607,
+          912339.0771624392
+        ],
+        "minimum": 902154,
+        "n": 30,
+        "p50": 909014,
+        "p95": 922903,
+        "p99": 922953
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 435701,
+        "mean": 435701,
+        "mean_t95_interval": [
+          435701.0,
+          435701.0
+        ],
+        "minimum": 435701,
+        "n": 30,
+        "p50": 435701,
+        "p95": 435701,
+        "p99": 435701
+      },
+      "normal_timing": false,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 378,
+        "mean": 378,
+        "mean_t95_interval": [
+          378.0,
+          378.0
+        ],
+        "minimum": 378,
+        "n": 30,
+        "p50": 378,
+        "p95": 378,
+        "p99": 378
+      },
+      "process_max_rss_kib": 4028,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4567040,
+          "mean": 4567040,
+          "mean_t95_interval": [
+            4567040.0,
+            4567040.0
+          ],
+          "minimum": 4567040,
+          "n": 30,
+          "p50": 4567040,
+          "p95": 4567040,
+          "p99": 4567040
+        },
+        "rchar": {
+          "maximum": 1972,
+          "mean": 1970.5333333333333,
+          "mean_t95_interval": [
+            1970.2435731537264,
+            1970.8230935129402
+          ],
+          "minimum": 1970,
+          "n": 30,
+          "p50": 1970,
+          "p95": 1972,
+          "p99": 1972
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 499462,
+        "mean": 499462,
+        "mean_t95_interval": [
+          499462.0,
+          499462.0
+        ],
+        "minimum": 499462,
+        "n": 30,
+        "p50": 499462,
+        "p95": 499462,
+        "p99": 499462
+      },
+      "scratch_bytes": null
+    },
+    "r1-allocator-8-spool": {
+      "allocation_calls": {
+        "maximum": 617,
+        "mean": 617,
+        "mean_t95_interval": [
+          617.0,
+          617.0
+        ],
+        "minimum": 617,
+        "n": 30,
+        "p50": 617,
+        "p95": 617,
+        "p99": 617
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-8-spool"
+        ],
+        "count": 8,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-8-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 475312,
+        "mean": 475312,
+        "mean_t95_interval": [
+          475312.0,
+          475312.0
+        ],
+        "minimum": 475312,
+        "n": 30,
+        "p50": 475312,
+        "p95": 475312,
+        "p99": 475312
+      },
+      "elapsed_ns": {
+        "maximum": 931943,
+        "mean": 922179.9666666667,
+        "mean_t95_interval": [
+          919821.949164674,
+          924537.9841686593
+        ],
+        "minimum": 910904,
+        "n": 30,
+        "p50": 920854,
+        "p95": 931643,
+        "p99": 931943
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 273,
+        "mean": 273,
+        "mean_t95_interval": [
+          273.0,
+          273.0
+        ],
+        "minimum": 273,
+        "n": 30,
+        "p50": 273,
+        "p95": 273,
+        "p99": 273
+      },
+      "process_max_rss_kib": 4036,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4648960,
+          "mean": 4648960,
+          "mean_t95_interval": [
+            4648960.0,
+            4648960.0
+          ],
+          "minimum": 4648960,
+          "n": 30,
+          "p50": 4648960,
+          "p95": 4648960,
+          "p99": 4648960
+        },
+        "rchar": {
+          "maximum": 6055,
+          "mean": 6052.733333333334,
+          "mean_t95_interval": [
+            6052.179255455216,
+            6053.287411211451
+          ],
+          "minimum": 6051,
+          "n": 30,
+          "p50": 6052,
+          "p95": 6055,
+          "p99": 6055
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 19,
+          "mean": 19,
+          "mean_t95_interval": [
+            19.0,
+            19.0
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "syscw": {
+          "maximum": 53,
+          "mean": 53,
+          "mean_t95_interval": [
+            53.0,
+            53.0
+          ],
+          "minimum": 53,
+          "n": 30,
+          "p50": 53,
+          "p95": 53,
+          "p99": 53
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 4074,
+          "mean": 4074,
+          "mean_t95_interval": [
+            4074.0,
+            4074.0
+          ],
+          "minimum": 4074,
+          "n": 30,
+          "p50": 4074,
+          "p95": 4074,
+          "p99": 4074
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 475312,
+        "mean": 475312,
+        "mean_t95_interval": [
+          475312.0,
+          475312.0
+        ],
+        "minimum": 475312,
+        "n": 30,
+        "p50": 475312,
+        "p95": 475312,
+        "p99": 475312
+      },
+      "scratch_bytes": {
+        "maximum": 4074,
+        "mean": 4074,
+        "mean_t95_interval": [
+          4074.0,
+          4074.0
+        ],
+        "minimum": 4074,
+        "n": 30,
+        "p50": 4074,
+        "p95": 4074,
+        "p99": 4074
+      }
+    },
+    "r1-allocator-8192-control": {
+      "allocation_calls": {
+        "maximum": 278153,
+        "mean": 278153,
+        "mean_t95_interval": [
+          278153.0,
+          278153.0
+        ],
+        "minimum": 278153,
+        "n": 30,
+        "p50": 278153,
+        "p95": 278153,
+        "p99": 278153
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8192-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8192-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-8192-control"
+        ],
+        "count": 8192,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-8192-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 31428173,
+        "mean": 31428173,
+        "mean_t95_interval": [
+          31428173.0,
+          31428173.0
+        ],
+        "minimum": 31428173,
+        "n": 30,
+        "p50": 31428173,
+        "p95": 31428173,
+        "p99": 31428173
+      },
+      "elapsed_ns": {
+        "maximum": 194463670,
+        "mean": 191642075.83333334,
+        "mean_t95_interval": [
+          191329289.80871767,
+          191954861.85794902
+        ],
+        "minimum": 189533410,
+        "n": 30,
+        "p50": 191612248,
+        "p95": 192711653,
+        "p99": 194463670
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 8875252,
+        "mean": 8875252,
+        "mean_t95_interval": [
+          8875252.0,
+          8875252.0
+        ],
+        "minimum": 8875252,
+        "n": 30,
+        "p50": 8875252,
+        "p95": 8875252,
+        "p99": 8875252
+      },
+      "normal_timing": false,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 114958,
+        "mean": 114958,
+        "mean_t95_interval": [
+          114958.0,
+          114958.0
+        ],
+        "minimum": 114958,
+        "n": 30,
+        "p50": 114958,
+        "p95": 114958,
+        "p99": 114958
+      },
+      "process_max_rss_kib": 99524,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 4,
+          "mean": 1.9666666666666666,
+          "mean_t95_interval": [
+            1.6066295131453823,
+            2.3267038201879506
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 4
+        },
+        "peak_rss_bytes": {
+          "maximum": 102252544,
+          "mean": 102252544,
+          "mean_t95_interval": [
+            102252544.0,
+            102252544.0
+          ],
+          "minimum": 102252544,
+          "n": 30,
+          "p50": 102252544,
+          "p95": 102252544,
+          "p99": 102252544
+        },
+        "rchar": {
+          "maximum": 1996,
+          "mean": 1995.2333333333333,
+          "mean_t95_interval": [
+            1995.0727183722968,
+            1995.39394829437
+          ],
+          "minimum": 1995,
+          "n": 30,
+          "p50": 1995,
+          "p95": 1996,
+          "p99": 1996
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 20,
+          "mean": 19.166666666666668,
+          "mean_t95_interval": [
+            19.025143328082585,
+            19.30819000525075
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 20,
+          "p99": 20
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 31428173,
+        "mean": 31428173,
+        "mean_t95_interval": [
+          31428173.0,
+          31428173.0
+        ],
+        "minimum": 31428173,
+        "n": 30,
+        "p50": 31428173,
+        "p95": 31428173,
+        "p99": 31428173
+      },
+      "scratch_bytes": null
+    },
+    "r1-allocator-8192-spool": {
+      "allocation_calls": {
+        "maximum": 179677,
+        "mean": 179677,
+        "mean_t95_interval": [
+          179677.0,
+          179677.0
+        ],
+        "minimum": 179677,
+        "n": 30,
+        "p50": 179677,
+        "p95": 179677,
+        "p99": 179677
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8192-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-allocator-8192-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-allocator-8192-spool"
+        ],
+        "count": 8192,
+        "instrumentation": "allocator",
+        "label": "r1-allocator-8192-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "deallocated_bytes": {
+        "maximum": 13379518,
+        "mean": 13379518,
+        "mean_t95_interval": [
+          13379518.0,
+          13379518.0
+        ],
+        "minimum": 13379518,
+        "n": 30,
+        "p50": 13379518,
+        "p95": 13379518,
+        "p99": 13379518
+      },
+      "elapsed_ns": {
+        "maximum": 185211319,
+        "mean": 184348355.6,
+        "mean_t95_interval": [
+          184180226.28682503,
+          184516484.91317496
+        ],
+        "minimum": 183442432,
+        "n": 30,
+        "p50": 184343196,
+        "p95": 185153229,
+        "p99": 185211319
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 82192,
+        "mean": 82192,
+        "mean_t95_interval": [
+          82192.0,
+          82192.0
+        ],
+        "minimum": 82192,
+        "n": 30,
+        "p50": 82192,
+        "p95": 82192,
+        "p99": 82192
+      },
+      "process_max_rss_kib": 102880,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 4,
+          "mean": 2.066666666666667,
+          "mean_t95_interval": [
+            1.6631886172036665,
+            2.470144716129667
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 4,
+          "p99": 4
+        },
+        "peak_rss_bytes": {
+          "maximum": 105615360,
+          "mean": 105615360,
+          "mean_t95_interval": [
+            105615360.0,
+            105615360.0
+          ],
+          "minimum": 105615360,
+          "n": 30,
+          "p50": 105615360,
+          "p95": 105615360,
+          "p99": 105615360
+        },
+        "rchar": {
+          "maximum": 1239692,
+          "mean": 1239690.8666666667,
+          "mean_t95_interval": [
+            1239690.240883813,
+            1239691.4924495204
+          ],
+          "minimum": 1239687,
+          "n": 30,
+          "p50": 1239691,
+          "p95": 1239692,
+          "p99": 1239692
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 94,
+          "mean": 94,
+          "mean_t95_interval": [
+            94.0,
+            94.0
+          ],
+          "minimum": 94,
+          "n": 30,
+          "p50": 94,
+          "p95": 94,
+          "p99": 94
+        },
+        "syscw": {
+          "maximum": 16421,
+          "mean": 16421,
+          "mean_t95_interval": [
+            16421.0,
+            16421.0
+          ],
+          "minimum": 16421,
+          "n": 30,
+          "p50": 16421,
+          "p95": 16421,
+          "p99": 16421
+        },
+        "system_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.3,
+          "mean_t95_interval": [
+            0.12597807807536193,
+            0.47402192192463805
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 18.033333333333335,
+          "mean_t95_interval": [
+            17.878819917754395,
+            18.187846748912275
+          ],
+          "minimum": 17,
+          "n": 30,
+          "p50": 18,
+          "p95": 19,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 1237692,
+          "mean": 1237692,
+          "mean_t95_interval": [
+            1237692.0,
+            1237692.0
+          ],
+          "minimum": 1237692,
+          "n": 30,
+          "p50": 1237692,
+          "p95": 1237692,
+          "p99": 1237692
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 13379518,
+        "mean": 13379518,
+        "mean_t95_interval": [
+          13379518.0,
+          13379518.0
+        ],
+        "minimum": 13379518,
+        "n": 30,
+        "p50": 13379518,
+        "p95": 13379518,
+        "p99": 13379518
+      },
+      "scratch_bytes": {
+        "maximum": 1237692,
+        "mean": 1237692,
+        "mean_t95_interval": [
+          1237692.0,
+          1237692.0
+        ],
+        "minimum": 1237692,
+        "n": 30,
+        "p50": 1237692,
+        "p95": 1237692,
+        "p99": 1237692
+      }
+    },
+    "r1-normal-256-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-256-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-256-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-256-control"
+        ],
+        "count": 256,
+        "instrumentation": "normal",
+        "label": "r1-normal-256-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 6455507,
+        "mean": 6344201.9,
+        "mean_t95_interval": [
+          6331459.145903431,
+          6356944.65409657
+        ],
+        "minimum": 6313526,
+        "n": 30,
+        "p50": 6339666,
+        "p95": 6455467,
+        "p99": 6455507
+      },
+      "normal_timing": true,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 3850,
+        "mean": 3850,
+        "mean_t95_interval": [
+          3850.0,
+          3850.0
+        ],
+        "minimum": 3850,
+        "n": 30,
+        "p50": 3850,
+        "p95": 3850,
+        "p99": 3850
+      },
+      "process_max_rss_kib": 6808,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.06666666666666667,
+          "mean_t95_interval": [
+            -0.028058869505292447,
+            0.16139220283862576
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 6971392,
+          "mean": 6971392,
+          "mean_t95_interval": [
+            6971392.0,
+            6971392.0
+          ],
+          "minimum": 6971392,
+          "n": 30,
+          "p50": 6971392,
+          "p95": 6971392,
+          "p99": 6971392
+        },
+        "rchar": {
+          "maximum": 1982,
+          "mean": 1980.8666666666666,
+          "mean_t95_interval": [
+            1980.6122393478968,
+            1981.1210939854363
+          ],
+          "minimum": 1980,
+          "n": 30,
+          "p50": 1981,
+          "p95": 1982,
+          "p99": 1982
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6333333333333333,
+          "mean_t95_interval": [
+            0.45033539299360603,
+            0.8163312736730606
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r1-normal-256-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-256-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-256-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-256-spool"
+        ],
+        "count": 256,
+        "instrumentation": "normal",
+        "label": "r1-normal-256-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 6345406,
+        "mean": 6320574.3,
+        "mean_t95_interval": [
+          6315454.784083452,
+          6325693.815916548
+        ],
+        "minimum": 6294507,
+        "n": 30,
+        "p50": 6321027,
+        "p95": 6341257,
+        "p99": 6345406
+      },
+      "normal_timing": true,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 2755,
+        "mean": 2755,
+        "mean_t95_interval": [
+          2755.0,
+          2755.0
+        ],
+        "minimum": 2755,
+        "n": 30,
+        "p50": 2755,
+        "p95": 2755,
+        "p99": 2755
+      },
+      "process_max_rss_kib": 6832,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 6995968,
+          "mean": 6995968,
+          "mean_t95_interval": [
+            6995968.0,
+            6995968.0
+          ],
+          "minimum": 6995968,
+          "n": 30,
+          "p50": 6995968,
+          "p95": 6995968,
+          "p99": 6995968
+        },
+        "rchar": {
+          "maximum": 42823,
+          "mean": 42820.4,
+          "mean_t95_interval": [
+            42819.76759492103,
+            42821.03240507897
+          ],
+          "minimum": 42819,
+          "n": 30,
+          "p50": 42819,
+          "p95": 42823,
+          "p99": 42823
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 21,
+          "mean": 21,
+          "mean_t95_interval": [
+            21.0,
+            21.0
+          ],
+          "minimum": 21,
+          "n": 30,
+          "p50": 21,
+          "p95": 21,
+          "p99": 21
+        },
+        "syscw": {
+          "maximum": 549,
+          "mean": 549,
+          "mean_t95_interval": [
+            549.0,
+            549.0
+          ],
+          "minimum": 549,
+          "n": 30,
+          "p50": 549,
+          "p95": 549,
+          "p99": 549
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6,
+          "mean_t95_interval": [
+            0.4139627401057371,
+            0.7860372598942629
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 40842,
+          "mean": 40842,
+          "mean_t95_interval": [
+            40842.0,
+            40842.0
+          ],
+          "minimum": 40842,
+          "n": 30,
+          "p50": 40842,
+          "p95": 40842,
+          "p99": 40842
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 40842,
+        "mean": 40842,
+        "mean_t95_interval": [
+          40842.0,
+          40842.0
+        ],
+        "minimum": 40842,
+        "n": 30,
+        "p50": 40842,
+        "p95": 40842,
+        "p99": 40842
+      }
+    },
+    "r1-normal-8-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-8-control"
+        ],
+        "count": 8,
+        "instrumentation": "normal",
+        "label": "r1-normal-8-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 919723,
+        "mean": 905319,
+        "mean_t95_interval": [
+          903275.554485238,
+          907362.445514762
+        ],
+        "minimum": 892353,
+        "n": 30,
+        "p50": 904344,
+        "p95": 915683,
+        "p99": 919723
+      },
+      "normal_timing": true,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 378,
+        "mean": 378,
+        "mean_t95_interval": [
+          378.0,
+          378.0
+        ],
+        "minimum": 378,
+        "n": 30,
+        "p50": 378,
+        "p95": 378,
+        "p99": 378
+      },
+      "process_max_rss_kib": 4044,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4648960,
+          "mean": 4648960,
+          "mean_t95_interval": [
+            4648960.0,
+            4648960.0
+          ],
+          "minimum": 4648960,
+          "n": 30,
+          "p50": 4648960,
+          "p95": 4648960,
+          "p99": 4648960
+        },
+        "rchar": {
+          "maximum": 1977,
+          "mean": 1975.5333333333333,
+          "mean_t95_interval": [
+            1975.2435731537264,
+            1975.8230935129402
+          ],
+          "minimum": 1975,
+          "n": 30,
+          "p50": 1975,
+          "p95": 1977,
+          "p99": 1977
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r1-normal-8-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-8-spool"
+        ],
+        "count": 8,
+        "instrumentation": "normal",
+        "label": "r1-normal-8-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 947064,
+        "mean": 933504.6,
+        "mean_t95_interval": [
+          931312.8707709751,
+          935696.3292290248
+        ],
+        "minimum": 921504,
+        "n": 30,
+        "p50": 933944,
+        "p95": 943084,
+        "p99": 947064
+      },
+      "normal_timing": true,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 273,
+        "mean": 273,
+        "mean_t95_interval": [
+          273.0,
+          273.0
+        ],
+        "minimum": 273,
+        "n": 30,
+        "p50": 273,
+        "p95": 273,
+        "p99": 273
+      },
+      "process_max_rss_kib": 4044,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4648960,
+          "mean": 4648960,
+          "mean_t95_interval": [
+            4648960.0,
+            4648960.0
+          ],
+          "minimum": 4648960,
+          "n": 30,
+          "p50": 4648960,
+          "p95": 4648960,
+          "p99": 4648960
+        },
+        "rchar": {
+          "maximum": 6055,
+          "mean": 6052.733333333334,
+          "mean_t95_interval": [
+            6052.179255455216,
+            6053.287411211451
+          ],
+          "minimum": 6051,
+          "n": 30,
+          "p50": 6052,
+          "p95": 6055,
+          "p99": 6055
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 19,
+          "mean": 19,
+          "mean_t95_interval": [
+            19.0,
+            19.0
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "syscw": {
+          "maximum": 53,
+          "mean": 53,
+          "mean_t95_interval": [
+            53.0,
+            53.0
+          ],
+          "minimum": 53,
+          "n": 30,
+          "p50": 53,
+          "p95": 53,
+          "p99": 53
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 4074,
+          "mean": 4074,
+          "mean_t95_interval": [
+            4074.0,
+            4074.0
+          ],
+          "minimum": 4074,
+          "n": 30,
+          "p50": 4074,
+          "p95": 4074,
+          "p99": 4074
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 4074,
+        "mean": 4074,
+        "mean_t95_interval": [
+          4074.0,
+          4074.0
+        ],
+        "minimum": 4074,
+        "n": 30,
+        "p50": 4074,
+        "p95": 4074,
+        "p99": 4074
+      }
+    },
+    "r1-normal-8192-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8192-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8192-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-8192-control"
+        ],
+        "count": 8192,
+        "instrumentation": "normal",
+        "label": "r1-normal-8192-control",
+        "policy": "control",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 189065036,
+        "mean": 185536250.63333333,
+        "mean_t95_interval": [
+          184724049.92591178,
+          186348451.34075487
+        ],
+        "minimum": 183411881,
+        "n": 30,
+        "p50": 184195604,
+        "p95": 188825695,
+        "p99": 189065036
+      },
+      "normal_timing": true,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 114958,
+        "mean": 114958,
+        "mean_t95_interval": [
+          114958.0,
+          114958.0
+        ],
+        "minimum": 114958,
+        "n": 30,
+        "p50": 114958,
+        "p95": 114958,
+        "p99": 114958
+      },
+      "process_max_rss_kib": 102860,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 3,
+          "mean": 1.9666666666666666,
+          "mean_t95_interval": [
+            1.649199817701974,
+            2.284133515631359
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        },
+        "peak_rss_bytes": {
+          "maximum": 105328640,
+          "mean": 105328640,
+          "mean_t95_interval": [
+            105328640.0,
+            105328640.0
+          ],
+          "minimum": 105328640,
+          "n": 30,
+          "p50": 105328640,
+          "p95": 105328640,
+          "p99": 105328640
+        },
+        "rchar": {
+          "maximum": 1993,
+          "mean": 1992.2333333333333,
+          "mean_t95_interval": [
+            1992.0727183722968,
+            1992.39394829437
+          ],
+          "minimum": 1992,
+          "n": 30,
+          "p50": 1992,
+          "p95": 1993,
+          "p99": 1993
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 18.533333333333335,
+          "mean_t95_interval": [
+            18.343882260989417,
+            18.722784405677253
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r1-normal-8192-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8192-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8192-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r1-normal-8192-spool"
+        ],
+        "count": 8192,
+        "instrumentation": "normal",
+        "label": "r1-normal-8192-spool",
+        "policy": "spool",
+        "repeat": 1
+      },
+      "elapsed_ns": {
+        "maximum": 183892064,
+        "mean": 182077139.7,
+        "mean_t95_interval": [
+          181769519.56706944,
+          182384759.83293054
+        ],
+        "minimum": 179796147,
+        "n": 30,
+        "p50": 182301259,
+        "p95": 182950661,
+        "p99": 183892064
+      },
+      "normal_timing": true,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 82192,
+        "mean": 82192,
+        "mean_t95_interval": [
+          82192.0,
+          82192.0
+        ],
+        "minimum": 82192,
+        "n": 30,
+        "p50": 82192,
+        "p95": 82192,
+        "p99": 82192
+      },
+      "process_max_rss_kib": 99536,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 5,
+          "mean": 1.9666666666666666,
+          "mean_t95_interval": [
+            1.620237884171626,
+            2.313095449161707
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 5
+        },
+        "peak_rss_bytes": {
+          "maximum": 101924864,
+          "mean": 101924864,
+          "mean_t95_interval": [
+            101924864.0,
+            101924864.0
+          ],
+          "minimum": 101924864,
+          "n": 30,
+          "p50": 101924864,
+          "p95": 101924864,
+          "p99": 101924864
+        },
+        "rchar": {
+          "maximum": 1239690,
+          "mean": 1239688.7,
+          "mean_t95_interval": [
+            1239688.1023759134,
+            1239689.2976240865
+          ],
+          "minimum": 1239685,
+          "n": 30,
+          "p50": 1239689,
+          "p95": 1239690,
+          "p99": 1239690
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 94,
+          "mean": 94,
+          "mean_t95_interval": [
+            94.0,
+            94.0
+          ],
+          "minimum": 94,
+          "n": 30,
+          "p50": 94,
+          "p95": 94,
+          "p99": 94
+        },
+        "syscw": {
+          "maximum": 16421,
+          "mean": 16421,
+          "mean_t95_interval": [
+            16421.0,
+            16421.0
+          ],
+          "minimum": 16421,
+          "n": 30,
+          "p50": 16421,
+          "p95": 16421,
+          "p99": 16421
+        },
+        "system_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.23333333333333334,
+          "mean_t95_interval": [
+            0.07271837229665948,
+            0.3939482943700072
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 17.966666666666665,
+          "mean_t95_interval": [
+            17.783668726326937,
+            18.149664607006393
+          ],
+          "minimum": 17,
+          "n": 30,
+          "p50": 18,
+          "p95": 19,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 1237692,
+          "mean": 1237692,
+          "mean_t95_interval": [
+            1237692.0,
+            1237692.0
+          ],
+          "minimum": 1237692,
+          "n": 30,
+          "p50": 1237692,
+          "p95": 1237692,
+          "p99": 1237692
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 1237692,
+        "mean": 1237692,
+        "mean_t95_interval": [
+          1237692.0,
+          1237692.0
+        ],
+        "minimum": 1237692,
+        "n": 30,
+        "p50": 1237692,
+        "p95": 1237692,
+        "p99": 1237692
+      }
+    },
+    "r2-allocator-256-control": {
+      "allocation_calls": {
+        "maximum": 9049,
+        "mean": 9049,
+        "mean_t95_interval": [
+          9049.0,
+          9049.0
+        ],
+        "minimum": 9049,
+        "n": 30,
+        "p50": 9049,
+        "p95": 9049,
+        "p99": 9049
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-256-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-256-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-256-control"
+        ],
+        "count": 256,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-256-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 1415242,
+        "mean": 1415242,
+        "mean_t95_interval": [
+          1415242.0,
+          1415242.0
+        ],
+        "minimum": 1415242,
+        "n": 30,
+        "p50": 1415242,
+        "p95": 1415242,
+        "p99": 1415242
+      },
+      "elapsed_ns": {
+        "maximum": 6604267,
+        "mean": 6508550.533333333,
+        "mean_t95_interval": [
+          6483289.482034321,
+          6533811.5846323455
+        ],
+        "minimum": 6423916,
+        "n": 30,
+        "p50": 6479937,
+        "p95": 6599477,
+        "p99": 6604267
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 681819,
+        "mean": 681819,
+        "mean_t95_interval": [
+          681819.0,
+          681819.0
+        ],
+        "minimum": 681819,
+        "n": 30,
+        "p50": 681819,
+        "p95": 681819,
+        "p99": 681819
+      },
+      "normal_timing": false,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 3850,
+        "mean": 3850,
+        "mean_t95_interval": [
+          3850.0,
+          3850.0
+        ],
+        "minimum": 3850,
+        "n": 30,
+        "p50": 3850,
+        "p95": 3850,
+        "p99": 3850
+      },
+      "process_max_rss_kib": 6800,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 6963200,
+          "mean": 6963200,
+          "mean_t95_interval": [
+            6963200.0,
+            6963200.0
+          ],
+          "minimum": 6963200,
+          "n": 30,
+          "p50": 6963200,
+          "p95": 6963200,
+          "p99": 6963200
+        },
+        "rchar": {
+          "maximum": 1981,
+          "mean": 1979.8666666666666,
+          "mean_t95_interval": [
+            1979.6122393478968,
+            1980.1210939854363
+          ],
+          "minimum": 1979,
+          "n": 30,
+          "p50": 1980,
+          "p95": 1981,
+          "p99": 1981
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6666666666666666,
+          "mean_t95_interval": [
+            0.48765222986791157,
+            0.8456811034654217
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 1415242,
+        "mean": 1415242,
+        "mean_t95_interval": [
+          1415242.0,
+          1415242.0
+        ],
+        "minimum": 1415242,
+        "n": 30,
+        "p50": 1415242,
+        "p95": 1415242,
+        "p99": 1415242
+      },
+      "scratch_bytes": null
+    },
+    "r2-allocator-256-spool": {
+      "allocation_calls": {
+        "maximum": 5825,
+        "mean": 5825,
+        "mean_t95_interval": [
+          5825.0,
+          5825.0
+        ],
+        "minimum": 5825,
+        "n": 30,
+        "p50": 5825,
+        "p95": 5825,
+        "p99": 5825
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-256-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-256-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-256-spool"
+        ],
+        "count": 256,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-256-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 861904,
+        "mean": 861904,
+        "mean_t95_interval": [
+          861904.0,
+          861904.0
+        ],
+        "minimum": 861904,
+        "n": 30,
+        "p50": 861904,
+        "p95": 861904,
+        "p99": 861904
+      },
+      "elapsed_ns": {
+        "maximum": 6369406,
+        "mean": 6326335.566666666,
+        "mean_t95_interval": [
+          6305943.575830962,
+          6346727.557502371
+        ],
+        "minimum": 6186695,
+        "n": 30,
+        "p50": 6347646,
+        "p95": 6365646,
+        "p99": 6369406
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 2755,
+        "mean": 2755,
+        "mean_t95_interval": [
+          2755.0,
+          2755.0
+        ],
+        "minimum": 2755,
+        "n": 30,
+        "p50": 2755,
+        "p95": 2755,
+        "p99": 2755
+      },
+      "process_max_rss_kib": 6600,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 7020544,
+          "mean": 7020544,
+          "mean_t95_interval": [
+            7020544.0,
+            7020544.0
+          ],
+          "minimum": 7020544,
+          "n": 30,
+          "p50": 7020544,
+          "p95": 7020544,
+          "p99": 7020544
+        },
+        "rchar": {
+          "maximum": 42829,
+          "mean": 42826.4,
+          "mean_t95_interval": [
+            42825.76759492103,
+            42827.03240507897
+          ],
+          "minimum": 42825,
+          "n": 30,
+          "p50": 42825,
+          "p95": 42829,
+          "p99": 42829
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 21,
+          "mean": 21,
+          "mean_t95_interval": [
+            21.0,
+            21.0
+          ],
+          "minimum": 21,
+          "n": 30,
+          "p50": 21,
+          "p95": 21,
+          "p99": 21
+        },
+        "syscw": {
+          "maximum": 549,
+          "mean": 549,
+          "mean_t95_interval": [
+            549.0,
+            549.0
+          ],
+          "minimum": 549,
+          "n": 30,
+          "p50": 549,
+          "p95": 549,
+          "p99": 549
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6333333333333333,
+          "mean_t95_interval": [
+            0.45033539299360603,
+            0.8163312736730606
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 40842,
+          "mean": 40842,
+          "mean_t95_interval": [
+            40842.0,
+            40842.0
+          ],
+          "minimum": 40842,
+          "n": 30,
+          "p50": 40842,
+          "p95": 40842,
+          "p99": 40842
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 861904,
+        "mean": 861904,
+        "mean_t95_interval": [
+          861904.0,
+          861904.0
+        ],
+        "minimum": 861904,
+        "n": 30,
+        "p50": 861904,
+        "p95": 861904,
+        "p99": 861904
+      },
+      "scratch_bytes": {
+        "maximum": 40842,
+        "mean": 40842,
+        "mean_t95_interval": [
+          40842.0,
+          40842.0
+        ],
+        "minimum": 40842,
+        "n": 30,
+        "p50": 40842,
+        "p95": 40842,
+        "p99": 40842
+      }
+    },
+    "r2-allocator-8-control": {
+      "allocation_calls": {
+        "maximum": 850,
+        "mean": 850,
+        "mean_t95_interval": [
+          850.0,
+          850.0
+        ],
+        "minimum": 850,
+        "n": 30,
+        "p50": 850,
+        "p95": 850,
+        "p99": 850
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-8-control"
+        ],
+        "count": 8,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-8-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 499462,
+        "mean": 499462,
+        "mean_t95_interval": [
+          499462.0,
+          499462.0
+        ],
+        "minimum": 499462,
+        "n": 30,
+        "p50": 499462,
+        "p95": 499462,
+        "p99": 499462
+      },
+      "elapsed_ns": {
+        "maximum": 919284,
+        "mean": 908655.7333333333,
+        "mean_t95_interval": [
+          906878.9920633418,
+          910432.4746033248
+        ],
+        "minimum": 899323,
+        "n": 30,
+        "p50": 907254,
+        "p95": 917364,
+        "p99": 919284
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 435701,
+        "mean": 435701,
+        "mean_t95_interval": [
+          435701.0,
+          435701.0
+        ],
+        "minimum": 435701,
+        "n": 30,
+        "p50": 435701,
+        "p95": 435701,
+        "p99": 435701
+      },
+      "normal_timing": false,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 378,
+        "mean": 378,
+        "mean_t95_interval": [
+          378.0,
+          378.0
+        ],
+        "minimum": 378,
+        "n": 30,
+        "p50": 378,
+        "p95": 378,
+        "p99": 378
+      },
+      "process_max_rss_kib": 4060,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4603904,
+          "mean": 4603904,
+          "mean_t95_interval": [
+            4603904.0,
+            4603904.0
+          ],
+          "minimum": 4603904,
+          "n": 30,
+          "p50": 4603904,
+          "p95": 4603904,
+          "p99": 4603904
+        },
+        "rchar": {
+          "maximum": 1977,
+          "mean": 1975.5333333333333,
+          "mean_t95_interval": [
+            1975.2435731537264,
+            1975.8230935129402
+          ],
+          "minimum": 1975,
+          "n": 30,
+          "p50": 1975,
+          "p95": 1977,
+          "p99": 1977
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 499462,
+        "mean": 499462,
+        "mean_t95_interval": [
+          499462.0,
+          499462.0
+        ],
+        "minimum": 499462,
+        "n": 30,
+        "p50": 499462,
+        "p95": 499462,
+        "p99": 499462
+      },
+      "scratch_bytes": null
+    },
+    "r2-allocator-8-spool": {
+      "allocation_calls": {
+        "maximum": 617,
+        "mean": 617,
+        "mean_t95_interval": [
+          617.0,
+          617.0
+        ],
+        "minimum": 617,
+        "n": 30,
+        "p50": 617,
+        "p95": 617,
+        "p99": 617
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-8-spool"
+        ],
+        "count": 8,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-8-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 475312,
+        "mean": 475312,
+        "mean_t95_interval": [
+          475312.0,
+          475312.0
+        ],
+        "minimum": 475312,
+        "n": 30,
+        "p50": 475312,
+        "p95": 475312,
+        "p99": 475312
+      },
+      "elapsed_ns": {
+        "maximum": 952184,
+        "mean": 934779.8666666667,
+        "mean_t95_interval": [
+          932497.3552946013,
+          937062.3780387321
+        ],
+        "minimum": 923444,
+        "n": 30,
+        "p50": 934744,
+        "p95": 949134,
+        "p99": 952184
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 273,
+        "mean": 273,
+        "mean_t95_interval": [
+          273.0,
+          273.0
+        ],
+        "minimum": 273,
+        "n": 30,
+        "p50": 273,
+        "p95": 273,
+        "p99": 273
+      },
+      "process_max_rss_kib": 4028,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 4567040,
+          "mean": 4567040,
+          "mean_t95_interval": [
+            4567040.0,
+            4567040.0
+          ],
+          "minimum": 4567040,
+          "n": 30,
+          "p50": 4567040,
+          "p95": 4567040,
+          "p99": 4567040
+        },
+        "rchar": {
+          "maximum": 6055,
+          "mean": 6052.733333333334,
+          "mean_t95_interval": [
+            6052.179255455216,
+            6053.287411211451
+          ],
+          "minimum": 6051,
+          "n": 30,
+          "p50": 6052,
+          "p95": 6055,
+          "p99": 6055
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 19,
+          "mean": 19,
+          "mean_t95_interval": [
+            19.0,
+            19.0
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "syscw": {
+          "maximum": 53,
+          "mean": 53,
+          "mean_t95_interval": [
+            53.0,
+            53.0
+          ],
+          "minimum": 53,
+          "n": 30,
+          "p50": 53,
+          "p95": 53,
+          "p99": 53
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 4074,
+          "mean": 4074,
+          "mean_t95_interval": [
+            4074.0,
+            4074.0
+          ],
+          "minimum": 4074,
+          "n": 30,
+          "p50": 4074,
+          "p95": 4074,
+          "p99": 4074
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 475312,
+        "mean": 475312,
+        "mean_t95_interval": [
+          475312.0,
+          475312.0
+        ],
+        "minimum": 475312,
+        "n": 30,
+        "p50": 475312,
+        "p95": 475312,
+        "p99": 475312
+      },
+      "scratch_bytes": {
+        "maximum": 4074,
+        "mean": 4074,
+        "mean_t95_interval": [
+          4074.0,
+          4074.0
+        ],
+        "minimum": 4074,
+        "n": 30,
+        "p50": 4074,
+        "p95": 4074,
+        "p99": 4074
+      }
+    },
+    "r2-allocator-8192-control": {
+      "allocation_calls": {
+        "maximum": 278153,
+        "mean": 278153,
+        "mean_t95_interval": [
+          278153.0,
+          278153.0
+        ],
+        "minimum": 278153,
+        "n": 30,
+        "p50": 278153,
+        "p95": 278153,
+        "p99": 278153
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8192-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8192-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-8192-control"
+        ],
+        "count": 8192,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-8192-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 31428173,
+        "mean": 31428173,
+        "mean_t95_interval": [
+          31428173.0,
+          31428173.0
+        ],
+        "minimum": 31428173,
+        "n": 30,
+        "p50": 31428173,
+        "p95": 31428173,
+        "p99": 31428173
+      },
+      "elapsed_ns": {
+        "maximum": 191583818,
+        "mean": 190378858,
+        "mean_t95_interval": [
+          190076928.25571656,
+          190680787.74428344
+        ],
+        "minimum": 187994003,
+        "n": 30,
+        "p50": 190426333,
+        "p95": 191486588,
+        "p99": 191583818
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 8875252,
+        "mean": 8875252,
+        "mean_t95_interval": [
+          8875252.0,
+          8875252.0
+        ],
+        "minimum": 8875252,
+        "n": 30,
+        "p50": 8875252,
+        "p95": 8875252,
+        "p99": 8875252
+      },
+      "normal_timing": false,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 114958,
+        "mean": 114958,
+        "mean_t95_interval": [
+          114958.0,
+          114958.0
+        ],
+        "minimum": 114958,
+        "n": 30,
+        "p50": 114958,
+        "p95": 114958,
+        "p99": 114958
+      },
+      "process_max_rss_kib": 101316,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 3,
+          "mean": 1.9,
+          "mean_t95_interval": [
+            1.600184218438116,
+            2.1998157815618837
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        },
+        "peak_rss_bytes": {
+          "maximum": 103956480,
+          "mean": 103956480,
+          "mean_t95_interval": [
+            103956480.0,
+            103956480.0
+          ],
+          "minimum": 103956480,
+          "n": 30,
+          "p50": 103956480,
+          "p95": 103956480,
+          "p99": 103956480
+        },
+        "rchar": {
+          "maximum": 1996,
+          "mean": 1995.2333333333333,
+          "mean_t95_interval": [
+            1995.0727183722968,
+            1995.39394829437
+          ],
+          "minimum": 1995,
+          "n": 30,
+          "p50": 1995,
+          "p95": 1996,
+          "p99": 1996
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 20,
+          "mean": 19.033333333333335,
+          "mean_t95_interval": [
+            18.96516666666667,
+            19.1015
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 20
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 31428173,
+        "mean": 31428173,
+        "mean_t95_interval": [
+          31428173.0,
+          31428173.0
+        ],
+        "minimum": 31428173,
+        "n": 30,
+        "p50": 31428173,
+        "p95": 31428173,
+        "p99": 31428173
+      },
+      "scratch_bytes": null
+    },
+    "r2-allocator-8192-spool": {
+      "allocation_calls": {
+        "maximum": 179677,
+        "mean": 179677,
+        "mean_t95_interval": [
+          179677.0,
+          179677.0
+        ],
+        "minimum": 179677,
+        "n": 30,
+        "p50": 179677,
+        "p95": 179677,
+        "p99": 179677
+      },
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8192-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-allocator-8192-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-allocator-8192-spool"
+        ],
+        "count": 8192,
+        "instrumentation": "allocator",
+        "label": "r2-allocator-8192-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "deallocated_bytes": {
+        "maximum": 13379518,
+        "mean": 13379518,
+        "mean_t95_interval": [
+          13379518.0,
+          13379518.0
+        ],
+        "minimum": 13379518,
+        "n": 30,
+        "p50": 13379518,
+        "p95": 13379518,
+        "p99": 13379518
+      },
+      "elapsed_ns": {
+        "maximum": 184841558,
+        "mean": 184411305.7,
+        "mean_t95_interval": [
+          184316388.16073632,
+          184506223.23926365
+        ],
+        "minimum": 183782154,
+        "n": 30,
+        "p50": 184453198,
+        "p95": 184774839,
+        "p99": 184841558
+      },
+      "incremental_peak_live_bytes": {
+        "maximum": 432436,
+        "mean": 432436,
+        "mean_t95_interval": [
+          432436.0,
+          432436.0
+        ],
+        "minimum": 432436,
+        "n": 30,
+        "p50": 432436,
+        "p95": 432436,
+        "p99": 432436
+      },
+      "normal_timing": false,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 82192,
+        "mean": 82192,
+        "mean_t95_interval": [
+          82192.0,
+          82192.0
+        ],
+        "minimum": 82192,
+        "n": 30,
+        "p50": 82192,
+        "p95": 82192,
+        "p99": 82192
+      },
+      "process_max_rss_kib": 99412,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 3,
+          "mean": 2.1,
+          "mean_t95_interval": [
+            1.8001842184381163,
+            2.399815781561884
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        },
+        "peak_rss_bytes": {
+          "maximum": 101797888,
+          "mean": 101797888,
+          "mean_t95_interval": [
+            101797888.0,
+            101797888.0
+          ],
+          "minimum": 101797888,
+          "n": 30,
+          "p50": 101797888,
+          "p95": 101797888,
+          "p99": 101797888
+        },
+        "rchar": {
+          "maximum": 1239691,
+          "mean": 1239689.8666666667,
+          "mean_t95_interval": [
+            1239689.240883813,
+            1239690.4924495204
+          ],
+          "minimum": 1239686,
+          "n": 30,
+          "p50": 1239690,
+          "p95": 1239691,
+          "p99": 1239691
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 94,
+          "mean": 94,
+          "mean_t95_interval": [
+            94.0,
+            94.0
+          ],
+          "minimum": 94,
+          "n": 30,
+          "p50": 94,
+          "p95": 94,
+          "p99": 94
+        },
+        "syscw": {
+          "maximum": 16421,
+          "mean": 16421,
+          "mean_t95_interval": [
+            16421.0,
+            16421.0
+          ],
+          "minimum": 16421,
+          "n": 30,
+          "p50": 16421,
+          "p95": 16421,
+          "p99": 16421
+        },
+        "system_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.3333333333333333,
+          "mean_t95_interval": [
+            0.15431889653457825,
+            0.5123477701320884
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 18.133333333333333,
+          "mean_t95_interval": [
+            17.943882260989415,
+            18.32278440567725
+          ],
+          "minimum": 17,
+          "n": 30,
+          "p50": 18,
+          "p95": 19,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 1237692,
+          "mean": 1237692,
+          "mean_t95_interval": [
+            1237692.0,
+            1237692.0
+          ],
+          "minimum": 1237692,
+          "n": 30,
+          "p50": 1237692,
+          "p95": 1237692,
+          "p99": 1237692
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "requested_bytes": {
+        "maximum": 13379518,
+        "mean": 13379518,
+        "mean_t95_interval": [
+          13379518.0,
+          13379518.0
+        ],
+        "minimum": 13379518,
+        "n": 30,
+        "p50": 13379518,
+        "p95": 13379518,
+        "p99": 13379518
+      },
+      "scratch_bytes": {
+        "maximum": 1237692,
+        "mean": 1237692,
+        "mean_t95_interval": [
+          1237692.0,
+          1237692.0
+        ],
+        "minimum": 1237692,
+        "n": 30,
+        "p50": 1237692,
+        "p95": 1237692,
+        "p99": 1237692
+      }
+    },
+    "r2-normal-256-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-256-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-256-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-256-control"
+        ],
+        "count": 256,
+        "instrumentation": "normal",
+        "label": "r2-normal-256-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 6523597,
+        "mean": 6471067.1,
+        "mean_t95_interval": [
+          6458093.858504252,
+          6484040.341495748
+        ],
+        "minimum": 6347446,
+        "n": 30,
+        "p50": 6480767,
+        "p95": 6492937,
+        "p99": 6523597
+      },
+      "normal_timing": true,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 3850,
+        "mean": 3850,
+        "mean_t95_interval": [
+          3850.0,
+          3850.0
+        ],
+        "minimum": 3850,
+        "n": 30,
+        "p50": 3850,
+        "p95": 3850,
+        "p99": 3850
+      },
+      "process_max_rss_kib": 6844,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.06666666666666667,
+          "mean_t95_interval": [
+            -0.028058869505292447,
+            0.16139220283862576
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 7008256,
+          "mean": 7008256,
+          "mean_t95_interval": [
+            7008256.0,
+            7008256.0
+          ],
+          "minimum": 7008256,
+          "n": 30,
+          "p50": 7008256,
+          "p95": 7008256,
+          "p99": 7008256
+        },
+        "rchar": {
+          "maximum": 1981,
+          "mean": 1979.8666666666666,
+          "mean_t95_interval": [
+            1979.6122393478968,
+            1980.1210939854363
+          ],
+          "minimum": 1979,
+          "n": 30,
+          "p50": 1980,
+          "p95": 1981,
+          "p99": 1981
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.6333333333333333,
+          "mean_t95_interval": [
+            0.45033539299360603,
+            0.8163312736730606
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r2-normal-256-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-256-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "256",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-256-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-256-spool"
+        ],
+        "count": 256,
+        "instrumentation": "normal",
+        "label": "r2-normal-256-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 6323947,
+        "mean": 6295404.733333333,
+        "mean_t95_interval": [
+          6290965.595980833,
+          6299843.8706858335
+        ],
+        "minimum": 6274737,
+        "n": 30,
+        "p50": 6293517,
+        "p95": 6316657,
+        "p99": 6323947
+      },
+      "normal_timing": true,
+      "output_bytes": 274398,
+      "output_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "output_write_calls": {
+        "maximum": 2755,
+        "mean": 2755,
+        "mean_t95_interval": [
+          2755.0,
+          2755.0
+        ],
+        "minimum": 2755,
+        "n": 30,
+        "p50": 2755,
+        "p95": 2755,
+        "p99": 2755
+      },
+      "process_max_rss_kib": 6596,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.1,
+          "mean_t95_interval": [
+            -0.013924089971621298,
+            0.21392408997162132
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 6754304,
+          "mean": 6754304,
+          "mean_t95_interval": [
+            6754304.0,
+            6754304.0
+          ],
+          "minimum": 6754304,
+          "n": 30,
+          "p50": 6754304,
+          "p95": 6754304,
+          "p99": 6754304
+        },
+        "rchar": {
+          "maximum": 42828,
+          "mean": 42825.4,
+          "mean_t95_interval": [
+            42824.76759492103,
+            42826.03240507897
+          ],
+          "minimum": 42824,
+          "n": 30,
+          "p50": 42824,
+          "p95": 42828,
+          "p99": 42828
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 21,
+          "mean": 21,
+          "mean_t95_interval": [
+            21.0,
+            21.0
+          ],
+          "minimum": 21,
+          "n": 30,
+          "p50": 21,
+          "p95": 21,
+          "p99": 21
+        },
+        "syscw": {
+          "maximum": 549,
+          "mean": 549,
+          "mean_t95_interval": [
+            549.0,
+            549.0
+          ],
+          "minimum": 549,
+          "n": 30,
+          "p50": 549,
+          "p95": 549,
+          "p99": 549
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.5666666666666667,
+          "mean_t95_interval": [
+            0.3784885162784643,
+            0.7548448170548689
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 40842,
+          "mean": 40842,
+          "mean_t95_interval": [
+            40842.0,
+            40842.0
+          ],
+          "minimum": 40842,
+          "n": 30,
+          "p50": 40842,
+          "p95": 40842,
+          "p99": 40842
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 40842,
+        "mean": 40842,
+        "mean_t95_interval": [
+          40842.0,
+          40842.0
+        ],
+        "minimum": 40842,
+        "n": 30,
+        "p50": 40842,
+        "p95": 40842,
+        "p99": 40842
+      }
+    },
+    "r2-normal-8-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-8-control"
+        ],
+        "count": 8,
+        "instrumentation": "normal",
+        "label": "r2-normal-8-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 917114,
+        "mean": 901271.4333333333,
+        "mean_t95_interval": [
+          898707.7567625629,
+          903835.1099041038
+        ],
+        "minimum": 888303,
+        "n": 30,
+        "p50": 900583,
+        "p95": 915664,
+        "p99": 917114
+      },
+      "normal_timing": true,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 378,
+        "mean": 378,
+        "mean_t95_interval": [
+          378.0,
+          378.0
+        ],
+        "minimum": 378,
+        "n": 30,
+        "p50": 378,
+        "p95": 378,
+        "p99": 378
+      },
+      "process_max_rss_kib": 4064,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "peak_rss_bytes": {
+          "maximum": 4603904,
+          "mean": 4603904,
+          "mean_t95_interval": [
+            4603904.0,
+            4603904.0
+          ],
+          "minimum": 4603904,
+          "n": 30,
+          "p50": 4603904,
+          "p95": 4603904,
+          "p99": 4603904
+        },
+        "rchar": {
+          "maximum": 1972,
+          "mean": 1970.5333333333333,
+          "mean_t95_interval": [
+            1970.2435731537264,
+            1970.8230935129402
+          ],
+          "minimum": 1970,
+          "n": 30,
+          "p50": 1970,
+          "p95": 1972,
+          "p99": 1972
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.06666666666666667,
+          "mean_t95_interval": [
+            -0.028058869505292447,
+            0.16139220283862576
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r2-normal-8-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-8-spool"
+        ],
+        "count": 8,
+        "instrumentation": "normal",
+        "label": "r2-normal-8-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 961084,
+        "mean": 931108.5666666667,
+        "mean_t95_interval": [
+          928182.0881745185,
+          934035.0451588148
+        ],
+        "minimum": 916843,
+        "n": 30,
+        "p50": 929294,
+        "p95": 945394,
+        "p99": 961084
+      },
+      "normal_timing": true,
+      "output_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "output_write_calls": {
+        "maximum": 273,
+        "mean": 273,
+        "mean_t95_interval": [
+          273.0,
+          273.0
+        ],
+        "minimum": 273,
+        "n": 30,
+        "p50": 273,
+        "p95": 273,
+        "p99": 273
+      },
+      "process_max_rss_kib": 4052,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 1,
+          "mean": 0.03333333333333333,
+          "mean_t95_interval": [
+            -0.034833333333333334,
+            0.1015
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 1
+        },
+        "peak_rss_bytes": {
+          "maximum": 4661248,
+          "mean": 4661248,
+          "mean_t95_interval": [
+            4661248.0,
+            4661248.0
+          ],
+          "minimum": 4661248,
+          "n": 30,
+          "p50": 4661248,
+          "p95": 4661248,
+          "p99": 4661248
+        },
+        "rchar": {
+          "maximum": 6055,
+          "mean": 6052.733333333334,
+          "mean_t95_interval": [
+            6052.179255455216,
+            6053.287411211451
+          ],
+          "minimum": 6051,
+          "n": 30,
+          "p50": 6052,
+          "p95": 6055,
+          "p99": 6055
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 19,
+          "mean": 19,
+          "mean_t95_interval": [
+            19.0,
+            19.0
+          ],
+          "minimum": 19,
+          "n": 30,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "syscw": {
+          "maximum": 53,
+          "mean": 53,
+          "mean_t95_interval": [
+            53.0,
+            53.0
+          ],
+          "minimum": 53,
+          "n": 30,
+          "p50": 53,
+          "p95": 53,
+          "p99": 53
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.06666666666666667,
+          "mean_t95_interval": [
+            -0.028058869505292447,
+            0.16139220283862576
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 4074,
+          "mean": 4074,
+          "mean_t95_interval": [
+            4074.0,
+            4074.0
+          ],
+          "minimum": 4074,
+          "n": 30,
+          "p50": 4074,
+          "p95": 4074,
+          "p99": 4074
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 4074,
+        "mean": 4074,
+        "mean_t95_interval": [
+          4074.0,
+          4074.0
+        ],
+        "minimum": 4074,
+        "n": 30,
+        "p50": 4074,
+        "p95": 4074,
+        "p99": 4074
+      }
+    },
+    "r2-normal-8192-control": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8192-control.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "control",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8192-control.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-8192-control"
+        ],
+        "count": 8192,
+        "instrumentation": "normal",
+        "label": "r2-normal-8192-control",
+        "policy": "control",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 190741678,
+        "mean": 185602817.2,
+        "mean_t95_interval": [
+          184999342.9442051,
+          186206291.45579487
+        ],
+        "minimum": 184016750,
+        "n": 30,
+        "p50": 185164615,
+        "p95": 189965465,
+        "p99": 190741678
+      },
+      "normal_timing": true,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 114958,
+        "mean": 114958,
+        "mean_t95_interval": [
+          114958.0,
+          114958.0
+        ],
+        "minimum": 114958,
+        "n": 30,
+        "p50": 114958,
+        "p95": 114958,
+        "p99": 114958
+      },
+      "process_max_rss_kib": 101472,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 3,
+          "mean": 1.9333333333333333,
+          "mean_t95_interval": [
+            1.6402740700421583,
+            2.2263925966245086
+          ],
+          "minimum": 1,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        },
+        "peak_rss_bytes": {
+          "maximum": 103907328,
+          "mean": 103907328,
+          "mean_t95_interval": [
+            103907328.0,
+            103907328.0
+          ],
+          "minimum": 103907328,
+          "n": 30,
+          "p50": 103907328,
+          "p95": 103907328,
+          "p99": 103907328
+        },
+        "rchar": {
+          "maximum": 1993,
+          "mean": 1992.2333333333333,
+          "mean_t95_interval": [
+            1992.0727183722968,
+            1992.39394829437
+          ],
+          "minimum": 1992,
+          "n": 30,
+          "p50": 1992,
+          "p95": 1993,
+          "p99": 1993
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 18,
+          "mean": 18,
+          "mean_t95_interval": [
+            18.0,
+            18.0
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 18
+        },
+        "syscw": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "system_cpu_ticks": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 18.5,
+          "mean_t95_interval": [
+            18.310126516713964,
+            18.689873483286036
+          ],
+          "minimum": 18,
+          "n": 30,
+          "p50": 18,
+          "p95": 19,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": null
+    },
+    "r2-normal-8192-spool": {
+      "capture": {
+        "argv": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8192-spool.resource",
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+          "--mode",
+          "spool",
+          "--counts",
+          "8192",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--repeats",
+          "1",
+          "--max-spool-bytes",
+          "67108864",
+          "--spool-buffer-bytes",
+          "16384",
+          "--json",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r2-normal-8192-spool.report.json",
+          "--spool-dir",
+          "/tmp/litchi-goal-0478/spools/r2-normal-8192-spool"
+        ],
+        "count": 8192,
+        "instrumentation": "normal",
+        "label": "r2-normal-8192-spool",
+        "policy": "spool",
+        "repeat": 2
+      },
+      "elapsed_ns": {
+        "maximum": 183125533,
+        "mean": 181198961.1,
+        "mean_t95_interval": [
+          180408553.35455433,
+          181989368.84544566
+        ],
+        "minimum": 177742291,
+        "n": 30,
+        "p50": 182400040,
+        "p95": 182932063,
+        "p99": 183125533
+      },
+      "normal_timing": true,
+      "output_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "output_write_calls": {
+        "maximum": 82192,
+        "mean": 82192,
+        "mean_t95_interval": [
+          82192.0,
+          82192.0
+        ],
+        "minimum": 82192,
+        "n": 30,
+        "p50": 82192,
+        "p95": 82192,
+        "p99": 82192
+      },
+      "process_max_rss_kib": 99416,
+      "process_observer_deltas": {
+        "cancelled_write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "major_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "minor_faults": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "nonvoluntary_context_switches": {
+          "maximum": 3,
+          "mean": 1.9,
+          "mean_t95_interval": [
+            1.6529211641005541,
+            2.1470788358994457
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        },
+        "peak_rss_bytes": {
+          "maximum": 101801984,
+          "mean": 101801984,
+          "mean_t95_interval": [
+            101801984.0,
+            101801984.0
+          ],
+          "minimum": 101801984,
+          "n": 30,
+          "p50": 101801984,
+          "p95": 101801984,
+          "p99": 101801984
+        },
+        "rchar": {
+          "maximum": 1239684,
+          "mean": 1239682.9,
+          "mean_t95_interval": [
+            1239682.2694980402,
+            1239683.5305019596
+          ],
+          "minimum": 1239679,
+          "n": 30,
+          "p50": 1239684,
+          "p95": 1239684,
+          "p99": 1239684
+        },
+        "read_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "rss_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "syscr": {
+          "maximum": 94,
+          "mean": 94,
+          "mean_t95_interval": [
+            94.0,
+            94.0
+          ],
+          "minimum": 94,
+          "n": 30,
+          "p50": 94,
+          "p95": 94,
+          "p99": 94
+        },
+        "syscw": {
+          "maximum": 16421,
+          "mean": 16421,
+          "mean_t95_interval": [
+            16421.0,
+            16421.0
+          ],
+          "minimum": 16421,
+          "n": 30,
+          "p50": 16421,
+          "p95": 16421,
+          "p99": 16421
+        },
+        "system_cpu_ticks": {
+          "maximum": 1,
+          "mean": 0.36666666666666664,
+          "mean_t95_interval": [
+            0.1836687263269394,
+            0.5496646070063939
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1
+        },
+        "user_cpu_ticks": {
+          "maximum": 19,
+          "mean": 17.766666666666666,
+          "mean_t95_interval": [
+            17.578488516278462,
+            17.95484481705487
+          ],
+          "minimum": 17,
+          "n": 30,
+          "p50": 18,
+          "p95": 18,
+          "p99": 19
+        },
+        "voluntary_context_switches": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "wchar": {
+          "maximum": 1237692,
+          "mean": 1237692,
+          "mean_t95_interval": [
+            1237692.0,
+            1237692.0
+          ],
+          "minimum": 1237692,
+          "n": 30,
+          "p50": 1237692,
+          "p95": 1237692,
+          "p99": 1237692
+        },
+        "write_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "mean_t95_interval": [
+            0.0,
+            0.0
+          ],
+          "minimum": 0,
+          "n": 30,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "scratch_bytes": {
+        "maximum": 1237692,
+        "mean": 1237692,
+        "mean_t95_interval": [
+          1237692.0,
+          1237692.0
+        ],
+        "minimum": 1237692,
+        "n": 30,
+        "p50": 1237692,
+        "p95": 1237692,
+        "p99": 1237692
+      }
+    }
+  },
+  "samples": 720,
+  "schema": "pptx-metadata-spool-summary-v1",
+  "uncertainty": "nearest-rank percentiles; mean interval uses t(29)=2.045; independent process repeats retained, no registered latency claim"
+}

@@ -1,0 +1,34 @@
+{
+  "cleanup_sha256": "3fac901c5620500bd2bdf669b1168133d1edfb9a4c2f157c59ffd28498c41d47",
+  "completed_utc": "2026-09-08T16:06:28.670808+00:00",
+  "destination": {
+    "bytes": 414504696,
+    "path": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+    "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+  },
+  "driver_sha256": "66f3b7b5e52ea3cd76e9aa07b07eba3dd8ded1dfb09f9d1dc760ed01f5916948",
+  "embedded_inputs": {
+    "bytes": 4980,
+    "path": "embedded-inputs.json",
+    "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+  },
+  "failure_sha256": "0820f9ba737e5e8d0d8c837eead4c4aa10a69455dba13aab7f41819da0ebc7cb",
+  "origin": {
+    "bytes": 414504696,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/pptx_metadata_spool",
+    "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+  },
+  "schema": "pptx-metadata-spool-build-copy-recovery-v1",
+  "source_after": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_before": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_unchanged": true,
+  "status": "pass"
+}

@@ -1,0 +1,63 @@
+   Compiling syn v2.0.114
+    Checking zeroize v1.9.0
+    Checking bitflags v2.13.1
+    Checking smallvec v1.16.0
+    Checking generic-array v0.14.9
+    Checking rustix v1.1.4
+    Checking block-buffer v0.12.1
+    Checking digest v0.11.3
+    Checking sha2 v0.11.0
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking stable_deref_trait v1.2.1
+    Checking litemap v0.7.3
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking writeable v0.5.5
+    Checking icu_locid_transform_data v1.5.1
+    Checking icu_properties_data v1.5.1
+    Checking icu_normalizer_data v1.5.1
+    Checking utf8_iter v1.0.4
+    Checking write16 v1.0.0
+    Checking tempfile v3.27.0
+    Checking utf16_iter v1.0.5
+    Checking tinyvec_macros v0.1.1
+    Checking tinyvec v1.12.0
+    Checking percent-encoding v2.3.2
+    Checking form_urlencoded v1.2.2
+    Checking ryu v1.0.22
+    Checking unicode-normalization v0.1.25
+    Checking caseless v0.2.2
+    Checking der v0.7.10
+error: manual case-insensitive ASCII comparison
+   --> crates/soapberry-zip/src/generated_names.rs:777:12
+    |
+777 |         if first_folded[index].to_ascii_lowercase() != second_folded[index].to_ascii_lowercase() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_ignore_case_cmp
+    = note: `-D clippy::manual-ignore-case-cmp` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_ignore_case_cmp)]`
+help: consider using `.eq_ignore_ascii_case()` instead
+    |
+777 -         if first_folded[index].to_ascii_lowercase() != second_folded[index].to_ascii_lowercase() {
+777 +         if !first_folded[index].eq_ignore_ascii_case(&second_folded[index]) {
+    |
+
+error: manual case-insensitive ASCII comparison
+   --> crates/soapberry-zip/src/generated_names.rs:801:34
+    |
+801 |             .all(|(left, right)| left.to_ascii_lowercase() == right.to_ascii_lowercase())
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_ignore_case_cmp
+help: consider using `.eq_ignore_ascii_case()` instead
+    |
+801 -             .all(|(left, right)| left.to_ascii_lowercase() == right.to_ascii_lowercase())
+801 +             .all(|(left, right)| left.eq_ignore_ascii_case(right))
+    |
+
+    Checking crypto-bigint v0.5.5
+error: could not compile `soapberry-zip` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

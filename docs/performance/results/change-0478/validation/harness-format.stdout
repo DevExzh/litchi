@@ -1,0 +1,16 @@
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:23:
+ mod operation_metrics;
+ mod parallel_metrics;
+ pub mod pptx_cache_retention;
+[32m+pub mod pptx_metadata_spool;
+[m pub mod pptx_native_image;
+ pub mod pptx_pair_lifecycle;
+ pub mod pptx_provider_lifecycle;
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:29:
+ pub mod pptx_range_source;
+ pub mod pptx_retention;
+ mod pptx_slide_boundaries;
+[31m-pub mod pptx_metadata_spool;
+[m mod pptx_streaming_create;
+ mod process_metrics;
+ #[cfg(test)]

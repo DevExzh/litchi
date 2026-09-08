@@ -1,5 +1,25 @@
 # Performance CRUD coverage
 
+## 2026-09-08: public PPTX generated-name scratch route (0478)
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) adds explicit metadata
+scratch to fresh plain-text PPTX streaming creation. The paired diagnostic uses
+8/256/8,192 slides, exact `37 + 2N` member topology, and byte-exact,
+physical-member, slide-text/geometry and relationship oracles. The allocator
+region covers complete public writer construction through finalization, with
+the materialized oracle and output retention outside that region.
+This advances creation from scratch. Logical append, semantic Part addition,
+and arbitrary edits followed by repackaging remain separate scenarios; this
+route does not supply their missing coverage. Provider storage, native-producer
+breadth, source variants and bounded-worker scaling remain separately scoped.
+
+The final 24-process, 720-sample matrix passes byte and reopen verification.
+All 180 spool allocator samples have a 432,436-byte operation peak, versus
+8,875,252 bytes for the 8,192-slide control. Scratch extents are 4,074, 40,842
+and 1,237,692 bytes at 8, 256 and 8,192 slides. Small-deck normal mean latency
+increases 3.11% and 3.31% in the two repeats; no registered 5% review threshold
+is crossed. This is an operation-heap result with separate caller storage.
+
 ## 2026-09-08: explicit central-directory scratch (0477)
 
 [0477](changes/0477-zip-central-directory-spool.md) adds an opt-in low-level ZIP

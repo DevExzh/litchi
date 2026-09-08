@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0478/build.py"
+  ],
+  "exit_code": 1,
+  "phase": "embedded input setup before any Cargo build gate",
+  "error": "NameError: name 'Path' is not defined",
+  "driver_path": "build-driver-initial.py",
+  "driver_sha256": "581eb08c4ecf8e3419d4b8a48c42f3abb1c975085a3873196a453edfb48378f0",
+  "recorded_utc": "2026-09-08T14:49:10.162439+00:00"
+}

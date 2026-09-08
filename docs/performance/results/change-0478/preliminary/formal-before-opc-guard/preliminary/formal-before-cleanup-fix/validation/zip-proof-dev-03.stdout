@@ -1,0 +1,44 @@
+
+running 8 tests
+test generated_plan_cannot_raise_streaming_entry_or_name_limits ... ok
+test missing_members_refuse_finalization_with_exact_progress ... ok
+test an_empty_plan_can_finalize_an_empty_archive ... ok
+test a_completed_plan_rejects_extra_members_but_can_finish ... ok
+test owned_route_refuses_skipped_or_repeated_members_before_header_output ... ok
+test ordinary_name_validation_still_rejects_duplicates ... ok
+test every_borrowed_route_refuses_wrong_names_without_consuming_the_plan ... ok
+test mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test empty_plans_and_rejected_insertions_are_atomic ... ok
+test huge_symbolic_ranges_use_bounded_representation ... ok
+test exact_folded_and_whole_component_conflicts_are_rejected ... ok
+test internal_digits_are_supported_but_ambiguous_numeric_slots_are_not ... FAILED
+test common_pptx_families_and_decimal_range_transitions_succeed ... FAILED
+test exhaustive_small_literal_and_family_pairs_have_no_false_acceptance ... ok
+
+failures:
+
+---- internal_digits_are_supported_but_ambiguous_numeric_slots_are_not stdout ----
+
+thread 'internal_digits_are_supported_but_ambiguous_numeric_slots_are_not' (2062537) panicked at crates/soapberry-zip/tests/generated_name_proof.rs:343:5:
+assertion failed: ambiguous_slots.push_indexed(1, 1, &[("a2-", ".x"), ("a-", "-2.x")]).is_err()
+
+---- common_pptx_families_and_decimal_range_transitions_succeed stdout ----
+
+thread 'common_pptx_families_and_decimal_range_transitions_succeed' (2062532) panicked at crates/soapberry-zip/tests/generated_name_proof.rs:317:5:
+assertion `left == right` failed
+  left: 558
+ right: 536
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    common_pptx_families_and_decimal_range_transitions_succeed
+    internal_digits_are_supported_but_ambiguous_numeric_slots_are_not
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

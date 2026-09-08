@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0478: checked generated names and public PPTX scratch
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) keeps the finite-name
+proof in ZIP, absolute Part-name validation in OPC, and the exact PPTX
+serialization plan in its format owner. Public PPTX APIs expose an explicit
+scratch provider and limits. The generated route retains bounded descriptors
+and cursor state; arbitrary-name constructors retain their established checks.
+The [matrix](results/change-0478/adr-matrix.md) covers ownership, preservation,
+preflight refusals, resource limits and partial-output failures. Final validation
+and measured source custody are recorded in the linked evidence bundle.
+
 ## 0477: explicit ZIP metadata scratch
 
 The [0477 change](changes/0477-zip-central-directory-spool.md) keeps scratch

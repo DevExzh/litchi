@@ -1,0 +1,113 @@
+   Compiling synstructure v0.13.2
+   Compiling thiserror-impl v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling zerovec-derive v0.10.4
+   Compiling displaydoc v0.2.6
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling icu_provider_macros v1.5.0
+    Checking thiserror v2.0.18
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking zerofrom v0.1.4
+    Checking spki v0.7.3
+    Checking yoke v0.7.4
+    Checking pkcs8 v0.10.2
+    Checking zerovec v0.10.4
+    Checking sec1 v0.7.3
+    Checking stable_deref_trait v1.2.1
+    Checking sha2 v0.10.9
+    Checking elliptic-curve v0.13.8
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking icu_collections v1.5.0
+    Checking bitflags v2.13.1
+    Checking hmac v0.12.1
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking rustix v1.1.4
+    Checking rfc6979 v0.4.0
+    Checking icu_provider v1.5.0
+    Checking icu_locid_transform v1.5.0
+    Checking signature v2.2.0
+    Checking smallvec v1.16.0
+    Checking icu_properties v1.5.1
+    Checking tempfile v3.27.0
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+   Compiling futures-macro v0.3.31
+    Checking p256 v0.13.2
+    Checking block-buffer v0.12.1
+    Checking icu_normalizer v1.5.0
+    Checking writeable v0.5.5
+    Checking litemap v0.7.3
+   Compiling rstest_macros v0.26.1
+    Checking digest v0.11.3
+    Checking idna_adapter v1.2.0
+    Checking sha2 v0.11.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking icu_locid_transform_data v1.5.1
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking icu_properties_data v1.5.1
+   Compiling quickcheck_macros v1.1.0
+    Checking icu_normalizer_data v1.5.1
+    Checking utf8_iter v1.0.4
+    Checking write16 v1.0.0
+    Checking utf16_iter v1.0.5
+    Checking der v0.7.10
+    Checking tinyvec_macros v0.1.1
+    Checking futures-util v0.3.31
+    Checking tinyvec v1.12.0
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking percent-encoding v2.3.2
+    Checking form_urlencoded v1.2.2
+    Checking unicode-normalization v0.1.25
+    Checking caseless v0.2.2
+    Checking crypto-bigint v0.5.5
+    Checking ryu v1.0.22
+    Checking rstest v0.26.1
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: this can be `std::io::Error::other(_)`
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:459:24
+    |
+459 |             return Err(io::Error::new(io::ErrorKind::Other, "replay read fault"));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+    = note: `-D clippy::io-other-error` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+    |
+459 -             return Err(io::Error::new(io::ErrorKind::Other, "replay read fault"));
+459 +             return Err(io::Error::other("replay read fault"));
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:488:24
+    |
+488 |             return Err(io::Error::new(io::ErrorKind::Other, "append write fault"));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+    |
+488 -             return Err(io::Error::new(io::ErrorKind::Other, "append write fault"));
+488 +             return Err(io::Error::other("append write fault"));
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:520:24
+    |
+520 |             return Err(io::Error::new(io::ErrorKind::Other, "initial seek fault"));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+    |
+520 -             return Err(io::Error::new(io::ErrorKind::Other, "initial seek fault"));
+520 +             return Err(io::Error::other("initial seek fault"));
+    |
+
+error: could not compile `litchi-pptx` (test "streaming_metadata_spool") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,1121 @@
+{
+  "attempts": {
+    "analyze": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0478/analyze.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/analyze.json",
+      "sha256": "848b891cf67b1cb600c4863b32cede8aa442c5ce4d92fb8cc25a394db8e21dce",
+      "source_unchanged": true
+    },
+    "boundaries": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/boundaries.json",
+      "sha256": "10992994c5bc6f784898c34f5a1a24354bd3d33927f28d5ef713b3ff0a9696ad",
+      "source_unchanged": true
+    },
+    "build-allocator": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-allocator.json",
+      "sha256": "332871bac2c43a462bec703bef71d6cbde1ae1d1d37541a96c32242bddde80a2",
+      "source_unchanged": true
+    },
+    "build-allocator-cleanup": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-allocator-cleanup.json",
+      "sha256": "dd2316ca3170ad724e8fe4e91a6042afca262d7528113a048d46d0997d91701b",
+      "source_unchanged": true
+    },
+    "build-allocator-opc-guard": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-allocator-opc-guard.json",
+      "sha256": "381fecf1c0bb24a304a2193f0a2d0b8daa1e85406d419b0dc1a42fa70fa4ec41",
+      "source_unchanged": true
+    },
+    "build-normal": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": -15,
+      "path": "validation/build-normal.json",
+      "sha256": "4bc8f6a7bfef4001bb2c62f0fab4bb8e6ec9a5498dc1678eabb825ac5cd04466",
+      "source_unchanged": true
+    },
+    "build-normal-cleanup": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-normal-cleanup.json",
+      "sha256": "12de6f675c5e2949ecc731e1b359a2b981aa3b20f6d0f1a9271e33a47e3a4eb2",
+      "source_unchanged": true
+    },
+    "build-normal-final": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": -15,
+      "path": "validation/build-normal-final.json",
+      "sha256": "e1478af60433d682dda1999f07e9e609c96f6bc4f92b7fcdb1d56186c2bc2a3b",
+      "source_unchanged": true
+    },
+    "build-normal-opc-guard": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-normal-opc-guard.json",
+      "sha256": "4361710509687b816062da58b958b5b9dd5919e10dbfd3a1dd36c43f2b8bcd01",
+      "source_unchanged": true
+    },
+    "build-normal-verified": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-normal-verified.json",
+      "sha256": "e46e6275b112a5396226ca271c0ab5e30f5af039bf6d95f3d275fca1922d5451",
+      "source_unchanged": true
+    },
+    "docx-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "streaming"
+      ],
+      "exit_code": 0,
+      "path": "validation/docx-streaming.json",
+      "sha256": "cf0b2cac4dc2ca081cb5d1a55ac5f0b8e1c4071247eee6203233ed4d7b250e27",
+      "source_unchanged": true
+    },
+    "evidence-tests": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0478",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests.json",
+      "sha256": "d187a39b54a308e6c31082fe5dd3977cd0647e50ca4f036fe4495723c9983c82",
+      "source_unchanged": true
+    },
+    "harness-cleanup-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-cleanup-dev-01.json",
+      "sha256": "5e078be7dec26d4f32768491782112188b2ce5456661e33c50cca50077fd7883",
+      "source_unchanged": false
+    },
+    "harness-cleanup-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "zip_directory_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-cleanup-dev-02.json",
+      "sha256": "282752a8bc0db351898c1dbe1aaa46bf699c7dbef1ae400ebbc7b230984c1c46",
+      "source_unchanged": true
+    },
+    "harness-clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy.json",
+      "sha256": "982e6d121f41547c7f3488658837413e56cd7a489a85267968377babcbf9843b",
+      "source_unchanged": true
+    },
+    "harness-clippy-cleanup": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy-cleanup.json",
+      "sha256": "8d2e52bfc7abd0a742f2d4928815f369d5d617abfc595cd2f9a70ecbeee9a0c3",
+      "source_unchanged": true
+    },
+    "harness-clippy-dev-01": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-clippy-dev-01.json",
+      "sha256": "ee5931a5009e11516fbb6ee1ed1f8a6e31814b0f9c47dee669219aaf470380d1",
+      "source_unchanged": true
+    },
+    "harness-clippy-final": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy-final.json",
+      "sha256": "72b792c261383201a48aa177d6d3a4cc91b62072a1042231e020578d2a6cc166",
+      "source_unchanged": true
+    },
+    "harness-clippy-opc-guard": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy-opc-guard.json",
+      "sha256": "ebd582a4a01d941b55978fa98db03f8a3dbc684dfb3e036fa7bf26d2dcc4a8c4",
+      "source_unchanged": true
+    },
+    "harness-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-dev-01.json",
+      "sha256": "fa21066ababf6399b0648323314342dc4595c62a87978596af66d678ca21a951",
+      "source_unchanged": false
+    },
+    "harness-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-dev-02.json",
+      "sha256": "0d09911fdf505176dd8abf0ae62036f2ffb0719ab5128d29e2088bef1f544257",
+      "source_unchanged": false
+    },
+    "harness-format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 1,
+      "path": "validation/harness-format.json",
+      "sha256": "f6d4c36eec0717d9e8d52d7b42b3d18b64ff9ff769f096519aa38c0afce5ac6d",
+      "source_unchanged": true
+    },
+    "harness-format-cleanup": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-format-cleanup.json",
+      "sha256": "6406ef337bf634894f39773e73b4fcde2f7586ecd0ac9afe9678239a1b48dfcd",
+      "source_unchanged": true
+    },
+    "harness-format-final": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-format-final.json",
+      "sha256": "47acc11ecec70804cc91132830c71e8be428b44fbbfc4eaae1555b2ea0462a65",
+      "source_unchanged": true
+    },
+    "harness-format-opc-guard": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-format-opc-guard.json",
+      "sha256": "d3c3812378dce50df913100c01b66efeabaf88a0de3c4eeb9041961f71c08e6e",
+      "source_unchanged": true
+    },
+    "harness-oracle-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-oracle-dev-01.json",
+      "sha256": "aaccf0d811c1101251bfac210a219623faf226ff44758564203aef5956b15b09",
+      "source_unchanged": true
+    },
+    "harness-oracle-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-oracle-dev-02.json",
+      "sha256": "b128ebb6f47a3201370a8c4027929b4ab290ad483efcaa33dac4c4c885669b0b",
+      "source_unchanged": true
+    },
+    "harness-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "pptx_metadata_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-tests.json",
+      "sha256": "58af90d8a6e9fd75d4285095338d61184a42d98be4c431aa69c88a0f96f7e752",
+      "source_unchanged": true
+    },
+    "libraries-clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-clippy.json",
+      "sha256": "47c9084201d42dc55ff0f63a3b0c4cd8e94f695107b2b8271de7a933c356cc4f",
+      "source_unchanged": true
+    },
+    "libraries-clippy-dev-01": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/libraries-clippy-dev-01.json",
+      "sha256": "02177a6b5224165c0f7da2e5e17eeb4f93bfb873a3fb30f3f0afeffb16776e0f",
+      "source_unchanged": false
+    },
+    "libraries-clippy-dev-02": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/libraries-clippy-dev-02.json",
+      "sha256": "f2ff900e5b7ddceb9696b9d1690164ab946c039ed9cdfc4c9d0c55731e810a5a",
+      "source_unchanged": false
+    },
+    "libraries-clippy-opc-guard": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-clippy-opc-guard.json",
+      "sha256": "4fe5aad60615a03324cddceedd5b0f4603a73b0abf75115aefbd37199d464b9a",
+      "source_unchanged": true
+    },
+    "libraries-format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-format.json",
+      "sha256": "528476922464c07a820fec76c01e21697a37ea9b5ee027d9d64c04199e7cffd5",
+      "source_unchanged": true
+    },
+    "libraries-format-opc-guard": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-format-opc-guard.json",
+      "sha256": "19d7c21e631bb87bf437485519383595a458449e0471dc7649c81540c90e5ffc",
+      "source_unchanged": true
+    },
+    "libraries-rustdoc": {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-rustdoc.json",
+      "sha256": "c16ae2bbf477a898262134a75063fa45524d393646d37554c57253f2d99ec690",
+      "source_unchanged": true
+    },
+    "libraries-rustdoc-opc-guard": {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-rustdoc-opc-guard.json",
+      "sha256": "78a04f181198d0f6696b3577bca4487e5bf0da141ecac73c2bbfb7162280bc48",
+      "source_unchanged": true
+    },
+    "libraries-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-tests.json",
+      "sha256": "e402211c635be4cbbe3e9243bc2c04cf74637e1f3ad86693598b30387f86d739",
+      "source_unchanged": false
+    },
+    "libraries-tests-final": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-tests-final.json",
+      "sha256": "a4062cf4567e436868b00dc162558c3591385f8ae9314a0b4cf9e246ea4d91ce",
+      "source_unchanged": true
+    },
+    "libraries-tests-opc-guard": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-tests-opc-guard.json",
+      "sha256": "b127d3a2ee0a0909be7ec6b66edcb4907070df7284b77d12a06f0139d1bda360",
+      "source_unchanged": true
+    },
+    "odf-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odf-common",
+        "--test",
+        "streaming_package_writer"
+      ],
+      "exit_code": 0,
+      "path": "validation/odf-streaming.json",
+      "sha256": "ec2fee2c61d0c5bdb439f8118f5126fe157dbd9ffbb25207afa77b8cabb0c129",
+      "source_unchanged": true
+    },
+    "odp-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odp",
+        "--test",
+        "streaming_provider"
+      ],
+      "exit_code": 0,
+      "path": "validation/odp-streaming.json",
+      "sha256": "0f8d48b5b29d6142726d85235748df90475671144d59f97ac8824c2b9d7858e8",
+      "source_unchanged": true
+    },
+    "ods-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-ods",
+        "--test",
+        "streaming_creation",
+        "--test",
+        "streaming_text_spans"
+      ],
+      "exit_code": 0,
+      "path": "validation/ods-streaming.json",
+      "sha256": "7dbd7f102875527069d89ad82d47263a9fd9821081403378d2470022b591de11",
+      "source_unchanged": true
+    },
+    "odt-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odt",
+        "--test",
+        "streaming_plain_paragraphs"
+      ],
+      "exit_code": 0,
+      "path": "validation/odt-streaming.json",
+      "sha256": "8f1e8aec521dc8533a20ead11464b143ccc944f54f38a3a3010d785b5c016c04",
+      "source_unchanged": true
+    },
+    "opc-pptx-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "path": "validation/opc-pptx-dev-01.json",
+      "sha256": "e1f3aa727a3a446ab4a3b3dee400299a99a53ed81e0bc8952d69e038295781ff",
+      "source_unchanged": true
+    },
+    "opc-pptx-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "--lib",
+        "--test",
+        "streaming_metadata_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/opc-pptx-dev-02.json",
+      "sha256": "5695e2e969d5a9e75d85548fbc0b6028ccdc4d1f51c884eeb84f98676250606b",
+      "source_unchanged": false
+    },
+    "pilot-allocator": {
+      "argv": [
+        "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-allocator.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-allocator"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator.json",
+      "sha256": "a0ac7ec1837c185c37f64c0626d36476a06a3fd2d90835bbb1ecd4b96779467f",
+      "source_unchanged": true
+    },
+    "pilot-allocator-cleanup": {
+      "argv": [
+        "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-allocator-cleanup.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-allocator-cleanup"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator-cleanup.json",
+      "sha256": "96f7147b6433fae9651cd6ccaced27817933b799b468f8bf9cb0b421575df7c8",
+      "source_unchanged": true
+    },
+    "pilot-allocator-opc-guard": {
+      "argv": [
+        "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-allocator-opc-guard.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-allocator-opc-guard"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator-opc-guard.json",
+      "sha256": "b7c96f2d52ae6d7ca9c02dd15495291fdc3fd67d37711d054e93a587a93085d9",
+      "source_unchanged": true
+    },
+    "pilot-normal": {
+      "argv": [
+        "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-normal.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-normal"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal.json",
+      "sha256": "d5019145e6a4be83e422eb4c078b61be784dce43c4241c818f73b2b94ed46583",
+      "source_unchanged": true
+    },
+    "pilot-normal-cleanup": {
+      "argv": [
+        "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-normal-cleanup.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-normal-cleanup"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal-cleanup.json",
+      "sha256": "413ca2d6449512bc6e301954f55f3c8decb53203d4e14884e54b158beb24be00",
+      "source_unchanged": true
+    },
+    "pilot-normal-opc-guard": {
+      "argv": [
+        "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0478/pilot-normal-opc-guard.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0478/spools/pilot-normal-opc-guard"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal-opc-guard.json",
+      "sha256": "cd633612e16870b8a3b3814c0c1643888d23c78eb0c514fe78c620bd5e6cbdd7",
+      "source_unchanged": true
+    },
+    "pptx-spool-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-pptx",
+        "--test",
+        "streaming_metadata_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/pptx-spool-dev-01.json",
+      "sha256": "067211ce71a9431fc74ba0362d0955c2937efe46f92234ed0bd1295438e254ee",
+      "source_unchanged": true
+    },
+    "pptx-spool-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-pptx",
+        "--test",
+        "streaming_metadata_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/pptx-spool-dev-02.json",
+      "sha256": "10cc0419c81b7e5f04d8044f1dc312bd98f9de27efc6510cf36c1f6e047d2469",
+      "source_unchanged": false
+    },
+    "registry-strict": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "path": "validation/registry-strict.json",
+      "sha256": "2511f4e73e807eb3e574a0d442a5221ade73216b9eea1791cc1f6a13e62d0ed5",
+      "source_unchanged": true
+    },
+    "shared-streaming-unit": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-odf-common",
+        "-p",
+        "litchi-odt",
+        "-p",
+        "litchi-ods",
+        "-p",
+        "litchi-odp",
+        "--lib",
+        "streaming"
+      ],
+      "exit_code": 0,
+      "path": "validation/shared-streaming-unit.json",
+      "sha256": "5836dee7058dd2e626472bc2f1d1a0d93fcda271f090f1957eb6ac61fc94bccd",
+      "source_unchanged": true
+    },
+    "zip-dev-01": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "generated_name_policy"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-dev-01.json",
+      "sha256": "7feb1b5e80c268a8c61315cd8bbb9e9f8befda48b8ee43287014d08d0d4d4898",
+      "source_unchanged": false
+    },
+    "zip-dev-02": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-dev-02.json",
+      "sha256": "dd5faad79b2a2212653abde1d4c0128feaf2c893ce77f5ce59a45c263267104d",
+      "source_unchanged": false
+    },
+    "zip-proof-dev-03": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "generated_name_proof",
+        "--test",
+        "generated_name_policy"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-proof-dev-03.json",
+      "sha256": "dacf922c47850b1cf552f1cd2e3d6f13dcd1c25f0470740640f130ef9682ce03",
+      "source_unchanged": true
+    },
+    "zip-proof-dev-04": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "generated_name_proof",
+        "--test",
+        "generated_name_policy"
+      ],
+      "exit_code": 0,
+      "path": "validation/zip-proof-dev-04.json",
+      "sha256": "3dcd151edf1a7ad352f0f1b4fadf3b3b8938d5c1b2ab288cdcaa42c1db32fc20",
+      "source_unchanged": true
+    }
+  },
+  "final_source_sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080",
+  "required": [
+    "libraries-tests-opc-guard",
+    "libraries-clippy-opc-guard",
+    "libraries-rustdoc-opc-guard",
+    "libraries-format-opc-guard",
+    "shared-streaming-unit",
+    "docx-streaming",
+    "odf-streaming",
+    "odt-streaming",
+    "ods-streaming",
+    "odp-streaming",
+    "harness-tests",
+    "harness-clippy-opc-guard",
+    "harness-format-opc-guard",
+    "boundaries",
+    "registry-strict",
+    "build-normal-opc-guard",
+    "build-allocator-opc-guard",
+    "pilot-normal-opc-guard",
+    "pilot-allocator-opc-guard",
+    "analyze",
+    "evidence-tests"
+  ],
+  "schema": "pptx-metadata-spool-rust-validation-v1"
+}

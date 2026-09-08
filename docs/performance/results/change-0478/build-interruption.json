@@ -1,0 +1,10 @@
+{
+  "reason": "Stop stale build to close independently found full-member oracle and nineteenth embedded-input custody gaps before final binaries/capture.",
+  "gate_pid": 2109851,
+  "descendant_pids": [
+    2112244,
+    2109853
+  ],
+  "signal": "SIGTERM",
+  "utc": "2026-09-08T14:51:53.616418+00:00"
+}
