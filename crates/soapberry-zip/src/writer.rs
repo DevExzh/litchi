@@ -11,7 +11,7 @@ use crate::{
     time::{DosDateTime, UtcDateTime},
 };
 use flate2::{Compress, Compression, FlushCompress, Status};
-use std::io::{self, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 
 // ZIP64 constants
 const ZIP64_VERSION_NEEDED: u16 = 45; // 4.5
@@ -28,6 +28,376 @@ const ZIP64_THRESHOLD_ENTRIES: usize = u16::MAX as usize;
 const ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN: u16 = 16;
 const ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN: u16 = 20;
 const ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN: usize = 20;
+
+fn io_error_is_interrupted(error: &io::Error) -> bool {
+    error.kind() == io::ErrorKind::Interrupted
+}
+
+fn zip_error_is_interrupted(error: &Error) -> bool {
+    matches!(
+        error.kind(),
+        ErrorKind::IO(source) | ErrorKind::Io(source)
+            if source.kind() == io::ErrorKind::Interrupted
+    )
+}
+
+/// Limits for a caller-provided central-directory spool.
+///
+/// The spool stores finalized central-directory records while member payloads
+/// are written to the output sink. `max_bytes` bounds the complete serialized
+/// directory extent; `buffer_bytes` bounds the fixed replay buffer used while
+/// copying that extent to the final output. The replay buffer is operation
+/// scratch and is not counted against the serialized extent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DirectorySpoolLimits {
+    /// Maximum serialized central-directory bytes retained by the spool.
+    pub max_bytes: u64,
+    /// Size of the bounded buffer used to replay the spool at finalization.
+    pub buffer_bytes: usize,
+}
+
+impl DirectorySpoolLimits {
+    /// Creates a central-directory spool limit policy.
+    pub const fn new(max_bytes: u64, buffer_bytes: usize) -> Self {
+        Self {
+            max_bytes,
+            buffer_bytes,
+        }
+    }
+
+    /// Returns the maximum serialized central-directory extent.
+    pub const fn max_bytes(self) -> u64 {
+        self.max_bytes
+    }
+
+    /// Returns the fixed replay buffer size.
+    pub const fn buffer_bytes(self) -> usize {
+        self.buffer_bytes
+    }
+
+    fn validate(self) -> Result<(), Error> {
+        if self.buffer_bytes == 0 {
+            return Err(ErrorKind::InvalidInput {
+                msg: "central-directory spool replay buffer must be non-zero".to_string(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+/// The erased caller-owned storage capability used by the optional central
+/// directory spool. The bound intentionally includes `Send` and `Sync` so
+/// adding the optional mode does not weaken the writer's existing auto-trait
+/// behavior.
+trait DirectorySpoolStore: Read + Write + Seek + Send + Sync + 'static {}
+
+impl<T> DirectorySpoolStore for T where T: Read + Write + Seek + Send + Sync + 'static {}
+
+struct DirectorySpool {
+    store: Box<dyn DirectorySpoolStore>,
+    base_offset: u64,
+    extent: u64,
+    entries: u64,
+    saw_zip64: bool,
+    limits: DirectorySpoolLimits,
+    replay_buffer: Vec<u8>,
+    poisoned: bool,
+}
+
+impl std::fmt::Debug for DirectorySpool {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DirectorySpool")
+            .field("base_offset", &self.base_offset)
+            .field("extent", &self.extent)
+            .field("entries", &self.entries)
+            .field("saw_zip64", &self.saw_zip64)
+            .field("limits", &self.limits)
+            .field("poisoned", &self.poisoned)
+            .finish()
+    }
+}
+
+impl DirectorySpool {
+    fn new<S>(mut store: S, limits: DirectorySpoolLimits) -> Result<Self, Error>
+    where
+        S: DirectorySpoolStore,
+    {
+        limits.validate()?;
+        let mut replay_buffer = Vec::new();
+        replay_buffer
+            .try_reserve_exact(limits.buffer_bytes)
+            .map_err(|source| ErrorKind::Allocation {
+                resource: "central-directory spool replay buffer",
+                source,
+            })?;
+        replay_buffer.resize(limits.buffer_bytes, 0);
+        let base_offset = loop {
+            match store.seek(SeekFrom::End(0)) {
+                Ok(offset) => break offset,
+                Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
+                Err(source) => {
+                    return Err(ErrorKind::CentralDirectorySpool {
+                        operation: "position",
+                        source,
+                    }
+                    .into());
+                },
+            }
+        };
+        if base_offset.checked_add(limits.max_bytes).is_none() {
+            return Err(ErrorKind::InvalidInput {
+                msg: "central-directory spool base offset plus maximum extent overflows u64"
+                    .to_string(),
+            }
+            .into());
+        }
+        Ok(Self {
+            store: Box::new(store),
+            base_offset,
+            extent: 0,
+            entries: 0,
+            saw_zip64: false,
+            limits,
+            replay_buffer,
+            poisoned: false,
+        })
+    }
+
+    fn healthy(&self) -> Result<(), Error> {
+        if self.poisoned {
+            return Err(ErrorKind::InvalidInput {
+                msg: "central-directory spool is poisoned after a prior failure".to_string(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    fn capacity_for(&self, additional: u64) -> Result<u64, Error> {
+        let actual =
+            self.extent
+                .checked_add(additional)
+                .ok_or_else(|| ErrorKind::InvalidInput {
+                    msg: "central-directory spool extent overflows u64".to_string(),
+                })?;
+        if actual > self.limits.max_bytes {
+            return Err(ErrorKind::CentralDirectorySpoolLimitExceeded {
+                actual,
+                maximum: self.limits.max_bytes,
+            }
+            .into());
+        }
+        Ok(actual)
+    }
+
+    fn check_capacity(&self, additional: u64) -> Result<(), Error> {
+        self.healthy()?;
+        self.capacity_for(additional).map(|_| ())
+    }
+
+    fn record_len(file: &FileHeader, name: &[u8]) -> Result<u64, Error> {
+        let size = ZipFileHeaderFixed::SIZE
+            .checked_add(name.len())
+            .and_then(|size| size.checked_add(usize::from(file.extra_fields.central_size)))
+            .ok_or_else(|| ErrorKind::InvalidInput {
+                msg: "central-directory record length overflow".to_string(),
+            })?;
+        usize_to_u64(size, "central-directory record length")
+    }
+
+    fn record_bytes(file: &FileHeader, name: &[u8]) -> Result<Vec<u8>, Error> {
+        let capacity = usize::try_from(Self::record_len(file, name)?).map_err(|_| {
+            ErrorKind::InvalidInput {
+                msg: "central-directory record length does not fit usize".to_string(),
+            }
+        })?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| ErrorKind::Allocation {
+                resource: "central-directory spool record",
+                source,
+            })?;
+        file.central_fixed().write(&mut bytes)?;
+        bytes.extend_from_slice(name);
+        file.extra_fields
+            .write_extra_fields(&mut bytes, Header::CENTRAL)?;
+        Ok(bytes)
+    }
+
+    fn append_record(&mut self, file: &FileHeader, name: &[u8]) -> Result<(), Error> {
+        self.healthy()?;
+        let record_len = match Self::record_len(file, name) {
+            Ok(length) => length,
+            Err(error) => {
+                self.poisoned = true;
+                return Err(error);
+            },
+        };
+        if let Err(error) = self.capacity_for(record_len) {
+            self.poisoned = true;
+            return Err(error);
+        }
+        let bytes = match Self::record_bytes(file, name) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.poisoned = true;
+                return Err(error);
+            },
+        };
+        if let Err(error) = self.write_bytes(&bytes) {
+            self.poisoned = true;
+            return Err(error);
+        }
+        self.extent += record_len;
+        self.entries = match self.entries.checked_add(1) {
+            Some(entries) => entries,
+            None => {
+                self.poisoned = true;
+                return Err(ErrorKind::InvalidInput {
+                    msg: "central-directory entry count overflows u64".to_string(),
+                }
+                .into());
+            },
+        };
+        self.saw_zip64 |= file.needs_zip64();
+        Ok(())
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        let mut written = 0;
+        while written < bytes.len() {
+            let remaining = &bytes[written..];
+            let count = loop {
+                match self.store.write(remaining) {
+                    Ok(count) => break count,
+                    Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(source) => {
+                        return Err(ErrorKind::CentralDirectorySpool {
+                            operation: "write central-directory record",
+                            source,
+                        }
+                        .into());
+                    },
+                }
+            };
+            if count == 0 {
+                return Err(ErrorKind::CentralDirectorySpool {
+                    operation: "write central-directory record",
+                    source: io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "central-directory spool accepted no bytes",
+                    ),
+                }
+                .into());
+            }
+            if count > remaining.len() {
+                return Err(ErrorKind::CentralDirectorySpool {
+                    operation: "write central-directory record",
+                    source: io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "central-directory spool returned more bytes than requested",
+                    ),
+                }
+                .into());
+            }
+            written += count;
+        }
+        Ok(())
+    }
+
+    fn replay_into<W: Write>(&mut self, output: &mut W) -> Result<u64, Error> {
+        self.healthy()?;
+        loop {
+            match self.store.flush() {
+                Ok(()) => break,
+                Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
+                Err(source) => {
+                    self.poisoned = true;
+                    return Err(ErrorKind::CentralDirectorySpool {
+                        operation: "flush before replay",
+                        source,
+                    }
+                    .into());
+                },
+            }
+        }
+        loop {
+            match self.store.seek(SeekFrom::Start(self.base_offset)) {
+                Ok(offset) if offset == self.base_offset => break,
+                Ok(offset) => {
+                    self.poisoned = true;
+                    return Err(ErrorKind::CentralDirectorySpool {
+                        operation: "seek for replay",
+                        source: io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!(
+                                "central-directory spool seek returned {offset}, requested {}",
+                                self.base_offset
+                            ),
+                        ),
+                    }
+                    .into());
+                },
+                Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
+                Err(source) => {
+                    self.poisoned = true;
+                    return Err(ErrorKind::CentralDirectorySpool {
+                        operation: "seek for replay",
+                        source,
+                    }
+                    .into());
+                },
+            }
+        }
+
+        let mut remaining = self.extent;
+        while remaining != 0 {
+            let requested = remaining.min(self.replay_buffer.len() as u64) as usize;
+            let read = loop {
+                match self.store.read(&mut self.replay_buffer[..requested]) {
+                    Ok(read) => break read,
+                    Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(source) => {
+                        self.poisoned = true;
+                        return Err(ErrorKind::CentralDirectorySpool {
+                            operation: "read for replay",
+                            source,
+                        }
+                        .into());
+                    },
+                }
+            };
+            if read == 0 {
+                self.poisoned = true;
+                return Err(ErrorKind::CentralDirectorySpool {
+                    operation: "read for replay",
+                    source: io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "central-directory spool ended before its admitted extent",
+                    ),
+                }
+                .into());
+            }
+            if read > requested {
+                self.poisoned = true;
+                return Err(ErrorKind::CentralDirectorySpool {
+                    operation: "read for replay",
+                    source: io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "central-directory spool returned more bytes than requested",
+                    ),
+                }
+                .into());
+            }
+            output.write_all(&self.replay_buffer[..read])?;
+            remaining -= read as u64;
+        }
+        Ok(self.extent)
+    }
+}
 
 #[derive(Debug)]
 struct CountWriter<W> {
@@ -151,7 +521,42 @@ impl ZipArchiveWriterBuilder {
             files: Vec::with_capacity(self.capacity),
             file_names: Vec::new(),
             reusable_deflate: None,
+            directory_spool: None,
+            pending_borrowed_entry: false,
+            poisoned: false,
         }
+    }
+
+    /// Builds a `ZipArchiveWriter` with an explicit caller-provided store for
+    /// finalized central-directory records.
+    ///
+    /// The store is positioned at its current end and the writer owns it for
+    /// the lifetime of the archive. The store must remain exclusively owned by
+    /// this writer for that lifetime; callers must not mutate or reposition it
+    /// through another alias. It is never replaced with an ambient file or
+    /// temporary path. `finish` replays only the bytes admitted by `limits`
+    /// through its fixed replay buffer. The buffer is one part of the bounded
+    /// working set: one active member name and one serialized central record
+    /// are also retained, with their sizes bounded by ZIP field limits.
+    pub fn build_with_spool<W, S>(
+        &self,
+        writer: W,
+        spool: S,
+        limits: DirectorySpoolLimits,
+    ) -> Result<ZipArchiveWriter<W>, Error>
+    where
+        S: Read + Write + Seek + Send + Sync + 'static,
+    {
+        let directory_spool = Some(Box::new(DirectorySpool::new(spool, limits)?));
+        Ok(ZipArchiveWriter {
+            writer: CountWriter::new(writer, self.count),
+            files: Vec::new(),
+            file_names: Vec::new(),
+            reusable_deflate: None,
+            directory_spool,
+            pending_borrowed_entry: false,
+            poisoned: false,
+        })
     }
 }
 
@@ -187,6 +592,9 @@ pub struct ZipArchiveWriter<W> {
     file_names: Vec<u8>,
     writer: CountWriter<W>,
     reusable_deflate: Option<Box<OwnedDeflateState>>,
+    directory_spool: Option<Box<DirectorySpool>>,
+    pending_borrowed_entry: bool,
+    poisoned: bool,
 }
 
 struct SizedLocalHeader {
@@ -450,6 +858,21 @@ impl<W> ZipArchiveWriter<W> {
     /// Creates a new `ZipArchiveWriter` that writes to `writer`.
     pub fn new(writer: W) -> Self {
         ZipArchiveWriterBuilder::new().build(writer)
+    }
+
+    /// Creates a new writer whose finalized central-directory records are
+    /// retained in the supplied explicit store. The store is consumed and
+    /// remains exclusively owned by this writer; it must not be changed or
+    /// repositioned through another alias until the archive is finished.
+    pub fn new_with_spool<S>(
+        writer: W,
+        spool: S,
+        limits: DirectorySpoolLimits,
+    ) -> Result<Self, Error>
+    where
+        S: Read + Write + Seek + Send + Sync + 'static,
+    {
+        ZipArchiveWriterBuilder::new().build_with_spool(writer, spool, limits)
     }
 
     /// Returns the current offset in the output stream.
@@ -843,7 +1266,149 @@ impl<W> ZipArchiveWriter<W>
 where
     W: Write,
 {
+    fn ensure_usable(&self) -> Result<(), Error> {
+        if self.poisoned {
+            return Err(ErrorKind::InvalidInput {
+                msg: "ZIP archive is poisoned after a prior failure".to_string(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    fn ensure_no_pending_borrowed_entry(&self) -> Result<(), Error> {
+        if self.pending_borrowed_entry {
+            return Err(ErrorKind::InvalidInput {
+                msg: "ZIP archive has an unfinished borrowed entry".to_string(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    fn has_directory_spool(&self) -> bool {
+        self.directory_spool.is_some()
+    }
+
+    fn check_directory_spool_capacity(
+        &self,
+        name_len: usize,
+        central_extra_len: u16,
+    ) -> Result<(), Error> {
+        let Some(spool) = self.directory_spool.as_ref() else {
+            return Ok(());
+        };
+        let record_len = ZipFileHeaderFixed::SIZE
+            .checked_add(name_len)
+            .and_then(|size| size.checked_add(usize::from(central_extra_len)))
+            .ok_or_else(|| ErrorKind::InvalidInput {
+                msg: "central-directory record length overflow".to_string(),
+            })?;
+        spool.check_capacity(usize_to_u64(record_len, "central-directory record length")?)
+    }
+
+    fn check_directory_spool_file(&self, file: &FileHeader, name: &[u8]) -> Result<(), Error> {
+        let Some(spool) = self.directory_spool.as_ref() else {
+            return Ok(());
+        };
+        spool.check_capacity(DirectorySpool::record_len(file, name)?)
+    }
+
+    fn directory_spool_extra_len(
+        options: &ZipEntryOptions,
+        local_header_offset: u64,
+    ) -> Result<u16, Error> {
+        let automatic_timestamp = if options.modification_time.is_some() {
+            4usize + 5
+        } else {
+            0
+        };
+        let automatic_zip64 = if options.zip64 {
+            4usize
+                + 16
+                + if local_header_offset >= ZIP64_THRESHOLD_OFFSET {
+                    8
+                } else {
+                    0
+                }
+        } else if local_header_offset >= ZIP64_THRESHOLD_OFFSET {
+            4usize + 8
+        } else {
+            0
+        };
+        let size = usize::from(options.extra_fields.central_size)
+            .checked_add(automatic_timestamp)
+            .and_then(|size| size.checked_add(automatic_zip64))
+            .ok_or_else(|| ErrorKind::InvalidInput {
+                msg: "central-directory extra-field length overflow".to_string(),
+            })?;
+        u16::try_from(size).map_err(|_| {
+            ErrorKind::InvalidInput {
+                msg: "central-directory extra fields exceed ZIP limits".to_string(),
+            }
+            .into()
+        })
+    }
+
+    fn owned_spool_name(&self, name: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        if !self.has_directory_spool() {
+            return Ok(None);
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(name.len())
+            .map_err(|source| ErrorKind::Allocation {
+                resource: "active central-directory member name",
+                source,
+            })?;
+        owned.extend_from_slice(name);
+        Ok(Some(owned))
+    }
+
+    fn publish_file_header(&mut self, name: &[u8], file: FileHeader) -> Result<(), Error> {
+        if let Some(spool) = self.directory_spool.as_mut() {
+            match spool.append_record(&file, name) {
+                Ok(()) => Ok(()),
+                Err(error) => {
+                    self.poisoned = true;
+                    Err(error)
+                },
+            }
+        } else {
+            self.files.push(file);
+            Ok(())
+        }
+    }
+
+    fn poison_directory_spool(&mut self) {
+        self.poisoned = true;
+        if let Some(spool) = self.directory_spool.as_mut() {
+            spool.poisoned = true;
+        }
+    }
+
+    fn publish_prepared_member(&mut self, prepared: PreparedSizedMember<'_>) -> Result<(), Error> {
+        if let Some(spool) = self.directory_spool.as_mut() {
+            let PreparedSizedMember {
+                path, file_header, ..
+            } = prepared;
+            match spool.append_record(&file_header, path.as_ref().as_bytes()) {
+                Ok(()) => Ok(()),
+                Err(error) => {
+                    self.poisoned = true;
+                    Err(error)
+                },
+            }
+        } else {
+            self.files.push(prepared.into_file_header());
+            Ok(())
+        }
+    }
+
     fn reserve_member_metadata(&mut self, name_bytes: &[u8]) -> Result<(), Error> {
+        if self.has_directory_spool() {
+            return Ok(());
+        }
         self.file_names
             .try_reserve(name_bytes.len())
             .map_err(|error| ErrorKind::InvalidInput {
@@ -871,6 +1436,8 @@ where
         data: &[u8],
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         let path = sized_member_path(name)?;
         let crc32 = crc::crc32(data);
         let size_u64 = usize_to_u64(data.len(), "stored payload length")?;
@@ -882,22 +1449,23 @@ where
             size_u64,
             self.writer.count(),
         )?;
-        let uses_zip64 = prepared.local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
-        if uses_zip64 {
-            prepared.finalize_central()?;
-        }
+        prepared.finalize_central()?;
+        self.check_directory_spool_file(&prepared.file_header, prepared.name_bytes())?;
         self.reserve_member_metadata(prepared.name_bytes())?;
-        prepared.write_local(&mut self.writer)?;
-        write_all_counted(
+        if let Err(error) = prepared.write_local(&mut self.writer) {
+            self.poison_directory_spool();
+            return Err(error);
+        }
+        if let Err(error) = write_all_counted(
             &mut self.writer,
             data,
             accounting,
             AccountingWriteKind::Stored,
-        )?;
-        if !uses_zip64 {
-            prepared.finalize_central()?;
+        ) {
+            self.poison_directory_spool();
+            return Err(error);
         }
-        self.files.push(prepared.into_file_header());
+        self.publish_prepared_member(prepared)?;
 
         Ok(())
     }
@@ -986,6 +1554,8 @@ where
         accounting: &mut ZipOperationAccounting,
         accounting_kind: AccountingWriteKind,
     ) -> Result<(), Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1003,17 +1573,20 @@ where
             uncompressed_size,
             self.writer.count(),
         )?;
-        let uses_zip64 = prepared.local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
-        if uses_zip64 {
-            prepared.finalize_central()?;
-        }
+        prepared.finalize_central()?;
+        self.check_directory_spool_file(&prepared.file_header, prepared.name_bytes())?;
         self.reserve_member_metadata(prepared.name_bytes())?;
-        prepared.write_local(&mut self.writer)?;
-        write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)?;
-        if !uses_zip64 {
-            prepared.finalize_central()?;
+        if let Err(error) = prepared.write_local(&mut self.writer) {
+            self.poison_directory_spool();
+            return Err(error);
         }
-        self.files.push(prepared.into_file_header());
+        if let Err(error) =
+            write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)
+        {
+            self.poison_directory_spool();
+            return Err(error);
+        }
+        self.publish_prepared_member(prepared)?;
 
         Ok(())
     }
@@ -1128,6 +1701,8 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<(), Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         let file_path = ZipFilePath::from_str(name);
         if !file_path.is_dir() {
             return Err(Error::from(ErrorKind::InvalidInput {
@@ -1142,6 +1717,16 @@ where
         }
 
         let local_header_offset = self.writer.count();
+        if local_header_offset >= ZIP64_THRESHOLD_OFFSET
+            && options
+                .extra_fields
+                .contains_id(ExtraFieldId::ZIP64, Header::CENTRAL)
+        {
+            return Err(ErrorKind::InvalidInput {
+                msg: "ZIP64 extra field collides with automatic central metadata".to_string(),
+            }
+            .into());
+        }
         let mut flags = 0u16;
         if file_path.needs_utf8_encoding() {
             flags |= FLAG_UTF8_ENCODING;
@@ -1152,19 +1737,16 @@ where
         // Store the name bytes in the central buffer
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
-        self.file_names
-            .try_reserve(name_bytes.len())
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP member-name storage: {error}"),
-            })?;
-        self.files
-            .try_reserve(1)
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP file-header storage: {error}"),
-            })?;
-        self.file_names.extend_from_slice(name_bytes);
+        let spool_extra_len = Self::directory_spool_extra_len(&options, local_header_offset)?;
+        self.check_directory_spool_capacity(name_bytes.len(), spool_extra_len)?;
+        self.reserve_member_metadata(name_bytes)?;
 
-        self.write_local_header(&file_path, flags, CompressionMethod::Store, &mut options)?;
+        if let Err(error) =
+            self.write_local_header(&file_path, flags, CompressionMethod::Store, &mut options)
+        {
+            self.poison_directory_spool();
+            return Err(error);
+        }
 
         let file_header = FileHeader {
             name_len,
@@ -1179,7 +1761,16 @@ where
             unix_permissions: options.unix_permissions,
             extra_fields: options.extra_fields,
         };
-        self.files.push(file_header);
+        let mut file_header = file_header;
+        if let Err(error) = file_header.finalize_extra_fields() {
+            self.poison_directory_spool();
+            return Err(error);
+        }
+        if let Err(error) = self.check_directory_spool_file(&file_header, name_bytes) {
+            self.poison_directory_spool();
+            return Err(error);
+        }
+        self.publish_file_header(name_bytes, file_header)?;
 
         Ok(())
     }
@@ -1222,6 +1813,8 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<ZipEntryWriter<'_, W>, Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
 
         if file_path.len() > u16::MAX as usize {
@@ -1241,19 +1834,18 @@ where
         // Store the name bytes in the central buffer
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
-        self.file_names
-            .try_reserve(name_bytes.len())
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP member-name storage: {error}"),
-            })?;
-        self.files
-            .try_reserve(1)
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP file-header storage: {error}"),
-            })?;
-        self.file_names.extend_from_slice(name_bytes);
+        let spool_extra_len = Self::directory_spool_extra_len(&options, local_header_offset)?;
+        self.check_directory_spool_capacity(name_bytes.len(), spool_extra_len)?;
+        let spool_name = self.owned_spool_name(name_bytes)?;
+        self.reserve_member_metadata(name_bytes)?;
 
-        self.write_local_header(&file_path, flags, options.compression_method, &mut options)?;
+        if let Err(error) =
+            self.write_local_header(&file_path, flags, options.compression_method, &mut options)
+        {
+            self.poison_directory_spool();
+            return Err(error);
+        }
+        self.pending_borrowed_entry = true;
 
         Ok(ZipEntryWriter {
             inner: self,
@@ -1266,6 +1858,7 @@ where
             modification_time: options.modification_time,
             unix_permissions: options.unix_permissions,
             extra_fields: options.extra_fields,
+            name: spool_name,
         })
     }
 
@@ -1286,6 +1879,8 @@ where
         name: &str,
         compression_method: CompressionMethod,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1326,6 +1921,8 @@ where
         name: &str,
         compression_method: CompressionMethod,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1360,6 +1957,8 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
         if file_path.len() > u16::MAX as usize {
             return Err(Error::from(ErrorKind::InvalidInput {
@@ -1375,18 +1974,16 @@ where
 
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
-        self.file_names
-            .try_reserve(name_bytes.len())
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP member-name storage: {error}"),
-            })?;
-        self.files
-            .try_reserve(1)
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP file-header storage: {error}"),
-            })?;
-        self.file_names.extend_from_slice(name_bytes);
-        self.write_local_header(&file_path, flags, options.compression_method, &mut options)?;
+        let spool_extra_len = Self::directory_spool_extra_len(&options, local_header_offset)?;
+        self.check_directory_spool_capacity(name_bytes.len(), spool_extra_len)?;
+        let spool_name = self.owned_spool_name(name_bytes)?;
+        self.reserve_member_metadata(name_bytes)?;
+        if let Err(error) =
+            self.write_local_header(&file_path, flags, options.compression_method, &mut options)
+        {
+            self.poison_directory_spool();
+            return Err(error);
+        }
 
         let reusable_deflate = if options.compression_method == CompressionMethod::Deflate {
             Some(
@@ -1399,6 +1996,7 @@ where
         };
 
         let state = OwnedEntryState {
+            name: spool_name,
             name_len,
             local_header_offset,
             compression_method: options.compression_method,
@@ -1457,35 +2055,56 @@ where
     where
         W: Write,
     {
+        self.ensure_usable()?;
+        self.ensure_no_pending_borrowed_entry()?;
         let central_directory_offset = self.writer.count();
-        let total_entries = self.files.len();
+        let (total_entries, needs_zip64_before_central_directory, central_directory_size) =
+            if let Some(mut spool) = self.directory_spool.take() {
+                let total_entries = spool.entries;
+                let needs_zip64_before_central_directory = total_entries
+                    >= ZIP64_THRESHOLD_ENTRIES as u64
+                    || central_directory_offset >= ZIP64_THRESHOLD_OFFSET
+                    || spool.saw_zip64;
+                let central_directory_size = spool.replay_into(&mut self.writer)?;
+                (
+                    total_entries,
+                    needs_zip64_before_central_directory,
+                    central_directory_size,
+                )
+            } else {
+                let total_entries = self.files.len() as u64;
+                let needs_zip64_before_central_directory = total_entries
+                    >= ZIP64_THRESHOLD_ENTRIES as u64
+                    || central_directory_offset >= ZIP64_THRESHOLD_OFFSET
+                    || self.files.iter().any(|f| f.needs_zip64());
 
-        // Determine if we need ZIP64 format
-        let needs_zip64_before_central_directory = total_entries >= ZIP64_THRESHOLD_ENTRIES
-            || central_directory_offset >= ZIP64_THRESHOLD_OFFSET
-            || self.files.iter().any(|f| f.needs_zip64());
+                let mut name_offset = 0;
 
-        let mut name_offset = 0;
+                // Write central directory entries
+                for file in &self.files {
+                    let header = file.central_fixed();
 
-        // Write central directory entries
-        for file in &self.files {
-            let header = file.central_fixed();
+                    header.write(&mut self.writer)?;
 
-            header.write(&mut self.writer)?;
+                    // File name
+                    let new_name_offset = name_offset + file.name_len as usize;
+                    self.writer
+                        .write_all(&self.file_names[name_offset..new_name_offset])?;
+                    name_offset = new_name_offset;
 
-            // File name
-            let new_name_offset = name_offset + file.name_len as usize;
-            self.writer
-                .write_all(&self.file_names[name_offset..new_name_offset])?;
-            name_offset = new_name_offset;
+                    // Extra fields
+                    file.extra_fields
+                        .write_extra_fields(&mut self.writer, Header::CENTRAL)?;
+                }
 
-            // Extra fields
-            file.extra_fields
-                .write_extra_fields(&mut self.writer, Header::CENTRAL)?;
-        }
-
-        let central_directory_end = self.writer.count();
-        let central_directory_size = central_directory_end - central_directory_offset;
+                let central_directory_end = self.writer.count();
+                let central_directory_size = central_directory_end - central_directory_offset;
+                (
+                    total_entries,
+                    needs_zip64_before_central_directory,
+                    central_directory_size,
+                )
+            };
         let needs_zip64 = needs_zip64_before_central_directory
             || central_directory_size >= ZIP64_THRESHOLD_OFFSET;
 
@@ -1496,7 +2115,7 @@ where
             // Write ZIP64 End of Central Directory Record
             write_zip64_eocd(
                 &mut self.writer,
-                total_entries as u64,
+                total_entries,
                 central_directory_size,
                 central_directory_offset,
             )?;
@@ -1517,7 +2136,7 @@ where
         let entries_count = if needs_zip64 {
             u16::MAX
         } else {
-            total_entries.min(ZIP64_THRESHOLD_ENTRIES) as u16
+            total_entries.min(ZIP64_THRESHOLD_ENTRIES as u64) as u16
         };
         self.writer.write_all(&entries_count.to_le_bytes())?;
         self.writer.write_all(&entries_count.to_le_bytes())?;
@@ -1548,6 +2167,7 @@ where
 pub struct ZipEntryWriter<'a, W> {
     inner: &'a mut ZipArchiveWriter<W>,
     compressed_bytes: u64,
+    name: Option<Vec<u8>>,
     name_len: u16,
     local_header_offset: u64,
     compression_method: CompressionMethod,
@@ -1591,6 +2211,7 @@ impl<'a, W> ZipEntryWriter<'a, W> {
     where
         W: Write,
     {
+        self.inner.ensure_usable()?;
         output.compressed_size = self.compressed_bytes;
         let mut file_header = FileHeader {
             name_len: self.name_len,
@@ -1605,15 +2226,27 @@ impl<'a, W> ZipEntryWriter<'a, W> {
             unix_permissions: self.unix_permissions,
             extra_fields: self.extra_fields,
         };
-        file_header.finalize_extra_fields()?;
-        write_data_descriptor(
+        if let Err(error) = file_header.finalize_extra_fields() {
+            if !zip_error_is_interrupted(&error) {
+                self.inner.poison_directory_spool();
+            }
+            return Err(error);
+        }
+        if let Err(error) = write_data_descriptor(
             &mut self.inner.writer,
             output.crc,
             output.compressed_size,
             output.uncompressed_size,
             self.zip64,
-        )?;
-        self.inner.files.push(file_header);
+        ) {
+            if !zip_error_is_interrupted(&error) {
+                self.inner.poison_directory_spool();
+            }
+            return Err(error);
+        }
+        let name = self.name.unwrap_or_default();
+        self.inner.publish_file_header(&name, file_header)?;
+        self.inner.pending_borrowed_entry = false;
 
         Ok(self.compressed_bytes)
     }
@@ -1624,48 +2257,90 @@ where
     W: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let requested = u64::try_from(buf.len()).map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "ZIP compressed byte count does not fit in u64",
-            )
-        })?;
+        let requested = match u64::try_from(buf.len()) {
+            Ok(requested) => requested,
+            Err(_) => {
+                let error = io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "ZIP compressed byte count does not fit in u64",
+                );
+                self.inner.poison_directory_spool();
+                return Err(error);
+            },
+        };
         if self.compressed_bytes.checked_add(requested).is_none() {
-            return Err(io::Error::new(
+            let error = io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ZIP compressed byte count overflows u64",
-            ));
+            );
+            self.inner.poison_directory_spool();
+            return Err(error);
         }
-        let bytes_written = self.inner.writer.write(buf)?;
+        let bytes_written = match self.inner.writer.write(buf) {
+            Ok(bytes_written) => bytes_written,
+            Err(error) => {
+                if !io_error_is_interrupted(&error) {
+                    self.inner.poison_directory_spool();
+                }
+                return Err(error);
+            },
+        };
         if bytes_written > buf.len() {
+            self.inner.poison_directory_spool();
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "ZIP compressed sink returned more bytes than requested",
             ));
         }
-        let accepted = u64::try_from(bytes_written).map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "ZIP compressed byte count does not fit in u64",
-            )
-        })?;
-        self.compressed_bytes = self.compressed_bytes.checked_add(accepted).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "ZIP compressed byte count overflows u64",
-            )
-        })?;
+        if !buf.is_empty() && bytes_written == 0 {
+            self.inner.poison_directory_spool();
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "ZIP compressed sink accepted no bytes",
+            ));
+        }
+        let accepted = match u64::try_from(bytes_written) {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                let error = io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "ZIP compressed byte count does not fit in u64",
+                );
+                self.inner.poison_directory_spool();
+                return Err(error);
+            },
+        };
+        self.compressed_bytes = match self.compressed_bytes.checked_add(accepted) {
+            Some(total) => total,
+            None => {
+                let error = io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "ZIP compressed byte count overflows u64",
+                );
+                self.inner.poison_directory_spool();
+                return Err(error);
+            },
+        };
         Ok(bytes_written)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.writer.flush()
+        match self.inner.writer.flush() {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                if !io_error_is_interrupted(&error) {
+                    self.inner.poison_directory_spool();
+                }
+                Err(error)
+            },
+        }
     }
 }
 
 /// Internal state retained by an owned entry while its payload is emitted.
 #[derive(Debug)]
 struct OwnedEntryState {
+    name: Option<Vec<u8>>,
     name_len: u16,
     local_header_offset: u64,
     compression_method: CompressionMethod,
@@ -1700,6 +2375,7 @@ impl<W> OwnedCompressedEntry<W> {
     {
         output.compressed_size = self.compressed_bytes;
         let mut archive = self.archive;
+        archive.ensure_usable()?;
         let mut file_header = FileHeader {
             name_len: self.state.name_len,
             compression_method: self.state.compression_method,
@@ -1713,15 +2389,26 @@ impl<W> OwnedCompressedEntry<W> {
             unix_permissions: self.state.unix_permissions,
             extra_fields: self.state.extra_fields,
         };
-        file_header.finalize_extra_fields()?;
-        write_data_descriptor(
+        if let Err(error) = file_header.finalize_extra_fields() {
+            if !zip_error_is_interrupted(&error) {
+                archive.poison_directory_spool();
+            }
+            return Err(error);
+        }
+        if let Err(error) = write_data_descriptor(
             &mut archive.writer,
             output.crc,
             output.compressed_size,
             output.uncompressed_size,
             self.state.zip64,
-        )?;
-        archive.files.push(file_header);
+        ) {
+            if !zip_error_is_interrupted(&error) {
+                archive.poison_directory_spool();
+            }
+            return Err(error);
+        }
+        let name = self.state.name.unwrap_or_default();
+        archive.publish_file_header(&name, file_header)?;
 
         Ok(archive)
     }
@@ -1961,14 +2648,30 @@ impl<W: Write> Write for OwnedCompressor<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         match self {
             Self::Store(entry) => entry.write(buffer),
-            Self::Deflate(compressor) => compressor.state.write_to(&mut compressor.entry, buffer),
+            Self::Deflate(compressor) => {
+                let result = compressor.state.write_to(&mut compressor.entry, buffer);
+                if let Err(error) = &result {
+                    if !io_error_is_interrupted(error) {
+                        compressor.entry.archive.poison_directory_spool();
+                    }
+                }
+                result
+            },
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
             Self::Store(entry) => entry.flush(),
-            Self::Deflate(compressor) => compressor.state.flush_to(&mut compressor.entry),
+            Self::Deflate(compressor) => {
+                let result = compressor.state.flush_to(&mut compressor.entry);
+                if let Err(error) = &result {
+                    if !io_error_is_interrupted(error) {
+                        compressor.entry.archive.poison_directory_spool();
+                    }
+                }
+                result
+            },
         }
     }
 }
@@ -2064,11 +2767,27 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
                 return Err(owned_entry_limit_io_error(attempted, maximum));
             }
         }
-        let written = self.archive.writer.write(buffer)?;
+        let written = match self.archive.writer.write(buffer) {
+            Ok(written) => written,
+            Err(error) => {
+                if !io_error_is_interrupted(&error) {
+                    self.archive.poison_directory_spool();
+                }
+                return Err(error);
+            },
+        };
         if written > buffer.len() {
+            self.archive.poison_directory_spool();
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "ZIP compressed sink returned more bytes than requested",
+            ));
+        }
+        if written == 0 {
+            self.archive.poison_directory_spool();
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "ZIP compressed sink accepted no bytes",
             ));
         }
         let accepted = u64::try_from(written).map_err(|_| {
@@ -2087,7 +2806,15 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.archive.writer.flush()
+        match self.archive.writer.flush() {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                if !io_error_is_interrupted(&error) {
+                    self.archive.poison_directory_spool();
+                }
+                Err(error)
+            },
+        }
     }
 }
 
@@ -2952,6 +3679,7 @@ mod tests {
         let entry = ZipEntryWriter {
             inner: &mut archive,
             compressed_bytes: ZIP64_THRESHOLD_FILE_SIZE,
+            name: None,
             name_len: 1,
             local_header_offset: 0,
             compression_method: CompressionMethod::Store,
@@ -3013,6 +3741,7 @@ mod tests {
         let mut compressed_entry = OwnedCompressedEntry {
             archive,
             state: OwnedEntryState {
+                name: None,
                 name_len: 1,
                 local_header_offset: 0,
                 compression_method: CompressionMethod::Store,

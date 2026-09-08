@@ -1,8 +1,8 @@
-//! Forbid-safe operation-scoped allocation counters shared by the two targets.
+//! Forbid-safe operation-scoped allocation counters for the benchmark targets.
 //!
 //! The normal binary never installs a global allocator wrapper and never calls
-//! [`enable`]. The allocator binary owns the only `GlobalAlloc` implementation
-//! and calls the record functions below after each successful or failed system
+//! [`enable`]. Isolated allocator binaries install the shared `GlobalAlloc`
+//! wrapper and call the record functions below after each successful or failed system
 //! allocation. Keeping this state and all arithmetic safe lets the shared
 //! harness library retain `#![forbid(unsafe_code)]`.
 //!

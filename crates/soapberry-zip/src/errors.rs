@@ -130,6 +130,20 @@ pub enum ErrorKind {
 
     /// A ZIP layout cannot be safely preserved by the raw-copy writer.
     UnsupportedPreservation { reason: &'static str },
+
+    /// A caller-provided central-directory spool failed while being used.
+    ///
+    /// The original I/O error is retained as the source so callers can
+    /// distinguish storage failure from a ZIP format or payload failure.
+    CentralDirectorySpool {
+        /// Operation being performed on the caller-provided store.
+        operation: &'static str,
+        /// Original storage error.
+        source: std::io::Error,
+    },
+
+    /// The caller-provided central-directory spool exceeded its byte budget.
+    CentralDirectorySpoolLimitExceeded { actual: u64, maximum: u64 },
 }
 
 impl std::error::Error for Error {
@@ -137,6 +151,7 @@ impl std::error::Error for Error {
         match &self.inner.kind {
             ErrorKind::Allocation { source, .. } => Some(source),
             ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            ErrorKind::CentralDirectorySpool { source, .. } => Some(source),
             _ => None,
         }
     }
@@ -234,6 +249,15 @@ impl std::fmt::Display for ErrorKind {
             },
             ErrorKind::UnsupportedPreservation { reason } => {
                 write!(f, "Unsupported ZIP preservation layout: {reason}")
+            },
+            ErrorKind::CentralDirectorySpool { operation, .. } => {
+                write!(f, "central-directory spool {operation} failed")
+            },
+            ErrorKind::CentralDirectorySpoolLimitExceeded { actual, maximum } => {
+                write!(
+                    f,
+                    "central-directory spool limit exceeded: {actual} bytes, maximum {maximum}"
+                )
             },
         }
     }
