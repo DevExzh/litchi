@@ -1,0 +1,13 @@
+--- before/tools/perf-baseline/src/zip_directory_spool.rs
++++ after/tools/perf-baseline/src/zip_directory_spool.rs
+@@ -337,9 +337,7 @@
+                     )
+                     .into());
+                 }
+-                if let Err(error) = validate_oracle(corpus, &spool.bytes) {
+-                    return Err(error);
+-                }
++                validate_oracle(corpus, &spool.bytes)?;
+                 insert_oracle_record(
+                     &mut oracle_records,
+                     &mut oracle_keys,

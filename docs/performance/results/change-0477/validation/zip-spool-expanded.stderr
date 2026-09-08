@@ -1,0 +1,73 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error[E0425]: cannot find value `archive` in this scope
+    --> crates/soapberry-zip/tests/directory_spool.rs:1049:33
+     |
+1049 |     assert_rejected_after_drop!(archive.write_stored_file("next-stored.bin", b"next"));
+     |                                 ^^^^^^^ not found in this scope
+     |
+help: an identifier with the same name is defined here, but is not accessible due to macro hygiene
+    --> crates/soapberry-zip/tests/directory_spool.rs:1028:21
+     |
+1028 |             let mut archive = fresh_spooled_archive(&mut output);
+     |                     ^^^^^^^
+...
+1049 |     assert_rejected_after_drop!(archive.write_stored_file("next-stored.bin", b"next"));
+     |     ---------------------------------------------------------------------------------- in this macro invocation
+     = note: this error originates in the macro `assert_rejected_after_drop` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find value `archive` in this scope
+    --> crates/soapberry-zip/tests/directory_spool.rs:1050:33
+     |
+1050 |     assert_rejected_after_drop!(archive.write_precompressed_file(
+     |                                 ^^^^^^^ not found in this scope
+     |
+help: an identifier with the same name is defined here, but is not accessible due to macro hygiene
+    --> crates/soapberry-zip/tests/directory_spool.rs:1028:21
+     |
+1028 |               let mut archive = fresh_spooled_archive(&mut output);
+     |                       ^^^^^^^
+...
+1050 | /     assert_rejected_after_drop!(archive.write_precompressed_file(
+1051 | |         "next-precompressed.bin",
+1052 | |         CompressionMethod::Store,
+1053 | |         soapberry_zip::crc32(b"next"),
+1054 | |         4,
+1055 | |         b"next"
+1056 | |     ));
+     | |______- in this macro invocation
+     = note: this error originates in the macro `assert_rejected_after_drop` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find value `archive` in this scope
+    --> crates/soapberry-zip/tests/directory_spool.rs:1057:33
+     |
+1057 |     assert_rejected_after_drop!(archive.new_dir("next/").create());
+     |                                 ^^^^^^^ not found in this scope
+     |
+help: an identifier with the same name is defined here, but is not accessible due to macro hygiene
+    --> crates/soapberry-zip/tests/directory_spool.rs:1028:21
+     |
+1028 |             let mut archive = fresh_spooled_archive(&mut output);
+     |                     ^^^^^^^
+...
+1057 |     assert_rejected_after_drop!(archive.new_dir("next/").create());
+     |     -------------------------------------------------------------- in this macro invocation
+     = note: this error originates in the macro `assert_rejected_after_drop` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find value `archive` in this scope
+    --> crates/soapberry-zip/tests/directory_spool.rs:1058:33
+     |
+1058 |     assert_rejected_after_drop!(archive.new_file("next-borrowed.bin").start());
+     |                                 ^^^^^^^ not found in this scope
+     |
+help: an identifier with the same name is defined here, but is not accessible due to macro hygiene
+    --> crates/soapberry-zip/tests/directory_spool.rs:1028:21
+     |
+1028 |             let mut archive = fresh_spooled_archive(&mut output);
+     |                     ^^^^^^^
+...
+1058 |     assert_rejected_after_drop!(archive.new_file("next-borrowed.bin").start());
+     |     -------------------------------------------------------------------------- in this macro invocation
+     = note: this error originates in the macro `assert_rejected_after_drop` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `soapberry-zip` (test "directory_spool") due to 4 previous errors

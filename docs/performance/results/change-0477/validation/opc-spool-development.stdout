@@ -1,0 +1,9 @@
+
+running 4 tests
+test phys_pkg::tests::metadata_spool_limit_maps_to_typed_opc_error ... ok
+test phys_pkg::tests::metadata_spool_failure_retains_source_and_partial_output_progress ... ok
+test phys_pkg::tests::metadata_spool_preserves_duplicate_equivalent_and_derived_refusals ... ok
+test phys_pkg::tests::metadata_spool_preserves_bytes_and_reopens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 332 filtered out; finished in 0.00s
+

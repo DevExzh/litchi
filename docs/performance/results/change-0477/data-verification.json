@@ -1,0 +1,6 @@
+{
+  "scope": "protocol/build/capture/report/summary; final validation ledger and seal excluded",
+  "status": "pass",
+  "captures": 48,
+  "protocol_sha256": "dc4b1b07c8854f93cf41876f4aa8e9ed362c90fdf8445dd6bde6b147923cd654"
+}

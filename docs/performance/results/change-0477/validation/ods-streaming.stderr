@@ -1,0 +1,4 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+    Finished `release` profile [optimized + debuginfo] target(s) in 23.47s
+     Running tests/streaming_creation.rs (target/release/deps/streaming_creation-d9b63388589aaa41)
+     Running tests/streaming_text_spans.rs (target/release/deps/streaming_text_spans-56f74912a8f5985d)

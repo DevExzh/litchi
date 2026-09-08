@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "zip_directory_spool",
+    "--features",
+    "allocator-metrics"
+  ],
+  "artifacts": {
+    "build-allocator.stderr": {
+      "bytes": 162,
+      "sha256": "7b3bc6210f951493afc2aa879d675137dd91576924d2af314a5b8fda0b1699b8"
+    },
+    "build-allocator.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 413186584,
+    "path": "/tmp/litchi-goal-0477/allocator/zip_directory_spool",
+    "sha256": "3d6694bb497fde03ae3a9fbacebf1ed83c29ba5597509831bf4146c65e194522"
+  },
+  "common_sha256": "36b8e593ad10d8621c9277b6394b071b30b6911526a5d3a1df7fa8737ee61385",
+  "copied_utc": "2026-09-08T13:55:24.574942+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T13:55:23.591160+00:00",
+  "original_binary": {
+    "bytes": 413186584,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/zip_directory_spool",
+    "sha256": "3d6694bb497fde03ae3a9fbacebf1ed83c29ba5597509831bf4146c65e194522"
+  },
+  "source_after": {
+    "files": 7040,
+    "path": "validation-sources/bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937.json",
+    "sha256": "bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937"
+  },
+  "source_before": {
+    "files": 7040,
+    "path": "validation-sources/bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937.json",
+    "sha256": "bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T13:54:35.025227+00:00",
+  "validation_gate": {
+    "path": "validation/build-allocator.json",
+    "sha256": "9356153b2118f3a7160b1c3c9e9aa2930f7770045bc14ea65fe9c0655ccb009c"
+  }
+}

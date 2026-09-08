@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "{\"captures\": 48, \"protocol_sha256\": \"dc4b1b07c8854f93cf41876f4aa8e9ed362c90fdf8445dd6bde6b147923cd654\", \"rust_validation\": {\"receipts\": 40, \"required_success\": 23, \"retained_nonzero_attempts\": 7}, \"samples\": 1440, \"schema\": \"zip-directory-spool-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"failed\": 7, \"successful\": 33, \"total\": 40}}\n"
+  },
+  "original_runtime_binaries_absent": true,
+  "probes": {
+    "allocator_live_exit": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: r1-allocator-8-store-spool.operations[0].allocation: operation did not return to the same live-byte level\n",
+      "stdout": ""
+    },
+    "final_gate_exclusion": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation.attempts.harness-focused-final: source exclusions are not allowed for this final gate\n",
+      "stdout": ""
+    },
+    "instrumentation": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: r1-normal-8-store-control: instrumentation identity differs\n",
+      "stdout": ""
+    },
+    "output_digest": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: r1-normal-8-store-control.operations[0]: output differs from oracle\n",
+      "stdout": ""
+    },
+    "required_gate_omitted": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation.required: mandatory final gate is missing: zip-tests-final\n",
+      "stdout": ""
+    },
+    "spool_extent": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: r1-normal-8-store-spool.operations[0]: spool extent differs\n",
+      "stdout": ""
+    },
+    "summary_arithmetic": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: summary.rows.r1-normal-8-store-control.elapsed_ns.mean: numeric value differs\n",
+      "stdout": ""
+    }
+  },
+  "status": "pass",
+  "temporary_copy_removed": true,
+  "validation_seal_sha256": "625b934732bf97a5acaedde8787e179ac0df046e43799acec0ffe298561e58d2"
+}

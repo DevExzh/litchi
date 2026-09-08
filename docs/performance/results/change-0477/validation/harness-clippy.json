@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--bin",
+    "zip_directory_spool",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "artifacts": {
+    "harness-clippy.stderr": {
+      "bytes": 7749,
+      "sha256": "abc7e86089bad20099d23be503872f6b2e8d6e8f114819c1515764ed75d5cc46"
+    },
+    "harness-clippy.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "common_sha256": "36b8e593ad10d8621c9277b6394b071b30b6911526a5d3a1df7fa8737ee61385",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-08T13:46:51.995333+00:00",
+  "source_after": {
+    "files": 7040,
+    "path": "validation-sources/0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83.json",
+    "sha256": "0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83"
+  },
+  "source_before": {
+    "files": 7040,
+    "path": "validation-sources/0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83.json",
+    "sha256": "0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T13:46:21.740025+00:00"
+}

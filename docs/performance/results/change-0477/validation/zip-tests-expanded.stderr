@@ -1,0 +1,7 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `release` profile [optimized + debuginfo] target(s) in 42.00s
+     Running unittests src/lib.rs (target/release/deps/soapberry_zip-7938a0cdeab585a5)
+     Running tests/central_directory_short_reads.rs (target/release/deps/central_directory_short_reads-7215220a80aa5ce6)
+     Running tests/deflate_reuse.rs (target/release/deps/deflate_reuse-f194403f0de7f9d6)
+     Running tests/directory_spool.rs (target/release/deps/directory_spool-0074616d36beb97b)
+error: test failed, to rerun pass `-p soapberry-zip --test directory_spool`

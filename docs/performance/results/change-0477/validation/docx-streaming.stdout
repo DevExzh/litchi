@@ -1,0 +1,9 @@
+
+running 4 tests
+test cancellation_and_hierarchical_scratch_release_are_observable ... ok
+test exported_writer_rejects_invalid_text_and_reports_progress_and_state ... ok
+test exported_writer_is_deterministic_three_member_and_reopens_with_run_parity ... ok
+test exported_writer_accepts_non_seek_short_and_interrupted_sinks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

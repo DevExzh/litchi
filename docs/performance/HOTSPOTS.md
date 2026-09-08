@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## Central-directory working heap separated from scratch (0477)
+
+[0477](changes/0477-zip-central-directory-spool.md) gives the ZIP writer
+explicit replayable central scratch. At 8,192 members, Store peak heap changes
+from 1,196,032 to 16,574 bytes and Deflate from 1,608,992 to 429,534 bytes. The
+File provider adds one syscall per member and the temporary records add
+allocations; large Store medians rise to about 4.3 ms from about 3.1 ms.
+Retained ZIP/OPC name indexes remain the next public streaming memory owner. See
+[next work](results/change-0477/next-work.md).
+
 ## Repeated owned compressor allocation addressed (0476)
 
 [0476](changes/0476-zip-deflate-state-reuse.md) removes repeated backend and

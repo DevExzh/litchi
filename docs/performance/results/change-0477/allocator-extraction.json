@@ -1,0 +1,8 @@
+{
+  "body_sha256": "f84cfbd85e647d5701156e68e854772399038650a23ca9ff80290c2f91d6de57",
+  "dedented_implementation_and_five_tests_exact": true,
+  "destination": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+  "destination_sha256": "c498a1e0cd3984551bc09f4f4bbe0885104deb7428c79bd249250f9b1b4e5cd5",
+  "reference": "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+  "reference_revision": "d7032754c1fa3c0580eda66ef5813af1b7192d7c"
+}

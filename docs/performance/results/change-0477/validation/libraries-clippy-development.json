@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-opc",
+    "--lib",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "artifacts": {
+    "libraries-clippy-development.stderr": {
+      "bytes": 2028,
+      "sha256": "fcd265f87add0c557b5644fb0ba4c80dfe01f68f876d92cabab8904a221e4bfb"
+    },
+    "libraries-clippy-development.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "common_sha256": "36b8e593ad10d8621c9277b6394b071b30b6911526a5d3a1df7fa8737ee61385",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-08T13:09:05.021035+00:00",
+  "source_after": {
+    "files": 7039,
+    "path": "validation-sources/dd6934b530a163d0ef66386d5c17438024e19c154b49646574fbc215f5343337.json",
+    "sha256": "dd6934b530a163d0ef66386d5c17438024e19c154b49646574fbc215f5343337"
+  },
+  "source_before": {
+    "files": 7039,
+    "path": "validation-sources/dd6934b530a163d0ef66386d5c17438024e19c154b49646574fbc215f5343337.json",
+    "sha256": "dd6934b530a163d0ef66386d5c17438024e19c154b49646574fbc215f5343337"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T13:09:02.459957+00:00"
+}

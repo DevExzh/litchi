@@ -1,0 +1,15 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error: mismatched closing delimiter: `}`
+    --> crates/soapberry-zip/tests/directory_spool.rs:1243:12
+     |
+1213 | fn local_only_extra_fields_do_not_consume_central_spool_quota() {
+     |                                                                 - closing delimiter possibly meant for this
+...
+1243 |     assert!(record
+     |            ^ unclosed delimiter
+...
+1247 | }
+     | ^ mismatched closing delimiter
+
+error: could not compile `soapberry-zip` (test "directory_spool") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

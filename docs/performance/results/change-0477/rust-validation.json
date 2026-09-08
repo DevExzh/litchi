@@ -1,0 +1,771 @@
+{
+  "attempts": {
+    "analyze": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0477/analyze.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/analyze.json",
+      "sha256": "e0ba2e9152b89b29b338548d6fbff35a5d4264cb6762d8b8ba593d10db2a8e04",
+      "source_unchanged": true
+    },
+    "boundaries": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/boundaries.json",
+      "sha256": "2f0e02ec464391ebf4290c1a2421e33eff3442286dd7895ed56e5ab41c2829f1",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "build-allocator": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "zip_directory_spool",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-allocator.json",
+      "sha256": "9356153b2118f3a7160b1c3c9e9aa2930f7770045bc14ea65fe9c0655ccb009c",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "build-normal": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "zip_directory_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-normal.json",
+      "sha256": "2b0a92226bea027ae715810ec4a818cf4ceccb7af2d6c69080efd9096503638c",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "docx-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "streaming"
+      ],
+      "exit_code": 0,
+      "path": "validation/docx-streaming.json",
+      "sha256": "a1c990948419be4564c0f8e95205662c6a1d0df2e6f6335063d8beb0b06105c6",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "evidence-tests": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0477",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests.json",
+      "sha256": "221cfee1b61b5b4d660c8a851f9fcc1433a49b73b2cd769efa35b7a0bda1ee0e",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "harness-clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "zip_directory_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-clippy.json",
+      "sha256": "a4f4aff6eae98dd243990fc901664a3ad914ac9023dde724e8b0e4dd9e18b676",
+      "source_unchanged": true
+    },
+    "harness-clippy-corrected": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "zip_directory_spool",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy-corrected.json",
+      "sha256": "4f982ac16cfcf7bd85495c796db2921ce42a4e8fcebf5feccdd92456347d3f87",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "harness-focused-final": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "zip_directory_spool::tests"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-focused-final.json",
+      "sha256": "f2059f2ce200ae9a9a177a17e0d23d5368124a906fbc8a1018eaddb80863c662",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "harness-format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-format.json",
+      "sha256": "90a9344b32032b536c3bae18e10dd477e2cb13206a73ce6230216f5ce1bc83c0",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "harness-spool-development": {
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "zip_directory_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-spool-development.json",
+      "sha256": "1a08f63f9da16a061f09fe4dfd4e9e311686a40f9aec312abdc9a655aba11e4d",
+      "source_unchanged": false
+    },
+    "harness-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--bin",
+        "zip_directory_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-tests.json",
+      "sha256": "7bfa26ad352f3c438b1912b0d8eea317dc55acfac2052d4e00f396f55340f13a",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "layout-after-build": {
+      "argv": [
+        "rustup",
+        "run",
+        "1.98.1",
+        "rustc",
+        "--edition=2021",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0477/layout.rs",
+        "--extern",
+        "soapberry_zip=target/release/deps/libsoapberry_zip-ab095c0834ecae61.rlib",
+        "-L",
+        "dependency=target/release/deps",
+        "-o",
+        "/tmp/litchi-goal-0477/layout-after"
+      ],
+      "exit_code": 0,
+      "path": "validation/layout-after-build.json",
+      "sha256": "dc4a809e974c595dc22683156ddd846011ad2ac9baadb23e3cc6ec7ec65d7c91",
+      "source_unchanged": true
+    },
+    "layout-after-run": {
+      "argv": [
+        "/tmp/litchi-goal-0477/layout-after"
+      ],
+      "exit_code": 0,
+      "path": "validation/layout-after-run.json",
+      "sha256": "0aae97efe4a4a749f4e9db353949a1f58e73fdfda6d19039c2ab409140cf4c42",
+      "source_unchanged": true
+    },
+    "layout-before-build": {
+      "argv": [
+        "rustup",
+        "run",
+        "1.98.1",
+        "rustc",
+        "--edition",
+        "2021",
+        "docs/performance/results/change-0477/layout.rs",
+        "--extern",
+        "soapberry_zip=target/release/deps/libsoapberry_zip-ab095c0834ecae61.rlib",
+        "-L",
+        "dependency=target/release/deps",
+        "-o",
+        "/tmp/litchi-goal-0477/layout-before"
+      ],
+      "exit_code": 0,
+      "path": "validation/layout-before-build.json",
+      "sha256": "0d2006095bdcca191474f7780b7b3193774c2d213d676ed4b1d47b6ee026ee12",
+      "source_unchanged": true
+    },
+    "layout-before-run": {
+      "argv": [
+        "/tmp/litchi-goal-0477/layout-before"
+      ],
+      "exit_code": 0,
+      "path": "validation/layout-before-run.json",
+      "sha256": "81fb39ba5acd7cba2ec881d4b13358ccc547d6f4fb238daf4a638559d5464354",
+      "source_unchanged": true
+    },
+    "libraries-clippy-corrected": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-clippy-corrected.json",
+      "sha256": "5f8468c6f6fed93b2061c265c1154fd9cef47eec22f2368790c9f3210d14095f",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "libraries-clippy-development": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/libraries-clippy-development.json",
+      "sha256": "42612e8e54863da0b34338bce78f1512dfdec36b4bd425e7c6133d8699be530f",
+      "source_unchanged": true
+    },
+    "libraries-clippy-final": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/libraries-clippy-final.json",
+      "sha256": "d5a65f29a1b1ea0689018f57dd36e42e4e15331671c047b890d30933dfd5ad4c",
+      "source_unchanged": true
+    },
+    "libraries-format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-format.json",
+      "sha256": "250bf8dcc9346a5e81e67875ea900163918afe1c8487d7b717a8062fdb4ddc43",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "libraries-rustdoc": {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "path": "validation/libraries-rustdoc.json",
+      "sha256": "8c64314a2914c34777e81947a455646bc80b70e63d5d52d717f503674684ab25",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "odf-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odf-common",
+        "--test",
+        "streaming_package_writer"
+      ],
+      "exit_code": 0,
+      "path": "validation/odf-streaming.json",
+      "sha256": "7d69bce034b58105e39c540ffb08b8aabbb8e7bb30025c3717e7348721c557ef",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "odp-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odp",
+        "--test",
+        "streaming_provider"
+      ],
+      "exit_code": 0,
+      "path": "validation/odp-streaming.json",
+      "sha256": "d3408ca8176cd864053d8a5051e89e597406eabad43776b5343d1f13896b834a",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "ods-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-ods",
+        "--test",
+        "streaming_creation",
+        "--test",
+        "streaming_text_spans"
+      ],
+      "exit_code": 0,
+      "path": "validation/ods-streaming.json",
+      "sha256": "4e65dd022805526aaef63cc76e2cf97ab5c4a80dbf3248be0c997dd9cccd62e2",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "odt-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odt",
+        "--test",
+        "streaming_plain_paragraphs"
+      ],
+      "exit_code": 0,
+      "path": "validation/odt-streaming.json",
+      "sha256": "71057a1c1ac9db536853dea6964a5384ea8f7447543b28fdf5e7653588eea21e",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "opc-spool-development": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--lib",
+        "spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/opc-spool-development.json",
+      "sha256": "71cdf164b59983dfaa43efe13c5e102340b53cb45b1d8a40b997d75eb91e2c43",
+      "source_unchanged": false
+    },
+    "opc-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc"
+      ],
+      "exit_code": 0,
+      "path": "validation/opc-tests.json",
+      "sha256": "95afcde341b252ac323e1611b289ec8f3ac8f319e34a6a7181a749460994943e",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "pilot-allocator": {
+      "argv": [
+        "/tmp/litchi-goal-0477/allocator/zip_directory_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--methods",
+        "store,deflate",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0477/pilot-allocator.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0477/spools/pilot-allocator"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator.json",
+      "sha256": "53fe0a216edba459779f7b72c2313c565c384709fd67a495cb7b66ca2b0c6e89",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "pilot-normal": {
+      "argv": [
+        "/tmp/litchi-goal-0477/normal/zip_directory_spool",
+        "--mode",
+        "both",
+        "--counts",
+        "8",
+        "--methods",
+        "store,deflate",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--repeats",
+        "1",
+        "--max-spool-bytes",
+        "67108864",
+        "--spool-buffer-bytes",
+        "16384",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0477/pilot-normal.report.json",
+        "--spool-dir",
+        "/tmp/litchi-goal-0477/spools/pilot-normal"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal.json",
+      "sha256": "d576680fb4e4b5627dfe644f1a4a9415c086e67ea699aefb2debc01ea34fb48f",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "pptx-streaming": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--test",
+        "streaming_authoring"
+      ],
+      "exit_code": 0,
+      "path": "validation/pptx-streaming.json",
+      "sha256": "c9d7399c1efebf81c6c5477e4df3c05819825091d1b9252f9d8fe315d1f155cb",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "registry-strict": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "path": "validation/registry-strict.json",
+      "sha256": "c1a8cae1cb6ddd7dbb2691a25753f702a723b8f0e88347b7c251ef04229699bd",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "shared-streaming-unit": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-odf-common",
+        "-p",
+        "litchi-odt",
+        "-p",
+        "litchi-ods",
+        "-p",
+        "litchi-odp",
+        "--lib",
+        "streaming"
+      ],
+      "exit_code": 0,
+      "path": "validation/shared-streaming-unit.json",
+      "sha256": "4e0564fe2c5d3219e55386f312ad6236155c8ebb53ad036e26621e7d4d204e7a",
+      "source_exclusions": [
+        "tools/perf-baseline/src/zip_directory_spool.rs"
+      ],
+      "source_unchanged": true
+    },
+    "zip-check-development": {
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "path": "validation/zip-check-development.json",
+      "sha256": "e71058f900618077cd64311c30bd5214b84a4611087a88f257a2e4aa9f7fc857",
+      "source_unchanged": true
+    },
+    "zip-spool-development": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "directory_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-spool-development.json",
+      "sha256": "7e966d26d1d871571ec6d518ca483d80b8e2d421069d20cf77b5b3ad702103b9",
+      "source_unchanged": false
+    },
+    "zip-spool-expanded": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "directory_spool"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-spool-expanded.json",
+      "sha256": "eb495447ce9a3055317b7c0016cfcaa675e5db17ff8fc74d8695b6dfeefef3ec",
+      "source_unchanged": true
+    },
+    "zip-spool-final": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "--test",
+        "directory_spool"
+      ],
+      "exit_code": 0,
+      "path": "validation/zip-spool-final.json",
+      "sha256": "02de4665385bf2493be45b8660233933f4d5c257e22397e7e66ca58ca1813818",
+      "source_unchanged": true
+    },
+    "zip-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-tests.json",
+      "sha256": "193229ef87878d2388f5d5965d5371e652b721658ff303c34668ea6cea11e393",
+      "source_unchanged": false
+    },
+    "zip-tests-expanded": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 101,
+      "path": "validation/zip-tests-expanded.json",
+      "sha256": "bba309542512b1fb6182814eea86bcfcdf63fc1de67ad46560a5f59a035e4dd6",
+      "source_unchanged": true
+    },
+    "zip-tests-final": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "path": "validation/zip-tests-final.json",
+      "sha256": "bb3807e79a21d6be88a1310d5c80f5500739772f357b4e6236641d5aba677697",
+      "source_exclusions": [],
+      "source_unchanged": true
+    },
+    "zip-tests-frozen": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "path": "validation/zip-tests-frozen.json",
+      "sha256": "a5188b54ea4438cd638b4e12f67debf6ecacfb2688b2375538f35deffde9c7aa",
+      "source_unchanged": true
+    }
+  },
+  "final_source_sha256": "bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937",
+  "required": [
+    "libraries-clippy-corrected",
+    "opc-tests",
+    "shared-streaming-unit",
+    "docx-streaming",
+    "pptx-streaming",
+    "odf-streaming",
+    "odp-streaming",
+    "ods-streaming",
+    "odt-streaming",
+    "harness-tests",
+    "harness-clippy-corrected",
+    "harness-focused-final",
+    "libraries-rustdoc",
+    "libraries-format",
+    "harness-format",
+    "zip-tests-final",
+    "boundaries",
+    "registry-strict",
+    "build-normal",
+    "build-allocator",
+    "pilot-normal",
+    "pilot-allocator",
+    "evidence-tests"
+  ],
+  "schema": "zip-directory-spool-rust-validation-v1"
+}
