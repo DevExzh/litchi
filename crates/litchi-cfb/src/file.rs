@@ -236,6 +236,14 @@ pub struct DirectoryEntry {
     pub sid_child: u32,
     /// CLSID of this entry
     pub clsid: String,
+    /// User-defined state bits from the CFB directory entry.
+    pub state_bits: u32,
+    /// Exact Windows FILETIME creation value stored in the directory entry.
+    /// Values are retained verbatim, including values emitted by legacy
+    /// producers that do not satisfy the stream-field recommendation.
+    pub creation_time: u64,
+    /// Exact Windows FILETIME modification value stored in the directory entry.
+    pub modified_time: u64,
     /// First sector of the stream
     pub start_sector: u32,
     /// Size of the stream in bytes
@@ -1373,6 +1381,11 @@ impl<R: Read + Seek> OleFile<R> {
         // what `DirectoryEntry` reading already does.
         let stream_size = mask_v3_stream_size(raw.stream_size.get(), sector_size);
 
+        // Keep the raw state and FILETIME words available to source-preserving
+        // callers. New writers emit zeroes for stream timestamps, but rejecting
+        // legacy entries here would make an otherwise readable Office file
+        // impossible to round-trip without normalization.
+
         match raw.entry_type {
             STGTY_ROOT if sid != 0 => {
                 return Err(OleError::CorruptedFile(
@@ -1464,6 +1477,9 @@ impl<R: Read + Seek> OleFile<R> {
             sid_right: raw.sid_right.get(),
             sid_child: raw.sid_child.get(),
             clsid,
+            state_bits: raw.state_bits.get(),
+            creation_time: raw.creation_time.get(),
+            modified_time: raw.modified_time.get(),
             start_sector: raw.start_sector.get(),
             size,
             is_minifat,
@@ -3003,6 +3019,31 @@ mod tests {
         output.into_inner()
     }
 
+    #[test]
+    fn preserves_nonzero_stream_directory_timestamps_from_legacy_sources() {
+        let mut data = sample_file();
+        let name = [b'D', 0, b'a', 0, b't', 0, b'a', 0];
+        let entry_name = data
+            .windows(name.len())
+            .position(|window| window == name)
+            .expect("stream name should be present in directory");
+        let creation_time = entry_name + 100;
+        data[creation_time..creation_time + 8].copy_from_slice(&1_u64.to_le_bytes());
+        let file = OleFile::open(Cursor::new(data)).expect("legacy stream metadata is readable");
+        let stream = file
+            .list_streams()
+            .into_iter()
+            .find(|path| path == &["Data".to_string()])
+            .expect("sample stream should remain reachable");
+        let entry = file
+            .list_directory_entries(&[])
+            .expect("root directory entries")
+            .into_iter()
+            .find(|entry| entry.name == stream[0])
+            .expect("sample stream directory entry");
+        assert_eq!(entry.creation_time, 1);
+    }
+
     fn file_with_streams<I, S>(names: I) -> OleFile<Cursor<Vec<u8>>>
     where
         I: IntoIterator<Item = S>,
@@ -3324,6 +3365,9 @@ mod tests {
             sid_right: NOSTREAM,
             sid_child: 1,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: ENDOFCHAIN,
             size: root_size,
             is_minifat: false,
@@ -3337,6 +3381,9 @@ mod tests {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector,
             size: stream_size,
             is_minifat,
@@ -4038,6 +4085,9 @@ mod tests {
                 sid_right: right,
                 sid_child: NOSTREAM,
                 clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
                 start_sector: ENDOFCHAIN,
                 size: 0,
                 is_minifat: false,
@@ -4063,6 +4113,9 @@ mod tests {
                 sid_right: NOSTREAM,
                 sid_child: 1,
                 clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
                 start_sector: ENDOFCHAIN,
                 size: 0,
                 is_minifat: false,

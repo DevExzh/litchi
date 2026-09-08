@@ -300,6 +300,86 @@ fn commit_exposes_snapshot_and_reversible_patch() {
 }
 
 #[test]
+fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
+    let original = write_cfb(|writer| {
+        writer.set_root_state_bits(0x1020_3040);
+        writer.set_root_creation_time(0x0102_0304_0506_0708);
+        writer.set_root_modified_time(0x1112_1314_1516_1718);
+        writer.create_storage(&["ObjectPool"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["ObjectPool"],
+                0xA1A2_A3A4,
+                0x2122_2324_2526_2728,
+                0x3132_3334_3536_3738,
+            )
+            .unwrap();
+        writer.create_storage(&["ObjectPool", "_42"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["ObjectPool", "_42"],
+                0xB1B2_B3B4,
+                0x4142_4344_4546_4748,
+                0x5152_5354_5556_5758,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["WordDocument"], b"unchanged host bytes")
+            .unwrap();
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{3}PRINT"], b"preview")
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["ObjectPool", "_42", "\u{3}PRINT"],
+                0xC1C2_C3C4,
+                0x6162_6364_6566_6768,
+                0x7172_7374_7576_7778,
+            )
+            .unwrap();
+    });
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let mut editor = Editor::open(original, selected, Limits::default()).expect("editor opens");
+    editor
+        .put_stream(&["WordDocument".into()], b"edited host bytes".to_vec())
+        .expect("unrelated stream edit should commit");
+    let output = editor.finish().expect("edited package should finish");
+    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+
+    let root = file.root_entry().expect("root entry");
+    assert_eq!(root.state_bits, 0x1020_3040);
+    assert_eq!(root.creation_time, 0x0102_0304_0506_0708);
+    assert_eq!(root.modified_time, 0x1112_1314_1516_1718);
+    let object_pool = file
+        .list_directory_entries(&[])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "ObjectPool")
+        .unwrap();
+    assert_eq!(object_pool.state_bits, 0xA1A2_A3A4);
+    assert_eq!(object_pool.creation_time, 0x2122_2324_2526_2728);
+    assert_eq!(object_pool.modified_time, 0x3132_3334_3536_3738);
+    let object = file
+        .list_directory_entries(&["ObjectPool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "_42")
+        .unwrap();
+    assert_eq!(object.state_bits, 0xB1B2_B3B4);
+    assert_eq!(object.creation_time, 0x4142_4344_4546_4748);
+    assert_eq!(object.modified_time, 0x5152_5354_5556_5758);
+    let preview = file
+        .list_directory_entries(&["ObjectPool", "_42"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "\u{3}PRINT")
+        .unwrap();
+    assert_eq!(preview.state_bits, 0xC1C2_C3C4);
+    assert_eq!(preview.creation_time, 0x6162_6364_6566_6768);
+    assert_eq!(preview.modified_time, 0x7172_7374_7576_7778);
+}
+
+#[test]
 fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(

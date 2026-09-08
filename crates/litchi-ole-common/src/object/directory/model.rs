@@ -185,6 +185,9 @@ pub struct Metadata {
     kind: EntryKind,
     class_id: Option<Guid>,
     links: Links,
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
     start_sector: u32,
     stream_size: u64,
     uses_mini_stream: bool,
@@ -205,6 +208,9 @@ impl Metadata {
             kind,
             class_id,
             links,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector,
             stream_size,
             uses_mini_stream,
@@ -231,6 +237,38 @@ impl Metadata {
     pub const fn set_links(&mut self, links: Links) -> &mut Self {
         self.links = links;
         self
+    }
+
+    /// Replaces the raw CFB state bits without interpreting their meaning.
+    pub const fn set_state_bits(&mut self, state_bits: u32) -> &mut Self {
+        self.state_bits = state_bits;
+        self
+    }
+
+    /// Replaces the exact raw CFB creation FILETIME.
+    pub const fn set_creation_time(&mut self, creation_time: u64) -> &mut Self {
+        self.creation_time = creation_time;
+        self
+    }
+
+    /// Replaces the exact raw CFB modification FILETIME.
+    pub const fn set_modified_time(&mut self, modified_time: u64) -> &mut Self {
+        self.modified_time = modified_time;
+        self
+    }
+
+    pub(crate) const fn with_directory_fields(
+        self,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Self {
+        Self {
+            state_bits,
+            creation_time,
+            modified_time,
+            ..self
+        }
     }
 
     /// Replaces the starting FAT or `MiniFAT` sector in a transaction draft.
@@ -285,6 +323,24 @@ impl Metadata {
     #[must_use]
     pub const fn links(self) -> Links {
         self.links
+    }
+
+    /// The raw user-defined CFB state bits.
+    #[must_use]
+    pub const fn state_bits(self) -> u32 {
+        self.state_bits
+    }
+
+    /// The exact raw CFB creation FILETIME.
+    #[must_use]
+    pub const fn creation_time(self) -> u64 {
+        self.creation_time
+    }
+
+    /// The exact raw CFB modification FILETIME.
+    #[must_use]
+    pub const fn modified_time(self) -> u64 {
+        self.modified_time
     }
 
     /// The starting FAT or `MiniFAT` sector location.

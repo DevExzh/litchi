@@ -15,6 +15,7 @@ use std::sync::Arc;
 pub(crate) struct Package {
     sector_size: usize,
     root_clsid: Option<Guid>,
+    root_directory: Option<directory::Metadata>,
     storages: Vec<Storage>,
     streams: Vec<Stream>,
 }
@@ -24,13 +25,11 @@ impl Package {
         ole: &mut OleFile<R>,
         limits: Limits,
     ) -> Result<Self, OleError> {
+        let root_directory = ole.root_entry().map(directory::decode).transpose()?;
         let mut package = Self {
             sector_size: ole.sector_size(),
-            root_clsid: ole
-                .root_entry()
-                .map(directory::decode)
-                .transpose()?
-                .and_then(directory::Metadata::class_id),
+            root_clsid: root_directory.and_then(directory::Metadata::class_id),
+            root_directory,
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -54,6 +53,7 @@ impl Package {
         let mut package = Self {
             sector_size: ole.sector_size(),
             root_clsid: storage.class_id(),
+            root_directory: Some(*storage.directory()),
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -81,6 +81,7 @@ impl Package {
         let object_package = Self {
             sector_size: self.sector_size,
             root_clsid: storage.class_id(),
+            root_directory: Some(*storage.directory()),
             storages: self
                 .storages
                 .iter()
@@ -130,7 +131,8 @@ impl Package {
             .iter_mut()
             .find(|stream| stream.path() == path)
             .ok_or(OleError::StreamNotFound)?;
-        *stream = Stream::new(path.to_vec(), data, None);
+        let directory = stream.directory().copied();
+        *stream = Stream::new(path.to_vec(), data, directory);
         self.check(limits)
     }
 
@@ -353,7 +355,13 @@ impl Package {
             .iter_mut()
             .find(|storage| storage.path() == path)
             .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-        let root_directory = root.directory().with_class_id(replacement.root_clsid);
+        let mut root_directory = root.directory().with_class_id(replacement.root_clsid);
+        if let Some(replacement_root) = replacement.root_directory {
+            root_directory
+                .set_state_bits(replacement_root.state_bits())
+                .set_creation_time(replacement_root.creation_time())
+                .set_modified_time(replacement_root.modified_time());
+        }
         *root = Storage::new(path.to_vec(), root_directory);
         self.storages.retain(|storage| {
             storage.path() == path
@@ -403,10 +411,15 @@ impl Package {
                 "new object storage parent is missing".into(),
             ));
         }
-        self.storages.push(Storage::new(
-            target.path().to_vec(),
-            directory::Metadata::staged_storage(replacement.root_clsid),
-        ));
+        let mut root_directory = directory::Metadata::staged_storage(replacement.root_clsid);
+        if let Some(replacement_root) = replacement.root_directory {
+            root_directory
+                .set_state_bits(replacement_root.state_bits())
+                .set_creation_time(replacement_root.creation_time())
+                .set_modified_time(replacement_root.modified_time());
+        }
+        self.storages
+            .push(Storage::new(target.path().to_vec(), root_directory));
         for storage in &replacement.storages {
             self.storages.push(Storage::new(
                 join(target.path(), storage.path()),
@@ -446,6 +459,15 @@ impl Package {
         if let Some(clsid) = self.root_clsid {
             writer.set_root_clsid(*clsid.as_bytes());
         }
+        if let Some(root) = self.root_directory {
+            // A selected storage is promoted to the standalone compound-file
+            // root during object extraction. Keep its raw directory words
+            // unchanged so source-preserving edits do not silently discard
+            // producer metadata; fresh OleWriter roots still default to zero.
+            writer.set_root_state_bits(root.state_bits());
+            writer.set_root_modified_time(root.modified_time());
+            writer.set_root_creation_time(root.creation_time());
+        }
         let mut storages = self.storages.clone();
         storages.sort_by(|left, right| {
             left.path()
@@ -459,9 +481,36 @@ impl Package {
             if let Some(clsid) = storage.class_id() {
                 writer.set_storage_clsid(&refs, *clsid.as_bytes())?;
             }
+            let directory = storage.directory();
+            if directory.state_bits() != 0
+                || directory.creation_time() != 0
+                || directory.modified_time() != 0
+            {
+                writer.set_storage_metadata(
+                    &refs,
+                    directory.state_bits(),
+                    directory.creation_time(),
+                    directory.modified_time(),
+                )?;
+            }
         }
         for stream in &self.streams {
             let refs = path_refs(stream.path());
+            if let Some(directory) = stream.directory() {
+                if directory.state_bits() != 0
+                    || directory.creation_time() != 0
+                    || directory.modified_time() != 0
+                {
+                    writer.create_stream_with_metadata(
+                        &refs,
+                        stream.bytes(),
+                        directory.state_bits(),
+                        directory.creation_time(),
+                        directory.modified_time(),
+                    )?;
+                    continue;
+                }
+            }
             writer.create_stream(&refs, stream.bytes())?;
         }
         let mut output = Cursor::new(Vec::new());
