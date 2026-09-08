@@ -29,6 +29,7 @@ pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
 pub mod pptx_retention;
 mod pptx_slide_boundaries;
+mod pptx_streaming_create;
 mod process_metrics;
 #[cfg(test)]
 mod security_corpus;
@@ -1410,6 +1411,7 @@ enum Case {
     PptxSemanticOneSlide,
     PptxSemanticFullText,
     PptxSemanticCreateSmall,
+    PptxStreamingCreate,
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
@@ -1999,6 +2001,7 @@ impl Case {
             Self::PptxSemanticOneSlide => "pptx_semantic_one_slide",
             Self::PptxSemanticFullText => "pptx_semantic_full_text",
             Self::PptxSemanticCreateSmall => "pptx_semantic_create_small",
+            Self::PptxStreamingCreate => "pptx_streaming_create",
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
@@ -2448,6 +2451,10 @@ impl Case {
 
     const fn uses_docx_streaming_creation(self) -> bool {
         matches!(self, Self::DocxStreamingCreate)
+    }
+
+    const fn uses_pptx_streaming_creation(self) -> bool {
+        matches!(self, Self::PptxStreamingCreate)
     }
 
     const fn uses_semantic_docx(self) -> bool {
@@ -4396,6 +4403,8 @@ struct SourceSummary {
     odt_mixed: Option<OdtMixedPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_paragraphs: Option<docx_streaming_create::DocxParagraphsSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_slides: Option<pptx_streaming_create::PptxSlidesSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_paragraphs: Option<odt_streaming_create::OdtParagraphsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -9012,6 +9021,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
                     && !case.uses_docx_streaming_creation()
+                    && !case.uses_pptx_streaming_creation()
                     && !case.uses_odt_buffered_creation()
                     && !case.uses_odt_streaming_creation()
                     && !case.uses_odp_buffered_creation()
@@ -10146,6 +10156,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 .filter(|case| case.uses_docx_streaming_creation())
             {
                 results.push(docx_streaming_create::run(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_pptx_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = pptx_streaming_create::build_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_pptx_streaming_creation())
+            {
+                results.push(pptx_streaming_create::run(
                     case,
                     &corpus,
                     options.warmup_iterations,
@@ -11823,6 +11856,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_one_slide" => Some(Case::PptxSemanticOneSlide),
         "pptx_semantic_full_text" => Some(Case::PptxSemanticFullText),
         "pptx_semantic_create_small" => Some(Case::PptxSemanticCreateSmall),
+        "pptx_streaming_create" => Some(Case::PptxStreamingCreate),
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
@@ -12290,7 +12324,8 @@ fn usage_text() -> String {
                                        docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,\n\
                                        pptx_semantic_open,pptx_semantic_list_slides,\n\
                                        pptx_semantic_one_slide,pptx_semantic_full_text,\n\
-                                       pptx_semantic_create_small,pptx_semantic_noop_edit_save,\n\
+                                       pptx_semantic_create_small,pptx_streaming_create,\n\
+                                       pptx_semantic_noop_edit_save,\n\
                                        pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,\n\
                                        pptx_named_one_edit_save,pptx_named_repeated_edit_save,\n\
                                        pptx_numeric_repeated_edit_save,\n\
@@ -23103,7 +23138,10 @@ fn run_case_with_config(
         Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
             run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
-        Case::XlsxStreamingCreate | Case::RtfStreamingCreate | Case::DocxStreamingCreate => {
+        Case::XlsxStreamingCreate
+        | Case::RtfStreamingCreate
+        | Case::DocxStreamingCreate
+        | Case::PptxStreamingCreate => {
             Err("streaming creation cases use their bounded corpus runner".into())
         },
         Case::OpcRangeSourceOpen => {
@@ -58777,7 +58815,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 440);
+        assert_eq!(selectable_count, 441);
         assert_eq!(Case::DEFAULT.len(), 37);
     }
 
@@ -60806,6 +60844,41 @@ mod tests {
         assert!(docx.semantic_reopen_verified);
         assert!(docx.deterministic_output_verified);
         assert_eq!(docx.scratch_bytes, 64);
+        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
+    }
+
+    #[test]
+    fn pptx_streaming_creation_is_opt_in_and_reports_public_writer_evidence() {
+        let case = parse_case("pptx_streaming_create").expect("streaming PPTX selector parses");
+        assert_eq!(case, Case::PptxStreamingCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+        let corpus = super::pptx_streaming_create::build_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(corpus.manifest.archive_member_count, 37 + 2 * 8);
+        assert_eq!(corpus.manifest.entry_count, 8);
+        let measured = super::pptx_streaming_create::run(case, &corpus, 0, 1).unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(corpus.manifest.archive_sha256.as_str())
+        );
+        let sink = measured.sink.as_ref().unwrap();
+        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(sink.retained_authoring_window_bytes, None);
+        assert_eq!(
+            sink.input_bytes,
+            Some(corpus.manifest.uncompressed_payload_bytes as u64)
+        );
+        let source = measured.source.as_ref().unwrap();
+        let pptx = source.pptx_slides.as_ref().unwrap();
+        assert_eq!(pptx.role, "streaming");
+        assert_eq!(pptx.slide_count, corpus.manifest.entry_count);
+        assert_eq!(pptx.text_box_count, corpus.manifest.entry_count);
+        assert!(pptx.archive_member_set_verified);
+        assert!(pptx.semantic_reopen_verified);
+        assert!(pptx.deterministic_output_verified);
+        assert_eq!(pptx.structural_metadata_fixed_member_count, 37);
+        assert_eq!(pptx.structural_metadata_members_per_slide, 2);
         assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
     }
 

@@ -2512,6 +2512,38 @@ The corpus contains deterministic numeric cells and untouched media members;
 the row-visibility evidence does not reuse the multi-sheet scalar-cell CRUD
 shape or make a claim about broad worksheet/row structural editing.
 
+## Opt-in PPTX fresh streaming creation
+
+`pptx_streaming_create` exercises public `StreamingPresentationWriter` with
+one plain Unicode text box per slide. `--semantic-shape` selects 8 (`tiny`),
+256 (`medium`) or 8,192 (`large`) slides. The case is excluded from the default
+matrix and uses a non-seek hashing discard sink with zero retained output.
+
+```sh
+RUSTUP_TOOLCHAIN=1.98.1 cargo run --release --locked \
+  --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline -- \
+  --case pptx_streaming_create --semantic-shape tiny,medium,large \
+  --workers 1 --warmup 3 --samples 30 --json pptx-streaming.json
+```
+
+An untimed artifact checks the exact 37+2N member sequence, all slide text and
+geometry, and the presentation/master/layout graph. It is released before
+samples. Timed outputs must match its archive hash, byte count and validated
+writer slide/text counters. The target-part identity and `authored_part_bytes`
+refer to preflight `ppt/presentation.xml`, not the sum of slide XML bytes.
+
+Operation allocation metrics use the existing `litchi-perf-baseline-alloc`
+target with `--features allocator-metrics`. Limits construction, generated
+text, the full public writer lifecycle and ZIP finalization/destruction are
+inside the timer and allocator region; preflight and sink digest extraction
+are outside. Process RSS includes the materializing preflight.
+
+The slide XML byte limit is a policy counter. OPC name validation maps and ZIP
+name/directory metadata grow with member count, so the case does not report
+an authoring-window byte reservation or claim constant total memory. Fresh
+creation is separate from logical append, package Part addition and arbitrary
+editing/repackaging. See the [0474 evidence record](../../docs/performance/changes/0474-pptx-streaming-operation-memory.md).
+
 ## Opt-in DOCX fresh streaming creation
 
 `docx_streaming_create` exercises the public `StreamingDocumentWriter` with
