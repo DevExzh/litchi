@@ -1,0 +1,25 @@
+{
+  "identity_shapes": 3,
+  "lanes": 12,
+  "live": {
+    "binaries": [
+      "normal",
+      "allocator"
+    ],
+    "status": "pass",
+    "tree": "/tmp/litchi-goal-0473/tree"
+  },
+  "samples": 360,
+  "schema": "litchi-0473-verification-v1",
+  "sealed": {
+    "files": 159,
+    "status": "pass"
+  },
+  "shapes": [
+    "tiny",
+    "medium",
+    "large"
+  ],
+  "status": "pass",
+  "validation_receipts": 13
+}

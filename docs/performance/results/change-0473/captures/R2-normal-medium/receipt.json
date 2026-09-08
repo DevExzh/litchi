@@ -1,0 +1,78 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0473/captures/R2-normal-medium/resource.log",
+    "/tmp/litchi-goal-0473/normal",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--case",
+    "docx_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0473/captures/R2-normal-medium/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0473/captures/R2-normal-medium/corpus-catalog.json"
+  ],
+  "artifacts": {
+    "corpus-catalog.json": {
+      "bytes": 4886,
+      "sha256": "83ebcdb99763113e41296abbe84bb8d59ad5341692fa9e40e324004496c66503"
+    },
+    "report.json": {
+      "bytes": 33383,
+      "sha256": "161620df41923a4a333ed2385da775c58e172075868da37ce23e9f81c1ac3a09"
+    },
+    "resource.log": {
+      "bytes": 1066,
+      "sha256": "d4d18e22f62a7c88e96da22c95480d582bc2804901445954d1c16b6f9fa3b2d8"
+    },
+    "started.json": {
+      "bytes": 1556,
+      "sha256": "26d089edf3e5c541d6af5eb62a0aacc72b557ef8203db0bf79276c0d69662ba4"
+    },
+    "stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary_sha256": "2b86d46e3ec91bbcb84d26f1417f8481e6c3807c86bcb3584b6d52ee65227f14",
+  "binary_unchanged": true,
+  "build_sha256": "ce3072e8d2ed19160b41cbdc7b98c3179d54d93797560a3c55f47220f2361edb",
+  "clean_after": true,
+  "clean_before": true,
+  "cwd": "/tmp/litchi-goal-0473/tree",
+  "driver_sha256": "d436af9d0f7e3a68935ec040657869dbced1c9c3f6a3529b6c355452e1314ed1",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T09:31:38.788418+00:00",
+  "lane": "R2-normal-medium",
+  "mode": "normal",
+  "protocol_sha256": "1ef264d15924ea712f0cb7cbb843ccdd9211daa146e1737862001f150db7fd3b",
+  "repeat": "R2",
+  "revision": "a1bd623b3dd0ab23259d2d6f692392ee275475e0",
+  "samples": 30,
+  "schema": "litchi-0473-capture-v1",
+  "shape": "medium",
+  "started_utc": "2026-09-08T09:31:37.703858+00:00",
+  "warmups": 3
+}

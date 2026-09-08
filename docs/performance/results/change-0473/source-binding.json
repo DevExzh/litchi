@@ -1,0 +1,12 @@
+{
+  "fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "a1bd623b3dd0ab23259d2d6f692392ee275475e0",
+  "source_manifest": {
+    "files": 7033,
+    "path": "sources/source.json",
+    "sha256": "4e75a55c9df2827e944142504d279518dd00bc888191fb63332bcec5270441e5"
+  }
+}

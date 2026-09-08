@@ -1,0 +1,24 @@
+{
+  "identity_shapes": 3,
+  "lanes": 12,
+  "live": {
+    "status": "not_checked"
+  },
+  "portable": [
+    "isolated export passed",
+    "output identity mutation rejected"
+  ],
+  "samples": 360,
+  "schema": "litchi-0473-verification-v1",
+  "sealed": {
+    "files": 163,
+    "status": "pass"
+  },
+  "shapes": [
+    "tiny",
+    "medium",
+    "large"
+  ],
+  "status": "pass",
+  "validation_receipts": 13
+}

@@ -1,0 +1,14 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+warning: unused variable: `work`
+   --> src/docx_streaming_create.rs:136:9
+    |
+136 |     let work = paragraphs
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_work`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi-perf-baseline` (lib test) generated 1 warning (run `cargo fix --lib -p litchi-perf-baseline --tests` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 1m 25s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-29f337af20e7aa2c)

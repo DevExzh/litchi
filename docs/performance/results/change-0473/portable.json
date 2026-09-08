@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/tmp/litchi-goal-0473-portable/verify.py",
+    "--sealed",
+    "--portable-check"
+  ],
+  "started_utc": "2026-09-08T09:37:27.227548+00:00",
+  "stdout_sha256": "bace8297fb79d8d7017e7f1432f80151414aed24b0aeb7c0a03beee038959981",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T09:37:28.175212+00:00"
+}

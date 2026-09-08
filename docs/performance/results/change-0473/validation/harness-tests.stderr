@@ -1,0 +1,4 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 1m 09s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-29f337af20e7aa2c)
+error: test failed, to rerun pass `--lib`

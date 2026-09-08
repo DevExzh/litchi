@@ -1,0 +1,160 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "d1149474a8bcab183e011b49d9835b95c669653c132444abb345bde5f44668d7",
+  "content_set_sha256": "9e01e936f5a653c4bc8e6c37b4cb949129cdf39f6ebd92ffe0dc15600856490d",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "a1bd623b3dd0ab23259d2d6f692392ee275475e0",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "docx-ooxml-zip:sha256:a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba",
+      "name": "docx-streaming-paragraphs-tiny",
+      "legacy_v1": {
+        "name": "docx-streaming-paragraphs-tiny",
+        "generator": "litchi-docx-streaming-paragraphs-v1",
+        "package_format": "DOCX/OOXML/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-plain-unicode-xml-significant-paragraphs",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 46,
+        "uncompressed_payload_bytes": 2944,
+        "archive_bytes": 1233,
+        "archive_sha256": "a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba",
+        "target_entry": "word/document.xml",
+        "target_payload_bytes": 7219,
+        "target_payload_sha256": "d2d95ec748567e2416358a2804a03edb43c87e581502dd68fa19d36aa8a00bbd",
+        "xlsx": null
+      },
+      "format": "DOCX/OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-docx-streaming-paragraphs-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-plain-unicode-xml-significant-paragraphs",
+          "legacy_shape": "tiny"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 1233,
+        "archive_sha256": "a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba",
+        "logical_payload_bytes": 2944,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 46,
+        "entry_count": 64
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 1233,
+          "members": 3,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "word/document.xml",
+          "logical_bytes": 7219,
+          "sha256": "d2d95ec748567e2416358a2804a03edb43c87e581502dd68fa19d36aa8a00bbd"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "docx_streaming_create"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "docx_streaming_create",
+      "corpus_id": "docx-ooxml-zip:sha256:a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba",
+      "legacy_name": "docx-streaming-paragraphs-tiny",
+      "legacy_archive_sha256": "a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba",
+      "role": "timed"
+    }
+  ]
+}

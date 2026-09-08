@@ -1,0 +1,6 @@
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+ Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.91s
+   Generated /home/zhuhe/code/litchi/tools/perf-baseline/target/doc/litchi_perf_baseline/index.html and 8 other files

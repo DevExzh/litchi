@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0473/validation/docx-streaming-tests.stdout",
+    ":(exclude)docs/performance/results/change-0473/validation/docx-streaming-unit.stdout",
+    ":(exclude)docs/performance/results/change-0473/validation/harness-focused.stdout",
+    ":(exclude)docs/performance/results/change-0473/validation/harness-tests-final.stdout",
+    ":(exclude)docs/performance/results/change-0473/validation/harness-tests.stdout"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "excluded_immutable_logs": [
+    "docs/performance/results/change-0473/validation/docx-streaming-tests.stdout",
+    "docs/performance/results/change-0473/validation/docx-streaming-unit.stdout",
+    "docs/performance/results/change-0473/validation/harness-focused.stdout",
+    "docs/performance/results/change-0473/validation/harness-tests-final.stdout",
+    "docs/performance/results/change-0473/validation/harness-tests.stdout"
+  ],
+  "reason": "Retain original Rust test stdout terminal blank lines."
+}

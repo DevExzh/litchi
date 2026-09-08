@@ -1,0 +1,23 @@
+
+running 18 tests
+test streaming::tests::hidden_opc_ceilings_are_rejected_instead_of_being_opaque_runtime_limits ... ok
+test streaming::tests::fixed_memory_reservation_releases_through_hierarchy ... ok
+test streaming::tests::text_size_scan_charges_work_at_a_bounded_checkpoint ... ok
+test streaming::tests::cancellation_during_package_finalization_preserves_typed_progress ... ok
+test streaming::tests::cancellation_is_observed_before_next_output ... ok
+test streaming::tests::fixed_objects_and_work_are_preflighted_before_first_output ... ok
+test streaming::tests::cancellation_during_flush_retry_is_checked_before_retrying ... ok
+test streaming::tests::state_errors_are_retryable_but_semantic_failures_poison ... ok
+test streaming::tests::counter_overflow_is_reported_as_a_finite_limit_failure ... ok
+test streaming::tests::zero_and_failing_sinks_report_typed_progress_and_poisoning ... ok
+test streaming::tests::non_seek_short_and_interrupted_sinks_finish_without_buffering ... ok
+test streaming::tests::deterministic_package_is_bounded_to_three_members ... ok
+test streaming::tests::finite_limits_are_exact_and_one_over ... ok
+test streaming::tests::escaped_chunk_boundaries_are_counted_once_at_exact_xml_limits ... ok
+test streaming::tests::output_limit_is_exact_and_one_over ... ok
+test streaming::tests::hierarchical_input_and_output_budgets_have_exact_boundaries ... ok
+test streaming::tests::plain_text_validation_and_escaping_are_preflighted ... ok
+test streaming::tests::controlled_sink_preserves_document_progress_through_deflate_failure ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 908 filtered out; finished in 0.10s
+
