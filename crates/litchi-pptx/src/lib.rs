@@ -186,5 +186,6 @@ pub use view_properties::{
 };
 pub use writer::{
     MutablePresentation, MutableShape, MutableSlide, StreamingPresentationLimits,
-    StreamingPresentationOptions, StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
+    StreamingPresentationOptions, StreamingPresentationScratchLimits, StreamingPresentationWriter,
+    StreamingSlideWriter, TextBoxSpec,
 };

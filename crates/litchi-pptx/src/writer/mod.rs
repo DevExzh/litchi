@@ -9,8 +9,8 @@ pub use presentation::{FIRST_SLIDE_ID, MutablePresentation};
 pub use shape::{MutableShape, ShapeType};
 pub use slide::MutableSlide;
 pub use streaming::{
-    StreamingPresentationLimits, StreamingPresentationOptions, StreamingPresentationWriter,
-    StreamingSlideWriter, TextBoxSpec,
+    StreamingPresentationLimits, StreamingPresentationOptions, StreamingPresentationScratchLimits,
+    StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
 };
 
 #[cfg(test)]

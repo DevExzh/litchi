@@ -29,6 +29,7 @@ mod archive;
 mod crc;
 mod errors;
 pub mod extra_fields;
+pub mod generated_names;
 mod headers;
 mod locator;
 mod mode;

@@ -4,8 +4,10 @@
 //! The caller declares the slide count up front and emits one slide at a time;
 //! each completed slide is released after its OPC member is finalized.  The
 //! writer is fresh-authoring only and intentionally models plain text boxes.
-//! The semantic authoring window is bounded; the ZIP transport still retains
+//! The semantic authoring window is bounded. Default constructors retain ZIP
 //! central-directory and member-name metadata that grows with the part count.
+//! Explicit metadata-spool constructors use caller-supplied storage for the
+//! directory and a fixed descriptor plan for the generated member names.
 //! The output budget's preflight check covers only mandatory ZIP structure and
 //! member-name metadata; payload, descriptor, and compressor bytes remain
 //! runtime work that can report typed incomplete output.
@@ -14,7 +16,10 @@ use std::io::{self, Write};
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
-use litchi_opc::phys_pkg::{PartWriter, PhysPkgWriter};
+use litchi_opc::phys_pkg::{
+    GeneratedPartNamePlan, GeneratedPartNamePlanBuilder, GeneratedPartNamePlanLimits, PartWriter,
+    PhysPkgWriter,
+};
 
 use crate::resources;
 use crate::{Error, Result};
@@ -95,6 +100,36 @@ pub struct StreamingPresentationLimits {
     /// static resources and authored XML will fit; such output can fail with
     /// typed incomplete progress after streaming has begun.
     pub max_output_bytes: u64,
+}
+
+/// Explicit caller-owned scratch policy for the generated-name streaming
+/// presentation route.
+///
+/// The provider is appended with finalized ZIP central-directory records and
+/// replayed through a fixed buffer when the archive is finished. The provider
+/// is never opened implicitly; callers choose its storage and cleanup policy.
+/// The provider must preserve exclusive, coherent access to appended bytes,
+/// including through any backing aliases, until finalization. A memory-backed
+/// provider retains these records in memory; its storage is additional to the
+/// writer's replay window, descriptor plan, active member, and compressor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StreamingPresentationScratchLimits {
+    /// Maximum bytes of serialized ZIP central-directory records retained in
+    /// the caller-supplied scratch provider.
+    pub max_bytes: u64,
+    /// Number of bytes used for each scratch replay window.
+    pub buffer_bytes: usize,
+}
+
+impl StreamingPresentationScratchLimits {
+    /// Construct an explicit scratch policy.
+    #[must_use]
+    pub const fn new(max_bytes: u64, buffer_bytes: usize) -> Self {
+        Self {
+            max_bytes,
+            buffer_bytes,
+        }
+    }
 }
 
 impl Default for StreamingPresentationLimits {
@@ -286,6 +321,88 @@ impl<W: Write> StreamingPresentationWriter<W> {
             limits,
             total_text_bytes: 0,
         })
+    }
+
+    /// Create a streaming deck with explicit dimensions, finite limits, and
+    /// caller-owned central-directory scratch.
+    ///
+    /// The complete physical member sequence is checked symbolically before
+    /// the output sink is constructed. The generated-name capability therefore
+    /// retains only a bounded cursor for member-name validation; it does not
+    /// retain a name set proportional to the declared slide count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, dimensions, scratch policy, an
+    /// unprovable generated member sequence, or a sink/provider failure.
+    /// Failures after output begins report accepted bytes through
+    /// [`litchi_opc::OpcError::IncompleteOutput`].
+    pub fn with_options_and_metadata_spool<S>(
+        writer: W,
+        slide_count: usize,
+        options: StreamingPresentationOptions,
+        limits: StreamingPresentationLimits,
+        spool: S,
+        scratch_limits: StreamingPresentationScratchLimits,
+    ) -> Result<Self>
+    where
+        S: io::Read + io::Seek + Write + Send + Sync + 'static,
+    {
+        validate_configuration(slide_count, options, limits)?;
+        validate_scratch_configuration(scratch_limits)?;
+
+        // Build and validate every fixed and indexed name before handing the
+        // output sink to OPC. This is the only name-validation state retained
+        // by the generated route.
+        let plan = generated_name_plan(slide_count)?;
+        let sink = BudgetedSink::new(writer, limits.max_output_bytes);
+        let mut archive = PhysPkgWriter::with_writer_and_generated_plan_and_metadata_spool(
+            sink,
+            plan,
+            spool,
+            scratch_limits.max_bytes,
+            scratch_limits.buffer_bytes,
+        )
+        .map_err(Error::Opc)?;
+        archive = write_content_types(archive, slide_count)?;
+        archive = write_package_relationships(archive)?;
+        archive = write_static_parts(archive)?;
+        archive = write_presentation(archive, slide_count, options)?;
+        archive = write_presentation_relationships(archive, slide_count)?;
+        Ok(Self {
+            archive,
+            slide_count,
+            next_slide: 0,
+            options,
+            limits,
+            total_text_bytes: 0,
+        })
+    }
+
+    /// Create a 4:3 streaming deck with default semantic limits and explicit
+    /// caller-owned central-directory scratch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid scratch policy, generated-name proof,
+    /// semantic limits, or a sink/provider failure.
+    pub fn with_metadata_spool<S>(
+        writer: W,
+        slide_count: usize,
+        spool: S,
+        scratch_limits: StreamingPresentationScratchLimits,
+    ) -> Result<Self>
+    where
+        S: io::Read + io::Seek + Write + Send + Sync + 'static,
+    {
+        Self::with_options_and_metadata_spool(
+            writer,
+            slide_count,
+            StreamingPresentationOptions::default(),
+            StreamingPresentationLimits::default(),
+            spool,
+            scratch_limits,
+        )
     }
 
     /// Start the next slide in declaration order.
@@ -630,6 +747,86 @@ impl<W: Write> StreamingSlideWriter<W> {
         );
         Ok(())
     }
+}
+
+fn validate_scratch_configuration(
+    scratch_limits: StreamingPresentationScratchLimits,
+) -> Result<()> {
+    if scratch_limits.max_bytes == 0 || scratch_limits.buffer_bytes == 0 {
+        return Err(Error::Invalid(
+            "streaming PPTX scratch limits must all be positive".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn generated_name_plan(slide_count: usize) -> Result<GeneratedPartNamePlan> {
+    let layout_count = u64::try_from(resources::SLIDE_LAYOUTS.len())
+        .map_err(|_| Error::Invalid("streaming PPTX layout count overflow".into()))?;
+    let slide_count_u64 = u64::try_from(slide_count)
+        .map_err(|_| Error::Invalid("streaming PPTX slide count overflow".into()))?;
+    let fixed_entries = u64::try_from(FIXED_PHYSICAL_ENTRY_COUNT)
+        .map_err(|_| Error::Invalid("streaming PPTX fixed member count overflow".into()))?;
+    let slide_entries = slide_count_u64
+        .checked_mul(2)
+        .ok_or_else(|| Error::Invalid("streaming PPTX member count overflow".into()))?;
+    let max_entries = fixed_entries
+        .checked_add(slide_entries)
+        .ok_or_else(|| Error::Invalid("streaming PPTX member count overflow".into()))?;
+
+    // The descriptor budget is fixed by the PPTX topology. It is deliberately
+    // independent of slide_count; max_entries remains the only count-sized
+    // quantity passed to the proof builder.
+    let limits = GeneratedPartNamePlanLimits {
+        max_patterns: 64,
+        max_pattern_bytes: 4096,
+        max_entries,
+    };
+    let mut builder = GeneratedPartNamePlanBuilder::new(limits).map_err(Error::Opc)?;
+    for name in [
+        "/[Content_Types].xml",
+        "/_rels/.rels",
+        CORE_PROPERTIES_PART,
+        EXTENDED_PROPERTIES_PART,
+        PRESENTATION_PROPERTIES_PART,
+        VIEW_PROPERTIES_PART,
+        TABLE_STYLES_PART,
+        MASTER_PART,
+        "/ppt/slideMasters/_rels/slideMaster1.xml.rels",
+    ] {
+        builder.push_literal(name).map_err(Error::Opc)?;
+    }
+    builder
+        .push_indexed(
+            1,
+            layout_count,
+            &[
+                ("/ppt/slideLayouts/slideLayout", ".xml"),
+                ("/ppt/slideLayouts/_rels/slideLayout", ".xml.rels"),
+            ],
+        )
+        .map_err(Error::Opc)?;
+    for name in [
+        THEME_PART,
+        NOTES_THEME_PART,
+        NOTES_MASTER_PART,
+        "/ppt/notesMasters/_rels/notesMaster1.xml.rels",
+        PRESENTATION_PART,
+        "/ppt/_rels/presentation.xml.rels",
+    ] {
+        builder.push_literal(name).map_err(Error::Opc)?;
+    }
+    builder
+        .push_indexed(
+            1,
+            slide_count_u64,
+            &[
+                ("/ppt/slides/slide", ".xml"),
+                ("/ppt/slides/_rels/slide", ".xml.rels"),
+            ],
+        )
+        .map_err(Error::Opc)?;
+    builder.finish().map_err(Error::Opc)
 }
 
 struct BudgetedSink<W: Write> {
