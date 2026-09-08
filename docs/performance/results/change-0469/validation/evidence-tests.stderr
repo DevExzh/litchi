@@ -1,0 +1,14 @@
+......F.
+======================================================================
+FAIL: test_heaptrack_fractional_count_fails_closed (__main__.ResourceParserTests.test_heaptrack_fractional_count_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0469/test_evidence.py", line 75, in test_heaptrack_fractional_count_fails_closed
+    with self.assertRaises(analyze.AnalysisError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: AnalysisError not raised
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.002s
+
+FAILED (failures=1)

@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0469-portable-replay-v1",
+  "argv": [
+    "python3",
+    "-B",
+    "/tmp/litchi-goal-0469/portable/docs/performance/results/change-0469/verify.py"
+  ],
+  "cwd": "/tmp/litchi-goal-0469/portable",
+  "started_utc": "2026-09-08T06:37:42.139785+00:00",
+  "input_seal_sha256": "c3ed7f9f53e0fcdd1601053d29646666490e481d48d7d5e1ee7076e22eb616a3",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T06:37:42.897282+00:00",
+  "stdout": "{\n  \"binary_sha256\": {\n    \"candidate\": \"dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da\",\n    \"control\": \"9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb\"\n  },\n  \"change\": 469,\n  \"chronology\": {\n    \"build_before_candidate_captures\": true,\n    \"capture_intervals_non_overlapping\": true,\n    \"capture_order\": [\n      \"A1\",\n      \"B1\",\n      \"B2\",\n      \"A2\",\n      \"A-full\",\n      \"B-full\",\n      \"A-heap\",\n      \"B-heap\"\n    ],\n    \"exports_after_captures\": true\n  },\n  \"dependencies\": {\n    \"perf_abba_summary\": {\n      \"bytes\": 319636,\n      \"path\": \"tools/perf_abba_summary.py\",\n      \"sha256\": \"b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4\"\n    },\n    \"perf_compare\": {\n      \"bytes\": 169266,\n      \"path\": \"tools/perf_compare.py\",\n      \"sha256\": \"9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e\"\n    },\n    \"report_policy\": {\n      \"bytes\": 5353,\n      \"path\": \"report-policy.json\",\n      \"sha256\": \"6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c\"\n    }\n  },\n  \"lanes\": [\n    \"A1\",\n    \"B1\",\n    \"B2\",\n    \"A2\",\n    \"A-full\",\n    \"B-full\",\n    \"A-heap\",\n    \"B-heap\"\n  ],\n  \"live_state\": {\n    \"mode\": \"post-cleanup\",\n    \"roles\": {\n      \"candidate\": {\n        \"binary_absent\": true,\n        \"tree_absent\": true\n      },\n      \"control\": {\n        \"binary_absent\": true,\n        \"tree_absent\": true\n      }\n    }\n  },\n  \"mode\": \"post-cleanup\",\n  \"schema\": \"litchi-0469-verification-v1\",\n  \"sealed_files\": 153,\n  \"status\": \"pass\",\n  \"summary\": {\n    \"analyzer\": {\n      \"bytes\": 18313,\n      \"path\": \"analyze.py\",\n      \"sha256\": \"830ea0546c0cff6732a11b4d7e1a10f1b56ecf3e83d0acf50f503b95e145ff3d\"\n    },\n    \"path\": \"summary.json\"\n  },\n  \"targeted_guard_strict_abba_status\": \"rejected\"\n}\n",
+  "stderr": ""
+}

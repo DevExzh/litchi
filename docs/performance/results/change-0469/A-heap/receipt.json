@@ -1,0 +1,85 @@
+{
+  "schema": "litchi-0469-capture-v1",
+  "lane": "A-heap",
+  "role": "control",
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "binding_sha256": "9d99a1397db5b093ab295d685d0d47128366375b79f1353ede3b067ab5423826",
+  "driver_sha256": "4c5f240695681f846128440f60092dc48dcc143c68e9b4a7ee0b58d13a669038",
+  "protocol_sha256": "c40d210d79e3bb29898c445e32d673af729088290f96f4a6b416f5b83347a3e4",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/A-heap/resource.log",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/A-heap/heaptrack",
+    "--",
+    "/tmp/litchi-goal-0469/control",
+    "--workers",
+    "1",
+    "--warmup",
+    "1",
+    "--samples",
+    "5",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/A-heap/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/A-heap/corpus-catalog.json",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "samples": 5,
+  "warmups": 1,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T06:19:29.934738+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "report_metadata_matches_clean_role": true,
+  "finished_utc": "2026-09-08T06:19:48.194523+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "e33d167bfdeaa2fe0ed82895370091786e722fd6e54e4885c30efa1793c5722d",
+      "bytes": 1589
+    },
+    "heaptrack.zst": {
+      "sha256": "591efa35a540165401c7634f0a048b38ea770705c675b195e77dd3fd1b97dc8a",
+      "bytes": 1228494
+    },
+    "corpus-catalog.json": {
+      "sha256": "c8a36078f090533fb205fcfd50accebe26d1c23b7aeb1401bce2c48b692d2c4c",
+      "bytes": 6314
+    },
+    "stdout.log": {
+      "sha256": "46fa6a0540264db4298234ca2343b591b7e87524585230f05a7ef42962f5f9a5",
+      "bytes": 345
+    },
+    "report.json": {
+      "sha256": "f753972913cfe74273f4dcd4bb46cf4031a4974b4879230ed0fe89be7be8aa9c",
+      "bytes": 16708
+    },
+    "resource.log": {
+      "sha256": "785e76c17e22b055bab75726a4c2b48144060a206f82edf1170c73802ebfcbf4",
+      "bytes": 1144
+    },
+    "stderr.log": {
+      "sha256": "e3dc34b226c3ac133eff0f3bd3d9f971eb6cdb2b9ec9dc3f583611df312d9192",
+      "bytes": 300
+    }
+  }
+}

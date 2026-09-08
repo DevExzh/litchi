@@ -1,0 +1,77 @@
+{
+  "schema": "litchi-0469-capture-v1",
+  "lane": "B1",
+  "role": "candidate",
+  "revision": "7cc58fc1b37144f15b7bde13a9598e396e5089eb",
+  "binary_sha256": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da",
+  "binding_sha256": "cd96065b83953367d50bffe24ee22472e80772c784ceb0dd362c0468fac56510",
+  "driver_sha256": "4c5f240695681f846128440f60092dc48dcc143c68e9b4a7ee0b58d13a669038",
+  "protocol_sha256": "c40d210d79e3bb29898c445e32d673af729088290f96f4a6b416f5b83347a3e4",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/B1/resource.log",
+    "/tmp/litchi-goal-0469/candidate",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "100",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/B1/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/B1/corpus-catalog.json",
+    "--case",
+    "xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "samples": 100,
+  "warmups": 5,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T06:13:24.854336+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "report_metadata_matches_clean_role": true,
+  "finished_utc": "2026-09-08T06:14:51.002061+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "599a2c33ba2b2cdfcccbc26fa016626934ea4385e0d9a862fb5dfed6bb2392f3",
+      "bytes": 1497
+    },
+    "corpus-catalog.json": {
+      "sha256": "95dacbefdeebeb14382b9b944616d162f5306c88f4d144d1b1b0d31f7292cda1",
+      "bytes": 18771
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "1cc0029461787167f9476eba5d1facee994751c552c43ae6bef464b0a14f9ef3",
+      "bytes": 210041
+    },
+    "resource.log": {
+      "sha256": "5b820ef9d3d7b6bc7d073c9951b5442914ad9435b0fac508b97498f6405fe975",
+      "bytes": 1074
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

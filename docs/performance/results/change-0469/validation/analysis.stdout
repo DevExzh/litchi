@@ -1,0 +1,1 @@
+{"error": "canonical full guard comparison failed: optional metric source.read_calls has 0 samples; minimum is 15", "status": "fail"}

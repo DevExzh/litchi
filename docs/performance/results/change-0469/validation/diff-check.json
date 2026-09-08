@@ -1,0 +1,10 @@
+{
+  "full_exit_code": 2,
+  "full_stdout": "docs/performance/results/change-0469/A-heap/stderr.log:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0469/B-heap/stderr.log:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \n",
+  "scoped_exit_code": 0,
+  "scope_exceptions": [
+    "docs/performance/results/change-0469/A-heap/stderr.log",
+    "docs/performance/results/change-0469/B-heap/stderr.log"
+  ],
+  "reason": "Two raw Heaptrack stderr lines contain original trailing spaces. Preserve exact capture hashes; all other staged files pass whitespace checking."
+}

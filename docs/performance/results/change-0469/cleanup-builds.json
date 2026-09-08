@@ -1,0 +1,19 @@
+{
+  "schema": "litchi-0469-build-cleanup-v1",
+  "finished_utc": "2026-09-08T06:37:17.928350+00:00",
+  "removed_binaries": [
+    {
+      "path": "/tmp/litchi-goal-0469/control",
+      "sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+      "bytes": 463620672
+    },
+    {
+      "path": "/tmp/litchi-goal-0469/candidate",
+      "sha256": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da",
+      "bytes": 463620664
+    }
+  ],
+  "removed_worktree": "/tmp/litchi-goal-0468/profile-tree",
+  "worktree_absent": true,
+  "shared_cargo_cache_retained": true
+}

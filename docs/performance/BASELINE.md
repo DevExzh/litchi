@@ -1,6 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
-## Current dense XLSX residual profile (0468)
+## Current XLSX compaction allocation result (0469)
+
+[0469](changes/0469-xlsx-borrowed-compaction-events.md) removes temporary event
+ownership while retaining the complete changed-XML compaction pass. Matched
+whole-process Heaptrack calls fall from 44,815,468 to 39,892,490 (10.985%);
+rounded peak heap remains `104.38M`. All 1,245 XLSX tests and scoped gates pass.
+The 100/5 six-row ABBA has modest median improvements, with mixed dense mean
+and tails; there is no registered latency claim. Normal RSS has appreciable
+control drift. The 201-row short guard retains 57 latency policy flags; a
+seven-row follow-up is rejected by strict ABBA because a CFB concurrency
+counter varies. Individual observations and limitations remain documented.
+
+
+## Dense XLSX residual profile before event borrowing (0468)
 
 [0468](changes/0468-xlsx-remaining-commit-profile.md) profiles the committed
 0467 parser from a clean Rust 1.98.1 frame-pointer build. Two uninstrumented

@@ -1,0 +1,78 @@
+{
+  "binary_sha256": {
+    "candidate": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da",
+    "control": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb"
+  },
+  "change": 469,
+  "chronology": {
+    "build_before_candidate_captures": true,
+    "capture_intervals_non_overlapping": true,
+    "capture_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2",
+      "A-full",
+      "B-full",
+      "A-heap",
+      "B-heap"
+    ],
+    "exports_after_captures": true
+  },
+  "dependencies": {
+    "perf_abba_summary": {
+      "bytes": 319636,
+      "path": "tools/perf_abba_summary.py",
+      "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+    },
+    "perf_compare": {
+      "bytes": 169266,
+      "path": "tools/perf_compare.py",
+      "sha256": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+    },
+    "report_policy": {
+      "bytes": 5353,
+      "path": "report-policy.json",
+      "sha256": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c"
+    }
+  },
+  "lanes": [
+    "A1",
+    "B1",
+    "B2",
+    "A2",
+    "A-full",
+    "B-full",
+    "A-heap",
+    "B-heap"
+  ],
+  "live_state": {
+    "mode": "live",
+    "roles": {
+      "candidate": {
+        "binary_bytes": 463620664,
+        "binary_sha256": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da"
+      },
+      "control": {
+        "binary_bytes": 463620672,
+        "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+        "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+        "source_verified": true,
+        "tree": "/tmp/litchi-goal-0468/profile-tree"
+      }
+    }
+  },
+  "mode": "live",
+  "schema": "litchi-0469-verification-v1",
+  "sealed_files": null,
+  "status": "pass",
+  "summary": {
+    "analyzer": {
+      "bytes": 18313,
+      "path": "analyze.py",
+      "sha256": "830ea0546c0cff6732a11b4d7e1a10f1b56ecf3e83d0acf50f503b95e145ff3d"
+    },
+    "path": "summary.json"
+  },
+  "targeted_guard_strict_abba_status": "rejected"
+}

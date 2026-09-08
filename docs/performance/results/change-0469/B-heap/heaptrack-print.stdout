@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi/docs/performance/results/change-0469/B-heap/heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-goal-0469/candidate --workers 1 --warmup 1 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0469/B-heap/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0469/B-heap/corpus-catalog.json --case xlsx_one_percent_commit_save --xlsx-shape dense-wide
+finished reading file, now analyzing data:
+
+total runtime: 16.260000s.
+calls to allocation functions: 39892490 (2453412/s)
+temporary memory allocations: 10633497 (653966/s)
+peak heap memory consumption: 104.38M
+peak RSS (including heaptrack overhead): 118.65M
+total memory leaked: 544B
