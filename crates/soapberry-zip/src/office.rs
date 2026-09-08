@@ -5285,6 +5285,67 @@ struct CompressedScratch<'a> {
     maximum: u64,
 }
 
+/// Name admission policy used by the Office streaming writer.
+///
+/// The ordinary policy retains normalized names so compatibility callers keep
+/// the existing duplicate-name checks.  A generated policy owns a bounded
+/// cursor instead; its descriptor proves the next normalized name and is
+/// advanced only after the low-level ZIP entry has been published.
+enum StreamingNamePolicy {
+    Ordinary(HashSet<String>),
+    Generated(Box<crate::generated_names::GeneratedNamePlan>),
+}
+
+impl StreamingNamePolicy {
+    fn check_next(&self, normalized_name: &str) -> Result<(), Error> {
+        match self {
+            Self::Ordinary(names) => {
+                if names.contains(normalized_name) {
+                    return Err(ErrorKind::InvalidInput {
+                        msg: format!("duplicate normalized member name: {normalized_name}"),
+                    }
+                    .into());
+                }
+                Ok(())
+            },
+            Self::Generated(plan) => plan.check_next(normalized_name),
+        }
+    }
+
+    fn reserve(&mut self) -> Result<(), Error> {
+        match self {
+            Self::Ordinary(names) => names.try_reserve(1).map_err(|error| {
+                ErrorKind::InvalidInput {
+                    msg: format!("could not reserve streaming ZIP member-name index: {error}"),
+                }
+                .into()
+            }),
+            Self::Generated(_) => Ok(()),
+        }
+    }
+
+    fn record(&mut self, normalized_name: String) -> Result<(), Error> {
+        match self {
+            Self::Ordinary(names) => {
+                let inserted = names.insert(normalized_name);
+                debug_assert!(inserted);
+                Ok(())
+            },
+            Self::Generated(plan) => {
+                drop(normalized_name);
+                plan.advance()
+            },
+        }
+    }
+
+    fn is_complete(&self) -> bool {
+        match self {
+            Self::Ordinary(_) => true,
+            Self::Generated(plan) => plan.is_complete(),
+        }
+    }
+}
+
 impl<'a> CompressedScratch<'a> {
     fn new(inner: &'a mut Vec<u8>, maximum: u64) -> Self {
         Self { inner, maximum }
@@ -5331,7 +5392,7 @@ pub struct StreamingArchiveWriter<W: Write> {
     total_uncompressed_bytes: u64,
     output_bytes: u64,
     poisoned: bool,
-    names: HashSet<String>,
+    name_policy: StreamingNamePolicy,
     last_limit: Option<StreamingLimitExceeded>,
     output_counter: Arc<AtomicU64>,
 }
@@ -5350,7 +5411,7 @@ pub struct StreamingArchiveEntry<W: Write> {
     metadata_bytes: u64,
     metadata_charge: u64,
     total_uncompressed_bytes: u64,
-    names: HashSet<String>,
+    name_policy: StreamingNamePolicy,
     normalized_name: String,
     uncompressed_bytes: u64,
     output_bytes: u64,
@@ -5534,12 +5595,18 @@ impl<W: Write> StreamingArchiveEntry<W> {
             total_uncompressed_bytes: next_total_uncompressed_bytes,
             output_bytes: self.output_bytes,
             poisoned: false,
-            names: self.names,
+            name_policy: self.name_policy,
             last_limit: None,
             output_counter: self.output_counter,
         };
-        let inserted = writer.names.insert(self.normalized_name);
-        debug_assert!(inserted);
+        if let Err(error) = writer.name_policy.record(self.normalized_name) {
+            let error = writer.poison(error);
+            return Err(StreamingArchiveFailure {
+                error,
+                progress: writer.progress(),
+                limit: writer.last_limit,
+            });
+        }
         writer.refresh_output_bytes();
         let progress = writer.progress();
         Ok((writer, progress))
@@ -5687,7 +5754,7 @@ impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
             total_uncompressed_bytes: 0,
             output_bytes: 0,
             poisoned: false,
-            names: HashSet::new(),
+            name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
             last_limit: None,
             output_counter,
         }
@@ -5721,7 +5788,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             total_uncompressed_bytes: 0,
             output_bytes: 0,
             poisoned: false,
-            names: HashSet::new(),
+            name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
             last_limit: None,
             output_counter,
         }
@@ -5769,7 +5836,73 @@ impl<W: Write> StreamingArchiveWriter<W> {
             total_uncompressed_bytes: 0,
             output_bytes: 0,
             poisoned: false,
-            names: HashSet::new(),
+            name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
+            last_limit: None,
+            output_counter,
+        };
+        result.ensure_usable()?;
+        Ok(result)
+    }
+
+    /// Create a sequential writer whose member names must follow a checked
+    /// generated-name plan.
+    ///
+    /// The plan is consumed by the writer and carried through each owned
+    /// entry. Each caller-supplied name must exactly match the plan's next
+    /// canonical raw name before any trimming or ZIP path normalization. The
+    /// plan advances only after that member's central record has been
+    /// published. Unlike the ordinary writer, this mode does not retain a
+    /// growing normalized-name set.
+    pub fn with_writer_and_limits_and_spool_and_name_plan<S>(
+        writer: W,
+        limits: StreamingArchiveLimits,
+        spool: S,
+        spool_limits: crate::DirectorySpoolLimits,
+        plan: crate::generated_names::GeneratedNamePlan,
+    ) -> Result<Self, Error>
+    where
+        S: Read + Write + std::io::Seek + Send + Sync + 'static,
+    {
+        if let Some(error) = Self::invalid_limits_for(limits) {
+            return Err(error);
+        }
+        let maximum_entries = usize_to_u64(limits.max_entries, "streaming ZIP entry limit")?;
+        if plan.entry_count() > maximum_entries {
+            return Err(limit_error(
+                LimitResource::FileCount,
+                plan.entry_count(),
+                maximum_entries,
+            ));
+        }
+        let plan_name_bytes = usize_to_u64(
+            plan.max_name_bytes(),
+            "generated streaming ZIP member name bytes",
+        )?;
+        let maximum_name_bytes = limits
+            .max_member_name_bytes
+            .min(ZIP32_MAX_MEMBER_NAME_BYTES);
+        if plan_name_bytes > maximum_name_bytes {
+            return Err(limit_error(
+                LimitResource::MemberNameBytes,
+                plan_name_bytes,
+                maximum_name_bytes,
+            ));
+        }
+        let output_counter = Arc::new(AtomicU64::new(0));
+        let archive = ZipArchiveWriter::builder().build_with_spool(
+            BoundedOutput::new(writer, limits.max_output_bytes, Arc::clone(&output_counter)),
+            spool,
+            spool_limits,
+        )?;
+        let result = Self {
+            archive,
+            limits,
+            entries: 0,
+            metadata_bytes: 0,
+            total_uncompressed_bytes: 0,
+            output_bytes: 0,
+            poisoned: false,
+            name_policy: StreamingNamePolicy::Generated(Box::new(plan)),
             last_limit: None,
             output_counter,
         };
@@ -5834,19 +5967,23 @@ impl<W: Write> StreamingArchiveWriter<W> {
         self.output_bytes = self.output_counter.load(Ordering::Acquire);
     }
 
-    fn invalid_limits(&self) -> Option<Error> {
-        let reason = if self.limits.max_member_name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES {
+    fn invalid_limits_for(limits: StreamingArchiveLimits) -> Option<Error> {
+        let reason = if limits.max_member_name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES {
             "max_member_name_bytes exceeds the ZIP32 member-name field"
-        } else if self.limits.max_metadata_bytes > self.limits.max_output_bytes {
+        } else if limits.max_metadata_bytes > limits.max_output_bytes {
             "max_metadata_bytes exceeds max_output_bytes"
-        } else if self.limits.max_compressed_size > self.limits.max_output_bytes {
+        } else if limits.max_compressed_size > limits.max_output_bytes {
             "max_compressed_size exceeds max_output_bytes"
-        } else if self.limits.max_output_bytes < MIN_STREAM_OUTPUT_BYTES {
+        } else if limits.max_output_bytes < MIN_STREAM_OUTPUT_BYTES {
             "max_output_bytes is too small for an empty ZIP archive"
         } else {
             return None;
         };
         Some(ErrorKind::InvalidInput { msg: reason.into() }.into())
+    }
+
+    fn invalid_limits(&self) -> Option<Error> {
+        Self::invalid_limits_for(self.limits)
     }
 
     /// Whether an unknown-size entry must establish ZIP64 framing before its
@@ -5925,6 +6062,16 @@ impl<W: Write> StreamingArchiveWriter<W> {
 
     fn validate_entry_name(&self, name: &str) -> Result<(String, u64, usize), Error> {
         self.ensure_usable()?;
+        let generated_name = match &self.name_policy {
+            StreamingNamePolicy::Ordinary(_) => false,
+            StreamingNamePolicy::Generated(plan) => {
+                // Generated plans describe the exact public name sequence.
+                // Check the caller's raw spelling before the compatibility
+                // path normalization below can erase a mismatch.
+                plan.check_next(name)?;
+                true
+            },
+        };
         let raw_name = name.trim_end_matches('/');
         let raw_name_bytes = usize_to_u64(raw_name.len(), "streaming ZIP member name bytes")?;
         let maximum_name_bytes = self
@@ -5951,11 +6098,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             ));
         }
 
-        if self.names.contains(&normalized_name) {
-            return Err(ErrorKind::InvalidInput {
-                msg: format!("duplicate normalized member name: {normalized_name}"),
-            }
-            .into());
+        if !generated_name {
+            self.name_policy.check_next(&normalized_name)?;
         }
 
         let next_entries = self
@@ -6065,20 +6209,15 @@ impl<W: Write> StreamingArchiveWriter<W> {
         )
     }
 
-    fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
-        let inserted = self.names.insert(admission.normalized_name);
-        debug_assert!(inserted);
+    fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) -> Result<(), Error> {
+        self.name_policy.record(admission.normalized_name)?;
         self.entries = admission.next_entries;
         self.metadata_bytes = admission.next_metadata_bytes;
+        Ok(())
     }
 
     fn reserve_streaming_entry(&mut self) -> Result<(), Error> {
-        self.names.try_reserve(1).map_err(|error| {
-            ErrorKind::InvalidInput {
-                msg: format!("could not reserve streaming ZIP member-name index: {error}"),
-            }
-            .into()
-        })
+        self.name_policy.reserve()
     }
 
     fn copy_stream<R: Read, O: Write>(
@@ -6237,7 +6376,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 )));
             },
         };
-        self.record_streaming_entry(admission);
+        if let Err(error) = self.record_streaming_entry(admission) {
+            return Err(self.poison(error));
+        }
         self.refresh_output_bytes();
         Ok(())
     }
@@ -6293,7 +6434,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             total_uncompressed_bytes,
             output_bytes,
             poisoned: _,
-            names,
+            name_policy,
             last_limit,
             output_counter,
         } = self;
@@ -6333,7 +6474,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             metadata_bytes,
             metadata_charge: admission.metadata_bytes,
             total_uncompressed_bytes,
-            names,
+            name_policy,
             normalized_name: admission.normalized_name,
             uncompressed_bytes: 0,
             output_bytes,
@@ -6383,7 +6524,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                             )));
                         },
                     };
-                self.record_streaming_entry(admission);
+                if let Err(error) = self.record_streaming_entry(admission) {
+                    return Err(self.poison(error));
+                }
                 self.refresh_output_bytes();
                 Ok(())
             },
@@ -6455,7 +6598,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 )));
             },
         };
-        self.record_streaming_entry(admission);
+        if let Err(error) = self.record_streaming_entry(admission) {
+            return Err(self.poison(error));
+        }
         self.refresh_output_bytes();
         Ok(())
     }
@@ -6548,7 +6693,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                             )));
                         },
                     };
-                self.record_streaming_entry(admission);
+                if let Err(error) = self.record_streaming_entry(admission) {
+                    return Err(self.poison(error));
+                }
                 self.refresh_output_bytes();
                 Ok(())
             },
@@ -6691,6 +6838,16 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 error,
                 progress: self.progress(),
                 limit: self.last_limit,
+            });
+        }
+        if !self.name_policy.is_complete() {
+            return Err(StreamingArchiveFailure {
+                error: ErrorKind::InvalidInput {
+                    msg: "generated ZIP member-name plan is not exhausted".to_string(),
+                }
+                .into(),
+                progress: self.progress(),
+                limit: None,
             });
         }
         self.refresh_output_bytes();

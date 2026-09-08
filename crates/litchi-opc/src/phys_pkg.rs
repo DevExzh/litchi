@@ -961,6 +961,280 @@ struct PreparedPartName {
     ancestors: Vec<(String, String)>,
 }
 
+/// Resource limits for an OPC generated part-name plan.
+///
+/// The limits describe the finite pattern language used to construct a plan;
+/// they do not reserve storage proportional to the number of generated parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GeneratedPartNamePlanLimits {
+    /// Maximum number of literal or indexed pattern descriptors.
+    pub max_patterns: usize,
+    /// Maximum total bytes retained by pattern descriptors.
+    pub max_pattern_bytes: usize,
+    /// Maximum number of generated OPC parts.
+    pub max_entries: u64,
+}
+
+impl GeneratedPartNamePlanLimits {
+    /// Construct explicit generated-name plan limits.
+    #[must_use]
+    pub const fn new(max_patterns: usize, max_pattern_bytes: usize, max_entries: u64) -> Self {
+        Self {
+            max_patterns,
+            max_pattern_bytes,
+            max_entries,
+        }
+    }
+}
+
+/// A checked, finite OPC generated-name plan builder.
+///
+/// OPC callers use absolute [`PackURI`] names.  The underlying ZIP plan uses
+/// package-relative member names, so this adapter validates and translates the
+/// descriptors without exposing ZIP plan types from the OPC API.
+pub struct GeneratedPartNamePlanBuilder {
+    inner: soapberry_zip::generated_names::GeneratedNamePlanBuilder,
+    limits: GeneratedPartNamePlanLimits,
+    pattern_count: usize,
+    pattern_bytes: usize,
+    entry_count: u64,
+}
+
+/// A checked sequence of OPC part names that can be consumed by a streaming
+/// physical package writer.
+pub struct GeneratedPartNamePlan {
+    inner: soapberry_zip::generated_names::GeneratedNamePlan,
+}
+
+impl GeneratedPartNamePlanBuilder {
+    /// Create a plan builder with finite descriptor and entry limits.
+    pub fn new(limits: GeneratedPartNamePlanLimits) -> Result<Self> {
+        let inner_limits = soapberry_zip::generated_names::GeneratedNamePlanLimits {
+            max_patterns: limits.max_patterns,
+            max_pattern_bytes: limits.max_pattern_bytes,
+            max_entries: limits.max_entries,
+        };
+        Ok(Self {
+            inner: soapberry_zip::generated_names::GeneratedNamePlanBuilder::new(inner_limits)
+                .map_err(OpcError::from)?,
+            limits,
+            pattern_count: 0,
+            pattern_bytes: 0,
+            entry_count: 0,
+        })
+    }
+
+    /// Append one absolute, non-root OPC part name to the sequence.
+    pub fn push_literal(&mut self, name: &str) -> Result<()> {
+        let (pattern_count, pattern_bytes, entry_count) = self.next_budget(1, name.len(), 1)?;
+        let partname = validate_generated_literal(name)?;
+        self.inner
+            .push_literal(partname.membername())
+            .map_err(OpcError::from)?;
+        self.pattern_count = pattern_count;
+        self.pattern_bytes = pattern_bytes;
+        self.entry_count = entry_count;
+        Ok(())
+    }
+
+    /// Append an indexed family of absolute OPC part names.
+    ///
+    /// For each index in `first..first + count`, every `(prefix, suffix)` pair
+    /// emits `prefix + decimal(index) + suffix`.  Prefixes include the
+    /// absolute OPC leading slash; the plan stores the corresponding ZIP
+    /// member names internally. Prefixes ending in `%` are refused because
+    /// decimal insertion could change the validity of an OPC percent escape
+    /// between the checked endpoints.
+    pub fn push_indexed(
+        &mut self,
+        first: u64,
+        count: u64,
+        patterns: &[(&str, &str)],
+    ) -> Result<()> {
+        if count == 0 {
+            return Err(OpcError::ZipError(
+                "generated name plan indexed range is empty".to_owned(),
+            ));
+        }
+        if patterns.is_empty() {
+            return Err(OpcError::ZipError(
+                "generated name plan indexed range has no patterns".to_owned(),
+            ));
+        }
+        let static_bytes = patterns
+            .iter()
+            .try_fold(0usize, |total, (prefix, suffix)| {
+                let pair_bytes = prefix.len().checked_add(suffix.len()).ok_or_else(|| {
+                    OpcError::ZipError(
+                        "generated name plan pattern bytes overflow usize".to_owned(),
+                    )
+                })?;
+                total.checked_add(pair_bytes).ok_or_else(|| {
+                    OpcError::ZipError(
+                        "generated name plan pattern bytes overflow usize".to_owned(),
+                    )
+                })
+            })?;
+        let pattern_count_added = patterns.len();
+        let pattern_count_added_u64 = u64::try_from(pattern_count_added).map_err(|_| {
+            OpcError::ZipError("generated name plan pattern count overflows u64".to_owned())
+        })?;
+        let entries_added = count.checked_mul(pattern_count_added_u64).ok_or_else(|| {
+            OpcError::ZipError("generated name plan entry count overflows u64".to_owned())
+        })?;
+        let (pattern_count, pattern_bytes, entry_count) =
+            self.next_budget(pattern_count_added, static_bytes, entries_added)?;
+
+        for (prefix, _) in patterns {
+            if prefix.as_bytes().last() == Some(&b'%') {
+                return Err(OpcError::InvalidPackUri(
+                    "generated OPC indexed prefixes cannot end with '%'".to_owned(),
+                ));
+            }
+        }
+
+        let last = first.checked_add(count - 1).ok_or_else(|| {
+            OpcError::InvalidPackUri("generated OPC name index range overflows u64".to_owned())
+        })?;
+        for (prefix, suffix) in patterns {
+            validate_generated_index_endpoint(prefix, suffix, first)?;
+            validate_generated_index_endpoint(prefix, suffix, last)?;
+        }
+
+        let mut translated = Vec::new();
+        translated
+            .try_reserve_exact(patterns.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC generated name plan pattern references",
+                source,
+            })?;
+        for &(prefix, suffix) in patterns {
+            let member_prefix = prefix.strip_prefix('/').ok_or_else(|| {
+                OpcError::InvalidPackUri(format!(
+                    "generated OPC name prefix must begin with slash, got '{prefix}'"
+                ))
+            })?;
+            translated.push((member_prefix, suffix));
+        }
+        self.inner
+            .push_indexed(first, count, &translated)
+            .map_err(OpcError::from)?;
+        self.pattern_count = pattern_count;
+        self.pattern_bytes = pattern_bytes;
+        self.entry_count = entry_count;
+        Ok(())
+    }
+
+    /// Finish and return the checked OPC plan.
+    pub fn finish(self) -> Result<GeneratedPartNamePlan> {
+        Ok(GeneratedPartNamePlan {
+            inner: self.inner.finish().map_err(OpcError::from)?,
+        })
+    }
+
+    fn next_budget(
+        &self,
+        additional_patterns: usize,
+        additional_bytes: usize,
+        additional_entries: u64,
+    ) -> Result<(usize, usize, u64)> {
+        let pattern_count = self
+            .pattern_count
+            .checked_add(additional_patterns)
+            .ok_or_else(|| {
+                OpcError::ZipError("generated name plan pattern count overflows usize".to_owned())
+            })?;
+        if pattern_count > self.limits.max_patterns {
+            return Err(OpcError::ZipError(
+                "generated name plan exceeds its pattern budget".to_owned(),
+            ));
+        }
+        let pattern_bytes = self
+            .pattern_bytes
+            .checked_add(additional_bytes)
+            .ok_or_else(|| {
+                OpcError::ZipError("generated name plan pattern bytes overflow usize".to_owned())
+            })?;
+        if pattern_bytes > self.limits.max_pattern_bytes {
+            return Err(OpcError::ZipError(
+                "generated name plan exceeds its pattern-byte budget".to_owned(),
+            ));
+        }
+        let entry_count = self
+            .entry_count
+            .checked_add(additional_entries)
+            .ok_or_else(|| {
+                OpcError::ZipError("generated name plan entry count overflows u64".to_owned())
+            })?;
+        if entry_count > self.limits.max_entries {
+            return Err(OpcError::ZipError(
+                "generated name plan exceeds its entry budget".to_owned(),
+            ));
+        }
+        Ok((pattern_count, pattern_bytes, entry_count))
+    }
+}
+
+impl GeneratedPartNamePlan {
+    /// Number of OPC parts in this plan.
+    #[must_use]
+    pub fn entry_count(&self) -> u64 {
+        self.inner.entry_count()
+    }
+
+    /// Maximum UTF-8 byte length of a generated OPC part name.
+    #[must_use]
+    pub fn max_name_bytes(&self) -> usize {
+        // The lower plan measures ZIP member names.  OPC adds one leading
+        // slash, which is part of every absolute PackURI exposed here.
+        self.inner.max_name_bytes().saturating_add(1)
+    }
+}
+
+fn validate_generated_literal(name: &str) -> Result<PackURI> {
+    let owned = try_owned_string(name, "OPC generated part name")?;
+    let partname = PackURI::new(owned).map_err(OpcError::InvalidPackUri)?;
+    if partname.as_str() == "/" {
+        return Err(OpcError::InvalidPackUri(
+            "an OPC Part cannot use the package root URI".to_owned(),
+        ));
+    }
+    Ok(partname)
+}
+
+fn validate_generated_index_endpoint(prefix: &str, suffix: &str, index: u64) -> Result<()> {
+    let candidate = compose_generated_name(prefix, index, suffix)?;
+    let _ = validate_generated_literal(&candidate)?;
+    Ok(())
+}
+
+fn compose_generated_name(prefix: &str, index: u64, suffix: &str) -> Result<String> {
+    if !prefix.starts_with('/') {
+        return Err(OpcError::InvalidPackUri(format!(
+            "generated OPC name prefix must begin with slash, got '{prefix}'"
+        )));
+    }
+    let digits = index.to_string();
+    let length = prefix
+        .len()
+        .checked_add(digits.len())
+        .and_then(|length| length.checked_add(suffix.len()))
+        .ok_or_else(|| {
+            OpcError::InvalidPackUri("generated OPC name length overflows usize".to_owned())
+        })?;
+    let mut candidate = String::new();
+    candidate
+        .try_reserve_exact(length)
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC generated name endpoint",
+            source,
+        })?;
+    candidate.push_str(prefix);
+    candidate.push_str(&digits);
+    candidate.push_str(suffix);
+    Ok(candidate)
+}
+
 impl PartNameSet {
     fn prepare(candidate: &PackURI) -> Result<PreparedPartName> {
         let folded = fold_part_name(candidate.as_str())?;
@@ -1038,6 +1312,25 @@ impl PartNameSet {
     }
 }
 
+/// Name-validation state carried by a physical package writer.
+///
+/// The generated variant is deliberately zero-sized: the checked sequence is
+/// owned and enforced by the lower ZIP writer, so the OPC layer does not keep
+/// a completed-name index or completed `PackURI` values for that mode.
+enum PartNamePolicy {
+    Ordinary(PartNameSet),
+    Generated,
+}
+
+enum PartWriterNameState {
+    Ordinary {
+        partname: PackURI,
+        prepared: PreparedPartName,
+        part_names: PartNameSet,
+    },
+    Generated,
+}
+
 fn try_owned_string(value: &str, resource: &'static str) -> Result<String> {
     let mut owned = String::new();
     owned
@@ -1077,7 +1370,7 @@ pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
     /// Keeping this state at the OPC boundary prevents a streaming caller from
     /// publishing duplicate, ASCII-equivalent, or derived part names while the
     /// underlying ZIP transport remains format-neutral.
-    part_names: PartNameSet,
+    part_names: PartNamePolicy,
     directory_spool: bool,
 }
 
@@ -1091,9 +1384,7 @@ pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
 /// already-published sequential sink bytes incomplete.
 pub struct PartWriter<W: Write> {
     entry: Option<soapberry_zip::office::StreamingArchiveEntry<W>>,
-    partname: PackURI,
-    part_names: PartNameSet,
-    prepared_name: PreparedPartName,
+    name_state: PartWriterNameState,
     directory_spool: bool,
 }
 
@@ -1159,11 +1450,20 @@ impl<W: Write> PartWriter<W> {
         let (archive, _progress) = entry
             .finish_with_progress()
             .map_err(map_streaming_failure)?;
-        let partname = self.partname;
-        self.part_names.insert(partname, self.prepared_name);
+        let part_names = match self.name_state {
+            PartWriterNameState::Ordinary {
+                partname,
+                prepared,
+                mut part_names,
+            } => {
+                part_names.insert(partname, prepared);
+                PartNamePolicy::Ordinary(part_names)
+            },
+            PartWriterNameState::Generated => PartNamePolicy::Generated,
+        };
         Ok(PhysPkgWriter {
             archive,
-            part_names: self.part_names,
+            part_names,
             directory_spool: self.directory_spool,
         })
     }
@@ -1175,7 +1475,7 @@ impl PhysPkgWriter<Cursor<Vec<u8>>> {
     pub fn new() -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::new(),
-            part_names: PartNameSet::default(),
+            part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
             directory_spool: false,
         }
     }
@@ -1200,7 +1500,7 @@ impl<W: Write> PhysPkgWriter<W> {
     pub fn with_writer(writer: W) -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
-            part_names: PartNameSet::default(),
+            part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
             directory_spool: false,
         }
     }
@@ -1245,7 +1545,38 @@ impl<W: Write> PhysPkgWriter<W> {
             .map_err(OpcError::from)?;
         Ok(Self {
             archive,
-            part_names: PartNameSet::default(),
+            part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
+            directory_spool: true,
+        })
+    }
+
+    /// Create a physical package writer whose part names must follow `plan`.
+    ///
+    /// The caller supplies absolute OPC names through the owner-local plan
+    /// wrapper. The checked lower ZIP cursor validates every name-taking route
+    /// before publication and refuses finalization until the sequence is
+    /// exhausted. Generated mode keeps no completed OPC name index.
+    pub fn with_writer_and_generated_plan_and_metadata_spool<S>(
+        writer: W,
+        plan: GeneratedPartNamePlan,
+        spool: S,
+        maximum_spool_bytes: u64,
+        buffer_bytes: usize,
+    ) -> Result<Self>
+    where
+        S: Read + Write + Seek + Send + Sync + 'static,
+    {
+        let archive = soapberry_zip::office::StreamingArchiveWriter::with_writer_and_limits_and_spool_and_name_plan(
+            writer,
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+            spool,
+            soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
+            plan.inner,
+        )
+        .map_err(OpcError::from)?;
+        Ok(Self {
+            archive,
+            part_names: PartNamePolicy::Generated,
             directory_spool: true,
         })
     }
@@ -1281,23 +1612,34 @@ impl<W: Write> PhysPkgWriter<W> {
     }
 
     fn start_part_inner(
-        mut self,
+        self,
         partname: &PackURI,
         compression_method: CompressionMethod,
     ) -> Result<PartWriter<W>> {
-        let prepared_name = PartNameSet::prepare(partname)?;
-        validate_part_name(&self.part_names, partname, &prepared_name)?;
-        self.part_names.reserve(&prepared_name)?;
-        let owned_partname = clone_pack_uri(partname)?;
+        let name_state = match self.part_names {
+            PartNamePolicy::Ordinary(mut part_names) => {
+                let prepared_name = PartNameSet::prepare(partname)?;
+                validate_part_name(&part_names, partname, &prepared_name)?;
+                part_names.reserve(&prepared_name)?;
+                let owned_partname = clone_pack_uri(partname)?;
+                PartWriterNameState::Ordinary {
+                    partname: owned_partname,
+                    prepared: prepared_name,
+                    part_names,
+                }
+            },
+            PartNamePolicy::Generated => {
+                validate_generated_route_name(partname)?;
+                PartWriterNameState::Generated
+            },
+        };
         let entry = self
             .archive
             .start_entry(partname.membername(), compression_method)
             .map_err(map_streaming_failure)?;
         Ok(PartWriter {
             entry: Some(entry),
-            partname: owned_partname,
-            part_names: self.part_names,
-            prepared_name,
+            name_state,
             directory_spool: self.directory_spool,
         })
     }
@@ -1311,16 +1653,28 @@ impl<W: Write> PhysPkgWriter<W> {
     /// # Errors
     /// Returns an error if the part cannot be written to the archive.
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
-        let prepared_name = PartNameSet::prepare(pack_uri)?;
-        validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
-        self.part_names.reserve(&prepared_name)?;
-        let owned_partname = clone_pack_uri(pack_uri)?;
+        let ordinary_name = match &mut self.part_names {
+            PartNamePolicy::Ordinary(part_names) => {
+                let prepared_name = PartNameSet::prepare(pack_uri)?;
+                validate_part_name(part_names, pack_uri, &prepared_name)?;
+                part_names.reserve(&prepared_name)?;
+                Some((clone_pack_uri(pack_uri)?, prepared_name))
+            },
+            PartNamePolicy::Generated => {
+                validate_generated_route_name(pack_uri)?;
+                None
+            },
+        };
         let result = self.archive.write_deflated(pack_uri.membername(), blob);
         if let Err(error) = result {
             let written = self.archive.output_bytes();
             return Err(map_write_error(error, self.directory_spool, written));
         }
-        self.part_names.insert(owned_partname, prepared_name);
+        if let (PartNamePolicy::Ordinary(part_names), Some((owned_partname, prepared_name))) =
+            (&mut self.part_names, ordinary_name)
+        {
+            part_names.insert(owned_partname, prepared_name);
+        }
         Ok(())
     }
 
@@ -1333,16 +1687,28 @@ impl<W: Write> PhysPkgWriter<W> {
     /// # Errors
     /// Returns an error if the part cannot be written to the archive.
     pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
-        let prepared_name = PartNameSet::prepare(pack_uri)?;
-        validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
-        self.part_names.reserve(&prepared_name)?;
-        let owned_partname = clone_pack_uri(pack_uri)?;
+        let ordinary_name = match &mut self.part_names {
+            PartNamePolicy::Ordinary(part_names) => {
+                let prepared_name = PartNameSet::prepare(pack_uri)?;
+                validate_part_name(part_names, pack_uri, &prepared_name)?;
+                part_names.reserve(&prepared_name)?;
+                Some((clone_pack_uri(pack_uri)?, prepared_name))
+            },
+            PartNamePolicy::Generated => {
+                validate_generated_route_name(pack_uri)?;
+                None
+            },
+        };
         let result = self.archive.write_stored(pack_uri.membername(), blob);
         if let Err(error) = result {
             let written = self.archive.output_bytes();
             return Err(map_write_error(error, self.directory_spool, written));
         }
-        self.part_names.insert(owned_partname, prepared_name);
+        if let (PartNamePolicy::Ordinary(part_names), Some((owned_partname, prepared_name))) =
+            (&mut self.part_names, ordinary_name)
+        {
+            part_names.insert(owned_partname, prepared_name);
+        }
         Ok(())
     }
 
@@ -1480,6 +1846,15 @@ fn validate_part_name(
         ));
     }
     part_names.validate(candidate, prepared)
+}
+
+fn validate_generated_route_name(candidate: &PackURI) -> Result<()> {
+    if candidate.as_str() == "/" {
+        return Err(OpcError::InvalidPackUri(
+            "an OPC Part cannot use the package root URI".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn clone_pack_uri(candidate: &PackURI) -> Result<PackURI> {
@@ -2117,6 +2492,195 @@ mod tests {
             Err(error) => panic!("unexpected metadata spool error: {error:?}"),
             Ok(_) => panic!("spool replay unexpectedly succeeded"),
         }
+    }
+
+    fn generated_plan_fixture() -> GeneratedPartNamePlan {
+        let mut builder =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(16, 4096, 16))
+                .unwrap();
+        builder.push_literal("/doc.xml").unwrap();
+        builder
+            .push_indexed(
+                1,
+                2,
+                &[
+                    ("/xl/worksheets/sheet", ".xml"),
+                    ("/xl/worksheets/_rels/sheet", ".xml.rels"),
+                ],
+            )
+            .unwrap();
+        builder.push_literal("/tail.bin").unwrap();
+        builder.finish().unwrap()
+    }
+
+    #[test]
+    fn generated_opc_plan_translates_absolute_names_and_all_routes() {
+        let plan = generated_plan_fixture();
+        assert_eq!(plan.entry_count(), 6);
+        assert_eq!(
+            plan.max_name_bytes(),
+            "/xl/worksheets/_rels/sheet1.xml.rels".len()
+        );
+
+        let mut writer = PhysPkgWriter::with_writer_and_generated_plan_and_metadata_spool(
+            Vec::new(),
+            plan,
+            Cursor::new(Vec::new()),
+            1024 * 1024,
+            17,
+        )
+        .unwrap();
+        writer
+            .write_stored(&PackURI::new("/doc.xml").unwrap(), b"document")
+            .unwrap();
+
+        let mut part = writer
+            .start_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .unwrap();
+        part.write_all(b"sheet one").unwrap();
+        writer = part.finish().unwrap();
+        writer
+            .write_stored(
+                &PackURI::new("/xl/worksheets/_rels/sheet1.xml.rels").unwrap(),
+                b"rels one",
+            )
+            .unwrap();
+
+        let mut part = writer
+            .start_stored_part(&PackURI::new("/xl/worksheets/sheet2.xml").unwrap())
+            .unwrap();
+        part.write_all(b"sheet two").unwrap();
+        writer = part.finish().unwrap();
+        writer
+            .write(
+                &PackURI::new("/xl/worksheets/_rels/sheet2.xml.rels").unwrap(),
+                b"rels two",
+            )
+            .unwrap();
+        writer
+            .write_stored(&PackURI::new("/tail.bin").unwrap(), b"tail")
+            .unwrap();
+
+        let bytes = writer.finish_into_inner().unwrap();
+        let reader = PhysPkgReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.blob_for(&PackURI::new("/doc.xml").unwrap()).unwrap(),
+            b"document"
+        );
+        assert_eq!(
+            reader
+                .blob_for(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+                .unwrap(),
+            b"sheet one"
+        );
+        assert_eq!(
+            reader
+                .blob_for(&PackURI::new("/xl/worksheets/_rels/sheet2.xml.rels").unwrap())
+                .unwrap(),
+            b"rels two"
+        );
+        assert_eq!(
+            reader
+                .blob_for(&PackURI::new("/tail.bin").unwrap())
+                .unwrap(),
+            b"tail"
+        );
+    }
+
+    #[test]
+    fn generated_opc_plan_refuses_wrong_name_before_output_and_requires_completion() {
+        let mut builder =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(4, 128, 2)).unwrap();
+        builder.push_literal("/first.xml").unwrap();
+        builder.push_literal("/second.xml").unwrap();
+        let plan = builder.finish().unwrap();
+
+        let mut sink = Vec::new();
+        let mut writer = PhysPkgWriter::with_writer_and_generated_plan_and_metadata_spool(
+            &mut sink,
+            plan,
+            Cursor::new(Vec::new()),
+            1024 * 1024,
+            16,
+        )
+        .unwrap();
+        let before = writer.output_bytes();
+        assert!(
+            writer
+                .write_stored(&PackURI::new("/wrong.xml").unwrap(), b"wrong")
+                .is_err()
+        );
+        assert_eq!(writer.output_bytes(), before);
+        writer
+            .write_stored(&PackURI::new("/first.xml").unwrap(), b"first")
+            .unwrap();
+        let incomplete = writer.finish_into_inner();
+        assert!(incomplete.is_err());
+    }
+
+    #[test]
+    fn generated_opc_plan_validates_pack_uri_literals_and_index_endpoints() {
+        assert!(PackURI::new("/%1A").is_ok());
+        assert!(PackURI::new("/%9A").is_ok());
+        assert!(PackURI::new("/%4A").is_err());
+
+        let mut builder =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(4, 128, 8)).unwrap();
+        assert!(matches!(
+            builder.push_literal("/"),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(matches!(
+            builder.push_indexed(1, 1, &[("ppt/slide", ".xml")]),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(matches!(
+            builder.push_indexed(1, 1, &[("/ppt/slide", ".")]),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(matches!(
+            builder.push_indexed(u64::MAX, 2, &[("/ppt/slide", ".xml")]),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+
+        let mut percent_boundary =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(8, 256, 16))
+                .unwrap();
+        assert!(matches!(
+            percent_boundary.push_indexed(1, 9, &[("/%", "A")]),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        percent_boundary.push_literal("/after.xml").unwrap();
+        percent_boundary
+            .push_indexed(1, 3, &[("/x%20-slide", ".xml")])
+            .unwrap();
+        let percent_plan = percent_boundary.finish().unwrap();
+        assert_eq!(percent_plan.entry_count(), 4);
+        assert!(PackURI::new("/x%20-slide1.xml").is_ok());
+    }
+
+    #[test]
+    fn generated_opc_plan_checks_descriptor_budget_before_name_allocations() {
+        let mut literal_budget =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(4, 2, 4)).unwrap();
+        assert!(matches!(
+            literal_budget.push_literal("/invalid?name"),
+            Err(OpcError::ZipError(message)) if message.contains("pattern-byte budget")
+        ));
+        literal_budget.push_literal("/a").unwrap();
+
+        let mut indexed_budget =
+            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(1, 1024, 4))
+                .unwrap();
+        assert!(matches!(
+            indexed_budget.push_indexed(
+                1,
+                1,
+                &[("relative/slide", ".xml"), ("/ppt/slide", ".xml")],
+            ),
+            Err(OpcError::ZipError(message)) if message.contains("pattern budget")
+        ));
+        indexed_budget.push_literal("/a").unwrap();
     }
 
     #[test]
