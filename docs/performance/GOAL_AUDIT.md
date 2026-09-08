@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Latest measured rejection (0471)
+
+[0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) rejects a safe explicit
+release of obsolete worksheet rewrite bytes because matched measurements do
+not demonstrate the required peak-memory benefit. Seven-row diagnostic ABBA,
+full-guard results and Heaptrack totals remain reproducible. This closes one
+hypothesis, not a goal requirement or the broader non-iWork program. Larger
+snapshot allocation and duplicate parsing work, CRUD coverage, source variants,
+bounded streaming and measured scaling remain open.
+
 ## Current audit: 0470 bounded XLSX pass reuse (2026-09-08)
 
 The [0470 record](changes/0470-xlsx-empty-web-proof.md) advances the measured

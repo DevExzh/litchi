@@ -1,0 +1,9 @@
+{
+  "status": "rejected",
+  "candidate_revision": "aea5b744f35775272c0a5919049f06385aa89804",
+  "revert_revision": "b8b0ae445f6d2b09334a8bdf764aa3f3b3bc52b6",
+  "reason": "No demonstrated practical peak-memory benefit: equal rounded whole-process heap peaks and no lower normal ABBA RSS.",
+  "restored_file": "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+  "restored_sha256": "328adb7780553627efb7cab693d776c46c2e044267799f14e87195a6b3fd9243",
+  "verified_utc": "2026-09-08T08:16:13.753449+00:00"
+}

@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Rejected worksheet lifetime experiment (0471)
+
+[0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) adds matched seven-row
+100/5 ABBA, a 201-row 15/3 guard and whole-process 5/1 Heaptrack captures for
+explicitly releasing the pre-compaction worksheet vector. Both rounded heap
+peaks are `104.38M`; allocation calls are equal, and normal RSS is not lower in
+either matched pair. The candidate is rejected. These retained negative
+measurements add no registered latency or memory-improvement claim.
+
 ## Current XLSX validation-pass result (0470)
 
 [0470](changes/0470-xlsx-empty-web-proof.md) reuses emitted compaction events

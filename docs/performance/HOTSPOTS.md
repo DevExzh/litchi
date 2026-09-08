@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Pre-compaction lifetime hypothesis rejected (0471)
+
+[0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) tests the old rewrite
+vector's overlap with verification. Explicit release changes neither rounded
+whole-process peak heap nor allocation count, and normal RSS is not reduced in
+either matched pair. The production experiment is reverted. Local lifetime
+shortening alone is not a sufficient performance result.
+
+The snapshot scan remains the next measured lead: ordinary cells allocate
+owned names, values and attribute slices, and cell addresses are checked in a
+separate attribute traversal. Full eager/snapshot fusion also adds no-op work
+and temporary overlap unless carefully deferred; MCE-processed bytes cannot
+supply original-byte spans. Compare local attribute-pass reuse with a properly
+source-bound tag representation before adding retained caches or larger Store
+handoffs. The [0471 analysis](results/change-0471/next-work.md) records both
+options and their limits.
+
 ## Current XLSX pass-reuse result and remaining leads (0470)
 
 [0470](changes/0470-xlsx-empty-web-proof.md) removes the later web-binding

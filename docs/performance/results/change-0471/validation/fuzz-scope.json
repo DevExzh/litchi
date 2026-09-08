@@ -1,0 +1,6 @@
+{
+  "dedicated_xlsx_fuzz_manifest_exists": false,
+  "cargo_fuzz_binary_exists": false,
+  "new_fuzz_campaign": false,
+  "covered_here": "Existing full XLSX unit/integration/doc suite including malformed XML and legacy/fused pipeline differential fixtures; no new native Office run claimed."
+}
