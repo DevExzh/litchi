@@ -46,10 +46,21 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_drawable_comments"
+path = "fuzz_targets/keynote_slide_drawable_comments.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
+litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
 litchi-iwa-common = { path = "../../litchi-iwa-common" }
+litchi-iwa-core = { path = "../../litchi-iwa-core" }
+litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
 litchi-keynote = { path = ".." }
+prost = "0.14"
 
 [profile.release]
 debug = 1

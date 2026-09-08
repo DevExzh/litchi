@@ -14,7 +14,7 @@
 
 use core::{fmt, mem::size_of, str};
 
-use buffa::DecodeOptions as BuffaDecodeOptions;
+use buffa::{DecodeOptions as BuffaDecodeOptions, ViewEncode as _};
 
 use crate::buffa_comment_storage_generated::LitchiIwaCommentStorageProjection as projection;
 
@@ -1406,14 +1406,16 @@ pub type CommentStorageTextRewrite<'text> = CommentStorageLeafTextRewrite<'text>
 
 /// Canonical values for a newly created direct comment-storage leaf.
 ///
-/// A leaf created by this codec has text, creation date, author, and storage
-/// UUID fields, and no replies.  Object ownership, UUID collision checks, and
-/// package metadata remain the package transaction's responsibility.
+/// A leaf created by this codec has text, creation date, storage UUID, and an
+/// optional author field, and no replies.  Object ownership, UUID collision
+/// checks, and package metadata remain the package transaction's
+/// responsibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommentStorageLeafWrite<'text> {
     text: &'text str,
     creation_date: DateSnapshot,
     author_identifier: u64,
+    author_present: bool,
     storage_uuid: UuidSnapshot,
 }
 
@@ -1430,6 +1432,28 @@ impl<'text> CommentStorageLeafWrite<'text> {
             text,
             creation_date,
             author_identifier,
+            author_present: true,
+            storage_uuid,
+        }
+    }
+
+    /// Build a canonical direct leaf without an author reference.
+    ///
+    /// Existing [`Self::new`] callers retain the original required-author
+    /// contract. The private presence bit keeps `new(..., 0, ...)` invalid
+    /// while giving package owners an explicit authorless form for native
+    /// comments whose field 3 is absent.
+    #[must_use]
+    pub const fn without_author(
+        text: &'text str,
+        creation_date: DateSnapshot,
+        storage_uuid: UuidSnapshot,
+    ) -> Self {
+        Self {
+            text,
+            creation_date,
+            author_identifier: 0,
+            author_present: false,
             storage_uuid,
         }
     }
@@ -1481,9 +1505,17 @@ impl<'text> CommentStorageLeafWrite<'text> {
         self.creation_date.seconds_bits()
     }
 
+    /// Return the author identifier, or zero when [`Self::without_author`]
+    /// selected the absent field form.
     #[must_use]
     pub const fn author_identifier(self) -> u64 {
         self.author_identifier
+    }
+
+    /// Return whether the canonical field 3 author reference is present.
+    #[must_use]
+    pub const fn has_author(self) -> bool {
+        self.author_present
     }
 
     #[must_use]
@@ -2409,7 +2441,7 @@ pub fn rewrite_comment_storage_text(
 /// Prepared canonical construction of a new direct comment-storage leaf.
 ///
 /// This constructor deliberately has no source argument: it creates the
-/// four-field direct-leaf shape used for newly allocated replies.  The
+/// canonical direct-leaf shape used for newly allocated comments.  The
 /// package transaction remains responsible for selecting fresh object IDs,
 /// registering the UUID, and publishing the object in its owning archive.
 #[derive(Debug, Clone, Copy)]
@@ -2456,11 +2488,14 @@ impl<'text> PreparedCommentStorageLeafWrite<'text> {
             return Err(DecodeError::invalid());
         }
         let candidate = scan_comment_storage_raw(&output, self.verify_options, None)?;
+        let author_matches = match (self.write.author_present, candidate.author_reference) {
+            (true, Some(reference)) => reference.identifier == self.write.author_identifier,
+            (false, None) => true,
+            _ => false,
+        };
         if candidate.report != self.report
             || !candidate.reply_ids.is_empty()
-            || candidate
-                .author_reference
-                .is_none_or(|reference| reference.identifier != self.write.author_identifier)
+            || !author_matches
             || candidate.storage_uuid_value != Some(self.write.storage_uuid)
         {
             return Err(DecodeError::invalid());
@@ -2525,7 +2560,7 @@ pub fn prepare_comment_storage_leaf_write<'text>(
             maximum: options.max_text_bytes,
         }));
     }
-    if write.author_identifier == 0 {
+    if write.author_present && write.author_identifier == 0 {
         return Err(DecodeError::invalid());
     }
     if write.storage_uuid.lower == 0 && write.storage_uuid.upper == 0 {
@@ -2690,7 +2725,6 @@ fn comment_storage_leaf_output_len(
     write: CommentStorageLeafWrite<'_>,
 ) -> Result<usize, DecodeError> {
     let date_payload = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
-    let author_payload = canonical_reference_payload_len(write.author_identifier)?;
     let uuid_payload = canonical_uuid_payload_len(write.storage_uuid)?;
     let mut total = canonical_text_field_len(write.text.as_bytes())?;
     total = total
@@ -2699,9 +2733,12 @@ fn comment_storage_leaf_output_len(
             date_payload,
         )?)
         .ok_or_else(DecodeError::invalid)?;
-    total = total
-        .checked_add(canonical_bytes_field_len(AUTHOR_FIELD, author_payload)?)
-        .ok_or_else(DecodeError::invalid)?;
+    if write.author_present {
+        let author_payload = canonical_reference_payload_len(write.author_identifier)?;
+        total = total
+            .checked_add(canonical_bytes_field_len(AUTHOR_FIELD, author_payload)?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
     total = total
         .checked_add(canonical_bytes_field_len(STORAGE_UUID_FIELD, uuid_payload)?)
         .ok_or_else(DecodeError::invalid)?;
@@ -2713,21 +2750,27 @@ fn comment_storage_leaf_report(
     output_bytes: usize,
 ) -> Result<DecodeReport, DecodeError> {
     let date_payload = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
-    let author_payload = canonical_reference_payload_len(write.author_identifier)?;
     let uuid_payload = canonical_uuid_payload_len(write.storage_uuid)?;
+    let author_payload = write
+        .author_present
+        .then(|| canonical_reference_payload_len(write.author_identifier))
+        .transpose()?;
     let work_bytes = output_bytes
         .checked_add(date_payload)
-        .and_then(|work| work.checked_add(author_payload))
+        .and_then(|work| work.checked_add(author_payload.unwrap_or(0)))
         .and_then(|work| work.checked_add(uuid_payload))
         .ok_or_else(DecodeError::invalid)?;
     Ok(DecodeReport {
         source_bytes: output_bytes,
-        fields: 8,
+        // The author contributes both its archive field and the nested
+        // `TSP.Reference.identifier` field.  The other leaf shape is six
+        // fields: text, date, date.seconds, UUID, UUID.lower, UUID.upper.
+        fields: 6 + 2 * usize::from(write.author_present),
         work_bytes,
         max_depth: 2,
-        references: 1,
+        references: usize::from(write.author_present),
         replies: 0,
-        reference_bytes: author_payload,
+        reference_bytes: author_payload.unwrap_or(0),
         text_bytes: write.text.len(),
     })
 }
@@ -2736,42 +2779,41 @@ fn emit_comment_storage_leaf(
     output: &mut Vec<u8>,
     write: CommentStorageLeafWrite<'_>,
 ) -> Result<(), DecodeError> {
-    output.push(0x0a);
-    append_varint(
-        output,
-        u64::try_from(write.text.len()).map_err(|_error| DecodeError::invalid())?,
-    );
-    output.extend_from_slice(write.text.as_bytes());
-
-    let date_payload_len = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
-    output.push(0x12);
-    append_varint(
-        output,
-        u64::try_from(date_payload_len).map_err(|_error| DecodeError::invalid())?,
-    );
-    output.push(0x09);
-    output.extend_from_slice(&write.creation_date.seconds_bits.to_le_bytes());
-
-    let author_payload_len = canonical_reference_payload_len(write.author_identifier)?;
-    output.push(0x1a);
-    append_varint(
-        output,
-        u64::try_from(author_payload_len).map_err(|_error| DecodeError::invalid())?,
-    );
-    output.push(0x08);
-    append_varint(output, write.author_identifier);
-
-    let uuid_payload_len = canonical_uuid_payload_len(write.storage_uuid)?;
-    output.push(0x2a);
-    append_varint(
-        output,
-        u64::try_from(uuid_payload_len).map_err(|_error| DecodeError::invalid())?,
-    );
-    output.push(0x08);
-    append_varint(output, write.storage_uuid.lower);
-    output.push(0x10);
-    append_varint(output, write.storage_uuid.upper);
+    let view = comment_storage_leaf_view(write);
+    let maximum = buffa::MAX_MESSAGE_BYTES;
+    let encoded = view
+        .try_encode_bounded(maximum, output)
+        .map_err(|_error| DecodeError::invalid())?;
+    if usize::try_from(encoded).ok() != Some(output.len()) {
+        return Err(DecodeError::invalid());
+    }
     Ok(())
+}
+
+fn comment_storage_leaf_view<'text>(
+    write: CommentStorageLeafWrite<'text>,
+) -> projection::CommentStorageArchiveView<'text> {
+    let author = if write.author_present {
+        buffa::MessageFieldView::set(projection::ReferenceView {
+            identifier: write.author_identifier,
+            ..Default::default()
+        })
+    } else {
+        buffa::MessageFieldView::unset()
+    };
+    projection::CommentStorageArchiveView {
+        text: Some(write.text),
+        creation_date: buffa::MessageFieldView::set(projection::DateView {
+            seconds: write.creation_date.seconds(),
+            ..Default::default()
+        }),
+        author,
+        storage_uuid: buffa::MessageFieldView::set(projection::UuidView {
+            lower: write.storage_uuid.lower,
+            upper: write.storage_uuid.upper,
+            ..Default::default()
+        }),
+    }
 }
 
 fn measure_leaf_text_report(
@@ -4007,6 +4049,8 @@ fn check_rewrite_limits(
 )]
 mod tests {
     use super::*;
+    use crate::tsd;
+    use prost::Message as _;
 
     fn varint(output: &mut Vec<u8>, mut value: u64) {
         loop {
@@ -4930,6 +4974,94 @@ mod tests {
                 .is_some_and(|author| {
                     author.deprecated_type().is_none() && author.deprecated_is_external().is_none()
                 })
+        );
+    }
+
+    #[test]
+    fn canonical_leaf_matches_prost_with_and_without_author() {
+        let date = DateSnapshot::from_bits(0x3ff0_0000_0000_0000);
+        let uuid = UuidSnapshot::from_parts(901, 902);
+        let options = DecodeOptions::new(4096, 64, 32_768, 8, 8, 4096);
+        let writes = [
+            CommentStorageLeafWrite::new("with author", date, 73, uuid),
+            CommentStorageLeafWrite::without_author("without author", date, uuid),
+        ];
+        for write in writes {
+            let output = canonical_comment_storage_leaf(write, options).unwrap();
+            let native = tsd::CommentStorageArchive::decode(output.bytes()).unwrap();
+            assert_eq!(native.text.as_deref(), Some(write.text()));
+            assert_eq!(
+                native.creation_date.as_ref().map(|value| value.seconds),
+                Some(date.seconds())
+            );
+            assert_eq!(
+                native.author.as_ref().map(|value| value.identifier),
+                write.has_author().then_some(write.author_identifier())
+            );
+            assert!(native.replies.is_empty());
+            assert_eq!(
+                native
+                    .storage_uuid
+                    .as_ref()
+                    .map(|value| (value.lower, value.upper)),
+                Some((uuid.lower(), uuid.upper()))
+            );
+            let snapshot = decode_comment_storage_archive(output.bytes(), options).unwrap();
+            assert_eq!(
+                snapshot.author().map(ReferenceSnapshot::identifier),
+                write.has_author().then_some(write.author_identifier())
+            );
+        }
+    }
+
+    #[test]
+    fn authorless_leaf_reports_inclusive_reference_and_field_budgets() {
+        let write = CommentStorageLeafWrite::without_author(
+            "without author",
+            DateSnapshot::from_bits(1),
+            UuidSnapshot::from_parts(1, 2),
+        );
+        let options = DecodeOptions::new(4096, 64, 32_768, 8, 8, 4096);
+        let prepared = prepare_comment_storage_leaf_write(write, options).unwrap();
+        let report = prepared.prepare_report();
+        assert_eq!(report.references(), 0);
+        assert_eq!(report.reference_bytes(), 0);
+        assert_eq!(report.fields(), 6);
+        let requirements = prepared.execution_requirements();
+        assert_eq!(requirements.references, 0);
+        assert_eq!(requirements.fields, report.fields());
+        let output = prepared.execute(requirements.exact()).unwrap();
+        assert!(
+            decode_comment_storage_archive(output.bytes(), options)
+                .unwrap()
+                .author()
+                .is_none()
+        );
+
+        let below_references = DecodeOptions::new(
+            options.max_message_bytes,
+            options.max_fields,
+            options.max_work_bytes,
+            options.recursion_limit,
+            0,
+            options.max_text_bytes,
+        );
+        prepare_comment_storage_leaf_write(write, below_references).unwrap();
+        let below_fields = DecodeOptions::new(
+            options.max_message_bytes,
+            report.fields() - 1,
+            options.max_work_bytes,
+            options.recursion_limit,
+            options.max_references,
+            options.max_text_bytes,
+        );
+        let error = prepare_comment_storage_leaf_write(write, below_fields).unwrap_err();
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: report.fields(),
+                maximum: report.fields() - 1,
+            })
         );
     }
 

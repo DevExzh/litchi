@@ -43,6 +43,25 @@ const REFERENCE_EXTERNAL_FIELD: u32 = 3;
 const UUID_LOWER_FIELD: u32 = 1;
 const UUID_UPPER_FIELD: u32 = 2;
 
+/// Payload admission policy for a rooted comment graph.
+///
+/// The media lifecycle clone path reconstructs selected payloads and requires
+/// strict root ownership. The focused drawable-comment owner preserves the
+/// complete source payload and therefore may read and rewrite an unknown root
+/// extension while retaining the strict nested reference/date/UUID checks
+/// below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommentGraphPayloadPolicy {
+    Strict,
+    PreserveRootExtensions,
+}
+
+impl CommentGraphPayloadPolicy {
+    const fn reject_unknown_root_fields(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
+
 /// One source storage identity retained for the future clone/removal seam.
 ///
 /// `uuid` stays optional because the native archive declares `storage_uuid`
@@ -50,9 +69,9 @@ const UUID_UPPER_FIELD: u32 = 2;
 /// shared by native copy-on-write roots; it is not a package-wide uniqueness
 /// witness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct CommentStorageIdentity {
-    pub(super) identifier: u64,
-    pub(super) uuid: Option<SuperUuid>,
+pub(in crate::package) struct CommentStorageIdentity {
+    pub(in crate::package) identifier: u64,
+    pub(in crate::package) uuid: Option<SuperUuid>,
 }
 
 /// One comment storage to annotation-author edge.
@@ -61,10 +80,10 @@ pub(super) struct CommentStorageIdentity {
 /// exact source dependency without accidentally treating the author as a
 /// clone root.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CommentAuthorDependency {
-    pub(super) storage_identifier: u64,
-    pub(super) author_identifier: u64,
-    pub(super) component_name: Box<str>,
+pub(in crate::package) struct CommentAuthorDependency {
+    pub(in crate::package) storage_identifier: u64,
+    pub(in crate::package) author_identifier: u64,
+    pub(in crate::package) component_name: Box<str>,
 }
 
 /// Complete rooted comment/reply closure for one selected drawable.
@@ -73,19 +92,19 @@ pub(super) struct CommentAuthorDependency {
 /// `author_ids` is sorted and unique, while `author_dependencies` retains the
 /// per-storage edge and the exact source component of each dependency.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CommentGraphPlan {
-    pub(super) root_storage_identifier: u64,
-    pub(super) component_name: Box<str>,
-    pub(super) storage_ids: Vec<u64>,
-    pub(super) storage_identities: Vec<CommentStorageIdentity>,
-    pub(super) author_ids: Vec<u64>,
-    pub(super) author_dependencies: Vec<CommentAuthorDependency>,
+pub(in crate::package) struct CommentGraphPlan {
+    pub(in crate::package) root_storage_identifier: u64,
+    pub(in crate::package) component_name: Box<str>,
+    pub(in crate::package) storage_ids: Vec<u64>,
+    pub(in crate::package) storage_identities: Vec<CommentStorageIdentity>,
+    pub(in crate::package) author_ids: Vec<u64>,
+    pub(in crate::package) author_dependencies: Vec<CommentAuthorDependency>,
 }
 
 impl CommentGraphPlan {
     /// Return the selected root's source UUID, when the root encoded one.
     #[must_use]
-    pub(super) fn root_storage_uuid(&self) -> Option<SuperUuid> {
+    pub(in crate::package) fn root_storage_uuid(&self) -> Option<SuperUuid> {
         self.storage_identities
             .iter()
             .find(|identity| identity.identifier == self.root_storage_identifier)
@@ -101,12 +120,52 @@ impl CommentGraphPlan {
 /// [`Package`] object and must resolve to that component.  Author objects are
 /// looked up in the same package, validated as type-212 objects, and returned
 /// as dependencies only; they are never added to `storage_ids`.
-pub(super) fn plan_comment_graph(
+pub(in crate::package) fn plan_comment_graph(
     package: &Package,
     component_name: &str,
     root_storage_identifier: u64,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
+) -> Result<CommentGraphPlan, SlideMediaLifecycleError> {
+    plan_comment_graph_with_policy(
+        package,
+        component_name,
+        root_storage_identifier,
+        limits,
+        budget,
+        CommentGraphPayloadPolicy::Strict,
+    )
+}
+
+/// Plan a drawable comment graph while preserving unknown root payload fields.
+///
+/// This is intentionally separate from [`plan_comment_graph`]: the focused
+/// drawable owner rewrites the source wire payload exactly, whereas the media
+/// lifecycle clone/removal owner remains strict about opaque root extensions.
+pub(in crate::package) fn plan_comment_graph_preserving_extensions(
+    package: &Package,
+    component_name: &str,
+    root_storage_identifier: u64,
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+) -> Result<CommentGraphPlan, SlideMediaLifecycleError> {
+    plan_comment_graph_with_policy(
+        package,
+        component_name,
+        root_storage_identifier,
+        limits,
+        budget,
+        CommentGraphPayloadPolicy::PreserveRootExtensions,
+    )
+}
+
+fn plan_comment_graph_with_policy(
+    package: &Package,
+    component_name: &str,
+    root_storage_identifier: u64,
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+    payload_policy: CommentGraphPayloadPolicy,
 ) -> Result<CommentGraphPlan, SlideMediaLifecycleError> {
     if component_name.is_empty() || root_storage_identifier == 0 {
         return Err(SlideMediaLifecycleError::InvalidSource);
@@ -139,6 +198,7 @@ pub(super) fn plan_comment_graph(
             storage_identifier,
             limits,
             budget,
+            payload_policy,
         )?;
 
         push_storage_identity(
@@ -223,10 +283,10 @@ pub(super) fn plan_comment_graph(
 }
 
 #[derive(Debug)]
-pub(super) struct StorageFacts {
-    pub(super) author_identifier: Option<u64>,
-    pub(super) reply_identifiers: Vec<u64>,
-    pub(super) uuid: Option<SuperUuid>,
+pub(in crate::package) struct StorageFacts {
+    pub(in crate::package) author_identifier: Option<u64>,
+    pub(in crate::package) reply_identifiers: Vec<u64>,
+    pub(in crate::package) uuid: Option<SuperUuid>,
 }
 
 fn read_storage_facts(
@@ -235,6 +295,7 @@ fn read_storage_facts(
     storage_identifier: u64,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
+    payload_policy: CommentGraphPayloadPolicy,
 ) -> Result<StorageFacts, SlideMediaLifecycleError> {
     let (actual_component, object) = package
         .object_with_component(storage_identifier)
@@ -253,7 +314,14 @@ fn read_storage_facts(
             .map_err(|_| SlideMediaLifecycleError::InvalidSource)?,
         budget,
     )?;
-    decode_storage_payload(storage_identifier, info, payload, limits, budget, true)
+    decode_storage_payload(
+        storage_identifier,
+        info,
+        payload,
+        limits,
+        budget,
+        payload_policy,
+    )
 }
 
 fn exact_comment_storage_payload<'source>(
@@ -299,7 +367,7 @@ fn exact_comment_storage_payload<'source>(
 /// without requiring opaque root extensions to be understood.  The selected
 /// clone path remains strict; removal scans use this neutral semantic census
 /// for untouched storage objects and preserve their source bytes.
-pub(super) fn validate_comment_storage_payload_relationship(
+pub(in crate::package) fn validate_comment_storage_payload_relationship(
     storage_identifier: u64,
     info: &MessageInfo,
     payload: &[u8],
@@ -313,7 +381,14 @@ pub(super) fn validate_comment_storage_payload_relationship(
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
     validate_archive_reference_shape(info)?;
-    decode_storage_payload(storage_identifier, info, payload, limits, budget, false)
+    decode_storage_payload(
+        storage_identifier,
+        info,
+        payload,
+        limits,
+        budget,
+        CommentGraphPayloadPolicy::PreserveRootExtensions,
+    )
 }
 
 fn decode_storage_payload(
@@ -322,7 +397,7 @@ fn decode_storage_payload(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-    reject_unknown_root_fields: bool,
+    payload_policy: CommentGraphPayloadPolicy,
 ) -> Result<StorageFacts, SlideMediaLifecycleError> {
     // The neutral codec owns a bounded lazy projection and may allocate its
     // own temporary Buffa state.  Reserve an operation-wide upper bound before
@@ -350,7 +425,12 @@ fn decode_storage_payload(
         return Err(error);
     }
 
-    validate_comment_payload_wire(payload, limits, budget, reject_unknown_root_fields)?;
+    validate_comment_payload_wire(
+        payload,
+        limits,
+        budget,
+        payload_policy.reject_unknown_root_fields(),
+    )?;
 
     let author_identifier = snapshot.author().map(|reference| {
         if reference.deprecated_type().is_some() || reference.deprecated_is_external().is_some() {

@@ -4045,59 +4045,6 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
-#[test]
-#[allow(deprecated)]
-fn slide_owned_drawable_comment_crud_is_reachability_guarded() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    assert_eq!(
-        editor
-            .slide_drawables(0)
-            .unwrap()
-            .into_iter()
-            .map(|drawable| drawable.id.get())
-            .collect::<Vec<_>>(),
-        vec![5, 6]
-    );
-    assert!(editor.slide_drawable_comment(0, 5).unwrap().is_none());
-    assert!(
-        editor
-            .set_slide_drawable_comment(0, 11, "Wrong slide")
-            .is_err()
-    );
-
-    editor
-        .set_slide_drawable_comment(0, 5, "Title annotation")
-        .unwrap();
-    let comment = editor.slide_drawable_comment(0, 5).unwrap().unwrap();
-    assert_eq!(comment.comment.text, "Title annotation");
-    assert_eq!(
-        editor.slides().unwrap()[0].title.as_deref(),
-        Some("Old title")
-    );
-    let bytes = editor.to_bytes().unwrap();
-    editor
-        .set_slide_drawable_comment(0, 5, "Title annotation")
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), bytes);
-
-    let mut reparsed = KeynoteEditor::from_bytes(&bytes).unwrap();
-    assert_eq!(
-        reparsed
-            .slide_drawable_comment(0, 5)
-            .unwrap()
-            .unwrap()
-            .comment
-            .text,
-        "Title annotation"
-    );
-    reparsed.clear_slide_drawable_comment(0, 5).unwrap();
-    assert!(reparsed.slide_drawable_comment(0, 5).unwrap().is_none());
-    assert_eq!(
-        reparsed.slides().unwrap()[0].title.as_deref(),
-        Some("Old title")
-    );
-}
-
 fn reference(identifier: u64) -> Reference {
     Reference {
         identifier,

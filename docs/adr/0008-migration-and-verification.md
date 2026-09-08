@@ -17985,3 +17985,121 @@ RSS 509 MB); these are smoke results, not exhaustive fuzz certification. A
 scoped `cargo clean` removed 1.7 GiB of temporary fuzz build output. Normal
 workspace formatting, lint, unit/integration, and doctest commit hooks remain
 the publication gate for this cut.
+
+## 2026-09-08 focused Keynote direct-drawable comment semantic owner
+
+The focused `litchi-keynote::Package` now exposes selector-first direct-drawable
+comment discovery and transactions through `slide_drawables`,
+`slide_drawable_comment`, `slide_drawable_comment_replies`,
+`edit_slide_drawable_comment`, and `apply_slide_drawable_comment`. The public
+values are `DrawableSummary`, `Comment`, `Reply`, `CommentAuthor`, and
+`CommentTimestamp`; edits provide root set/clear and ordinal reply add/set/remove
+operations. Commits carry typed diagnostics, exact source fingerprints,
+copy-on-write patches, and inverses. Native object IDs, archive locations,
+generated messages, and wire payloads remain private.
+
+The owner resolves the complete rooted slide and direct-drawable source order,
+rejects ambiguous or unsupported graph dependencies, and keeps the same
+bounded lifecycle ledger across selection, graph admission, author/storage
+metadata, payload rewrites, candidate reopen, and semantic readback. The
+neutral `annotation_author_codec` adds a private lazy Buffa projection for
+author and author-storage records; strict handwritten field validation and
+source-order rewrites retain unknown bytes and replay finite decode, encode,
+work, reference, and allocation ceilings. The drawable owner composes this
+codec with the existing comment-storage and package-metadata codecs.
+
+The native source receipt
+[`drawable-comments-source-native.key`](../../test-data/iwork/keynote/drawable-comments-source-native.key)
+is 753,541 bytes with SHA-256
+`e21cf3f33da23d0c0b9df1dfa80693abc090a714b92d29338d6298d0862fe15e`. Keynote
+14.4 saved, actually closed, reopened, and exposed the authored square comment
+text “Native square comment — 北区”. The focused integration test pins and
+consumes this source fixture. It is source-oracle evidence only: focused
+operation-specific candidate/readback evidence is tracked below; cross-
+component parity, rooted-registry policy, and host retirement remain pending,
+so no host comment route is retired by this entry. Boundary rules require the
+fixture, its consuming test, private owner children, semantic re-exports, and
+the hidden generated Buffa module while retaining the generic Keynote cleanup
+debt.
+
+No workspace package, manifest edge, ordered migration debt, or deletion gate
+changes in this semantic-owner step. The operation-specific native evidence
+below does not satisfy the separate host-retirement parity gate.
+
+### Scope correction: host-global graph versus focused same-component graph
+
+The host audit confirms that the compatibility graph is package-global: the
+legacy editor can resolve a comment root or reply by native identity even when
+its archive component differs from the selected drawable's component. The
+focused owner deliberately has a narrower admission contract. Drawable
+ownership and every comment-storage node in the admitted root/reply closure
+must resolve to the selected slide component; a foreign component dependency
+returns a typed admission error without publishing a candidate. Boundary
+tests keep both locality guards fail-closed.
+
+Cross-component parity is therefore explicitly pending. The existing focused
+shared-root and shared-reply coverage proves same-component copy-on-write and
+cleanup behavior only; it does not claim parity with the host-global graph or
+native cross-component authoring. The seven legacy host comment methods remain
+available for migration compatibility this turn:
+`slide_drawable_comment`, `set_slide_drawable_comment`,
+`clear_slide_drawable_comment`, `slide_drawable_comment_replies`,
+`add_slide_drawable_comment_reply`, `set_slide_drawable_comment_reply`, and
+`remove_slide_drawable_comment_reply`. No host retirement is implied by local
+focused or native progress.
+
+The same provenance distinction applies to author storage. The compatibility
+host's helper scans globally for a unique type-213 storage object, whereas the
+focused owner follows the rooted Keynote `Document` -> `TSA` -> `TSK` field
+chain (`3` -> `1` -> `7`) and does not silently adopt an unrooted registry.
+
+### Operation ledger: direct-drawable comment CRUD closeout
+
+Native probing is tracked per operation so partial evidence cannot be promoted
+to a generic CRUD claim. The six native candidate gates below are closed by
+the strict `native_resaved_drawable_comment_candidates_read_back` readback,
+which also checks the baseline slide names, titles, and movie summaries:
+
+| Operation | Current evidence/status |
+| --- | --- |
+| Root create | **Native candidate gate closed.** Keynote 14.4 showed `drawable root created`; save, actual close, exact-path reopen, and strict focused readback preserved the result. |
+| Root update | **Native candidate gate closed.** Keynote 14.4 showed `drawable root updated`; save, actual close, exact-path reopen, and strict focused readback preserved the result. |
+| Root clear | **Native candidate gate closed.** Keynote 14.4 removed the selected root while preserving the movie and unrelated square comments; strict focused readback confirmed the result. |
+| Reply add | **Native candidate gate closed.** Keynote 14.4 showed the original root plus `duplicate reply`; strict focused readback confirmed the added reply. |
+| Reply update (set) | **Native candidate gate closed.** Keynote 14.4 showed `duplicate reply updated` on the original root; strict focused readback confirmed the updated reply. |
+| Reply remove | **Native candidate gate closed.** Keynote 14.4 retained the original root and only the first duplicate reply; strict focused readback confirmed the removal. |
+
+Scratch candidate paths and hashes are intentionally omitted. These gates do
+not retire a host route, broaden the same-component contract, or close the
+cross-component or rooted-registry debt.
+
+The comment payload policy is intentionally split at this boundary. Media
+lifecycle cloning reconstructs selected payloads and retains the strict
+`CommentGraphPayloadPolicy::Strict` plan. Focused drawable-comment CRUD uses
+`plan_comment_graph_preserving_extensions`: unknown root fields remain opaque
+source bytes for the wire-preserving rewrite, while nested date/reference/UUID
+envelopes and the exact ArchiveInfo reference census remain strict. Permanent
+regressions prove root/reply extension preservation and atomic rejection of
+unknown archive-header metadata. The corrected owner passes a bounded 128-run
+ASAN smoke in 194 seconds, reaching 547 MiB RSS.
+
+The sanitizer corpus replay passes all 61 persisted inputs plus the empty
+bootstrap (62 executions in 84 seconds, 545 MiB RSS). The native fixture has
+990 IWA objects; its target-local fuzz profile allows 16,384 cumulative entry
+visits and 262,144 references while retaining the existing byte ceilings.
+Arbitrary fuzz inputs retain the shared tighter profile. A permanent regression
+checks typed entry-limit errors on comment reads and edits, exact source
+preservation after rejection, and lazy drawable inventory under the same limit.
+Root-text updates preserve ordered replies, timestamps, and authors, including
+exact restoration through the inverse patch.
+
+Final focused checks pass 281 Keynote library tests and 20 drawable-comment
+integration tests, including all six Keynote-resaved candidate readbacks.
+The boundary suite passes 997 cases; the full scanner accepts 64 workspace
+packages and 238 internal dependency declarations with 11 explicit migration
+debts. Normal commit hooks passed Rust formatting, Cargo manifest sorting,
+strict workspace Clippy, all-feature workspace library/integration tests, and
+workspace documentation tests. The scoped Cargo clean removed the affected
+crate artifacts; the owned sanitizer build, scratch corpus, native candidate
+copies, temporary probes, generated fuzz lockfile, and bootstrap crash artifact
+were removed after validation. The permanent native source fixture remains.

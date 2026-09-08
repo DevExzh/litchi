@@ -13,7 +13,7 @@ use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::{MovieKind, Point as FocusedPoint};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{DrawableSelector, MediaPart, MovieSelector, Package, SlideSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -83,6 +83,56 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     Ok(bytes)
+}
+
+fn focused_drawable_type(message_type: u32) -> bool {
+    matches!(
+        message_type,
+        3_002 | 3_004..=3_009 | 5_021 | 6_000 | 6_007 | 2_011 | 2_014 | 7 | 12
+    )
+}
+
+fn focused_drawable_selector(source: &[u8], drawable_id: u64) -> TestResult<DrawableSelector> {
+    let catalog = Catalog::from_bytes(source)?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            Ok(stream) => stream.into_bytes(),
+            Err(_) => continue,
+        };
+        let archive = match Archive::parse(&stream) {
+            Ok(archive) => archive,
+            Err(_) => continue,
+        };
+        for object in &archive.objects {
+            let Some(message) = object.messages.iter().find(|message| message.type_ == 5) else {
+                continue;
+            };
+            let Ok(slide) = kn::SlideArchive::decode(message.data.as_slice()) else {
+                continue;
+            };
+            let mut position = 0usize;
+            for reference in slide.owned_drawables {
+                let Some(drawable) = archive.object(reference.identifier) else {
+                    continue;
+                };
+                if !drawable
+                    .messages
+                    .iter()
+                    .any(|message| focused_drawable_type(message.type_))
+                {
+                    continue;
+                }
+                if reference.identifier == drawable_id {
+                    return Ok(DrawableSelector::index(position));
+                }
+                position = position.saturating_add(1);
+            }
+        }
+    }
+    Err(io::Error::other("focused drawable selector target is missing").into())
 }
 
 /// Read only the native media identities needed to correlate host build and
@@ -275,13 +325,14 @@ fn source_fixture() -> TestResult<SourceFixture> {
         .nth(1)
         .map(|(identifier, _)| identifier)
         .ok_or_else(|| io::Error::other("source-built movie B is missing"))?;
-    #[allow(deprecated)]
-    editor.set_slide_drawable_comment(
-        0,
-        movie_b_id,
-        "unselected movie comment survives audio position edits",
-    )?;
-    let bytes = editor.to_bytes()?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let selector = focused_drawable_selector(&editor.to_bytes()?, movie_b_id)?;
+    let bytes = package
+        .edit_slide_drawable_comment(SlideSelector::index(0), selector)?
+        .set("unselected movie comment survives audio position edits")?
+        .commit()?
+        .into_package();
+    let bytes = package_bytes(&bytes)?;
     let reopened = KeynoteEditor::from_bytes(&bytes)?;
     let movie_b_id = native_media_ids(&reopened.to_bytes()?)?
         .into_iter()
@@ -407,10 +458,10 @@ fn semantic_snapshot(
         builds,
         assets,
         movie_b_comment: {
-            #[allow(deprecated)]
-            editor
-                .slide_drawable_comment(0, movie_b_id)?
-                .map(|comment| comment.comment.text)
+            let selector = focused_drawable_selector(&editor.to_bytes()?, movie_b_id)?;
+            package
+                .slide_drawable_comment(SlideSelector::index(0), selector)?
+                .map(|comment| comment.text().to_owned())
         },
     })
 }

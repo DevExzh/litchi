@@ -1493,3 +1493,20 @@ The same native fixture also gates semantic media-byte reads: its selected
 content is `Data/fresh-content-9094.mov` (34,667 bytes) and its poster is
 `Data/fresh-content-9095.png` (4,447 bytes). The focused replacement tests read
 both through typed selectors and verify exact bytes while refusing mutation.
+
+## Keynote direct-drawable comment source oracle (2026-09-08)
+
+[`drawable-comments-source-native.key`](keynote/drawable-comments-source-native.key)
+is a native Keynote 14.4 (7043.0.93) source fixture for the focused
+selector-first drawable-comment API. It is 753,541 bytes with SHA-256
+`e21cf3f33da23d0c0b9df1dfa80693abc090a714b92d29338d6298d0862fe15e`. The
+source contains the existing movie comment/audio graph and a newly authored
+100-by-100 square with comment text “Native square comment — 北区”. Keynote
+saved it, closed to the theme chooser, reopened it from the exact path, and
+the comment text was confirmed through the native comment popover before a
+second close.
+
+The focused `slide_drawable_comments` integration test consumes this artifact
+for source-order inventory, root comment CRUD, replies, copy-on-write, exact
+inverse, and malformed-graph refusal. This is a native source-oracle receipt;
+no focused candidate or native reply-authoring acceptance is claimed here.

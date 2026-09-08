@@ -4,6 +4,61 @@
 //! editors plus the concrete `.key` package boundary. Archive objects,
 //! protobuf messages, native identifiers, and component names remain private.
 //!
+//! # Edit direct-drawable comments
+//!
+//! Direct comments use a slide selector, a source-order drawable selector,
+//! and an ordinal reply selector. Each edit stages exactly one operation and
+//! returns an immutable package plus an exact-source patch. The selected
+//! drawable, root comment, and reply-storage closure must resolve to one
+//! physical IWA component. The annotation-author registry is followed through
+//! its package ownership witness and may live in another component. Shared
+//! local threads use copy-on-write; cross-component root or reply storage
+//! and ambiguous ownership fail closed.
+//!
+//! ```no_run
+//! use litchi_keynote::{DrawableSelector, Package, ReplySelector, SlideSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.key")?;
+//! let slide = SlideSelector::name("Overview");
+//! let drawable = DrawableSelector::index(0);
+//!
+//! let root = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .set("Root comment")?
+//!     .commit()?;
+//! let package = root.into_package();
+//! let _comment = package.slide_drawable_comment(slide, drawable)?;
+//! let _replies = package.slide_drawable_comment_replies(slide, drawable)?;
+//!
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .add_reply("First reply")?
+//!     .commit()?
+//!     .into_package();
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .set_reply(ReplySelector::index(0), "Edited reply")?
+//!     .commit()?
+//!     .into_package();
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .remove_reply(ReplySelector::index(0))?
+//!     .commit()?
+//!     .into_package();
+//!
+//! let cleared = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .clear()?
+//!     .commit()?;
+//! let restored = cleared
+//!     .package()
+//!     .apply_slide_drawable_comment(&cleared.patch().inverse())?;
+//! # let _ = restored;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Edit slide playback state
 //!
 //! Select slides by an exact navigator name or a checked semantic position;
@@ -451,6 +506,11 @@ pub use package::{
     ChartValueAxisLimitKind, ChartValueAxisPatch,
 };
 pub use package::{
+    DrawableSummary, SlideDrawableCommentCommit, SlideDrawableCommentDiagnostics,
+    SlideDrawableCommentEdit, SlideDrawableCommentError, SlideDrawableCommentLimitKind,
+    SlideDrawableCommentPatch,
+};
+pub use package::{
     MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
     SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch, SlideMediaPropertiesCommit,
     SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit, SlideMediaPropertiesError,
@@ -470,11 +530,14 @@ pub use package::{
     SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
     SlideTableCellNumberFormatPath,
 };
-pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
+pub use selector::{
+    DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
+};
 pub use slide::audio::creation::{
     SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
     SlideAudioCreationLimitKind, SlideAudioCreationPatch,
 };
+pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
 pub use slide::image::ImageSelector;
 pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;

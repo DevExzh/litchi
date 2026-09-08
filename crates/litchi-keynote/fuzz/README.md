@@ -49,3 +49,21 @@ bounded smoke pass is:
 ```sh
 cargo +nightly fuzz run keynote_slide_media_properties -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
 ```
+
+The `keynote_slide_drawable_comments` target reads every selector-owned
+drawable and comment thread from the native comments fixture, then fuzzes root
+replacement/clear and ordered reply add/set/remove operations. It checks exact
+replay, inverse restoration, stale-source rejection, invalid selectors, and
+atomic handling of cycle, missing-reference, duplicate-reference, unknown
+comment-payload, unknown ArchiveInfo header, and tight semantic-budget
+mutations. Run its
+bounded smoke pass with:
+
+```sh
+cargo +nightly fuzz run keynote_slide_drawable_comments -- -runs=128 -max_len=4096 -timeout=60 -rss_limit_mb=2048
+```
+
+The native comments seed contains 990 IWA objects because comment ownership
+checks scan the complete package. The target widens only its native read
+profile for that deterministic seed; arbitrary inputs retain the shared tight
+archive profile.

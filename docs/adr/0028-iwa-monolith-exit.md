@@ -10303,3 +10303,87 @@ RSS 509 MB); these are smoke results, not exhaustive fuzz certification. A
 scoped `cargo clean` removed 1.7 GiB of temporary fuzz build output. Normal
 workspace formatting, lint, unit/integration, and doctest commit hooks remain
 the publication gate for this cut.
+
+## 2026-09-08 focused Keynote direct-drawable comment semantic owner
+
+Direct-drawable comment discovery and CRUD now have a focused semantic owner in
+`litchi-keynote::Package`. Callers select a slide and direct drawable by typed
+selectors, inspect `DrawableSummary`/`Comment`/`Reply` values, and stage root or
+ordinal-reply edits through a typed exact-source patch. Commit diagnostics,
+inverse patches, no-op detection, candidate reopen, and semantic verification
+remain part of the package transaction. Native IDs, archive objects, generated
+protobuf values, and raw wire bytes do not cross this API.
+
+The owner keeps the complete source-order drawable graph and rejects foreign,
+ambiguous, malformed, or unsupported comment dependencies before publication.
+Its bounded ledger is shared by selection, comment storage, author/storage
+metadata, source-preserving rewrites, and candidate verification. A neutral
+lazy Buffa annotation-author codec supplies strict author and author-storage
+snapshots, canonical writes, and prepared source-order rewrites while retaining
+unknown fields and finite resource accounting. The implementation is split
+between private graph, metadata, and transaction children.
+
+The native source oracle
+[`drawable-comments-source-native.key`](../../test-data/iwork/keynote/drawable-comments-source-native.key)
+is 753,541 bytes with SHA-256
+`e21cf3f33da23d0c0b9df1dfa80693abc090a714b92d29338d6298d0862fe15e`. It was
+authored, saved, closed to the theme chooser, reopened, and inspected in
+Keynote 14.4; the newly authored square comment text was confirmed natively.
+This receipt is limited to source fixture evidence. Focused candidate/native
+CRUD evidence is tracked per operation below; cross-component parity, rooted-
+registry policy, host method retirement, and the generic Keynote cleanup
+debt remain open. No monolith-exit gate or ordered migration debt closes here.
+
+### Scope correction: cross-component parity remains pending
+
+The host audit confirms package-global comment graph resolution: legacy editor
+routes can follow a comment root or reply whose archive component differs from
+the selected drawable's component. The focused direct-drawable owner keeps an
+explicit same-component contract until that behavior has a designed semantic
+API and native proof. It rejects foreign component dependencies with the typed
+admission error without publishing a candidate, and boundary tests fail closed if
+either the drawable or comment/reply locality guard is removed.
+
+Cross-component parity remains pending; focused shared-root and shared-reply
+tests cover same-component copy-on-write and cleanup only. All seven legacy
+host comment methods remain retained for this migration turn:
+`slide_drawable_comment`, `set_slide_drawable_comment`,
+`clear_slide_drawable_comment`, `slide_drawable_comment_replies`,
+`add_slide_drawable_comment_reply`, `set_slide_drawable_comment_reply`, and
+`remove_slide_drawable_comment_reply`. Local native or focused progress does
+not retire a host route or close a monolith-exit debt.
+
+Author-storage provenance follows the same boundary: the compatibility host
+may scan globally for a unique type-213 object, while the focused owner only
+accepts the rooted Keynote `Document` -> `TSA` -> `TSK` path (`3` -> `1` ->
+`7`) and does not silently adopt an unrooted registry.
+
+### Operation ledger: direct-drawable comment CRUD closeout
+
+Native probing remains operation-specific so partial evidence does not become
+a generic CRUD claim. The six native candidate gates below are closed by the
+strict `native_resaved_drawable_comment_candidates_read_back` readback, which
+also checks the baseline slide names, titles, and movie summaries:
+
+| Operation | Current evidence/status |
+| --- | --- |
+| Root create | **Native candidate gate closed.** Keynote 14.4 showed `drawable root created`; save, actual close, exact-path reopen, and strict focused readback preserved the result. |
+| Root update | **Native candidate gate closed.** Keynote 14.4 showed `drawable root updated`; save, actual close, exact-path reopen, and strict focused readback preserved the result. |
+| Root clear | **Native candidate gate closed.** Keynote 14.4 removed the selected root while preserving the movie and unrelated square comments; strict focused readback confirmed the result. |
+| Reply add | **Native candidate gate closed.** Keynote 14.4 showed the original root plus `duplicate reply`; strict focused readback confirmed the added reply. |
+| Reply update (set) | **Native candidate gate closed.** Keynote 14.4 showed `duplicate reply updated` on the original root; strict focused readback confirmed the updated reply. |
+| Reply remove | **Native candidate gate closed.** Keynote 14.4 retained the original root and only the first duplicate reply; strict focused readback confirmed the removal. |
+
+Scratch candidate paths and hashes are intentionally omitted. These gates do
+not retire a host route, broaden the same-component contract, or close the
+cross-component or rooted-registry debt.
+
+The comment payload policy is intentionally split at this boundary. Media
+lifecycle cloning reconstructs selected payloads and retains the strict
+`CommentGraphPayloadPolicy::Strict` plan. Focused drawable-comment CRUD uses
+`plan_comment_graph_preserving_extensions`: unknown root fields remain opaque
+source bytes for the wire-preserving rewrite, while nested date/reference/UUID
+envelopes and the exact ArchiveInfo reference census remain strict. Permanent
+regressions prove root/reply extension preservation and atomic rejection of
+unknown archive-header metadata. The corrected owner passes a bounded 128-run
+ASAN smoke in 194 seconds, reaching 547 MiB RSS.

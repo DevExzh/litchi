@@ -9,7 +9,7 @@ use super::{Package, SlideMediaLifecycleError, SlideMediaLifecycleLimitKind};
 
 /// Finite resources charged by one duplicate/remove transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct LifecycleBudget {
+pub(in crate::package) struct LifecycleBudget {
     max_input: u64,
     max_output: u64,
     max_entries: usize,
@@ -35,7 +35,9 @@ impl LifecycleBudget {
     /// Build a ledger from the package's already checked physical/semantic
     /// profiles.  The maxima are finite even when an individual source is
     /// small; every later phase still consumes the same counters.
-    pub(super) fn for_package(package: &Package) -> Result<Self, SlideMediaLifecycleError> {
+    pub(in crate::package) fn for_package(
+        package: &Package,
+    ) -> Result<Self, SlideMediaLifecycleError> {
         let physical = package.limits();
         let semantic = package.semantic_limits();
         let max_input = physical.max_input_bytes();
@@ -89,7 +91,10 @@ impl LifecycleBudget {
         Ok(budget)
     }
 
-    pub(super) fn charge_input(&mut self, amount: usize) -> Result<(), SlideMediaLifecycleError> {
+    pub(in crate::package) fn charge_input(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), SlideMediaLifecycleError> {
         let amount = as_u64(amount)?;
         let observed = checked_add(self.input, amount)?;
         if observed > self.max_input {
@@ -103,7 +108,10 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_output(&mut self, amount: usize) -> Result<(), SlideMediaLifecycleError> {
+    pub(in crate::package) fn charge_output(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), SlideMediaLifecycleError> {
         let amount = as_u64(amount)?;
         let observed = checked_add(self.output, amount)?;
         if observed > self.max_output {
@@ -117,7 +125,10 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_entries(&mut self, amount: usize) -> Result<(), SlideMediaLifecycleError> {
+    pub(in crate::package) fn charge_entries(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), SlideMediaLifecycleError> {
         let observed = self.entries.checked_add(amount).ok_or_else(|| {
             limit_usize(
                 SlideMediaLifecycleLimitKind::Entries,
@@ -136,7 +147,7 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_references(
+    pub(in crate::package) fn charge_references(
         &mut self,
         amount: usize,
     ) -> Result<(), SlideMediaLifecycleError> {
@@ -158,7 +169,7 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_media_bytes(
+    pub(in crate::package) fn charge_media_bytes(
         &mut self,
         amount: usize,
     ) -> Result<(), SlideMediaLifecycleError> {
@@ -175,7 +186,7 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_wire_fields(
+    pub(in crate::package) fn charge_wire_fields(
         &mut self,
         amount: usize,
     ) -> Result<(), SlideMediaLifecycleError> {
@@ -197,7 +208,7 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_wire_work(
+    pub(in crate::package) fn charge_wire_work(
         &mut self,
         amount: usize,
     ) -> Result<(), SlideMediaLifecycleError> {
@@ -216,7 +227,7 @@ impl LifecycleBudget {
 
     /// Charge both allocation bytes and one allocation event.  Callers must
     /// invoke this before `try_reserve` or any other fallible allocation.
-    pub(super) fn charge_allocations(
+    pub(in crate::package) fn charge_allocations(
         &mut self,
         amount: usize,
     ) -> Result<(), SlideMediaLifecycleError> {
@@ -224,7 +235,7 @@ impl LifecycleBudget {
     }
 
     /// Atomically admit a bounded library call's bytes and allocation events.
-    pub(super) fn charge_allocation_plan(
+    pub(in crate::package) fn charge_allocation_plan(
         &mut self,
         amount: usize,
         events: usize,
@@ -257,7 +268,10 @@ impl LifecycleBudget {
         Ok(())
     }
 
-    pub(super) fn charge_nesting(&mut self, amount: usize) -> Result<(), SlideMediaLifecycleError> {
+    pub(in crate::package) fn charge_nesting(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), SlideMediaLifecycleError> {
         let amount = u32::try_from(amount).map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
         if amount > self.max_nesting {
             return Err(limit(

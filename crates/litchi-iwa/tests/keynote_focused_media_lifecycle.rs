@@ -5,7 +5,7 @@
 //! selectors, and each candidate is reopened by the host editor before its
 //! semantic projection is compared with the expected state.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::io;
 use std::time::Duration;
@@ -17,7 +17,7 @@ use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{DrawableSelector, MediaPart, MovieSelector, Package, SlideSelector};
 use prost::Message as _;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -87,6 +87,59 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     Ok(bytes)
+}
+
+fn focused_drawable_type(message_type: u32) -> bool {
+    matches!(
+        message_type,
+        3_002 | 3_004..=3_009 | 5_021 | 6_000 | 6_007 | 2_011 | 2_014 | 7 | 12
+    )
+}
+
+fn focused_drawable_selector(
+    source: &[u8],
+    drawable_id: u64,
+) -> Result<DrawableSelector, Box<dyn Error>> {
+    let catalog = Catalog::from_bytes(source)?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            Ok(stream) => stream.into_bytes(),
+            Err(_) => continue,
+        };
+        let archive = match Archive::parse(&stream) {
+            Ok(archive) => archive,
+            Err(_) => continue,
+        };
+        for object in &archive.objects {
+            let Some(message) = object.messages.iter().find(|message| message.type_ == 5) else {
+                continue;
+            };
+            let Ok(slide) = kn::SlideArchive::decode(message.data.as_slice()) else {
+                continue;
+            };
+            let mut position = 0usize;
+            for reference in slide.owned_drawables {
+                let Some(drawable) = archive.object(reference.identifier) else {
+                    continue;
+                };
+                if !drawable
+                    .messages
+                    .iter()
+                    .any(|message| focused_drawable_type(message.type_))
+                {
+                    continue;
+                }
+                if reference.identifier == drawable_id {
+                    return Ok(DrawableSelector::index(position));
+                }
+                position = position.saturating_add(1);
+            }
+        }
+    }
+    Err(io::Error::other("focused drawable selector target is missing").into())
 }
 
 /// Read only native media identities needed by the host build/comment oracle.
@@ -407,15 +460,14 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     second_build.set_start(BuildStart::AfterPrevious)?;
     editor.add_slide_build(0, movie_a_id, second_build)?;
 
-    #[allow(deprecated)]
-    editor.set_slide_drawable_comment(0, movie_b_id, "unselected movie B lifecycle comment")?;
-
-    let package = set_movie_labels(
-        Package::from_bytes(&editor.to_bytes()?)?,
-        0,
-        "Movie A title",
-        "Movie A caption",
-    )?;
+    let comment_package = Package::from_bytes(&editor.to_bytes()?)?;
+    let comment_selector = focused_drawable_selector(&editor.to_bytes()?, movie_b_id)?;
+    let comment_package = comment_package
+        .edit_slide_drawable_comment(SlideSelector::index(0), comment_selector)?
+        .set("unselected movie B lifecycle comment")?
+        .commit()?
+        .into_package();
+    let package = set_movie_labels(comment_package, 0, "Movie A title", "Movie A caption")?;
     let bytes = package_bytes(&package)?;
 
     // Reopen once before returning so this fixture itself proves that labels,
@@ -437,10 +489,11 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     );
     assert_eq!(reopened_slide.audio().count(), 2);
     assert_eq!(reopened.slide_builds(0)?.len(), 5);
+    let reopened_selector = focused_drawable_selector(&bytes, movie_b_id)?;
     assert_eq!(
-        reopened
-            .slide_drawable_comment(0, movie_b_id)?
-            .map(|comment| comment.comment.text),
+        reopened_package
+            .slide_drawable_comment(SlideSelector::index(0), reopened_selector)?
+            .map(|comment| comment.text().to_owned()),
         Some("unselected movie B lifecycle comment".to_owned())
     );
 
@@ -606,16 +659,6 @@ fn has_media_bytes(package: &Package, expected: &[u8]) -> Result<bool, Box<dyn E
     Ok(false)
 }
 
-#[allow(deprecated)]
-fn comment_text(
-    editor: &KeynoteEditor,
-    drawable_object_id: u64,
-) -> Result<Option<String>, Box<dyn Error>> {
-    Ok(editor
-        .slide_drawable_comment(0, drawable_object_id)?
-        .map(|comment| comment.comment.text))
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CommentStorageSnapshot {
     storage_id: u64,
@@ -630,36 +673,97 @@ struct DrawableCommentSnapshot {
     replies: Vec<CommentStorageSnapshot>,
 }
 
-fn storage_snapshot(
-    storage_id: u64,
-    comment: &litchi_iwa_common::comment::Comment,
-) -> CommentStorageSnapshot {
-    CommentStorageSnapshot {
-        storage_id,
-        text: comment.text.clone(),
-        author_id: comment.author_id.map(|author| author.get()),
-        storage_uuid: comment
-            .storage_uuid
-            .map(|uuid| (uuid.lower(), uuid.upper())),
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+
+fn native_component_containing_object(
+    source: &[u8],
+    identifier: u64,
+) -> Result<Archive, Box<dyn Error>> {
+    for entry in Catalog::from_bytes(source)?
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            Ok(stream) => stream.into_bytes(),
+            Err(_) => continue,
+        };
+        let archive = match Archive::parse(&stream) {
+            Ok(archive) => archive,
+            Err(_) => continue,
+        };
+        if archive.object(identifier).is_some() {
+            return Ok(archive);
+        }
     }
+    Err(io::Error::other(format!("native object {identifier} is missing")).into())
 }
 
-#[allow(deprecated)]
+fn native_comment_node(
+    source: &[u8],
+    identifier: u64,
+) -> Result<(CommentStorageSnapshot, Vec<u64>), Box<dyn Error>> {
+    let archive = native_component_containing_object(source, identifier)?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| io::Error::other("native comment object disappeared"))?;
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("native comment payload is missing"))?;
+    let comment = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
+    let replies = comment
+        .replies
+        .iter()
+        .map(|reference| reference.identifier)
+        .collect::<Vec<_>>();
+    Ok((
+        CommentStorageSnapshot {
+            storage_id: identifier,
+            text: comment.text.unwrap_or_default(),
+            author_id: comment.author.map(|reference| reference.identifier),
+            storage_uuid: comment.storage_uuid.map(|uuid| (uuid.lower, uuid.upper)),
+        },
+        replies,
+    ))
+}
+
 fn drawable_comment_snapshot(
-    editor: &KeynoteEditor,
+    source: &[u8],
     drawable_object_id: u64,
 ) -> Result<Option<DrawableCommentSnapshot>, Box<dyn Error>> {
-    let Some(root) = editor.slide_drawable_comment(0, drawable_object_id)? else {
+    let archive = native_component_containing_object(source, drawable_object_id)?;
+    let object = archive
+        .object(drawable_object_id)
+        .ok_or_else(|| io::Error::other("native drawable disappeared"))?;
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 3_007)
+        .ok_or_else(|| io::Error::other("native drawable has no movie payload"))?;
+    let movie = tsd::MovieArchive::decode(message.data.as_slice())?;
+    let Some(root_reference) = movie.super_.comment else {
         return Ok(None);
     };
-    let replies = editor.slide_drawable_comment_replies(0, drawable_object_id)?;
-    Ok(Some(DrawableCommentSnapshot {
-        root: storage_snapshot(root.storage_id.get(), &root.comment),
-        replies: replies
-            .into_iter()
-            .map(|reply| storage_snapshot(reply.storage_id.get(), &reply.comment))
-            .collect(),
-    }))
+    let root_identifier = root_reference.identifier;
+    let (root, root_replies) = native_comment_node(source, root_identifier)?;
+    let mut replies = Vec::new();
+    let mut pending = root_replies;
+    let mut seen = BTreeSet::new();
+    while let Some(identifier) = pending.first().copied() {
+        pending.remove(0);
+        if !seen.insert(identifier) {
+            continue;
+        }
+        let (reply, nested) = native_comment_node(source, identifier)?;
+        replies.push(reply);
+        pending.extend(nested);
+    }
+    Ok(Some(DrawableCommentSnapshot { root, replies }))
+}
+
+fn comment_text(source: &[u8], drawable_object_id: u64) -> Result<Option<String>, Box<dyn Error>> {
+    Ok(drawable_comment_snapshot(source, drawable_object_id)?.map(|comment| comment.root.text))
 }
 
 fn assert_cloned_comment(source: &DrawableCommentSnapshot, cloned: &DrawableCommentSnapshot) {
@@ -706,7 +810,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         )
     );
     assert_eq!(
-        comment_text(&baseline_editor, fixture.movie_b_id)?,
+        comment_text(&source_bytes, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
 
@@ -739,7 +843,10 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         )
     );
     assert_eq!(
-        comment_text(&duplicate_movie_editor, fixture.movie_b_id)?,
+        comment_text(
+            &package_bytes(duplicate_movie.package())?,
+            fixture.movie_b_id
+        )?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert_eq!(duplicate_movie.diagnostics().source_media_count(), 4);
@@ -826,7 +933,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
         )
     );
     assert_eq!(
-        comment_text(&movie_shared_editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(movie_shared.package())?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
 
@@ -839,7 +946,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     assert_eq!(movie_final_state.movies[0].content, MOVIE_B);
     assert_eq!(movie_final_state.audio, baseline.audio);
     assert_eq!(
-        comment_text(&movie_final_editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(movie_final.package())?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert_eq!(movie_final_state.builds.len(), 3);
@@ -887,7 +994,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     assert_eq!(audio_shared_state.audio[1].content, AUDIO_A);
     assert_eq!(audio_shared_state.builds.len(), 5);
     assert_eq!(
-        comment_text(&audio_shared_editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(audio_shared.package())?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert!(has_media_bytes(audio_shared.package(), AUDIO_A)?);
@@ -901,7 +1008,7 @@ fn source_built_media_lifecycle_matches_reopened_host_semantics() -> TestResult 
     assert_eq!(audio_final_state.audio.len(), 1);
     assert_eq!(audio_final_state.audio[0].content, AUDIO_B);
     assert_eq!(
-        comment_text(&audio_final_editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(audio_final.package())?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert_eq!(audio_final_state.builds.len(), 4);
@@ -977,7 +1084,6 @@ fn source_built_media_lifecycle_type_guards_are_atomic() -> TestResult {
 }
 
 #[test]
-#[allow(deprecated)]
 fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> TestResult {
     let fixture = source_fixture()?;
     let package = Package::from_bytes(&fixture.bytes)?;
@@ -986,20 +1092,19 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
     // The mixed source order is movie A, audio A, movie B, audio B.  Movie B
     // owns an existing direct comment. Duplication preserves its semantic
     // identity while allocating an independent storage graph.
-    let editor = host_from_package(&package)?;
     assert_eq!(
-        comment_text(&editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(&package)?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
-    let source_comment = drawable_comment_snapshot(&editor, fixture.movie_b_id)?
+    let source_comment = drawable_comment_snapshot(&package_bytes(&package)?, fixture.movie_b_id)?
         .ok_or_else(|| io::Error::other("source movie comment missing"))?;
     let duplicate =
         package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
-    let duplicate_editor = host_from_package(duplicate.package())?;
     let cloned_movie_id =
         last_native_media_id(&package_bytes(duplicate.package())?, MovieKind::File)?;
-    let cloned_comment = drawable_comment_snapshot(&duplicate_editor, cloned_movie_id)?
-        .ok_or_else(|| io::Error::other("cloned movie comment missing"))?;
+    let cloned_comment =
+        drawable_comment_snapshot(&package_bytes(duplicate.package())?, cloned_movie_id)?
+            .ok_or_else(|| io::Error::other("cloned movie comment missing"))?;
     assert_cloned_comment(&source_comment, &cloned_comment);
     let restored = duplicate
         .package()
@@ -1010,7 +1115,11 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
     let remaining = semantic_snapshot(removed.package(), &removed_editor)?;
     assert_eq!(remaining.movies.len(), 1);
     assert_eq!(remaining.movies[0].content, MOVIE_A);
-    assert_eq!(remaining.audio, semantic_snapshot(&package, &editor)?.audio);
+    let package_editor = host_from_package(&package)?;
+    assert_eq!(
+        remaining.audio,
+        semantic_snapshot(&package, &package_editor)?.audio
+    );
     assert!(
         native_media_ids(&package_bytes(removed.package())?)?
             .iter()
@@ -1025,26 +1134,26 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
 }
 
 #[test]
-#[allow(deprecated)]
 fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_atomic() -> TestResult
 {
     let fixture = source_fixture()?;
-    let mut editor = KeynoteEditor::from_bytes(&fixture.bytes)?;
-    #[allow(deprecated)]
-    editor.set_slide_drawable_comment(0, fixture.audio_a_id, "selected audio lifecycle comment")?;
-    #[allow(deprecated)]
-    let reply_id = editor.add_slide_drawable_comment_reply(
-        0,
-        fixture.audio_a_id,
-        "selected audio lifecycle reply",
-    )?;
-    let bytes = editor.to_bytes()?;
+    let package = Package::from_bytes(&fixture.bytes)?;
+    let audio_selector = focused_drawable_selector(&fixture.bytes, fixture.audio_a_id)?;
+    let created = package
+        .edit_slide_drawable_comment(SlideSelector::index(0), audio_selector)?
+        .set("selected audio lifecycle comment")?
+        .commit()?
+        .into_package();
+    let replied = created
+        .edit_slide_drawable_comment(SlideSelector::index(0), audio_selector)?
+        .add_reply("selected audio lifecycle reply")?
+        .commit()?;
+    let bytes = package_bytes(replied.package())?;
     let reopened = KeynoteEditor::from_bytes(&bytes)?;
-    let comment = drawable_comment_snapshot(&reopened, fixture.audio_a_id)?
+    let comment = drawable_comment_snapshot(&bytes, fixture.audio_a_id)?
         .ok_or_else(|| io::Error::other("selected audio comment was not persisted"))?;
     assert_eq!(comment.root.text, "selected audio lifecycle comment");
     assert_eq!(comment.replies.len(), 1);
-    assert_eq!(comment.replies[0].storage_id, reply_id);
     assert_eq!(comment.replies[0].text, "selected audio lifecycle reply");
     assert!(comment.root.storage_uuid.is_some());
     assert!(comment.replies[0].storage_uuid.is_some());
@@ -1057,14 +1166,14 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
     let before = package_bytes(&package)?;
     let duplicate =
         package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
-    let duplicate_editor = host_from_package(duplicate.package())?;
     let cloned_audio_id =
         last_native_media_id(&package_bytes(duplicate.package())?, MovieKind::Audio)?;
-    let cloned_comment = drawable_comment_snapshot(&duplicate_editor, cloned_audio_id)?
-        .ok_or_else(|| io::Error::other("cloned audio comment missing"))?;
+    let cloned_comment =
+        drawable_comment_snapshot(&package_bytes(duplicate.package())?, cloned_audio_id)?
+            .ok_or_else(|| io::Error::other("cloned audio comment missing"))?;
     assert_cloned_comment(&comment, &cloned_comment);
     assert_eq!(
-        drawable_comment_snapshot(&duplicate_editor, fixture.audio_a_id)?,
+        drawable_comment_snapshot(&package_bytes(duplicate.package())?, fixture.audio_a_id)?,
         Some(comment)
     );
     let restored = duplicate
@@ -1081,7 +1190,7 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
         semantic_snapshot(&package, &reopened)?.movies
     );
     assert_eq!(
-        comment_text(&removed_editor, fixture.movie_b_id)?,
+        comment_text(&package_bytes(removed.package())?, fixture.movie_b_id)?,
         Some("unselected movie B lifecycle comment".to_owned())
     );
     assert!(
@@ -1100,43 +1209,47 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
 #[test]
 fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> TestResult {
     let fixture = source_fixture()?;
-    let mut editor = KeynoteEditor::from_bytes(&fixture.bytes)?;
+    let package = Package::from_bytes(&fixture.bytes)?;
+    let movie_selector = focused_drawable_selector(&fixture.bytes, fixture.movie_a_id)?;
+    let audio_selector = focused_drawable_selector(&fixture.bytes, fixture.audio_a_id)?;
+    let movie_set = package
+        .edit_slide_drawable_comment(SlideSelector::index(0), movie_selector)?
+        .set("selected movie lifecycle comment")?
+        .commit()?
+        .into_package();
+    let both_set = movie_set
+        .edit_slide_drawable_comment(SlideSelector::index(0), audio_selector)?
+        .set("selected audio lifecycle comment")?
+        .commit()?
+        .into_package();
 
-    #[allow(deprecated)]
-    editor.set_slide_drawable_comment(0, fixture.movie_a_id, "selected movie lifecycle comment")?;
-    #[allow(deprecated)]
-    editor.set_slide_drawable_comment(0, fixture.audio_a_id, "selected audio lifecycle comment")?;
-
-    let movie_before_reply = drawable_comment_snapshot(&editor, fixture.movie_a_id)?
-        .ok_or_else(|| io::Error::other("selected movie comment was not created"))?;
-    let audio_before_reply = drawable_comment_snapshot(&editor, fixture.audio_a_id)?
-        .ok_or_else(|| io::Error::other("selected audio comment was not created"))?;
+    let movie_before_reply =
+        drawable_comment_snapshot(&package_bytes(&both_set)?, fixture.movie_a_id)?
+            .ok_or_else(|| io::Error::other("selected movie comment was not created"))?;
+    let audio_before_reply =
+        drawable_comment_snapshot(&package_bytes(&both_set)?, fixture.audio_a_id)?
+            .ok_or_else(|| io::Error::other("selected audio comment was not created"))?;
     assert!(movie_before_reply.replies.is_empty());
     assert!(audio_before_reply.replies.is_empty());
 
-    #[allow(deprecated)]
-    let movie_reply_id = editor.add_slide_drawable_comment_reply(
-        0,
-        fixture.movie_a_id,
-        "selected movie lifecycle reply",
-    )?;
-    #[allow(deprecated)]
-    let audio_reply_id = editor.add_slide_drawable_comment_reply(
-        0,
-        fixture.audio_a_id,
-        "selected audio lifecycle reply",
-    )?;
-
-    let movie = drawable_comment_snapshot(&editor, fixture.movie_a_id)?
+    let movie_reply = both_set
+        .edit_slide_drawable_comment(SlideSelector::index(0), movie_selector)?
+        .add_reply("selected movie lifecycle reply")?
+        .commit()?
+        .into_package();
+    let audio_reply = movie_reply
+        .edit_slide_drawable_comment(SlideSelector::index(0), audio_selector)?
+        .add_reply("selected audio lifecycle reply")?
+        .commit()?;
+    let before_operations = package_bytes(audio_reply.package())?;
+    let movie = drawable_comment_snapshot(&before_operations, fixture.movie_a_id)?
         .ok_or_else(|| io::Error::other("selected movie comment disappeared"))?;
-    let audio = drawable_comment_snapshot(&editor, fixture.audio_a_id)?
+    let audio = drawable_comment_snapshot(&before_operations, fixture.audio_a_id)?
         .ok_or_else(|| io::Error::other("selected audio comment disappeared"))?;
     assert_eq!(movie.root.text, "selected movie lifecycle comment");
     assert_eq!(audio.root.text, "selected audio lifecycle comment");
     assert_eq!(movie.replies.len(), 1);
     assert_eq!(audio.replies.len(), 1);
-    assert_eq!(movie.replies[0].storage_id, movie_reply_id);
-    assert_eq!(audio.replies[0].storage_id, audio_reply_id);
     assert_eq!(movie.replies[0].text, "selected movie lifecycle reply");
     assert_eq!(audio.replies[0].text, "selected audio lifecycle reply");
 
@@ -1166,17 +1279,16 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
     let unique_uuids = uuids.into_iter().flatten().collect::<HashSet<_>>();
     assert_eq!(unique_uuids.len(), 4);
 
-    let reopened = KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+    let _reopened = KeynoteEditor::from_bytes(&before_operations)?;
     assert_eq!(
-        drawable_comment_snapshot(&reopened, fixture.movie_a_id)?,
+        drawable_comment_snapshot(&before_operations, fixture.movie_a_id)?,
         Some(movie.clone())
     );
     assert_eq!(
-        drawable_comment_snapshot(&reopened, fixture.audio_a_id)?,
+        drawable_comment_snapshot(&before_operations, fixture.audio_a_id)?,
         Some(audio.clone())
     );
 
-    let before_operations = editor.to_bytes()?;
     let package = Package::from_bytes(&before_operations)?;
     for (source_index, selected_id, source_thread, other_id, other_thread) in [
         (0, fixture.movie_a_id, &movie, fixture.audio_a_id, &audio),
@@ -1184,7 +1296,6 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
     ] {
         let duplicate = package
             .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
-        let duplicate_host = host_from_package(duplicate.package())?;
         let clone_id = last_native_media_id(
             &package_bytes(duplicate.package())?,
             if source_index == 0 {
@@ -1193,24 +1304,24 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
                 MovieKind::Audio
             },
         )?;
-        let cloned_thread = drawable_comment_snapshot(&duplicate_host, clone_id)?
-            .ok_or_else(|| io::Error::other("focused clone lost its comment thread"))?;
+        let cloned_thread =
+            drawable_comment_snapshot(&package_bytes(duplicate.package())?, clone_id)?
+                .ok_or_else(|| io::Error::other("focused clone lost its comment thread"))?;
         assert_cloned_comment(source_thread, &cloned_thread);
         assert_eq!(
-            drawable_comment_snapshot(&duplicate_host, other_id)?,
+            drawable_comment_snapshot(&package_bytes(duplicate.package())?, other_id)?,
             Some(other_thread.clone())
         );
 
         let removed = package
             .remove_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
-        let removed_host = host_from_package(removed.package())?;
         assert!(
             native_media_ids(&package_bytes(removed.package())?)?
                 .iter()
                 .all(|(identifier, _)| *identifier != selected_id)
         );
         assert_eq!(
-            drawable_comment_snapshot(&removed_host, other_id)?,
+            drawable_comment_snapshot(&package_bytes(removed.package())?, other_id)?,
             Some(other_thread.clone())
         );
         let restored = removed
