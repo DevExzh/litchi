@@ -40,7 +40,7 @@ mod comment_clone;
 mod comment_graph;
 mod comment_removal;
 mod graph;
-mod graph_caption_witness;
+pub(super) mod graph_caption_witness;
 mod identifier_watermark;
 mod metadata;
 mod node_cache;

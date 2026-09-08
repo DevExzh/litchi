@@ -39,3 +39,13 @@ its focused smoke pass with:
 ```sh
 cargo +nightly fuzz run keynote_slide_movie_geometry -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
 ```
+
+The `keynote_slide_media_properties` target also reads the permanent native
+placeholder fixture, verifies its source-order `Placeholder` classification
+and Unicode accessibility marker, and checks that placeholder/live-video
+property mutations are rejected without changing the source bytes.  Its
+bounded smoke pass is:
+
+```sh
+cargo +nightly fuzz run keynote_slide_media_properties -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
+```

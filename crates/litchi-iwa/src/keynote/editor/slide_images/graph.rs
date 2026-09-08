@@ -12,7 +12,7 @@ use crate::shapes::{
     patch_wrapped_drawable_properties,
 };
 use crate::{DrawableTitleCaption, IWorkThemeArchive};
-use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_iwa_common::{WireLimits, shape::image::ImageAdjustments};
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -529,6 +529,35 @@ pub(super) fn image_graph(
     })
 }
 
+fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| {
+            limits.with_fields(
+                source_bytes
+                    .saturating_mul(4)
+                    .clamp(1, WireLimits::MAX_FIELDS),
+            )
+        })
+        .and_then(|limits| limits.with_output_bytes(source_bytes))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_mul(8)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid Keynote image adjustments limits: {error}"))
+        })
+}
+
 fn image_info(
     editor: &KeynoteEditor,
     graph: &ObjectGraph,
@@ -563,7 +592,7 @@ fn image_info(
     let raw = graph.message_data_type(identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
     let image_adjustments: ImageAdjustments = litchi_keynote::__decode_image_adjustments_payload(
         raw,
-        crate::keynote::editor::slide_movies::movie_playback_wire_limits(editor.package())?,
+        image_adjustments_wire_limits(editor.package())?,
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(

@@ -25,19 +25,80 @@ const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 const STANDIN_MESSAGE_TYPE: u32 = 3_097;
 
+/// Resource ledger used while proving private caption-style ownership.
+///
+/// The proof is shared by lifecycle cloning and read-only media-property
+/// selection. Each caller supplies its operation-wide ledger so the witness
+/// cannot hide a second, uncharged decode budget behind a semantic read.
+pub(in crate::package) trait CaptionWitnessBudget {
+    type Error;
+
+    fn invalid_source() -> Self::Error;
+
+    fn charge_codec_pass(&mut self, payload: &[u8]) -> Result<(), Self::Error>;
+
+    fn charge_header_metadata(
+        &mut self,
+        info: &litchi_iwa_core::MessageInfo,
+    ) -> Result<(), Self::Error>;
+}
+
+impl CaptionWitnessBudget for LifecycleBudget {
+    type Error = SlideMediaLifecycleError;
+
+    fn invalid_source() -> Self::Error {
+        SlideMediaLifecycleError::InvalidSource
+    }
+
+    fn charge_codec_pass(&mut self, payload: &[u8]) -> Result<(), Self::Error> {
+        let fields = payload.len().max(1);
+        let work = payload.len().saturating_mul(32).max(1);
+        self.charge_wire_fields(fields)?;
+        self.charge_wire_work(work)?;
+        self.charge_allocation_plan(payload.len().max(1), 1)
+    }
+
+    fn charge_header_metadata(
+        &mut self,
+        info: &litchi_iwa_core::MessageInfo,
+    ) -> Result<(), Self::Error> {
+        let fields = info
+            .object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| count.checked_add(info.field_infos.len()))
+            .ok_or_else(Self::invalid_source)?;
+        let references = info
+            .object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| {
+                info.field_infos.iter().try_fold(count, |count, field| {
+                    count
+                        .checked_add(field.object_references.len())
+                        .and_then(|count| count.checked_add(field.data_references.len()))
+                })
+            })
+            .ok_or_else(Self::invalid_source)?;
+        self.charge_wire_fields(fields)?;
+        self.charge_references(references)?;
+        self.charge_wire_work(fields.saturating_add(references))
+    }
+}
+
 /// Prove the private style identifiers transitively owned by one movie.
 ///
 /// The result has one slot for the title style and one for the caption style;
 /// equal identifiers are de-duplicated.  `None` means that the corresponding
 /// movie edge was absent.  The fixed result avoids an allocation while making
 /// the maximum of two transitive witnesses explicit to callers.
-pub(super) fn prove_movie_caption_style_witness(
+pub(in crate::package) fn prove_movie_caption_style_witness<B: CaptionWitnessBudget>(
     package: &Package,
     source_component: &str,
     source_movie: &ArchiveObject,
     limits: WireLimits,
-    budget: &mut LifecycleBudget,
-) -> Result<[Option<u64>; 2], SlideMediaLifecycleError> {
+    budget: &mut B,
+) -> Result<[Option<u64>; 2], B::Error> {
     let Some(movie_identifier) = source_movie.archive_info.identifier else {
         return Ok([None, None]);
     };
@@ -71,17 +132,17 @@ pub(super) fn prove_movie_caption_style_witness(
     else {
         return Ok([None, None]);
     };
-    charge_codec_pass(movie_payload, budget)?;
+    budget.charge_codec_pass(movie_payload)?;
     let Ok(movie_snapshot) = keynote_movie_caption_codec::decode_movie_caption(
         movie_payload,
-        movie_decode_options(limits)?,
+        movie_decode_options::<B>(limits)?,
     ) else {
         return Ok([None, None]);
     };
     let Some(movie_info) = source_movie.archive_info.message_infos.get(movie_index) else {
         return Ok([None, None]);
     };
-    charge_header_metadata(movie_info, budget)?;
+    budget.charge_header_metadata(movie_info)?;
 
     let mut styles = [None, None];
     admit_caption_style(
@@ -107,7 +168,7 @@ pub(super) fn prove_movie_caption_style_witness(
     Ok(styles)
 }
 
-fn admit_caption_style(
+fn admit_caption_style<B: CaptionWitnessBudget>(
     package: &Package,
     source_component: &str,
     movie_info: &litchi_iwa_core::MessageInfo,
@@ -115,8 +176,8 @@ fn admit_caption_style(
     caption_identifier: Option<u64>,
     styles: &mut [Option<u64>; 2],
     limits: WireLimits,
-    budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+    budget: &mut B,
+) -> Result<(), B::Error> {
     let Some(caption_identifier) = caption_identifier else {
         return Ok(());
     };
@@ -154,12 +215,12 @@ fn admit_caption_style(
     let Some(caption_info) = caption_object.archive_info.message_infos.get(caption_index) else {
         return Ok(());
     };
-    charge_header_metadata(caption_info, budget)?;
+    budget.charge_header_metadata(caption_info)?;
 
-    charge_codec_pass(&caption_message.data, budget)?;
+    budget.charge_codec_pass(&caption_message.data)?;
     let Ok(caption_snapshot) = pages_movie_caption_codec::decode_caption_info(
         &caption_message.data,
-        caption_decode_options(limits)?,
+        caption_decode_options::<B>(limits)?,
     ) else {
         return Ok(());
     };
@@ -208,7 +269,7 @@ fn admit_caption_style(
     let slot = styles
         .iter_mut()
         .find(|slot| slot.is_none())
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or_else(B::invalid_source)?;
     *slot = Some(style_identifier);
     Ok(())
 }
@@ -223,21 +284,21 @@ fn admit_caption_style(
 fn strict_style_header_reference(
     caption_info: &litchi_iwa_core::MessageInfo,
     style_identifier: u64,
-) -> Result<u64, SlideMediaLifecycleError> {
+) -> Result<u64, ()> {
     let aggregate_count = caption_info
         .object_references
         .iter()
         .filter(|identifier| **identifier == style_identifier)
         .count();
     if aggregate_count != 1 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(());
     }
 
     let mut field_count = 0usize;
     for field in &caption_info.field_infos {
         if field.data_references.contains(&style_identifier) {
             // A data edge can never prove private style ownership.
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(());
         }
         let references = field
             .object_references
@@ -245,32 +306,27 @@ fn strict_style_header_reference(
             .filter(|identifier| **identifier == style_identifier)
             .count();
         if references != 0 && !matches!(field.path.path.as_slice(), [1, 1, 2] | [1, 2]) {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(());
         }
-        field_count = field_count
-            .checked_add(references)
-            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        field_count = field_count.checked_add(references).ok_or(())?;
     }
     if field_count > 1 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(());
     }
     Ok(style_identifier)
 }
 
-fn unique_message_index(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<usize, SlideMediaLifecycleError> {
+fn unique_message_index(object: &ArchiveObject, message_type: u32) -> Result<usize, ()> {
     let mut index = None;
     for (candidate, message) in object.messages.iter().enumerate() {
         if message.type_ == message_type {
             if index.is_some() {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(());
             }
             index = Some(candidate);
         }
     }
-    index.ok_or(SlideMediaLifecycleError::InvalidSource)
+    index.ok_or(())
 }
 
 fn unique_caption_message_index(object: &ArchiveObject) -> Option<usize> {
@@ -286,49 +342,10 @@ fn unique_caption_message_index(object: &ArchiveObject) -> Option<usize> {
     index
 }
 
-fn charge_codec_pass(
-    payload: &[u8],
-    budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
-    let fields = payload.len().max(1);
-    let work = payload.len().saturating_mul(32).max(1);
-    budget.charge_wire_fields(fields)?;
-    budget.charge_wire_work(work)?;
-    budget.charge_allocation_plan(payload.len().max(1), 1)
-}
-
-fn charge_header_metadata(
-    info: &litchi_iwa_core::MessageInfo,
-    budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
-    let fields = info
-        .object_references
-        .len()
-        .checked_add(info.data_references.len())
-        .and_then(|count| count.checked_add(info.field_infos.len()))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-    let references = info
-        .object_references
-        .len()
-        .checked_add(info.data_references.len())
-        .and_then(|count| {
-            info.field_infos.iter().try_fold(count, |count, field| {
-                count
-                    .checked_add(field.object_references.len())
-                    .and_then(|count| count.checked_add(field.data_references.len()))
-            })
-        })
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-    budget.charge_wire_fields(fields)?;
-    budget.charge_references(references)?;
-    budget.charge_wire_work(fields.saturating_add(references))
-}
-
-fn movie_decode_options(
+fn movie_decode_options<B: CaptionWitnessBudget>(
     limits: WireLimits,
-) -> Result<keynote_movie_caption_codec::DecodeOptions, SlideMediaLifecycleError> {
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+) -> Result<keynote_movie_caption_codec::DecodeOptions, B::Error> {
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| B::invalid_source())?;
     Ok(keynote_movie_caption_codec::DecodeOptions::new(
         limits.max_input_bytes(),
         limits.max_fields(),
@@ -337,11 +354,10 @@ fn movie_decode_options(
     ))
 }
 
-fn caption_decode_options(
+fn caption_decode_options<B: CaptionWitnessBudget>(
     limits: WireLimits,
-) -> Result<pages_movie_caption_codec::DecodeOptions, SlideMediaLifecycleError> {
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+) -> Result<pages_movie_caption_codec::DecodeOptions, B::Error> {
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| B::invalid_source())?;
     Ok(pages_movie_caption_codec::DecodeOptions::new(
         limits.max_input_bytes(),
         limits.max_fields(),

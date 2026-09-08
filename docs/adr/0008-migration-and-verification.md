@@ -17911,3 +17911,77 @@ source oracle and both saved candidates with consuming tests. This gate covers
 the accepted file-movie fixture profile and persisted Arrange transform fields,
 not every native movie kind or unsupported geometry flag, and it closes no
 monolith-exit condition.
+
+## 2026-09-08 focused Keynote media discovery and raw-reader retirement
+
+Keynote media discovery now uses the concrete package's complete source-order
+`Slide::movies` sequence, with `audio` and `video_movies` filtered views.
+Detached summaries preserve kind, optional position and sizes, transform,
+playback, and duration without exposing native identities. Read-only
+`slide_media_properties` additionally admits sparse placeholders and live
+video through the existing bounded Buffa property projection. Mutation still
+requires the admitted file-movie or audio kind and its materialized closure.
+A movie archive aliasing a title, body, or slide-number placeholder fails
+semantic projection instead of disappearing and shifting media positions.
+
+The production host readers `slide_movies`, `slide_audio`, and
+`slide_media_infos`, their two public raw info types, and the obsolete inspect
+examples are retired. Keynote's hidden `__decode_movie_playback_payload` host
+bridge is removed; Pages and Numbers retain their separate migration bridges.
+Image-adjustment decoding retains its existing wire limits in its own private
+image owner. Boundary checks prohibit restoring these raw readers or hiding
+their former spellings under `cfg(test)`.
+
+Audio comment/reply lifecycle verification moved into focused
+`slide_media_comments` tests using the permanent native comment fixtures.
+Remaining host builder/layout/build/media-asset tests observe semantic values
+through `litchi-keynote`; private generated fixture oracles retain only the
+physical graph assertions needed to verify ownership, asset sharing, and build
+correlation. These test dependencies retain their named future Keynote owners;
+this cut does not retire builder, layout, build, direct comment CRUD, or shared
+media-asset ownership. All eleven ordered host dependency debts remain open.
+
+Computer Use created
+[`media-properties-placeholder-native.key`](../../test-data/iwork/keynote/media-properties-placeholder-native.key)
+in Keynote 14.4 (7043.0.93) by defining the fresh source-order movie 4 as a media
+placeholder. Native save, actual close, exact-path reopen, inspection, and
+second close confirmed its Replace movie control, 640×360 size, (321,42)
+position, 1.25-second playback range, and the accessibility description
+“Native movie placeholder — accessible 北区”. The final file is 798,695 bytes,
+SHA-256 `ca3ef01f42b061a90a7620a2e1cef29f09e6ecd73591c60cf3286572781649d0`.
+Mandatory focused tests consume this artifact and preserve the preceding
+Audio, Audio, File, File source sequence, exact read bytes, and atomic refusal
+of placeholder property edits. Live-video read evidence remains synthetic.
+
+`slide_media_data` also reads materialized placeholder/live-video content and
+posters through the same bounded ownership, metadata, digest, size, and media
+family checks used for ordinary media. A private selection purpose keeps all
+edit, apply, pair-selection, and candidate-verification paths restricted to
+file movies and audio. The native placeholder's content and poster are the
+unchanged 34,667-byte movie and 4,447-byte PNG from the fresh-creation fixture;
+focused tests verify both exact assets and atomic replacement refusal. Sparse
+live-video records without materialized data continue to return typed errors.
+
+A sparse movie with a remaining poster and no content reference can read that
+poster through the same selected-part closure. Content reads still return a
+typed error; every mutation and pair selection still requires content. A
+source-built regression verifies exact poster bytes and atomic edit refusal.
+
+The migrated captioned-duplicate regression exposed a read compatibility gap:
+source-built movie headers retain transitive title/caption style references.
+Properties admission now shares the lifecycle owner's bounded schema proof for
+at most two private caption styles, charged to the existing operation ledger.
+Only same-component caption-info paths with the selected movie as parent and
+the expected shape-style target can justify extra aggregate references.
+Unknown, duplicate, foreign, or incorrectly typed edges remain invalid.
+
+Verification passes 1,742 host unit cases, 24 focused media-properties cases,
+25 media-data cases, two discovery cases, two caption-style witness cases, and
+24 focused comment cases. The boundary suite passes 990 cases; the full audit
+retains 64 packages, 238 internal dependencies, and 11 explicit debts. Strict
+workspace lint passes. The bounded ASAN properties smoke passes 128 inputs,
+followed by an 83-input corpus replay (coverage 9,037, features 15,297, reported
+RSS 509 MB); these are smoke results, not exhaustive fuzz certification. A
+scoped `cargo clean` removed 1.7 GiB of temporary fuzz build output. Normal
+workspace formatting, lint, unit/integration, and doctest commit hooks remain
+the publication gate for this cut.

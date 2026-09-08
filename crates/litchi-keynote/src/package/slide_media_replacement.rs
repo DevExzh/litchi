@@ -284,6 +284,12 @@ pub(super) struct MediaSelection {
     record: Option<MediaRecord>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MediaSelectionPurpose {
+    Read,
+    Mutate,
+}
+
 impl MediaSelection {
     pub(super) fn same_identity(&self, other: &Self) -> bool {
         self.slide_position == other.slide_position
@@ -734,7 +740,11 @@ impl SlideMediaDataDiagnostics {
 
 impl Package {
     /// Borrow the materialized content or poster for one source-order slide
-    /// movie/audio drawable.
+    /// media drawable.
+    ///
+    /// File movies, audio controls, and materialized placeholders/live-video
+    /// drawables share this read selector. The latter remain read-only here;
+    /// replacement transactions admit only file movies and audio controls.
     pub fn slide_media_data<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -744,7 +754,7 @@ impl Package {
         let mut budget = MediaBudget::for_package(self)?;
         let catalog = physical_catalog(self)?;
         budget.charge_catalog(catalog)?;
-        let selection = select_media(
+        let selection = select_media_read(
             self,
             slide_selector.into(),
             movie_selector.into(),
@@ -1110,7 +1120,50 @@ pub(super) fn select_media(
     part: MediaPart,
     budget: &mut MediaBudget,
 ) -> Result<MediaSelection, SlideMediaDataError> {
+    select_media_with_purpose(
+        package,
+        slide_selector,
+        movie_selector,
+        part,
+        MediaSelectionPurpose::Mutate,
+        budget,
+    )
+}
+
+fn select_media_read(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    part: MediaPart,
+    budget: &mut MediaBudget,
+) -> Result<MediaSelection, SlideMediaDataError> {
+    select_media_with_purpose(
+        package,
+        slide_selector,
+        movie_selector,
+        part,
+        MediaSelectionPurpose::Read,
+        budget,
+    )
+}
+
+fn select_media_with_purpose(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    part: MediaPart,
+    purpose: MediaSelectionPurpose,
+    budget: &mut MediaBudget,
+) -> Result<MediaSelection, SlideMediaDataError> {
     let mut selection = select_media_graph(package, slide_selector, movie_selector, part, budget)?;
+    if purpose == MediaSelectionPurpose::Mutate
+        && !matches!(selection.kind, MovieKind::File | MovieKind::Audio)
+    {
+        return Err(SlideMediaDataError::InvalidSource);
+    }
+    if purpose == MediaSelectionPurpose::Mutate && selection.content_identifier.is_none() {
+        return Err(SlideMediaDataError::InvalidSource);
+    }
     let record = validate_media_closure(package, &selection, part, budget)?;
     selection.record = Some(record);
     Ok(selection)
@@ -1132,6 +1185,9 @@ pub(super) fn select_media_pair(
         MediaPart::Poster,
         budget,
     )?;
+    if !matches!(selection.kind, MovieKind::File | MovieKind::Audio) {
+        return Err(SlideMediaDataError::InvalidSource);
+    }
     let content_identifier = selection
         .identifier(MediaPart::Content)
         .ok_or(SlideMediaDataError::InvalidSource)?;
@@ -1258,9 +1314,6 @@ fn select_media_graph(
     .map_err(|_| SlideMediaDataError::InvalidSource)?;
     budget.references(movie_references)?;
     let kind = movie_info.kind();
-    if !matches!(kind, MovieKind::File | MovieKind::Audio) {
-        return Err(SlideMediaDataError::InvalidSource);
-    }
     if part == MediaPart::Poster && kind == MovieKind::Audio {
         return Err(SlideMediaDataError::AudioPoster);
     }
@@ -1272,7 +1325,7 @@ fn select_media_graph(
         unique_movie_data_identifier(movie_payload, MOVIE_DATA_FIELD, limits, budget)?;
     let poster_identifier =
         unique_movie_data_identifier(movie_payload, POSTER_IMAGE_DATA_FIELD, limits, budget)?;
-    if content_identifier.is_none() {
+    if part == MediaPart::Content && content_identifier.is_none() {
         return Err(SlideMediaDataError::InvalidSource);
     }
     if part == MediaPart::Poster && poster_identifier.is_none() {

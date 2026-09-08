@@ -104,8 +104,6 @@ pub use catalog_table_appearance::{
 #[doc(hidden)]
 pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[cfg(feature = "internal-iwork-source")]
-pub use slide_movie_playback::__decode_movie_playback_payload;
-#[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use slide_preview::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 
@@ -1358,10 +1356,23 @@ impl Package {
             builder.push_text_storage(storage);
         }
         for (drawable_index, &drawable_identifier) in owned_drawables.iter().enumerate() {
-            if Some(drawable_identifier) == title
-                || Some(drawable_identifier) == body
-                || Some(drawable_identifier) == slide_number
+            if let Some(role) =
+                slide_placeholder_role(drawable_identifier, title, body, slide_number)
             {
+                // Role references normally resolve to PlaceholderArchive objects. A movie
+                // payload at the same identifier is a malformed alias; reject it instead of
+                // silently dropping a source-order media entry.
+                let has_movie = self.object(drawable_identifier).is_some_and(|drawable| {
+                    drawable
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                });
+                if has_movie {
+                    return Err(ReadError::InvalidFormat(format!(
+                        "Keynote movie drawable {drawable_identifier} aliases the slide {role} placeholder"
+                    )));
+                }
                 continue;
             }
             if let Some(movie_payload) = self.movie_payload(drawable_identifier)? {
@@ -1572,6 +1583,23 @@ impl Package {
         self.wire_limits().map_err(|error| {
             map_wire_preflight_error(error, "Keynote semantic payload", SemanticPath::Package)
         })
+    }
+}
+
+fn slide_placeholder_role(
+    identifier: u64,
+    title: Option<u64>,
+    body: Option<u64>,
+    slide_number: Option<u64>,
+) -> Option<&'static str> {
+    if title == Some(identifier) {
+        Some("title")
+    } else if body == Some(identifier) {
+        Some("body")
+    } else if slide_number == Some(identifier) {
+        Some("slide-number")
+    } else {
+        None
     }
 }
 

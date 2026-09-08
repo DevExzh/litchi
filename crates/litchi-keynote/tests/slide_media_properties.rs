@@ -5,14 +5,14 @@
 //! and inspect the native graph only for physical-locality assertions; native
 //! identifiers never enter the public transaction calls.
 
-use std::{collections::BTreeMap, env, fs, io, path::PathBuf};
+use std::{collections::BTreeMap, env, fs, io, path::PathBuf, time::Duration};
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MediaProperties, MovieSelector, Package, ReadOptions, SemanticLimits,
+    MediaPart, MediaProperties, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
     SlideAudioPositionError, SlideMediaPropertiesError, SlideSelector,
 };
 use prost::Message as _;
@@ -25,8 +25,13 @@ const NATIVE_AUDIO_FOCUSED: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-properties-audio-focused-native.key");
 const NATIVE_FILE_FOCUSED: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-properties-file-focused-native.key");
+const NATIVE_PLACEHOLDER: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-properties-placeholder-native.key");
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
+const MOVIE_AUDIO_ONLY_FIELD: u32 = 9;
+const MOVIE_FLAGS_FIELD: u32 = 13;
+const MOVIE_LIVE_VIDEO_FIELD: u32 = 30;
 const OPAQUE_AUDIO_MESSAGE_TYPE: u32 = 65_000;
 const OPAQUE_AUDIO_MESSAGE: &[u8] = b"opaque Audio B extension";
 const NATIVE_MOVIE_DATA_MEMBER: &str = "Data/keynote-selfauthored-coral-mjpeg-9085.mov";
@@ -328,6 +333,80 @@ fn mutate_movie_header(
         .ok_or_else(|| io::Error::other("selected movie message is missing"))?;
     edit(object, message_index)?;
     replace_component(source, &component_name, &archive)
+}
+
+fn mutate_movie_kind(
+    source: &[u8],
+    movie: usize,
+    target_field: u32,
+    value: u64,
+) -> TestResult<Vec<u8>> {
+    mutate_movie_header(source, movie, |object, message_index| {
+        let payload = object.messages[message_index].data.clone();
+        let root = WireView::parse(&payload)?;
+        let replacement_field = if root.fields().any(|field| field.number() == target_field) {
+            Some(target_field)
+        } else if root
+            .fields()
+            .any(|field| field.number() == MOVIE_FLAGS_FIELD)
+        {
+            Some(MOVIE_FLAGS_FIELD)
+        } else if root
+            .fields()
+            .any(|field| field.number() == MOVIE_AUDIO_ONLY_FIELD)
+        {
+            Some(MOVIE_AUDIO_ONLY_FIELD)
+        } else {
+            None
+        };
+        let mut output = Vec::with_capacity(payload.len().saturating_add(2));
+        let mut replaced = false;
+        for field in root.fields() {
+            if Some(field.number()) != replacement_field {
+                output.extend_from_slice(field.raw());
+                continue;
+            }
+            if replaced || field.wire_type() != 0 {
+                return Err(io::Error::other(
+                    "selected movie classification is not singular varint",
+                )
+                .into());
+            }
+            append_varint_field(&mut output, target_field, value)?;
+            replaced = true;
+        }
+        if !replaced {
+            append_varint_field(&mut output, target_field, value)?;
+        }
+        object.messages[message_index].data = output;
+        object.archive_info.message_infos[message_index].length =
+            u32::try_from(object.messages[message_index].data.len())?;
+        Ok(())
+    })
+}
+
+fn without_movie_properties(source: &[u8], movie: usize) -> TestResult<Vec<u8>> {
+    mutate_movie_header(source, movie, |object, message_index| {
+        let payload = object.messages[message_index].data.clone();
+        let root = WireView::parse(&payload)?;
+        let super_field = root
+            .fields()
+            .find(|field| field.number() == 1)
+            .ok_or_else(|| io::Error::other("selected movie drawable envelope is missing"))?;
+        let drawable = WireView::parse(super_field.payload())?;
+        let mut drawable_payload = Vec::with_capacity(super_field.payload().len());
+        for field in drawable.fields() {
+            if matches!(field.number(), 4 | 5 | 7 | 8) {
+                continue;
+            }
+            drawable_payload.extend_from_slice(field.raw());
+        }
+        let output = rewrite_unique_length_field(&payload, 1, Some(&drawable_payload))?;
+        object.messages[message_index].data = output;
+        object.archive_info.message_infos[message_index].length =
+            u32::try_from(object.messages[message_index].data.len())?;
+        Ok(())
+    })
 }
 
 fn stale_movie_field_info(source: &[u8], movie: usize) -> TestResult<Vec<u8>> {
@@ -884,6 +963,51 @@ fn native_saved_file_properties_focused_candidate_is_stable() -> TestResult {
 }
 
 #[test]
+fn native_media_properties_read_placeholder_fixture_and_refuse_mutation() -> TestResult {
+    let package = Package::from_bytes(NATIVE_PLACEHOLDER)?;
+    package.validate()?;
+    let movies = package.show()?.slides()[0].movies();
+    assert_eq!(movies.len(), 5);
+    assert_eq!(
+        movies.iter().map(|movie| movie.kind()).collect::<Vec<_>>(),
+        vec![
+            MovieKind::Audio,
+            MovieKind::Audio,
+            MovieKind::File,
+            MovieKind::File,
+            MovieKind::Placeholder,
+        ]
+    );
+
+    let placeholder = movies[4];
+    assert_eq!(
+        placeholder
+            .position()
+            .map(|position| (position.x, position.y)),
+        Some((321.0, 42.0))
+    );
+    assert_eq!(
+        placeholder.size().map(|size| (size.width, size.height)),
+        Some((640.0, 360.0))
+    );
+    assert_eq!(placeholder.duration(), Some(Duration::from_millis(1_250)));
+    assert_eq!(
+        properties(&package, 4)?.accessibility_description(),
+        Some("Native movie placeholder — accessible 北区")
+    );
+
+    let before = exact_bytes(&package)?;
+    let error =
+        package.edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(4));
+    assert!(matches!(
+        error,
+        Err(SlideMediaPropertiesError::WrongMediaKind)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
 fn media_properties_retain_absence_explicit_defaults_and_unicode() -> TestResult {
     let omitted = MediaProperties::new();
     assert_eq!(omitted.hyperlink_url(), None);
@@ -923,6 +1047,41 @@ fn native_media_properties_read_all_media_in_source_order_and_reject_wrong_selec
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(4))
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn placeholder_and_live_video_properties_are_read_only_and_preserve_sparse_fields() -> TestResult {
+    let placeholder_source = without_movie_properties(
+        &mutate_movie_kind(NATIVE_BASELINE, 2, MOVIE_FLAGS_FIELD, 1)?,
+        2,
+    )?;
+    let live_video_source = without_movie_properties(
+        &mutate_movie_kind(NATIVE_BASELINE, 3, MOVIE_LIVE_VIDEO_FIELD, 1)?,
+        3,
+    )?;
+
+    for (source, movie, expected_kind) in [
+        (&placeholder_source, 2, MovieKind::Placeholder),
+        (&live_video_source, 3, MovieKind::LiveVideo),
+    ] {
+        let package = Package::from_bytes(source)?;
+        package.validate()?;
+        assert_eq!(
+            package.show()?.slides()[0].movies()[movie].kind(),
+            expected_kind
+        );
+        assert_eq!(properties(&package, movie)?, MediaProperties::new());
+
+        let before = exact_bytes(&package)?;
+        let error = package
+            .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie));
+        assert!(matches!(
+            error,
+            Err(SlideMediaPropertiesError::WrongMediaKind)
+        ));
+        assert_eq!(exact_bytes(&package)?, before);
+    }
     Ok(())
 }
 

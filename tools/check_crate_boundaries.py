@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -2031,12 +2032,68 @@ IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES = (
     Path("crates/litchi-iwa/examples/create_keynote_movie.rs"),
 )
 
-# Wave108 moves the last shared host playback reader/writer into the three
-# format owners.  The focused packages expose only feature-gated hidden seams
-# for the compatibility host; their public APIs remain semantic and selector
-# first.  Keep the source inventory explicit so a generic ``media_playback``
-# spelling in an unrelated Pages editor module cannot satisfy or trip this
-# boundary.
+# Wave110 retires the compatibility Keynote media readers after the focused
+# package owns semantic movie/audio reads.  The old reader methods and
+# projection types must disappear from production and test-only source alike;
+# only the private graph fixture helpers (which use distinct names) remain
+# valid.  Scan the complete Keynote host tree plus integration/examples so an
+# old call cannot survive in a fixture while the public implementation is
+# removed.
+IWA_KEYNOTE_MEDIA_READER_METHODS = frozenset(
+    {"slide_movies", "slide_audio", "slide_media_infos"}
+)
+IWA_KEYNOTE_MEDIA_READER_TYPES = frozenset(
+    {"KeynoteSlideMovieInfo", "KeynoteSlideAudioInfo"}
+)
+IWA_KEYNOTE_MEDIA_READER_MODULE_FILES = frozenset(
+    {"slide_movies.rs", "slide_audio.rs"}
+)
+IWA_KEYNOTE_MEDIA_READER_SCAN_ROOTS = (
+    IWA_KEYNOTE_SOURCE_ROOT,
+    Path("crates/litchi-iwa/tests"),
+    Path("crates/litchi-iwa/examples"),
+)
+IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_media_properties.rs"
+)
+IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE = Path(
+    "test-data/iwork/keynote/media-properties-placeholder-native.key"
+)
+IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST = (
+    "native_media_properties_read_placeholder_fixture_and_refuse_mutation"
+)
+IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SIZE = 798_695
+IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SHA256 = (
+    "ca3ef01f42b061a90a7620a2e1cef29f09e6ecd73591c60cf3286572781649d0"
+)
+IWA_KEYNOTE_MEDIA_READER_METHOD_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_movies|slide_audio|"
+    r"slide_media_infos)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MEDIA_READER_TYPE_USE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?P<type>KeynoteSlideMovieInfo|"
+    r"KeynoteSlideAudioInfo)(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_MEDIA_READER_MODULE_DECLARATION = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?(?P<module>slide_movies|slide_audio)\s*;"
+)
+
+# Keynote no longer provides the raw borrowed-payload compatibility ingress.
+# Pages and Numbers retain their existing hidden seams; the shared playback
+# ratchet below treats this Keynote seam as a forbidden symbol instead.
+IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM = "__decode_movie_playback_payload"
+IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE = re.compile(
+    rf"(?<![A-Za-z0-9_#]){re.escape(IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM)}"
+    r"(?![A-Za-z0-9_])"
+)
+
+# Wave108 moved the last shared host playback reader/writer into the three
+# format owners. Pages and Numbers still expose feature-gated hidden seams for
+# their narrow compatibility adapters; Keynote's seam is retired with its raw
+# host readers. Keep the source inventory explicit so a generic
+# ``media_playback`` spelling in an unrelated editor module cannot satisfy or
+# trip this boundary.
 IWA_SHARED_MEDIA_PLAYBACK_SOURCE = Path("crates/litchi-iwa/src/media_playback.rs")
 IWA_SHARED_MEDIA_PLAYBACK_ROOT_MODULE = re.compile(
     r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+(?:r#)?media_playback\b"
@@ -2072,7 +2129,10 @@ IWA_MEDIA_PLAYBACK_OWNER_MODULES = {
     ),
 }
 IWA_MEDIA_PLAYBACK_OWNER_SEAMS = {
-    "Keynote": ("__decode_movie_playback_payload", None),
+    # Keynote's former compatibility reader is retired with the host raw
+    # projections.  Pages and Numbers still expose their feature-gated seams
+    # to the narrow legacy adapters below.
+    "Keynote": (None, None),
     "Pages": (
         "__decode_movie_playback_payload",
         "__rewrite_movie_playback_payload",
@@ -2080,19 +2140,13 @@ IWA_MEDIA_PLAYBACK_OWNER_SEAMS = {
     "Numbers": ("__movie_playback_settings", "__rewrite_movie_playback_settings"),
 }
 IWA_MEDIA_PLAYBACK_HOST_SOURCES = {
-    "Keynote": (
-        Path("crates/litchi-iwa/src/keynote/editor/slide_movies.rs"),
-        Path("crates/litchi-iwa/src/keynote/editor/slide_audio.rs"),
-    ),
+    "Keynote": (),
     "Pages": (Path("crates/litchi-iwa/src/pages/editor/media_playback.rs"),),
     "Numbers": (
         Path("crates/litchi-iwa/src/numbers/editor/sheet_movies/graph.rs"),
     ),
 }
 IWA_MEDIA_PLAYBACK_HOST_CALLS = {
-    "Keynote": re.compile(
-        r"\blitchi_keynote\s*::\s*__decode_movie_playback_payload\s*\("
-    ),
     "Pages": re.compile(
         r"\blitchi_pages\s*::\s*__decode_movie_playback_payload\s*\("
         r"|\blitchi_pages\s*::\s*__rewrite_movie_playback_payload\s*\("
@@ -2110,11 +2164,6 @@ IWA_MEDIA_PLAYBACK_GENERATED_LEAK = re.compile(
     r"|\b(?:prost|buffa)\s*::\s*Message\b"
     r"|\b(?:tsd|tsp)\s*::\s*MovieArchive\b"
 )
-KEYNOTE_MOVIE_PLAYBACK_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
-    r"\bpub\s+fn\s+__decode_movie_playback_payload\s*\([^)]*"
-    r"\bsource\s*:\s*&\s*\[\s*u8\s*\][^)]*\bWireLimits\b"
-)
-
 # Wave109 retires the last shared image-adjustment wire adapter.  The complete
 # ImageArchive remains a host-owned payload; only the bounded scalar edge is
 # routed through the neutral Buffa sidecar and the format-specific package
@@ -43960,10 +44009,13 @@ def audit_iwa_shared_media_playback_source_topology(
     violations: list[str] = []
     owner_sources: dict[str, str] = {}
     owner_codes: dict[str, str] = {}
+    owner_raw_codes: dict[str, str] = {}
     for ecosystem, path in owner_paths.items():
-        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_cfg_test_items(raw_source)
         owner_sources[ecosystem] = source
         owner_codes[ecosystem] = _mask_rust_non_code(source)
+        owner_raw_codes[ecosystem] = _mask_rust_non_code(raw_source)
 
     def function_declaration(
         name: str,
@@ -44010,6 +44062,39 @@ def audit_iwa_shared_media_playback_source_topology(
                 f"focused litchi-{ecosystem.lower()} movie-playback owner module is missing: "
                 f"{IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES[ecosystem]}"
             )
+
+        if ecosystem == "Keynote":
+            seam_sources = [
+                (owner_raw_codes[ecosystem], owner_paths[ecosystem]),
+            ]
+            if package_paths[ecosystem].is_file():
+                seam_sources.append(
+                    (
+                        _mask_rust_non_code(
+                            package_paths[ecosystem].read_text(encoding="utf-8")
+                        ),
+                        package_paths[ecosystem],
+                    )
+                )
+            if export_paths[ecosystem].is_file():
+                seam_sources.append(
+                    (
+                        _mask_rust_non_code(
+                            export_paths[ecosystem].read_text(encoding="utf-8")
+                        ),
+                        export_paths[ecosystem],
+                    )
+                )
+            for seam_source, seam_path in seam_sources:
+                for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE.finditer(
+                    seam_source
+                ):
+                    line_number = seam_source.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired focused litchi-keynote movie-playback hidden seam "
+                        f"{IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM}: "
+                        f"{seam_path.relative_to(root)}:{line_number}"
+                    )
 
         export_sources = [package_source]
         export_path = export_paths[ecosystem]
@@ -55212,16 +55297,6 @@ def audit_keynote_movie_playback_facade_source_topology(
             continue
         dedicated = source_path in {owner_path, semantic_path}
         for declaration, line_number in _rust_public_declarations(source):
-            # The migration host needs one exact hidden borrowed-payload
-            # ingress. It is feature-gated at the package/lib re-export and
-            # is intentionally the only raw-wire exception in this facade.
-            if (
-                source_path == owner_path
-                and KEYNOTE_MOVIE_PLAYBACK_HIDDEN_SOURCE_SEAM_DECLARATION.search(
-                    declaration
-                )
-            ):
-                continue
             identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
             if not dedicated and not (identifiers & facade_names):
                 continue
@@ -55370,6 +55445,16 @@ def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[
         r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
     )
     for path in sorted(source_root.rglob("*.rs")):
+        raw_source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE.finditer(
+            raw_source
+        ):
+            line_number = raw_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-keynote movie-playback hidden seam reference "
+                f"{IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM}: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
         source = _mask_rust_non_code(
             _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
         )
@@ -55418,6 +55503,131 @@ def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[
                 "retired litchi-iwa Keynote movie-playback example call "
                 f"{match.group('method')}: {example_path}:{line_number}"
             )
+    return sorted(set(violations))
+
+
+def _audit_iwa_keynote_media_reader_native_evidence(root: Path) -> list[str]:
+    """Require the permanent native placeholder read receipt and its test."""
+
+    test_path = root / IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE
+    if not test_path.is_file():
+        return [
+            "retired litchi-iwa Keynote media readers are missing their native "
+            f"placeholder integration test: {IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE}"
+        ]
+
+    fixture_path = root / IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE
+    violations: list[str] = []
+    if not fixture_path.is_file():
+        violations.append(
+            "retired litchi-iwa Keynote media readers are missing native placeholder "
+            f"fixture: {IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE}"
+        )
+    else:
+        fixture_bytes = fixture_path.read_bytes()
+        fixture_size = len(fixture_bytes)
+        if fixture_size != IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SIZE:
+            violations.append(
+                "retired litchi-iwa Keynote native placeholder fixture has unexpected "
+                f"size {fixture_size} (expected "
+                f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SIZE}): "
+                f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE}"
+            )
+        fixture_hash = hashlib.sha256(fixture_bytes).hexdigest()
+        if fixture_hash != IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SHA256:
+            violations.append(
+                "retired litchi-iwa Keynote native placeholder fixture has unexpected "
+                f"SHA-256 {fixture_hash} (expected "
+                f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE_SHA256}): "
+                f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE}"
+            )
+
+    raw_test = test_path.read_text(encoding="utf-8")
+    include_test = _mask_rust_comments(raw_test)
+    code_test = _mask_rust_non_code(raw_test)
+    if re.search(
+        rf"\binclude_bytes!\s*\([^)]*"
+        rf"{re.escape(IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE.as_posix())}",
+        include_test,
+    ) is None:
+        violations.append(
+            "retired litchi-iwa Keynote native placeholder integration test must "
+            f"include fixture {IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE}: "
+            f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE}"
+        )
+    if re.search(
+        rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+        rf"{re.escape(IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST)}\b",
+        code_test,
+    ) is None:
+        violations.append(
+            "retired litchi-iwa Keynote native placeholder integration test is "
+            f"missing {IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST}: "
+            f"{IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_media_reader_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Ensure the retired Keynote raw media readers leave no source residue.
+
+    This ratchet deliberately keeps ``cfg(test)`` code visible.  Once the
+    focused package owns semantic media reads, a test-only call or re-export
+    would keep the old host contract alive and make a later production
+    reintroduction easy.  Private graph fixtures remain available when they
+    use the replacement helper names (for example ``slide_movie_graph``).
+    """
+
+    if not _keynote_movie_playback_owner_present(root):
+        return []
+
+    violations = _audit_iwa_keynote_media_reader_native_evidence(root)
+    seen_files: set[Path] = set()
+    for relative_root in IWA_KEYNOTE_MEDIA_READER_SCAN_ROOTS:
+        scan_root = root / relative_root
+        if not scan_root.exists():
+            continue
+        paths = [scan_root] if scan_root.is_file() else sorted(scan_root.rglob("*.rs"))
+        for path in paths:
+            if not path.is_file() or path in seen_files:
+                continue
+            seen_files.add(path)
+            if path.name in IWA_KEYNOTE_MEDIA_READER_MODULE_FILES:
+                violations.append(
+                    "retired litchi-iwa Keynote media-reader module was restored: "
+                    f"{path.relative_to(root)}"
+                )
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE.finditer(
+                source
+            ):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-keynote movie-playback hidden seam reference "
+                    f"{IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_MEDIA_READER_METHOD_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-reader method "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_MEDIA_READER_TYPE_USE.finditer(source):
+                line_number = source.count("\n", 0, match.start("type")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-reader type "
+                    f"{match.group('type')}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_MEDIA_READER_MODULE_DECLARATION.finditer(source):
+                line_number = source.count("\n", 0, match.start("module")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-reader module declaration "
+                    f"{match.group('module')}: {path.relative_to(root)}:{line_number}"
+                )
+
     return sorted(set(violations))
 
 
@@ -66205,6 +66415,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_movie_caption_facade_source_topology()
         + audit_keynote_movie_caption_lifecycle_source_topology()
         + audit_iwa_keynote_movie_playback_source_topology()
+        + audit_iwa_keynote_media_reader_retirement_source_topology()
         + audit_keynote_movie_playback_facade_source_topology()
         + audit_keynote_movie_playback_resource_source_topology()
         + audit_iwa_keynote_movie_geometry_source_topology()

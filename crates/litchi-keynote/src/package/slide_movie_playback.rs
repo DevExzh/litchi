@@ -727,39 +727,7 @@ impl Package {
     }
 }
 
-/// Decode one borrowed `TSD.MovieArchive` playback payload for the migration
-/// host.
-///
-/// The host already owns the physical object graph and supplies the package's
-/// bounded wire profile. This seam retains no generated archive and never
-/// re-encodes the source payload; the strict Buffa projection and the focused
-/// semantic conversion remain owned by Keynote.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __decode_movie_playback_payload(
-    source: &[u8],
-    wire_limits: WireLimits,
-) -> Result<litchi_iwa_common::media::playback::MediaPlaybackSettings, SlideMoviePlaybackError> {
-    let settings = decode_movie_playback_payload(source, wire_limits)?;
-    let settings = litchi_iwa_common::media::playback::MediaPlaybackSettings {
-        start_time: settings.start_time,
-        end_time: settings.end_time,
-        poster_time: settings.poster_time,
-        loop_mode: settings
-            .loop_mode
-            .map(|mode| litchi_iwa_common::media::playback::MediaLoopMode::from_raw(mode.as_raw())),
-        volume: settings
-            .volume
-            .map(|volume| litchi_iwa_common::media::playback::MediaVolume::new(volume.as_f32()))
-            .transpose()
-            .map_err(|_| SlideMoviePlaybackError::InvalidSource)?,
-    };
-    settings
-        .canonicalize()
-        .map_err(|_| SlideMoviePlaybackError::InvalidSource)
-}
-
-#[cfg(any(test, feature = "internal-iwork-source"))]
+#[cfg(test)]
 fn decode_movie_playback_payload(
     source: &[u8],
     wire_limits: WireLimits,

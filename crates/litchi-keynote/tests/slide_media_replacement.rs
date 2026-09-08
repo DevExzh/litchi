@@ -10,10 +10,10 @@ use std::{io, time::Duration};
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::append_length_delimited_field;
-use litchi_iwa_protos::tsp;
+use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::slide::media::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaDataError,
+    MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaDataError,
     SlideSelector,
 };
 use prost::Message as _;
@@ -27,6 +27,10 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const NATIVE_SOURCE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-replacement-native.key");
+const NATIVE_PLACEHOLDER_SOURCE: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-properties-placeholder-native.key");
+const NATIVE_PLACEHOLDER_CONTENT_MEMBER: &str = "Data/fresh-content-9094.mov";
+const NATIVE_PLACEHOLDER_POSTER_MEMBER: &str = "Data/fresh-content-9095.png";
 
 fn source_and_package() -> TestResult<(Vec<u8>, Package)> {
     let source = synthetic_package()?;
@@ -45,6 +49,35 @@ fn assert_media(package: &Package, movie: usize, part: MediaPart, expected: &[u8
         "movie {movie} {part:?} bytes",
     );
     Ok(())
+}
+
+fn changed_materialized_bytes(source: &[u8]) -> Vec<u8> {
+    let mut changed = source.to_vec();
+    changed.extend_from_slice(b"focused non-file media mutation guard");
+    changed
+}
+
+fn synthetic_live_video_source(with_content: bool) -> TestResult<Vec<u8>> {
+    let source = synthetic_package()?;
+    let payload = movie_payload_from_package(&source, MOVIES[0])?;
+    let mut movie = tsd::MovieArchive::decode(payload.as_slice())?;
+    movie.is_live_video = Some(true);
+    if !with_content {
+        movie.movie_data = None;
+    }
+    let mut payload = movie.encode_to_vec();
+    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    with_movie_payload(&source, MOVIES[0], payload)
+}
+
+fn synthetic_file_without_content_source() -> TestResult<Vec<u8>> {
+    let source = synthetic_package()?;
+    let payload = movie_payload_from_package(&source, MOVIES[0])?;
+    let mut movie = tsd::MovieArchive::decode(payload.as_slice())?;
+    movie.movie_data = None;
+    let mut payload = movie.encode_to_vec();
+    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    with_movie_payload(&source, MOVIES[0], payload)
 }
 
 fn assert_common_movie_state(before: &Package, after: &Package) -> TestResult {
@@ -136,6 +169,104 @@ fn reads_content_poster_and_audio_without_native_ids() -> TestResult {
         ),
         Err(SlideMediaDataError::AudioPoster)
     ));
+    Ok(())
+}
+
+#[test]
+fn materialized_placeholder_reads_content_and_poster_but_refuses_mutation() -> TestResult {
+    let package = Package::from_bytes(NATIVE_PLACEHOLDER_SOURCE)?;
+    package.validate()?;
+    assert_eq!(
+        package.show()?.slides()[0].movies()[4].kind(),
+        MovieKind::Placeholder
+    );
+    let content = member_bytes(NATIVE_PLACEHOLDER_SOURCE, NATIVE_PLACEHOLDER_CONTENT_MEMBER)?;
+    let poster = member_bytes(NATIVE_PLACEHOLDER_SOURCE, NATIVE_PLACEHOLDER_POSTER_MEMBER)?;
+    assert_media(&package, 4, MediaPart::Content, &content)?;
+    assert_media(&package, 4, MediaPart::Poster, &poster)?;
+
+    for (part, replacement) in [
+        (MediaPart::Content, changed_materialized_bytes(&content)),
+        (MediaPart::Poster, changed_materialized_bytes(&poster)),
+    ] {
+        let before = exact_bytes(&package)?;
+        let error = package
+            .edit_slide_media_data(SlideSelector::index(0), MovieSelector::index(4), part)
+            .and_then(|edit| edit.set(&replacement))
+            .and_then(|edit| edit.commit());
+        assert!(matches!(error, Err(SlideMediaDataError::InvalidSource)));
+        assert_eq!(exact_bytes(&package)?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn materialized_live_video_reads_through_the_same_bounded_closure() -> TestResult {
+    let source = synthetic_live_video_source(true)?;
+    let package = Package::from_bytes(&source)?;
+    package.validate()?;
+    assert_eq!(
+        package.show()?.slides()[0].movies()[0].kind(),
+        MovieKind::LiveVideo
+    );
+    assert_media(&package, 0, MediaPart::Content, MOVIE_BYTES)?;
+    assert_media(&package, 0, MediaPart::Poster, POSTER_BYTES)?;
+
+    for (part, replacement) in [
+        (MediaPart::Content, changed_materialized_bytes(MOVIE_BYTES)),
+        (MediaPart::Poster, changed_materialized_bytes(POSTER_BYTES)),
+    ] {
+        let before = exact_bytes(&package)?;
+        let error = package
+            .edit_slide_media_data(SlideSelector::index(0), MovieSelector::index(0), part)
+            .and_then(|edit| edit.set(&replacement))
+            .and_then(|edit| edit.commit());
+        assert!(matches!(error, Err(SlideMediaDataError::InvalidSource)));
+        assert_eq!(exact_bytes(&package)?, before);
+    }
+
+    let missing_content = Package::from_bytes(&synthetic_live_video_source(false)?)?;
+    assert!(matches!(
+        missing_content.slide_media_data(
+            SlideSelector::index(0),
+            MovieSelector::index(0),
+            MediaPart::Content,
+        ),
+        Err(SlideMediaDataError::InvalidSource)
+    ));
+    Ok(())
+}
+
+#[test]
+fn sparse_file_movie_reads_poster_without_content_but_refuses_content_and_mutation() -> TestResult {
+    let source = synthetic_file_without_content_source()?;
+    let package = Package::from_bytes(&source)?;
+    package.validate()?;
+    assert_eq!(
+        package.show()?.slides()[0].movies()[0].kind(),
+        MovieKind::File
+    );
+    assert_media(&package, 0, MediaPart::Poster, POSTER_BYTES)?;
+    assert!(matches!(
+        package.slide_media_data(
+            SlideSelector::index(0),
+            MovieSelector::index(0),
+            MediaPart::Content,
+        ),
+        Err(SlideMediaDataError::InvalidSource)
+    ));
+
+    let before = exact_bytes(&package)?;
+    let error = package
+        .edit_slide_media_data(
+            SlideSelector::index(0),
+            MovieSelector::index(0),
+            MediaPart::Poster,
+        )
+        .and_then(|edit| edit.set(REPLACED_POSTER_BYTES))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(error, Err(SlideMediaDataError::InvalidSource)));
+    assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
 

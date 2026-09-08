@@ -1467,3 +1467,29 @@ The geometry boundary requires all three fixtures and their consuming native
 tests. This receipt covers the accepted file-movie fixture profile and the
 persisted Arrange transform fields; it does not establish parity for every
 native movie kind or unsupported geometry flag.
+
+## Keynote native media-placeholder read parity (2026-09-08)
+
+[media-properties-placeholder-native.key](keynote/media-properties-placeholder-native.key)
+contains 798,695 bytes with SHA-256
+`ca3ef01f42b061a90a7620a2e1cef29f09e6ecd73591c60cf3286572781649d0`.
+Computer Use opened a scratch copy of the fresh-movie creation fixture in
+Keynote 14.4 (7043.0.93), selected source-order movie 4, and invoked Format →
+Advanced → Define as Media Placeholder. The native Movie inspector authored
+“Native movie placeholder — accessible 北区”; deselecting the drawable committed
+the description. The file was saved, actually closed to the theme chooser,
+reopened from its exact path, inspected, and closed again.
+
+The reopened placeholder exposes the native Replace movie control and retains
+640×360 displayed dimensions, position (321,42), and a 1.25-second playback
+range. The first four media remain Audio, Audio, File, File. Mandatory focused
+properties tests retain this complete source order, the placeholder kind,
+geometry, playback, and accessibility description, with byte-exact reads and
+atomic refusal of unsupported placeholder property mutation. Sparse live-video
+read coverage is synthetic; this fixture establishes no camera or live-video
+native acceptance claim.
+
+The same native fixture also gates semantic media-byte reads: its selected
+content is `Data/fresh-content-9094.mov` (34,667 bytes) and its poster is
+`Data/fresh-content-9095.png` (4,447 bytes). The focused replacement tests read
+both through typed selectors and verify exact bytes while refusing mutation.

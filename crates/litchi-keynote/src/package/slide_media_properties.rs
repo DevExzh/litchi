@@ -3,11 +3,13 @@
 //! This owner deliberately treats a media drawable as a `MovieArchive` and
 //! counts every such archive in slide source order.  File movies and
 //! independently positioned audio therefore share one typed selector space;
-//! selecting an unsupported movie kind is reported as a graph error instead
-//! of silently changing the meaning of a selector.  Only the four user-facing
-//! drawable-property fields are projected.  The Buffa codec and the archive
-//! reassembly seam preserve all other movie fields and their original wire
-//! bytes.
+//! selecting an unsupported movie kind for mutation is reported as a graph
+//! error instead of silently changing the meaning of a selector.  Only the
+//! four user-facing drawable-property fields are projected.  The read path
+//! accepts every classified movie kind, including sparse placeholder and
+//! live-video archives; mutation remains limited to file movies and audio
+//! controls.  The Buffa codec and archive reassembly seam preserve all other
+//! movie fields and their original wire bytes.
 
 #![allow(
     clippy::map_err_ignore,
@@ -35,6 +37,7 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::keynote_media_properties_codec;
 use thiserror::Error;
 
+use super::slide_media_lifecycle::graph_caption_witness::CaptionWitnessBudget;
 use super::slide_movie_geometry::{
     GeometryBudget, physical_catalog, previews_absent, rewrite_geometry_message, verify_locality,
 };
@@ -67,6 +70,62 @@ const MOVIE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 const MOVIE_AUDIO_STYLE_MESSAGE_TYPE: u32 = 3_016;
 const SLIDE_NAME_FIELD: u32 = 10;
 const MAX_PROPERTY_BYTES: usize = 64 * 1024 * 1024;
+
+impl CaptionWitnessBudget for GeometryBudget {
+    type Error = SlideMediaPropertiesError;
+
+    fn invalid_source() -> Self::Error {
+        SlideMediaPropertiesError::InvalidSource
+    }
+
+    fn charge_codec_pass(&mut self, payload: &[u8]) -> Result<(), Self::Error> {
+        self.fields(payload.len().max(1))
+            .map_err(SlideMediaPropertiesError::from)?;
+        self.work(
+            payload
+                .len()
+                .checked_mul(32)
+                .ok_or(SlideMediaPropertiesError::InvalidSource)?
+                .max(1),
+        )
+        .map_err(SlideMediaPropertiesError::from)?;
+        self.allocations(1)
+            .map_err(SlideMediaPropertiesError::from)?;
+        self.scratch(payload.len().max(1))
+            .map_err(SlideMediaPropertiesError::from)
+    }
+
+    fn charge_header_metadata(&mut self, info: &MessageInfo) -> Result<(), Self::Error> {
+        let fields = info
+            .object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| count.checked_add(info.field_infos.len()))
+            .ok_or_else(Self::invalid_source)?;
+        let references = info
+            .object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| {
+                info.field_infos.iter().try_fold(count, |count, field| {
+                    count
+                        .checked_add(field.object_references.len())
+                        .and_then(|count| count.checked_add(field.data_references.len()))
+                })
+            })
+            .ok_or_else(Self::invalid_source)?;
+        self.fields(fields)
+            .map_err(SlideMediaPropertiesError::from)?;
+        self.references(references)
+            .map_err(SlideMediaPropertiesError::from)?;
+        self.work(
+            fields
+                .checked_add(references)
+                .ok_or(SlideMediaPropertiesError::InvalidSource)?,
+        )
+        .map_err(SlideMediaPropertiesError::from)
+    }
+}
 
 /// Resource categories reported by a media-properties transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -154,7 +213,7 @@ pub enum SlideMediaPropertiesError {
     /// No movie archive existed at a checked source-order position.
     #[error("the selected Keynote slide has no media at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    /// The selected media is not a supported file movie or audio control.
+    /// The selected media is not supported by the mutation path.
     #[error("the selected Keynote media kind is unsupported for properties")]
     WrongMediaKind,
     /// The selected media graph or payload was malformed.
@@ -482,7 +541,8 @@ impl Package {
     /// Reading validates ownership, references, and the selected property
     /// fields without loading media assets. Properties therefore remain
     /// readable when a sparse source omits media content. Editing additionally
-    /// requires valid, materialized media assets before publication.
+    /// requires a file movie or audio control with valid, materialized media
+    /// assets before publication.
     pub fn slide_media_properties<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
@@ -724,6 +784,13 @@ fn select_media_properties(
     budget: &mut GeometryBudget,
 ) -> Result<MediaPropertiesSelection, SlideMediaPropertiesError> {
     let selection = select_media_property_fields(package, slide_selector, movie_selector, budget)?;
+    // Placeholder and live-video archives expose the same four semantic
+    // drawable fields, but their media closure is owned by the slide layout
+    // or camera subsystem. Keep their read path available while refusing to
+    // route those records through a file/audio asset rewrite transaction.
+    if !matches!(selection.kind, MovieKind::File | MovieKind::Audio) {
+        return Err(SlideMediaPropertiesError::WrongMediaKind);
+    }
     let assets = data::validate_selected_media_assets(
         package,
         selection.slide_position,
@@ -791,9 +858,6 @@ fn select_media_property_fields(
         let kind = classify_movie_kind(payload, limits, budget)?;
         if movie_parent(payload, limits, budget)? != record.slide_identifier {
             return Err(SlideMediaPropertiesError::InvalidSource);
-        }
-        if !matches!(kind, MovieKind::File | MovieKind::Audio) {
-            return Err(SlideMediaPropertiesError::WrongMediaKind);
         }
         super::slide_media_replacement::validate_selected_message_metadata(object, message_index)
             .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
@@ -1295,13 +1359,60 @@ fn validate_selected_movie_references(
         .message_infos
         .get(message_index)
         .ok_or(SlideMediaPropertiesError::InvalidSource)?;
-    if info.object_references.len() != references.len()
+    let extra_object_reference_count = info
+        .object_references
+        .len()
+        .checked_sub(references.len())
+        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+    let style_witnesses = if extra_object_reference_count == 0 {
+        [None, None]
+    } else {
+        super::slide_media_lifecycle::graph_caption_witness::prove_movie_caption_style_witness(
+            package,
+            component_name,
+            movie_object,
+            limits,
+            budget,
+        )?
+    };
+    let mut transitive_style_ids = [0_u64; 2];
+    let mut transitive_style_count = 0usize;
+    for identifier in style_witnesses.into_iter().flatten() {
+        if references.iter().any(|(known, _)| *known == identifier) {
+            continue;
+        }
+        if transitive_style_count == transitive_style_ids.len()
+            || transitive_style_ids[..transitive_style_count].contains(&identifier)
+        {
+            return Err(SlideMediaPropertiesError::InvalidSource);
+        }
+        transitive_style_ids[transitive_style_count] = identifier;
+        transitive_style_count += 1;
+    }
+    budget.references(transitive_style_count)?;
+    let expected_object_reference_count = references
+        .len()
+        .checked_add(transitive_style_count)
+        .ok_or(SlideMediaPropertiesError::InvalidSource)?;
+    if info.object_references.len() != expected_object_reference_count
         || references.iter().any(|(identifier, _)| {
             info.object_references
                 .iter()
                 .filter(|known| *known == identifier)
                 .count()
                 != 1
+        })
+        || (0..transitive_style_count).any(|index| {
+            let identifier = transitive_style_ids[index];
+            info.object_references
+                .iter()
+                .filter(|known| **known == identifier)
+                .count()
+                != 1
+        })
+        || info.object_references.iter().any(|identifier| {
+            !references.iter().any(|(known, _)| *known == *identifier)
+                && !transitive_style_ids[..transitive_style_count].contains(identifier)
         })
     {
         return Err(SlideMediaPropertiesError::InvalidSource);
@@ -1324,6 +1435,18 @@ fn validate_selected_movie_references(
             _ => return Err(SlideMediaPropertiesError::InvalidSource),
         };
         let Some(_) = reference_message_type(referenced, allowed, budget)? else {
+            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+        };
+    }
+    for &identifier in &transitive_style_ids[..transitive_style_count] {
+        let (reference_component, referenced) = package
+            .object_with_component(identifier)
+            .ok_or(SlideMediaPropertiesError::UnsupportedDependency)?;
+        if reference_component != component_name {
+            return Err(SlideMediaPropertiesError::UnsupportedDependency);
+        }
+        let Some(_) = reference_message_type(referenced, &[MOVIE_STYLE_MESSAGE_TYPE], budget)?
+        else {
             return Err(SlideMediaPropertiesError::UnsupportedDependency);
         };
     }

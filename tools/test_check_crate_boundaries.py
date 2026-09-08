@@ -317,8 +317,8 @@ def add_iwa_shared_media_playback_scaffold(
 
     owner_sources = {
         "Keynote": (
-            "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) "
-            "{ movie_playback_codec::decode_movie_playback_with_report(source, limits); }\n"
+            "fn decode_movie_playback_with_report() "
+            "{ movie_playback_codec::decode_movie_playback_with_report(); }\n"
         ),
         "Pages": (
             "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) "
@@ -359,29 +359,26 @@ def add_iwa_shared_media_playback_scaffold(
         reexports = ", ".join(
             name for name in (decode_name, rewrite_name) if name is not None
         )
-        package.write_text(
-            module
-            + "#[cfg(feature = \"internal-iwork-source\")]\n"
-            + "#[doc(hidden)]\n"
-            + f"pub use {'slide_movie_playback' if ecosystem == 'Keynote' else 'movie_playback'}::{{{reexports}}};\n",
-            encoding="utf-8",
-        )
+        package_source = module
+        if reexports:
+            package_source += (
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                + f"pub use {'slide_movie_playback' if ecosystem == 'Keynote' else 'movie_playback'}::{{{reexports}}};\n"
+            )
+        package.write_text(package_source, encoding="utf-8")
         export = root / boundaries.IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES[ecosystem]
         export.parent.mkdir(parents=True, exist_ok=True)
-        export.write_text(
-            "#[cfg(feature = \"internal-iwork-source\")]\n"
-            "#[doc(hidden)]\n"
-            + f"pub use package::{{{reexports}}};\n",
-            encoding="utf-8",
-        )
+        export_source = ""
+        if reexports:
+            export_source = (
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                + f"pub use package::{{{reexports}}};\n"
+            )
+        export.write_text(export_source, encoding="utf-8")
 
     hosts = {
-        "Keynote": {
-            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Keynote"][0]:
-                "fn movie_info() { litchi_keynote::__decode_movie_playback_payload(source, limits); }\n",
-            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Keynote"][1]:
-                "fn audio_info() { litchi_keynote::__decode_movie_playback_payload(source, limits); }\n",
-        },
         "Pages": {
             boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Pages"][0]:
                 "fn movie_playback_settings() { litchi_pages::__decode_movie_playback_payload(source, limits); }\n"
@@ -3254,6 +3251,25 @@ def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
         )
     for corpus in boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_CORPORA:
         (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
+def add_iwa_keynote_media_reader_native_evidence(root: Path) -> None:
+    test_path = root / boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE
+    test_path.parent.mkdir(parents=True, exist_ok=True)
+    fixture = boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE
+    test_path.write_text(
+        "const NATIVE_PLACEHOLDER: &[u8] = include_bytes!(\n"
+        f"    \"../../../{fixture.as_posix()}\"\n"
+        ");\n"
+        "#[test]\n"
+        f"fn {boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST}() {{\n"
+        "    let _ = NATIVE_PLACEHOLDER;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    fixture_path = root / fixture
+    fixture_path.parent.mkdir(parents=True, exist_ok=True)
+    fixture_path.write_bytes((boundaries.ROOT / fixture).read_bytes())
 
 
 def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
@@ -19493,10 +19509,135 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_iwa_keynote_movie_playback_source_topology(root), []
             )
 
+            host.write_text(
+                "#[cfg(test)]\n"
+                "fn stale_hidden_ingress() {\n"
+                "    litchi_keynote::__decode_movie_playback_payload(source, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_playback_source_topology(root)
+            self.assertTrue(any("hidden seam reference" in item for item in violations), violations)
+
+    def test_iwa_keynote_media_reader_retirement_rejects_cfg_test_and_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_movie_playback_canonical_scaffold(root)
+            add_iwa_keynote_media_reader_native_evidence(root)
+            host = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "mod slide_movies;\n"
+                "mod slide_audio;\n"
+                "pub use slide_movies::KeynoteSlideMovieInfo;\n"
+                "#[cfg(test)]\n"
+                "fn retained_reader_calls() {\n"
+                "    editor.slide_movies(0);\n"
+                "    editor.slide_audio(0);\n"
+                "    editor.slide_media_infos(0);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            old_module = host.parent / "editor" / "slide_movies.rs"
+            old_module.parent.mkdir(parents=True, exist_ok=True)
+            old_module.write_text(
+                "pub struct KeynoteSlideAudioInfo;\n", encoding="utf-8"
+            )
+            integration = root / "crates/litchi-iwa/tests/keynote_media.rs"
+            integration.parent.mkdir(parents=True, exist_ok=True)
+            integration.write_text(
+                "#[cfg(test)]\n"
+                "fn retained_type() {\n"
+                "    let _: Option<KeynoteSlideAudioInfo> = None;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("module was restored" in item for item in violations), violations)
+            self.assertTrue(any("module declaration" in item for item in violations), violations)
+            self.assertTrue(any("media-reader method slide_movies" in item for item in violations), violations)
+            self.assertTrue(any("media-reader method slide_audio" in item for item in violations), violations)
+            self.assertTrue(any("media-reader method slide_media_infos" in item for item in violations), violations)
+            self.assertTrue(any("KeynoteSlideMovieInfo" in item for item in violations), violations)
+            self.assertTrue(any("KeynoteSlideAudioInfo" in item for item in violations), violations)
+
+            host.write_text(
+                "#[cfg(test)]\n"
+                "fn private_fixture_graph() {\n"
+                "    editor.slide_movie_graph(0, drawable_id);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            old_module.unlink()
+            integration.unlink()
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_media_reader_native_placeholder_receipt_is_exact_and_consumed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            add_iwa_keynote_media_reader_native_evidence(root)
+            fixture = root / boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_FIXTURE
+            test_path = root / boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            fixture.unlink()
+            violations = boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("missing native placeholder fixture" in item for item in violations), violations)
+
+            add_iwa_keynote_media_reader_native_evidence(root)
+            tampered = bytearray(fixture.read_bytes())
+            tampered[-1] ^= 0x01
+            fixture.write_bytes(tampered)
+            violations = boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("unexpected SHA-256" in item for item in violations), violations)
+
+            add_iwa_keynote_media_reader_native_evidence(root)
+            test_path.write_text(
+                test_path.read_text(encoding="utf-8").replace(
+                    "media-properties-placeholder-native.key",
+                    "media-properties-placeholder-native.unconsumed.key",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_media_reader_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("must include fixture" in item for item in violations), violations)
+
     def test_keynote_movie_playback_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         for expression in (
             "+ audit_iwa_keynote_movie_playback_source_topology()",
+            "+ audit_iwa_keynote_media_reader_retirement_source_topology()",
             "+ audit_keynote_movie_playback_facade_source_topology()",
             "+ audit_keynote_movie_playback_resource_source_topology()",
         ):
@@ -44533,6 +44674,51 @@ fn rewrite_movie_title_operation(
             self.assertTrue(
                 any("staging function replace_movie_playback_settings" in item for item in violations),
                 violations,
+            )
+
+    def test_iwa_shared_media_playback_boundary_retires_keynote_seam_but_keeps_pages_numbers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_media_playback_scaffold(root)
+
+            keynote_owner = root / boundaries.IWA_MEDIA_PLAYBACK_OWNER_SOURCES["Keynote"]
+            keynote_owner.write_text(
+                keynote_owner.read_text(encoding="utf-8")
+                + "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_shared_media_playback_source_topology(root)
+            self.assertTrue(any("retired focused litchi-keynote movie-playback hidden seam" in item for item in violations), violations)
+
+            keynote_owner.write_text(
+                keynote_owner.read_text(encoding="utf-8").replace(
+                    "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) {}\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            pages_owner = root / boundaries.IWA_MEDIA_PLAYBACK_OWNER_SOURCES["Pages"]
+            pages_owner.write_text(
+                pages_owner.read_text(encoding="utf-8").replace(
+                    "pub fn __decode_movie_playback_payload",
+                    "pub fn stale_decode_movie_playback_payload",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_shared_media_playback_source_topology(root)
+            self.assertTrue(any("litchi-pages" in item and "hidden source seam" in item for item in violations), violations)
+
+            pages_owner.write_text(
+                pages_owner.read_text(encoding="utf-8").replace(
+                    "pub fn stale_decode_movie_playback_payload",
+                    "pub fn __decode_movie_playback_payload",
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_shared_media_playback_source_topology(root), []
             )
 
     def test_iwa_shared_media_playback_boundary_is_in_main_dispatch(self) -> None:
