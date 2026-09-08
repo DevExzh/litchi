@@ -4168,18 +4168,28 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_NODE_CACHE_REQUIRED_TYPES = (
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_APIS = (
     "CommentStorageIdentity",
     "CommentAuthorDependency",
+    "CommentStorageLocation",
     "CommentGraphPlan",
     "CommentGraphPayloadPolicy",
+    "CommentGraphComponentPolicy",
     "plan_comment_graph",
-    "plan_comment_graph_preserving_extensions",
+    "plan_comment_graph_cross_component",
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_MARKER_GROUPS = {
-    "strict versus extension-preserving policy": (
+    "strict versus package-scope policy": (
         "CommentGraphPayloadPolicy",
         "Strict",
         "PreserveRootExtensions",
+        "CommentGraphComponentPolicy",
+        "SameComponent",
+        "Package",
+        "plan_comment_graph_cross_component",
         "reject_unknown_root_fields",
-        "plan_comment_graph_preserving_extensions",
+    ),
+    "per-node storage locations": (
+        "CommentStorageLocation",
+        "storage_locations",
+        "storage_component",
     ),
     "strict comment-storage visitor": (
         "comment_storage_codec",
@@ -57832,26 +57842,50 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 )
 
         graph_code = child_sources_by_name.get("graph", "")
-        strict_start = comment_graph_code.find("fn plan_comment_graph(")
-        preserving_start = comment_graph_code.find(
-            "fn plan_comment_graph_preserving_extensions(", strict_start + 1
-        )
-        strict_body = comment_graph_code[
-            strict_start : preserving_start if preserving_start >= 0 else len(comment_graph_code)
-        ]
+        strict_body = _rust_any_function_body(comment_graph_code, "plan_comment_graph") or ""
         if (
-            strict_start < 0
+            not strict_body
             or "CommentGraphPayloadPolicy::Strict" not in strict_body
+            or "CommentGraphComponentPolicy::SameComponent" not in strict_body
             or "plan_comment_graph_with_policy" not in strict_body
         ):
             violations.append(
                 "focused Keynote media lifecycle comment graph must keep its clone wrapper strict: "
                 f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
             )
-        if re.search(r"\bplan_comment_graph_preserving_extensions\s*\(", graph_code):
+        cross_component_body = (
+            _rust_any_function_body(comment_graph_code, "plan_comment_graph_cross_component")
+            or ""
+        )
+        if (
+            not cross_component_body
+            or "CommentGraphPayloadPolicy::PreserveRootExtensions" not in cross_component_body
+            or "CommentGraphComponentPolicy::Package" not in cross_component_body
+            or "plan_comment_graph_with_policy" not in cross_component_body
+        ):
             violations.append(
-                "focused Keynote media lifecycle graph must not use the drawable extension-preserving "
-                f"comment plan: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                "focused Keynote media lifecycle comment graph must keep its package-scope "
+                "cross-component wrapper explicit: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+            )
+        policy_body = _rust_any_function_body(comment_graph_code, "plan_comment_graph_with_policy") or ""
+        if not re.search(
+            r"matches!?\s*\(\s*component_policy\s*,\s*"
+            r"CommentGraphComponentPolicy::SameComponent\s*\)",
+            policy_body,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle comment graph must keep same-component "
+                "checks inside its policy helper: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+            )
+        if not re.search(
+            r"storage_component\s*!=\s*component_name", policy_body
+        ):
+            violations.append(
+                "focused Keynote media lifecycle comment graph must validate each strict "
+                "storage node against its selected component: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
             )
         if not re.search(
             r"\bplan_comment_graph\s*\([^)]*\bbudget\b",
@@ -57861,6 +57895,12 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             violations.append(
                 "focused Keynote media lifecycle graph must route the shared budget through "
                 f"plan_comment_graph: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        if re.search(r"\bplan_comment_graph_cross_component\s*\(", graph_code):
+            violations.append(
+                "focused Keynote media lifecycle graph must not use the package-scope "
+                "cross-component comment plan: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
             )
         private_graph_body = graph_function_body("private_graph")
         if not re.search(
@@ -59007,44 +59047,101 @@ def audit_keynote_slide_drawable_comment_source_topology(
                 f"{label} marker: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
             )
 
-    # Drawable-comment CRUD preserves opaque root extensions through its own
-    # bounded admission wrapper.  The lifecycle clone/removal owner remains
-    # strict; keeping the call site explicit prevents either policy from
-    # silently widening the other owner's contract.
-    drawable_graph_code = all_owner_code
-    if not re.search(
-        r"\bplan_comment_graph_preserving_extensions\s*\(", drawable_graph_code
-    ):
+    # Drawable-comment CRUD uses the package-scope graph wrapper.  The
+    # lifecycle owner remains strict and same-component; keeping the call
+    # site inside the focused read function prevents either policy from being
+    # widened by an unrelated helper or import.
+    drawable_graph_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "graph.rs"
+    drawable_graph_source = (
+        _mask_rust_cfg_test_items(drawable_graph_path.read_text(encoding="utf-8"))
+        if drawable_graph_path.is_file()
+        else ""
+    )
+    drawable_graph_code = _mask_rust_non_code(drawable_graph_source)
+    read_graph_body = _rust_any_function_body(drawable_graph_code, "read_comment_graph") or ""
+    if not re.search(r"\bplan_comment_graph_cross_component\s*\(", read_graph_body):
         violations.append(
-            "focused Keynote drawable-comment graph must use the extension-preserving "
-            "comment plan: "
-            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / 'graph.rs'}"
+            "focused Keynote drawable-comment read graph must use the package-scope "
+            "cross-component comment plan: "
+            f"{drawable_graph_path.relative_to(root)}"
         )
-    if re.search(r"\bplan_comment_graph\s*\(", drawable_graph_code):
+    if re.search(r"\bplan_comment_graph\s*\(", read_graph_body):
         violations.append(
-            "focused Keynote drawable-comment graph must not use the strict lifecycle "
-            "comment plan: "
-            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / 'graph.rs'}"
+            "focused Keynote drawable-comment read graph must not use the strict "
+            "same-component comment plan: "
+            f"{drawable_graph_path.relative_to(root)}"
         )
 
-    # The host compatibility graph can resolve a comment root/reply globally,
-    # but the focused owner is deliberately narrower until cross-component
-    # parity is designed and proven.  Preserve both pre-allocation locality
-    # guards so a future refactor cannot silently widen the focused contract.
-    for label, marker in (
+    # The package-scope plan retains a physical CommentStorageLocation for
+    # every node.  The focused reader must consume that evidence before it
+    # decodes or exposes a node, rather than treating a package-global lookup
+    # as proof of the selected node's identity.
+    read_node_body = _rust_any_function_body(drawable_graph_code, "read_storage_node") or ""
+    for label, pattern in (
         (
-            "foreign drawable-component fail-closed guard",
-            "component_name != context.component_name",
+            "per-node storage-component accessor",
+            r"plan\s*\.\s*storage_component\s*\(\s*identifier\s*\)",
         ),
         (
-            "foreign comment/reply-component fail-closed guard",
-            "component_name != plan.component_name",
+            "per-node component equality check",
+            r"component_name\s*!=\s*expected_component",
+        ),
+        (
+            "per-node archive identifier check",
+            r"object\.archive_info\.identifier\s*!=\s*Some\s*\(\s*identifier\s*\)",
         ),
     ):
-        if marker not in all_owner_code:
+        if not re.search(pattern, read_node_body):
             violations.append(
-                "focused Keynote drawable-comment owner is missing "
-                f"{label}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+                "focused Keynote drawable-comment reader is missing "
+                f"{label}: {drawable_graph_path.relative_to(root)}"
+            )
+
+    # Slide-owned membership remains the selector authority even though a
+    # supported drawable may reside in a different archive component.  Keep
+    # source order and duplicate rejection local to slide-context resolution,
+    # and resolve the selected drawable's actual component at selection time.
+    slide_context_body = _rust_any_function_body(drawable_graph_code, "resolve_slide_context") or ""
+    for label, pattern in (
+        ("slide-owned field", r"SLIDE_OWNED_DRAWABLES_FIELD"),
+        ("source-order enumeration", r"enumerate\s*\(\)"),
+        ("unique drawable membership", r"seen\s*\.\s*insert\s*\(\s*identifier\s*\)"),
+        ("source-order drawable append", r"drawables\s*\.\s*push\s*\(\s*\(\s*position\s*,\s*identifier\s*\)"),
+    ):
+        if not re.search(pattern, slide_context_body):
+            violations.append(
+                "focused Keynote drawable-comment selector is missing "
+                f"{label} proof: {drawable_graph_path.relative_to(root)}"
+            )
+    select_body = _rust_any_function_body(drawable_graph_code, "select_drawable") or ""
+    for label, pattern in (
+        (
+            "selected drawable component lookup",
+            r"object_with_component\s*\(\s*resolved\.identifier\s*\)",
+        ),
+        ("selected component storage", r"component_name\s*=\s*copy_arc\s*\("),
+    ):
+        if not re.search(pattern, select_body):
+            violations.append(
+                "focused Keynote drawable-comment selector is missing "
+                f"{label}: {drawable_graph_path.relative_to(root)}"
+            )
+
+    # Direct-user counts inspect every archive component and the complete
+    # ArchiveInfo census.  This preserves copy-on-write when an opaque or
+    # header-only owner is discovered alongside the selected route.
+    direct_users_body = _rust_any_function_body(drawable_graph_code, "global_direct_users") or ""
+    for label, pattern in (
+        ("complete header census", r"census_core_header_root_reference\s*\("),
+        ("all-component scan", r"package\.state\.source\.components\s*\(\s*\)"),
+        ("distinct owner count", r"users\s*=\s*users\.checked_add\s*\("),
+        ("self-owner exclusion", r"object_identifier\s*!=\s*root_identifier"),
+        ("zero-owner rejection", r"if\s+users\s*==\s*0"),
+    ):
+        if not re.search(pattern, direct_users_body):
+            violations.append(
+                "focused Keynote drawable-comment graph is missing "
+                f"{label}: {drawable_graph_path.relative_to(root)}"
             )
 
     # This is a source-oracle receipt only. Candidate CRUD/reply acceptance

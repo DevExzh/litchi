@@ -3915,18 +3915,20 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "comment_graph.rs": (
             "enum CommentGraphPayloadPolicy { Strict, PreserveRootExtensions }\n"
             "impl CommentGraphPayloadPolicy { fn reject_unknown_root_fields(self) -> bool { Strict; PreserveRootExtensions; true } }\n"
+            "enum CommentGraphComponentPolicy { SameComponent, Package }\n"
             "struct CommentStorageIdentity { identifier: u64, uuid: Option<SuperUuid> }\n"
+            "struct CommentStorageLocation { identifier: u64, component_name: Box<str> }\n"
             "struct CommentAuthorDependency;\n"
-            "struct CommentGraphPlan { storage_ids: Vec<u64>, storage_identities: Vec<CommentStorageIdentity>, author_ids: Vec<u64>, author_dependencies: Vec<CommentAuthorDependency> }\n"
-            "impl CommentGraphPlan { fn root_storage_uuid() { storage_uuid; root_storage_uuid; uuid; } }\n"
+            "struct CommentGraphPlan { storage_ids: Vec<u64>, storage_locations: Vec<CommentStorageLocation>, storage_identities: Vec<CommentStorageIdentity>, author_ids: Vec<u64>, author_dependencies: Vec<CommentAuthorDependency> }\n"
+            "impl CommentGraphPlan { fn root_storage_uuid() { storage_uuid; root_storage_uuid; uuid; } fn storage_component(&self, identifier: u64) -> Option<&str> { storage_locations; binary_search; identifier; } }\n"
             "fn plan_comment_graph(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) {\n"
             "    comment_storage_codec; decode_comment_storage_archive_with_visitor; CommentStorageVisitor; ReplyCollector;\n"
-            "    storage_ids; storage_identities; author_ids; author_dependencies; binary_search; InvalidSource;\n"
-            "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve; CommentGraphPayloadPolicy::Strict; plan_comment_graph_with_policy;\n"
+            "    storage_ids; storage_locations; storage_identities; author_ids; author_dependencies; binary_search; InvalidSource;\n"
+            "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve; CommentGraphPayloadPolicy::Strict; CommentGraphComponentPolicy::SameComponent; plan_comment_graph_with_policy;\n"
             "    let _ = (package, component_name, root, limits, budget);\n"
             "}\n"
-            "fn plan_comment_graph_preserving_extensions(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) { plan_comment_graph_with_policy(package, component_name, root, limits, budget, CommentGraphPayloadPolicy::PreserveRootExtensions); }\n"
-            "fn plan_comment_graph_with_policy(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget, policy: CommentGraphPayloadPolicy) { let _ = (package, component_name, root, limits, budget, policy, reject_unknown_root_fields); }\n"
+            "fn plan_comment_graph_cross_component(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) { plan_comment_graph_with_policy(package, component_name, root, limits, budget, CommentGraphPayloadPolicy::PreserveRootExtensions, CommentGraphComponentPolicy::Package); }\n"
+            "fn plan_comment_graph_with_policy(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget, policy: CommentGraphPayloadPolicy, component_policy: CommentGraphComponentPolicy) { if matches(component_policy, CommentGraphComponentPolicy::SameComponent) && storage_component != component_name { return Err(InvalidSource); } let _ = (package, component_name, root, limits, budget, policy, component_policy, reject_unknown_root_fields); }\n"
         ),
             "comment_removal.rs": (
             "struct CommentRemovalPlan { removed_object_ids: Vec<u64>, retained_comment_storage_ids: Vec<u64>, unused_external_author_ids: Vec<u64> }\n"
@@ -20704,7 +20706,7 @@ fn rewrite_movie_title_operation(
             graph.write_text(
                 graph_source.replace(
                     "plan_comment_graph(package,",
-                    "plan_comment_graph_preserving_extensions(package,",
+                    "plan_comment_graph_cross_component(package,",
                     1,
                 ),
                 encoding="utf-8",
@@ -20713,7 +20715,7 @@ fn rewrite_movie_title_operation(
                 root
             )
             self.assertTrue(
-                any("must not use the drawable extension-preserving" in item for item in violations),
+                any("must not use the package-scope cross-component" in item for item in violations),
                 violations,
             )
             graph.write_text(graph_source, encoding="utf-8")
@@ -45098,7 +45100,7 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("missing native source fixture" in item for item in violations), violations)
 
-    def test_keynote_drawable_comment_boundary_requires_component_fail_closed_guards(
+    def test_keynote_drawable_comment_boundary_requires_local_ownership_proofs(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -45129,53 +45131,54 @@ fn rewrite_movie_title_operation(
 
             graph = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "graph.rs"
             original = graph.read_text(encoding="utf-8")
-            graph.write_text(
+
+            def assert_rejected(replacement: str, message: str) -> None:
+                graph.write_text(replacement, encoding="utf-8")
+                violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                    root
+                )
+                self.assertTrue(any(message in item for item in violations), violations)
+                graph.write_text(original, encoding="utf-8")
+
+            assert_rejected(
                 original.replace(
-                    "if component_name != context.component_name.as_ref() {",
-                    "if false {",
+                    "let plan = plan_comment_graph_cross_component(\n",
+                    "let plan = plan_comment_graph(\n",
                     1,
                 ),
-                encoding="utf-8",
+                "must use the package-scope cross-component",
             )
-            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
-                root
-            )
-            self.assertTrue(
-                any("foreign drawable-component fail-closed guard" in item for item in violations),
-                violations,
-            )
-
-            graph.write_text(original, encoding="utf-8")
-            graph.write_text(
+            assert_rejected(
                 original.replace(
-                    "plan_comment_graph_preserving_extensions",
-                    "plan_comment_graph",
-                ),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
-                root
-            )
-            self.assertTrue(
-                any("must use the extension-preserving" in item for item in violations),
-                violations,
-            )
-            graph.write_text(original, encoding="utf-8")
-
-            graph.write_text(
-                original.replace(
-                    "if component_name != plan.component_name.as_ref()",
-                    "if false {",
+                    ".storage_component(identifier)",
+                    ".storage_component_removed(identifier)",
                     1,
                 ),
-                encoding="utf-8",
+                "per-node storage-component accessor",
             )
-            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
-                root
+            assert_rejected(
+                original.replace(
+                    "seen.insert(identifier)",
+                    "seen.contains(&identifier)",
+                    1,
+                ),
+                "unique drawable membership",
             )
-            self.assertTrue(
-                any("foreign comment/reply-component fail-closed guard" in item for item in violations),
-                violations,
+            assert_rejected(
+                original.replace(
+                    "object_with_component(resolved.identifier)",
+                    "object_with_component(resolved.drawable_identifier)",
+                    1,
+                ),
+                "selected drawable component lookup",
+            )
+            assert_rejected(
+                original.replace(
+                    "census_core_header_root_reference(object, root_identifier, archive_limits, budget)?",
+                    "false",
+                    1,
+                ),
+                "complete header census",
             )
 
     def test_keynote_drawable_comment_boundary_is_in_main_dispatch(self) -> None:

@@ -3,9 +3,11 @@
 //! The media lifecycle owner cannot clone or remove a drawable while leaving
 //! an opaque comment/reply edge behind.  This adapter therefore resolves the
 //! complete rooted `TSD.CommentStorageArchive` graph before a transaction is
-//! allowed to touch the drawable.  Storage objects and replies belong to the
-//! selected component; annotation authors are preserved dependencies and are
-//! deliberately excluded from the storage clone/removal closure.
+//! allowed to touch the drawable.  The lifecycle transaction keeps storage
+//! objects and replies in the selected component; the focused drawable owner
+//! may use the package-global variant and retains each node's source location.
+//! Annotation authors are preserved dependencies and are deliberately excluded
+//! from the storage clone/removal closure.
 //!
 //! This module supplies the private plan consumed by the lifecycle clone
 //! transaction.  It does not rewrite a drawable, clone a storage object,
@@ -62,6 +64,18 @@ impl CommentGraphPayloadPolicy {
     }
 }
 
+/// Component scope used while resolving a rooted storage graph.
+///
+/// The media lifecycle clone/removal transaction keeps the historical
+/// same-component invariant.  The focused drawable-comment owner follows
+/// package-global object identities, while retaining the actual component for
+/// every storage node in the returned plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommentGraphComponentPolicy {
+    SameComponent,
+    Package,
+}
+
 /// One source storage identity retained for the future clone/removal seam.
 ///
 /// `uuid` stays optional because the native archive declares `storage_uuid`
@@ -86,16 +100,31 @@ pub(in crate::package) struct CommentAuthorDependency {
     pub(in crate::package) component_name: Box<str>,
 }
 
+/// Physical source location for one storage node in a rooted graph.
+///
+/// This is kept scoped to the package implementation.  Public comment
+/// snapshots do not expose archive names or native identifiers; the focused
+/// transaction uses the location only to route each node's exact rewrite.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::package) struct CommentStorageLocation {
+    pub(in crate::package) identifier: u64,
+    pub(in crate::package) component_name: Box<str>,
+}
+
 /// Complete rooted comment/reply closure for one selected drawable.
 ///
-/// Every storage identifier is sorted and belongs to `component_name`.
-/// `author_ids` is sorted and unique, while `author_dependencies` retains the
-/// per-storage edge and the exact source component of each dependency.
+/// Every storage identifier is sorted.  `component_name` is the selected
+/// drawable's component, while `storage_locations` retains the exact physical
+/// component for every storage node; the two differ when a focused drawable
+/// comment graph crosses component boundaries. `author_ids` is sorted and
+/// unique, while `author_dependencies` retains the per-storage edge and the
+/// exact source component of each dependency.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::package) struct CommentGraphPlan {
     pub(in crate::package) root_storage_identifier: u64,
     pub(in crate::package) component_name: Box<str>,
     pub(in crate::package) storage_ids: Vec<u64>,
+    pub(in crate::package) storage_locations: Vec<CommentStorageLocation>,
     pub(in crate::package) storage_identities: Vec<CommentStorageIdentity>,
     pub(in crate::package) author_ids: Vec<u64>,
     pub(in crate::package) author_dependencies: Vec<CommentAuthorDependency>,
@@ -109,6 +138,15 @@ impl CommentGraphPlan {
             .iter()
             .find(|identity| identity.identifier == self.root_storage_identifier)
             .and_then(|identity| identity.uuid)
+    }
+
+    /// Return the exact source component for one storage node.
+    #[must_use]
+    pub(in crate::package) fn storage_component(&self, identifier: u64) -> Option<&str> {
+        self.storage_locations
+            .binary_search_by_key(&identifier, |location| location.identifier)
+            .ok()
+            .map(|index| self.storage_locations[index].component_name.as_ref())
     }
 }
 
@@ -134,15 +172,17 @@ pub(in crate::package) fn plan_comment_graph(
         limits,
         budget,
         CommentGraphPayloadPolicy::Strict,
+        CommentGraphComponentPolicy::SameComponent,
     )
 }
 
-/// Plan a drawable comment graph while preserving unknown root payload fields.
+/// Plan a focused drawable comment graph across package components.
 ///
-/// This is intentionally separate from [`plan_comment_graph`]: the focused
-/// drawable owner rewrites the source wire payload exactly, whereas the media
-/// lifecycle clone/removal owner remains strict about opaque root extensions.
-pub(in crate::package) fn plan_comment_graph_preserving_extensions(
+/// The selected drawable's component remains the plan anchor, but every
+/// storage root and reply is resolved by the package-global object index and
+/// records its own source component.  Lifecycle clone/removal callers use the
+/// same-component wrapper above and therefore retain their strict invariant.
+pub(in crate::package) fn plan_comment_graph_cross_component(
     package: &Package,
     component_name: &str,
     root_storage_identifier: u64,
@@ -156,6 +196,7 @@ pub(in crate::package) fn plan_comment_graph_preserving_extensions(
         limits,
         budget,
         CommentGraphPayloadPolicy::PreserveRootExtensions,
+        CommentGraphComponentPolicy::Package,
     )
 }
 
@@ -166,6 +207,7 @@ fn plan_comment_graph_with_policy(
     limits: WireLimits,
     budget: &mut LifecycleBudget,
     payload_policy: CommentGraphPayloadPolicy,
+    component_policy: CommentGraphComponentPolicy,
 ) -> Result<CommentGraphPlan, SlideMediaLifecycleError> {
     if component_name.is_empty() || root_storage_identifier == 0 {
         return Err(SlideMediaLifecycleError::InvalidSource);
@@ -174,7 +216,9 @@ fn plan_comment_graph_with_policy(
     let (actual_component, _) = package
         .object_with_component(root_storage_identifier)
         .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-    if actual_component != component_name {
+    if matches!(component_policy, CommentGraphComponentPolicy::SameComponent)
+        && actual_component != component_name
+    {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
 
@@ -187,18 +231,36 @@ fn plan_comment_graph_with_policy(
     insert_sorted_unique(&mut storage_ids, root_storage_identifier, budget)?;
     budget.charge_entries(1)?;
 
+    let mut storage_locations = Vec::new();
     let mut storage_identities = Vec::new();
     let mut author_ids = Vec::new();
     let mut author_dependencies = Vec::new();
 
     while let Some(storage_identifier) = pending.pop() {
+        let (storage_component, _) = package
+            .object_with_component(storage_identifier)
+            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        if matches!(component_policy, CommentGraphComponentPolicy::SameComponent)
+            && storage_component != component_name.as_ref()
+        {
+            return Err(SlideMediaLifecycleError::InvalidSource);
+        }
         let facts = read_storage_facts(
             package,
-            component_name.as_ref(),
+            storage_component,
             storage_identifier,
             limits,
             budget,
             payload_policy,
+        )?;
+
+        push_vec(
+            &mut storage_locations,
+            CommentStorageLocation {
+                identifier: storage_identifier,
+                component_name: copy_boxed(storage_component, budget)?,
+            },
+            budget,
         )?;
 
         push_storage_identity(
@@ -258,6 +320,18 @@ fn plan_comment_graph_with_policy(
     {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
+    storage_locations.sort_unstable_by_key(|location| location.identifier);
+    if storage_locations.len() != storage_ids.len()
+        || storage_locations
+            .windows(2)
+            .any(|window| window[0].identifier >= window[1].identifier)
+        || storage_locations
+            .iter()
+            .zip(&storage_ids)
+            .any(|(location, identifier)| location.identifier != *identifier)
+    {
+        return Err(SlideMediaLifecycleError::InvalidSource);
+    }
     author_dependencies.sort_unstable_by(|left, right| {
         (left.storage_identifier, left.author_identifier)
             .cmp(&(right.storage_identifier, right.author_identifier))
@@ -276,6 +350,7 @@ fn plan_comment_graph_with_policy(
         root_storage_identifier,
         component_name,
         storage_ids,
+        storage_locations,
         storage_identities,
         author_ids,
         author_dependencies,

@@ -1453,6 +1453,7 @@ use litchi_iwa::keynote::{
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
+use litchi_keynote::{DrawableSelector, Package as KeynotePackage, SlideSelector};
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
@@ -1613,8 +1614,22 @@ if let Some(text_box) = keynote
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
-    keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;
-    let _comment = keynote.slide_drawable_comment(0, drawable.object_id)?;
+    let focused = KeynotePackage::from_bytes(&keynote.to_bytes()?)?;
+    let focused = focused
+        .edit_slide_drawable_comment(
+            SlideSelector::index(0),
+            DrawableSelector::index(0),
+        )?
+        .set("Review this slide object")?
+        .commit()?
+        .into_package();
+    let _comment = focused.slide_drawable_comment(
+        SlideSelector::index(0),
+        DrawableSelector::index(0),
+    )?;
+    let mut focused_bytes = Vec::new();
+    focused.write_to(&mut focused_bytes)?;
+    keynote = KeynoteEditor::from_bytes(&focused_bytes)?;
 
     let build = keynote.add_slide_build(
         0,

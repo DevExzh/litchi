@@ -55,6 +55,7 @@ pub(super) struct WorkingSet<'source> {
     source: &'source Package,
     archives: BTreeMap<String, Archive>,
     reserved_identifiers: Vec<u64>,
+    pending_save_token_components: Vec<Box<str>>,
 }
 
 impl<'source> WorkingSet<'source> {
@@ -63,6 +64,7 @@ impl<'source> WorkingSet<'source> {
             source,
             archives: BTreeMap::new(),
             reserved_identifiers: Vec::new(),
+            pending_save_token_components: Vec::new(),
         }
     }
 
@@ -72,6 +74,38 @@ impl<'source> WorkingSet<'source> {
 
     pub(super) fn get(&self, name: &str) -> Option<&Archive> {
         self.archives.get(name)
+    }
+
+    /// Record a component whose physical archive was not copied but whose
+    /// PackageMetadata ownership edge changed.  The final transaction batch
+    /// unions these names with every copied archive, so token-only metadata
+    /// edits are published exactly once alongside ordinary COW edits.
+    pub(super) fn mark_save_token_component(
+        &mut self,
+        name: &str,
+        budget: &mut Budget,
+    ) -> Result<(), Error> {
+        if name.is_empty()
+            || name == "Index/Metadata.iwa"
+            || contains_component_name(&self.pending_save_token_components, name, budget)?
+        {
+            return Ok(());
+        }
+        let pointer_bytes = self
+            .pending_save_token_components
+            .len()
+            .checked_add(1)
+            .and_then(|length| length.checked_mul(size_of::<Box<str>>()))
+            .ok_or(Error::InvalidSource)?;
+        budget.charge_allocations(pointer_bytes)?;
+        self.pending_save_token_components
+            .try_reserve_exact(1)
+            .map_err(|_| Error::Allocation {
+                amount: pointer_bytes,
+            })?;
+        let owned = copy_text_value(name, budget)?;
+        self.pending_save_token_components.push(owned);
+        Ok(())
     }
 
     pub(super) fn reserve_identifier(
@@ -637,6 +671,18 @@ pub(super) struct EngineOutput {
     pub(super) diagnostics: EngineDiagnostics,
 }
 
+/// Facts retained for one storage clone until graph cleanup decides whether
+/// the old node is still owned elsewhere.  UUID identity is finalized only
+/// after that decision: a reclaimed old node keeps its UUID, while a retained
+/// old node forces the clone to receive a fresh UUID.
+#[derive(Debug, Clone, Copy)]
+struct PendingStorageClone<'source> {
+    component: &'source str,
+    old_identifier: u64,
+    old_uuid: Option<UuidSnapshot>,
+    new_identifier: u64,
+}
+
 /// Execute one complete direct-drawable comment operation.
 ///
 /// Graph validation happens before any archive is copied.  All subsequent
@@ -661,6 +707,10 @@ pub(super) fn execute(
 
     let mut working = WorkingSet::new(source);
     let mut diagnostics = EngineDiagnostics::noop();
+    let mut edge_transitions = Vec::new();
+    let mut storage_clones = Vec::new();
+    let mut deferred_author_edge = None;
+    let mut final_identifier = None;
     let root = selection.comment_identifier;
 
     match operation {
@@ -680,21 +730,18 @@ pub(super) fn execute(
                         text,
                         budget,
                     )?;
-                    advance_selected_save_token(source, &mut working, selection, budget)?;
                 } else {
                     let new_root = metadata::allocate_identifier(source, &mut working, budget)?;
-                    let uuid =
-                        metadata::fresh_storage_uuid_in_working_set(source, &working, budget)?;
-                    clone_root_with_text_and_uuid(
+                    let clone = clone_root_with_text(
                         source,
                         &mut working,
                         selection,
                         root_identifier,
                         new_root,
                         text,
-                        uuid,
                         budget,
                     )?;
+                    push_pending_storage_clone(&mut storage_clones, clone, budget)?;
                     replace_drawable_reference(
                         &mut working,
                         selection,
@@ -702,7 +749,15 @@ pub(super) fn execute(
                         Some(new_root),
                         budget,
                     )?;
-                    metadata::reserve_last_identifier(&mut working, new_root, budget)?;
+                    push_drawable_edge_transition(
+                        source,
+                        selection,
+                        Some(root_identifier),
+                        Some(new_root),
+                        &mut edge_transitions,
+                        budget,
+                    )?;
+                    final_identifier = Some(new_root);
                     cleanup_old_graph(
                         source,
                         &mut working,
@@ -715,7 +770,7 @@ pub(super) fn execute(
                 }
                 diagnostics.changed = true;
             } else {
-                create_root(
+                let new_root = create_root(
                     source,
                     &mut working,
                     selection,
@@ -723,7 +778,14 @@ pub(super) fn execute(
                     budget,
                     &mut diagnostics,
                 )?;
-                advance_selected_save_token(source, &mut working, selection, budget)?;
+                push_drawable_edge_transition(
+                    source,
+                    selection,
+                    None,
+                    Some(new_root),
+                    &mut edge_transitions,
+                    budget,
+                )?;
                 diagnostics.changed = true;
             }
         },
@@ -740,6 +802,14 @@ pub(super) fn execute(
                 None,
                 budget,
             )?;
+            push_drawable_edge_transition(
+                source,
+                selection,
+                Some(root_identifier),
+                None,
+                &mut edge_transitions,
+                budget,
+            )?;
             cleanup_old_graph(
                 source,
                 &mut working,
@@ -752,9 +822,18 @@ pub(super) fn execute(
         },
         Operation::AddReply { text } => {
             let root_identifier = root.ok_or(Error::InvalidSource)?;
-            let _facts = read_storage(source, root_identifier, budget)?;
+            // Replies are native children of the root storage object.  When
+            // the root is foreign to the selected drawable, preserve that
+            // physical ownership and stage the new reply in the root's
+            // component as well.  The graph admission has already proved the
+            // root location and strict header shape.
+            let root_component = object_component(source, root_identifier)?;
+            let author = metadata::ensure_generated_author(source, &mut working, budget)?;
+            let author_identifier = author.identifier();
             let new_root = metadata::allocate_identifier(source, &mut working, budget)?;
-            clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            let clone =
+                clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            push_pending_storage_clone(&mut storage_clones, clone, budget)?;
             replace_drawable_reference(
                 &mut working,
                 selection,
@@ -762,16 +841,22 @@ pub(super) fn execute(
                 Some(new_root),
                 budget,
             )?;
+            push_drawable_edge_transition(
+                source,
+                selection,
+                Some(root_identifier),
+                Some(new_root),
+                &mut edge_transitions,
+                budget,
+            )?;
 
-            let author = metadata::ensure_generated_author(source, &mut working, budget)?;
-            let author_identifier = author.identifier();
             let reply_identifier = metadata::allocate_identifier(source, &mut working, budget)?;
             let reply_uuid = metadata::fresh_storage_uuid_in_working_set(source, &working, budget)?;
             let reply_data = canonical_leaf(text, author_identifier, reply_uuid, budget)?;
             insert_storage_object(
                 source,
                 &mut working,
-                selection.component_name.as_ref(),
+                root_component,
                 reply_identifier,
                 reply_data,
                 author_identifier,
@@ -785,19 +870,14 @@ pub(super) fn execute(
                 budget,
             )?;
             if let Some(author_identifier) = author_identifier {
-                metadata::rewrite_for_comment_edges(
-                    source,
-                    &mut working,
-                    metadata::EdgeEdit::add_author(
-                        selection.component_name.as_ref(),
-                        reply_identifier,
-                        author_identifier,
-                        budget,
-                    )?,
+                deferred_author_edge = Some(metadata::EdgeEdit::add_author(
+                    root_component,
+                    reply_identifier,
+                    author_identifier,
                     budget,
-                )?;
+                )?);
             }
-            metadata::reserve_last_identifier(&mut working, reply_identifier, budget)?;
+            final_identifier = Some(reply_identifier);
             cleanup_old_graph(
                 source,
                 &mut working,
@@ -823,7 +903,9 @@ pub(super) fn execute(
                 return exact_noop(source, budget);
             }
             let new_root = metadata::allocate_identifier(source, &mut working, budget)?;
-            clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            let root_clone =
+                clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            push_pending_storage_clone(&mut storage_clones, root_clone, budget)?;
             replace_drawable_reference(
                 &mut working,
                 selection,
@@ -831,8 +913,18 @@ pub(super) fn execute(
                 Some(new_root),
                 budget,
             )?;
+            push_drawable_edge_transition(
+                source,
+                selection,
+                Some(root_identifier),
+                Some(new_root),
+                &mut edge_transitions,
+                budget,
+            )?;
             let new_reply = metadata::allocate_identifier(source, &mut working, budget)?;
-            clone_storage_object(source, &mut working, reply_identifier, new_reply, budget)?;
+            let reply_clone =
+                clone_storage_object(source, &mut working, reply_identifier, new_reply, budget)?;
+            push_pending_storage_clone(&mut storage_clones, reply_clone, budget)?;
             rewrite_storage_text(&mut working, source, new_reply, text, budget)?;
             rewrite_root_replies(
                 source,
@@ -845,7 +937,15 @@ pub(super) fn execute(
                 ),
                 budget,
             )?;
-            metadata::reserve_last_identifier(&mut working, new_reply, budget)?;
+            push_reply_edge_transition(
+                source,
+                root_identifier,
+                reply_identifier,
+                Some(new_reply),
+                &mut edge_transitions,
+                budget,
+            )?;
+            final_identifier = Some(new_reply);
             cleanup_old_graph(
                 source,
                 &mut working,
@@ -866,12 +966,30 @@ pub(super) fn execute(
                 .copied()
                 .ok_or(Error::InvalidSource)?;
             let new_root = metadata::allocate_identifier(source, &mut working, budget)?;
-            clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            let clone =
+                clone_storage_object(source, &mut working, root_identifier, new_root, budget)?;
+            push_pending_storage_clone(&mut storage_clones, clone, budget)?;
             replace_drawable_reference(
                 &mut working,
                 selection,
                 Some(root_identifier),
                 Some(new_root),
+                budget,
+            )?;
+            push_drawable_edge_transition(
+                source,
+                selection,
+                Some(root_identifier),
+                Some(new_root),
+                &mut edge_transitions,
+                budget,
+            )?;
+            push_reply_edge_transition(
+                source,
+                root_identifier,
+                reply_identifier,
+                None,
+                &mut edge_transitions,
                 budget,
             )?;
             rewrite_root_replies(
@@ -881,7 +999,7 @@ pub(super) fn execute(
                 CommentStorageReplyRewrite::remove(selector.as_index(), reply_identifier),
                 budget,
             )?;
-            metadata::reserve_last_identifier(&mut working, new_root, budget)?;
+            final_identifier = Some(new_root);
             cleanup_old_graph(
                 source,
                 &mut working,
@@ -898,6 +1016,22 @@ pub(super) fn execute(
     if !diagnostics.changed {
         return exact_noop(source, budget);
     }
+    finalize_storage_clones(source, &mut working, &storage_clones, budget)?;
+    if let Some(edge) = deferred_author_edge {
+        metadata::rewrite_for_comment_edges(source, &mut working, edge, budget)?;
+    }
+    if let Some(identifier) = final_identifier {
+        metadata::reserve_last_identifier(&mut working, identifier, budget)?;
+    }
+    let removed_storage_ids = collect_removed_storage_ids(thread.as_ref(), &working, budget)?;
+    metadata::reconcile_comment_storage_edges(
+        source,
+        &mut working,
+        &edge_transitions,
+        &removed_storage_ids,
+        budget,
+    )?;
+    advance_changed_save_tokens(source, &mut working, budget)?;
     let bytes = serialize_candidate(source, &working, budget)?;
     diagnostics.touched_components = working.archives.len();
     Ok(EngineOutput { bytes, diagnostics })
@@ -916,6 +1050,242 @@ fn exact_noop(source: &Package, budget: &mut Budget) -> Result<EngineOutput, Err
     })
 }
 
+fn push_edge_transition<'source>(
+    transitions: &mut Vec<metadata::CommentStorageEdgeTransition<'source>>,
+    source_component: &'source str,
+    old_target_component: Option<&'source str>,
+    old_identifier: Option<u64>,
+    new_target_component: Option<&'source str>,
+    new_identifier: Option<u64>,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    if source_component.is_empty() {
+        return Err(Error::InvalidSource);
+    }
+    if old_target_component.is_some() != old_identifier.is_some()
+        || new_target_component.is_some() != new_identifier.is_some()
+    {
+        return Err(Error::InvalidSource);
+    }
+    if old_identifier == Some(0) || new_identifier == Some(0) {
+        return Err(Error::InvalidSource);
+    }
+    let pointer_bytes = transitions
+        .len()
+        .checked_add(1)
+        .and_then(|length| {
+            length.checked_mul(size_of::<metadata::CommentStorageEdgeTransition<'source>>())
+        })
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(pointer_bytes)?;
+    transitions
+        .try_reserve_exact(1)
+        .map_err(|_| Error::Allocation {
+            amount: pointer_bytes,
+        })?;
+    transitions.push(metadata::CommentStorageEdgeTransition {
+        source_component,
+        old_target_component,
+        old_identifier,
+        new_target_component,
+        new_identifier,
+    });
+    Ok(())
+}
+
+fn register_storage_identity(
+    source: &Package,
+    working: &mut WorkingSet<'_>,
+    old_identifier: u64,
+    old_payload_uuid: Option<UuidSnapshot>,
+    new_identifier: u64,
+    new_payload_uuid: UuidSnapshot,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let component = object_component(source, old_identifier)?;
+    metadata::register_storage_identity_if_registered(
+        source,
+        working,
+        component,
+        old_identifier,
+        old_payload_uuid,
+        new_identifier,
+        new_payload_uuid,
+        budget,
+    )?;
+    Ok(())
+}
+
+fn finalize_storage_clones<'source>(
+    source: &'source Package,
+    working: &mut WorkingSet<'source>,
+    clones: &[PendingStorageClone<'source>],
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let changed_archive_objects =
+        working
+            .archives
+            .values()
+            .try_fold(0usize, |total, archive| {
+                total
+                    .checked_add(archive.objects.len())
+                    .ok_or(Error::InvalidSource)
+            })?;
+    let lookup_work = clones
+        .len()
+        .checked_mul(
+            changed_archive_objects
+                .checked_add(1)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|work| work.checked_mul(2))
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_wire_work(lookup_work.max(1))?;
+    for clone in clones {
+        let old_retained = working.find_object(clone.old_identifier).is_some();
+        let new_uuid = if old_retained || clone.old_uuid.is_none() {
+            metadata::fresh_storage_uuid_in_working_set(source, working, budget)?
+        } else {
+            clone.old_uuid.ok_or(Error::InvalidSource)?
+        };
+        if Some(new_uuid) != clone.old_uuid {
+            patch_storage_uuid(source, working, clone.new_identifier, new_uuid, budget)?;
+        }
+        register_storage_identity(
+            source,
+            working,
+            clone.old_identifier,
+            clone.old_uuid,
+            clone.new_identifier,
+            new_uuid,
+            budget,
+        )?;
+    }
+    Ok(())
+}
+
+fn patch_storage_uuid(
+    source: &Package,
+    working: &mut WorkingSet<'_>,
+    identifier: u64,
+    uuid: UuidSnapshot,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let component = working
+        .find_object(identifier)
+        .map(|(name, _)| name)
+        .ok_or(Error::InvalidSource)?;
+    let component = copy_component_name(component, budget)?;
+    let archive = working.load(component.as_str(), budget)?;
+    let (index, payload) = storage_message(archive, identifier)?;
+    let facts = decode_payload(identifier, payload, budget)?;
+    let wire_limits = source
+        .semantic_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let data = patch_uuid(payload, facts.uuid.is_some(), uuid, wire_limits, budget)?;
+    replace_message(archive, identifier, index, data, source, budget)
+}
+
+fn push_drawable_edge_transition<'source>(
+    source: &'source Package,
+    selection: &'source Selection,
+    old_identifier: Option<u64>,
+    new_identifier: Option<u64>,
+    transitions: &mut Vec<metadata::CommentStorageEdgeTransition<'source>>,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let old_target_component = old_identifier
+        .map(|identifier| object_component(source, identifier))
+        .transpose()?;
+    let new_target_component = match new_identifier {
+        Some(_) => old_target_component.or(Some(selection.component_name.as_ref())),
+        None => None,
+    };
+    push_edge_transition(
+        transitions,
+        selection.component_name.as_ref(),
+        old_target_component,
+        old_identifier,
+        new_target_component,
+        new_identifier,
+        budget,
+    )
+}
+
+fn push_reply_edge_transition<'source>(
+    source: &'source Package,
+    root_identifier: u64,
+    old_reply_identifier: u64,
+    new_reply_identifier: Option<u64>,
+    transitions: &mut Vec<metadata::CommentStorageEdgeTransition<'source>>,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let root_component = object_component(source, root_identifier)?;
+    let reply_component = object_component(source, old_reply_identifier)?;
+    let new_target_component = new_reply_identifier.map(|_| reply_component);
+    push_edge_transition(
+        transitions,
+        root_component,
+        Some(reply_component),
+        Some(old_reply_identifier),
+        new_target_component,
+        new_reply_identifier,
+        budget,
+    )
+}
+
+fn collect_removed_storage_ids(
+    thread: Option<&graph::Thread>,
+    working: &WorkingSet<'_>,
+    budget: &mut Budget,
+) -> Result<Vec<u64>, Error> {
+    let Some(thread) = thread else {
+        return Ok(Vec::new());
+    };
+    // The effective lookup first consults the package index and then scans a
+    // changed archive's object vector. Account for both full node scans and
+    // the worst changed-archive scan before either pass so a hostile graph
+    // cannot make this cleanup work free of the operation ledger.
+    let changed_archive_objects =
+        working
+            .archives
+            .values()
+            .try_fold(0usize, |total, archive| {
+                total
+                    .checked_add(archive.objects.len())
+                    .ok_or(Error::InvalidSource)
+            })?;
+    let per_pass_lookup_work = thread
+        .nodes
+        .len()
+        .checked_mul(changed_archive_objects)
+        .and_then(|work| work.checked_add(thread.nodes.len()))
+        .ok_or(Error::InvalidSource)?;
+    let lookup_work = per_pass_lookup_work
+        .checked_mul(2)
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_wire_work(lookup_work.max(1))?;
+    let removed_count = thread
+        .nodes
+        .iter()
+        .filter(|node| working.find_object(node.identifier).is_none())
+        .count();
+    let bytes = removed_count
+        .checked_mul(size_of::<u64>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(bytes)?;
+    let mut removed = Vec::new();
+    removed
+        .try_reserve_exact(removed_count)
+        .map_err(|_| Error::Allocation { amount: bytes })?;
+    for node in &thread.nodes {
+        if working.find_object(node.identifier).is_none() {
+            removed.push(node.identifier);
+        }
+    }
+    Ok(removed)
+}
+
 fn create_root(
     source: &Package,
     working: &mut WorkingSet<'_>,
@@ -923,7 +1293,7 @@ fn create_root(
     text: &str,
     budget: &mut Budget,
     diagnostics: &mut EngineDiagnostics,
-) -> Result<(), Error> {
+) -> Result<u64, Error> {
     let author = metadata::ensure_generated_author(source, working, budget)?;
     let author_identifier = author.identifier();
     let identifier = metadata::allocate_identifier(source, working, budget)?;
@@ -955,23 +1325,87 @@ fn create_root(
     metadata::reserve_last_identifier(working, identifier, budget)?;
     diagnostics.created_object_count = 1;
     diagnostics.generated_author = author.created();
+    Ok(identifier)
+}
+
+/// Advance each physically changed component once, after the operation has
+/// staged all object, reference, and metadata edits.  Calling the metadata
+/// codec per branch used to double-advance the selected drawable when a
+/// cross-component author edge was also rewritten.  The working set already
+/// deduplicates archive names, so this final batch is both deterministic and
+/// sufficient for foreign roots/replies.
+fn advance_changed_save_tokens(
+    source: &Package,
+    working: &mut WorkingSet<'_>,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    let physical_count = working
+        .changed_names()
+        .filter(|name| *name != "Index/Metadata.iwa")
+        .count();
+    let mut physical_names = Vec::new();
+    let physical_pointer_bytes = physical_count
+        .checked_mul(size_of::<Box<str>>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(physical_pointer_bytes)?;
+    physical_names
+        .try_reserve_exact(physical_count)
+        .map_err(|_| Error::Allocation {
+            amount: physical_pointer_bytes,
+        })?;
+    for name in working
+        .changed_names()
+        .filter(|name| *name != "Index/Metadata.iwa")
+    {
+        physical_names.push(copy_text_value(name, budget)?);
+    }
+    let mut pending_count = 0usize;
+    for name in &working.pending_save_token_components {
+        if !contains_component_name(&physical_names, name, budget)? {
+            pending_count = pending_count.checked_add(1).ok_or(Error::InvalidSource)?;
+        }
+    }
+    let component_count = physical_names
+        .len()
+        .checked_add(pending_count)
+        .ok_or(Error::InvalidSource)?;
+    if component_count == 0 {
+        return Ok(());
+    }
+    let mut component_names = Vec::new();
+    let component_pointer_bytes = component_count
+        .checked_mul(size_of::<Box<str>>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(component_pointer_bytes)?;
+    component_names
+        .try_reserve_exact(component_count)
+        .map_err(|_| Error::Allocation {
+            amount: component_pointer_bytes,
+        })?;
+    for name in physical_names {
+        component_names.push(name);
+    }
+    for name in working.pending_save_token_components.drain(..) {
+        if !contains_component_name(&component_names, &name, budget)? {
+            component_names.push(name);
+        }
+    }
+    metadata::advance_save_tokens(source, working, &component_names, budget)?;
     Ok(())
 }
 
-fn advance_selected_save_token(
-    source: &Package,
-    working: &mut WorkingSet<'_>,
-    selection: &Selection,
+fn contains_component_name(
+    names: &[Box<str>],
+    candidate: &str,
     budget: &mut Budget,
-) -> Result<(), Error> {
-    budget.charge_allocations(selection.component_name.len())?;
-    let component_name: Box<str> = selection.component_name.as_ref().into();
-    metadata::advance_save_tokens(
-        source,
-        working,
-        std::slice::from_ref(&component_name),
-        budget,
-    )
+) -> Result<bool, Error> {
+    for name in names {
+        budget.charge_wire_work(1)?;
+        if name.as_ref() == candidate {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn rewrite_root_in_place(
@@ -997,37 +1431,50 @@ fn rewrite_root_in_place(
     Ok(())
 }
 
-fn clone_root_with_text_and_uuid(
-    source: &Package,
+fn clone_root_with_text<'source>(
+    source: &'source Package,
     working: &mut WorkingSet<'_>,
     selection: &Selection,
     old_identifier: u64,
     new_identifier: u64,
     text: &str,
-    uuid: UuidSnapshot,
     budget: &mut Budget,
-) -> Result<(), Error> {
-    let facts = clone_storage_object_with_uuid(
-        source,
-        working,
-        old_identifier,
-        new_identifier,
-        uuid,
-        budget,
-    )?;
-    let component = copy_component_name(object_component(source, old_identifier)?, budget)?;
+) -> Result<PendingStorageClone<'source>, Error> {
+    let clone = clone_storage_object(source, working, old_identifier, new_identifier, budget)?;
+    let component = copy_component_name(clone.component, budget)?;
     let archive = working.load(component.as_str(), budget)?;
     let (index, payload) = storage_message(archive, new_identifier)?;
+    let facts = decode_payload(new_identifier, payload, budget)?;
     let wire_limits = source
         .semantic_wire_limits()
         .map_err(|_| Error::InvalidSource)?;
     let data = patch_text(payload, facts.text.is_some(), text, wire_limits, budget)?;
     replace_message(archive, new_identifier, index, data, source, budget)?;
     let _ = selection;
-    Ok(())
+    Ok(clone)
 }
 
-fn clone_storage_object(
+fn clone_storage_object<'source>(
+    source: &'source Package,
+    working: &mut WorkingSet<'_>,
+    old_identifier: u64,
+    new_identifier: u64,
+    budget: &mut Budget,
+) -> Result<PendingStorageClone<'source>, Error> {
+    let component = object_component(source, old_identifier)?;
+    let source_object = source.object(old_identifier).ok_or(Error::InvalidSource)?;
+    let (_, payload) = storage_message_in_object(source_object)?;
+    let facts = decode_payload(old_identifier, payload, budget)?;
+    clone_storage_object_raw(source, working, old_identifier, new_identifier, budget)?;
+    Ok(PendingStorageClone {
+        component,
+        old_identifier,
+        old_uuid: facts.uuid,
+        new_identifier,
+    })
+}
+
+fn clone_storage_object_raw(
     source: &Package,
     working: &mut WorkingSet<'_>,
     old_identifier: u64,
@@ -1115,25 +1562,24 @@ fn insert_storage_object(
         .map_err(|_| Error::InvalidSource)
 }
 
-fn clone_storage_object_with_uuid(
-    source: &Package,
-    working: &mut WorkingSet<'_>,
-    old_identifier: u64,
-    new_identifier: u64,
-    uuid: UuidSnapshot,
+fn push_pending_storage_clone<'source>(
+    pending: &mut Vec<PendingStorageClone<'source>>,
+    clone: PendingStorageClone<'source>,
     budget: &mut Budget,
-) -> Result<StorageFacts, Error> {
-    clone_storage_object(source, working, old_identifier, new_identifier, budget)?;
-    let component = copy_component_name(object_component(source, old_identifier)?, budget)?;
-    let archive = working.load(component.as_str(), budget)?;
-    let (index, payload) = storage_message(archive, new_identifier)?;
-    let facts = decode_payload(new_identifier, payload, budget)?;
-    let wire_limits = source
-        .semantic_wire_limits()
-        .map_err(|_| Error::InvalidSource)?;
-    let data = patch_uuid(payload, facts.uuid.is_some(), uuid, wire_limits, budget)?;
-    replace_message(archive, new_identifier, index, data, source, budget)?;
-    Ok(facts)
+) -> Result<(), Error> {
+    let pointer_bytes = pending
+        .len()
+        .checked_add(1)
+        .and_then(|length| length.checked_mul(size_of::<PendingStorageClone<'_>>()))
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(pointer_bytes)?;
+    pending
+        .try_reserve_exact(1)
+        .map_err(|_| Error::Allocation {
+            amount: pointer_bytes,
+        })?;
+    pending.push(clone);
+    Ok(())
 }
 
 fn rewrite_root_replies(
@@ -1947,8 +2393,14 @@ fn cleanup_old_graph(
         }
     }
     if removed.is_empty() {
-        return advance_selected_save_token(source, working, selection, budget);
+        return Ok(());
     }
+
+    // Reject the complete physical deletion set before any archive or
+    // PackageMetadata identity mutation. UUID-less/unregistered storage has no
+    // identity helper witness, so a current data-owner must fail closed rather
+    // than survive as a dangling metadata edge.
+    metadata::reject_data_reference_owners_for_removed_objects(source, working, &removed, budget)?;
 
     // Remove an existing optional PackageMetadata object-to-UUID witness before
     // deleting its archive object. Native sources may carry only the payload
@@ -2019,14 +2471,7 @@ fn cleanup_old_graph(
         }
     }
     metadata::release_identifier_suffix(working, &suffix_removed, budget)?;
-    budget.charge_allocations(selection.component_name.len())?;
-    let component_name: Box<str> = selection.component_name.as_ref().into();
-    metadata::advance_save_tokens(
-        source,
-        working,
-        std::slice::from_ref(&component_name),
-        budget,
-    )
+    Ok(())
 }
 
 fn replace_message(

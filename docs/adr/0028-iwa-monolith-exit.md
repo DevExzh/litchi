@@ -10334,29 +10334,74 @@ CRUD evidence is tracked per operation below; cross-component parity, rooted-
 registry policy, host method retirement, and the generic Keynote cleanup
 debt remain open. No monolith-exit gate or ordered migration debt closes here.
 
-### Scope correction: cross-component parity remains pending
+### Scope correction: cross-component contract is bounded; native parity remains pending
 
 The host audit confirms package-global comment graph resolution: legacy editor
 routes can follow a comment root or reply whose archive component differs from
-the selected drawable's component. The focused direct-drawable owner keeps an
-explicit same-component contract until that behavior has a designed semantic
-API and native proof. It rejects foreign component dependencies with the typed
-admission error without publishing a candidate, and boundary tests fail closed if
-either the drawable or comment/reply locality guard is removed.
+the selected drawable's component. The focused direct-drawable owner now has a
+separate package-scope graph plan for that topology. Each comment-storage node
+retains a `CommentStorageLocation` witness and the reader checks that witness
+against the current archive object before decoding it. The lifecycle clone and
+removal owner continues to use the strict same-component plan.
 
-Cross-component parity remains pending; focused shared-root and shared-reply
-tests cover same-component copy-on-write and cleanup only. All seven legacy
-host comment methods remain retained for this migration turn:
+Slide membership remains the source-order list of unique IDs in the selected
+slide. The selected drawable's actual archive component is resolved from that
+ID, so component placement does not change selector order. Direct-user counts
+scan every component and the complete ArchiveInfo reference census; an opaque
+or header-only incoming owner adds to the count and therefore preserves
+copy-on-write. Unknown core metadata still fails closed.
+
+The focused graph uses `plan_comment_graph_cross_component` with root-extension
+preservation. The rooted author registry remains authoritative; only an absent
+optional `Document -> TSA -> TSK` (`3 -> 1 -> 7`) reference permits a bounded
+global type-213 fallback. Zero fallback sources preserve supported authorless
+creation; ambiguous or malformed fallback sources remain fail-closed. Native
+cross-component parity and rooted-registry fixture proof remain pending. All
+seven legacy host comment methods remain retained for
+this migration turn:
 `slide_drawable_comment`, `set_slide_drawable_comment`,
 `clear_slide_drawable_comment`, `slide_drawable_comment_replies`,
 `add_slide_drawable_comment_reply`, `set_slide_drawable_comment_reply`, and
 `remove_slide_drawable_comment_reply`. Local native or focused progress does
-not retire a host route or close a monolith-exit debt.
+not retire a host route or close a monolith-exit debt. Generic shared host
+comment cleanup remains a separate migration responsibility.
 
-Author-storage provenance follows the same boundary: the compatibility host
-may scan globally for a unique type-213 object, while the focused owner only
-accepts the rooted Keynote `Document` -> `TSA` -> `TSK` path (`3` -> `1` ->
-`7`) and does not silently adopt an unrooted registry.
+### Current cross-component implementation verification (native gate pending)
+
+The focused implementation checks currently pass 12/12 local-graph cases,
+5/5 rooted-author-registry cases, and 7/7 cross-component cases, including
+four payload UUID/map combinations and current-data-owner atomic rejection. The broader
+Keynote library run passes 281 cases and the old-host compatibility run passes
+9/9 cases. These results cover the package-scope reader, copy-on-write engine,
+per-component metadata transitions, authorless fallback, and source
+immutability checks. The registered-reply path now passes focused strict UUID
+and reachable-graph checks: removal atomically preserves UUID/current-
+dependency state, the original source-edge probe preserves optional clone-edge
+presence, and final token accounting marks early-removed sources; registered
+ordinal-0 set/remove and its exact inverse pass. The host backend comparison
+now passes 6/6 cases. It retains one known legacy variance in generic
+registered-reply set (the old orphan remains while the replacement clone is
+unregistered), so no byte/identity parity claim is made. Remove and clear
+retain exactly one generated type-212 author plus its registry reference while
+focused graph cleanup removes it; selected-thread author payload bytes,
+unrelated authors, semantic values, non-comment objects, metadata, save tokens,
+UUIDs, and liveness remain strict. Unregistered and UUID-less storage with a
+`DataReference` owner is covered by the current data-owner atomic rejection.
+The final ASAN run passes 128 executions in 321 seconds at 647 MiB, including
+registered ordinal-0 SetReply/RemoveReply and exact inverse restoration.
+Normal commit hooks pass Rust formatting, workspace lint, all-feature workspace
+library/integration tests, and documentation tests. The boundary suite passes
+997 tests; the full scanner reports 64 packages, 238 dependency edges, and
+11 explicit migration debts. Scoped `cargo clean` for Keynote, the legacy IWA
+host, and the protobuf crate reclaimed 3.4 GiB. This turn's owned scratch files
+and sanitizer target (1.70 GiB logical bytes), generated fuzz lock, and empty
+artifact directories were removed; permanent fixtures and corpus seeds remain.
+Computer Use reached the Keynote theme chooser during native verification,
+but no foreign-topology candidate was opened or
+verified because subsequent Open-dialog inspection repeatedly failed with
+`SCStreamError -3802`. No native receipt is recorded. The seven legacy host
+comment methods remain retained, and the prior same-component sanitizer and
+hook receipts do not satisfy this native gate.
 
 ### Operation ledger: direct-drawable comment CRUD closeout
 
@@ -10364,6 +10409,16 @@ Native probing remains operation-specific so partial evidence does not become
 a generic CRUD claim. The six native candidate gates below are closed by the
 strict `native_resaved_drawable_comment_candidates_read_back` readback, which
 also checks the baseline slide names, titles, and movie summaries:
+
+These six receipts cover the existing same-component candidate layouts. They do
+not exercise foreign drawable, root, or reply components. A separate native
+cross-component fixture must be saved, actually closed, reopened at its exact
+path, and read back before that topology is treated as parity evidence.
+
+No cross-component native receipt or completion claim is recorded here yet;
+the prior same-component
+`native_resaved_drawable_comment_candidates_read_back` receipt remains
+unchanged and does not satisfy this gate.
 
 | Operation | Current evidence/status |
 | --- | --- |
@@ -10380,10 +10435,11 @@ cross-component or rooted-registry debt.
 
 The comment payload policy is intentionally split at this boundary. Media
 lifecycle cloning reconstructs selected payloads and retains the strict
-`CommentGraphPayloadPolicy::Strict` plan. Focused drawable-comment CRUD uses
-`plan_comment_graph_preserving_extensions`: unknown root fields remain opaque
-source bytes for the wire-preserving rewrite, while nested date/reference/UUID
-envelopes and the exact ArchiveInfo reference census remain strict. Permanent
-regressions prove root/reply extension preservation and atomic rejection of
-unknown archive-header metadata. The corrected owner passes a bounded 128-run
-ASAN smoke in 194 seconds, reaching 547 MiB RSS.
+`CommentGraphPayloadPolicy::Strict` same-component plan. Focused
+drawable-comment CRUD uses `plan_comment_graph_cross_component` with
+`CommentGraphPayloadPolicy::PreserveRootExtensions`: unknown root fields remain
+opaque source bytes for the wire-preserving rewrite, while nested
+date/reference/UUID envelopes and the exact ArchiveInfo reference census remain
+strict. Permanent regressions prove root/reply extension preservation and
+atomic rejection of unknown archive-header metadata. Native cross-component
+save/close/reopen parity is still a separate gate.
