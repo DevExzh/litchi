@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Existing DOCX logical append baseline and attribution (0479)
+
+[0479](changes/0479-docx-tail-append-baseline.md) adds total and phase observations for one existing-document paragraph
+append. At 131,072 source paragraphs, normal mean latency is 271.346097 and
+271.230824 ms across two process repeats; incremental operation heap is
+41,793,870 bytes with zero live-byte exit delta. These are baseline costs,
+with no before/after speedup or bounded-memory claim. All individual sizes,
+phases, allocations, logical I/O and wider-process profiles are retained.
+The goal remains open; source-window append requires additional work.
+
 ## Public PPTX generated-name metadata scratch implemented (0478)
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) adds an explicit provider

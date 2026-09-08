@@ -1,0 +1,11 @@
+
+running 6 tests
+test changed_live_source_version_is_rejected_before_publication_output ... ok
+test durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound ... ok
+test invalid_positions_operation_and_resource_limits_leave_projection_unchanged ... ok
+test publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact ... ok
+test empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing ... ok
+test removes_first_middle_last_and_the_only_paragraph_exactly ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

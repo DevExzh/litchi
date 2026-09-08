@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0479: existing DOCX single-paragraph tail append
+
+[0479](changes/0479-docx-tail-append-baseline.md) adds a baseline of the public source-backed paragraph-copy transaction
+at 64 / 8,192 / 131,072 paragraphs. Two reversed process repeats, normal and
+allocator builds, total and six-phase observation modes provide 24 reports and
+720 formal samples. Normal total means are 0.169641 / 0.169123 ms,
+17.011582 / 16.251897 ms and 271.346097 / 271.230824 ms respectively.
+Incremental operation heap peaks are 509,974 / 3,071,310 / 41,793,870 bytes.
+Full-process RSS and CPU/syscall profiles have a wider scope than each timed
+operation. The linked change records corpus, commands, uncertainty and limits.
+
 ## 0478: public PPTX metadata-storage policies
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) compares the ordinary

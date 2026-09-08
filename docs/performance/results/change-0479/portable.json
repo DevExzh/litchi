@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "{\"captures\": 24, \"closure\": {\"evidence_helpers\": 18, \"live_cleanup\": \"pass\", \"profiles\": \"pass\"}, \"data_only\": false, \"protocol_sha256\": \"99b75c3d91c972dad834118e4da7a91a18e3b1cdf847cdfe7661dee1c56a6cdb\", \"rust_validation\": {\"receipts\": 30, \"required_success\": 16}, \"samples\": 720, \"schema\": \"docx-plain-paragraph-tail-append-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"failed\": 4, \"successful\": 26, \"total\": 30}}\n"
+  },
+  "original_runtime_binaries_absent": true,
+  "probes": {
+    "allocator_live_exit": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0479-portable-o6rng4uy/bundle/captures/r1-allocator-64-total.report.json.total_samples[0].allocation: total lifecycle did not return to its entry live bytes\n",
+      "stdout": ""
+    },
+    "final_gate_exclusion": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation required source exclusions: harness-tests-final\n",
+      "stdout": ""
+    },
+    "instrumentation": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0479-portable-o6rng4uy/bundle/captures/r1-normal-64-total.report.json.binary: instrumentation identity differs\n",
+      "stdout": ""
+    },
+    "output_digest": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0479-portable-o6rng4uy/bundle/captures/r1-normal-64-total.report.json.total_samples[0].sink: sink digest differs from candidate archive\n",
+      "stdout": ""
+    },
+    "profile_arithmetic": {
+      "exit_code": 1,
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 546, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 538, in main\n    print(json.dumps(verify_bundle(args.root, data_only=args.data_only), sort_keys=True))\n                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 528, in verify_bundle\n    closure_result = closure.check(root, complete=True)\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/closure.py\", line 53, in check\n    v._compare(module.derive(root), read('profile-summary.json'), 'profile summary')\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 460, in _compare\n    _compare(expected[key], actual[key], f\"{label}.{key}\")\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 460, in _compare\n    _compare(expected[key], actual[key], f\"{label}.{key}\")\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 460, in _compare\n    _compare(expected[key], actual[key], f\"{label}.{key}\")\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 456, in _compare\n    require(expected == actual or abs(float(expected) - float(actual)) <= 1e-9 * max(1.0, abs(float(expected)), abs(float(actual))), f\"{label}: numeric value differs\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 53, in require\n    fail(message)\n    ~~~~^^^^^^^^^\n  File \"/tmp/litchi-goal-0479-portable-o6rng4uy/bundle/verify.py\", line 48, in fail\n    raise VerificationError(message)\nverify.VerificationError: profile summary.perf_stat.derived.instructions_per_cycle: numeric value differs\n",
+      "stdout": ""
+    },
+    "required_gate_omitted": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation required labels differ\n",
+      "stdout": ""
+    },
+    "source_reads": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0479-portable-o6rng4uy/bundle/captures/r1-normal-64-total.report.json.total_samples[0].source_reads: logical-read request histogram does not sum to calls\n",
+      "stdout": ""
+    },
+    "summary_arithmetic": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: summary.rows.r1-normal-64-total.elapsed_ns.mean: numeric value differs\n",
+      "stdout": ""
+    }
+  },
+  "status": "pass",
+  "temporary_copy_removed": true,
+  "validation_seal_sha256": "3b26635cbfa4f6f3feab21451ff14ebb06a753bd325cd576b7a3c563ff9018fd"
+}

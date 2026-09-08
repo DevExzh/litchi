@@ -1,0 +1,26 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+   --> src/docx_plain_paragraph_tail_append.rs:537:22
+    |
+537 |     let paragraphs = document.paragraphs()?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^ the `?` operator cannot be applied to type `Vec<litchi_docx::Paragraph>`
+    |
+    = help: the nightly-only, unstable trait `Try` is not implemented for `Vec<litchi_docx::Paragraph>`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error

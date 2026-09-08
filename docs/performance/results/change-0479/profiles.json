@@ -1,0 +1,57 @@
+{
+  "binary": {
+    "build_gate": "normal-build.json",
+    "build_gate_sha256": "2b17b9fcd03d16549a8b64b5865ed65fdd3ab7ed6cffaf190948dbac41e1a481",
+    "bytes": 417455632,
+    "embedded_inputs": {
+      "bytes": 2045,
+      "path": "embedded-inputs.json",
+      "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+    "sha256": "a90fd6934985f7763414d1f4d5ac98d87312ea031e87812aa52cb0270042112f",
+    "source_manifest_sha256": "1e507ffe4d143b8d7a6907a164e9ab248b04d52fa0be94ca64dd27fb7856aa9a"
+  },
+  "formal_samples": false,
+  "records": {
+    "perf-record": {
+      "exit_code": 0,
+      "path": "validation/profile-perf-record.json",
+      "sha256": "e39354570e6c0d2c06313144ce4d4c6fd4aec0c84996f257a09ff275512bee18"
+    },
+    "perf-report": {
+      "exit_code": 0,
+      "path": "validation/profile-perf-report.json",
+      "sha256": "60f960015d491fdfa6b1f07562d0ecbe173ae915c4f3f79dbe9b04e86da690bd"
+    },
+    "perf-script": {
+      "exit_code": 0,
+      "path": "validation/profile-perf-script.json",
+      "sha256": "c98f6a8ed569f587ea15330178bca98387b50cb16ba0f6c3d4c1a8f0c76a89d0"
+    },
+    "perf-stat": {
+      "exit_code": 0,
+      "path": "validation/profile-perf-stat.json",
+      "sha256": "d661169d5b5dad0721bbd8c22e9b7cc8d20abd229228f015cd60bccda805f746"
+    },
+    "raw_profile": {
+      "compressed": {
+        "bytes": 20560,
+        "sha256": "20c156ee2469d29b5d79daefe66dcf9d3380b38d593d8bc8c296defa03aead4f"
+      },
+      "uncompressed": {
+        "bytes": 221608,
+        "sha256": "0d4e5b033aad94e068898fcdf4093881a268a9ff69b84ba3d03a50d5100333a6"
+      }
+    },
+    "strace": {
+      "exit_code": 0,
+      "path": "validation/profile-strace.json",
+      "sha256": "bd2961f964b3a6801b11be63938ab3f35cb3bd4a1cdef57fd0576defacb36aac"
+    }
+  },
+  "schema": "docx-plain-paragraph-tail-append-profiles-v1",
+  "scope": "whole process including corpus generation, oracles, warmup, measured lifecycles, report serialization and teardown",
+  "status": "pass"
+}

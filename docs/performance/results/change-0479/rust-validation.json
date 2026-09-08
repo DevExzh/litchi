@@ -1,0 +1,574 @@
+{
+  "attempts": {
+    "analyze": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0479/analyze.py"
+      ],
+      "exit_code": 1,
+      "path": "validation/analyze.json",
+      "sha256": "e8d2274465d4111c717e2121bd2896913a9d85ad4b9cbb7b8d6523e08f7767fc",
+      "source_unchanged": true
+    },
+    "analyze-final": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0479/analyze.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/analyze-final.json",
+      "sha256": "c95a3b804f2369eda350b4d71130bd60e8a5b8def379d77ff2167eba42d3ad19",
+      "source_unchanged": true
+    },
+    "boundaries": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/boundaries.json",
+      "sha256": "6d88412a9ea753dc68eec526ed64d5a2cf7cdfd66bb3163c045de8a46a55a8cb",
+      "source_unchanged": true
+    },
+    "build-allocator": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-allocator.json",
+      "sha256": "47c562bdc17928537d10161478932073aebb955b49d6c8c81295b450e7eefd2d",
+      "source_unchanged": true
+    },
+    "build-normal": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-normal.json",
+      "sha256": "ddcd2de7d3c4ca0a4b5e74ec56725b6d94c3d80d1b2729e52e408604419306ec",
+      "source_unchanged": true
+    },
+    "docx-paragraph-copy": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "source_backed_paragraph_copy"
+      ],
+      "exit_code": 0,
+      "path": "validation/docx-paragraph-copy.json",
+      "sha256": "28fdbda37aaa44b702099d14dc3896527f1f964d71527b85a1bd50f61429ac9e",
+      "source_unchanged": true
+    },
+    "docx-paragraph-removal": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "source_backed_paragraph_removal"
+      ],
+      "exit_code": 0,
+      "path": "validation/docx-paragraph-removal.json",
+      "sha256": "883391c1d3fc76815394900a6292a706e923a31417d4f2b4b6656f288d2b83bf",
+      "source_unchanged": true
+    },
+    "evidence-tests": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0479",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests.json",
+      "sha256": "223baca339407a402bce2a11a1c2a3bff4ed28bed75db4fd15b7cf94b5450b87",
+      "source_unchanged": true
+    },
+    "evidence-tests-final": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0479",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests-final.json",
+      "sha256": "74699642f84e4ef206dfac7be8302ed4845b078c9a7e6290636b589aff485b82",
+      "source_unchanged": true
+    },
+    "harness-clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy.json",
+      "sha256": "9bd0af06f0eac368f1753e25b43fa82d97d4a5d8d0a1e5f32463caa05b84a485",
+      "source_unchanged": true
+    },
+    "harness-clippy-final": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-clippy-final.json",
+      "sha256": "072710633f9c5973ce607ef8e47188c27282a512aefdd205ced9185535b03a0a",
+      "source_unchanged": true
+    },
+    "harness-dev-01": {
+      "argv": [
+        "cargo",
+        "check",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-dev-01.json",
+      "sha256": "c3c5ee3c12e5050ae88dfd64c30762cde254b056eda9aad853f8e765b0957d46",
+      "source_unchanged": true
+    },
+    "harness-dev-02": {
+      "argv": [
+        "cargo",
+        "check",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 101,
+      "path": "validation/harness-dev-02.json",
+      "sha256": "785edf713e6f43bf57dd27363dd8c45882447cec5acdafdd9e6b9463989da378",
+      "source_unchanged": true
+    },
+    "harness-dev-03": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-dev-03.json",
+      "sha256": "de5a9fc1d08717e997b91b854ead3791a3a5d4ad23cdf3bac112618841cfe2e5",
+      "source_unchanged": true
+    },
+    "harness-dev-04": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-dev-04.json",
+      "sha256": "3f419e5c507eed3ea95b9e672f7ab152ea6d857f8b3c6199622a6cb90b7ad3c2",
+      "source_unchanged": true
+    },
+    "harness-format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 1,
+      "path": "validation/harness-format.json",
+      "sha256": "b663806713f1ca722ed899a8fec0ff29c973f245084272c1cb050dced63adc10",
+      "source_unchanged": true
+    },
+    "harness-format-final": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-format-final.json",
+      "sha256": "a039f4073ea0eec58f0c3c8d5a6137241d1d58dfe846cc43b3eccc1e08b30138",
+      "source_unchanged": true
+    },
+    "harness-rustdoc": {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-rustdoc.json",
+      "sha256": "0ba13c1b10208f29c0ef70b79f1f5dc5c90db894c17616066e8116c0fdd733ae",
+      "source_unchanged": true
+    },
+    "harness-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-tests.json",
+      "sha256": "606ff1ab07924a8208923371e1d0b963a36a0d23cff3716c44ceb1b495c22c6d",
+      "source_unchanged": true
+    },
+    "harness-tests-final": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--bin",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-tests-final.json",
+      "sha256": "27880b4ff4e0ecca33c61268f1ea384fe6d3dd464ac66914bee30719b7350c35",
+      "source_unchanged": true
+    },
+    "pilot-allocator-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0479/allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/pilot-allocator-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator-phases.json",
+      "sha256": "c2c1866cc9dfccce16897c0b19ce98b276c39fdba3a24083ff498541c1fdc84d",
+      "source_unchanged": true
+    },
+    "pilot-allocator-total": {
+      "argv": [
+        "/tmp/litchi-goal-0479/allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/pilot-allocator-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-allocator-total.json",
+      "sha256": "a00dd48451cd4599435471bacec9dd388ce31ec0c186ba41fc5a68b9a77bd517",
+      "source_unchanged": true
+    },
+    "pilot-normal-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/pilot-normal-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal-phases.json",
+      "sha256": "ea595df92a297a13f93dc73e43f8445773bb82679a787fa2a314251a0c8dbf36",
+      "source_unchanged": true
+    },
+    "pilot-normal-total": {
+      "argv": [
+        "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/pilot-normal-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-normal-total.json",
+      "sha256": "0532f2aed9ad62ab24ddf10b503506dd678c3a87e4539611e0171f83dd310954",
+      "source_unchanged": true
+    },
+    "profile-perf-record": {
+      "argv": [
+        "/usr/bin/taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "--call-graph",
+        "fp",
+        "-F",
+        "99",
+        "-o",
+        "/tmp/litchi-goal-0479/perf.data",
+        "--",
+        "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+        "--mode",
+        "total",
+        "--counts",
+        "131072",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/profiles/perf-record.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-perf-record.json",
+      "sha256": "e39354570e6c0d2c06313144ce4d4c6fd4aec0c84996f257a09ff275512bee18",
+      "source_unchanged": true
+    },
+    "profile-perf-report": {
+      "argv": [
+        "perf",
+        "report",
+        "--stdio",
+        "--no-children",
+        "--percent-limit",
+        "0",
+        "-i",
+        "/tmp/litchi-goal-0479/perf.data"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-perf-report.json",
+      "sha256": "60f960015d491fdfa6b1f07562d0ecbe173ae915c4f3f79dbe9b04e86da690bd",
+      "source_unchanged": true
+    },
+    "profile-perf-script": {
+      "argv": [
+        "perf",
+        "script",
+        "-i",
+        "/tmp/litchi-goal-0479/perf.data"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-perf-script.json",
+      "sha256": "c98f6a8ed569f587ea15330178bca98387b50cb16ba0f6c3d4c1a8f0c76a89d0",
+      "source_unchanged": true
+    },
+    "profile-perf-stat": {
+      "argv": [
+        "/usr/bin/taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/profiles/perf-stat.csv",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "--",
+        "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+        "--mode",
+        "total",
+        "--counts",
+        "131072",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/profiles/perf-stat.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-perf-stat.json",
+      "sha256": "d661169d5b5dad0721bbd8c22e9b7cc8d20abd229228f015cd60bccda805f746",
+      "source_unchanged": true
+    },
+    "profile-strace": {
+      "argv": [
+        "/usr/bin/taskset",
+        "-c",
+        "2",
+        "strace",
+        "-c",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/profiles/strace.txt",
+        "--",
+        "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+        "--mode",
+        "total",
+        "--counts",
+        "131072",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0479/profiles/strace.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-strace.json",
+      "sha256": "bd2961f964b3a6801b11be63938ab3f35cb3bd4a1cdef57fd0576defacb36aac",
+      "source_unchanged": true
+    },
+    "registry-strict": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "path": "validation/registry-strict.json",
+      "sha256": "57df734ac8ca13313aa78dfbb2ddc886505b6f83f95767f3961accffdaa99ac9",
+      "source_unchanged": true
+    }
+  },
+  "final_source_sha256": "1e507ffe4d143b8d7a6907a164e9ab248b04d52fa0be94ca64dd27fb7856aa9a",
+  "required": [
+    "harness-tests-final",
+    "harness-clippy-final",
+    "harness-format-final",
+    "harness-rustdoc",
+    "docx-paragraph-copy",
+    "docx-paragraph-removal",
+    "boundaries",
+    "registry-strict",
+    "evidence-tests-final",
+    "analyze-final",
+    "build-normal",
+    "build-allocator",
+    "pilot-normal-total",
+    "pilot-normal-phases",
+    "pilot-allocator-total",
+    "pilot-allocator-phases"
+  ],
+  "schema": "docx-plain-paragraph-tail-append-rust-validation-v1"
+}

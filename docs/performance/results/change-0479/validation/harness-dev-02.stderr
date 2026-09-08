@@ -1,0 +1,21 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0502]: cannot borrow `state.source` as mutable because it is also borrowed as immutable
+   --> src/docx_plain_paragraph_tail_append.rs:992:9
+    |
+984 |       let open = run_phase(
+    |                  --------- immutable borrow later used by call
+985 |           ReadObservation::default(),
+986 |           || {
+    |           -- immutable borrow occurs here
+987 | /             state
+988 | |                 .source
+    | |_______________________- first borrow occurs due to use of `state.source` in closure
+...
+992 |           || {
+    |           ^^ mutable borrow occurs here
+...
+996 |               state.source = Some(source);
+    |               ------------ second borrow occurs due to use of `state.source` in closure
+
+For more information about this error, try `rustc --explain E0502`.
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error
