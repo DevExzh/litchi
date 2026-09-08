@@ -3289,7 +3289,7 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         + "pub fn edit_slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MovieGeometry) -> Result<SlideMovieGeometryEdit, Error> { let _ = (slide, movie, value); todo!() }\n"
         + "pub fn apply_slide_movie_geometry(&self, patch: &SlideMovieGeometryPatch) -> Result<SlideMovieGeometryCommit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideMovieGeometryEdit { pub fn set(self, value: MovieGeometry) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMovieGeometryCommit, Error> { todo!() } }\n",
+        + "impl SlideMovieGeometryEdit { pub fn set(self, value: MovieGeometry) -> Self { let _ = value; self } pub fn restore_original_size(self) -> Result<Self, Error> { Ok(self) } pub fn set_transform(self, value: MovieTransform) -> Result<Self, Error> { let _ = value; Ok(self) } pub fn flip(self, axis: MovieFlipAxis) -> Result<Self, Error> { let _ = axis; Ok(self) } pub fn commit(self) -> Result<SlideMovieGeometryCommit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]
@@ -3595,17 +3595,42 @@ def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
         + "fn set_angle_degrees() {} fn set_flags() {}\n",
         encoding="utf-8",
     )
+    # The expanded owner retires the migration-host geometry wrappers.  Keep
+    # the synthetic host source present so the completion audit exercises its
+    # production scan without requiring a compatibility module.
     host = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
     host.parent.mkdir(parents=True, exist_ok=True)
-    host.write_text(
-        "impl KeynoteEditor {\n"
-        "    pub fn slide_movie_geometry_by_selector(&self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.slide_movie_geometry(slide, movie); }\n"
-        "    pub fn set_slide_movie_geometry_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
-        "    pub fn restore_slide_movie_original_size_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
-        "    pub fn flip_slide_movie_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
+    host.write_text("pub fn slide_movies(&self) {}\n", encoding="utf-8")
+
+    native_test = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE
+    native_test.parent.mkdir(parents=True, exist_ok=True)
+    native_test.write_text(
+        "const SOURCE: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-movie-geometry-source-native.key"\n'
+        ");\n"
+        "const CANDIDATE: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-movie-geometry-focused-native.key"\n'
+        ");\n"
+        "const VERTICAL_CANDIDATE: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-movie-geometry-vertical-focused-native.key"\n'
+        ");\n"
+        "#[test]\n"
+        "fn native_arrange_oracle_retains_original_size_rotation_and_reflection() {\n"
+        "    let _ = (SOURCE, CANDIDATE, VERTICAL_CANDIDATE, MovieSelector::index(4));\n"
+        "    edit.restore_original_size().unwrap();\n"
+        "    edit.flip(MovieFlipAxis::Horizontal).unwrap();\n"
+        "    patch.inverse();\n"
+        "}\n"
+        "#[test]\n"
+        "fn native_geometry_saved_candidates_remain_editable_and_reversible() {\n"
+        "    let _ = (CANDIDATE, VERTICAL_CANDIDATE);\n"
         "}\n",
         encoding="utf-8",
     )
+    for fixture, _test_name in boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE:
+        fixture_path = root / fixture
+        fixture_path.parent.mkdir(parents=True, exist_ok=True)
+        fixture_path.write_bytes(b"synthetic-native-keynote-fixture")
 
 
 def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
@@ -21350,6 +21375,72 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("rewrite_movie_geometry" in item for item in violations), violations)
             self.assertTrue(any("rewrite_movie_transform" in item for item in violations), violations)
             self.assertTrue(any("direct codec rewrite" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_completion_requires_native_source_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_completion_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+
+            native_test = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE
+            native_test.unlink()
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing its native integration test" in item for item in violations), violations)
+
+            add_keynote_movie_geometry_completion_scaffold(root)
+            fixture, _test_name = boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE[0]
+            (root / fixture).unlink()
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
+
+            add_keynote_movie_geometry_completion_scaffold(root)
+            candidate, _test_name = boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE[1]
+            (root / candidate).unlink()
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
+
+            add_keynote_movie_geometry_completion_scaffold(root)
+            vertical, _test_name = boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE[2]
+            (root / vertical).unlink()
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_completion_ratchets_typed_restore_and_source_order(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_completion_scaffold(root)
+            native_test = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE
+            source = native_test.read_text(encoding="utf-8")
+
+            native_test.write_text(
+                source.replace("MovieSelector::index(4)", "MovieSelector::index(2)"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("source-order selector" in item for item in violations), violations)
+
+            native_test.write_text(
+                source.replace(".restore_original_size()", ".set(MovieGeometry::default())"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("original-size restore" in item for item in violations), violations)
+
+            host = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "pub fn restore_slide_movie_original_size_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("selector wrapper restore_slide_movie_original_size_by_selector" in item for item in violations), violations)
 
     def test_keynote_slide_table_title_facade_is_dormant_then_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

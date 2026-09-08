@@ -30,3 +30,12 @@ Run its bounded smoke pass with:
 ```sh
 cargo +nightly fuzz run keynote_slide_movie_creation -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
 ```
+
+The `keynote_slide_movie_geometry` target uses the fresh native movie fixture
+to exercise all-media source-order selection, composed geometry and transform
+edits, original-size restoration, exact replay, and inverse restoration.  Run
+its focused smoke pass with:
+
+```sh
+cargo +nightly fuzz run keynote_slide_movie_geometry -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
+```

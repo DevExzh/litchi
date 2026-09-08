@@ -91,7 +91,7 @@ use crate::show::{Mode, Settings, Show, Size};
 use crate::{
     AnimationType, Build, Document, DocumentStats, MovieInfo, MovieKind, Seconds, Slide,
     Transition,
-    slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume},
+    slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume, geometry::MovieTransform},
     slide::media::{Point as MediaPoint, Size as MediaSize},
     transition::Effect,
 };
@@ -253,6 +253,7 @@ const NOTE_MESSAGE_TYPE: u32 = 15;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const MOVIE_REFLECTION_FLAG: u32 = 1 << 2;
 
 /// A result returned by a native Keynote package operation.
 type ReadResult<T> = Result<T, ReadError>;
@@ -2628,10 +2629,21 @@ fn decode_movie_info(
     } else {
         MovieKind::File
     };
+    let transform = match (movie.geometry_flags, movie.geometry_angle) {
+        (None, None) => None,
+        (flags, angle) => Some(
+            MovieTransform::new(
+                angle.unwrap_or(0.0),
+                flags.unwrap_or_default() & MOVIE_REFLECTION_FLAG != 0,
+            )
+            .map_err(|error| ReadError::InvalidFormat(error.to_string()))?,
+        ),
+    };
     let playback = decode_movie_playback(&movie)?;
     Ok((
         MovieInfo::from_parts(kind, position, size, natural_size, playback)
-            .with_original_size(original_size),
+            .with_original_size(original_size)
+            .with_transform(transform),
         movie.data_references,
     ))
 }
@@ -5591,8 +5603,90 @@ mod tests {
                 height: 360.0
             })
         );
+        assert_eq!(summary.transform(), None);
         assert_eq!(summary.duration(), Some(Duration::from_secs(3)));
         assert_eq!(references, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn movie_projection_decodes_optional_transform_controls()
+    -> Result<(), Box<dyn std::error::Error>> {
+        fn length_delimited(number: u32, payload: &[u8]) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, (u64::from(number) << 3) | 2);
+            litchi_iwa_common::encode_varint_into(
+                &mut output,
+                u64::try_from(payload.len()).expect("test payload fits u64"),
+            );
+            output.extend_from_slice(payload);
+            output
+        }
+
+        fn fixed32(number: u32, value: f32) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, (u64::from(number) << 3) | 5);
+            output.extend_from_slice(&value.to_le_bytes());
+            output
+        }
+
+        fn varint(number: u32, value: u64) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, u64::from(number) << 3);
+            litchi_iwa_common::encode_varint_into(&mut output, value);
+            output
+        }
+
+        fn movie_payload(flags: Option<u32>, angle: Option<f32>) -> Vec<u8> {
+            let mut point = fixed32(1, 12.0);
+            point.extend(fixed32(2, 24.0));
+            let mut size = fixed32(1, 640.0);
+            size.extend(fixed32(2, 360.0));
+            let mut geometry = length_delimited(1, &point);
+            geometry.extend(length_delimited(2, &size));
+            if let Some(flags) = flags {
+                geometry.extend(varint(3, u64::from(flags)));
+            }
+            if let Some(angle) = angle {
+                geometry.extend(fixed32(4, angle));
+            }
+            let drawable_archive = length_delimited(1, &geometry);
+            let super_archive = length_delimited(1, &drawable_archive);
+            let data_reference = varint(1, 17);
+            let mut movie = super_archive;
+            movie.extend(length_delimited(14, &data_reference));
+            movie
+        }
+
+        fn decode_transform(payload: &[u8]) -> ReadResult<Option<MovieTransform>> {
+            decode_movie_info(
+                payload,
+                WireLimits::default(),
+                SemanticPath::SlideDrawable { slide: 0, index: 0 },
+            )
+            .map(|(summary, _references)| summary.transform())
+        }
+
+        assert_eq!(
+            decode_transform(&movie_payload(
+                Some(MOVIE_REFLECTION_FLAG | 0x20),
+                Some(45.0),
+            ))?,
+            Some(MovieTransform::new(45.0, true)?)
+        );
+        assert_eq!(
+            decode_transform(&movie_payload(Some(MOVIE_REFLECTION_FLAG), None))?,
+            Some(MovieTransform::identity().with_reflected(true))
+        );
+        assert_eq!(
+            decode_transform(&movie_payload(None, Some(17.5)))?,
+            Some(MovieTransform::new(17.5, false)?)
+        );
+        assert_eq!(decode_transform(&movie_payload(None, None))?, None);
+        assert!(matches!(
+            decode_transform(&movie_payload(None, Some(f32::NAN))),
+            Err(ReadError::InvalidFormat(_))
+        ));
         Ok(())
     }
 

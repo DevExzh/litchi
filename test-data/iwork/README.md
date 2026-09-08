@@ -1448,3 +1448,22 @@ to that movie and a valid PNG `tEXt` chunk before the poster's `IEND`, producing
 movie's playback control was activated without an error appearing. Both files
 retain the two original audio controls and two captioned movies, including
 the existing comment marker.
+
+## Keynote movie-geometry native gate (2026-09-08)
+
+These artifacts were inspected in Keynote 14.4 (7043.0.93) after native save,
+actual close to the theme chooser, exact-path reopen, and a second close. The
+source oracle records persisted Arrange rotation, reflection, displayed size,
+and original-size fields. The two focused candidates are native-saved outputs
+of the typed geometry transaction and cover horizontal and vertical reflection.
+
+| Fixture | SHA-256 | Native observations |
+| --- | --- | --- |
+| [slide-movie-geometry-source-native.key](keynote/slide-movie-geometry-source-native.key) | `30f5a18e66fc49fcdee759c7a61f7bda8d315c43e686334b314b8bce0a2e79f7` | Source-order movie 4 began at (321,42), 640×360; native Arrange saved 27.5° rotation, horizontal reflection, and 320×180 displayed/original size. |
+| [slide-movie-geometry-focused-native.key](keynote/slide-movie-geometry-focused-native.key) | `edd4faa11f363ac545a196bc74c94276db9826185d72c18653599999aa4314b1` | Archive position (450.5,120.25), 320×180, 27.5° rotation, horizontal reflection; Arrange bounding box (427.02089,56.53925). |
+| [slide-movie-geometry-vertical-focused-native.key](keynote/slide-movie-geometry-vertical-focused-native.key) | `5a388d0a6de951c6352b92195dfaba6b6e3a6004654cbb4b7c72ba2cf0bf454c` | Archive position (420,200), 480×270, 207.5° rotation, no reflection; Arrange bounding box (384.781337,104.433870). |
+
+The geometry boundary requires all three fixtures and their consuming native
+tests. This receipt covers the accepted file-movie fixture profile and the
+persisted Arrange transform fields; it does not establish parity for every
+native movie kind or unsupported geometry flag.

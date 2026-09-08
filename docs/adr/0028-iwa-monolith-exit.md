@@ -10166,3 +10166,66 @@ Final focused verification passes 49 integration cases across movie creation,
 audio creation, and movie captions, including all three native movie fixtures,
 both metadata-map admission profiles, and dangling header identity reservation.
 Strict workspace all-feature library Clippy passes with warnings denied.
+
+## 2026-09-08 focused Keynote movie-geometry owner extension and host retirement
+
+The focused `litchi-keynote::Package` movie-geometry transaction now stages
+`restore_original_size` from the selected movie's archive-free original-size
+metadata while preserving a caller's staged position and `MovieTransform`.
+Geometry selectors count the complete source-order `MovieArchive` sequence;
+selecting an audio, live-video, or placeholder at a file-movie position fails
+with a typed unsupported-dependency error instead of silently shifting to a
+later file movie. The selected original-size value is captured during the same
+bounded selection pass used by the edit, so restore does not consult a raw
+listing or perform a second identifier traversal.
+
+Computer Use produced the permanent native Arrange source oracle
+[`slide-movie-geometry-source-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-source-native.key)
+with Keynote 14.4 (7043.0.93). The file was saved, actually closed to the theme
+chooser, reopened from its exact path, inspected, and closed again. The fresh movie
+at source position 4 began at 640×360; native Arrange saved 27.5 degree
+rotation, horizontal reflection, and 320×180 original/displayed dimensions.
+Its SHA-256 is
+`30f5a18e66fc49fcdee759c7a61f7bda8d315c43e686334b314b8bce0a2e79f7`.
+The checked-in native geometry test consumes this oracle and the two accepted
+candidate fixtures. The horizontal candidate
+[`slide-movie-geometry-focused-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-focused-native.key)
+is 800,182 bytes with SHA-256
+`edd4faa11f363ac545a196bc74c94276db9826185d72c18653599999aa4314b1`.
+Its selected movie stores archive position (450.5, 120.25), displayed size
+320×180, 27.5 degree rotation, and horizontal reflection. Keynote's Arrange
+bounding box is (427.02089, 56.53925), reflecting the rotated presentation
+geometry rather than changing the semantic archive position.
+
+The vertical candidate
+[`slide-movie-geometry-vertical-focused-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-vertical-focused-native.key)
+is 799,074 bytes with SHA-256
+`5a388d0a6de951c6352b92195dfaba6b6e3a6004654cbb4b7c72ba2cf0bf454c`.
+Its selected movie stores archive position (420, 200), displayed size
+480×270, 207.5 degree rotation, and no reflection. Keynote's Arrange bounding
+box is (384.781337, 104.433870). Each candidate opened without repair, was
+saved, actually closed to the theme chooser, reopened from its exact path,
+inspected, and closed again.
+
+The four migration-host selector wrappers
+`slide_movie_geometry_by_selector`, `set_slide_movie_geometry_by_selector`,
+`restore_slide_movie_original_size_by_selector`, and
+`flip_slide_movie_by_selector` are retired. Raw media listing projections
+remain available for compatibility observations; geometry mutation and
+original-size restoration are package-owned. The boundary requires all three
+native fixtures and their consuming tests, so deleting a receipt cannot
+silently reopen the host route.
+
+This gate covers the accepted file-movie fixture profile and its persisted
+Arrange transform fields. It does not claim parity for every native movie
+kind, sparse producer, or unsupported geometry flag. No crate, manifest edge,
+migration debt, or monolith-exit condition closes here.
+
+Focused verification passes 32 geometry cases, 13 audio-position cases, three
+native geometry cases, and three movie projection cases. The boundary suite
+passes 987 tests, and the full audit retains 64 packages, 238 internal
+dependencies, and 11 migration debts. The optimized AddressSanitizer geometry
+fuzz target completes 256 inputs (coverage 8,927, features 10,958, reported RSS
+522 MB), including a mandatory native successful-edit contract. Configured
+resource ceilings are unchanged. The scoped fuzz build was cleaned, removing
+1.7 GiB of temporary build output.

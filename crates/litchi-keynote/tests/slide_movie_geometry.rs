@@ -12,7 +12,7 @@ use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{Package, ReadOptions};
+use litchi_keynote::{Package, ReadOptions, SlideMovieGeometryError};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";
@@ -418,6 +418,37 @@ fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec
     replace_document(source, archive)
 }
 
+fn with_style_message_type(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let style = archive
+        .object_mut(id)
+        .ok_or_else(|| io::Error::other("style"))?;
+    let message = style
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == 2_025)
+        .ok_or_else(|| io::Error::other("style message"))?;
+    message.type_ = message_type;
+    style.archive_info.message_infos[0].type_ = message_type;
+    replace_document(source, archive)
+}
+
+fn with_duplicate_style_message(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let style = archive
+        .object_mut(id)
+        .ok_or_else(|| io::Error::other("style"))?;
+    style.messages.push(RawMessage {
+        type_: message_type,
+        data: Vec::new(),
+    });
+    style
+        .archive_info
+        .message_infos
+        .push(MessageInfo::new(message_type, 0));
+    replace_document(source, archive)
+}
+
 #[derive(Clone, Copy)]
 enum ForeignInbound {
     Object,
@@ -470,6 +501,12 @@ fn with_transform_fields(
         .ok_or_else(|| io::Error::other("geometry"))?;
     geometry.flags = flags;
     geometry.angle = angle;
+    with_movie(source, id, movie.encode_to_vec())
+}
+
+fn with_original_size(source: &[u8], id: u64, size: Option<tsp::Size>) -> R<Vec<u8>> {
+    let mut movie = tsd::MovieArchive::decode(movie_payload_at(source, id)?.as_slice())?;
+    movie.original_size = size;
     with_movie(source, id, movie.encode_to_vec())
 }
 
@@ -795,8 +832,10 @@ fn reads_file_movies_with_audio_sibling_and_media_assets() -> R<()> {
         package.slide_movie_geometry(0usize, 0usize)?,
         Some(expected)
     );
+    assert!(package.slide_movie_geometry(0usize, 1usize).is_err());
+    assert!(package.edit_slide_movie_geometry(0usize, 1usize).is_err());
     assert_eq!(
-        package.slide_movie_geometry(0usize, 1usize)?,
+        package.slide_movie_geometry(0usize, 2usize)?,
         Some(expected)
     );
     assert_eq!(
@@ -809,6 +848,33 @@ fn reads_file_movies_with_audio_sibling_and_media_assets() -> R<()> {
             .find(|e| e.name() == "Data/movie.mov")
             .map(|e| e.data()),
         Some(b"synthetic movie bytes".as_slice())
+    );
+    Ok(())
+}
+
+#[test]
+fn accepts_native_style_role_and_rejects_unknown_or_duplicate_styles() -> R<()> {
+    let source = source()?;
+    let native_style = with_style_message_type(&source, STYLE[0], 3_016)?;
+    assert_eq!(
+        Package::from_bytes(&native_style)?.slide_movie_geometry(0usize, 0usize)?,
+        Some(g(100.0, 200.0, 800.0, 300.0)?)
+    );
+
+    reject(&with_style_message_type(&source, STYLE[0], UNKNOWN)?)?;
+    reject(&with_duplicate_style_message(&source, STYLE[0], 2_025)?)?;
+    Ok(())
+}
+
+#[test]
+fn accepts_order_independent_unique_archive_info_references() -> R<()> {
+    let source = source()?;
+    let object_reordered = with_refs(&source, MOVIES[0], vec![STYLE[0], TITLE[0], CAPTION[0]])?;
+    let data_reordered =
+        with_movie_archive_data_refs(&object_reordered, MOVIES[0], vec![2_001, 2_002])?;
+    assert_eq!(
+        Package::from_bytes(&data_reordered)?.slide_movie_geometry(0usize, 0usize)?,
+        Some(g(100.0, 200.0, 800.0, 300.0)?)
     );
     Ok(())
 }
@@ -1014,7 +1080,7 @@ fn poster_only_missing_data_and_non_file_sibling_are_refused() -> R<()> {
     reject(&without_entry(&source, "Data/movie.mov")?)?;
     assert!(
         Package::from_bytes(&source)?
-            .slide_movie_geometry(0usize, 2usize)
+            .slide_movie_geometry(0usize, 1usize)
             .is_err()
     );
     Ok(())
@@ -1023,7 +1089,12 @@ fn poster_only_missing_data_and_non_file_sibling_are_refused() -> R<()> {
 #[test]
 fn archive_info_refs_and_duplicate_physical_aliases_fail_atomically() -> R<()> {
     let source = source()?;
-    for refs in [vec![], vec![TITLE[0]], vec![TITLE[0], TITLE[0], CAPTION[0]]] {
+    for refs in [
+        vec![],
+        vec![TITLE[0]],
+        vec![TITLE[0], TITLE[0], CAPTION[0]],
+        vec![TITLE[0], CAPTION[0], 9_999],
+    ] {
         reject(&with_refs(&source, MOVIES[0], refs)?)?;
     }
     reject(&with_field_info(&source, MOVIES[0], vec![CAPTION[0]])?)?;
@@ -1162,6 +1233,33 @@ fn absent_flags_read_unreflected_but_horizontal_flip_is_rejected_atomically() ->
             .is_err()
     );
     assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn absent_flags_and_angle_read_identity_and_noop_preserves_presence() -> R<()> {
+    let source = with_transform_fields(&source()?, MOVIES[0], None, None)?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.slide_movie_transform(0usize, 0usize)?,
+        Some(MovieTransform::identity())
+    );
+
+    let no_op = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set_transform(MovieTransform::identity())?
+        .commit()?;
+    assert_eq!(bytes(no_op.package())?, source);
+    let archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(no_op.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let geometry = archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    assert_eq!(geometry.flags, None);
+    assert_eq!(geometry.angle, None);
     Ok(())
 }
 
@@ -1336,6 +1434,87 @@ fn combined_geometry_and_transform_round_trip_inverse_and_conflict() -> R<()> {
             .apply_slide_movie_geometry(commit.patch())
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn restore_original_size_preserves_staged_position_transform_and_inverse() -> R<()> {
+    let source = source()?;
+    let package = Package::from_bytes(&source)?;
+    let original_size = Size {
+        width: 800.0,
+        height: 300.0,
+    };
+    let staged_position = Point {
+        x: 240.5,
+        y: 315.25,
+    };
+    let staged_transform = MovieTransform::new(17.5, true)?;
+    let edit = package.edit_slide_movie_geometry(0usize, 0usize)?;
+    assert_eq!(edit.original_size(), Some(original_size));
+
+    let edit = edit
+        .set(MovieGeometry::new(
+            staged_position,
+            Size {
+                width: 1_280.0,
+                height: 720.0,
+            },
+        )?)?
+        .flip(MovieFlipAxis::Horizontal)?
+        .restore_original_size()?;
+    assert_eq!(edit.after().position(), staged_position);
+    assert_eq!(edit.after().size(), original_size);
+    assert_eq!(edit.after_transform(), staged_transform);
+
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.package().slide_movie_geometry(0usize, 0usize)?,
+        Some(MovieGeometry::new(staged_position, original_size)?)
+    );
+    assert_eq!(
+        commit.package().slide_movie_transform(0usize, 0usize)?,
+        Some(staged_transform)
+    );
+    let inverse = commit
+        .package()
+        .apply_slide_movie_geometry(&commit.patch().inverse())?;
+    assert_eq!(bytes(inverse.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn restore_original_size_rejects_missing_and_invalid_metadata_atomically() -> R<()> {
+    let source = source()?;
+    let missing = with_original_size(&source, MOVIES[0], None)?;
+    let missing_package = Package::from_bytes(&missing)?;
+    let missing_before = bytes(&missing_package)?;
+    let missing_error = missing_package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .restore_original_size()
+        .unwrap_err();
+    assert_eq!(
+        missing_error,
+        SlideMovieGeometryError::UnsupportedDependency
+    );
+    assert_eq!(bytes(&missing_package)?, missing_before);
+
+    let invalid = with_original_size(
+        &source,
+        MOVIES[0],
+        Some(tsp::Size {
+            width: -1.0,
+            height: 300.0,
+        }),
+    )?;
+    let invalid_package = Package::from_bytes(&invalid)?;
+    let invalid_before = bytes(&invalid_package)?;
+    let invalid_error = invalid_package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .restore_original_size()
+        .unwrap_err();
+    assert_eq!(invalid_error, SlideMovieGeometryError::InvalidSource);
+    assert_eq!(bytes(&invalid_package)?, invalid_before);
     Ok(())
 }
 
@@ -1677,6 +1856,10 @@ fn hostile_movie_data_and_noncanonical_reference_routes_fail_closed() -> R<()> {
         (
             "wrong archive data reference",
             with_movie_archive_data_refs(&source, MOVIES[0], vec![2_001])?,
+        ),
+        (
+            "unexpected archive data reference",
+            with_movie_archive_data_refs(&source, MOVIES[0], vec![2_002, 9_999])?,
         ),
         (
             "noncanonical movie super key",

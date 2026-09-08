@@ -17874,3 +17874,40 @@ save/actual-close/exact-reopen receipt was produced. All four raw host APIs
 and their private helper remain retained. `MEDIA_PROPERTIES_NATIVE_VERIFIED`
 is absent, so this increment records source ownership and does not retire
 those routes or complete the monolith exit.
+
+## 2026-09-08 Keynote movie-geometry native gate and host retirement
+
+The focused movie-geometry owner now captures native original-size metadata
+during bounded selector resolution and exposes `SlideMovieGeometryEdit::restore_original_size`.
+The operation preserves staged position and transform. File-movie selectors
+use the complete source-order movie inventory and reject a selected wrong-kind
+archive instead of shifting to a later file movie.
+
+Computer Use produced and verified the permanent native Arrange source oracle
+[`slide-movie-geometry-source-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-source-native.key)
+with Keynote 14.4 (7043.0.93): saved, actually closed, reopened from its exact
+path, inspected, and closed again. The fresh movie is at source position 4,
+with persisted 27.5 degree rotation, horizontal reflection, and 320×180
+original/displayed dimensions. The fixture SHA-256 is
+`30f5a18e66fc49fcdee759c7a61f7bda8d315c43e686334b314b8bce0a2e79f7`.
+The mandatory native geometry test also consumes the accepted horizontal
+candidate
+[`slide-movie-geometry-focused-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-focused-native.key),
+800,182 bytes with SHA-256
+`edd4faa11f363ac545a196bc74c94276db9826185d72c18653599999aa4314b1`, and the
+vertical candidate
+[`slide-movie-geometry-vertical-focused-native.key`](../../test-data/iwork/keynote/slide-movie-geometry-vertical-focused-native.key),
+799,074 bytes with SHA-256
+`5a388d0a6de951c6352b92195dfaba6b6e3a6004654cbb4b7c72ba2cf0bf454c`.
+The horizontal candidate retains archive position (450.5, 120.25), size
+320×180, 27.5 degree rotation, and horizontal reflection. The vertical
+candidate retains archive position (420, 200), size 480×270, 207.5 degree
+rotation, and no reflection. Both candidates opened without repair, were saved,
+actually closed, reopened from their exact paths, inspected, and closed again.
+
+The four migration-host selector wrappers are retired; raw media listings stay
+available for compatibility observations. The permanent boundary requires the
+source oracle and both saved candidates with consuming tests. This gate covers
+the accepted file-movie fixture profile and persisted Arrange transform fields,
+not every native movie kind or unsupported geometry flag, and it closes no
+monolith-exit condition.

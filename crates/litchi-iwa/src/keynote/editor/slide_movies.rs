@@ -9,8 +9,6 @@ use crate::media::MediaAssetId;
 use crate::shapes::{DrawableGeometry, DrawableProperties, DrawableSize, geometry_from_drawable};
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
-pub(in crate::keynote::editor) mod geometry;
-
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const MOVIE_DATA_FIELD: u32 = 14;
@@ -285,16 +283,14 @@ mod tests {
     use super::*;
     use crate::archive::RawMessage;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::shapes::{DrawableFlipAxis, DrawablePoint};
+    use crate::shapes::DrawablePoint;
     use crate::wire::remove_repeated_length_delimited_field_where;
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
-    use litchi_keynote::slide::media::geometry::MovieGeometry;
     use litchi_keynote::slide::media::{
         MediaLoopMode as KeynoteMediaLoopMode, MediaPlaybackSettings as KeynotePlaybackSettings,
         MediaProperties as KeynoteMediaProperties, MediaVolume as KeynoteMediaVolume,
     };
-    use litchi_keynote::slide::media::{Point as KeynotePoint, Size as KeynoteSize};
     use litchi_keynote::slide::movie::Options as SlideMovieOptions;
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
     use std::time::Duration;
@@ -903,41 +899,6 @@ mod tests {
             raw_properties(&cleared_properties)
         );
 
-        // Builder snapshots are not admitted by the focused movie-geometry
-        // owner. Keep the host fail-closed and verify that rejection is
-        // atomic; the focused package integration suite covers successful
-        // geometry and transform edits on admitted sources.
-        let changed_geometry = MovieGeometry::new(
-            KeynotePoint { x: 48.0, y: 72.0 },
-            KeynoteSize {
-                width: 320.0,
-                height: 180.0,
-            },
-        )
-        .unwrap();
-        let before_geometry = editor.to_bytes().unwrap();
-        assert!(
-            editor
-                .set_slide_movie_geometry_by_selector(
-                    Position::new(0),
-                    MovieSelector::index(0),
-                    changed_geometry,
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before_geometry);
-        let before_flip = editor.to_bytes().unwrap();
-        assert!(
-            editor
-                .flip_slide_movie_by_selector(
-                    Position::new(0),
-                    MovieSelector::index(0),
-                    DrawableFlipAxis::Horizontal,
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before_flip);
-
         assert_eq!(
             editor.slide_movies(0).unwrap()[0].geometry,
             created.geometry
@@ -1168,35 +1129,5 @@ mod tests {
             options(),
         )
         .unwrap();
-        let before_flip = editor.to_bytes().unwrap();
-        assert!(
-            editor
-                .flip_slide_movie_by_selector(
-                    Position::new(0),
-                    MovieSelector::index(9),
-                    DrawableFlipAxis::Horizontal,
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before_flip);
-        assert!(
-            editor
-                .restore_slide_movie_original_size_by_selector(
-                    Position::new(0),
-                    MovieSelector::index(9),
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before_flip);
-        assert!(
-            editor
-                .flip_slide_movie_by_selector(
-                    Position::new(0),
-                    MovieSelector::index(0),
-                    DrawableFlipAxis::Horizontal,
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before_flip);
     }
 }
