@@ -1,0 +1,733 @@
+{
+  "counter_source": {
+    "bytes": 447,
+    "path": "counters/counters.csv",
+    "sha256": "1c5dc30ff69a60320fc0607e8cbe79d4d37e0c47378ca110797802bca90465b2"
+  },
+  "lanes": {
+    "counters": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 264915146.45860252,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 265837716.07473078
+        },
+        "max": 267620054,
+        "mean": 265376431.26666665,
+        "min": 262720824,
+        "p50": 265486285,
+        "p95": 267450074,
+        "p99": 267620054,
+        "sample_order": [
+          3,
+          25,
+          24,
+          21,
+          19,
+          23,
+          5,
+          12,
+          17,
+          18,
+          4,
+          11,
+          16,
+          8,
+          7,
+          20,
+          28,
+          9,
+          10,
+          27,
+          29,
+          22,
+          1,
+          2,
+          26,
+          6,
+          14,
+          13,
+          15,
+          0
+        ],
+        "samples": [
+          262720824,
+          263016775,
+          263724388,
+          263801138,
+          264257401,
+          264320151,
+          264569202,
+          264572302,
+          264672222,
+          264886243,
+          265223525,
+          265344405,
+          265435205,
+          265444465,
+          265456545,
+          265516025,
+          265523305,
+          265523695,
+          265527746,
+          265580745,
+          265597126,
+          265620656,
+          265710436,
+          265782097,
+          266713410,
+          266996862,
+          267331123,
+          267354793,
+          267450074,
+          267620054
+        ],
+        "standard_deviation": 1235482.1262159946,
+        "unit": "ns"
+      },
+      "kind": "counters",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 34457,
+        "path": "counters/report.json",
+        "sha256": "90fb2c9602dfdf603a2b2943f8ed6df3f9fe3d90e25c7a4da4c6eec868f88031"
+      },
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 3,
+      "whole_process_max_rss_kib": 82684
+    },
+    "cpu-P1": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 260191470.62835154,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 261617585.10498175
+        },
+        "max": 263858676,
+        "mean": 260904527.86666664,
+        "min": 257268389,
+        "p50": 260953734,
+        "p95": 263607865,
+        "p99": 263858676,
+        "sample_order": [
+          12,
+          8,
+          5,
+          13,
+          11,
+          25,
+          27,
+          23,
+          18,
+          15,
+          9,
+          2,
+          7,
+          26,
+          16,
+          24,
+          21,
+          29,
+          28,
+          19,
+          0,
+          14,
+          20,
+          6,
+          4,
+          22,
+          10,
+          1,
+          17,
+          3
+        ],
+        "samples": [
+          257268389,
+          257937302,
+          258262223,
+          258547324,
+          258734965,
+          259038496,
+          259214797,
+          259242247,
+          259287167,
+          259353228,
+          259910980,
+          260468712,
+          260561163,
+          260749873,
+          260949674,
+          260957794,
+          261254596,
+          261550587,
+          261662257,
+          261722427,
+          261743688,
+          262384210,
+          262871102,
+          262992972,
+          263005072,
+          263264033,
+          263300013,
+          263434004,
+          263607865,
+          263858676
+        ],
+        "standard_deviation": 1909816.7932397441,
+        "unit": "ns"
+      },
+      "kind": "cpu",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 34457,
+        "path": "cpu-P1/report.json",
+        "sha256": "48128ff2140034023da6ec39ff0121aac168fe90d95ffd2b71e9676749b06187"
+      },
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 3,
+      "whole_process_max_rss_kib": 511996
+    },
+    "cpu-P2": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 260841212.15446505,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 262025993.51220158
+        },
+        "max": 266171575,
+        "mean": 261433602.8333333,
+        "min": 259791459,
+        "p50": 260852673,
+        "p95": 265144811,
+        "p99": 266171575,
+        "sample_order": [
+          26,
+          23,
+          29,
+          27,
+          28,
+          22,
+          9,
+          3,
+          4,
+          2,
+          21,
+          25,
+          24,
+          20,
+          10,
+          8,
+          1,
+          12,
+          15,
+          13,
+          7,
+          16,
+          18,
+          0,
+          19,
+          14,
+          5,
+          11,
+          6,
+          17
+        ],
+        "samples": [
+          259791459,
+          259953889,
+          260034639,
+          260104650,
+          260170780,
+          260221451,
+          260298651,
+          260412081,
+          260487412,
+          260544152,
+          260558042,
+          260571692,
+          260573972,
+          260765343,
+          260851823,
+          260853523,
+          261153145,
+          261292204,
+          261295425,
+          261425495,
+          261587806,
+          261933108,
+          262032928,
+          262055388,
+          262303819,
+          262456460,
+          263032292,
+          264930070,
+          265144811,
+          266171575
+        ],
+        "standard_deviation": 1586629.5240682047,
+        "unit": "ns"
+      },
+      "kind": "cpu",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 34456,
+        "path": "cpu-P2/report.json",
+        "sha256": "8ba0cbb84d02bcf8f75f4504bca5e9cfabb99e93a4c47e7432df47c8070830a9"
+      },
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 3,
+      "whole_process_max_rss_kib": 82740
+    },
+    "heap-H1": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 379005667.0,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 379005667.0
+        },
+        "max": 379005667,
+        "mean": 379005667.0,
+        "min": 379005667,
+        "p50": 379005667,
+        "p95": 379005667,
+        "p99": 379005667,
+        "sample_order": [
+          0
+        ],
+        "samples": [
+          379005667
+        ],
+        "standard_deviation": 0.0,
+        "unit": "ns"
+      },
+      "kind": "heap",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 19350,
+        "path": "heap-H1/report.json",
+        "sha256": "5f91d1611250e1ff21593b83f77c03696c958d51c94094539ba544da0466b326"
+      },
+      "samples": 1,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 0,
+      "whole_process_max_rss_kib": 313660
+    },
+    "heap-H2": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 377495197.0,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 377495197.0
+        },
+        "max": 377495197,
+        "mean": 377495197.0,
+        "min": 377495197,
+        "p50": 377495197,
+        "p95": 377495197,
+        "p99": 377495197,
+        "sample_order": [
+          0
+        ],
+        "samples": [
+          377495197
+        ],
+        "standard_deviation": 0.0,
+        "unit": "ns"
+      },
+      "kind": "heap",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 19349,
+        "path": "heap-H2/report.json",
+        "sha256": "a2d69513534e2339ea5b576c01e275ecacbb71a2e08299b2bddc948c62657713"
+      },
+      "samples": 1,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 0,
+      "whole_process_max_rss_kib": 314312
+    },
+    "normal-R1": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 258175432.53803065,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 258763674.52863613
+        },
+        "max": 260098957,
+        "mean": 258469553.5333334,
+        "min": 257171774,
+        "p50": 258296564,
+        "p95": 260072437,
+        "p99": 260098957,
+        "sample_order": [
+          25,
+          20,
+          26,
+          27,
+          11,
+          7,
+          21,
+          17,
+          14,
+          12,
+          28,
+          16,
+          1,
+          0,
+          6,
+          19,
+          10,
+          18,
+          23,
+          2,
+          9,
+          4,
+          29,
+          3,
+          24,
+          8,
+          13,
+          5,
+          22,
+          15
+        ],
+        "samples": [
+          257171774,
+          257218945,
+          257362925,
+          257450636,
+          257691386,
+          257721695,
+          257843467,
+          258068949,
+          258098017,
+          258155697,
+          258181559,
+          258208299,
+          258222517,
+          258230497,
+          258293348,
+          258299780,
+          258336287,
+          258554890,
+          258580910,
+          258731869,
+          258849330,
+          258857830,
+          258971502,
+          259098281,
+          259240864,
+          259301912,
+          259313292,
+          259858754,
+          260072437,
+          260098957
+        ],
+        "standard_deviation": 787758.9426072505,
+        "unit": "ns"
+      },
+      "kind": "normal",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 34455,
+        "path": "normal-R1/report.json",
+        "sha256": "c960693ce833bd3f4f954779fce3fc5a4093ce3250c9450507780448632a1c6d"
+      },
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 3,
+      "whole_process_max_rss_kib": 82724
+    },
+    "normal-R2": {
+      "elapsed_ns": {
+        "confidence_interval_95": {
+          "lower": 253764848.7715047,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 254811591.0284953
+        },
+        "max": 258095977,
+        "mean": 254288219.9,
+        "min": 252211072,
+        "p50": 254160741,
+        "p95": 257354494,
+        "p99": 258095977,
+        "sample_order": [
+          4,
+          19,
+          25,
+          7,
+          20,
+          8,
+          5,
+          9,
+          24,
+          11,
+          6,
+          12,
+          16,
+          29,
+          21,
+          13,
+          10,
+          18,
+          28,
+          27,
+          26,
+          23,
+          17,
+          22,
+          15,
+          14,
+          0,
+          3,
+          2,
+          1
+        ],
+        "samples": [
+          252211072,
+          252454004,
+          252655664,
+          252859725,
+          252925826,
+          253171356,
+          253199066,
+          253304056,
+          253366408,
+          253442587,
+          253663068,
+          253672468,
+          253737678,
+          254012671,
+          254147752,
+          254173730,
+          254175190,
+          254180762,
+          254306992,
+          254417072,
+          254520352,
+          254621863,
+          255055550,
+          255317786,
+          255351235,
+          255937487,
+          256142548,
+          256172158,
+          257354494,
+          258095977
+        ],
+        "standard_deviation": 1401771.0172313382,
+        "unit": "ns"
+      },
+      "kind": "normal",
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "report": {
+        "bytes": 34448,
+        "path": "normal-R2/report.json",
+        "sha256": "2e66185ad8491e8cbd4caa339397cf46b6e999451f41b5d92ddde93731afce3c"
+      },
+      "samples": 30,
+      "sink": {
+        "accepted_bytes": 7940406,
+        "authored_part_bytes": 285476,
+        "input_bytes": 376832,
+        "largest_write": 23589,
+        "retained_output_bytes": 0,
+        "write_calls": 114958,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 5,
+          "bytes_1_to_512": 114936,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 17,
+          "bytes_over_65536": 0
+        }
+      },
+      "warmups": 3,
+      "whole_process_max_rss_kib": 82692
+    }
+  },
+  "limitations": [
+    "Normal runs bracket profilers on unchanged source and binary; this is descriptive repeatability, not a before/after or registered latency comparison.",
+    "Profiler-instrumented elapsed vectors are diagnostic and remain separate from normal timing.",
+    "perf stat values cover whole process including preflight and are scaled by perf for multiplexing; they are not operation-local counts.",
+    "A reported zero hardware event is retained as reported and does not establish absence of cache misses; unsupported events remain unavailable.",
+    "Whole-process RSS includes setup and profilers and cannot isolate writer heap or attribute its peak."
+  ],
+  "normal_repeat_drift": {
+    "mean": {
+      "exceeds_review_threshold": false,
+      "r1_ns": 258469553.5333334,
+      "r2_ns": 254288219.9,
+      "signed_percent": -1.6177277269889934
+    },
+    "p50": {
+      "exceeds_review_threshold": false,
+      "r1_ns": 258296564,
+      "r2_ns": 254160741,
+      "signed_percent": -1.6011916441908247
+    },
+    "p95": {
+      "exceeds_review_threshold": false,
+      "r1_ns": 260072437,
+      "r2_ns": 257354494,
+      "signed_percent": -1.0450715313595538
+    },
+    "p99": {
+      "exceeds_review_threshold": false,
+      "r1_ns": 260098957,
+      "r2_ns": 258095977,
+      "signed_percent": -0.7700838262108101
+    }
+  },
+  "normal_repeat_review_required": false,
+  "schema": "litchi-0475-normal-counter-context-v1",
+  "whole_process_counters": {
+    "L1-dcache-load-misses:u": {
+      "count": 0,
+      "event_runtime_ns": 30597278395,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "LLC-load-misses:u": {
+      "count": null,
+      "event_runtime_ns": 0,
+      "running_percent": 100.0,
+      "status": "not_supported"
+    },
+    "branch-misses:u": {
+      "count": 264602787,
+      "event_runtime_ns": 30630593415,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "branches:u": {
+      "count": 137270687930,
+      "event_runtime_ns": 30628906871,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "cache-misses:u": {
+      "count": 1709263656,
+      "event_runtime_ns": 30629376427,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "context-switches": {
+      "count": 231,
+      "event_runtime_ns": 36750925661,
+      "running_percent": 100.0,
+      "status": "reported"
+    },
+    "cycles:u": {
+      "count": 157634913764,
+      "event_runtime_ns": 30633332098,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "instructions:u": {
+      "count": 690745026904,
+      "event_runtime_ns": 30635141099,
+      "running_percent": 83.0,
+      "status": "reported"
+    },
+    "page-faults": {
+      "count": 105268,
+      "event_runtime_ns": 36750925661,
+      "running_percent": 100.0,
+      "status": "reported"
+    }
+  }
+}

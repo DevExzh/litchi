@@ -1,0 +1,37 @@
+{
+  "artifacts": [
+    {
+      "bytes": 698733,
+      "compressed_bytes": 19667,
+      "compressed_path": "heap-H1/runner-mangled.stdout.gz",
+      "compressed_sha256": "26e68dc1c463e5092058671813165faf701e7ce0cb77c2a74e9ef431192cadfd",
+      "path": "heap-H1/runner-mangled.stdout",
+      "sha256": "174d6d08239e2f8ab07932dc655b3ec56baa43067b915359d10ed576dd7b599f"
+    },
+    {
+      "bytes": 1706494,
+      "compressed_bytes": 44844,
+      "compressed_path": "heap-H1/runner-mangled-stacks.txt.gz",
+      "compressed_sha256": "e89cfcec57b7111d706c5767ee79a6875ec6649ccf2a6aaa6c9f0eded16aebc1",
+      "path": "heap-H1/runner-mangled-stacks.txt",
+      "sha256": "0ef15dd64de1d75cc2d3babd3003e007e0db36ca5b64cc1ba28cf39db734bfdf"
+    },
+    {
+      "bytes": 698733,
+      "compressed_bytes": 19667,
+      "compressed_path": "heap-H2/runner-mangled.stdout.gz",
+      "compressed_sha256": "b40eef5cdb1e63bca844decc4aaa6ed73fb9e91b1f01f2420d5dde80d61a4240",
+      "path": "heap-H2/runner-mangled.stdout",
+      "sha256": "95bf2690a063e666de61fd4852dbc97c8c75de5604ab482da3957da363e45376"
+    },
+    {
+      "bytes": 1706494,
+      "compressed_bytes": 44844,
+      "compressed_path": "heap-H2/runner-mangled-stacks.txt.gz",
+      "compressed_sha256": "e89cfcec57b7111d706c5767ee79a6875ec6649ccf2a6aaa6c9f0eded16aebc1",
+      "path": "heap-H2/runner-mangled-stacks.txt",
+      "sha256": "0ef15dd64de1d75cc2d3babd3003e007e0db36ca5b64cc1ba28cf39db734bfdf"
+    }
+  ],
+  "schema": "litchi-0475-compression-v1"
+}

@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## PPTX streaming profile context (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) reuses the authenticated
+0474 executable for seven frozen CPU/heap/counter/normal captures, totaling
+152 measured samples. Normal medians are 258.296564 / 254.160741 ms.
+Whole-process counters include preflight and are multiplexed; LLC misses
+are unsupported and reported zero L1 misses remain a limitation. All report
+and output identities pass. No source change, before/after or registered
+latency claim is introduced.
+
 ## PPTX fresh streaming allocation baseline (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) adds the opt-in public

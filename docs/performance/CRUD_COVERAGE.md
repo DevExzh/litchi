@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-08: PPTX streaming attribution (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) adds seven descriptive
+profiles and normal/counter captures of the existing large fresh-creation
+case. No selector or coverage mapping changes: selectable/default counts
+remain 441/37, with the checked default 201 rows and 31 corpora. Measured
+CPU/heap context does not add logical append, Part addition, arbitrary
+repackaging, native-producer or worker-scaling coverage.
+
 ## 2026-09-08: PPTX fresh streaming allocation scaling (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) adds opt-in

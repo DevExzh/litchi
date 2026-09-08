@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## PPTX profiling custody and scope (0475)
+
+[0475](changes/0475-pptx-streaming-attribution.md) changes evidence tools
+and documentation only. The reused binary and all 7,034 source hashes
+match the sealed 0474 source, and all 30 ADR hashes are unchanged. Capture
+receipts distinguish process counters, sampled cycle weights, allocation
+work, heap lifetimes and RSS. The source audit records compressor reuse
+obligations without changing production dependencies or contracts.
+
 ## Public PPTX streaming measurement (0474)
 
 [0474](changes/0474-pptx-streaming-operation-memory.md) adds only separate-harness

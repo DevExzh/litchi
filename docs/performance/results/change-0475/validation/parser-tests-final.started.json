@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    ".",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0475",
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "protocol_sha256": "619317a34866d28ef62386adc4e9924dbb9fdb63650f1ceebb622b93fb7963ac",
+  "python_sources": {
+    "analyze.py": "c55c683b13db51f905a97ed854727e19c0e8e7309cdaf8da672512d4acfd2b22",
+    "capture.py": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+    "check.py": "85d26cc626ee025b10d637787b03039dd64470f1447ac7e8125db7d466ddf0e6",
+    "cpu_analyze.py": "467e8335e98c37525fae228d8e04fc78c0f5517d59831b33a204e71d830867aa",
+    "cpu_parser.py": "e532a5288a9b47dd78cad6d405e534ba78fa0e571b8882126434099a4c203037",
+    "heap_analyze.py": "d4c0c392ddf60699cbf29264a8120c16f26c1c18ed7449f2b1099afe1a504622",
+    "replay.py": "43abdd8b58c01b3661bafe62b81d07e15210622b79938d8a03d74e81061f1c4d",
+    "seal.py": "8d0ce6be97e3dede2228ad1f4f13bc55777a3adfe5938e3df253adefffbc4e7b",
+    "split.py": "bc7f920feeebffdb9321676f58b80e9ae075646fe2652992f222a150aa0c3e02",
+    "supplement.py": "966956bc1d7e62e2b1cdb773dbf54c038beb02613b4d468b6b6048f4d5ba1649",
+    "test_analyze.py": "4069320de90956e1400d7c918e434d11cb34899e1b7ccc7076f1e5bf13babbf4",
+    "test_cpu_analyze.py": "21004d35176a603d5303001e45a65531b81eea8dc00657622d6760811ee4b0a5",
+    "test_evidence.py": "b2f119f9013d8ef6c7460fadb13dee93d3f0fecfbac85e2d5aeb262f1f527d44",
+    "test_heap_analyze.py": "5041a1c50b578a65e7dc034cb929e549f1c4551d145432ea310f6438d82f555f",
+    "test_heap_filter.py": "d3226e739826afd709c1daded3e1084969d2d96035bbce1dc1bb560d2e85d48d",
+    "verify.py": "15222a4fd31973dc446dbcc637537b0d794c3e95062ed0d8f990b748235c3bfd"
+  },
+  "source_manifest_sha256": "17db263e9709a9965f71f12efe2bd411a568e15689713312e98f51bcb0bcc423",
+  "started_utc": "2026-09-08T11:05:47.001112+00:00"
+}

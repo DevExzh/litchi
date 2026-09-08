@@ -1,0 +1,11 @@
+{
+  "captures_unchanged": true,
+  "change": "Factor hexadecimal descriptor alternatives through a prefix trie while preserving exact token boundaries and malformed selected tails. Exhaustive 4096-ID membership test added.",
+  "exit_code": -15,
+  "exports_unchanged": true,
+  "original_attempt": "validation/heap-analysis.json",
+  "reason": "Root terminated only the analysis process with SIGTERM after approximately four minutes; an unfactored regex tried a long descriptor alternative list for every excluded allocation event. Capture and export processes had already completed successfully.",
+  "recorded_utc": "2026-09-08T11:06:18.172139+00:00",
+  "replacement_attempt": "validation/heap-analysis-factored.json",
+  "schema": "litchi-0475-analysis-recovery-v1"
+}

@@ -1,0 +1,15 @@
+{
+  "captures": 7,
+  "classification": "progress",
+  "constant_total_memory_claim": false,
+  "fresh_build": false,
+  "full_non_iwork_goal_complete": false,
+  "measured_samples": 152,
+  "next_candidate": "private reusable raw Deflate backend state and fixed output scratch, subject to matched validation",
+  "normal_repeat_review_threshold_exceeded": false,
+  "production_change": false,
+  "registered_latency_claim": false,
+  "repeated_compressor_requested_bytes": 6778588800,
+  "schema": "litchi-0475-decision-v1",
+  "share_of_run_requested_bytes_percent": 99.54389065490294
+}

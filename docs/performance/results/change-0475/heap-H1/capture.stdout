@@ -1,0 +1,5 @@
+heaptrack output will be written to "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H1/heaptrack.zst"
+starting application, this might take some time...
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H1/heaptrack.zst"

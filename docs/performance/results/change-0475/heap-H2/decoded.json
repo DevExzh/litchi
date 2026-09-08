@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "zstd",
+    "--decompress",
+    "--stdout",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0475/heap-H2/heaptrack.zst"
+  ],
+  "artifacts": {
+    "decoded.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "decoded.stdout": {
+      "bytes": 6544534798,
+      "sha256": "ca3d1b0109d8af9aaccabfd3fc5e507e7843752bab422bcd344767021b47bf7e"
+    }
+  },
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T10:53:20.204935+00:00",
+  "started_utc": "2026-09-08T10:53:17.597406+00:00"
+}

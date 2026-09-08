@@ -1,0 +1,23 @@
+{
+  "binary": {
+    "bytes": 466033000,
+    "path": "/tmp/litchi-goal-0475/profile",
+    "sha256": "d205421b297b54a2f167ff0abde4b3814ef8c07c5883550b168d78d1af4f0935"
+  },
+  "cached_binary_path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+  "capture_driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "fresh_build": false,
+  "prepared_finished_utc": "2026-09-08T10:33:05.971959+00:00",
+  "prepared_started_utc": "2026-09-08T10:33:03.003189+00:00",
+  "protocol_sha256": "619317a34866d28ef62386adc4e9924dbb9fdb63650f1ceebb622b93fb7963ac",
+  "reused_build_sha256": "1081b05ce9eec6b03e309d08f1b0de67ba9bfc573e43f6c18844ec4ea0e4dc78",
+  "revision": "60a1a4300a2844f372c0c916b5be69c50ce38668",
+  "schema": "litchi-0475-reused-build-v1",
+  "source_files": 7034,
+  "source_manifest_sha256": "17db263e9709a9965f71f12efe2bd411a568e15689713312e98f51bcb0bcc423",
+  "tree": "/tmp/litchi-goal-0474/tree"
+}

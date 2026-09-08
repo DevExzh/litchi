@@ -1,0 +1,61 @@
+{
+  "acceptance": "Retain every attempt. Require unchanged clean bound source/binary and archive/text/counter identity for all completed reports; validate repeated context attribution before selecting next production change. Unsupported counters or incomplete callchains remain explicit and may require separately recorded supplemental work.",
+  "capture_driver_sha256": "ecd346137ebef5d44b2a7d9f15fa19931a5bd45f80ef9e5303e45a33e8282835",
+  "claim": "Descriptive profiling of unchanged source/binary; no optimization, before/after, registered latency or constant-memory claim.",
+  "corpus_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+  "counter_events": "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,L1-dcache-load-misses:u,LLC-load-misses:u,page-faults,context-switches",
+  "cpu": 2,
+  "declared_utc": "2026-09-08T10:33:02.733671+00:00",
+  "members": 16421,
+  "normal_repeat_review_threshold_percent": 5,
+  "order": [
+    {
+      "kind": "normal",
+      "lane": "normal-R1",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "kind": "counters",
+      "lane": "counters",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "kind": "cpu",
+      "lane": "cpu-P1",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "kind": "heap",
+      "lane": "heap-H1",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "kind": "heap",
+      "lane": "heap-H2",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "kind": "cpu",
+      "lane": "cpu-P2",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "kind": "normal",
+      "lane": "normal-R2",
+      "samples": 30,
+      "warmups": 3
+    }
+  ],
+  "schema": "litchi-0475-protocol-v1",
+  "scope": "Whole-process perf/Heaptrack captures include preflight and observers; analyze writer-under-run context explicitly. Perf event-period weights are not timings. Heap allocation work and requested-live peaks are distinct; preserve raw scopes and unknown coverage.",
+  "selector": "pptx_streaming_create",
+  "shape": "large",
+  "slides": 8192,
+  "workers": 1
+}

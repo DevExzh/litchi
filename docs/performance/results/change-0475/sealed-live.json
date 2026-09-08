@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "verify.py",
+    "--sealed",
+    "--live"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0475",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T11:13:08.172851+00:00",
+  "started_utc": "2026-09-08T11:12:56.037648+00:00",
+  "stderr": "",
+  "stdout": "{\n  \"chunked_originals\": 2,\n  \"compressed_originals\": 16,\n  \"cpu\": {\n    \"cpu-P1\": {\n      \"perf_script\": \"cpu-P1/perf-script.stdout.gz\",\n      \"schema\": \"litchi-0475-pptx-streaming-cpu-attribution-v1\"\n    },\n    \"cpu-P2\": {\n      \"perf_script\": \"cpu-P2/perf-script.stdout.gz\",\n      \"schema\": \"litchi-0475-pptx-streaming-cpu-attribution-v1\"\n    }\n  },\n  \"heap\": {\n    \"schema\": \"litchi-0475-heap-attribution-v1\",\n    \"traces\": 2\n  },\n  \"lanes\": 7,\n  \"live\": {\n    \"binary\": \"d205421b297b54a2f167ff0abde4b3814ef8c07c5883550b168d78d1af4f0935\",\n    \"source_files\": 7034,\n    \"status\": \"pass\"\n  },\n  \"reports\": {\n    \"counters\": {\n      \"kind\": \"counters\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"cpu-P1\": {\n      \"kind\": \"cpu\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"cpu-P2\": {\n      \"kind\": \"cpu\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"heap-H1\": {\n      \"kind\": \"heap\",\n      \"samples\": 1,\n      \"warmups\": 0\n    },\n    \"heap-H2\": {\n      \"kind\": \"heap\",\n      \"samples\": 1,\n      \"warmups\": 0\n    },\n    \"normal-R1\": {\n      \"kind\": \"normal\",\n      \"samples\": 30,\n      \"warmups\": 3\n    },\n    \"normal-R2\": {\n      \"kind\": \"normal\",\n      \"samples\": 30,\n      \"warmups\": 3\n    }\n  },\n  \"reuse\": {\n    \"files\": 13,\n    \"prior_schema\": \"litchi-0474-verification-v1\"\n  },\n  \"samples\": 152,\n  \"schema\": \"litchi-0475-verification-v1\",\n  \"sealed\": {\n    \"files\": 225,\n    \"status\": \"pass\"\n  },\n  \"status\": \"pass\",\n  \"summary\": {\n    \"lanes\": 7,\n    \"status\": \"pass\"\n  },\n  \"supplement\": {\n    \"artifacts\": 4,\n    \"filter_token\": \"21pptx_streaming_create3run\",\n    \"schema\": \"litchi-0475-supplement-protocol-v1\"\n  }\n}\n",
+  "verified_seal_sha256": "27104c941925dc0f7a3ab209d136150a5d5f94e3f1753222fe1ac4bf0fd16537"
+}

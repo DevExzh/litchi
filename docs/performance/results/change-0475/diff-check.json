@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":!docs/performance/results/change-0475/cpu-P1/top-symbols.stdout",
+    ":!docs/performance/results/change-0475/cpu-P2/top-symbols.stdout",
+    ":!docs/performance/results/change-0475/heap-H1/capture.stderr",
+    ":!docs/performance/results/change-0475/heap-H2/capture.stderr"
+  ],
+  "excluded_raw_artifacts": {
+    "docs/performance/results/change-0475/cpu-P1/top-symbols.stdout": "68990e589b78ff083af1b14f5001541b4e4bb12f63e436eb9211c3d8eefd1712",
+    "docs/performance/results/change-0475/cpu-P2/top-symbols.stdout": "dd2c9fa68642a08bf3350f59502a37e929193455056d3d69e6942abb0d108070",
+    "docs/performance/results/change-0475/heap-H1/capture.stderr": "3803bbcda174ed2dc9405a59a850dd739f7973f71f1dc76031928e1279303e43",
+    "docs/performance/results/change-0475/heap-H2/capture.stderr": "b0d5dda5c840e85249966a98f7bbde5568a659127184dcfdcd803ca46880841f"
+  },
+  "exit_code": 0,
+  "reason": "Preserve exact perf report and Heaptrack stderr whitespace; source/Markdown and other data remain checked. Earlier review-Markdown extra EOF blank line was removed.",
+  "recorded_utc": "2026-09-08T11:18:02.284930+00:00",
+  "stderr": "",
+  "stdout": ""
+}

@@ -1,0 +1,38 @@
+{
+  "commands": [
+    [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0475/capture.py",
+      "prepare"
+    ],
+    [
+      "flock",
+      "/tmp/litchi-goal-0475/cpu.lock",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0475/capture.py",
+      "matrix"
+    ],
+    [
+      "flock",
+      "/tmp/litchi-goal-0475/cpu.lock",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0475/capture.py",
+      "export"
+    ],
+    [
+      "flock",
+      "/tmp/litchi-goal-0475/cpu.lock",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0475/supplement.py"
+    ]
+  ],
+  "heavy_command_serialization": "Captures use the one owned CPU lock; export and later validation use the same lock. Light independent source review and Python parser unit tests are outside measured operations.",
+  "lock_path": "/tmp/litchi-goal-0475/cpu.lock",
+  "recorded_utc": "2026-09-08T10:44:01.788892+00:00",
+  "schema": "litchi-0475-orchestration-v1",
+  "scope": "Root record of actual parent commands; child receipts retain measured argv and capture chronology."
+}

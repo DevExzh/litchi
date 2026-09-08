@@ -1,0 +1,1 @@
+verify.py: error: heap-H1.scope drops writer_events_classified
