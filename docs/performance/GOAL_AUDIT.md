@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0470 bounded XLSX pass reuse (2026-09-08)
+
+The [0470 record](changes/0470-xlsx-empty-web-proof.md) advances the measured
+ordinary XLSX commit bottleneck: compaction can establish empty web bindings
+without another worksheet traversal, while every unproven input retains the
+original reader and error phase. All 1,257 XLSX tests and six scoped gates
+pass. The protocol retains six-row ABBA, full-default guard and whole-process
+allocation evidence, with its exact results and limitations recorded separately.
+
+This changes neither the default scenario matrix nor the taxonomy's remaining
+correctness-only mappings. Eager parsing and lossless snapshot scans remain
+substantial leads. Full native-producer, physical-cold/range, bounded-streaming,
+parallel-scaling and comprehensive CRUD evidence is not established by this
+batch. Existing caches and publication checks retain their bounds. The full
+non-iWork goal remains open; no completion or general speedup claim follows.
+
 ## Current audit: 0466 dense XLSX investigation (2026-09-08)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) advances the required

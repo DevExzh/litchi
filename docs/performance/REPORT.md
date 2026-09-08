@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## Current result: bounded XLSX web-validation reuse (0470)
+
+[0470](changes/0470-xlsx-empty-web-proof.md) adds a finite success proof during
+compaction and preserves full-reader fallback for every ambiguous worksheet.
+All 1,257 XLSX tests and scoped gates pass. Whole-process allocation calls
+decrease 19.753%, while rounded peak heap stays `104.38M`. Diagnostic ordinary
+XLSX latency improves without adding a registered claim. The original RSS
+increase is not consistently reproduced, and the targeted guard retains PPT
+creation and small CFB-read penalties. The record includes every original flag,
+repeat, source/binary binding and limitation. This is scoped progress toward
+the full non-iWork goal, which remains open.
+
 ## Current investigation: dense XLSX commit/save (0466)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) retains same-source CPU,

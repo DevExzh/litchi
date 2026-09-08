@@ -1,0 +1,28 @@
+{
+  "schema": "litchi-0470-rss-protocol-v1",
+  "purpose": "Separate descriptive normal-process RSS follow-up for the original six-row XLSX ABBA probe.",
+  "cpu": 2,
+  "workers": 1,
+  "order": [
+    "rss-A1",
+    "rss-B1",
+    "rss-B2",
+    "rss-A2"
+  ],
+  "samples": 100,
+  "warmups": 5,
+  "cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save"
+  ],
+  "shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "lock": "/tmp/litchi-goal-0470/cpu.lock",
+  "performance_claim": "none; descriptive RSS drift follow-up only",
+  "main_protocol_sha256": "13c9027b668f0b252520bc45ad2ae774ff368ebf24ded1f5448d3885b2cc9c43",
+  "capture_driver_sha256": "ca252f8a7ee716a4d9945dd6f70c5eb885b6f31114776132048e3b93982c24aa"
+}

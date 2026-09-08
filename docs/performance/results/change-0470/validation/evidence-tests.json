@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "docs/performance/results/change-0470",
+    "-p",
+    "test_evidence.py",
+    "-v"
+  ],
+  "started_utc": "2026-09-08T07:12:24.489001+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:12:24.576882+00:00",
+  "log_sha256": "3619451259a56ed1814c8570e6939e0ac8fefab4952a4e755a0aefa7f3dc8f0f"
+}

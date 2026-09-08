@@ -1,0 +1,6 @@
+{
+  "status": "fail",
+  "exit_code": 1,
+  "error": "guard-A1: frozen command differs",
+  "resolution": "Guard and RSS reviewers now compare command destinations with the fixed historical capture path, independently of relocated evidence paths; two tests preserve destination tamper rejection."
+}

@@ -1,0 +1,19 @@
+test_candidate_build_can_follow_first_control_capture (test_evidence.EvidencePolicyTests.test_candidate_build_can_follow_first_control_capture) ... ok
+test_canonical_json_rejects_nonfinite_values (test_evidence.EvidencePolicyTests.test_canonical_json_rejects_nonfinite_values) ... ok
+test_chronology_rejects_overlapping_capture_intervals (test_evidence.EvidencePolicyTests.test_chronology_rejects_overlapping_capture_intervals) ... ok
+test_seal_requires_exact_coverage_and_authentic_bytes (test_evidence.EvidencePolicyTests.test_seal_requires_exact_coverage_and_authentic_bytes) ... ok
+test_sha256_file_is_content_addressed (test_evidence.PathAndJsonTests.test_sha256_file_is_content_addressed) ... ok
+test_traversal_and_nonfinite_json_are_rejected (test_evidence.PathAndJsonTests.test_traversal_and_nonfinite_json_are_rejected) ... ok
+test_candidate_manifest_tamper_is_not_hidden_by_refreshed_hashes (test_evidence.RegressionTests.test_candidate_manifest_tamper_is_not_hidden_by_refreshed_hashes) ... ok
+test_historical_review_allows_only_verifier_binding_evolution (test_evidence.RegressionTests.test_historical_review_allows_only_verifier_binding_evolution) ... ok
+test_reused_control_must_match_prior_binary (test_evidence.RegressionTests.test_reused_control_must_match_prior_binary) ... ok
+test_source_projection_preserves_raw_and_measured_vectors (test_evidence.RegressionTests.test_source_projection_preserves_raw_and_measured_vectors) ... ok
+test_gnu_time_rss_extracts_kib_and_excludes_latency (test_evidence.ResourceParserTests.test_gnu_time_rss_extracts_kib_and_excludes_latency) ... ok
+test_heaptrack_fractional_count_fails_closed (test_evidence.ResourceParserTests.test_heaptrack_fractional_count_fails_closed) ... ok
+test_heaptrack_parser_keeps_rounded_peak_as_display_text (test_evidence.ResourceParserTests.test_heaptrack_parser_keeps_rounded_peak_as_display_text) ... ok
+test_rss_protocol_binds_its_driver_and_main_protocol (test_evidence.RssFollowupTests.test_rss_protocol_binds_its_driver_and_main_protocol) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.131s
+
+OK

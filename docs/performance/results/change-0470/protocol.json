@@ -1,0 +1,43 @@
+{
+  "allocation_scope": "Whole process including generation, expected output, warmups, verification and teardown; instrumented time/RSS excluded from comparisons.",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "capture_driver_sha256": "616cb7c7e080671242433da28ae62c43d746aca3bf66999aa03a0bfb367d0850",
+  "cpu": 2,
+  "decision": "Retain only if allocations decrease materially, correctness holds, and individual latency/RSS flags have been reviewed. No registered latency claim; any later qualification requires separate predeclared 500-sample ABBA.",
+  "full_guard_order": [
+    "A-full",
+    "B-full"
+  ],
+  "full_guard_samples": 15,
+  "full_guard_warmups": 3,
+  "heap_case": "xlsx_one_percent_commit_save",
+  "heap_order": [
+    "A-heap",
+    "B-heap"
+  ],
+  "heap_samples": 5,
+  "heap_shape": "dense-wide",
+  "heap_warmups": 1,
+  "hypothesis": "Reuse emitted worksheet events to prove empty web bindings, removing the later XML traversal and namespace/name allocations for ordinary worksheets; fall back for every unproven case.",
+  "lock": "/tmp/litchi-goal-0470/cpu.lock",
+  "performance_claim": "none; 100-sample diagnostic probe and whole-process allocation comparison",
+  "probe_cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save"
+  ],
+  "probe_order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "probe_samples": 100,
+  "probe_shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "probe_warmups": 5,
+  "schema": "litchi-0470-protocol-v1",
+  "workers": 1
+}

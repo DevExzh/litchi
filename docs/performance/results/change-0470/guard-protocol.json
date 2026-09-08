@@ -1,0 +1,96 @@
+{
+  "schema": "litchi-0470-targeted-guard-protocol-v1",
+  "purpose": "Frozen 100-sample diagnostic ABBA guard for selected non-XLSX and legacy-writer rows; no registered latency claim.",
+  "order": [
+    "guard-A1",
+    "guard-B1",
+    "guard-B2",
+    "guard-A2"
+  ],
+  "roles": {
+    "guard-A1": "control",
+    "guard-A2": "control",
+    "guard-B1": "candidate",
+    "guard-B2": "candidate"
+  },
+  "cases": [
+    "cfb_shared_read_one",
+    "opc_noop_save",
+    "cfb_read_one",
+    "opc_source_open",
+    "ppt_fresh_write_to"
+  ],
+  "synthetic_cases": [
+    "cfb_shared_read_one",
+    "opc_noop_save",
+    "cfb_read_one",
+    "opc_source_open"
+  ],
+  "shapes": [
+    "many-small",
+    "few-large",
+    "wide-root"
+  ],
+  "payload_kinds": [
+    "compressible",
+    "incompressible"
+  ],
+  "writer_shapes": [
+    "payload-heavy"
+  ],
+  "samples": 100,
+  "warmups": 5,
+  "cpu": 2,
+  "workers": 1,
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "binary_paths": {
+    "control": "/tmp/litchi-goal-0470/control",
+    "candidate": "/tmp/litchi-goal-0470/candidate"
+  },
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "expected_rows": 25,
+  "expected_synthetic_rows": 24,
+  "expected_writer_rows": 1,
+  "performance_claim": "none",
+  "strict_abba": {
+    "profile": "current-v1",
+    "all_rows": true,
+    "report_projection": false,
+    "counter_erasure": false
+  },
+  "original_full_guard": {
+    "review_summary": "review-summary.json",
+    "canonical_summary": "summary.json",
+    "rows": 201,
+    "raw_flags_above_five_percent": 131,
+    "canonical_regressions": 75,
+    "threshold_percent": 5.0
+  },
+  "prior_capture_lanes": [
+    "A1",
+    "B1",
+    "B2",
+    "A2",
+    "A-full",
+    "B-full",
+    "A-heap",
+    "B-heap"
+  ],
+  "prior_rss_lanes": [
+    "rss-A1",
+    "rss-B1",
+    "rss-B2",
+    "rss-A2"
+  ],
+  "original_full_guard_review_sha256": "bb47e4b6291533527a5f351f1954ed8c5350023ff9108c47b3de82267a2597bb",
+  "original_full_guard_summary_sha256": "1031cbcedf89fe520347a7295c48288a694df3122036ac8cba6bd186806b9153",
+  "capture_driver_sha256": "aec23698b65d0ba4199e4fef28c828f494bbe2796296110c7a5fb0ea569235c9"
+}

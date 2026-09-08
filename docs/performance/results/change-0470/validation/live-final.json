@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0470/verify.py",
+    "--live"
+  ],
+  "started_utc": "2026-09-08T07:47:36.457923+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:47:38.181402+00:00",
+  "artifacts": {
+    "live-final.stdout": {
+      "sha256": "f411a5b14cfd1fff4f8a1f363374054b9d4fd9916ae54a7379bc04eadd1fc0e7",
+      "bytes": 2490
+    },
+    "live-final.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

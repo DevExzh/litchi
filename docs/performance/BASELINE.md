@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Current XLSX validation-pass result (0470)
+
+[0470](changes/0470-xlsx-empty-web-proof.md) reuses emitted compaction events
+to prove empty worksheet web bindings, with unchanged full-reader fallback.
+Whole-process allocation calls fall 19.753% (39,892,490 to 32,012,510);
+rounded peak heap remains `104.38M`. All 1,257 XLSX tests and scoped gates pass.
+The diagnostic 100/5 six-row ABBA has lower mean/median/tails but authorizes
+no registered latency claim. An initial roughly eight-percent RSS increase
+does not reproduce in a second matched sequence; control RSS itself varies
+7.25%. The full guard retains 75 latency flags, and a targeted 25-row ABBA
+still shows roughly five-percent slower payload-heavy PPT creation and small
+CFB-read penalties. All individual observations and limitations remain retained.
+
 ## Current XLSX compaction allocation result (0469)
 
 [0469](changes/0469-xlsx-borrowed-compaction-events.md) removes temporary event

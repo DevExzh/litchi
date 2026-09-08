@@ -1,0 +1,92 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0470/guard-A1/resource.log",
+    "/tmp/litchi-goal-0470/control",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "100",
+    "--case",
+    "cfb_shared_read_one,opc_noop_save,cfb_read_one,opc_source_open,ppt_fresh_write_to",
+    "--shape",
+    "many-small,few-large,wide-root",
+    "--writer-shape",
+    "payload-heavy",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0470/guard-A1/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0470/guard-A1/corpus-catalog.json"
+  ],
+  "artifacts": {
+    "corpus-catalog.json": {
+      "bytes": 71392,
+      "sha256": "166030d581f330f30811b3c8869492afcfd4fefa22f21b8c7ff95c2e14e36238"
+    },
+    "report.json": {
+      "bytes": 406898,
+      "sha256": "1052c94773c85833480fa9b3cc5503530ae3d9e51f4c280689fa73eb076e5e6d"
+    },
+    "resource.log": {
+      "bytes": 1142,
+      "sha256": "8d834429872fef6d78a87dbc25419a0c5426ae9e5717ea1c5dc580c786538864"
+    },
+    "started.json": {
+      "bytes": 2320,
+      "sha256": "3a1b746ed99d305b9b6bfa03d25bc4b5ecf4ca69e02d30d27993665ab95a481b"
+    },
+    "stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary_bytes": 463620664,
+  "binary_path": "/tmp/litchi-goal-0470/control",
+  "binary_sha256": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da",
+  "binary_unchanged": true,
+  "binding_sha256": "8d1b84810c52188d795cec72b634a6469b0534f159338a19c9e46d1eab107a5c",
+  "capture_driver_sha256": "aec23698b65d0ba4199e4fef28c828f494bbe2796296110c7a5fb0ea569235c9",
+  "clean_after": true,
+  "clean_before": true,
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T07:34:14.970416+00:00",
+  "fixture_inventory": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "lane": "guard-A1",
+  "protocol_sha256": "4e76180ac62c7fbc62ed6191cc2fbc39aaf13aa3f0bcf2a2b41dd5d4be37b8ca",
+  "report_metadata_matches_clean_role": true,
+  "revision": "7cc58fc1b37144f15b7bde13a9598e396e5089eb",
+  "role": "control",
+  "samples": 100,
+  "schema": "litchi-0470-targeted-guard-capture-v1",
+  "source_inventory_count": 6992,
+  "source_inventory_sha256": "1240432ac558c45ce2123cdf5462a77bca6ebf1d2441c0d3dcc9de9c9e9511f8",
+  "source_inventory_verified_before": true,
+  "source_manifest": "sources/control.json",
+  "source_manifest_sha256": "1240432ac558c45ce2123cdf5462a77bca6ebf1d2441c0d3dcc9de9c9e9511f8",
+  "started_utc": "2026-09-08T07:34:11.660904+00:00",
+  "warmups": 5
+}

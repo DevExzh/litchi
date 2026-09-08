@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "scope": "staged owned changes excluding two immutable raw Heaptrack stderr artifacts",
+  "excluded_raw_artifacts": [
+    "docs/performance/results/change-0470/A-heap/stderr.log",
+    "docs/performance/results/change-0470/B-heap/stderr.log"
+  ],
+  "reason": "Each raw artifact retains one original trailing space on line 1.",
+  "scoped_exit_code": 0
+}
