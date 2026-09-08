@@ -34,10 +34,10 @@ use thiserror::Error;
 use super::{Package, PhysicalSource, SLIDE_MESSAGE_TYPE, SemanticPath};
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
-mod budget;
+pub(in crate::package) mod budget;
 mod clone_payload;
 mod comment_clone;
-mod comment_graph;
+pub(in crate::package) mod comment_graph;
 mod comment_removal;
 mod graph;
 pub(super) mod graph_caption_witness;
@@ -45,7 +45,7 @@ mod identifier_watermark;
 mod metadata;
 mod node_cache;
 
-use budget::LifecycleBudget;
+pub(in crate::package) use budget::LifecycleBudget;
 use graph::MediaGraphSelection;
 
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -151,9 +151,9 @@ pub enum SlideMediaLifecycleError {
 /// The 128-bit identity used by native build chunks, kept private to the
 /// package adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct SuperUuid {
-    pub(super) lower: u64,
-    pub(super) upper: u64,
+pub(in crate::package) struct SuperUuid {
+    pub(in crate::package) lower: u64,
+    pub(in crate::package) upper: u64,
 }
 
 impl From<identity_codec::UuidBits> for SuperUuid {

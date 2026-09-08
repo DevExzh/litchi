@@ -2,6 +2,98 @@
 
 use litchi_core::Position;
 
+/// Selects one drawable owned by a selected slide in source order.
+///
+/// The position is resolved against the package's direct-drawable inventory;
+/// it is intentionally not a native object identifier.  A selector can be
+/// constructed without a package, but package operations validate ownership
+/// before they read or mutate anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DrawableSelector(Position);
+
+impl DrawableSelector {
+    /// Construct a selector from a checked source position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self(position)
+    }
+
+    /// Construct a selector from a zero-based source index.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::position(Position::new(index))
+    }
+
+    /// Return the selected source position.
+    #[must_use]
+    pub const fn as_position(self) -> Position {
+        self.0
+    }
+
+    /// Return the selected source index.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        self.0.get()
+    }
+}
+
+impl From<Position> for DrawableSelector {
+    fn from(position: Position) -> Self {
+        Self::position(position)
+    }
+}
+
+impl From<usize> for DrawableSelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+/// Selects one direct reply by its checked ordinal in the comment thread.
+///
+/// Reply storage identifiers are deliberately excluded.  The ordinal is
+/// checked against the complete source thread before a mutation is staged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ReplySelector(Position);
+
+impl ReplySelector {
+    /// Construct a selector from a checked reply ordinal.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self(position)
+    }
+
+    /// Construct a selector from a zero-based reply ordinal.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::position(Position::new(index))
+    }
+
+    /// Return the selected reply ordinal.
+    #[must_use]
+    pub const fn as_position(self) -> Position {
+        self.0
+    }
+
+    /// Return the selected reply ordinal.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        self.0.get()
+    }
+}
+
+impl From<Position> for ReplySelector {
+    fn from(position: Position) -> Self {
+        Self::position(position)
+    }
+}
+
+impl From<usize> for ReplySelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
 /// Selects one slide by its exact navigator name or checked source position.
 ///
 /// A navigator name is a developer-facing Keynote property distinct from the

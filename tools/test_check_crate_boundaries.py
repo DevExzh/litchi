@@ -3913,6 +3913,8 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "fn reserve_core_header_work_inner(source: &ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget, rewrite: bool) { let bytes = source.header_length; let events = additional_references; budget.charge_allocation_plan(bytes, events); budget.charge_wire_work(bytes); let _ = (limits, rewrite); }\n"
         ),
         "comment_graph.rs": (
+            "enum CommentGraphPayloadPolicy { Strict, PreserveRootExtensions }\n"
+            "impl CommentGraphPayloadPolicy { fn reject_unknown_root_fields(self) -> bool { Strict; PreserveRootExtensions; true } }\n"
             "struct CommentStorageIdentity { identifier: u64, uuid: Option<SuperUuid> }\n"
             "struct CommentAuthorDependency;\n"
             "struct CommentGraphPlan { storage_ids: Vec<u64>, storage_identities: Vec<CommentStorageIdentity>, author_ids: Vec<u64>, author_dependencies: Vec<CommentAuthorDependency> }\n"
@@ -3920,9 +3922,11 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "fn plan_comment_graph(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) {\n"
             "    comment_storage_codec; decode_comment_storage_archive_with_visitor; CommentStorageVisitor; ReplyCollector;\n"
             "    storage_ids; storage_identities; author_ids; author_dependencies; binary_search; InvalidSource;\n"
-            "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve;\n"
+            "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve; CommentGraphPayloadPolicy::Strict; plan_comment_graph_with_policy;\n"
             "    let _ = (package, component_name, root, limits, budget);\n"
             "}\n"
+            "fn plan_comment_graph_preserving_extensions(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) { plan_comment_graph_with_policy(package, component_name, root, limits, budget, CommentGraphPayloadPolicy::PreserveRootExtensions); }\n"
+            "fn plan_comment_graph_with_policy(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget, policy: CommentGraphPayloadPolicy) { let _ = (package, component_name, root, limits, budget, policy, reject_unknown_root_fields); }\n"
         ),
             "comment_removal.rs": (
             "struct CommentRemovalPlan { removed_object_ids: Vec<u64>, retained_comment_storage_ids: Vec<u64>, unused_external_author_ids: Vec<u64> }\n"
@@ -20610,6 +20614,60 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("must remain private" in item for item in violations), violations)
 
+    def test_keynote_slide_media_lifecycle_allows_only_shared_internal_children(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+
+            shared = source.replace(
+                "mod budget;\n", "pub(in crate::package) mod budget;\n", 1
+            ).replace(
+                "mod comment_graph;\n",
+                "pub(in crate::package) mod comment_graph;\n",
+                1,
+            )
+            owner.write_text(shared, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                shared.replace(
+                    "mod graph;\n", "pub(in crate::package) mod graph;\n", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("child modules must remain private" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                shared.replace(
+                    "pub(in crate::package) mod budget;\n",
+                    "pub(crate) mod budget;\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("child modules must remain private" in item for item in violations),
+                violations,
+            )
+
     def test_keynote_slide_media_lifecycle_transaction_requires_one_budget_and_children(
         self,
     ) -> None:
@@ -20625,6 +20683,40 @@ fn rewrite_movie_title_operation(
 
             owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
             source = owner.read_text(encoding="utf-8")
+            comment_graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs"
+            comment_graph_source = comment_graph.read_text(encoding="utf-8")
+            comment_graph.write_text(
+                comment_graph_source.replace(
+                    "CommentGraphPayloadPolicy::Strict",
+                    "CommentGraphPayloadPolicy::PreserveRootExtensions",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("clone wrapper strict" in item for item in violations), violations)
+            comment_graph.write_text(comment_graph_source, encoding="utf-8")
+
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "plan_comment_graph(package,",
+                    "plan_comment_graph_preserving_extensions(package,",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not use the drawable extension-preserving" in item for item in violations),
+                violations,
+            )
+            graph.write_text(graph_source, encoding="utf-8")
             owner.write_text(source.replace("mod comment_graph;\n", "", 1), encoding="utf-8")
             violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 root
@@ -44909,6 +45001,191 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_keynote_slide_preview_source_topology()",
+            main_source,
+        )
+
+    def test_annotation_author_codec_boundary_accepts_checked_in_source(self) -> None:
+        self.assertEqual(boundaries.audit_annotation_author_codec_source_topology(), [])
+
+    def test_annotation_author_codec_boundary_rejects_eager_prost_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.ANNOTATION_AUTHOR_CODEC_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            source = root / boundaries.ANNOTATION_AUTHOR_CODEC_SOURCE
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + "\nfn eager_drift(bytes: &[u8]) { let _ = prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_annotation_author_codec_source_topology(root)
+            self.assertTrue(any("prost import" in item for item in violations), violations)
+
+    def test_keynote_drawable_comment_boundary_accepts_checked_in_owner(self) -> None:
+        self.assertEqual(
+            boundaries.audit_keynote_slide_drawable_comment_source_topology(), []
+        )
+
+    def test_keynote_drawable_comment_boundary_rejects_public_child_and_missing_receipt(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES,
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            fixture = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_bytes(b"native source receipt")
+            native_test = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE
+            native_test.parent.mkdir(parents=True, exist_ok=True)
+            native_test.write_text(
+                "const SOURCE: &[u8] = include_bytes!(\"../../../test-data/iwork/keynote/"
+                "drawable-comments-source-native.key\");\n"
+                "#[test]\nfn permanent_native_fixture_is_pinned() {}\n",
+                encoding="utf-8",
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "mod engine;", "pub mod engine;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(any("child modules must remain private" in item for item in violations), violations)
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "metadata.rs"
+            metadata.write_text(
+                metadata.read_text(encoding="utf-8").replace(
+                    "mod identities;", "pub mod identities;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("identities child must remain private" in item for item in violations),
+                violations,
+            )
+
+            fixture.unlink()
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(any("missing native source fixture" in item for item in violations), violations)
+
+    def test_keynote_drawable_comment_boundary_requires_component_fail_closed_guards(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES,
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            fixture = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_bytes(b"native source receipt")
+            native_test = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE
+            native_test.parent.mkdir(parents=True, exist_ok=True)
+            native_test.write_text(
+                "const SOURCE: &[u8] = include_bytes!(\"../../../test-data/iwork/keynote/"
+                "drawable-comments-source-native.key\");\n"
+                "#[test]\nfn permanent_native_fixture_is_pinned() {}\n",
+                encoding="utf-8",
+            )
+
+            graph = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "graph.rs"
+            original = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                original.replace(
+                    "if component_name != context.component_name.as_ref() {",
+                    "if false {",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("foreign drawable-component fail-closed guard" in item for item in violations),
+                violations,
+            )
+
+            graph.write_text(original, encoding="utf-8")
+            graph.write_text(
+                original.replace(
+                    "plan_comment_graph_preserving_extensions",
+                    "plan_comment_graph",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must use the extension-preserving" in item for item in violations),
+                violations,
+            )
+            graph.write_text(original, encoding="utf-8")
+
+            graph.write_text(
+                original.replace(
+                    "if component_name != plan.component_name.as_ref()",
+                    "if false {",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("foreign comment/reply-component fail-closed guard" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_drawable_comment_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_annotation_author_codec_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_keynote_slide_drawable_comment_source_topology()",
             main_source,
         )
 

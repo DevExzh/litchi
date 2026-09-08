@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec/lifecycle.rs");
+    println!("cargo:rerun-if-changed=src/annotation_author_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/table_model_discovery_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
@@ -368,6 +369,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_comment_storage_projection_budget(&buffa_comment_storage_out_directory)?;
+
+    // Annotation authors and the package-owned author storage list share a
+    // deliberately small lazy projection. Repeated source fields remain
+    // bounded by the handwritten codec; Buffa supplies borrowed nested views
+    // and the canonical writer's private ViewEncode surface.
+    let buffa_annotation_author_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-annotation-author");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSKAnnotationAuthorProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_annotation_author_out_directory)
+        .include_file("iwa_annotation_author_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_annotation_author_projection_budget(&buffa_annotation_author_out_directory)?;
 
     // Group-by category labels need only a zero-field GroupNode envelope plus
     // UUID and four scalar wrappers. The streaming adapter routes recursive
@@ -1649,6 +1671,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d",
         ),
         (
+            "TSKAnnotationAuthorProjection.proto",
+            1135,
+            "9278faa77786d60fb25867f2871c846c2bb92fba286524837bc5afd9fae8e66d",
+        ),
+        (
             "TSDDrawableParentArchive.proto",
             411,
             "55c88e34fb819fd629da76c77b6875ab0c2898b29433ffc75843b7be7b4adb11",
@@ -1876,6 +1903,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/comment_storage_codec.rs",
             "crate::buffa_comment_storage_generated::",
             "mod buffa_comment_storage_generated {",
+        ),
+        (
+            "src/annotation_author_codec.rs",
+            "crate::buffa_annotation_author_generated::",
+            "mod buffa_annotation_author_generated {",
         ),
         (
             "src/group_node_category_codec.rs",
@@ -2181,6 +2213,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_build_creation_codec.rs",
             "crate::buffa_keynote_build_creation_generated::",
             "mod buffa_keynote_build_creation_generated {",
+        ),
+        (
+            "src/annotation_author_codec.rs",
+            "crate::buffa_annotation_author_generated::",
+            "mod buffa_annotation_author_generated {",
         ),
     ];
     // This scalar projection deliberately uses Buffa's borrowed eager view
@@ -3053,7 +3090,15 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         || production_codec.contains("prost")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
-        || production_codec.contains("try_encode")
+        // The direct-leaf writer uses one private caller-buffered Buffa
+        // encoder after its semantic/resource preflight.  Keep the old
+        // blanket `try_encode` ratchet for every other encoder spelling, but
+        // admit exactly that bounded entry point here.
+        || (production_codec.contains("try_encode")
+            && (production_codec.matches("try_encode_bounded").count() != 1
+                || production_codec
+                    .replace("try_encode_bounded", "")
+                    .contains("try_encode")))
         || production_codec.contains(".encode(")
         || production_codec.contains("pub fn encode_comment_storage_archive")
         || production_codec.contains("pub fn to_owned_comment_storage")
@@ -9502,6 +9547,49 @@ fn enforce_comment_storage_projection_budget(directory: &Path) -> Result<(), Box
             "Numbers comment-storage projection generated {} files/{bytes} bytes; expected {} files and at most {MAX_GENERATED_BYTES} bytes",
             files.len(),
             EXPECTED_FILES.len(),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_annotation_author_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaAnnotationAuthorProjection.mod.rs",
+        "TSKAnnotationAuthorProjection.__lazy_view.rs",
+        "TSKAnnotationAuthorProjection.__view.rs",
+        "TSKAnnotationAuthorProjection.rs",
+        "iwa_annotation_author_buffa_protos.rs",
+    ];
+    const MAX_GENERATED_BYTES: u64 = 220_000;
+
+    let mut files = Vec::new();
+    let mut bytes = 0u64;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files.push(
+            entry
+                .file_name()
+                .to_str()
+                .ok_or("generated filename is not UTF-8")?
+                .to_owned(),
+        );
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+    }
+    files.sort_unstable();
+    let mut expected = EXPECTED_FILES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect::<Vec<_>>();
+    expected.sort_unstable();
+    if files != expected || bytes > MAX_GENERATED_BYTES {
+        return Err(format!(
+            "annotation-author projection generated {files:?}/{bytes} bytes; expected {expected:?} and at most {MAX_GENERATED_BYTES} bytes"
         )
         .into());
     }

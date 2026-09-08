@@ -188,6 +188,45 @@ mod buffa_comment_storage_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for TSK annotation authors and the
+/// package-owned author storage list. Rewrites keep the source payload
+/// authoritative; generated views are used only after strict preflight and
+/// for bounded canonical author creation.
+#[doc(hidden)]
+mod buffa_annotation_author_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated annotation-author views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-annotation-author/iwa_annotation_author_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the GroupNode category-label path.
 ///
 /// It includes only an empty node envelope, UUID identity, and the scalar
@@ -1967,6 +2006,11 @@ pub mod hyperlink_codec;
 /// private, and replies are streamed from caller-owned source bytes.
 #[doc(hidden)]
 pub mod comment_storage_codec;
+
+/// Internal strict, source-preserving annotation-author and author-storage
+/// codec. Generated Buffa types remain private to this crate.
+#[doc(hidden)]
+pub mod annotation_author_codec;
 
 /// Internal raw GroupNode category-label projection implemented by the
 /// private Buffa sidecar. Generated types remain inaccessible to downstream

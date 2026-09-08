@@ -3586,9 +3586,18 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
     r"(?:r#)?slide_media_lifecycle\b"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
-    r"(?:r#)?(?:comment_graph|comment_removal|graph|identifier_watermark|metadata|budget|clone_payload|node_cache)\b"
+    r"(?m)^[ \t]*(?P<visibility>pub(?:\([^()\n]*\))?)[ \t]+mod[ \t]+"
+    r"(?P<name>(?:r#)?(?:comment_graph|comment_removal|graph|identifier_watermark|metadata|budget|clone_payload|node_cache))\b"
 )
+# These two adapters are intentionally visible to the containing ``package``
+# module because the focused drawable-comment owner reuses their bounded
+# budget and same-component comment graph.  The exact restricted visibility is
+# part of the boundary: widening either module, or exposing any other lifecycle
+# child, remains an audit failure.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_MODULES = frozenset(
+    {"budget", "comment_graph"}
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_VISIBILITY = "pub(in crate::package)"
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
         "duplicate_slide_media",
@@ -3664,6 +3673,268 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RAW_ID_PARAMETER = re.compile(
     r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
     r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
     r"(?=$|[^A-Za-z0-9_])"
+)
+
+# The direct-drawable comment route is a separate semantic owner from media
+# lifecycle.  Keep its inventory explicit while the host still retains the
+# compatibility CRUD surface: this ratchet reviews the new Package API and
+# its private graph/transaction children, but intentionally performs no host
+# retirement.  A future native/reply acceptance pass may add that retirement
+# audit without weakening this source-ownership boundary.
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_drawable_comments.rs"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_drawable_comments"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES = (
+    KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "engine.rs",
+    KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "graph.rs",
+    KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "metadata.rs",
+    KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "metadata" / "identities.rs",
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "comment.rs"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_MODULE = re.compile(
+    r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_drawable_comments[ \t]*;"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?slide_drawable_comments\b"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_CHILD_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?(?:engine|graph|metadata)\b"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PRIVATE_IDENTITY_MODULE = re.compile(
+    r"(?m)^[ \t]*mod[ \t]+(?:r#)?identities[ \t]*;"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_IDENTITY_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?identities\b"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_METHODS = frozenset(
+    {
+        "slide_drawables",
+        "slide_drawable_comment",
+        "slide_drawable_comment_replies",
+        "edit_slide_drawable_comment",
+        "apply_slide_drawable_comment",
+    }
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_EDIT_METHODS = frozenset(
+    {
+        "set",
+        "clear",
+        "add_reply",
+        "set_reply",
+        "remove_reply",
+        "commit",
+    }
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES = frozenset(
+    {
+        "DrawableSummary",
+        "SlideDrawableCommentCommit",
+        "SlideDrawableCommentDiagnostics",
+        "SlideDrawableCommentEdit",
+        "SlideDrawableCommentError",
+        "SlideDrawableCommentLimitKind",
+        "SlideDrawableCommentPatch",
+    }
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_TYPES = frozenset(
+    {"Comment", "CommentAuthor", "CommentTimestamp", "DrawableKind", "Reply"}
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "DrawableSelector", "ReplySelector", "Position"}
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "EntryEdit",
+        "ExactArtifacts",
+        "LifecycleBudget",
+        "MessageInfo",
+        "PhysicalSource",
+        "RawMessage",
+        "Selection",
+        "SnappyStream",
+        "SourceCatalog",
+        "ThreadSnapshot",
+        "WireLimits",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_WIRE_TYPES = frozenset(
+    {
+        "AnnotationAuthorSnapshot",
+        "AnnotationAuthorStorageSnapshot",
+        "CommentStorageSnapshot",
+        "DecodeError",
+        "DecodeOptions",
+        "DecodeReport",
+        "EncodeError",
+        "EncodeOptions",
+        "RawMessage",
+        "ReferenceRecord",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "UuidSnapshot",
+    }
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:author|comment|drawable|message|object|reference|reply|"
+    r"storage|thread|uuid)[A-Za-z_]*(?:id|identifier))[ \t\r\n]*"
+    r":[ \t\r\n]*(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_MARKER_GROUPS = {
+    "selector-first graph": (
+        "SlideSelector",
+        "DrawableSelector",
+        "select_drawable",
+        "inventory_drawables",
+    ),
+    "semantic comment/reply operations": (
+        "Comment",
+        "Reply",
+        "set_reply",
+        "remove_reply",
+        "add_reply",
+        "clear",
+    ),
+    "shared bounded transaction ledger": (
+        "LifecycleBudget",
+        "budget_for",
+        "LimitExceeded",
+        "WireLimits",
+        "try_reserve",
+    ),
+    "lazy source-preserving codec route": (
+        "comment_storage_codec",
+        "annotation_author_codec",
+        "WireView",
+        "unknown",
+        "source",
+    ),
+    "exact candidate publication": (
+        "ExactArtifacts",
+        "candidate",
+        "Verification",
+        "inverse",
+        "PatchConflict",
+    ),
+    "metadata author ownership": (
+        "package_metadata_codec",
+        "MetadataPlan",
+        "AuthorRegistrationPlan",
+        "GENERATED_AUTHOR_PUBLIC_ID",
+    ),
+}
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE = Path(
+    "test-data/iwork/keynote/drawable-comments-source-native.key"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_drawable_comments.rs"
+)
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_NAME = "permanent_native_fixture_is_pinned"
+
+# Annotation authors are a neutral wire codec consumed by the Keynote owner.
+# Keep the generated Buffa projection private and the source-preserving codec
+# inventory independent of any one format owner so Numbers/Pages may reuse it.
+ANNOTATION_AUTHOR_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/annotation_author_codec.rs"
+)
+ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/buffa-projections/TSKAnnotationAuthorProjection.proto"
+)
+ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE = Path("crates/litchi-iwa-protos/src/lib.rs")
+ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE = Path("crates/litchi-iwa-protos/build.rs")
+ANNOTATION_AUTHOR_CODEC_GENERATED_MODULE = "buffa_annotation_author_generated"
+ANNOTATION_AUTHOR_CODEC_APIS = frozenset(
+    {
+        "decode_annotation_author",
+        "decode_annotation_author_with_report",
+        "decode_annotation_author_storage",
+        "decode_annotation_author_storage_with_report",
+        "encode_annotation_author",
+        "encode_annotation_author_with_report",
+        "encode_annotation_author_storage",
+        "encode_annotation_author_storage_with_report",
+        "prepare_annotation_author_storage_rewrite",
+        "rewrite_annotation_author_storage",
+    }
+)
+ANNOTATION_AUTHOR_CODEC_TYPES = frozenset(
+    {
+        "AnnotationAuthorSnapshot",
+        "AnnotationAuthorStorageSnapshot",
+        "AnnotationAuthorWrite",
+        "AnnotationAuthorStorageWrite",
+        "AuthorColorWrite",
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "EncodeError",
+        "EncodeLimit",
+        "EncodeOptions",
+        "EncodeReport",
+        "PreparedAnnotationAuthorStorageRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+    }
+)
+ANNOTATION_AUTHOR_CODEC_MARKER_GROUPS = {
+    "lazy Buffa view ingress": (
+        "buffa",
+        "decode_lazy_view",
+        "LazyView",
+        "ViewEncode",
+    ),
+    "strict author/storage field validation": (
+        "AUTHOR_NAME_FIELD",
+        "AUTHOR_PUBLIC_ID_FIELD",
+        "STORAGE_AUTHOR_FIELD",
+        "duplicate",
+        "require_wire",
+    ),
+    "unknown-field/source preservation": (
+        "unknown",
+        "raw",
+        "source",
+        "preserv",
+        "source_order",
+    ),
+    "bounded decode/encode accounting": (
+        "max_message_bytes",
+        "max_fields",
+        "max_work_bytes",
+        "max_allocations",
+        "try_reserve_exact",
+        "RewriteExecutionRequirements",
+    ),
+}
+ANNOTATION_AUTHOR_CODEC_FORBIDDEN_PATTERNS = (
+    (
+        "prost import",
+        re.compile(r"(?<![A-Za-z0-9_#])prost(?:_types)?[ \t\r\n]*::"),
+    ),
+    (
+        "eager generated decode",
+        re.compile(
+            r"\b(?:Message|[A-Za-z_][A-Za-z0-9_]*Archive)[ \t\r\n]*::"
+            r"[ \t\r\n]*(?:decode|encode_to_vec)\b"
+        ),
+    ),
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/keynote_media_lifecycle_codec.rs"
@@ -3898,9 +4169,18 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_APIS = (
     "CommentStorageIdentity",
     "CommentAuthorDependency",
     "CommentGraphPlan",
+    "CommentGraphPayloadPolicy",
     "plan_comment_graph",
+    "plan_comment_graph_preserving_extensions",
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_MARKER_GROUPS = {
+    "strict versus extension-preserving policy": (
+        "CommentGraphPayloadPolicy",
+        "Strict",
+        "PreserveRootExtensions",
+        "reject_unknown_root_fields",
+        "plan_comment_graph_preserving_extensions",
+    ),
     "strict comment-storage visitor": (
         "comment_storage_codec",
         "decode_comment_storage_archive_with_visitor",
@@ -57208,7 +57488,14 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             "focused Keynote media lifecycle child module must remain private: "
             f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
         )
-    if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE.search(owner):
+    for match in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE.finditer(owner):
+        visibility = match.group("visibility")
+        name = match.group("name").removeprefix("r#")
+        if (
+            visibility == KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_VISIBILITY
+            and name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_MODULES
+        ):
+            continue
         violations.append(
             "focused Keynote media lifecycle child modules must remain private: "
             f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
@@ -57545,6 +57832,27 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 )
 
         graph_code = child_sources_by_name.get("graph", "")
+        strict_start = comment_graph_code.find("fn plan_comment_graph(")
+        preserving_start = comment_graph_code.find(
+            "fn plan_comment_graph_preserving_extensions(", strict_start + 1
+        )
+        strict_body = comment_graph_code[
+            strict_start : preserving_start if preserving_start >= 0 else len(comment_graph_code)
+        ]
+        if (
+            strict_start < 0
+            or "CommentGraphPayloadPolicy::Strict" not in strict_body
+            or "plan_comment_graph_with_policy" not in strict_body
+        ):
+            violations.append(
+                "focused Keynote media lifecycle comment graph must keep its clone wrapper strict: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+            )
+        if re.search(r"\bplan_comment_graph_preserving_extensions\s*\(", graph_code):
+            violations.append(
+                "focused Keynote media lifecycle graph must not use the drawable extension-preserving "
+                f"comment plan: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
         if not re.search(
             r"\bplan_comment_graph\s*\([^)]*\bbudget\b",
             graph_code,
@@ -58273,6 +58581,511 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             "without shifting source-order positions: "
             f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
         )
+    return sorted(set(violations))
+
+
+def _keynote_slide_drawable_comment_owner_present(root: Path) -> bool:
+    """Return whether the selector-first drawable-comment owner is wired."""
+
+    owner_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES[0]
+    if not owner_path.is_file() or not package_path.is_file():
+        return False
+    package = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    )
+    return KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_MODULE.search(package) is not None
+
+
+def _keynote_slide_drawable_comment_owner_sources(root: Path) -> list[Path]:
+    """Return the public owner and private graph/metadata implementation files."""
+
+    owner = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE
+    children = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT
+    paths = [owner] if owner.is_file() else []
+    if children.is_dir():
+        # The metadata owner has a private child directory.  Keep the entire
+        # owner closure in the source inventory so a new nested wire helper
+        # cannot silently evade the public-leak and marker ratchets.
+        paths.extend(sorted(children.rglob("*.rs")))
+    return paths
+
+
+def audit_annotation_author_codec_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the neutral annotation-author codec lazy, bounded, and private-wire."""
+
+    source_path = root / ANNOTATION_AUTHOR_CODEC_SOURCE
+    if not source_path.is_file():
+        return []
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    source = _mask_rust_cfg_test_items(raw_source)
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+
+    for api in sorted(ANNOTATION_AUTHOR_CODEC_APIS):
+        if re.search(
+            rf"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            rf"(?:r#)?{re.escape(api)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "annotation-author codec is missing strict API "
+                f"{api}: {ANNOTATION_AUTHOR_CODEC_SOURCE}"
+            )
+    for type_name in sorted(ANNOTATION_AUTHOR_CODEC_TYPES):
+        if re.search(
+            rf"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            rf"(?:struct|enum|type)[ \t]+(?:r#)?{re.escape(type_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "annotation-author codec is missing strict type "
+                f"{type_name}: {ANNOTATION_AUTHOR_CODEC_SOURCE}"
+            )
+
+    for label, markers in ANNOTATION_AUTHOR_CODEC_MARKER_GROUPS.items():
+        if not any(marker in raw_source for marker in markers):
+            violations.append(
+                "annotation-author codec is missing "
+                f"{label} marker: {ANNOTATION_AUTHOR_CODEC_SOURCE}"
+            )
+
+    for label, pattern in ANNOTATION_AUTHOR_CODEC_FORBIDDEN_PATTERNS:
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "annotation-author codec production source uses "
+                f"{label}: {ANNOTATION_AUTHOR_CODEC_SOURCE}:{line_number}"
+            )
+
+    projection_path = root / ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE
+    if not projection_path.is_file():
+        violations.append(
+            "annotation-author codec is missing its Buffa projection: "
+            f"{ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE}"
+        )
+    else:
+        # This is a protobuf projection, not Rust. Keep its literal syntax
+        # visible instead of passing it through the Rust string masker.
+        projection = projection_path.read_text(encoding="utf-8")
+        for marker in (
+            'syntax = "proto2"',
+            "message Color",
+            "message Reference",
+            "message AnnotationAuthorArchive",
+            "message AnnotationAuthorStorageArchive",
+            "required uint64 identifier",
+            "optional string public_id",
+        ):
+            if marker not in projection:
+                violations.append(
+                    "annotation-author Buffa projection is missing "
+                    f"{marker}: {ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE}"
+                )
+
+    public_path = root / ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE
+    if not public_path.is_file():
+        violations.append(
+            "annotation-author codec is missing its public module source: "
+            f"{ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE}"
+        )
+    else:
+        public = public_path.read_text(encoding="utf-8")
+        public_code = _mask_rust_non_code(public)
+        if re.search(
+            rf"(?m)^\s*pub\s+mod\s+{re.escape('annotation_author_codec')}\s*;",
+            public_code,
+        ) is None:
+            violations.append(
+                "annotation-author codec module is missing its hidden public ingress: "
+                f"{ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*pub\s+mod\s+{re.escape(ANNOTATION_AUTHOR_CODEC_GENERATED_MODULE)}\b",
+            public_code,
+        ) is not None:
+            violations.append(
+                "annotation-author generated Buffa module must remain private: "
+                f"{ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*mod\s+{re.escape(ANNOTATION_AUTHOR_CODEC_GENERATED_MODULE)}\s*\{{",
+            public_code,
+        ) is None:
+            violations.append(
+                "annotation-author generated Buffa module is missing: "
+                f"{ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE}"
+            )
+        if "/buffa-annotation-author/iwa_annotation_author_buffa_protos.rs" not in public:
+            violations.append(
+                "annotation-author generated Buffa include is missing: "
+                f"{ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE}"
+            )
+
+    build_path = root / ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE
+    if not build_path.is_file():
+        violations.append(
+            "annotation-author codec is missing build-script provenance: "
+            f"{ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE}"
+        )
+    else:
+        build = build_path.read_text(encoding="utf-8")
+        for marker in (
+            "src/annotation_author_codec.rs",
+            "TSKAnnotationAuthorProjection.proto",
+            "enforce_annotation_author_projection_budget",
+            "buffa-annotation-author",
+        ):
+            if marker not in build:
+                violations.append(
+                    "annotation-author build script is missing "
+                    f"{marker}: {ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE}"
+                )
+        if re.search(
+            rf"(?s){re.escape('src/annotation_author_codec.rs')}.*?"
+            rf"{re.escape(ANNOTATION_AUTHOR_CODEC_GENERATED_MODULE)}",
+            build,
+        ) is None:
+            violations.append(
+                "annotation-author production ingress is not tied to its private generated module: "
+                f"{ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE}"
+            )
+
+    if not re.search(r"(?m)^\s*#\s*\[test\b", raw_source):
+        violations.append(
+            "annotation-author codec is missing direct unit coverage: "
+            f"{ANNOTATION_AUTHOR_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_drawable_comment_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep direct drawable comments semantic while host CRUD remains pending."""
+
+    if not _keynote_slide_drawable_comment_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES
+    )
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    semantic = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+    owner_code = _mask_rust_non_code(owner)
+    semantic_code = _mask_rust_non_code(semantic)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    all_owner_code = "\n".join(
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for path in _keynote_slide_drawable_comment_owner_sources(root)
+        if path.is_file()
+    )
+
+    if KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_MODULE.search(package + library):
+        violations.append(
+            "focused Keynote drawable-comment owner modules must remain private: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES[0]}"
+        )
+    if KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_MODULE.search(package) is None:
+        violations.append(
+            "focused Keynote drawable-comment Package module is missing: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES[0]}"
+        )
+    for child in ("engine", "graph", "metadata"):
+        if re.search(
+            rf"(?m)^\s*mod\s+{re.escape(child)}\s*;", owner_code
+        ) is None:
+            violations.append(
+                "focused Keynote drawable-comment owner is missing private child "
+                f"{child}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+    if KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_CHILD_MODULE.search(owner_code):
+        violations.append(
+            "focused Keynote drawable-comment child modules must remain private: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+        )
+    for relative in KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES:
+        if not (root / relative).is_file():
+            violations.append(
+                "focused Keynote drawable-comment owner is missing child source: "
+                f"{relative}"
+            )
+
+    metadata_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "metadata.rs"
+    metadata = (
+        _mask_rust_cfg_test_items(metadata_path.read_text(encoding="utf-8"))
+        if metadata_path.is_file()
+        else ""
+    )
+    metadata_code = _mask_rust_non_code(metadata)
+    if metadata_path.is_file() and (
+        KEYNOTE_SLIDE_DRAWABLE_COMMENT_PRIVATE_IDENTITY_MODULE.search(metadata_code)
+        is None
+    ):
+        violations.append(
+            "focused Keynote drawable-comment metadata is missing its private identities child: "
+            f"{metadata_path.relative_to(root)}"
+        )
+    if KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_IDENTITY_MODULE.search(metadata_code):
+        violations.append(
+            "focused Keynote drawable-comment metadata identities child must remain private: "
+            f"{metadata_path.relative_to(root)}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES):
+        for source, path in (
+            (owner, owner_path),
+            (package, package_path),
+            (library, lib_path),
+        ):
+            if name not in _rust_canonical_exports(
+                source, KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused Keynote drawable-comment public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+    for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_TYPES):
+        if name not in _rust_canonical_exports(
+            semantic + library, KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_TYPES
+        ):
+            violations.append(
+                "focused Keynote drawable-comment semantic API is missing "
+                f"{name}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE}"
+            )
+    for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_SELECTOR_TYPES):
+        if name not in _rust_canonical_exports(
+            library, KEYNOTE_SLIDE_DRAWABLE_COMMENT_SELECTOR_TYPES
+        ):
+            violations.append(
+                "focused Keynote drawable-comment public API is missing selector "
+                f"{name}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES[1]}"
+            )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused Keynote drawable-comment Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_drawable_comment":
+            selectors = (
+                ("SlideSelector",)
+                if name == "slide_drawables"
+                else ("SlideSelector", "DrawableSelector")
+            )
+            for selector in selectors:
+                if not re.search(rf"\b{re.escape(selector)}\b", declaration):
+                    violations.append(
+                        "focused Keynote drawable-comment Package method must accept "
+                        f"selector-first {selector} ({name}): "
+                        f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+                    )
+        if name == "apply_slide_drawable_comment" and not re.search(
+            r"\bSlideDrawableCommentPatch\b", declaration
+        ):
+            violations.append(
+                "focused Keynote drawable-comment apply method must accept its typed patch: "
+                f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+        if re.search(r"\b(?:Archive|RawMessage|WireView|WireLimits|u64)\b", declaration):
+            if "fingerprint" not in declaration:
+                violations.append(
+                    "focused Keynote drawable-comment Package method exposes a raw wire value: "
+                    f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+                )
+        for match in KEYNOTE_SLIDE_DRAWABLE_COMMENT_RAW_ID_PARAMETER.finditer(
+            declaration
+        ):
+            violations.append(
+                "focused Keynote drawable-comment Package method exposes raw identifier "
+                f"{match.group(0).strip()}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(
+            owner, "SlideDrawableCommentEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_EDIT_METHODS):
+        if name not in edit_methods:
+            violations.append(
+                "focused Keynote drawable-comment edit is missing "
+                f"{name}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_DRAWABLE_COMMENT_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_DRAWABLE_COMMENT_EDIT_METHODS
+    )
+    for source, path in (
+        (owner, owner_path),
+        (semantic, semantic_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            # Private fields are intentionally physical inside the owner. Only
+            # inspect a public item header, where a leaked type is observable.
+            header = declaration.split("{", 1)[0]
+            header_identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(header)
+            }
+            for identifier in sorted(header_identifiers):
+                if identifier in KEYNOTE_SLIDE_DRAWABLE_COMMENT_PHYSICAL_TYPES:
+                    violations.append(
+                        "focused Keynote drawable-comment public API exposes archive/IWA type "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                elif identifier in KEYNOTE_SLIDE_DRAWABLE_COMMENT_WIRE_TYPES:
+                    violations.append(
+                        "focused Keynote drawable-comment public API exposes wire type "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                else:
+                    reason = _iwork_public_leak(identifier)
+                    if reason is not None and identifier not in {
+                        # The semantic author value carries an opaque public
+                        # string identifier, not a native object identity.
+                        "public_id",
+                        "SourceCatalog",
+                        "ExactArtifacts",
+                    }:
+                        violations.append(
+                            "focused Keynote drawable-comment public API exposes "
+                            f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                        )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused Keynote drawable-comment public API retains a glob re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    for label, markers in KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_MARKER_GROUPS.items():
+        if not any(marker in all_owner_code for marker in markers):
+            violations.append(
+                "focused Keynote drawable-comment owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+
+    # Drawable-comment CRUD preserves opaque root extensions through its own
+    # bounded admission wrapper.  The lifecycle clone/removal owner remains
+    # strict; keeping the call site explicit prevents either policy from
+    # silently widening the other owner's contract.
+    drawable_graph_code = all_owner_code
+    if not re.search(
+        r"\bplan_comment_graph_preserving_extensions\s*\(", drawable_graph_code
+    ):
+        violations.append(
+            "focused Keynote drawable-comment graph must use the extension-preserving "
+            "comment plan: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / 'graph.rs'}"
+        )
+    if re.search(r"\bplan_comment_graph\s*\(", drawable_graph_code):
+        violations.append(
+            "focused Keynote drawable-comment graph must not use the strict lifecycle "
+            "comment plan: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / 'graph.rs'}"
+        )
+
+    # The host compatibility graph can resolve a comment root/reply globally,
+    # but the focused owner is deliberately narrower until cross-component
+    # parity is designed and proven.  Preserve both pre-allocation locality
+    # guards so a future refactor cannot silently widen the focused contract.
+    for label, marker in (
+        (
+            "foreign drawable-component fail-closed guard",
+            "component_name != context.component_name",
+        ),
+        (
+            "foreign comment/reply-component fail-closed guard",
+            "component_name != plan.component_name",
+        ),
+    ):
+        if marker not in all_owner_code:
+            violations.append(
+                "focused Keynote drawable-comment owner is missing "
+                f"{label}: {KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
+            )
+
+    # This is a source-oracle receipt only. Candidate CRUD/reply acceptance
+    # remains a separate native gate and must not be implied by this check.
+    native_test_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE
+    native_fixture_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE
+    if not native_fixture_path.is_file():
+        violations.append(
+            "focused Keynote drawable-comment owner is missing native source fixture: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE}"
+        )
+    elif native_fixture_path.stat().st_size == 0:
+        violations.append(
+            "focused Keynote drawable-comment native source fixture is empty: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE}"
+        )
+    if not native_test_path.is_file():
+        violations.append(
+            "focused Keynote drawable-comment owner is missing native source test: "
+            f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE}"
+        )
+    else:
+        native_test = native_test_path.read_text(encoding="utf-8")
+        if re.search(
+            rf"\binclude_bytes!\s*\([^)]*"
+            rf"{re.escape(KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE.as_posix())}",
+            native_test,
+        ) is None:
+            violations.append(
+                "focused Keynote drawable-comment source test must include its native fixture: "
+                f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+            rf"{re.escape(KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_NAME)}\b",
+            _mask_rust_non_code(native_test),
+        ) is None:
+            violations.append(
+                "focused Keynote drawable-comment source test is missing its fixture pin: "
+                f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE}"
+            )
     return sorted(set(violations))
 
 
@@ -66442,6 +67255,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_slide_media_lifecycle_facade_source_topology()
         + audit_keynote_slide_media_lifecycle_codec_source_topology()
         + audit_keynote_slide_media_lifecycle_transaction_source_topology()
+        + audit_annotation_author_codec_source_topology()
+        + audit_keynote_slide_drawable_comment_source_topology()
         + audit_iwa_keynote_slide_table_number_format_source_topology()
         + audit_keynote_slide_table_title_facade_source_topology()
         + audit_keynote_slide_table_title_resource_source_topology()
