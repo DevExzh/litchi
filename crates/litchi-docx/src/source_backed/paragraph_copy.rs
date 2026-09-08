@@ -1031,9 +1031,9 @@ impl Package {
                 .write_to_stream(&mut output)
                 .map_err(crate::Error::from)?;
         } else {
-            let replacement = checked_clone(target.xml_bytes(), "publication replacement")?;
+            let replacement = Arc::clone(&target.xml);
             self.package
-                .write_part_overlay_to_stream(&mut output, &main, replacement)
+                .write_part_overlay_shared_to_stream(&mut output, &main, replacement)
                 .map_err(crate::Error::from)?;
         }
         let published_fingerprint = output.finish();
