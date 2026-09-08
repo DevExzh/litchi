@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use litchi_core::xml::escape_xml;
 use litchi_sheet::{Cell as Address, Row};
 
-use super::super::super::wire::{sibling_name, write_attribute, write_close, write_tag};
+use super::super::super::wire::{
+    sibling_name, write_attribute, write_cell_tag, write_close, write_tag,
+};
 use super::super::model::{CellSlot, RowSlot, SheetData, Span, Tag};
 use crate::cell::{Content, Value};
 use crate::error::{Result, invalid};
@@ -294,12 +296,18 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
         appended.push(("s", key.to_string()));
     }
     let remains_empty = cell.empty && payload.is_none();
-    write_tag(output, &cell.tag, remains_empty, &removed, &appended);
+    let cell_name = if let Some(tag) = cell.tag.as_ref() {
+        write_tag(output, tag, remains_empty, &removed, &appended);
+        tag.name.as_ref()
+    } else {
+        write_cell_tag(output, remains_empty, &appended);
+        "c"
+    };
     if remains_empty {
         return Ok(());
     }
     if let Some(content) = content {
-        write_payload(output, &cell.tag.name, content)?;
+        write_payload(output, cell_name, content)?;
     }
     if !cell.empty {
         if payload.is_some() {
@@ -314,7 +322,7 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
             output.extend_from_slice(&source[cell.tag_end..cell.close_start]);
         }
     }
-    write_close(output, &cell.tag.name);
+    write_close(output, cell_name);
     Ok(())
 }
 

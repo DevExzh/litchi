@@ -4,6 +4,8 @@
 //! than rebuilding a DOM.  The snapshot layer can therefore replace only the
 //! spans it owns while the package layer keeps every unrelated byte intact.
 
+use std::borrow::Cow;
+
 use litchi_core::xml::escape_xml;
 use litchi_sheet::{COLUMNS, Column};
 use quick_xml::XmlVersion;
@@ -32,6 +34,18 @@ pub(crate) fn write_tag(
         }
         write_attribute(output, &attribute.name, &attribute.value);
     }
+    for (name, value) in appended {
+        write_attribute(output, name, value);
+    }
+    if empty {
+        output.extend_from_slice(b"/>");
+    } else {
+        output.extend_from_slice(b">");
+    }
+}
+
+pub(crate) fn write_cell_tag(output: &mut Vec<u8>, empty: bool, appended: &[(&str, String)]) {
+    output.extend_from_slice(b"<c");
     for (name, value) in appended {
         write_attribute(output, name, value);
     }
@@ -79,6 +93,58 @@ pub(crate) fn tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Tag> {
         name: name.into_boxed_str(),
         attributes: attributes.into_boxed_slice(),
     })
+}
+
+/// Capture a cell tag while eliding the owned representation of the common
+/// unprefixed `<c>` form. The attribute loop intentionally follows `tag`
+/// exactly: every attribute is parsed, its name is UTF-8 checked, and its
+/// value is decoded and normalized in source order. A second attribute (or
+/// any first attribute other than unqualified `r`) materializes the same
+/// owned `Tag`, preserving source attribute order after the iterator's
+/// duplicate-name checks.
+pub(crate) fn cell_tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Tag>> {
+    if element.name().as_ref() != b"c" {
+        return tag(element, decoder).map(Some);
+    }
+
+    let mut r_value: Option<Cow<'_, str>> = None;
+    let mut attributes: Option<Vec<Attribute>> = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        let attribute_name = std::str::from_utf8(attribute.key.as_ref())
+            .map_err(|error| invalid(format!("worksheet attribute name is not UTF-8: {error}")))?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| invalid(error.to_string()))?;
+
+        if attributes.is_none() && r_value.is_none() && attribute.key.as_ref() == b"r" {
+            r_value = Some(value);
+            continue;
+        }
+
+        if attributes.is_none() {
+            let mut materialized = Vec::new();
+            if let Some(value) = r_value.take() {
+                materialized.push(Attribute {
+                    name: "r".into(),
+                    value: value.into_owned().into_boxed_str(),
+                });
+            }
+            attributes = Some(materialized);
+        }
+        let Some(attributes) = attributes.as_mut() else {
+            return Err(invalid("worksheet cell attributes lost during edit"));
+        };
+        attributes.push(Attribute {
+            name: attribute_name.to_owned().into_boxed_str(),
+            value: value.into_owned().into_boxed_str(),
+        });
+    }
+
+    Ok(attributes.map(|attributes| Tag {
+        name: "c".into(),
+        attributes: attributes.into_boxed_slice(),
+    }))
 }
 
 pub(crate) fn sibling_name(name: &str, local: &str) -> String {

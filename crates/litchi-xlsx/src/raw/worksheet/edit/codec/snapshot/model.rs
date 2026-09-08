@@ -28,7 +28,10 @@ pub(crate) struct CellSlot {
     pub(crate) span: Span,
     pub(crate) tag_end: usize,
     pub(crate) close_start: usize,
-    pub(crate) tag: Tag,
+    /// `None` is the common unprefixed `<c>` form with no attributes or only
+    /// one unqualified `r` attribute. The address is parsed separately, so
+    /// the writer can regenerate `r` without retaining an owned tag.
+    pub(crate) tag: Option<Tag>,
     pub(crate) primary: Box<[Span]>,
     pub(crate) mce_payload: bool,
     pub(crate) empty: bool,
