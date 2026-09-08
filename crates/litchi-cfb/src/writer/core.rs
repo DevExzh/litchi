@@ -170,6 +170,7 @@ struct StoragePathMove {
 #[derive(Debug)]
 struct StreamPathMove {
     index: usize,
+    old: Vec<String>,
     new: Vec<String>,
     canonical: CanonicalPath,
 }
@@ -179,6 +180,13 @@ struct ClsidPathMove {
     old: Vec<String>,
     new: Vec<String>,
     clsid: [u8; 16],
+}
+
+#[derive(Debug)]
+struct MetadataPathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    metadata: DirectoryMetadata,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -243,6 +251,13 @@ struct WriteDirectoryEntry {
     stream_size: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct DirectoryMetadata {
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
+}
+
 /// OLE file writer
 ///
 /// Provides methods to create and modify OLE2 structured storage files.
@@ -263,6 +278,11 @@ pub struct OleWriter {
     storages: HashSet<Vec<String>>,
     /// Non-zero CLSIDs assigned to individual storages.
     storage_clsids: HashMap<Vec<String>, [u8; 16]>,
+    /// Non-default state and FILETIME values assigned to storages.
+    storage_metadata: HashMap<Vec<String>, DirectoryMetadata>,
+    /// Raw state and FILETIME fields retained for streams from a lossless
+    /// source edit. Fresh streams omit this entry and serialize all zeroes.
+    stream_metadata: HashMap<Vec<String>, DirectoryMetadata>,
 }
 
 impl OleWriter {
@@ -307,6 +327,8 @@ impl OleWriter {
             streams: Vec::new(),
             storages: HashSet::new(),
             storage_clsids: HashMap::new(),
+            storage_metadata: HashMap::new(),
+            stream_metadata: HashMap::new(),
         };
 
         // Initialize with root entry
@@ -351,6 +373,31 @@ impl OleWriter {
         // Update the root entry (always at index 0)
         if !self.entries.is_empty() {
             self.entries[0].clsid = clsid;
+        }
+    }
+
+    /// Sets the root storage's user-defined state bits.
+    pub fn set_root_state_bits(&mut self, state_bits: u32) {
+        if let Some(root) = self.entries.first_mut() {
+            root.state_bits = state_bits;
+        }
+    }
+
+    /// Sets the root storage's raw modification FILETIME.
+    pub fn set_root_modified_time(&mut self, modified_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.modified_time = modified_time;
+        }
+    }
+
+    /// Sets the root storage's raw creation FILETIME.
+    ///
+    /// The value is retained exactly for source-preserving edits.  New
+    /// writers still default it to zero, as required by the normal CFB
+    /// production contract.
+    pub fn set_root_creation_time(&mut self, creation_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = creation_time;
         }
     }
 
@@ -422,6 +469,76 @@ impl OleWriter {
         Ok(())
     }
 
+    /// Creates or replaces a stream while assigning its raw directory fields.
+    ///
+    /// This is the source-replay form of [`Self::create_stream`]. The stream
+    /// path is admitted and the metadata is attached in one operation, so a
+    /// caller replaying a package does not perform a second metadata lookup or
+    /// canonicalization pass after creating each stream. It retains the exact
+    /// path matching behavior of [`Self::create_stream`]. Zero values are
+    /// deterministic and omit the metadata side table.
+    pub fn create_stream_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: &[u8],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        let mut owned_data = Vec::new();
+        owned_data
+            .try_reserve_exact(data.len())
+            .map_err(|source| OleError::allocation("stream payload", source))?;
+        owned_data.extend_from_slice(data);
+        let owned_path = own_path(path, "stream path", "stream path component")?;
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+
+        if let Some(position) = self
+            .streams
+            .iter()
+            .position(|(candidate, _)| candidate == &owned_path)
+        {
+            if metadata != DirectoryMetadata::default()
+                && !self.stream_metadata.contains_key(&owned_path)
+            {
+                self.stream_metadata
+                    .try_reserve(1)
+                    .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            }
+            self.streams[position].1 = owned_data;
+            if metadata == DirectoryMetadata::default() {
+                self.stream_metadata.remove(&owned_path);
+            } else {
+                self.stream_metadata.insert(owned_path, metadata);
+            }
+            return Ok(());
+        }
+
+        self.streams
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("stream table", source))?;
+        let metadata_path = if metadata == DirectoryMetadata::default() {
+            None
+        } else {
+            self.stream_metadata
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            Some(try_clone_path(&owned_path, "stream metadata path")?)
+        };
+        self.streams.push((owned_path, owned_data));
+        if let Some(metadata_path) = metadata_path {
+            self.stream_metadata.insert(metadata_path, metadata);
+        }
+        Ok(())
+    }
+
     /// Update an existing stream
     ///
     /// This is an alias for `create_stream` since both create and update operations
@@ -449,6 +566,50 @@ impl OleWriter {
         })
     }
 
+    fn resolve_storage_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "storage path", "storage path component")?;
+        if self.storages.contains(&requested) {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for candidate in &self.storages {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous storage paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "storage path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {requested:?} does not exist"))
+        })
+    }
+
+    fn resolve_stream_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "stream path", "stream path component")?;
+        if self.stream_position(path).is_some() {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for (candidate, _) in &self.streams {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous stream paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "stream path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB stream path {requested:?} does not exist"))
+        })
+    }
+
     /// Delete a stream
     ///
     /// # Arguments
@@ -468,6 +629,7 @@ impl OleWriter {
 
         if let Some(pos) = self.streams.iter().position(|(p, _)| p == &owned_path) {
             self.streams.remove(pos);
+            self.stream_metadata.remove(&owned_path);
             Ok(())
         } else {
             Err(OleError::StreamNotFound)
@@ -519,7 +681,7 @@ impl OleWriter {
     /// Returns `OleError::InvalidData` if `path` contains an invalid component
     /// or does not identify a previously created storage.
     pub fn set_storage_clsid(&mut self, path: &[&str], clsid: [u8; 16]) -> Result<(), OleError> {
-        let owned_path = own_path(path, "storage path", "storage path component")?;
+        let owned_path = self.resolve_storage_path(path)?;
         if !self.storages.contains(&owned_path) {
             return Err(OleError::InvalidData(format!(
                 "CFB storage path {owned_path:?} does not exist"
@@ -537,6 +699,189 @@ impl OleWriter {
             self.storage_clsids.insert(owned_path, clsid);
         }
         Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing storage.
+    ///
+    /// Values are retained as unsigned wire values.  No clock lookup or time
+    /// zone conversion is performed.  Newly created storages retain the
+    /// deterministic all-zero defaults until this method is called.
+    pub fn set_storage_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.storage_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.storage_metadata,
+                &owned_path,
+                1,
+                "storage metadata table",
+            )?;
+            self.storage_metadata.insert(owned_path, metadata);
+        }
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing storage.
+    pub fn set_storage_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing storage.
+    pub fn set_storage_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing storage.
+    pub fn set_storage_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing stream.
+    ///
+    /// New streams default to all zeroes. This setter is intended for
+    /// source-preserving rewrites and therefore retains legacy producer values
+    /// exactly, even when a producer wrote nonzero stream timestamp fields.
+    pub fn set_stream_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.stream_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.stream_metadata,
+                &owned_path,
+                1,
+                "stream metadata table",
+            )?;
+            self.stream_metadata.insert(owned_path, metadata);
+        }
+        Ok(())
+    }
+
+    /// Sets raw state bits for an existing stream. CFB producers normally
+    /// write zero state bits for streams, but source values are retained.
+    pub fn set_stream_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing stream.
+    pub fn set_stream_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing stream.
+    pub fn set_stream_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    fn stream_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        Ok(self
+            .stream_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
+    }
+
+    fn storage_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        Ok(self
+            .storage_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
     }
 
     /// Delete a storage and all its contents
@@ -577,6 +922,10 @@ impl OleWriter {
         self.storages
             .retain(|candidate| !candidate.starts_with(owned_path.as_slice()));
         self.storage_clsids
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.storage_metadata
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.stream_metadata
             .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
 
         Ok(())
@@ -785,6 +1134,7 @@ impl OleWriter {
             {
                 stream_moves.push(StreamPathMove {
                     index: entry.index,
+                    old: try_clone_path(entry.path, "stream move source path")?,
                     canonical: canonical_cfb_path(&new)?,
                     new,
                 });
@@ -801,6 +1151,34 @@ impl OleWriter {
                     old: try_clone_path(&path_move.old, "storage CLSID source path")?,
                     new: try_clone_path(&path_move.new, "storage CLSID destination path")?,
                     clsid: *clsid,
+                });
+            }
+        }
+
+        let mut metadata_moves = Vec::new();
+        metadata_moves
+            .try_reserve_exact(storage_moves.len())
+            .map_err(|error| OleError::allocation("storage metadata move plan", error))?;
+        for path_move in &storage_moves {
+            if let Some(metadata) = self.storage_metadata.get(&path_move.old) {
+                metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "storage metadata source path")?,
+                    new: try_clone_path(&path_move.new, "storage metadata destination path")?,
+                    metadata: *metadata,
+                });
+            }
+        }
+
+        let mut stream_metadata_moves = Vec::new();
+        stream_metadata_moves
+            .try_reserve_exact(stream_descendants)
+            .map_err(|error| OleError::allocation("stream metadata move plan", error))?;
+        for path_move in &stream_moves {
+            if let Some(metadata) = self.stream_metadata.get(&path_move.old) {
+                stream_metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "stream metadata source path")?,
+                    new: try_clone_path(&path_move.new, "stream metadata destination path")?,
+                    metadata: *metadata,
                 });
             }
         }
@@ -860,6 +1238,26 @@ impl OleWriter {
         }
         for path_move in clsid_moves {
             let replaced = self.storage_clsids.insert(path_move.new, path_move.clsid);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &metadata_moves {
+            let removed = self.storage_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in metadata_moves {
+            let replaced = self
+                .storage_metadata
+                .insert(path_move.new, path_move.metadata);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &stream_metadata_moves {
+            let removed = self.stream_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in stream_metadata_moves {
+            let replaced = self
+                .stream_metadata
+                .insert(path_move.new, path_move.metadata);
             debug_assert!(replaced.is_none());
         }
 
@@ -972,6 +1370,11 @@ impl OleWriter {
         if !self.entries.is_empty() && self.entries[0].clsid != [0u8; 16] {
             directory.set_root_clsid(self.entries[0].clsid);
         }
+        if let Some(root) = self.entries.first() {
+            directory.set_root_state_bits(root.state_bits);
+            directory.set_root_creation_time(root.creation_time);
+            directory.set_root_modified_time(root.modified_time);
+        }
 
         // Pre-create storages declared explicitly by user
         for storage_path in &self.storages {
@@ -980,6 +1383,14 @@ impl OleWriter {
         for (storage_path, clsid) in &self.storage_clsids {
             directory.set_storage_clsid(storage_path, *clsid)?;
         }
+        for (storage_path, metadata) in &self.storage_metadata {
+            directory.set_storage_metadata(
+                storage_path,
+                metadata.state_bits,
+                metadata.creation_time,
+                metadata.modified_time,
+            )?;
+        }
 
         // Add large streams to directory using full path
         for plan in &large_streams {
@@ -987,7 +1398,15 @@ impl OleWriter {
             let size = u64::try_from(data.len()).map_err(|_err| {
                 OleError::InvalidData("CFB stream size does not fit u64".to_string())
             })?;
-            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
         }
 
         // Add small streams to directory (using MiniFAT) with full path
@@ -996,7 +1415,15 @@ impl OleWriter {
             let size = u64::try_from(data.len()).map_err(|_err| {
                 OleError::InvalidData("CFB stream size does not fit u64".to_string())
             })?;
-            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
         }
 
         // Generate directory stream
@@ -1709,7 +2136,9 @@ mod tests {
     )]
     use super::*;
     use crate::consts::MAGIC;
+    use crate::file::OleFile;
     use std::error::Error as _;
+    use std::io::Cursor;
 
     #[test]
     fn test_create_writer() {
@@ -1738,7 +2167,7 @@ mod tests {
             .expect("move stream payload");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
 
-        let mut output = io::Cursor::new(Vec::new());
+        let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("write owned stream");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
     }
@@ -1747,7 +2176,7 @@ mod tests {
     fn serialization_normalizes_the_sink_position() {
         let mut writer = OleWriter::new();
         writer.create_stream(&["Test"], b"payload").unwrap();
-        let mut output = io::Cursor::new(Vec::new());
+        let mut output = Cursor::new(Vec::new());
         output.set_position(17);
 
         writer.write_to(&mut output).unwrap();
@@ -1873,6 +2302,22 @@ mod tests {
         writer
             .create_stream(&["RootSibling", "Preserved"], b"preserved")
             .unwrap();
+        writer
+            .set_storage_metadata(
+                &["Root", "Nested"],
+                0x1122_3344,
+                0x5566_7788_99AA_BBCC,
+                0xDDEE_FF00_0102_0304,
+            )
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Root", "Nested", "Removed"],
+                0x5566_7788,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
 
         writer.delete_storage(&["Root"]).unwrap();
 
@@ -1903,9 +2348,28 @@ mod tests {
                 .iter()
                 .all(|(path, _)| !path.starts_with(root.as_slice()))
         );
+        assert!(writer.storage_metadata.is_empty());
+        assert!(writer.stream_metadata.is_empty());
         assert!(writer.streams.iter().any(|(path, data)| {
             path == &["RootSibling".to_string(), "Preserved".to_string()] && data == b"preserved"
         }));
+
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Fresh"], b"fresh")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let fresh = ole
+            .list_directory_entries(&["Root", "Nested"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Fresh")
+            .unwrap();
+        assert_eq!(fresh.state_bits, 0);
+        assert_eq!(fresh.creation_time, 0);
+        assert_eq!(fresh.modified_time, 0);
     }
 
     #[test]
@@ -1955,11 +2419,37 @@ mod tests {
         let second = vec![0x42; 97];
         let mut writer = OleWriter::new();
         writer.create_storage(&["Source"]).unwrap();
+        writer.create_storage(&["Source", "Nested"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Source", "Nested"],
+                0xCAFE_BABE,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .set_storage_state_bits(&["source", "nested"], 0xFACE_CAFE)
+            .unwrap();
         writer
             .create_stream_owned(&["Source", "First"], first)
             .unwrap();
         writer
             .create_stream_owned(&["Source", "Second"], second)
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Source", "First"],
+                0xDEAD_BEEF,
+                0x2122_2324_2526_2728,
+                0x3132_3334_3536_3738,
+            )
+            .unwrap();
+        writer
+            .set_stream_modified_time(&["source", "first"], 0x4142_4344_4546_4748)
+            .unwrap();
+        writer
+            .set_stream_state_bits(&["Source", "Second"], 0xABCD_1234)
             .unwrap();
 
         let before = writer
@@ -1973,7 +2463,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        writer.move_storage(&["Source"], &["Renamed"]).unwrap();
+        writer.move_storage(&["source"], &["Renamed"]).unwrap();
         let after = writer
             .streams
             .iter()
@@ -1993,6 +2483,54 @@ mod tests {
                 .iter()
                 .all(|(path, _)| path.first().is_some_and(|name| name == "Renamed"))
         );
+        let renamed_nested = vec!["Renamed".to_string(), "Nested".to_string()];
+        let renamed_first = vec!["Renamed".to_string(), "First".to_string()];
+        let renamed_second = vec!["Renamed".to_string(), "Second".to_string()];
+        assert_eq!(
+            writer.storage_metadata.get(&renamed_nested),
+            Some(&DirectoryMetadata {
+                state_bits: 0xFACE_CAFE,
+                creation_time: 0x0102_0304_0506_0708,
+                modified_time: 0x1112_1314_1516_1718,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_first),
+            Some(&DirectoryMetadata {
+                state_bits: 0xDEAD_BEEF,
+                creation_time: 0x2122_2324_2526_2728,
+                modified_time: 0x4142_4344_4546_4748,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_second),
+            Some(&DirectoryMetadata {
+                state_bits: 0xABCD_1234,
+                creation_time: 0,
+                modified_time: 0,
+            })
+        );
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let nested = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Nested")
+            .unwrap();
+        assert_eq!(nested.state_bits, 0xFACE_CAFE);
+        assert_eq!(nested.creation_time, 0x0102_0304_0506_0708);
+        assert_eq!(nested.modified_time, 0x1112_1314_1516_1718);
+        let first = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "First")
+            .unwrap();
+        assert_eq!(first.creation_time, 0x2122_2324_2526_2728);
+        assert_eq!(first.modified_time, 0x4142_4344_4546_4748);
     }
 
     #[test]

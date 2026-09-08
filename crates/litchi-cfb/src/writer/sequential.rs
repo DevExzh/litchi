@@ -595,6 +595,9 @@ struct StreamInput<'a> {
     path: Vec<String>,
     declared_len: u64,
     source: Box<dyn Read + 'a>,
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
     start_sector: u32,
     start_mini_sector: u32,
 }
@@ -602,6 +605,9 @@ struct StreamInput<'a> {
 struct StorageInput {
     path: Vec<String>,
     clsid: Option<[u8; 16]>,
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
 }
 
 /// A single-use writer for a fresh CFB artifact.
@@ -614,6 +620,9 @@ struct StorageInput {
 pub struct SequentialOleWriter<'a> {
     options: SequentialWriterOptions,
     root_clsid: Option<[u8; 16]>,
+    root_state_bits: u32,
+    root_creation_time: u64,
+    root_modified_time: u64,
     storages: Vec<StorageInput>,
     streams: Vec<StreamInput<'a>>,
     path_bytes: u64,
@@ -626,6 +635,9 @@ impl<'a> SequentialOleWriter<'a> {
         Self {
             options: SequentialWriterOptions::default(),
             root_clsid: None,
+            root_state_bits: 0,
+            root_creation_time: 0,
+            root_modified_time: 0,
             storages: Vec::new(),
             streams: Vec::new(),
             path_bytes: 0,
@@ -638,6 +650,9 @@ impl<'a> SequentialOleWriter<'a> {
         Ok(Self {
             options,
             root_clsid: None,
+            root_state_bits: 0,
+            root_creation_time: 0,
+            root_modified_time: 0,
             storages: Vec::new(),
             streams: Vec::new(),
             path_bytes: 0,
@@ -660,6 +675,21 @@ impl<'a> SequentialOleWriter<'a> {
         self.root_clsid = Some(clsid);
     }
 
+    /// Sets the root storage's user-defined state bits.
+    pub fn set_root_state_bits(&mut self, state_bits: u32) {
+        self.root_state_bits = state_bits;
+    }
+
+    /// Sets the root storage's raw modification FILETIME.
+    pub fn set_root_modified_time(&mut self, modified_time: u64) {
+        self.root_modified_time = modified_time;
+    }
+
+    /// Sets the root storage's raw creation FILETIME exactly.
+    pub fn set_root_creation_time(&mut self, creation_time: u64) {
+        self.root_creation_time = creation_time;
+    }
+
     /// Declares a storage path.  Missing parent storages are created during planning.
     pub fn create_storage(&mut self, path: &[&str]) -> Result<(), SequentialWriteError> {
         let path_bytes_before = self.path_bytes;
@@ -672,7 +702,13 @@ impl<'a> SequentialOleWriter<'a> {
             self.path_bytes = path_bytes_before;
             return Err(OleError::allocation("sequential storage table", source).into());
         }
-        self.storages.push(StorageInput { path, clsid: None });
+        self.storages.push(StorageInput {
+            path,
+            clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+        });
         Ok(())
     }
 
@@ -704,8 +740,139 @@ impl<'a> SequentialOleWriter<'a> {
         self.storages.push(StorageInput {
             path,
             clsid: Some(clsid),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
         });
         Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing or newly
+    /// declared storage path. Path matching uses the exact stored spelling,
+    /// consistent with sequential storage registration; it does not resolve
+    /// case aliases before planning.
+    pub fn set_storage_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    fn set_storage_metadata_owned(
+        &mut self,
+        path: Vec<String>,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+        path_bytes_before: u64,
+    ) -> Result<(), SequentialWriteError> {
+        if path.is_empty() {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB storage metadata path must not be empty"));
+        }
+        if let Some(storage) = self
+            .storages
+            .iter_mut()
+            .find(|storage| storage.path == path)
+        {
+            storage.state_bits = state_bits;
+            storage.creation_time = creation_time;
+            storage.modified_time = modified_time;
+            self.path_bytes = path_bytes_before;
+            return Ok(());
+        }
+        if let Err(source) = self.storages.try_reserve(1) {
+            self.path_bytes = path_bytes_before;
+            return Err(OleError::allocation("sequential storage table", source).into());
+        }
+        self.storages.push(StorageInput {
+            path,
+            clsid: None,
+            state_bits,
+            creation_time,
+            modified_time,
+        });
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing or newly declared storage.
+    pub fn set_storage_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.creation_time, storage.modified_time));
+        let (creation_time, modified_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing or newly declared storage.
+    pub fn set_storage_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.state_bits, storage.modified_time));
+        let (state_bits, modified_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing or newly declared storage.
+    pub fn set_storage_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.state_bits, storage.creation_time));
+        let (state_bits, creation_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
     }
 
     /// Registers one single-use source and its exact byte length.
@@ -743,9 +910,90 @@ impl<'a> SequentialOleWriter<'a> {
             path,
             declared_len,
             source: Box::new(source),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: ENDOFCHAIN,
             start_mini_sector: ENDOFCHAIN,
         });
+        Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing stream.
+    ///
+    /// Sequential writers default newly added streams to zero. This setter
+    /// is available when a caller is replaying raw source metadata, including
+    /// legacy nonzero stream timestamp words. Path matching uses the exact
+    /// stored spelling, consistent with sequential stream registration; it
+    /// does not resolve case aliases before planning.
+    pub fn set_stream_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.state_bits = state_bits;
+        stream.creation_time = creation_time;
+        stream.modified_time = modified_time;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing stream.
+    pub fn set_stream_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.state_bits = state_bits;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the creation FILETIME for an existing stream.
+    pub fn set_stream_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.creation_time = creation_time;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the modification FILETIME for an existing stream.
+    pub fn set_stream_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.modified_time = modified_time;
+        self.path_bytes = path_bytes_before;
         Ok(())
     }
 
@@ -1151,6 +1399,9 @@ impl<'a> SequentialOleWriter<'a> {
         if let Some(clsid) = self.root_clsid {
             directory.set_root_clsid(clsid);
         }
+        directory.set_root_state_bits(self.root_state_bits);
+        directory.set_root_creation_time(self.root_creation_time);
+        directory.set_root_modified_time(self.root_modified_time);
         for storage in &self.storages {
             directory
                 .add_storage_path(&storage.path)
@@ -1162,17 +1413,41 @@ impl<'a> SequentialOleWriter<'a> {
                     .set_storage_clsid(&storage.path, clsid)
                     .map_err(SequentialWriteError::Planning)?;
             }
+            directory
+                .set_storage_metadata(
+                    &storage.path,
+                    storage.state_bits,
+                    storage.creation_time,
+                    storage.modified_time,
+                )
+                .map_err(SequentialWriteError::Planning)?;
         }
         for &index in &large_streams {
             let stream = &self.streams[index];
-            directory
+            let sid = directory
                 .add_stream_path(&stream.path, stream.start_sector, stream.declared_len)
+                .map_err(SequentialWriteError::Planning)?;
+            directory
+                .set_stream_metadata_sid(
+                    sid,
+                    stream.state_bits,
+                    stream.creation_time,
+                    stream.modified_time,
+                )
                 .map_err(SequentialWriteError::Planning)?;
         }
         for &index in &small_streams {
             let stream = &self.streams[index];
-            directory
+            let sid = directory
                 .add_stream_path(&stream.path, stream.start_mini_sector, stream.declared_len)
+                .map_err(SequentialWriteError::Planning)?;
+            directory
+                .set_stream_metadata_sid(
+                    sid,
+                    stream.state_bits,
+                    stream.creation_time,
+                    stream.modified_time,
+                )
                 .map_err(SequentialWriteError::Planning)?;
         }
         let directory_entries = u64::try_from(directory.entry_count()).unwrap_or(u64::MAX);
