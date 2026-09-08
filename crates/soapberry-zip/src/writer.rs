@@ -10,8 +10,7 @@ use crate::{
     path::{NormalizedPath, ZipFilePath},
     time::{DosDateTime, UtcDateTime},
 };
-use flate2::Compression;
-use flate2::write::DeflateEncoder;
+use flate2::{Compress, Compression, FlushCompress, Status};
 use std::io::{self, Write};
 
 // ZIP64 constants
@@ -151,6 +150,7 @@ impl ZipArchiveWriterBuilder {
             writer: CountWriter::new(writer, self.count),
             files: Vec::with_capacity(self.capacity),
             file_names: Vec::new(),
+            reusable_deflate: None,
         }
     }
 }
@@ -186,6 +186,7 @@ pub struct ZipArchiveWriter<W> {
     files: Vec<FileHeader>,
     file_names: Vec<u8>,
     writer: CountWriter<W>,
+    reusable_deflate: Option<Box<OwnedDeflateState>>,
 }
 
 struct SizedLocalHeader {
@@ -1387,6 +1388,16 @@ where
         self.file_names.extend_from_slice(name_bytes);
         self.write_local_header(&file_path, flags, options.compression_method, &mut options)?;
 
+        let reusable_deflate = if options.compression_method == CompressionMethod::Deflate {
+            Some(
+                self.reusable_deflate
+                    .take()
+                    .unwrap_or_else(|| Box::new(OwnedDeflateState::new())),
+            )
+        } else {
+            None
+        };
+
         let state = OwnedEntryState {
             name_len,
             local_header_offset,
@@ -1406,7 +1417,19 @@ where
         let compressor = match options.compression_method {
             CompressionMethod::Store => OwnedCompressor::Store(compressed),
             CompressionMethod::Deflate => {
-                OwnedCompressor::Deflate(DeflateEncoder::new(compressed, Compression::default()))
+                let state = match reusable_deflate {
+                    Some(state) => state,
+                    None => {
+                        return Err(ErrorKind::InvalidInput {
+                            msg: "owned Deflate state was not prepared".to_string(),
+                        }
+                        .into());
+                    },
+                };
+                OwnedCompressor::Deflate(OwnedDeflateCompressor {
+                    state,
+                    entry: compressed,
+                })
             },
             // `start_file_owned` checks this before calling this helper. Keep
             // the internal helper defensive for future callers with custom
@@ -1704,24 +1727,216 @@ impl<W> OwnedCompressedEntry<W> {
     }
 }
 
+/// The output capacity used by flate2's allocating write adapter.
+///
+/// `DeflateEncoder` uses a `Vec` with this initial capacity.  Keeping the same
+/// capacity here preserves its input/output boundaries while avoiding one
+/// fresh vector allocation for every owned entry.
+const OWNED_DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
+
+/// Reusable state for one raw Deflate stream at a time.
+///
+/// The state is held by the parent archive between successfully finalized
+/// entries.  An active entry owns it, so dropping an unfinished entry drops
+/// the compressor instead of returning a partially finished stream to the
+/// parent archive.
+#[derive(Debug)]
+struct OwnedDeflateState {
+    compressor: Compress,
+    output: [u8; OWNED_DEFLATE_OUTPUT_BUFFER_SIZE],
+    pending_start: usize,
+    pending_end: usize,
+}
+
+impl OwnedDeflateState {
+    fn new() -> Self {
+        Self {
+            compressor: Compress::new(Compression::default(), false),
+            output: [0; OWNED_DEFLATE_OUTPUT_BUFFER_SIZE],
+            pending_start: 0,
+            pending_end: 0,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.compressor.reset();
+        self.pending_start = 0;
+        self.pending_end = 0;
+    }
+
+    fn compress_once(
+        &mut self,
+        input: &[u8],
+        flush: FlushCompress,
+    ) -> io::Result<(Status, usize, usize)> {
+        let before_in = self.compressor.total_in();
+        let before_out = self.compressor.total_out();
+        let status = self
+            .compressor
+            .compress(input, &mut self.output[self.pending_end..], flush)
+            .map_err(|_| owned_deflate_error())?;
+        let consumed = self
+            .compressor
+            .total_in()
+            .checked_sub(before_in)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(owned_deflate_progress_error)?;
+        let produced = self
+            .compressor
+            .total_out()
+            .checked_sub(before_out)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(owned_deflate_progress_error)?;
+        let available = self.output.len() - self.pending_end;
+        if consumed > input.len() || produced > available {
+            return Err(owned_deflate_progress_error());
+        }
+        self.pending_end += produced;
+        Ok((status, consumed, produced))
+    }
+
+    fn compact_pending(&mut self) {
+        if self.pending_start != 0 {
+            let remaining = self.pending_end - self.pending_start;
+            self.output
+                .copy_within(self.pending_start..self.pending_end, 0);
+            self.pending_start = 0;
+            self.pending_end = remaining;
+        }
+    }
+
+    fn drain_pending<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+        while self.pending_start < self.pending_end {
+            let start = self.pending_start;
+            let end = self.pending_end;
+            let pending_len = end - start;
+            match entry.write(&self.output[start..end]) {
+                Ok(0) => {
+                    self.compact_pending();
+                    return Err(io::ErrorKind::WriteZero.into());
+                },
+                Ok(written) => {
+                    if written > pending_len {
+                        self.compact_pending();
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "ZIP compressed sink returned more bytes than requested",
+                        ));
+                    }
+                    self.pending_start += written;
+                },
+                Err(error) => {
+                    self.compact_pending();
+                    return Err(error);
+                },
+            }
+        }
+        self.pending_start = 0;
+        self.pending_end = 0;
+        Ok(())
+    }
+
+    fn write_to<W: Write>(
+        &mut self,
+        entry: &mut OwnedCompressedEntry<W>,
+        input: &[u8],
+    ) -> io::Result<usize> {
+        // Keep the same write boundary as flate2's zio writer: one codec
+        // call per `Write::write`, draining output left by the preceding
+        // codec call before retrying a zero-consumption call. Newly produced
+        // bytes remain pending until the next drain, as they do in zio.
+        loop {
+            self.drain_pending(entry)?;
+            let (status, consumed, produced) = self.compress_once(input, FlushCompress::None)?;
+            if !input.is_empty() && consumed == 0 && status != Status::StreamEnd {
+                if produced == 0 {
+                    return Err(owned_deflate_progress_error());
+                }
+                continue;
+            }
+            return Ok(consumed);
+        }
+    }
+
+    fn flush_to<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+        // zio runs the initial sync flush before dumping output already
+        // buffered by the preceding write. This intentionally uses only the
+        // remaining scratch capacity, then drains the combined range.
+        let (_, consumed, _) = self.compress_once(&[], FlushCompress::Sync)?;
+        if consumed != 0 {
+            return Err(owned_deflate_progress_error());
+        }
+
+        // zio::Writer drains any bytes left by the sync flush with no-flush
+        // calls before forwarding `flush` to its wrapped writer.
+        loop {
+            self.drain_pending(entry)?;
+            let before_out = self.compressor.total_out();
+            let (_, consumed, _) = self.compress_once(&[], FlushCompress::None)?;
+            if consumed != 0 {
+                return Err(owned_deflate_progress_error());
+            }
+            if self.compressor.total_out() == before_out {
+                break;
+            }
+        }
+        entry.flush()
+    }
+
+    fn finish_to<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+        loop {
+            self.drain_pending(entry)?;
+            let before_out = self.compressor.total_out();
+            let (status, consumed, _) = self.compress_once(&[], FlushCompress::Finish)?;
+            if consumed != 0 {
+                return Err(owned_deflate_progress_error());
+            }
+            if status == Status::StreamEnd {
+                self.drain_pending(entry)?;
+                return Ok(());
+            }
+            if self.compressor.total_out() == before_out {
+                return Err(owned_deflate_progress_error());
+            }
+        }
+    }
+}
+
+fn owned_deflate_error() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, "corrupt deflate stream")
+}
+
+fn owned_deflate_progress_error() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        "owned Deflate compressor made no valid progress",
+    )
+}
+
+#[derive(Debug)]
+struct OwnedDeflateCompressor<W: Write> {
+    state: Box<OwnedDeflateState>,
+    entry: OwnedCompressedEntry<W>,
+}
+
 #[derive(Debug)]
 enum OwnedCompressor<W: Write> {
     Store(OwnedCompressedEntry<W>),
-    Deflate(DeflateEncoder<OwnedCompressedEntry<W>>),
+    Deflate(OwnedDeflateCompressor<W>),
 }
 
 impl<W: Write> OwnedCompressor<W> {
     fn compressed_bytes(&self) -> u64 {
         match self {
             Self::Store(entry) => entry.compressed_bytes(),
-            Self::Deflate(encoder) => encoder.get_ref().compressed_bytes(),
+            Self::Deflate(compressor) => compressor.entry.compressed_bytes(),
         }
     }
 
     fn set_compressed_limit(&mut self, maximum: u64) {
         match self {
             Self::Store(entry) => entry.set_compressed_limit(maximum),
-            Self::Deflate(encoder) => encoder.get_mut().set_compressed_limit(maximum),
+            Self::Deflate(compressor) => compressor.entry.set_compressed_limit(maximum),
         }
     }
 
@@ -1731,7 +1946,13 @@ impl<W: Write> OwnedCompressor<W> {
     {
         match self {
             Self::Store(entry) => entry.finish(output),
-            Self::Deflate(encoder) => encoder.finish()?.finish(output),
+            Self::Deflate(mut compressor) => {
+                compressor.state.finish_to(&mut compressor.entry)?;
+                let mut archive = compressor.entry.finish(output)?;
+                compressor.state.reset();
+                archive.reusable_deflate = Some(compressor.state);
+                Ok(archive)
+            },
         }
     }
 }
@@ -1740,14 +1961,14 @@ impl<W: Write> Write for OwnedCompressor<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         match self {
             Self::Store(entry) => entry.write(buffer),
-            Self::Deflate(encoder) => encoder.write(buffer),
+            Self::Deflate(compressor) => compressor.state.write_to(&mut compressor.entry, buffer),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
             Self::Store(entry) => entry.flush(),
-            Self::Deflate(encoder) => encoder.flush(),
+            Self::Deflate(compressor) => compressor.state.flush_to(&mut compressor.entry),
         }
     }
 }
