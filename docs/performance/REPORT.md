@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0481: measured DOCX scanner name borrowing
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) removes three event-name
+clone sites with a seven-line production change. Across 1,440 formal samples,
+normal mean observations are 7.84–12.00% lower and allocator callback removal
+matches the source-derived formula exactly. Incremental peak heap is unchanged.
+Whole-process generic cache misses rise 13.52% in the separate PMU pair; that
+adverse observation and all timing/RSS review flags remain visible. Results are
+scoped to the named materialized lifecycle, not a general DOCX performance claim.
+
 ## Shared DOCX publication payload measured (0480)
 
 [0480](changes/0480-docx-shared-publication.md) uses the target's existing immutable Arc rather than copying its XML

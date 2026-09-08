@@ -1,0 +1,18 @@
+{
+  "attempts": [
+    {
+      "command": [
+        "flock",
+        "/tmp/litchi-goal-0481/cpu.lock",
+        "python3",
+        "-B",
+        "docs/performance/results/change-0481/build.py",
+        "control"
+      ],
+      "error": "FileNotFoundError: validation/build-control-normal.started.json parent directory absent",
+      "exit_code": 1,
+      "resolution": "Create root-owned validation directory; no source or frozen script changed; retry build under the same lock.",
+      "stage": "before build-control-normal started receipt and before cargo invocation"
+    }
+  ]
+}

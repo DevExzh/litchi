@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 0481: existing DOCX tail-copy scanner comparison
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) measures the existing
+one-paragraph plain tail-copy transaction and covers the shared copy/removal
+scanner through focused tests. Its 48 reports preserve the source/candidate,
+semantic, physical-member, patch/inverse and sink oracles. The result does not
+certify fresh streaming creation, new-Part addition, repeated logical append,
+section-property admission or native/cold/range and worker-scaling scenarios.
+
 ## 2026-09-08: existing DOCX copy publication ownership (0480)
 
 [0480](changes/0480-docx-shared-publication.md) measures the same one-paragraph tail-copy lifecycle as 0479 with a

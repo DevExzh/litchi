@@ -1,0 +1,7 @@
+{
+  "after_sha256": "2b564aab015477d6af0f25ea3a26ae448e72d990b1901b1bca0d82e009ed6945",
+  "before_path": "before-source.txt",
+  "before_sha256": "103293623395c07c055de7fc5a55565a91a1ff530246ee0248fecca03f1ec600",
+  "patch_path": "source-change.patch",
+  "path": "crates/litchi-docx/src/source_backed/paragraph_copy.rs"
+}

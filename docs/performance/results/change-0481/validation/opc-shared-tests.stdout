@@ -1,0 +1,14 @@
+
+running 9 tests
+test part::tests::blob_part_new_shared_preserves_allocation ... ok
+test part::tests::part_factory_shared_load_preserves_allocation_for_xml_and_binary ... ok
+test source_backed::tests::topology_add_part_shared_reuses_payload_and_matches_add_validation ... ok
+test pkgreader::tests::eager_serialized_parts_preserve_mixed_storage_and_shared_identity ... ok
+test source_backed::tests::shared_overlay_preserves_duplicate_and_limit_refusals_before_output ... ok
+test pkgreader::tests::structural_member_reuses_lazy_shared_decompression_allocation ... ok
+test source_backed::tests::shared_overlay_reports_partial_sink_failure_with_bounded_writes ... ok
+test source_backed::tests::shared_single_overlay_matches_vec_changed_and_signed_noop_publication ... ok
+test source_backed::tests::shared_multi_overlay_matches_vec_and_reopens ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 334 filtered out; finished in 0.00s
+

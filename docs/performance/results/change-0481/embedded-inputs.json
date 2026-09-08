@@ -1,0 +1,45 @@
+{
+  "files": {
+    "crates/litchi-docx/src/resources/generated/docProps/app.xml": {
+      "bytes": 700,
+      "path": "embedded-resources/resources/generated/docProps/app.xml",
+      "sha256": "517e8c38bfeed466a2c512a2f25dadf4435ccb89962088c5f98509f70a5b4f6e"
+    },
+    "crates/litchi-docx/src/resources/generated/docProps/core.xml": {
+      "bytes": 344,
+      "path": "embedded-resources/resources/generated/docProps/core.xml",
+      "sha256": "2fce7b01b3fdc2f3a263ad6cf4b108789f7a42c931b3e36a7eb179ac6e189160"
+    },
+    "crates/litchi-docx/src/resources/generated/document.xml": {
+      "bytes": 1547,
+      "path": "embedded-resources/resources/generated/document.xml",
+      "sha256": "98583ff8d249b545013060185a2339773db2f29652092dd52a24198ec2e95cd1"
+    },
+    "crates/litchi-docx/src/resources/generated/fontTable.xml": {
+      "bytes": 2550,
+      "path": "embedded-resources/resources/generated/fontTable.xml",
+      "sha256": "a82f3626916d1da1df3efa5840594fa2b5deddba61cec1f1617abc5c2c7904d4"
+    },
+    "crates/litchi-docx/src/resources/generated/numbering.xml": {
+      "bytes": 7216,
+      "path": "embedded-resources/resources/generated/numbering.xml",
+      "sha256": "e26e3e3112aca677fc6e4435a4dd4a914dddb0da2df9abf4950312483ce0f47e"
+    },
+    "crates/litchi-docx/src/resources/generated/settings.xml": {
+      "bytes": 2534,
+      "path": "embedded-resources/resources/generated/settings.xml",
+      "sha256": "f7755c44aabfa788cb42394d5ee7f0df68d0f1187bf25f871026791f58df6777"
+    },
+    "crates/litchi-docx/src/resources/generated/styles.xml": {
+      "bytes": 349457,
+      "path": "embedded-resources/resources/generated/styles.xml",
+      "sha256": "71d5b962d437b4725873caa27162d733870df95d158aecd3d3497c68beeacd77"
+    },
+    "crates/litchi-docx/src/resources/generated/theme/theme1.xml": {
+      "bytes": 7641,
+      "path": "embedded-resources/resources/generated/theme/theme1.xml",
+      "sha256": "3af368e7c61433818fb0432524c61aa887ae417802652df8246f3dc8fdbb67a1"
+    }
+  },
+  "schema": "docx-embedded-inputs-v1"
+}

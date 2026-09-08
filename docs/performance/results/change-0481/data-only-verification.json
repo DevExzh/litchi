@@ -1,0 +1,13 @@
+{
+  "captures": 48,
+  "data_only": true,
+  "profiles": {
+    "arms": 2,
+    "status": "pass"
+  },
+  "protocol_sha256": "72b73ede53dbcc24a51164730bdb4431e8213ea2ecc73a1104c3ec9c5b39bda2",
+  "samples": 1440,
+  "schema": "docx-borrowed-names-comparison-verification-v1",
+  "sealed": false,
+  "status": "pass"
+}

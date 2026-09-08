@@ -1,0 +1,10 @@
+{
+  "baseline_corpus_sha256": "880812c9467453b38eeabfcb5680b9fd1f0c9be39a19ef0bfee9c5cb9ae630b8",
+  "prior_source_sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893",
+  "protected_files": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/report/spec-gap-audit.md": "f71288dddc0827d5f5a16bf3936985606ec1b341d6e5c06fced4e612c7972ddf"
+  },
+  "report_schema_sha256": "0fd5e77be572726d1ad8d05712f43673fbe205fbec48152fb1554623a99796a4",
+  "revision": "71945974ebf28460e27b320af01949ea4f319284"
+}

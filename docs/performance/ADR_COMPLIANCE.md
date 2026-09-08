@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0481: borrowed DOCX scanner names
+
+[0481](changes/0481-docx-borrowed-scanner-names.md) keeps event names borrowed
+inside their existing parser-event lifetime. The same namespace, attributes,
+scope, source and finite-limit checks run in the same order (ADR 0003/0005/0006).
+No public API, dependency direction, patch format, parallel execution or
+preservation rule changes. The 30 previously read ADR/README hashes are
+unchanged. Bounded-window append remains a separate required capability.
+
 ## 0480: private shared XML publication handoff
 
 [0480](changes/0480-docx-shared-publication.md) uses an existing OPC shared-payload entry point from the DOCX format
