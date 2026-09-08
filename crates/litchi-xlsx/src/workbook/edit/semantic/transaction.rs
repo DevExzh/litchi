@@ -1670,8 +1670,6 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
-            // Grid verification needs only the compacted bytes.
-            drop(after);
             let parsed = requires_store_verification
                 .then(|| raw::worksheet::parse(compacted.bytes(), || base.inner.shared_strings()))
                 .transpose()?;
