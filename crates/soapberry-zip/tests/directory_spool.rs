@@ -22,6 +22,7 @@ use soapberry_zip::{
 };
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 const REPLAY_BUFFER: usize = 7;
@@ -341,6 +342,49 @@ impl Seek for SeekFailureSpool {
             io::ErrorKind::PermissionDenied,
             "seek unavailable",
         ))
+    }
+}
+
+#[derive(Debug)]
+struct WrongOffsetSpool {
+    inner: Cursor<Vec<u8>>,
+    seek_calls: usize,
+}
+
+impl WrongOffsetSpool {
+    fn new() -> Self {
+        Self {
+            inner: Cursor::new(Vec::new()),
+            seek_calls: 0,
+        }
+    }
+}
+
+impl Read for WrongOffsetSpool {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(output)
+    }
+}
+
+impl Write for WrongOffsetSpool {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        self.inner.write(input)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl Seek for WrongOffsetSpool {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.seek_calls += 1;
+        let offset = self.inner.seek(position)?;
+        if self.seek_calls == 2 {
+            Ok(offset + 1)
+        } else {
+            Ok(offset)
+        }
     }
 }
 
@@ -713,6 +757,31 @@ fn replay_seek_failure_is_typed() {
     ));
 }
 
+#[test]
+fn replay_seek_wrong_offset_is_typed_refusal() {
+    let mut output = Cursor::new(Vec::new());
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut output,
+            WrongOffsetSpool::new(),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("wrong-offset construction");
+    archive
+        .write_stored_file("wrong-offset.bin", STORED_PAYLOAD)
+        .expect("wrong-offset entry");
+    let error = archive
+        .finish()
+        .expect_err("wrong replay seek offset must fail");
+    match error.kind() {
+        ErrorKind::CentralDirectorySpool { operation, source } => {
+            assert_eq!(*operation, "seek for replay");
+            assert_eq!(source.kind(), io::ErrorKind::InvalidData);
+        },
+        other => panic!("unexpected wrong-offset error: {other:?}"),
+    }
+}
+
 #[derive(Debug)]
 struct FailingWriteSpool {
     inner: Cursor<Vec<u8>>,
@@ -759,6 +828,66 @@ impl Seek for FailingWriteSpool {
     fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
         self.inner.seek(position)
     }
+}
+
+#[derive(Debug)]
+struct SensitiveWriteSpool {
+    inner: Cursor<Vec<u8>>,
+    message: &'static str,
+}
+
+impl SensitiveWriteSpool {
+    fn new(message: &'static str) -> Self {
+        Self {
+            inner: Cursor::new(Vec::new()),
+            message,
+        }
+    }
+}
+
+impl Read for SensitiveWriteSpool {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(output)
+    }
+}
+
+impl Write for SensitiveWriteSpool {
+    fn write(&mut self, _input: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::BrokenPipe, self.message))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Seek for SensitiveWriteSpool {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.inner.seek(position)
+    }
+}
+
+#[test]
+fn spool_io_display_omits_provider_text_but_source_retains_it() {
+    const SENSITIVE: &str = "injected sensitive provider text";
+    let mut output = Cursor::new(Vec::new());
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut output,
+            SensitiveWriteSpool::new(SENSITIVE),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("sensitive spool construction");
+    let error = archive
+        .write_stored_file("sensitive.bin", STORED_PAYLOAD)
+        .expect_err("sensitive spool write must fail");
+    assert!(matches!(
+        error.kind(),
+        ErrorKind::CentralDirectorySpool { .. }
+    ));
+    assert!(!error.to_string().contains(SENSITIVE));
+    let source = std::error::Error::source(&error).expect("spool source retained");
+    assert!(source.to_string().contains(SENSITIVE));
 }
 
 #[test]
@@ -990,6 +1119,77 @@ fn zip64_offset_layout_is_identical_with_and_without_spool() {
     assert!(spooled.bytes.windows(4).any(|bytes| bytes == b"PK\x06\x06"));
 }
 
+fn offset_sized_attempt(
+    maximum: u64,
+    precompressed: bool,
+) -> (Result<(), soapberry_zip::Error>, Vec<u8>) {
+    let mut sink = VirtualOffsetSink { bytes: Vec::new() };
+    let result = {
+        let mut archive = ZipArchiveWriter::builder()
+            .with_offset(u32::MAX as u64)
+            .build_with_spool(&mut sink, Cursor::new(Vec::new()), spool_limits(maximum))
+            .expect("offset-sized construction");
+        let write_result = if precompressed {
+            let compressed = deflate(DEFLATED_PAYLOAD);
+            archive.write_precompressed_file(
+                "a",
+                CompressionMethod::Deflate,
+                soapberry_zip::crc32(DEFLATED_PAYLOAD),
+                DEFLATED_PAYLOAD.len() as u64,
+                &compressed,
+            )
+        } else {
+            archive.write_stored_file("a", STORED_PAYLOAD)
+        };
+        match write_result {
+            Ok(()) => archive.finish().map(|_| ()),
+            Err(error) => Err(error),
+        }
+    };
+    (result, sink.bytes)
+}
+
+#[test]
+fn offset_only_zip64_sized_records_use_the_exact_spool_budget() {
+    // A one-byte name plus the 46-byte central fixed header and the
+    // offset-only ZIP64 extra field (4-byte header plus 8-byte offset) totals
+    // 59 bytes.
+    for precompressed in [false, true] {
+        let (result, bytes) = offset_sized_attempt(59, precompressed);
+        result.expect("offset-only ZIP64 record fits exactly");
+        let central_start = bytes
+            .windows(4)
+            .position(|window| window == b"PK\x01\x02")
+            .expect("central directory signature");
+        let record = &bytes[central_start..];
+        let name_len = u16::from_le_bytes([record[28], record[29]]) as usize;
+        let extra_len = u16::from_le_bytes([record[30], record[31]]) as usize;
+        assert_eq!(&record[46..46 + name_len], b"a");
+        assert_eq!(extra_len, 12);
+        let extra = &record[46 + name_len..46 + name_len + extra_len];
+        assert_eq!(
+            u16::from_le_bytes([extra[0], extra[1]]),
+            ExtraFieldId::ZIP64.as_u16()
+        );
+        assert_eq!(u16::from_le_bytes([extra[2], extra[3]]), 8);
+        assert_eq!(
+            u64::from_le_bytes(extra[4..12].try_into().expect("ZIP64 offset bytes")),
+            u32::MAX as u64
+        );
+
+        let (result, bytes) = offset_sized_attempt(58, precompressed);
+        let error = result.expect_err("one byte below offset-only ZIP64 budget");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::CentralDirectorySpoolLimitExceeded {
+                actual: 59,
+                maximum: 58
+            }
+        ));
+        assert!(bytes.is_empty(), "budget refusal must precede local output");
+    }
+}
+
 #[test]
 fn borrowed_entry_drop_does_not_publish_a_partial_central_record() {
     let mut output = Cursor::new(Vec::new());
@@ -1009,6 +1209,476 @@ fn borrowed_entry_drop_does_not_publish_a_partial_central_record() {
         .finish()
         .expect_err("abandoned entry must poison archive");
     assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+fn fresh_spooled_archive(output: &mut Cursor<Vec<u8>>) -> ZipArchiveWriter<&mut Cursor<Vec<u8>>> {
+    ZipArchiveWriter::builder()
+        .build_with_spool(output, Cursor::new(Vec::new()), spool_limits(SPOOL_LIMIT))
+        .expect("spooled archive construction")
+}
+
+#[test]
+fn dropped_borrowed_entry_rejects_all_reentrant_writer_operations() {
+    macro_rules! assert_rejected_after_drop {
+        ($archive:ident, $operation:expr) => {{
+            let mut output = Cursor::new(Vec::new());
+            let mut $archive = fresh_spooled_archive(&mut output);
+            let (entry, _config) = $archive
+                .new_file("abandoned.bin")
+                .start()
+                .expect("abandoned entry start");
+            drop(entry);
+            let before = $archive.stream_offset();
+            let error = $operation.expect_err("unfinished borrowed entry must reject operation");
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+            assert_eq!(
+                $archive.stream_offset(),
+                before,
+                "rejected operation wrote bytes"
+            );
+            let finish = $archive
+                .finish()
+                .expect_err("unfinished borrowed entry must reject finish");
+            assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+        }};
+    }
+
+    assert_rejected_after_drop!(
+        archive,
+        archive.write_stored_file("next-stored.bin", b"next")
+    );
+    assert_rejected_after_drop!(
+        archive,
+        archive.write_precompressed_file(
+            "next-precompressed.bin",
+            CompressionMethod::Store,
+            soapberry_zip::crc32(b"next"),
+            4,
+            b"next"
+        )
+    );
+    assert_rejected_after_drop!(archive, archive.new_dir("next/").create());
+    assert_rejected_after_drop!(archive, archive.new_file("next-borrowed.bin").start());
+}
+
+#[test]
+fn dropped_borrowed_entry_rejects_owned_start_without_new_output() {
+    let mut output = Cursor::new(Vec::new());
+    let mut archive = fresh_spooled_archive(&mut output);
+    let (entry, _config) = archive
+        .new_file("abandoned.bin")
+        .start()
+        .expect("abandoned entry start");
+    drop(entry);
+    let before = archive.stream_offset();
+    let error = archive
+        .start_file_owned("next-owned.bin", CompressionMethod::Store)
+        .expect_err("unfinished borrowed entry must reject owned start");
+    assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    assert_eq!(
+        before,
+        output.position(),
+        "rejected owned start wrote bytes"
+    );
+}
+
+#[test]
+fn borrowed_finish_collision_poisons_archive_before_finish() {
+    let mut output = Cursor::new(Vec::new());
+    let mut archive = ZipArchiveWriter::builder()
+        .with_offset(u32::MAX as u64)
+        .build_with_spool(
+            &mut output,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("collision archive construction");
+    let (mut entry, config) = archive
+        .new_file("collision.bin")
+        .extra_field(ExtraFieldId::ZIP64, &[0; 8], Header::CENTRAL)
+        .expect("user ZIP64 field")
+        .start()
+        .expect("collision entry start");
+    let mut writer = config.wrap(&mut entry);
+    writer.write_all(b"collision").expect("collision payload");
+    let (_, descriptor) = writer.finish().expect("collision descriptor");
+    let error = entry
+        .finish(descriptor)
+        .expect_err("automatic ZIP64 field collision must fail at finish");
+    assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    let finish = archive
+        .finish()
+        .expect_err("failed borrowed finalization must poison archive");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[derive(Debug)]
+struct RecoveringSink {
+    bytes: Vec<u8>,
+    fail_write: Arc<AtomicBool>,
+    write_fault: Arc<Mutex<Option<io::ErrorKind>>>,
+    fail_flush: Arc<AtomicBool>,
+}
+
+impl RecoveringSink {
+    fn write_failure() -> (Self, Arc<AtomicBool>) {
+        let fail_write = Arc::new(AtomicBool::new(false));
+        let sink = Self {
+            bytes: Vec::new(),
+            fail_write: Arc::clone(&fail_write),
+            write_fault: Arc::new(Mutex::new(None)),
+            fail_flush: Arc::new(AtomicBool::new(false)),
+        };
+        (sink, fail_write)
+    }
+
+    fn flush_failure() -> Self {
+        Self {
+            bytes: Vec::new(),
+            fail_write: Arc::new(AtomicBool::new(false)),
+            write_fault: Arc::new(Mutex::new(None)),
+            fail_flush: Arc::new(AtomicBool::new(true)),
+        }
+    }
+
+    fn armed_write_fault() -> (Self, Arc<Mutex<Option<io::ErrorKind>>>) {
+        let write_fault = Arc::new(Mutex::new(None));
+        let sink = Self {
+            bytes: Vec::new(),
+            fail_write: Arc::new(AtomicBool::new(false)),
+            write_fault: Arc::clone(&write_fault),
+            fail_flush: Arc::new(AtomicBool::new(false)),
+        };
+        (sink, write_fault)
+    }
+}
+
+impl Write for RecoveringSink {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        if let Some(kind) = self.write_fault.lock().expect("write fault lock").take() {
+            if kind == io::ErrorKind::WriteZero {
+                return Ok(0);
+            }
+            return Err(io::Error::new(kind, "one scripted write fault"));
+        }
+        if self.fail_write.swap(false, Ordering::AcqRel) {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "one write failed",
+            ));
+        }
+        self.bytes.extend_from_slice(input);
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.fail_flush.swap(false, Ordering::AcqRel) {
+            return Err(io::Error::new(io::ErrorKind::WriteZero, "one flush failed"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct PartialRecoveringSink {
+    bytes: Vec<u8>,
+    remaining: usize,
+    fail_next: bool,
+}
+
+impl PartialRecoveringSink {
+    fn new(fail_after: usize) -> Self {
+        assert!(fail_after > 0);
+        Self {
+            bytes: Vec::new(),
+            remaining: fail_after,
+            fail_next: false,
+        }
+    }
+}
+
+impl Write for PartialRecoveringSink {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        if self.fail_next {
+            self.fail_next = false;
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "one partial output failure",
+            ));
+        }
+        if input.is_empty() {
+            return Ok(0);
+        }
+        if self.remaining < input.len() {
+            let accepted = self.remaining;
+            self.bytes.extend_from_slice(&input[..accepted]);
+            self.remaining = 0;
+            self.fail_next = true;
+            return Ok(accepted);
+        }
+        self.bytes.extend_from_slice(input);
+        self.remaining -= input.len();
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn no_spool_partial_sized_write_poisons_future_writes_and_finish() {
+    let mut sink = PartialRecoveringSink::new(40);
+    let mut archive = ZipArchiveWriter::new(&mut sink);
+    let error = archive
+        .write_stored_file("sized.bin", STORED_PAYLOAD)
+        .expect_err("partial sized output must fail");
+    assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+
+    let next = archive
+        .write_stored_file("after.bin", b"after")
+        .expect_err("partial sized failure must poison later writes");
+    assert!(matches!(next.kind(), ErrorKind::InvalidInput { .. }));
+    let finish = archive
+        .finish()
+        .expect_err("partial sized failure must poison finish");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[test]
+fn no_spool_partial_directory_header_poisons_future_writes_and_finish() {
+    let mut sink = PartialRecoveringSink::new(4);
+    let mut archive = ZipArchiveWriter::new(&mut sink);
+    let error = archive
+        .new_dir("partial/")
+        .create()
+        .expect_err("partial directory header must fail");
+    assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+
+    let next = archive
+        .write_stored_file("after.bin", b"after")
+        .expect_err("partial directory failure must poison later writes");
+    assert!(matches!(next.kind(), ErrorKind::InvalidInput { .. }));
+    let finish = archive
+        .finish()
+        .expect_err("partial directory failure must poison finish");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[test]
+fn ignored_borrowed_sink_write_error_cannot_finish_successfully() {
+    let (mut sink, fail_write) = RecoveringSink::write_failure();
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut sink,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("write-failure archive construction");
+    let (mut entry, config) = archive
+        .new_file("write-failure.bin")
+        .start()
+        .expect("write-failure entry start");
+    fail_write.store(true, Ordering::Release);
+    let mut writer = config.wrap(&mut entry);
+    let write_error = writer
+        .write(STORED_PAYLOAD)
+        .expect_err("sink write must fail once");
+    assert_eq!(write_error.kind(), io::ErrorKind::BrokenPipe);
+    let (_, descriptor) = writer
+        .finish()
+        .expect("recovered sink still supplies a descriptor");
+    let finish = entry
+        .finish(descriptor)
+        .expect_err("ignored sink write failure must poison entry publication");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+    let finish = archive
+        .finish()
+        .expect_err("poisoned borrowed sink write must reject archive finish");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[test]
+fn ignored_borrowed_sink_flush_error_cannot_finish_successfully() {
+    let mut sink = RecoveringSink::flush_failure();
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut sink,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("flush-failure archive construction");
+    let (mut entry, config) = archive
+        .new_file("flush-failure.bin")
+        .start()
+        .expect("flush-failure entry start");
+    let mut writer = config.wrap(&mut entry);
+    writer.write_all(STORED_PAYLOAD).expect("payload write");
+    let flush_error = writer.flush().expect_err("sink flush must fail once");
+    assert_eq!(flush_error.kind(), io::ErrorKind::WriteZero);
+    let (_, descriptor) = writer
+        .finish()
+        .expect("recovered sink still supplies a descriptor");
+    let finish = entry
+        .finish(descriptor)
+        .expect_err("ignored sink flush failure must poison entry publication");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+    let finish = archive
+        .finish()
+        .expect_err("poisoned borrowed sink flush must reject archive finish");
+    assert!(matches!(finish.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[test]
+fn borrowed_output_interrupted_once_then_write_all_and_finish_succeed() {
+    let (mut sink, write_fault) = RecoveringSink::armed_write_fault();
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut sink,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("Interrupted archive construction");
+    let (mut entry, config) = archive
+        .new_file("interrupted-output.bin")
+        .start()
+        .expect("Interrupted entry start");
+    *write_fault.lock().expect("write fault lock") = Some(io::ErrorKind::Interrupted);
+    let mut writer = config.wrap(&mut entry);
+    writer
+        .write_all(STORED_PAYLOAD)
+        .expect("write_all retries Interrupted");
+    let (_, descriptor) = writer.finish().expect("Interrupted descriptor");
+    entry.finish(descriptor).expect("Interrupted entry finish");
+    archive.finish().expect("Interrupted archive finish");
+    assert!(ZipArchive::from_slice(&sink.bytes).is_ok());
+}
+
+#[test]
+fn borrowed_output_zero_write_poison_rejects_finish() {
+    let (mut sink, write_fault) = RecoveringSink::armed_write_fault();
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut sink,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("zero-write archive construction");
+    let (mut entry, config) = archive
+        .new_file("zero-output.bin")
+        .start()
+        .expect("zero-write entry start");
+    *write_fault.lock().expect("write fault lock") = Some(io::ErrorKind::WriteZero);
+    let mut writer = config.wrap(&mut entry);
+    let write_error = writer
+        .write_all(STORED_PAYLOAD)
+        .expect_err("write_all must report a non-progressing sink");
+    assert_eq!(write_error.kind(), io::ErrorKind::WriteZero);
+    let (_, descriptor) = writer.finish().expect("zero-write descriptor");
+    let error = entry
+        .finish(descriptor)
+        .expect_err("ignored zero-write failure must reject publication");
+    assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    let error = archive
+        .finish()
+        .expect_err("zero-write poison must reject archive finish");
+    assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+}
+
+#[test]
+fn directory_at_zip64_offset_preserves_and_decodes_offset_extra() {
+    let offset = u32::MAX as u64;
+    let mut baseline_sink = VirtualOffsetSink { bytes: Vec::new() };
+    let mut baseline = ZipArchiveWriter::builder()
+        .with_offset(offset)
+        .build(&mut baseline_sink);
+    baseline
+        .new_dir("virtual/")
+        .create()
+        .expect("baseline directory");
+    baseline.finish().expect("baseline directory finish");
+
+    let mut spooled_sink = VirtualOffsetSink { bytes: Vec::new() };
+    let mut spooled = ZipArchiveWriter::builder()
+        .with_offset(offset)
+        .build_with_spool(
+            &mut spooled_sink,
+            Cursor::new(Vec::new()),
+            spool_limits(SPOOL_LIMIT),
+        )
+        .expect("spooled directory construction");
+    spooled
+        .new_dir("virtual/")
+        .create()
+        .expect("spooled directory");
+    spooled.finish().expect("spooled directory finish");
+    assert_eq!(spooled_sink.bytes, baseline_sink.bytes);
+
+    let central_start = spooled_sink
+        .bytes
+        .windows(4)
+        .position(|window| window == b"PK\x01\x02")
+        .expect("central directory signature");
+    let record = &spooled_sink.bytes[central_start..];
+    let name_len = u16::from_le_bytes([record[28], record[29]]) as usize;
+    let extra_len = u16::from_le_bytes([record[30], record[31]]) as usize;
+    assert_eq!(&record[46..46 + name_len], b"virtual/");
+    let extra = &record[46 + name_len..46 + name_len + extra_len];
+    assert_eq!(
+        u16::from_le_bytes([extra[0], extra[1]]),
+        ExtraFieldId::ZIP64.as_u16()
+    );
+    assert_eq!(u16::from_le_bytes([extra[2], extra[3]]), 8);
+    assert_eq!(
+        u64::from_le_bytes(extra[4..12].try_into().expect("ZIP64 offset bytes")),
+        offset
+    );
+}
+
+#[test]
+fn local_only_extra_fields_do_not_consume_central_spool_quota() {
+    let name = "local-only.bin";
+    let exact_central_record = 46 + name.len() as u64;
+    let mut output = Cursor::new(Vec::new());
+    let mut archive = ZipArchiveWriter::builder()
+        .build_with_spool(
+            &mut output,
+            Cursor::new(Vec::new()),
+            spool_limits(exact_central_record),
+        )
+        .expect("local-only extra archive construction");
+    let (mut entry, config) = archive
+        .new_file(name)
+        .extra_field(ExtraFieldId::new(0xcafe), &[1, 2, 3, 4], Header::LOCAL)
+        .expect("local-only extra field")
+        .start()
+        .expect("local-only entry start");
+    let mut writer = config.wrap(&mut entry);
+    writer
+        .write_all(b"local metadata")
+        .expect("local-only payload");
+    let (_, descriptor) = writer.finish().expect("local-only descriptor");
+    entry.finish(descriptor).expect("exact central quota");
+    archive.finish().expect("local-only finish");
+
+    let bytes = output.into_inner();
+    let archive = ZipArchive::from_slice(&bytes).expect("local-only ZIP");
+    let record = archive
+        .entries()
+        .next_entry()
+        .expect("local-only record result")
+        .expect("local-only record");
+    assert!(
+        record
+            .extra_fields()
+            .all(|(id, _)| id != ExtraFieldId::new(0xcafe))
+    );
+    let local_extra_offset = 30 + name.len();
+    assert_eq!(
+        &bytes[local_extra_offset..local_extra_offset + 8],
+        &[0xfe, 0xca, 4, 0, 1, 2, 3, 4],
+        "the local header must preserve the complete little-endian extra field"
+    );
 }
 
 #[test]

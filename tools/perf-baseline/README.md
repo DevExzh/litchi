@@ -4460,3 +4460,38 @@ extended verifier is retained at
 The 0455 experiment keeps ordinary latency lanes separate from allocator and
 whole-process hardware-counter runs. See its frozen protocols and exact-output
 checks before comparing reports across instrumentation modes.
+
+
+## Explicit ZIP directory storage diagnostic (0477)
+
+The `zip_directory_spool` binary compares two low-level ZIP storage policies:
+preallocated in-memory headers and explicitly supplied file storage for central
+records. This is a substrate measurement, not a PPTX streaming-memory claim;
+the ZIP/OPC duplicate-name indexes remain a separate owner.
+
+```sh
+RUSTUP_TOOLCHAIN=1.98.1 cargo build --release --locked \
+  --manifest-path tools/perf-baseline/Cargo.toml --bin zip_directory_spool
+tools/perf-baseline/target/release/zip_directory_spool \
+  --mode both --counts 8,256,8192 --methods store,deflate \
+  --samples 30 --warmups 3 --repeats 2 \
+  --spool-dir /caller/selected/unique-directory --json /caller/selected/report.json
+```
+
+Build the same target with `--features allocator-metrics` for isolated allocator
+observations; retain its executable separately from the normal build. The
+normal target installs no allocator wrapper. Timings from the instrumented
+build must remain separate from normal timings. Both binaries reuse the same
+safe region counters; the existing allocator wrapper and its five tests now
+live in `src/bin/support/counting_allocator.rs`.
+
+Supplying `--spool-dir` runs both byte-exact, full-member reopen oracles before
+timing, including when `--mode control` selects only in-memory timed operations.
+Each process needs a unique caller-selected directory. The timed region includes
+writer construction/finalization, bounded hashing output, and spool open/close;
+input fixtures, digest finalization, validation, and file removal are outside
+it. A returned error is not a successful measurement. Process RSS includes
+preparation and validation. Operation incremental heap is the region high-water
+live bytes minus live bytes at region entry, not cumulative requested bytes or
+RSS. See `docs/performance/results/change-0477` for the frozen isolated process
+matrix, commands, source custody, and limitations.

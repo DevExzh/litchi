@@ -11,7 +11,7 @@ use crate::packuri::{PackURI, PartNameConflict};
 use soapberry_zip::CompressionMethod;
 use soapberry_zip::office::{LazyArchiveReader, LimitResource};
 use std::collections::HashMap;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -1078,6 +1078,7 @@ pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
     /// publishing duplicate, ASCII-equivalent, or derived part names while the
     /// underlying ZIP transport remains format-neutral.
     part_names: PartNameSet,
+    directory_spool: bool,
 }
 
 /// An owned, sequential writer for one OPC part.
@@ -1093,6 +1094,7 @@ pub struct PartWriter<W: Write> {
     partname: PackURI,
     part_names: PartNameSet,
     prepared_name: PreparedPartName,
+    directory_spool: bool,
 }
 
 impl<W: Write> Write for PartWriter<W> {
@@ -1162,6 +1164,7 @@ impl<W: Write> PartWriter<W> {
         Ok(PhysPkgWriter {
             archive,
             part_names: self.part_names,
+            directory_spool: self.directory_spool,
         })
     }
 }
@@ -1173,6 +1176,7 @@ impl PhysPkgWriter<Cursor<Vec<u8>>> {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::new(),
             part_names: PartNameSet::default(),
+            directory_spool: false,
         }
     }
 
@@ -1197,7 +1201,53 @@ impl<W: Write> PhysPkgWriter<W> {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
             part_names: PartNameSet::default(),
+            directory_spool: false,
         }
+    }
+
+    /// Create a physical package writer with explicit central-directory
+    /// scratch storage.
+    ///
+    /// The caller owns the replay store and chooses its storage and cleanup
+    /// policy. The store is used only for serialized ZIP central-directory
+    /// records; OPC duplicate, ASCII-equivalent, and ancestor/descendant name
+    /// validation remains in this writer's existing in-memory index. The
+    /// output sink remains sequential and does not need to implement `Seek`.
+    /// No path or temporary file is opened implicitly.
+    ///
+    /// The central-directory spool is bounded by `maximum_spool_bytes`, and
+    /// replay uses a fixed `buffer_bytes` window. One active record and name
+    /// additionally use storage bounded by ZIP field limits. This does not
+    /// bound the OPC name index or the provider's own retained storage.
+    /// The provider must preserve written bytes and exclusive access to its
+    /// appended range throughout the archive lifetime, including through any
+    /// aliases of its backing storage.
+    ///
+    /// # Errors
+    /// Returns a typed storage or spool-limit error if the store cannot be
+    /// initialized or the supplied limits are invalid.
+    pub fn with_writer_and_metadata_spool<S>(
+        writer: W,
+        spool: S,
+        maximum_spool_bytes: u64,
+        buffer_bytes: usize,
+    ) -> Result<Self>
+    where
+        S: Read + Write + Seek + Send + Sync + 'static,
+    {
+        let archive =
+            soapberry_zip::office::StreamingArchiveWriter::with_writer_and_limits_and_spool(
+                writer,
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+                spool,
+                soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
+            )
+            .map_err(OpcError::from)?;
+        Ok(Self {
+            archive,
+            part_names: PartNameSet::default(),
+            directory_spool: true,
+        })
     }
 
     /// Start a Deflate-compressed OPC Part without buffering its payload.
@@ -1248,6 +1298,7 @@ impl<W: Write> PhysPkgWriter<W> {
             partname: owned_partname,
             part_names: self.part_names,
             prepared_name,
+            directory_spool: self.directory_spool,
         })
     }
 
@@ -1264,9 +1315,11 @@ impl<W: Write> PhysPkgWriter<W> {
         validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
         self.part_names.reserve(&prepared_name)?;
         let owned_partname = clone_pack_uri(pack_uri)?;
-        self.archive
-            .write_deflated(pack_uri.membername(), blob)
-            .map_err(|error| map_archive_error(&error))?;
+        let result = self.archive.write_deflated(pack_uri.membername(), blob);
+        if let Err(error) = result {
+            let written = self.archive.output_bytes();
+            return Err(map_write_error(error, self.directory_spool, written));
+        }
         self.part_names.insert(owned_partname, prepared_name);
         Ok(())
     }
@@ -1284,9 +1337,11 @@ impl<W: Write> PhysPkgWriter<W> {
         validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
         self.part_names.reserve(&prepared_name)?;
         let owned_partname = clone_pack_uri(pack_uri)?;
-        self.archive
-            .write_stored(pack_uri.membername(), blob)
-            .map_err(|error| map_archive_error(&error))?;
+        let result = self.archive.write_stored(pack_uri.membername(), blob);
+        if let Err(error) = result {
+            let written = self.archive.output_bytes();
+            return Err(map_write_error(error, self.directory_spool, written));
+        }
         self.part_names.insert(owned_partname, prepared_name);
         Ok(())
     }
@@ -1474,6 +1529,27 @@ fn map_archive_error(error: &soapberry_zip::Error) -> OpcError {
     OpcError::ZipError(error.to_string())
 }
 
+fn map_write_error(error: soapberry_zip::Error, directory_spool: bool, written: u64) -> OpcError {
+    let is_spool_failure = directory_spool
+        && matches!(
+            error.kind(),
+            soapberry_zip::ErrorKind::CentralDirectorySpool { .. }
+                | soapberry_zip::ErrorKind::CentralDirectorySpoolLimitExceeded { .. }
+        );
+    if !is_spool_failure {
+        return map_archive_error(&error);
+    }
+    let source = OpcError::from(error);
+    if written == 0 {
+        source
+    } else {
+        OpcError::IncompleteOutput {
+            written,
+            source: Box::new(source),
+        }
+    }
+}
+
 fn map_part_error(label: &str, error: &soapberry_zip::Error) -> OpcError {
     if matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_)) {
         OpcError::PartNotFound(label.to_owned())
@@ -1498,6 +1574,17 @@ mod tests {
             writer.write_stored(&uri, bytes).unwrap();
         }
         writer.finish().unwrap()
+    }
+
+    fn write_spool_fixture<W: Write>(writer: &mut PhysPkgWriter<W>) {
+        let content_types = PackURI::new("/[Content_Types].xml").unwrap();
+        let rels = PackURI::new("/_rels/.rels").unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        writer.write_stored(&content_types, b"<Types/>").unwrap();
+        writer.write(&rels, b"<Relationships/>").unwrap();
+        writer
+            .write(&document, b"<document>payload</document>")
+            .unwrap();
     }
 
     #[test]
@@ -1746,6 +1833,32 @@ mod tests {
     }
 
     #[test]
+    fn metadata_spool_preserves_bytes_and_reopens() {
+        let mut ordinary = PhysPkgWriter::new();
+        write_spool_fixture(&mut ordinary);
+        let expected = ordinary.finish().unwrap();
+
+        let mut spooled = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            Cursor::new(Vec::new()),
+            1024 * 1024,
+            17,
+        )
+        .unwrap();
+        write_spool_fixture(&mut spooled);
+        let actual = spooled.finish_into_inner().unwrap();
+        assert_eq!(actual, expected);
+
+        let reader = PhysPkgReader::new(&actual).unwrap();
+        assert_eq!(
+            reader
+                .blob_for(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap(),
+            b"<document>payload</document>"
+        );
+    }
+
+    #[test]
     fn physical_writer_rejects_duplicate_equivalent_and_derived_names() {
         let mut writer = PhysPkgWriter::new();
         let document = PackURI::new("/word/document.xml").unwrap();
@@ -1787,6 +1900,223 @@ mod tests {
             child_first.write(&document, b"parent"),
             Err(OpcError::DerivedPartNames { .. })
         ));
+    }
+
+    #[test]
+    fn metadata_spool_preserves_duplicate_equivalent_and_derived_refusals() {
+        let mut writer = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            Cursor::new(Vec::new()),
+            1024 * 1024,
+            32,
+        )
+        .unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        writer.write_stored(&document, b"document").unwrap();
+
+        assert!(matches!(
+            writer.write_stored(&document, b"duplicate"),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert!(matches!(
+            writer.write_stored(&PackURI::new("/WORD/DOCUMENT.XML").unwrap(), b"equivalent"),
+            Err(OpcError::EquivalentPartNames { .. })
+        ));
+        assert!(matches!(
+            writer.write_stored(
+                &PackURI::new("/word/document.xml/image.bin").unwrap(),
+                b"derived"
+            ),
+            Err(OpcError::DerivedPartNames { .. })
+        ));
+
+        let mut child_first = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            Cursor::new(Vec::new()),
+            1024 * 1024,
+            32,
+        )
+        .unwrap();
+        child_first
+            .write_stored(
+                &PackURI::new("/word/document.xml/image.bin").unwrap(),
+                b"child",
+            )
+            .unwrap();
+        assert!(matches!(
+            child_first.write_stored(&document, b"parent"),
+            Err(OpcError::DerivedPartNames { .. })
+        ));
+    }
+
+    #[test]
+    fn metadata_spool_limit_maps_to_typed_opc_error() {
+        let mut writer = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            Cursor::new(Vec::new()),
+            1,
+            16,
+        )
+        .unwrap();
+        let error = writer
+            .write_stored(&PackURI::new("/document.xml").unwrap(), b"payload")
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::CentralDirectorySpoolLimitExceeded {
+                actual,
+                maximum: 1
+            } if actual > 1
+        ));
+    }
+
+    struct FailingReplaySpool {
+        inner: Cursor<Vec<u8>>,
+    }
+
+    struct FailingAppendSpool {
+        inner: Cursor<Vec<u8>>,
+        successful_writes: usize,
+    }
+
+    impl Read for FailingReplaySpool {
+        fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("central spool replay failure"))
+        }
+    }
+
+    impl Write for FailingReplaySpool {
+        fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+            self.inner.write(buffer)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    impl Seek for FailingReplaySpool {
+        fn seek(&mut self, position: std::io::SeekFrom) -> std::io::Result<u64> {
+            self.inner.seek(position)
+        }
+    }
+
+    impl Read for FailingAppendSpool {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            self.inner.read(buffer)
+        }
+    }
+
+    impl Write for FailingAppendSpool {
+        fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+            if self.successful_writes != 0 {
+                return Err(std::io::Error::other("central spool append failure"));
+            }
+            self.successful_writes = 1;
+            self.inner.write(buffer)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    impl Seek for FailingAppendSpool {
+        fn seek(&mut self, position: std::io::SeekFrom) -> std::io::Result<u64> {
+            self.inner.seek(position)
+        }
+    }
+
+    #[test]
+    fn metadata_spool_append_failure_wraps_prior_output_progress() {
+        let mut writer = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            FailingAppendSpool {
+                inner: Cursor::new(Vec::new()),
+                successful_writes: 0,
+            },
+            1024 * 1024,
+            16,
+        )
+        .unwrap();
+        writer
+            .write_stored(&PackURI::new("/first").unwrap(), b"first")
+            .unwrap();
+
+        match writer.write_stored(&PackURI::new("/second").unwrap(), b"second") {
+            Err(OpcError::IncompleteOutput { written, source }) => {
+                assert!(written > 0);
+                match *source {
+                    OpcError::CentralDirectorySpool { operation, source } => {
+                        assert_eq!(operation, "write central-directory record");
+                        assert_eq!(source.kind(), std::io::ErrorKind::Other);
+                    },
+                    error => panic!("unexpected wrapped spool error: {error:?}"),
+                }
+            },
+            Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+            Ok(()) => panic!("spool append unexpectedly succeeded"),
+        }
+    }
+
+    #[test]
+    fn metadata_spool_preflight_after_prior_output_wraps_limit() {
+        let mut writer = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            Cursor::new(Vec::new()),
+            60,
+            16,
+        )
+        .unwrap();
+        writer
+            .write_stored(&PackURI::new("/first").unwrap(), b"first")
+            .unwrap();
+
+        match writer.write_stored(&PackURI::new("/second").unwrap(), b"second") {
+            Err(OpcError::IncompleteOutput { written, source }) => {
+                assert!(written > 0);
+                assert!(matches!(
+                    *source,
+                    OpcError::CentralDirectorySpoolLimitExceeded {
+                        actual,
+                        maximum: 60
+                    } if actual > 60
+                ));
+            },
+            Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+            Ok(()) => panic!("spool limit unexpectedly accepted the record"),
+        }
+    }
+
+    #[test]
+    fn metadata_spool_failure_retains_source_and_partial_output_progress() {
+        let mut writer = PhysPkgWriter::with_writer_and_metadata_spool(
+            Vec::new(),
+            FailingReplaySpool {
+                inner: Cursor::new(Vec::new()),
+            },
+            1024 * 1024,
+            16,
+        )
+        .unwrap();
+        writer
+            .write_stored(&PackURI::new("/document.xml").unwrap(), b"payload")
+            .unwrap();
+
+        match writer.finish_into_inner() {
+            Err(OpcError::IncompleteOutput { written, source }) => {
+                assert!(written > 0);
+                assert!(matches!(
+                    *source,
+                    OpcError::CentralDirectorySpool {
+                        operation: "read for replay",
+                        ..
+                    }
+                ));
+            },
+            Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+            Ok(_) => panic!("spool replay unexpectedly succeeded"),
+        }
     }
 
     #[test]

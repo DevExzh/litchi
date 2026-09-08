@@ -129,6 +129,23 @@ pub enum OpcError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// A caller-provided central-directory spool failed during an explicit
+    /// storage operation. The source remains available to callers that need
+    /// the provider's underlying diagnostic.
+    #[error("OPC central-directory spool {operation} failed")]
+    CentralDirectorySpool {
+        /// Content-free operation performed on the caller-provided store.
+        operation: &'static str,
+        /// Original provider error.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The caller-provided central-directory spool exceeded its explicit
+    /// serialized-byte ceiling.
+    #[error("OPC central-directory spool limit exceeded: {actual} > {maximum}")]
+    CentralDirectorySpoolLimitExceeded { actual: u64, maximum: u64 },
+
     /// A positional source changed after this package captured its snapshot.
     #[error("OPC source changed from {expected:?} to {actual:?}")]
     SourceChanged {
@@ -266,6 +283,12 @@ impl From<soapberry_zip::Error> for OpcError {
             soapberry_zip::ErrorKind::Allocation { resource, source } => {
                 Self::Allocation { resource, source }
             },
+            soapberry_zip::ErrorKind::CentralDirectorySpool { operation, source } => {
+                Self::CentralDirectorySpool { operation, source }
+            },
+            soapberry_zip::ErrorKind::CentralDirectorySpoolLimitExceeded { actual, maximum } => {
+                Self::CentralDirectorySpoolLimitExceeded { actual, maximum }
+            },
             kind => Self::ZipError(kind.to_string()),
         }
     }
@@ -354,6 +377,8 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::ManagedPartDataArcEscape
             | OpcError::ManagedPackageMaterialization
             | OpcError::OperationAccountingOverflow { .. }
+            | OpcError::CentralDirectorySpool { .. }
+            | OpcError::CentralDirectorySpoolLimitExceeded { .. }
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)
@@ -388,6 +413,24 @@ impl From<OpcError> for litchi_core::Error {
 #[cfg(test)]
 mod tests {
     use super::{OpcError, execution_io_error};
+
+    #[test]
+    fn spool_error_display_is_content_free_and_retains_the_provider_source() {
+        let error = OpcError::from(soapberry_zip::Error::from(
+            soapberry_zip::ErrorKind::CentralDirectorySpool {
+                operation: "read for replay",
+                source: std::io::Error::other("private/provider/path"),
+            },
+        ));
+        assert_eq!(
+            error.to_string(),
+            "OPC central-directory spool read for replay failed"
+        );
+        assert_eq!(
+            std::error::Error::source(&error).unwrap().to_string(),
+            "private/provider/path"
+        );
+    }
 
     #[test]
     fn publication_capability_errors_retain_typed_core_classification() {

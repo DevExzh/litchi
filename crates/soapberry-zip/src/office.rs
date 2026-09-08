@@ -5727,6 +5727,56 @@ impl<W: Write> StreamingArchiveWriter<W> {
         }
     }
 
+    /// Create a sequential writer with explicit central-directory scratch.
+    ///
+    /// Finalized central records are appended to the caller-supplied store
+    /// and replayed through the configured buffer at archive finalization.
+    /// The output sink remains sequential and need not implement `Seek`.
+    /// Scratch is never opened implicitly; the caller chooses its storage,
+    /// confidentiality, and cleanup policy. A memory-backed store retains its
+    /// contents in memory.
+    ///
+    /// Working storage includes the replay buffer and one active record/name
+    /// bounded by ZIP field limits. This does not bound the complete writer:
+    /// normalized names are still retained for exact duplicate checks
+    /// under `limits`. Spool failures after output begins are reported by the
+    /// existing progress-bearing entry and archive finalization methods.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits or failure to initialize scratch.
+    /// Construction does not write to the output sink.
+    pub fn with_writer_and_limits_and_spool<S>(
+        writer: W,
+        limits: StreamingArchiveLimits,
+        spool: S,
+        spool_limits: crate::DirectorySpoolLimits,
+    ) -> Result<Self, Error>
+    where
+        S: Read + Write + std::io::Seek + Send + Sync + 'static,
+    {
+        let output_counter = Arc::new(AtomicU64::new(0));
+        let archive = ZipArchiveWriter::builder().build_with_spool(
+            BoundedOutput::new(writer, limits.max_output_bytes, Arc::clone(&output_counter)),
+            spool,
+            spool_limits,
+        )?;
+        let result = Self {
+            archive,
+            limits,
+            entries: 0,
+            metadata_bytes: 0,
+            total_uncompressed_bytes: 0,
+            output_bytes: 0,
+            poisoned: false,
+            names: HashSet::new(),
+            last_limit: None,
+            output_counter,
+        };
+        result.ensure_usable()?;
+        Ok(result)
+    }
+
     /// Return the metadata policy used by this writer.
     #[must_use]
     pub const fn limits(&self) -> StreamingArchiveLimits {
