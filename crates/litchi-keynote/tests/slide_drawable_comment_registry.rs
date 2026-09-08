@@ -30,6 +30,15 @@ type TestError = Box<dyn std::error::Error>;
 const SOURCE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/drawable-comments-source-native.key");
 const OUTPUT_ENV: &str = "LITCHI_KEYNOTE_DRAWABLE_COMMENT_REGISTRY_OUTPUT_DIR";
+const NATIVE_DIR_ENV: &str = "LITCHI_KEYNOTE_DRAWABLE_COMMENT_REGISTRY_NATIVE_DIR";
+const NATIVE_FIXTURE_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../test-data/iwork/keynote/drawable-comments-cross-component-native/",
+    "unrooted-unique-native-create-reply.key"
+);
+const NATIVE_CANDIDATE: &str = "unrooted-unique-native-create-reply.key";
+const NATIVE_ROOT_TEXT: &str = "native unrooted registry";
+const NATIVE_REPLY_TEXT: &str = "native registry reply";
 
 const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
 const DOCUMENT_OBJECT_IDENTIFIER: u64 = 1;
@@ -44,6 +53,17 @@ const TSK_ANNOTATION_AUTHOR_STORAGE_FIELD: u32 = 7;
 struct RegistrySnapshot {
     author_objects: BTreeSet<u64>,
     storage_references: BTreeMap<u64, Vec<u64>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DrawableSemantic {
+    kind: litchi_keynote::DrawableKind,
+    has_comment: bool,
+    reply_count: usize,
+    comment_text: Option<String>,
+    comment_has_author: bool,
+    reply_texts: Vec<String>,
+    reply_authors: Vec<bool>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -81,6 +101,38 @@ fn export_if_requested(bytes: &[u8], name: &str) -> TestResult<()> {
     fs::write(&path, bytes)?;
     eprintln!("exported Keynote registry candidate to {}", path.display());
     Ok(())
+}
+
+fn drawable_semantics(package: &Package) -> TestResult<Vec<DrawableSemantic>> {
+    let slide = SlideSelector::index(0);
+    package
+        .slide_drawables(slide)?
+        .iter()
+        .enumerate()
+        .map(|(index, summary)| {
+            let selector = DrawableSelector::index(index);
+            let comment = package.slide_drawable_comment(slide, selector)?;
+            let replies = package.slide_drawable_comment_replies(slide, selector)?;
+            Ok(DrawableSemantic {
+                kind: summary.kind(),
+                has_comment: summary.has_comment(),
+                reply_count: summary.reply_count(),
+                comment_text: comment.as_ref().map(|comment| comment.text().to_owned()),
+                comment_has_author: comment
+                    .as_ref()
+                    .and_then(|comment| comment.author())
+                    .is_some(),
+                reply_texts: replies
+                    .iter()
+                    .map(|reply| reply.text().to_owned())
+                    .collect(),
+                reply_authors: replies
+                    .iter()
+                    .map(|reply| reply.author().is_some())
+                    .collect(),
+            })
+        })
+        .collect()
 }
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
@@ -490,6 +542,17 @@ fn unrooted_unique_registry_creates_and_cleans_generated_author() -> TestResult 
         "unrooted-unique-create.key",
     )?;
 
+    let native_root = package
+        .edit_slide_drawable_comment(SlideSelector::index(0), selected)?
+        .set(NATIVE_ROOT_TEXT)?
+        .commit()?;
+    let native_candidate = native_root
+        .package()
+        .edit_slide_drawable_comment(SlideSelector::index(0), selected)?
+        .add_reply(NATIVE_REPLY_TEXT)?
+        .commit()?;
+    export_if_requested(&exact_bytes(native_candidate.package())?, NATIVE_CANDIDATE)?;
+
     let cleared = created
         .package()
         .edit_slide_drawable_comment(SlideSelector::index(0), selected)?
@@ -637,6 +700,57 @@ fn present_root_registry_witness_never_falls_back() -> TestResult {
     ] {
         let source = mutate_root_storage_reference(SOURCE, mutation)?;
         assert_rejected_atomically(&source, "present malformed registry root")?;
+    }
+    Ok(())
+}
+
+#[test]
+fn native_resaved_unique_unrooted_registry_readback() -> TestResult {
+    let candidate_bytes = if let Some(directory) = env::var_os(NATIVE_DIR_ENV) {
+        let path = Path::new(&directory).join(NATIVE_CANDIDATE);
+        assert!(
+            path.is_file(),
+            "missing native registry candidate {}; export the source with {OUTPUT_ENV}, save it in Keynote, and rerun with {NATIVE_DIR_ENV}",
+            path.display()
+        );
+        fs::read(path)?
+    } else {
+        fs::read(NATIVE_FIXTURE_PATH).map_err(|error| {
+            io::Error::other(format!(
+                "read permanent native registry fixture {NATIVE_FIXTURE_PATH}: {error}"
+            ))
+        })?
+    };
+
+    let source_package = Package::from_bytes(SOURCE)?;
+    let source_semantics = drawable_semantics(&source_package)?;
+    let target_index = source_semantics
+        .iter()
+        .position(|drawable| !drawable.has_comment)
+        .ok_or_else(|| io::Error::other("native source has no empty drawable"))?;
+    let candidate = Package::from_bytes(&candidate_bytes)?;
+    let candidate_semantics = drawable_semantics(&candidate)?;
+    assert_eq!(candidate_semantics.len(), source_semantics.len());
+
+    for (index, (source, candidate)) in source_semantics
+        .iter()
+        .zip(&candidate_semantics)
+        .enumerate()
+    {
+        if index == target_index {
+            assert_eq!(candidate.kind, source.kind);
+            assert!(candidate.has_comment);
+            assert_eq!(candidate.comment_text.as_deref(), Some(NATIVE_ROOT_TEXT));
+            assert!(candidate.comment_has_author);
+            assert_eq!(candidate.reply_count, 1);
+            assert_eq!(candidate.reply_texts, vec![NATIVE_REPLY_TEXT.to_owned()]);
+            assert_eq!(candidate.reply_authors, vec![true]);
+        } else {
+            assert_eq!(
+                candidate, source,
+                "native sibling drawable changed at {index}"
+            );
+        }
     }
     Ok(())
 }

@@ -1,0 +1,75 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "verification_date": "2026-09-08",
+  "native_lifecycle": [
+    "opened without repair warning",
+    "comment semantics inspected",
+    "saved",
+    "document window closed",
+    "exact path reopened",
+    "strict focused readback passed"
+  ],
+  "files": {
+    "foreign-drawable-root-and-reply.key": {
+      "sha256": "32730bcf14e89442b14e0adcb0df7ef82713704ef8ef40abda27854a06ec53f8",
+      "size": 753709,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "3424f4f0c1406e35ee956fb5d27bcff766a96d20c160f24774ea5546b9f99468"
+    },
+    "foreign-drawable-root-create.key": {
+      "sha256": "91cff7313408c795a6af48b79f31591bcbf2f82f8ebbc7a5f9ccbc1264b4cede",
+      "size": 753606,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "c6f1805ac159c7307ab541d9fc2a42a9cc346292e31852d1ad4cfa5b4e65b23c"
+    },
+    "foreign-reply-add.key": {
+      "sha256": "aa3321581671075b12a9e6ed028ffed3909820a05d4e4780ceb1db25e452b7fe",
+      "size": 753749,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "6cdbfcb164d98d1ccdca0e030acba7364c279212bc07b746823dd37a452b2ca9"
+    },
+    "foreign-reply-remove.key": {
+      "sha256": "f46d3aeda8ad63d72cf2a007a9b8f2309f23485f018902da4cd25c79f0e207d7",
+      "size": 753346,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "52a8f6412b4887f2070653889ab71ad911195db41368d4bc974cd4f58ee77355"
+    },
+    "foreign-reply-set.key": {
+      "sha256": "4f3017278c73ce76fb42f50b902f445d79281c8478898287afb4f69d095036bf",
+      "size": 753647,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "bb9ee4d97b7a7e351e6144f1a7e5eb4b5e092693a5e2fc0400a2f511f6df1350"
+    },
+    "foreign-root-clear.key": {
+      "sha256": "79a88ca63dc990ef1931337506113fe30c163921ed55a17d531a14a4ed94bf0f",
+      "size": 753256,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "0673f42dab4b132d9b851543a17f37a074fa168ef502db536288a3bcbd37d6a5"
+    },
+    "foreign-root-set.key": {
+      "sha256": "84f79f40d13e8f6304657961f29f5880156aeff42795e8feaeec16ab69f4695b",
+      "size": 753372,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "ba6fbd029420b52a19bc513331d3069fdc4498ffae855d2fe2e6801b571b889e"
+    },
+    "shared-foreign-reply-clear.key": {
+      "sha256": "2723c20e0de8db00544197f3576db2a5f5b9d552587548b9fb42ebff8d7183ad",
+      "size": 753579,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "fa8ecbe6ddbd335417db70cf6ac31748d63a0df5cb357eaa5cb458e493eceb7b"
+    },
+    "shared-foreign-root-set.key": {
+      "sha256": "6ce47982cd3d0e928e1d03ccb2c511400780cd88aa8a0683150bc913016abcbe",
+      "size": 753451,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "5961960520ff0b6f903e3bc642b597f1b65acfc9e245da3c1855eb99f27f8b68"
+    },
+    "unrooted-unique-native-create-reply.key": {
+      "sha256": "276b85b1a0e7d0dc78f868ced779ea09c36b85950caad3fd32ac424a90d9afb1",
+      "size": 753794,
+      "native_hash_changed": true,
+      "focused_candidate_sha256": "4a24bce74d001e3fa99d4d5c74c5b142082139fd42ddb3eb015e087ba7bd2b59"
+    }
+  }
+}
