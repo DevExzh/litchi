@@ -1,0 +1,10 @@
+{
+  "schema": "litchi-0469-final-cleanup-v1",
+  "finished_utc": "2026-09-08T06:38:08.730555+00:00",
+  "temporary_roots_absent": [
+    "/tmp/litchi-goal-0469",
+    "/tmp/litchi-goal-0468"
+  ],
+  "shared_cargo_cache_retained": true,
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

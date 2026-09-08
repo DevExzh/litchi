@@ -1,0 +1,79 @@
+{
+  "schema": "litchi-0469-capture-v1",
+  "lane": "review-B1",
+  "role": "candidate",
+  "revision": "7cc58fc1b37144f15b7bde13a9598e396e5089eb",
+  "binary_sha256": "dbd3f7014b4b3d5203e7c37efe3f739565b4d34a33913e4317720f4a105729da",
+  "binding_sha256": "cd96065b83953367d50bffe24ee22472e80772c784ceb0dd362c0468fac56510",
+  "driver_sha256": "5082c642094fc78f4fe2d6ff17ea4adcce5c356e0e9340ba7e9cf6fd66aa57b4",
+  "protocol_sha256": "e12f27a27c02c739a7a46342596141d253b890df674a414c4549f68c8a210d1a",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/review-B1/resource.log",
+    "/tmp/litchi-goal-0469/candidate",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "100",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/review-B1/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/review-B1/corpus-catalog.json",
+    "--case",
+    "cfb_read_one,cfb_shared_concurrent_reads,opc_mutated_save,xls_fresh_write_to",
+    "--shape",
+    "few-large",
+    "--writer-shape",
+    "large"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "samples": 100,
+  "warmups": 5,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T06:26:19.085716+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "report_metadata_matches_clean_role": true,
+  "finished_utc": "2026-09-08T06:26:27.160843+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "86e0f831e1ffdeecdafd9fd5033ca51485bb009914bf6fb38335d9eb50268b36",
+      "bytes": 1564
+    },
+    "corpus-catalog.json": {
+      "sha256": "4340c8a7dd98809f6d5ae23ab8c05026ded5640348c8b46ffc683591d6091cef",
+      "bytes": 27050
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "5417f5bcd7e5185a0eccd4ed2aacbf073cc38c62ed3e1f0195ac62a29f57d50e",
+      "bytes": 115761
+    },
+    "resource.log": {
+      "sha256": "c2a063fb146fb9882b23c0029b560b0d35ca9d6cf9025acc0d28430cbbaacd6f",
+      "bytes": 1115
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

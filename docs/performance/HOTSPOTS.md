@@ -1,6 +1,19 @@
 # Performance hotspot inventory
 
-## Current measured next experiment (0468)
+## Current XLSX result and next lead (0469)
+
+[0469](changes/0469-xlsx-borrowed-compaction-events.md) retains borrowed events
+in the compactor after byte/error differential checks and a measured 10.985%
+reduction in whole-process allocation calls. The pass itself, checked attribute
+normalization, publication validation and bounded Store handoff remain intact.
+Latency improvement is modest and unqualified; peak-memory improvement is not
+established. Full-guard flags and the supplemental CFB identity rejection are
+retained. The larger remaining opportunities are eager parsing, snapshot scans
+and carefully validated pass reuse from the 0468 profile. Avoid spending further
+batches qualifying this small latency effect at the expense of those paths.
+
+
+## Measured compaction lead before 0469
 
 [0468](changes/0468-xlsx-remaining-commit-profile.md) refreshes CPU attribution
 after the 0467 optimization. Eager parsing remains the largest sampled commit

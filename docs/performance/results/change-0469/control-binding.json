@@ -1,0 +1,20 @@
+{
+  "binary_path": "/tmp/litchi-goal-0469/control",
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "bytes": 463620672,
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "prior_binding_path": "../change-0468/binding.json",
+  "prior_binding_sha256": "dd5d11329f103be16756b1c2068a2b2f21ba9a94fc612e978cb23b1a45253df7",
+  "prior_build_receipt_path": "../change-0468/build.json",
+  "prior_build_receipt_sha256": "ee07446b965c0d2ef403676a9ba49238d883d86ff83f59aa0cf5965d9e80627f",
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "role": "control",
+  "schema": "litchi-0469-role-binding-v1",
+  "scope": "Exact authenticated cached0468build reused; restore its compiled manifest path at exactcleanrevision fortruthfulruntimemetadata. Candidatewillbuildfromsameabsolutepath.",
+  "source_manifest": "sources/control.json",
+  "source_manifest_sha256": "c886ef74e98613ea3d19169f22fc9c0e32b82b12c098338f92250be185a713dd"
+}

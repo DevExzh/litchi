@@ -1,0 +1,29 @@
+{
+  "capture_driver_sha256": "5082c642094fc78f4fe2d6ff17ea4adcce5c356e0e9340ba7e9cf6fd66aa57b4",
+  "cases": [
+    "cfb_read_one",
+    "cfb_shared_concurrent_reads",
+    "opc_mutated_save",
+    "xls_fresh_write_to"
+  ],
+  "corpus_shapes": [
+    "few-large"
+  ],
+  "cpu": 2,
+  "expected_rows": 7,
+  "order": [
+    "review-A1",
+    "review-B1",
+    "review-B2",
+    "review-A2"
+  ],
+  "original_full_comparison_sha256": "ae85205b1934eb81ce19b0e079306ad090912e82862ba36fd601d04325d49138",
+  "reason": "Follow up full-guard latency flags with baseline over0.1ms in CFB read/concurrentread, OPC mutatedsave and XLSfreshwrite. Freeze before capture; retain original57flags. No registered latency claim.",
+  "samples": 100,
+  "schema": "litchi-0469-review-protocol-v1",
+  "warmups": 5,
+  "workers": 1,
+  "writer_shapes": [
+    "large"
+  ]
+}

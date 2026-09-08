@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "driver_sha256": "f16009b0c01fbc87319bc1b8516336f5c4c525a7a06503ef11ade71fc90a2315",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "schema": "litchi-0469-command-v1",
+  "started_utc": "2026-09-08T06:09:41.044299+00:00"
+}

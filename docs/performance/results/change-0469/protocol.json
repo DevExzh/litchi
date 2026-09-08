@@ -1,0 +1,42 @@
+{
+  "allocation_scope": "Whole process including generation, expected output, warmups, verification and teardown; instrumented time/RSS excluded from comparisons.",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "capture_driver_sha256": "4c5f240695681f846128440f60092dc48dcc143c68e9b4a7ee0b58d13a669038",
+  "cpu": 2,
+  "decision": "Retain only if allocations decrease materially, correctness holds, and individual latency/RSS flags have been reviewed. No registered latency claim; any later qualification requires separate predeclared 500-sample ABBA.",
+  "full_guard_order": [
+    "A-full",
+    "B-full"
+  ],
+  "full_guard_samples": 15,
+  "full_guard_warmups": 3,
+  "heap_case": "xlsx_one_percent_commit_save",
+  "heap_order": [
+    "A-heap",
+    "B-heap"
+  ],
+  "heap_samples": 5,
+  "heap_shape": "dense-wide",
+  "heap_warmups": 1,
+  "lock": "/tmp/litchi-goal-0469/cpu.lock",
+  "performance_claim": "none; 100-sample diagnostic probe and whole-process allocation comparison",
+  "probe_cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save"
+  ],
+  "probe_order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "probe_samples": 100,
+  "probe_shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "probe_warmups": 5,
+  "schema": "litchi-0469-protocol-v1",
+  "workers": 1
+}

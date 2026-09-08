@@ -1,0 +1,3383 @@
+{
+  "abba": null,
+  "full_guard_all_five_percent_flags": [
+    {
+      "baseline_ns": 590.0,
+      "candidate_ns": 630.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 1310,
+        "archive_member_count": 5,
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 6.779661016949157,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 20060.0,
+      "candidate_ns": 31090.0,
+      "case": "opc_open_owned",
+      "corpus": {
+        "archive_bytes": 1310,
+        "archive_member_count": 5,
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 54.985044865403786,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 20060.0,
+      "candidate_ns": 31090.0,
+      "case": "opc_open_owned",
+      "corpus": {
+        "archive_bytes": 1310,
+        "archive_member_count": 5,
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 54.985044865403786,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 30.0,
+      "candidate_ns": 40.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 1310,
+        "archive_member_count": 5,
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 33.33333333333333,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 150.0,
+      "candidate_ns": 160.0,
+      "case": "cfb_list_streams",
+      "corpus": {
+        "archive_bytes": 3584,
+        "archive_member_count": 3,
+        "archive_sha256": "84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+        "compression": "none",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-tiny-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark_stream_00002.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "dd5d7d50b40212c301baa2fc36d3896ae8df886b540d5395e70a67e5339d7c09",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 6.666666666666665,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 161.33333333333334,
+      "candidate_ns": 170.66666666666666,
+      "case": "cfb_list_streams",
+      "corpus": {
+        "archive_bytes": 3584,
+        "archive_member_count": 3,
+        "archive_sha256": "84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+        "compression": "none",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-tiny-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark_stream_00002.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "dd5d7d50b40212c301baa2fc36d3896ae8df886b540d5395e70a67e5339d7c09",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 5.7851239669421295,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 590.0,
+      "candidate_ns": 630.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 6.779661016949157,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 596.0,
+      "candidate_ns": 636.6666666666666,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 6.823266219239366,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 650.0,
+      "candidate_ns": 710.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 9.23076923076922,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 650.0,
+      "candidate_ns": 710.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 9.23076923076922,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 39.333333333333336,
+      "candidate_ns": 43.333333333333336,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 10.169491525423723,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 40.0,
+      "candidate_ns": 50.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 25.0,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 40.0,
+      "candidate_ns": 50.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 25.0,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 14684.733333333334,
+      "candidate_ns": 15446.733333333334,
+      "case": "opc_source_open",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 5.1890625638418175,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 15050.0,
+      "candidate_ns": 24371.0,
+      "case": "opc_source_open",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 61.933554817275734,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 15050.0,
+      "candidate_ns": 24371.0,
+      "case": "opc_source_open",
+      "corpus": {
+        "archive_bytes": 2702,
+        "archive_member_count": 5,
+        "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+        "compression": "deflate",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 61.933554817275734,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 25891.0,
+      "candidate_ns": 27300.0,
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 3584,
+        "archive_member_count": 3,
+        "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+        "compression": "none",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-tiny-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark_stream_00002.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "df355b60021f82a84ec1ca06edcf7aea64a5272388c4eed239562fd63d3fceb3",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "delta_percent": 5.442045498435744,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 694353.0,
+      "candidate_ns": 760073.0,
+      "case": "opc_open",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 9.464926341500647,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 694353.0,
+      "candidate_ns": 760073.0,
+      "case": "opc_open",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 9.464926341500647,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 420.0,
+      "candidate_ns": 450.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.14285714285714,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 421.3333333333333,
+      "candidate_ns": 454.6666666666667,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.911392405063311,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 430.0,
+      "candidate_ns": 520.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 20.93023255813953,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 430.0,
+      "candidate_ns": 520.0,
+      "case": "opc_noop_save",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 20.93023255813953,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 33871.0,
+      "candidate_ns": 36461.0,
+      "case": "opc_source_concurrent_same_part",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.646659384133914,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 33871.0,
+      "candidate_ns": 36461.0,
+      "case": "opc_source_concurrent_same_part",
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.646659384133914,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 680.0,
+      "candidate_ns": 800.0,
+      "case": "opc_source_cached_main_read",
+      "corpus": {
+        "archive_bytes": 303003,
+        "archive_member_count": 258,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 17.647058823529417,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 680.0,
+      "candidate_ns": 800.0,
+      "case": "opc_source_cached_main_read",
+      "corpus": {
+        "archive_bytes": 303003,
+        "archive_member_count": 258,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 17.647058823529417,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 630.0,
+      "candidate_ns": 680.0,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.9365079365079305,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 630.0,
+      "candidate_ns": 680.0,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.9365079365079305,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 50.0,
+      "candidate_ns": 60.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 19.999999999999996,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 50.0,
+      "candidate_ns": 60.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 19.999999999999996,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 660.0,
+      "candidate_ns": 710.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.575757575757569,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 666.0,
+      "candidate_ns": 713.3333333333334,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 7.1071071071071135,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 690.0,
+      "candidate_ns": 750.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 8.695652173913038,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 690.0,
+      "candidate_ns": 750.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "delta_percent": 8.695652173913038,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 700.0,
+      "candidate_ns": 760.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 8.571428571428562,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 712.0,
+      "candidate_ns": 782.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 9.831460674157299,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 760.0,
+      "candidate_ns": 1050.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 38.1578947368421,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 760.0,
+      "candidate_ns": 1050.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 38.1578947368421,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 1036764.0,
+      "candidate_ns": 1096785.0,
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 5.789263516094301,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 1037096.3333333334,
+      "candidate_ns": 1097911.8666666667,
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 5.864019703730516,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 1050574.0,
+      "candidate_ns": 1110785.0,
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 5.7312478702119085,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 1050574.0,
+      "candidate_ns": 1110785.0,
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 5.7312478702119085,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 66490.0,
+      "candidate_ns": 70560.0,
+      "case": "opc_source_cached_main_read",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 6.121221236276142,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 66490.0,
+      "candidate_ns": 70560.0,
+      "case": "opc_source_cached_main_read",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 6.121221236276142,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 176981.0,
+      "candidate_ns": 190891.0,
+      "case": "cfb_open",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 7.859600748102902,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 176981.0,
+      "candidate_ns": 190891.0,
+      "case": "cfb_open",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 7.859600748102902,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 180.0,
+      "candidate_ns": 190.0,
+      "case": "cfb_list_streams",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 5.555555555555558,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 373621.0,
+      "candidate_ns": 398391.0,
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 6.629712997931048,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 373621.0,
+      "candidate_ns": 398391.0,
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 6.629712997931048,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 720.0,
+      "candidate_ns": 800.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 16783632,
+        "archive_member_count": 6,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 11.111111111111116,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 747.3333333333334,
+      "candidate_ns": 845.3333333333334,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 16783632,
+        "archive_member_count": 6,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 13.113291703835861,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 930.0,
+      "candidate_ns": 1050.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 16783632,
+        "archive_member_count": 6,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 12.903225806451623,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 930.0,
+      "candidate_ns": 1050.0,
+      "case": "zip_index",
+      "corpus": {
+        "archive_bytes": 16783632,
+        "archive_member_count": 6,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 12.903225806451623,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 480.0,
+      "candidate_ns": 540.0,
+      "case": "cfb_list_streams",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 12.5,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 480.0,
+      "candidate_ns": 540.0,
+      "case": "cfb_list_streams",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 12.5,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 107850.0,
+      "candidate_ns": 127460.0,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 18.182661103384334,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 108021.13333333333,
+      "candidate_ns": 123235.86666666667,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 14.084959918336981,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 111181.0,
+      "candidate_ns": 156331.0,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 40.60945665176603,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 111181.0,
+      "candidate_ns": 156331.0,
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 40.60945665176603,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 330411.0,
+      "candidate_ns": 352632.0,
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "delta_percent": 6.725260357554674,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 50.0,
+      "candidate_ns": 60.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "553f3571e7f6667dd2b751bf6d9486fd5695b342f5fecaee8ce8d64b7e729170",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 19.999999999999996,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 47.333333333333336,
+      "candidate_ns": 62.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "553f3571e7f6667dd2b751bf6d9486fd5695b342f5fecaee8ce8d64b7e729170",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 30.98591549295775,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 60.0,
+      "candidate_ns": 90.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "553f3571e7f6667dd2b751bf6d9486fd5695b342f5fecaee8ce8d64b7e729170",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 50.0,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 60.0,
+      "candidate_ns": 90.0,
+      "case": "cfb_create_stream_borrowed",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "553f3571e7f6667dd2b751bf6d9486fd5695b342f5fecaee8ce8d64b7e729170",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 50.0,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 44851.0,
+      "candidate_ns": 51920.0,
+      "case": "opc_source_concurrent_same_part",
+      "corpus": {
+        "archive_bytes": 453104,
+        "archive_member_count": 2050,
+        "archive_sha256": "b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7",
+        "compression": "deflate",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "wide-root-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark/parts/01024.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "7df7e60e8f4da5b129fad4b95093b415e6c307daf10d02309fdaf46a1ed17a5e",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 15.761075561302974,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 44851.0,
+      "candidate_ns": 51920.0,
+      "case": "opc_source_concurrent_same_part",
+      "corpus": {
+        "archive_bytes": 453104,
+        "archive_member_count": 2050,
+        "archive_sha256": "b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7",
+        "compression": "deflate",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "wide-root-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark/parts/01024.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "7df7e60e8f4da5b129fad4b95093b415e6c307daf10d02309fdaf46a1ed17a5e",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 15.761075561302974,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 670.0,
+      "candidate_ns": 710.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "cdff1a703805ca23f9ecb5927cb59a2cd29190aba863c9afa2ac117e09e4fbc6",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 5.970149253731338,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 671.3333333333334,
+      "candidate_ns": 714.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "cdff1a703805ca23f9ecb5927cb59a2cd29190aba863c9afa2ac117e09e4fbc6",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 6.3555114200595675,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 690.0,
+      "candidate_ns": 820.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "cdff1a703805ca23f9ecb5927cb59a2cd29190aba863c9afa2ac117e09e4fbc6",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 18.840579710144922,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 690.0,
+      "candidate_ns": 820.0,
+      "case": "cfb_shared_read_one",
+      "corpus": {
+        "archive_bytes": 406016,
+        "archive_member_count": 2048,
+        "archive_sha256": "2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+        "compression": "none",
+        "entry_bytes": 64,
+        "entry_count": 2048,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-wide-root-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "wide-root",
+        "target_entry": "benchmark_stream_02047.bin",
+        "target_payload_bytes": 64,
+        "target_payload_sha256": "cdff1a703805ca23f9ecb5927cb59a2cd29190aba863c9afa2ac117e09e4fbc6",
+        "uncompressed_payload_bytes": 131072,
+        "xlsx": null
+      },
+      "delta_percent": 18.840579710144922,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 8533.333333333334,
+      "candidate_ns": 9373.4,
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 15360,
+        "archive_member_count": 5,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 3,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-tiny",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "tiny",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "uncompressed_payload_bytes": 189,
+        "xlsx": null
+      },
+      "delta_percent": 9.844531249999978,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 8990.0,
+      "candidate_ns": 19900.0,
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 15360,
+        "archive_member_count": 5,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 3,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-tiny",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "tiny",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "uncompressed_payload_bytes": 189,
+        "xlsx": null
+      },
+      "delta_percent": 121.35706340378198,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 8990.0,
+      "candidate_ns": 19900.0,
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 15360,
+        "archive_member_count": 5,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 3,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-tiny",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "tiny",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "uncompressed_payload_bytes": 189,
+        "xlsx": null
+      },
+      "delta_percent": 121.35706340378198,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 1088304.0,
+      "candidate_ns": 1296415.0,
+      "case": "xls_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "delta_percent": 19.122506211499733,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 1088304.0,
+      "candidate_ns": 1296415.0,
+      "case": "xls_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "delta_percent": 19.122506211499733,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 90.0,
+      "candidate_ns": 100.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 11.111111111111116,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 36960.0,
+      "candidate_ns": 41540.0,
+      "case": "xlsx_first_cell",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 12.391774891774897,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 36960.0,
+      "candidate_ns": 41540.0,
+      "case": "xlsx_first_cell",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 12.391774891774897,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 110.0,
+      "candidate_ns": 130.0,
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 18.181818181818187,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 108.66666666666667,
+      "candidate_ns": 126.66666666666667,
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 16.564417177914102,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 110.0,
+      "candidate_ns": 130.0,
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 18.181818181818187,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 110.0,
+      "candidate_ns": 130.0,
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 18.181818181818187,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 280.0,
+      "candidate_ns": 300.0,
+      "case": "xlsx_noop_commit_save",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 7.14285714285714,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 275.3333333333333,
+      "candidate_ns": 302.6666666666667,
+      "case": "xlsx_noop_commit_save",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 9.927360774818418,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 300.0,
+      "candidate_ns": 330.0,
+      "case": "xlsx_noop_commit_save",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.000000000000009,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 300.0,
+      "candidate_ns": 330.0,
+      "case": "xlsx_noop_commit_save",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.000000000000009,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 37776.666666666664,
+      "candidate_ns": 39760.8,
+      "case": "xlsx_source_open",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 5.252272125650759,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 41510.0,
+      "candidate_ns": 53710.0,
+      "case": "xlsx_source_open",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 29.390508311250297,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 41510.0,
+      "candidate_ns": 53710.0,
+      "case": "xlsx_source_open",
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 29.390508311250297,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 110.0,
+      "candidate_ns": 120.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 9.090909090909083,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 112.66666666666667,
+      "candidate_ns": 120.66666666666667,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 7.100591715976323,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 120.0,
+      "candidate_ns": 130.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 8.333333333333325,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 120.0,
+      "candidate_ns": 130.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 8.333333333333325,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 280.0,
+      "candidate_ns": 310.0,
+      "case": "xlsx_noop_commit",
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.71428571428572,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 70.0,
+      "candidate_ns": 90.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 28.57142857142858,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 85.33333333333333,
+      "candidate_ns": 94.0,
+      "case": "xlsx_list_sheets",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.15625,
+      "metric": "mean"
+    },
+    {
+      "baseline_ns": 1240.0,
+      "candidate_ns": 1340.0,
+      "case": "xlsx_noop_commit",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 8.064516129032251,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 1240.0,
+      "candidate_ns": 1340.0,
+      "case": "xlsx_noop_commit",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 8.064516129032251,
+      "metric": "p99"
+    },
+    {
+      "baseline_ns": 12730.0,
+      "candidate_ns": 15840.0,
+      "case": "xlsx_noop_commit_save",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 24.430479183032205,
+      "metric": "p50"
+    },
+    {
+      "baseline_ns": 52040.0,
+      "candidate_ns": 57370.0,
+      "case": "xlsx_source_open",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.242121445042285,
+      "metric": "p95"
+    },
+    {
+      "baseline_ns": 52040.0,
+      "candidate_ns": 57370.0,
+      "case": "xlsx_source_open",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "delta_percent": 10.242121445042285,
+      "metric": "p99"
+    }
+  ],
+  "inputs": [
+    {
+      "bytes": 115626,
+      "path": "review-A1/report.json",
+      "sha256": "a4c07807a9e0dfce6e27b811f583bbb5fc96e374df87bc7af8a747811502e913"
+    },
+    {
+      "bytes": 115761,
+      "path": "review-B1/report.json",
+      "sha256": "5417f5bcd7e5185a0eccd4ed2aacbf073cc38c62ed3e1f0195ac62a29f57d50e"
+    },
+    {
+      "bytes": 115761,
+      "path": "review-B2/report.json",
+      "sha256": "b9bd561d30ba95820c9c6007fdc2ed02a14f446d6e5fe318e052591d07e6c5e7"
+    },
+    {
+      "bytes": 115669,
+      "path": "review-A2/report.json",
+      "sha256": "f17816f5e0d9269ea588e5740546dbc2f4813f55397e8b350d379f1f0f164d69"
+    }
+  ],
+  "observation_scope": "Raw-sample descriptive statistics only; strict ABBA rejection does not authorize comparison claims",
+  "observations": [
+    {
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 113327.46,
+          "p50": 112385.5,
+          "p95": 124961.0,
+          "p99": 134230.0
+        },
+        "review-A2": {
+          "mean": 117723.93,
+          "p50": 119120.5,
+          "p95": 127880.0,
+          "p99": 129060.0
+        },
+        "review-B1": {
+          "mean": 115772.41,
+          "p50": 114305.5,
+          "p95": 131121.0,
+          "p99": 133371.0
+        },
+        "review-B2": {
+          "mean": 110714.73,
+          "p50": 108565.0,
+          "p95": 120701.0,
+          "p99": 125481.0
+        }
+      }
+    },
+    {
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "e0733b2f7ea451a23bd35460ebe5c8cb007d753cbb2b60222727f51f92c77a61",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 333404.46,
+          "p50": 331206.5,
+          "p95": 367241.0,
+          "p99": 392011.0
+        },
+        "review-A2": {
+          "mean": 330904.88,
+          "p50": 328751.0,
+          "p95": 357242.0,
+          "p99": 392051.0
+        },
+        "review-B1": {
+          "mean": 334993.1,
+          "p50": 335531.5,
+          "p95": 361691.0,
+          "p99": 384642.0
+        },
+        "review-B2": {
+          "mean": 337585.39,
+          "p50": 334867.0,
+          "p95": 386151.0,
+          "p99": 397992.0
+        }
+      }
+    },
+    {
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 99111,
+        "archive_member_count": 6,
+        "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 973961.44,
+          "p50": 973339.0,
+          "p95": 979344.0,
+          "p99": 987394.0
+        },
+        "review-A2": {
+          "mean": 994814.3,
+          "p50": 981619.0,
+          "p95": 1036114.0,
+          "p99": 1047294.0
+        },
+        "review-B1": {
+          "mean": 1039482.58,
+          "p50": 1038424.0,
+          "p95": 1074884.0,
+          "p99": 1083044.0
+        },
+        "review-B2": {
+          "mean": 1021940.21,
+          "p50": 1012334.0,
+          "p95": 1058774.0,
+          "p99": 1079934.0
+        }
+      }
+    },
+    {
+      "case": "cfb_read_one",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 113781.25,
+          "p50": 112720.0,
+          "p95": 124591.0,
+          "p99": 128100.0
+        },
+        "review-A2": {
+          "mean": 116003.95,
+          "p50": 114780.5,
+          "p95": 128320.0,
+          "p99": 134381.0
+        },
+        "review-B1": {
+          "mean": 113587.64,
+          "p50": 111245.5,
+          "p95": 126520.0,
+          "p99": 131121.0
+        },
+        "review-B2": {
+          "mean": 113487.41,
+          "p50": 112755.5,
+          "p95": 124231.0,
+          "p99": 127791.0
+        }
+      }
+    },
+    {
+      "case": "cfb_shared_concurrent_reads",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 338647.77,
+          "p50": 341222.0,
+          "p95": 362252.0,
+          "p99": 373411.0
+        },
+        "review-A2": {
+          "mean": 336727.28,
+          "p50": 335926.5,
+          "p95": 386752.0,
+          "p99": 391501.0
+        },
+        "review-B1": {
+          "mean": 340863.83,
+          "p50": 337211.5,
+          "p95": 380022.0,
+          "p99": 406482.0
+        },
+        "review-B2": {
+          "mean": 339240.31,
+          "p50": 336031.0,
+          "p95": 370261.0,
+          "p99": 409702.0
+        }
+      }
+    },
+    {
+      "case": "opc_mutated_save",
+      "corpus": {
+        "archive_bytes": 16783632,
+        "archive_member_count": 6,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "compression": "deflate",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 63531744.71,
+          "p50": 63530666.0,
+          "p95": 63602117.0,
+          "p99": 63625316.0
+        },
+        "review-A2": {
+          "mean": 61297495.26,
+          "p50": 61292619.0,
+          "p95": 61387044.0,
+          "p99": 61427974.0
+        },
+        "review-B1": {
+          "mean": 61206185.95,
+          "p50": 61202181.0,
+          "p95": 61292816.0,
+          "p99": 61323477.0
+        },
+        "review-B2": {
+          "mean": 61295764.77,
+          "p50": 61278669.0,
+          "p95": 61379344.0,
+          "p99": 61771038.0
+        }
+      }
+    },
+    {
+      "case": "xls_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "legs_ns": {
+        "review-A1": {
+          "mean": 1042535.2,
+          "p50": 1042059.0,
+          "p95": 1048954.0,
+          "p99": 1054174.0
+        },
+        "review-A2": {
+          "mean": 1045153.65,
+          "p50": 1044784.0,
+          "p95": 1051834.0,
+          "p99": 1055015.0
+        },
+        "review-B1": {
+          "mean": 1095588.72,
+          "p50": 1094714.0,
+          "p95": 1102935.0,
+          "p99": 1112394.0
+        },
+        "review-B2": {
+          "mean": 1059416.05,
+          "p50": 1058699.0,
+          "p95": 1065064.0,
+          "p99": 1073274.0
+        }
+      }
+    }
+  ],
+  "process_rss": {
+    "review-A1": {
+      "latency_comparison": "descriptive normal process",
+      "maximum_resident_set_bytes": 145932288,
+      "maximum_resident_set_kib": 142512,
+      "path": {
+        "bytes": 1113,
+        "path": "review-A1/resource.log",
+        "sha256": "658faebbfd917cae82cd460645bb918309a08e85ff5e08779babc5c5a6dabdb6"
+      },
+      "scope": "whole_process_lifetime_including_setup_and_teardown",
+      "unit": "KiB"
+    },
+    "review-A2": {
+      "latency_comparison": "descriptive normal process",
+      "maximum_resident_set_bytes": 145408000,
+      "maximum_resident_set_kib": 142000,
+      "path": {
+        "bytes": 1112,
+        "path": "review-A2/resource.log",
+        "sha256": "faf46176456d3ae958be3aae103ed0b25f477571eaa7e314698166dcbbedd67d"
+      },
+      "scope": "whole_process_lifetime_including_setup_and_teardown",
+      "unit": "KiB"
+    },
+    "review-B1": {
+      "latency_comparison": "descriptive normal process",
+      "maximum_resident_set_bytes": 145985536,
+      "maximum_resident_set_kib": 142564,
+      "path": {
+        "bytes": 1115,
+        "path": "review-B1/resource.log",
+        "sha256": "c2a063fb146fb9882b23c0029b560b0d35ca9d6cf9025acc0d28430cbbaacd6f"
+      },
+      "scope": "whole_process_lifetime_including_setup_and_teardown",
+      "unit": "KiB"
+    },
+    "review-B2": {
+      "latency_comparison": "descriptive normal process",
+      "maximum_resident_set_bytes": 145649664,
+      "maximum_resident_set_kib": 142236,
+      "path": {
+        "bytes": 1114,
+        "path": "review-B2/resource.log",
+        "sha256": "8fafc4f02469946aa280faf7a8ca964e72929dd15040634b00e3c6dac7a0deb8"
+      },
+      "scope": "whole_process_lifetime_including_setup_and_teardown",
+      "unit": "KiB"
+    }
+  },
+  "protocol": {
+    "bytes": 833,
+    "path": "review-protocol.json",
+    "sha256": "e12f27a27c02c739a7a46342596141d253b890df674a414c4549f68c8a210d1a"
+  },
+  "receipts": [
+    {
+      "bytes": 2547,
+      "path": "review-A1/receipt.json",
+      "sha256": "60b6ef4c64780be701274dffd19a52a6cddab0ab26c23521983dac6ca852c3c4"
+    },
+    {
+      "bytes": 2551,
+      "path": "review-B1/receipt.json",
+      "sha256": "89954b81480344184446f3ec6ee2ce32af8303c0c9b73ba1b381de2feff33c16"
+    },
+    {
+      "bytes": 2551,
+      "path": "review-B2/receipt.json",
+      "sha256": "8c5e1d3e91902df034747091f03f86708acaa87d31b6ccbd32720ba093dd43b3"
+    },
+    {
+      "bytes": 2547,
+      "path": "review-A2/receipt.json",
+      "sha256": "da919cea8a897559b5c403c37aabcc0b5453708896c100f4c767df117a3c72d4"
+    }
+  ],
+  "schema": "litchi-0469-review-v1",
+  "scope": "Seven targeted guard rows, 100 samples/five warmups; original full-guard flags retained; no registered latency claim",
+  "strict_abba_error": "cfb_shared_concurrent_reads[{\"archive_bytes\":16912384,\"archive_member_count\":4,\"archive_sha256\":\"4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa\",\"compression\":\"none\",\"entry_bytes\":4194304,\"entry_count\":4,\"generator\":\"litchi-cfb-synthetic-v1\",\"name\":\"cfb-few-large-incompressible\",\"package_format\":\"CFB/OLE2\",\"payload_kind\":\"incompressible\",\"shape\":\"few-large\",\"target_entry\":\"benchmark_stream_00003.bin\",\"target_payload_bytes\":4194304,\"target_payload_sha256\":\"57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706\",\"uncompressed_payload_bytes\":16777216,\"xlsx\":null}] source identity differs between ABBA legs",
+  "strict_abba_status": "rejected",
+  "tool": {
+    "bytes": 319636,
+    "path": "tools/perf_abba_summary.py",
+    "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+  }
+}

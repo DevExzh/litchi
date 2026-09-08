@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0469/test_evidence.py"
+  ],
+  "started_utc": "2026-09-08T06:22:19.528575+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T06:22:19.575236+00:00",
+  "artifacts": {
+    "evidence-tests-fixed.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "evidence-tests-fixed.stderr": {
+      "sha256": "75ff54e727b57e4bd7b88956ed0c92c4b9a416e6f0976707e8fb54aa385ac0bd",
+      "bytes": 106
+    }
+  }
+}

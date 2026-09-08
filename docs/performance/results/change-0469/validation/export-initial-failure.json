@@ -1,0 +1,8 @@
+{
+  "schema": "litchi-0469-export-diagnostic-v1",
+  "exit_code": 1,
+  "driver_sha256": "f389ed2b9ecc8051e2ffcd79d1499c53d8e8b72590a34f0e97a7725deb081306",
+  "error": "AssertionError: [] while locating heaptrack*.gz; installed Heaptrack emitted heaptrack.zst for both successful captures.",
+  "capture_rerun": false,
+  "fix": "Accept the actual supported .zst output as well as .gz; export the already authenticated captures."
+}

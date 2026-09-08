@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0469/A-heap/heaptrack.zst",
+    "-n",
+    "0",
+    "-a",
+    "0",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-l",
+    "0"
+  ],
+  "artifacts": {
+    "heaptrack-print.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "heaptrack-print.stdout": {
+      "bytes": 767,
+      "sha256": "ae98bb90c93a730f02fde8bffb595fbdd8be006bfd50daf7af1ae1de1ea48c9c"
+    }
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0469",
+  "driver_sha256": "786a65021fd0f632183ecba180da294bd23e0fcbdc3cad4a1fee14590cc5807d",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T06:20:51.306304+00:00",
+  "input_path": "heaptrack.zst",
+  "input_sha256": "591efa35a540165401c7634f0a048b38ea770705c675b195e77dd3fd1b97dc8a",
+  "schema": "litchi-0469-heap-export-v1",
+  "started_utc": "2026-09-08T06:20:48.117434+00:00"
+}

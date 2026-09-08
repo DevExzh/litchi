@@ -1,0 +1,14 @@
+{
+  "changed_source": "crates/litchi-xlsx/src/raw/compact.rs",
+  "changed_source_sha256": "b89251ff9d01bf4135cb2b5188d8f9185597d9adea58fba59b261237a0a876f9",
+  "formatting": "Changed XLSX crate checked; whole-workspace formatting has previously documented unchanged excluded Keynote discrepancy at src/document.rs:592; no iWork edits.",
+  "fuzz": "No dedicated XLSX compaction fuzz target exists; focused valid/adversarial differential cases and the complete XLSX suite run. No new fuzz or native Office execution claim.",
+  "schema": "litchi-0469-validation-scope-v1",
+  "tests": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 1245,
+    "targets": 59
+  },
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

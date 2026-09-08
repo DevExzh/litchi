@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0469/analyze.py",
+    "--full-control",
+    "docs/performance/results/change-0469/A-full/report.json",
+    "--full-candidate",
+    "docs/performance/results/change-0469/B-full/report.json",
+    "--heap-control",
+    "docs/performance/results/change-0469/A-heap/resource.log",
+    "--heap-candidate",
+    "docs/performance/results/change-0469/B-heap/resource.log",
+    "--output",
+    "docs/performance/results/change-0469/summary.json"
+  ],
+  "started_utc": "2026-09-08T06:22:19.575377+00:00",
+  "exit_code": 1,
+  "finished_utc": "2026-09-08T06:22:19.703225+00:00",
+  "artifacts": {
+    "analysis.stdout": {
+      "sha256": "13819cff15562ca11fd0fdd8a64ea72c34187983ed380306be748cd1bccb6636",
+      "bytes": 134
+    },
+    "analysis.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}
