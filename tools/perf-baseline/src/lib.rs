@@ -11,6 +11,7 @@ mod cold_verified;
 mod corpus_manifest;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
+mod docx_streaming_create;
 mod filesystem;
 pub mod odp_append_attribution;
 mod odp_buffered_create;
@@ -1398,6 +1399,7 @@ enum Case {
     DocxSemanticOneParagraphText,
     DocxSemanticFullText,
     DocxSemanticCreateSmall,
+    DocxStreamingCreate,
     DocxSemanticNoopEditSave,
     DocxSemanticOneEditSave,
     DocxSemanticOnePercentEditSave,
@@ -1986,6 +1988,7 @@ impl Case {
             Self::DocxSemanticOneParagraphText => "docx_semantic_one_paragraph_text",
             Self::DocxSemanticFullText => "docx_semantic_full_text",
             Self::DocxSemanticCreateSmall => "docx_semantic_create_small",
+            Self::DocxStreamingCreate => "docx_streaming_create",
             Self::DocxSemanticNoopEditSave => "docx_semantic_noop_edit_save",
             Self::DocxSemanticOneEditSave => "docx_semantic_one_edit_save",
             Self::DocxSemanticOnePercentEditSave => "docx_semantic_one_percent_edit_save",
@@ -2441,6 +2444,10 @@ impl Case {
 
     const fn uses_streaming_creation(self) -> bool {
         matches!(self, Self::XlsxStreamingCreate | Self::RtfStreamingCreate)
+    }
+
+    const fn uses_docx_streaming_creation(self) -> bool {
+        matches!(self, Self::DocxStreamingCreate)
     }
 
     const fn uses_semantic_docx(self) -> bool {
@@ -4387,6 +4394,8 @@ struct SourceSummary {
     cfb_open_stream: Option<CfbOpenStreamEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_mixed: Option<OdtMixedPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_paragraphs: Option<docx_streaming_create::DocxParagraphsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_paragraphs: Option<odt_streaming_create::OdtParagraphsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -9002,6 +9011,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_xlsx_cell_values()
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
+                    && !case.uses_docx_streaming_creation()
                     && !case.uses_odt_buffered_creation()
                     && !case.uses_odt_streaming_creation()
                     && !case.uses_odp_buffered_creation()
@@ -10117,6 +10127,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_docx_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = docx_streaming_create::build_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_docx_streaming_creation())
+            {
+                results.push(docx_streaming_create::run(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -11779,6 +11812,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_semantic_one_paragraph_text" => Some(Case::DocxSemanticOneParagraphText),
         "docx_semantic_full_text" => Some(Case::DocxSemanticFullText),
         "docx_semantic_create_small" => Some(Case::DocxSemanticCreateSmall),
+        "docx_streaming_create" => Some(Case::DocxStreamingCreate),
         "docx_semantic_noop_edit_save" => Some(Case::DocxSemanticNoopEditSave),
         "docx_semantic_one_edit_save" => Some(Case::DocxSemanticOneEditSave),
         "docx_semantic_one_percent_edit_save" => Some(Case::DocxSemanticOnePercentEditSave),
@@ -12251,7 +12285,8 @@ fn usage_text() -> String {
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,\n\
                                        docx_semantic_full_text,\n\
-                                       docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
+                                       docx_semantic_create_small,docx_streaming_create,\n\
+                                       docx_semantic_noop_edit_save,\n\
                                        docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,\n\
                                        pptx_semantic_open,pptx_semantic_list_slides,\n\
                                        pptx_semantic_one_slide,pptx_semantic_full_text,\n\
@@ -23068,7 +23103,7 @@ fn run_case_with_config(
         Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
             run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
-        Case::XlsxStreamingCreate | Case::RtfStreamingCreate => {
+        Case::XlsxStreamingCreate | Case::RtfStreamingCreate | Case::DocxStreamingCreate => {
             Err("streaming creation cases use their bounded corpus runner".into())
         },
         Case::OpcRangeSourceOpen => {
@@ -58742,7 +58777,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 439);
+        assert_eq!(selectable_count, 440);
         assert_eq!(Case::DEFAULT.len(), 37);
     }
 
@@ -60739,6 +60774,38 @@ mod tests {
         assert!(odt.semantic_reopen_verified);
         assert!(odt.immutable_styles_meta_verified);
         assert!(!odt.timing_scope.is_empty());
+        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
+    }
+
+    #[test]
+    fn docx_streaming_creation_is_opt_in_and_reports_public_writer_evidence() {
+        let case = parse_case("docx_streaming_create").expect("streaming DOCX selector parses");
+        assert_eq!(case, Case::DocxStreamingCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+        let corpus = super::docx_streaming_create::build_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(corpus.manifest.archive_member_count, 3);
+        assert_eq!(corpus.manifest.entry_count, 64);
+        let measured = super::docx_streaming_create::run(case, &corpus, 0, 1).unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(corpus.manifest.archive_sha256.as_str())
+        );
+        let sink = measured.sink.as_ref().unwrap();
+        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(sink.retained_authoring_window_bytes, Some(64));
+        assert_eq!(sink.paragraphs, Some(64));
+        assert_eq!(sink.runs, Some(64));
+        let source = measured.source.as_ref().unwrap();
+        let docx = source.docx_paragraphs.as_ref().unwrap();
+        assert_eq!(docx.role, "streaming");
+        assert_eq!(docx.paragraph_count, corpus.manifest.entry_count);
+        assert_eq!(docx.run_count, corpus.manifest.entry_count);
+        assert!(docx.archive_member_set_verified);
+        assert!(docx.semantic_reopen_verified);
+        assert!(docx.deterministic_output_verified);
+        assert_eq!(docx.scratch_bytes, 64);
         assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
     }
 
