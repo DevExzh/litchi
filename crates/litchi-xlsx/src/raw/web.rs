@@ -11,6 +11,8 @@ use quick_xml::reader::NsReader;
 use crate::error::{Result, allocation, invalid};
 use crate::web::{Binding, Bindings, MAX_BINDINGS, MAX_STRING_BYTES};
 
+pub(crate) mod check;
+
 /// `SpreadsheetML` extension URI for worksheet web-extension bindings.
 pub const EXTENSION_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
 /// Namespace of the worksheet web-extension collection.
