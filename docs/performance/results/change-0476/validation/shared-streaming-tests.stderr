@@ -1,0 +1,145 @@
+   Compiling zeroize v1.9.0
+   Compiling syn v2.0.114
+   Compiling const-oid v0.9.6
+   Compiling subtle v2.6.1
+   Compiling generic-array v0.14.9
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling block-buffer v0.12.1
+   Compiling cmov v0.5.4
+   Compiling libm v0.2.16
+   Compiling ctutils v0.4.2
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+   Compiling smallvec v1.16.0
+   Compiling digest v0.11.3
+   Compiling sha2 v0.10.9
+   Compiling sha2 v0.11.0
+   Compiling chrono v0.4.45
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling thiserror-impl v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling thiserror v2.0.18
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling bitflags v2.13.1
+   Compiling rustix v1.1.4
+   Compiling synstructure v0.13.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling zerofrom v0.1.4
+   Compiling yoke-derive v0.7.5
+   Compiling tempfile v3.27.0
+   Compiling stable_deref_trait v1.2.1
+   Compiling yoke v0.7.4
+   Compiling zerovec-derive v0.10.4
+   Compiling displaydoc v0.2.6
+   Compiling litemap v0.7.3
+   Compiling zerovec v0.10.4
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling writeable v0.5.5
+   Compiling icu_provider_macros v1.5.0
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_normalizer_data v1.5.1
+   Compiling utf16_iter v1.0.5
+   Compiling write16 v1.0.0
+   Compiling utf8_iter v1.0.4
+   Compiling tinyvec_macros v0.1.1
+   Compiling percent-encoding v2.3.2
+   Compiling tinyvec v1.12.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling form_urlencoded v1.2.2
+   Compiling ryu v1.0.22
+   Compiling unicode-normalization v0.1.25
+   Compiling tinystr v0.7.6
+   Compiling icu_locid v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling caseless v0.2.2
+   Compiling icu_provider v1.5.0
+   Compiling der_derive v0.7.3
+   Compiling icu_locid_transform v1.5.0
+   Compiling flagset v0.4.7
+   Compiling der v0.7.10
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling icu_properties v1.5.1
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling ff v0.13.1
+   Compiling sec1 v0.7.3
+   Compiling icu_normalizer v1.5.0
+   Compiling group v0.13.0
+   Compiling cipher v0.5.2
+   Compiling idna_adapter v1.2.0
+   Compiling crypto-bigint v0.5.5
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling ppv-lite86 v0.2.21
+   Compiling siphasher v1.0.3
+   Compiling cpubits v0.1.1
+   Compiling phf_shared v0.14.0
+   Compiling rand_chacha v0.3.1
+   Compiling elliptic-curve v0.13.8
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling universal-hash v0.6.1
+   Compiling hmac v0.12.1
+   Compiling fastrand v2.5.0
+   Compiling spin v0.9.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling phf_generator v0.14.0
+   Compiling lazy_static v1.5.0
+   Compiling rfc6979 v0.4.0
+   Compiling polyval v0.7.3
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling bergshamra-core v0.7.0
+   Compiling inout v0.1.4
+   Compiling uppsala v0.9.0
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling bergshamra-xml v0.7.0
+   Compiling cipher v0.4.4
+   Compiling ghash v0.6.0
+   Compiling ecdsa v0.16.9
+   Compiling phf_macros v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling pkcs1 v0.7.5
+   Compiling aead v0.6.1
+   Compiling password-hash v0.5.0
+   Compiling sha1 v0.10.7
+   Compiling hmac v0.13.0
+   Compiling blake2 v0.10.6
+   Compiling byteorder v1.5.0
+   Compiling blowfish v0.9.1
+   Compiling argon2 v0.5.3
+   Compiling pbkdf2 v0.13.0
+   Compiling rsa v0.9.10
+   Compiling aes-gcm v0.11.1
+   Compiling p256 v0.13.2
+   Compiling phf v0.14.0
+   Compiling bergshamra-c14n v0.7.0
+   Compiling cbc v0.2.1
+   Compiling x509-cert v0.2.5
+   Compiling sha1 v0.11.0
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling hashbrown v0.16.1
+   Compiling simd-adler32 v0.3.10
+   Compiling log v0.4.29
+   Compiling equivalent v1.0.2
+   Compiling bumpalo v3.20.3
+   Compiling zopfli v0.8.3
+   Compiling indexmap v2.11.4
+   Compiling typed-path v0.12.3
+   Compiling zip v8.6.0
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)

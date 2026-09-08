@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Repeated compressor allocation removed; total-memory gap remains (0476)
+
+[0476](changes/0476-zip-deflate-state-reuse.md) implements the allocation owner
+selected by 0475. All 720 main samples preserve output and the large operation
+reduces requested bytes by 99.538473%. Peak heap remains approximately
+8.88 MB for 8,192 slides, with retained name/directory metadata. This advances
+implementation without closing the explicit total-memory requirement, logical
+append, native breadth, source variants, repackaging or scaling.
+
 ## PPTX allocation ownership investigated (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) adds repeated attribution

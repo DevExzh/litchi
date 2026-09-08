@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## Repeated owned compressor allocation addressed (0476)
+
+[0476](changes/0476-zip-deflate-state-reuse.md) removes repeated backend and
+output-buffer allocation between successfully finalized owned ZIP members.
+Large PPTX requested operation allocation work falls 99.538473%, while peak
+heap is effectively unchanged and still grows with member count. The next
+memory design must account for ZIP directory/name storage and OPC/streaming
+name indexes. See [remaining work](results/change-0476/next-work.md).
+
 ## PPTX writer and preflight costs separated (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) retains repeated CPU and

@@ -1,0 +1,9 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `release` profile [optimized + debuginfo] target(s) in 38.12s
+     Running unittests src/lib.rs (target/release/deps/soapberry_zip-7938a0cdeab585a5)
+     Running tests/central_directory_short_reads.rs (target/release/deps/central_directory_short_reads-7215220a80aa5ce6)
+     Running tests/deflate_reuse.rs (target/release/deps/deflate_reuse-f194403f0de7f9d6)
+     Running tests/preservation_zip64_promotion.rs (target/release/deps/preservation_zip64_promotion-4ac4f56b7b701a18)
+     Running tests/python_zip64_compat.rs (target/release/deps/python_zip64_compat-5add239a8695fab1)
+     Running tests/streaming_zip64_deflate.rs (target/release/deps/streaming_zip64_deflate-ba9bc682eb775f5c)
+   Doc-tests soapberry_zip

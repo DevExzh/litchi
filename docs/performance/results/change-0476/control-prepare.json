@@ -1,0 +1,9 @@
+{
+  "clean_after": true,
+  "common_sha256": "865ac2ff6d8ae8c91334555a37aff93fd30c552da8a7c21dd82d17a42ecd2db6",
+  "driver_sha256": "b23a074b152dccbbd0eb79fae3cc584ad0a8a7133204034b6322fa2795a26efd",
+  "finished_utc": "2026-09-08T11:28:01.300339+00:00",
+  "selected_files": 9777,
+  "source_binding_sha256": "7eacb010fa88ac20ea80d5972af1d1214772b13dde10f28695d9d68def1416e5",
+  "started_utc": "2026-09-08T11:27:55.039936+00:00"
+}

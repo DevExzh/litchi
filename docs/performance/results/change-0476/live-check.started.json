@@ -1,0 +1,14 @@
+{
+  "analyze.py_sha256": "a67b3bb792d57e910638e353d944cfff6ea2384ac9e517acbdc918cecd31b8e9",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0476/verify.py",
+    "--unsealed",
+    "--live"
+  ],
+  "custody.py_sha256": "8e3017d05d3fc6f564691f2afb3491eee5367bdff5c9f82521580d1ef0a57806",
+  "report_checks.py_sha256": "1b6d01b4fdad9132d09ba1b4328a16d4b692c14a408a01f3c508c6ccb9a216df",
+  "started_utc": "2026-09-08T12:20:59.908212+00:00",
+  "verify.py_sha256": "12138b9c28e1add6266b8d60d941914a512be997ea971e062173872a4ed49d20"
+}

@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Owned ZIP Deflate allocation work reduced (0476)
+
+[0476](changes/0476-zip-deflate-state-reuse.md) reuses the raw compressor and
+output scratch after successful owned-member finalization. The large PPTX
+operation requests 31,428,173 bytes instead of 6,809,604,013 (99.538473% fewer),
+with identical output and zero allocator live exit change. Peak heap rises by
+160 bytes and still grows with deck size. Normal observations are descriptive;
+no registered latency or constant-total-memory claim is added. The full goal
+remains open.
+
 ## PPTX streaming attribution (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) profiles the unchanged large

@@ -1,0 +1,17 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-keynote/src/document.rs:592:
+             .source()
+             .detector_limits()
+             .map_err(map_detection_error)?;
+[31m-        let source =
+[m[31m-            litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(path, source_limits)
+[m[31m-                .map_err(map_detection_error)?
+[m[31m-                .ok_or(DocumentReadError::InvalidFormat)?;
+[m[32m+        let source = litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(
+[m[32m+            path,
+[m[32m+            source_limits,
+[m[32m+        )
+[m[32m+        .map_err(map_detection_error)?
+[m[32m+        .ok_or(DocumentReadError::InvalidFormat)?;
+[m         if source.format() != litchi_iwa_detect::Format::Keynote {
+             return Err(DocumentReadError::NotKeynote);
+         }

@@ -1,0 +1,22 @@
+{
+  "all_owned_roots_absent": true,
+  "driver_sha256": "cc47151307ecc03e6781edbb61a90427fa8cf380fcac46d65e357f3a6cc718e1",
+  "finished_utc": "2026-09-08T12:32:07.618668+00:00",
+  "owned_roots": [
+    "/tmp/litchi-goal-0476",
+    "/tmp/litchi-goal-0474"
+  ],
+  "retained_caches": [
+    "/home/zhuhe/code/litchi/target",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+  ],
+  "retained_caches_present": {
+    "/home/zhuhe/code/litchi/target": true,
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target": true
+  },
+  "started_utc": "2026-09-08T12:32:06.035749+00:00",
+  "user_files_unchanged": {
+    "docs/GOAL.md": true,
+    "docs/report/spec-gap-audit.md": true
+  }
+}

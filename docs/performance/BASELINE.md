@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Owned Deflate paired allocation result (0476)
+
+[0476](changes/0476-zip-deflate-state-reuse.md) compares authenticated 0474
+binaries with a clean committed ZIP reuse candidate. Requested operation bytes
+fall from 21,964,902 / 227,629,482 / 6,809,604,013 to
+499,462 / 1,415,242 / 31,428,173 for 8 / 256 / 8,192 slides. All 720 main
+samples preserve deterministic output. Peak heap rises by 160 bytes at every
+size; allocator exit deltas remain zero. Timing remains descriptive, and the
+retained metadata memory requirement stays open.
+
 ## PPTX streaming profile context (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) reuses the authenticated

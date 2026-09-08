@@ -1,0 +1,215 @@
+
+running 18 tests
+test streaming::tests::cancellation_during_flush_retry_is_checked_before_retrying ... ok
+test streaming::tests::cancellation_is_observed_before_next_output ... ok
+test streaming::tests::deterministic_package_is_bounded_to_three_members ... ok
+test streaming::tests::cancellation_during_package_finalization_preserves_typed_progress ... ok
+test streaming::tests::hidden_opc_ceilings_are_rejected_instead_of_being_opaque_runtime_limits ... ok
+test streaming::tests::fixed_memory_reservation_releases_through_hierarchy ... ok
+test streaming::tests::counter_overflow_is_reported_as_a_finite_limit_failure ... ok
+test streaming::tests::fixed_objects_and_work_are_preflighted_before_first_output ... ok
+test streaming::tests::non_seek_short_and_interrupted_sinks_finish_without_buffering ... ok
+test streaming::tests::text_size_scan_charges_work_at_a_bounded_checkpoint ... ok
+test streaming::tests::escaped_chunk_boundaries_are_counted_once_at_exact_xml_limits ... ok
+test streaming::tests::state_errors_are_retryable_but_semantic_failures_poison ... ok
+test streaming::tests::zero_and_failing_sinks_report_typed_progress_and_poisoning ... ok
+test streaming::tests::hierarchical_input_and_output_budgets_have_exact_boundaries ... ok
+test streaming::tests::output_limit_is_exact_and_one_over ... ok
+test streaming::tests::plain_text_validation_and_escaping_are_preflighted ... ok
+test streaming::tests::finite_limits_are_exact_and_one_over ... ok
+test streaming::tests::controlled_sink_preserves_document_progress_through_deflate_failure ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 908 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 324 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 195 filtered out; finished in 0.00s
+
+
+running 5 tests
+test streaming::streaming_text_unit_tests::empty_text_is_a_zero_work_success_and_boundary_values_are_exact ... ok
+test streaming::streaming_text_unit_tests::mixed_unicode_and_escape_text_matches_independent_scalar_reference ... ok
+test streaming::streaming_text_unit_tests::competing_row_and_work_limits_preserve_scalar_refusal_precedence ... ok
+test streaming::streaming_text_unit_tests::every_row_window_offset_preserves_reference_buffer_prefix_and_local_limit ... ok
+test streaming::streaming_text_unit_tests::every_work_offset_preserves_reference_buffer_prefix_for_child_and_parent_budgets ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 201 filtered out; finished in 0.08s
+
+
+running 5 tests
+test streaming::span_tests::pre_cancel_and_short_scratch_write_report_cancellation_without_losing_prefix ... ok
+test streaming::span_tests::paragraph_and_content_xml_ceilings_report_first_failure_and_prefix ... ok
+test streaming::span_tests::scalar_reference_matches_paragraph_emitter_at_controls_unicode_and_span_boundaries ... ok
+test streaming::span_tests::work_budget_exact_and_one_under_preserve_hierarchical_prefix_and_rollback ... ok
+test streaming::span_tests::every_span_threshold_matches_scalar_chunks_for_local_work_and_ties ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 558 filtered out; finished in 0.03s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 548 filtered out; finished in 0.00s
+
+
+running 152 tests
+test raw::strings::tests::streaming_0364_accepts_advisory_count_mismatches_and_rejects_bad_hints ... ok
+test raw::strings::tests::streaming_0364_drains_malformed_tail_and_rejects_roots ... ok
+test raw::strings::tests::streaming_0364_decodes_split_reference_escapes ... ok
+test raw::strings::tests::streaming_0364_selects_mce_choice_or_fallback ... ok
+test raw::strings::tests::streaming_0365_accepts_empty_request_without_retaining_items ... ok
+test raw::strings::tests::streaming_0365_accepts_exact_input_event_and_request_bounds ... ok
+test raw::strings::tests::streaming_0364_marks_unsupported_constructs_without_approximation ... ok
+test raw::strings::tests::streaming_0364_selects_plain_requested_indexes ... ok
+test raw::strings::tests::streaming_0365_drains_malformed_tail_after_selected_items ... ok
+test raw::strings::tests::streaming_0365_rejects_unsorted_and_duplicate_requests ... ok
+test raw::strings::tests::streaming_0365_omits_missing_and_out_of_range_indexes ... ok
+test raw::strings::tests::streaming_0365_reports_rich_items_for_requested_and_unrequested_indexes ... ok
+test raw::strings::tests::streaming_0365_returns_first_middle_last_in_request_order ... ok
+test raw::styles::tests::streaming_0364_counts_direct_cell_xfs ... ok
+test raw::styles::tests::streaming_0364_enforces_declared_count ... ok
+test raw::styles::tests::streaming_0364_honors_exact_event_limit ... ok
+test raw::styles::tests::streaming_0364_ignores_nested_and_unrelated_xfs ... ok
+test raw::styles::tests::streaming_0364_rejects_malformed_tail_and_endings ... ok
+test raw::styles::tests::streaming_0364_requires_nonempty_cell_xfs ... ok
+test raw::styles::tests::streaming_0364_selects_mce_choice_or_fallback ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_captures_start_and_empty_structural_events ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_diagnostics_keep_primary_input_or_mce_and_callback_secondaries ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_accepts_exact_depth_event_and_input_limits_but_rejects_one_under ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_focused_defaults_skip_malformed_rows_but_keep_raw_guards ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_legacy_adapter_maps_clean_eof_raw_then_active_errors ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_preserves_legacy_row_inference_and_order_semantics ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_raw_errors_survive_inactive_branches_and_later_malformed_tail ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_rejects_zero_and_grid_overflow_only_when_rows_are_captured ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_selects_supported_choice_or_fallback_and_ignores_inactive_bad_values ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_uses_expanded_namespace_after_prefix_rebinding ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_split_bom_and_chunk_sizes_match_cursor ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_valid_fixture_matches_legacy_capture_and_defaults ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_does_not_return_early_before_malformed_tail ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_outcomes_cover_first_last_missing_and_empty ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_chooses_supported_choice_or_fallback ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_marks_unsupported_structures_not_eligible ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_payloads_cover_scalar_variants ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_keeps_late_malformed_xml_primary ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_keeps_valid_direct_styles_eligible ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_rejects_ordering_and_adjacent_duplicates ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_marks_invalid_lexicals_not_eligible ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_validates_x14ac_without_retaining_rows ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_respects_exact_limits_and_split_input ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_accepts_max_cell_style_and_falls_back_above_it ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_tracks_global_maxima_and_target_states ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_defers_multiple_shared_strings_and_keeps_global_maxima ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_handles_first_last_grid_edges_and_empty_selection ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_is_sparse_row_major_with_explicit_empty_records ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_marks_formula_and_inherited_styles_not_eligible ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_preserves_inline_and_escape_heavy_empty_boundaries ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_bounds_valid_general_reference_tokens ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_rejects_numeric_inline_references_as_not_eligible ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_late_malformed_tail_is_not_published_as_eligible ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_keeps_invalid_references_as_typed_errors_without_early_publication ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_single_cell_scan_wrapper_matches_one_cell_ranges ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_accepts_unsorted_adjacent_merges ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_count_is_optional_exact_and_nonempty_but_not_mismatched ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_nested_and_payload_markup_falls_back ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_range_selection_remains_sparse_and_physical ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_rejects_invalid_merge_references_and_placement ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_unknown_merge_attributes_and_children_fall_back ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_single_cell_wrapper_classifies_anchor_covered_missing_and_follower ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_content_and_unknown_attributes_fall_back ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_keeps_scalar_and_range_queries_eligible ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_rejects_malformed_duplicate_and_late_metadata ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_decodes_entity_and_cdata_numeric_fragments ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_supports_strict_prefixed_and_ignorable_metadata ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_does_not_publish_before_malformed_tail ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_preserves_long_to_short_and_exponent_lexemes ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_handles_scalar_type_transitions ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_rejects_oversized_selected_and_unselected_values ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_accepts_predefined_and_numeric_references_in_scalar_payloads ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_keeps_formula_cache_ownership_and_parity ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_keeps_selected_and_unselected_errors_exact ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_preserves_selected_lexemes_and_unselected_validation ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_does_not_skip_unselected_inline_validation ... ok
+test raw::strings::tests::streaming_0364_enforces_exact_stream_and_text_limits ... ok
+test streaming::tests::batched_text_escaping_matches_scalar_error_order_and_bytes ... ok
+test streaming::tests::cancellation_before_finish_reports_partial_output ... ok
+test streaming::tests::cancellation_during_central_directory_preserves_typed_progress ... ok
+test streaming::tests::cancellation_during_member_finalization_preserves_typed_progress ... ok
+test streaming::tests::cell_limit_is_exact_and_one_over ... ok
+test streaming::tests::cancellation_during_final_flush_preserves_typed_progress ... ok
+test streaming::tests::static_member_failure_reports_exact_partial_output ... ok
+test streaming::tests::write_zero_sink_fails_without_hanging ... ok
+test workbook::source::tests::streaming_0363_tests::cancellation_0363_does_not_publish_store ... ok
+test streaming::tests::scalar_rows_reopen_without_dimension_or_shared_strings ... ok
+test streaming::tests::text_escaping_rejects_xml_controls ... ok
+test streaming::tests::central_directory_failure_reports_partial_output ... ok
+test workbook::source::tests::streaming_0363_tests::dimension_metadata_0400_keeps_scalar_and_range_queries_streaming ... ok
+test workbook::source::tests::streaming_0363_tests::eligible_scalar_cell_queries_0363_preserve_sparse_states_without_store ... ok
+test streaming::tests::maximum_character_text_and_unicode_byte_boundaries_are_checked ... ok
+test workbook::source::tests::streaming_0363_tests::eligible_scalar_cell_queries_0363_rescan_without_cache ... ok
+test streaming::tests::short_and_interrupted_sinks_are_retried ... ok
+test workbook::source::tests::streaming_0363_tests::malformed_tail_0363_does_not_publish_store ... ok
+test streaming::tests::rows_reuse_one_bounded_scratch_buffer ... ok
+test streaming::tests::final_flush_failure_reports_partial_output ... ok
+test streaming::tests::empty_workbook_has_compact_canonical_six_part_topology ... ok
+test streaming::tests::cancellation_during_row_poison_is_typed ... ok
+test streaming::tests::row_limit_is_exact_and_one_over ... ok
+test workbook::source::tests::streaming_0363_tests::unsupported_dimension_metadata_0400_preserves_eager_fallback ... ok
+test workbook::source::tests::streaming_0363_tests::merge_not_eligible_0363_falls_back_and_initializes_store ... ok
+test streaming::tests::nonfinite_and_unknown_errors_are_rejected ... ok
+test workbook::source::tests::streaming_0363_tests::source_change_0363_does_not_publish_store ... ok
+test streaming::tests::work_charge_is_exact_for_setup_row_and_cell ... ok
+test workbook::source::tests::streaming_0364_tests::dependency_crc_errors_0364_do_not_publish_semantics ... ok
+test streaming::tests::output_limit_is_enforced_before_finalization ... ok
+test workbook::source::tests::streaming_0364_tests::dependency_source_change_and_cancellation_0364_stay_primary ... ok
+test streaming::tests::object_charge_covers_writer_parts_rows_and_cells ... ok
+test workbook::source::tests::streaming_0364_tests::final_fence_0364_outranks_parser_error ... ok
+test workbook::source::tests::streaming_0364_tests::plain_shared_string_and_style_stream_0364_avoids_materialization ... ok
+test streaming::tests::rejected_text_row_can_be_retried_with_exact_scalar_values ... ok
+test workbook::source::tests::streaming_0364_tests::late_dependency_errors_0364_are_primary_without_publication ... ok
+test streaming::tests::cell_text_and_row_scratch_limits_are_exact_and_one_over ... ok
+test streaming::tests::rows_and_cells_are_strict_and_empty_rows_are_dropped ... ok
+test streaming::tests::sink_failure_poison_is_observable ... ok
+test workbook::source::tests::streaming_0364_tests::invalid_and_missing_dependency_refs_0364_fall_back_without_store ... ok
+test streaming::tests::coordinate_boundaries_are_checked ... ok
+test streaming::tests::non_seek_sink_and_determinism ... ok
+test workbook::source::tests::streaming_0365_tests::callback_cancellation_0365_uses_package_owned_context ... ok
+test workbook::source::tests::streaming_0365_tests::cold_visit_cells_0365_matches_sparse_sequence_and_count ... ok
+test workbook::source::tests::streaming_0365_tests::cold_cells_0365_are_sparse_row_major_and_area_bounded ... ok
+test workbook::source::tests::streaming_0364_tests::repeated_eligible_dependency_query_0364_rescans_source ... ok
+test workbook::source::tests::streaming_0364_tests::semantic_dependency_caches_0364_survive_payload_eviction ... ok
+test workbook::source::tests::streaming_0364_tests::requested_plain_and_rich_sst_0364_have_eager_parity ... ok
+test workbook::source::tests::streaming_0365_tests::warm_store_cells_0365_match_cold_selection ... ok
+test workbook::source::tests::streaming_0365_tests::merge_and_shared_formula_0365_fall_back_to_store ... ok
+test workbook::source::tests::streaming_0365_tests::source_change_and_cancellation_0365_have_zero_callbacks ... ok
+test workbook::source::tests::streaming_0364_tests::unselected_dependency_maxima_0364_are_validated ... ok
+test workbook::source::tests::streaming_0366_tests::cold_visit_cells_0366_stages_decoded_callbacks_without_admission ... ok
+test workbook::source::tests::streaming_0367_tests::cold_cells_and_visit_0367_are_sparse_physical_and_merge_coverage_is_not_synthetic ... ok
+test workbook::source::tests::streaming_0366_tests::cold_cell_0366_decodes_references_with_exact_eager_parity ... ok
+test workbook::source::tests::streaming_0366_tests::malformed_reference_tail_and_crc_0366_have_no_callbacks_or_publication ... ok
+test streaming::tests::work_charge_counts_rejected_row_attempts ... ok
+test workbook::source::tests::streaming_0365_tests::dependency_crc_0365_has_zero_callbacks_without_publication ... ok
+test workbook::source::tests::streaming_0367_tests::cold_merge_cell_views_0367_match_forced_eager_without_admission ... ok
+test workbook::source::tests::streaming_0367_tests::crc_source_change_and_cancellation_0367_have_zero_callbacks ... ok
+test workbook::source::tests::streaming_0366_tests::valid_overlong_and_numeric_inline_refs_0366_require_eager_fallback ... ok
+test workbook::source::tests::streaming_0363_tests::crc_failure_0363_does_not_publish_store ... ok
+test workbook::source::tests::streaming_0365_tests::callback_error_0365_preserves_exact_prefix ... ok
+test workbook::source::tests::streaming_0367_tests::malformed_merge_metadata_0367_has_zero_callbacks_and_publication ... ok
+test workbook::source::tests::streaming_0365_tests::final_source_change_0365_outranks_callback_error ... ok
+test workbook::source::tests::streaming_0365_tests::repeated_cells_0365_rescan_without_cache ... ok
+test workbook::source::tests::streaming_0365_tests::malformed_tail_and_worksheet_0365_have_zero_callbacks ... ok
+test workbook::source::tests::streaming_0365_tests::multiple_dependencies_0365_stay_cold_without_store_or_part_cache ... ok
+test workbook::source::tests::streaming_0366_tests::cold_cells_0366_are_sparse_row_major_and_stay_cold ... ok
+test streaming::tests::worksheet_xml_limit_is_exact_and_one_over ... ok
+test workbook::source::tests::streaming_0367_tests::numeric_value_scratch_0400_preserves_late_fallback_parity ... ok
+test workbook::source::tests::streaming_0367_tests::merge_and_unsupported_semantics_0367_match_eager_with_store_admission ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_cap_is_bounded_without_area_expansion ... ok
+test streaming::tests::large_row_scaling_keeps_fixed_memory_without_retaining_output ... ok
+
+test result: ok. 152 passed; 0 failed; 0 ignored; 0 measured; 797 filtered out; finished in 0.06s
+

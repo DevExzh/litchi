@@ -1,0 +1,18 @@
+
+running 13 tests
+test invalid_global_configuration_does_not_touch_sink ... ok
+test sink_failure_reports_incomplete_output_progress ... ok
+test static_content_types_and_relationships_close_the_one_slide_graph ... ok
+test empty_widescreen_slide_reopens_with_fixed_topology ... ok
+test title_only_slide_is_semantic_text_without_caller_boxes ... ok
+test hostile_text_and_geometry_are_refused_before_box_bytes ... ok
+test title_multiple_boxes_have_deterministic_order_and_ids ... ok
+test order_and_limit_refusals_are_checked ... ok
+test runtime_output_limit_is_exact_and_one_under_is_incomplete ... ok
+test slide_xml_limit_reserves_the_final_suffix_before_box_bytes ... ok
+test streaming_deck_is_deterministic_and_reopens ... ok
+test unicode_text_budget_is_utf8_exact_and_whitespace_is_preserved ... ok
+test post_start_sink_failure_reports_progress_and_poisoning ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

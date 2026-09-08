@@ -1,0 +1,17 @@
+
+running 12 tests
+test default_limits_round_trip_through_checked_xml_profile ... ok
+test adjacent_control_spacing_keeps_existing_authored_xml_refusal ... ok
+test cancellation_is_checked_before_source_pull_and_prevents_finalization ... ok
+test xml_audit_attribute_depth_and_event_limits_are_typed_refusals ... ok
+test fallible_and_lazy_sources_preserve_marker_and_stop_at_failure ... ok
+test modeled_memory_exact_and_one_under_is_preflighted_and_released ... ok
+test hierarchical_parent_work_limit_falls_back_from_a_256_byte_span ... ok
+test control_bytes_are_single_decoded_and_xml_controls_are_rejected ... ok
+test short_and_interrupted_sinks_retry_while_zero_and_partial_sinks_report_prefix ... ok
+test exact_provider_limits_reproduce_control_and_one_under_refuses ... ok
+test context_budget_exact_and_one_under_preserve_progress_and_release_memory ... ok
+test empty_controls_and_geometry_match_builder_and_reopen ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

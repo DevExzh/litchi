@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0476: private owned ZIP Deflate state reuse
+
+All 30 ADR files remain unchanged from the previous complete review.
+[0476](changes/0476-zip-deflate-state-reuse.md) changes private transport state
+under the existing ownership boundaries. Pending-output ordering, CRC/input
+accounting, typed limits, independent members and publication/failure behavior
+are covered by differential and shared-format tests. Source/build/capture
+identities remain explicit under ADR 0005; no public API, dependency, runtime
+or unsafe code is added. Constant total memory and the full goal remain open.
+
 ## PPTX profiling custody and scope (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) changes evidence tools

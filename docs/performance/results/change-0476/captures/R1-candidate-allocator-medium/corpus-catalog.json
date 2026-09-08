@@ -1,0 +1,160 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "42fbdced938212ede56078d7eb8c75f683d8d08a7a4a1612c708696cc6614215",
+  "content_set_sha256": "d295ce3a9913c5d8ad74532d7394371930f0b2e0fb4eb2c25fdf46a75f6675e8",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "bbbdedaa4cd2229403cc6c6f39d66548d3887816",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "pptx-ooxml-zip:sha256:1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "name": "pptx-streaming-slides-medium",
+      "legacy_v1": {
+        "name": "pptx-streaming-slides-medium",
+        "generator": "litchi-pptx-streaming-plaintext-slides-v1",
+        "package_format": "PPTX/OOXML/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-plain-unicode-xml-significant-text-box-per-slide",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 549,
+        "entry_bytes": 46,
+        "uncompressed_payload_bytes": 11776,
+        "archive_bytes": 274398,
+        "archive_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+        "target_entry": "ppt/presentation.xml",
+        "target_payload_bytes": 8944,
+        "target_payload_sha256": "b4bc0b783f4309e21a34237444b12da891dbb31f1b5fda2ce3afcaa132578987",
+        "xlsx": null
+      },
+      "format": "PPTX/OOXML/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-pptx-streaming-plaintext-slides-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-plain-unicode-xml-significant-text-box-per-slide",
+          "legacy_shape": "medium"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 274398,
+        "archive_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+        "logical_payload_bytes": 11776,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 46,
+        "entry_count": 256
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 274398,
+          "members": 549,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "ppt/presentation.xml",
+          "logical_bytes": 8944,
+          "sha256": "b4bc0b783f4309e21a34237444b12da891dbb31f1b5fda2ce3afcaa132578987"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "pptx_streaming_create"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "pptx_streaming_create",
+      "corpus_id": "pptx-ooxml-zip:sha256:1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "legacy_name": "pptx-streaming-slides-medium",
+      "legacy_archive_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "role": "timed"
+    }
+  ]
+}

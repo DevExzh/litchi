@@ -1,0 +1,12 @@
+{
+  "added": {
+    "crates/soapberry-zip/tests/deflate_reuse.rs": "c10cbe13ccdeec93e4fe8ba9e2986abf8b7e2a3bcc8a64b0c06802555fd5717f"
+  },
+  "changed": {
+    "crates/soapberry-zip/src/writer.rs": {
+      "candidate": "fa430b508800b441cd43dd66f9ac1fab7ebfbcaf74e1a04e11b4632ee4befe63",
+      "control": "146cb54d9ac67d3f615e6137e73a4aab474f455fa515f161d1dfd09806503691"
+    }
+  },
+  "removed": []
+}
