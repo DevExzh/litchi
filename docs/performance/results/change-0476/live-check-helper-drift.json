@@ -1,0 +1,8 @@
+{
+  "actual_sha256": "7ab1c732219ff39e8a5ec9d877f63c386f60d4f4f2a360f0c49ab93b466e887a",
+  "exit_code": 1,
+  "expected_sha256": "cbca70e9e044e636626370185b998654061d816497a4fe64c7bd8e9f0cc93875",
+  "reason": "evidence-validation helper hash differs: verify.py",
+  "recorded_utc": "2026-09-08T12:30:17.590340+00:00",
+  "scope": "Read-only unsealed live attempt after adding the explicit evidence-validation verifier; helper files are now frozen before the final checks."
+}

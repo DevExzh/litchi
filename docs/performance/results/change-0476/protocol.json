@@ -1,0 +1,354 @@
+{
+  "acceptance": "All archive hashes, lengths, semantic/source/sink counters and full producer oracles remain identical. Zero failed allocation calls and live exit delta required in every allocator sample. Large requested-byte work must fall at least95percent. Investigate normal latency, operation peak or process RSS regressions above5percent and repeat drift above5percent. Retain all captures, rejected attempts and limitations; no claim from allocator timing or profiled timing.",
+  "claim": "Matched scoped allocation-work experiment. Normal and counter comparisons are descriptive, with no new registered latency claim and no constant-total-memory claim.",
+  "control": "Authenticated reuse of the sealed0474 normal and allocator binaries at source60a1a4300; control preparation may precede this declaration. Candidate build and every pilot/formal capture follow this declaration.",
+  "corpora": {
+    "large": {
+      "archive_bytes": 7940406,
+      "archive_member_count": 16421,
+      "archive_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "compression": "deflate",
+      "entry_bytes": 46,
+      "entry_count": 8192,
+      "generator": "litchi-pptx-streaming-plaintext-slides-v1",
+      "name": "pptx-streaming-slides-large",
+      "package_format": "PPTX/OOXML/ZIP",
+      "payload_kind": "deterministic-plain-unicode-xml-significant-text-box-per-slide",
+      "shape": "large",
+      "target_entry": "ppt/presentation.xml",
+      "target_payload_bytes": 285476,
+      "target_payload_sha256": "22f4de48dc64e3136b3c48fd9dcea578cab85c22b76f31a61afba8956a9def77",
+      "uncompressed_payload_bytes": 376832,
+      "xlsx": null
+    },
+    "medium": {
+      "archive_bytes": 274398,
+      "archive_member_count": 549,
+      "archive_sha256": "1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2",
+      "compression": "deflate",
+      "entry_bytes": 46,
+      "entry_count": 256,
+      "generator": "litchi-pptx-streaming-plaintext-slides-v1",
+      "name": "pptx-streaming-slides-medium",
+      "package_format": "PPTX/OOXML/ZIP",
+      "payload_kind": "deterministic-plain-unicode-xml-significant-text-box-per-slide",
+      "shape": "medium",
+      "target_entry": "ppt/presentation.xml",
+      "target_payload_bytes": 8944,
+      "target_payload_sha256": "b4bc0b783f4309e21a34237444b12da891dbb31f1b5fda2ce3afcaa132578987",
+      "uncompressed_payload_bytes": 11776,
+      "xlsx": null
+    },
+    "tiny": {
+      "archive_bytes": 36259,
+      "archive_member_count": 53,
+      "archive_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "compression": "deflate",
+      "entry_bytes": 46,
+      "entry_count": 8,
+      "generator": "litchi-pptx-streaming-plaintext-slides-v1",
+      "name": "pptx-streaming-slides-tiny",
+      "package_format": "PPTX/OOXML/ZIP",
+      "payload_kind": "deterministic-plain-unicode-xml-significant-text-box-per-slide",
+      "shape": "tiny",
+      "target_entry": "ppt/presentation.xml",
+      "target_payload_bytes": 848,
+      "target_payload_sha256": "1c935108c7ac1b7d74416b9cf7b5edbbe858774f9605eec898b2dc762f0c7712",
+      "uncompressed_payload_bytes": 368,
+      "xlsx": null
+    }
+  },
+  "counter_events": "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,L1-dcache-load-misses:u,LLC-load-misses:u,page-faults,context-switches",
+  "counter_order": [
+    {
+      "arm": "control",
+      "lane": "C1-control",
+      "mode": "normal",
+      "repeat": "C1",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "C2-candidate",
+      "mode": "normal",
+      "repeat": "C2",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "C3-candidate",
+      "mode": "normal",
+      "repeat": "C3",
+      "shape": "large"
+    },
+    {
+      "arm": "control",
+      "lane": "C4-control",
+      "mode": "normal",
+      "repeat": "C4",
+      "shape": "large"
+    }
+  ],
+  "cpu": 2,
+  "declared_utc": "2026-09-08T11:32:10.827267+00:00",
+  "drivers": {
+    "build.py": "3991732207d16f385692f32d02fd4134b5141b7ed3673360243b798c62b3d167",
+    "capture.py": "7b9984eeedafa94d1b04777c79136db7a19eab5288364a0d10d91863a93f05d6",
+    "common.py": "865ac2ff6d8ae8c91334555a37aff93fd30c552da8a7c21dd82d17a42ecd2db6",
+    "prepare.py": "b23a074b152dccbbd0eb79fae3cc584ad0a8a7133204034b6322fa2795a26efd"
+  },
+  "guard_order": [
+    {
+      "arm": "control",
+      "lane": "G1-control",
+      "mode": "normal",
+      "repeat": "G1",
+      "shape": "tiny,large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "G2-candidate",
+      "mode": "normal",
+      "repeat": "G2",
+      "shape": "tiny,large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "G3-candidate",
+      "mode": "normal",
+      "repeat": "G3",
+      "shape": "tiny,large"
+    },
+    {
+      "arm": "control",
+      "lane": "G4-control",
+      "mode": "normal",
+      "repeat": "G4",
+      "shape": "tiny,large"
+    }
+  ],
+  "guard_selectors": [
+    "docx_streaming_create",
+    "xlsx_streaming_create",
+    "odt_streaming_create",
+    "ods_streaming_create",
+    "odp_streaming_create"
+  ],
+  "large_requested_bytes_reduction_required_percent": 95,
+  "normal_regression_review_threshold_percent": 5,
+  "normal_repeat_review_threshold_percent": 5,
+  "order": [
+    {
+      "arm": "control",
+      "lane": "R1-control-normal-tiny",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-normal-tiny",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "arm": "control",
+      "lane": "R1-control-normal-medium",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-normal-medium",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "arm": "control",
+      "lane": "R1-control-normal-large",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-normal-large",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "arm": "control",
+      "lane": "R1-control-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "arm": "control",
+      "lane": "R1-control-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "arm": "control",
+      "lane": "R1-control-allocator-large",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R1-candidate-allocator-large",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-allocator-large",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-allocator-large",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-normal-large",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-normal-large",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-normal-medium",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-normal-medium",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "arm": "candidate",
+      "lane": "R2-candidate-normal-tiny",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "arm": "control",
+      "lane": "R2-control-normal-tiny",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "tiny"
+    }
+  ],
+  "peak_rss_regression_review_threshold_percent": 5,
+  "pilot_order": [
+    {
+      "arm": "candidate",
+      "lane": "P-candidate-normal-tiny",
+      "mode": "normal",
+      "repeat": "pilot",
+      "shape": "tiny"
+    },
+    {
+      "arm": "candidate",
+      "lane": "P-candidate-normal-large",
+      "mode": "normal",
+      "repeat": "pilot",
+      "shape": "large"
+    },
+    {
+      "arm": "candidate",
+      "lane": "P-candidate-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "pilot",
+      "shape": "tiny"
+    },
+    {
+      "arm": "candidate",
+      "lane": "P-candidate-allocator-large",
+      "mode": "allocator",
+      "repeat": "pilot",
+      "shape": "large"
+    }
+  ],
+  "pilot_samples": 1,
+  "pilot_warmups": 0,
+  "samples": 30,
+  "schema": "litchi-0476-protocol-v1",
+  "scope": "Private owned ZIP Deflate transport reuse. Main PPTX fresh-creation memory curves and named shared-transport guards do not close native breadth, logical append, arbitrary repackaging, source variants, scaling or the full non-iWork goal.",
+  "selector": "pptx_streaming_create",
+  "shapes": {
+    "large": 8192,
+    "medium": 256,
+    "tiny": 8
+  },
+  "warmups": 3,
+  "workers": 1
+}

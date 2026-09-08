@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 764, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 758, in main
+    result = verify_bundle(args.root, sealed=not args.unsealed, live=args.live)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 722, in verify_bundle
+    verify_auxiliary_report(root, row, protocol_value)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 414, in verify_auxiliary_report
+    require(configuration["samples_per_case"] == int(row.get("samples", 30)), f"{row['lane']}: sample count differs")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 45, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 40, in fail
+    raise VerificationError(message)
+VerificationError: P-candidate-normal-tiny: sample count differs

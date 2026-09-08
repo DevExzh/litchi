@@ -1,0 +1,24 @@
+{
+  "helper_hashes": {
+    "analyze.py": "bdb0093c311edfd8b4f408a6e9e1c94ecea13a83cb32cace1758c16b9b59c596",
+    "custody.py": "7e6676e1c1ab65bd617529ce839828e916ee4bee1b49ef598cee12285dc5ce22",
+    "report_checks.py": "64a1bd8be3c33e8bf5908788ba42157deaae3247e85e86ee47c63aaca33e4482",
+    "test_evidence.py": "c601e3987f37dd286c6cb83ee44aa3c386379454796934a671641fb0c0ce5425",
+    "verify.py": "cbca70e9e044e636626370185b998654061d816497a4fe64c7bd8e9f0cc93875"
+  },
+  "receipts": {
+    "analyze-final": {
+      "exit_code": 0,
+      "receipt_sha256": "6577e5ffc5fd38a9432e4c1b03da44b210e886e1e3d6ce8105a89da4f1f72463"
+    },
+    "evidence-tests-corrected": {
+      "exit_code": 0,
+      "receipt_sha256": "20bf79814e6014bd0ed1c94f9aac8bb5f9ef6e004084adfb8e295a8f985c5f37"
+    }
+  },
+  "required_success": [
+    "analyze-final",
+    "evidence-tests-corrected"
+  ],
+  "schema": "litchi-0476-evidence-validation-v1"
+}

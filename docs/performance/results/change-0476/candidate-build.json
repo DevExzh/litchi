@@ -1,0 +1,33 @@
+{
+  "arm": "candidate",
+  "binaries": {
+    "allocator": {
+      "bytes": 465361928,
+      "path": "/tmp/litchi-goal-0476/candidate-allocator",
+      "sha256": "da0cb355285c3df25f2fd20f1659d63f3d7f3713fa7ab0b73c35d4c333c9cb0f"
+    },
+    "normal": {
+      "bytes": 465665576,
+      "path": "/tmp/litchi-goal-0476/candidate-normal",
+      "sha256": "60cad4cb423e3298dd45c688efd7fe99365a19824ee4b6923f824c078b1ed4ba"
+    }
+  },
+  "build_path": "/tmp/litchi-goal-0476/candidate",
+  "fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "fresh_build": true,
+  "protocol_sha256": "d53dd10fe8e090b098e1bbfc449c3040cc7e4c5a641cec661c484b28880cf3bb",
+  "receipt": {
+    "path": "build-command.json",
+    "sha256": "e1bbee5e7921f7b636e2cdfa6ab1fb93070037691a9a2101af99a7ccf05101d0"
+  },
+  "revision": "bbbdedaa4cd2229403cc6c6f39d66548d3887816",
+  "schema": "litchi-0476-source-v1",
+  "source_manifest": {
+    "files": 7035,
+    "path": "sources/candidate.json",
+    "sha256": "9913faf6155e4296eae6f1573795fad815611d397a96fdf11e3fc910164540ce"
+  }
+}

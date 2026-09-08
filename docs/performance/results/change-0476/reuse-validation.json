@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0474/verify.py",
+    "--sealed"
+  ],
+  "exit_code": 0,
+  "selected_files": {
+    "SHA256SUMS": "f26310ab6f0c22885fd153875fbfee9acec0e1a23d8f84f68326a9ce20921bce",
+    "build-command.json": "72fcf95a22e8324b0ed1e253803b30a825194d445b9c739483739b89c219d347",
+    "build-command.started.json": "358bfd6274dcb46ebd33f81d60c1b93f74311ff7ab9c30e8e12a8c5368983619",
+    "build-command.stderr": "b84dd3b8783af4967cade83a97fd60a600c839a6a43f86eb1fc6fee75175278e",
+    "build-command.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.json": "1081b05ce9eec6b03e309d08f1b0de67ba9bfc573e43f6c18844ec4ea0e4dc78",
+    "build.py": "0af06d660f176641a628dfff314554398494bcc70dbfc375e626aa1e170baf79",
+    "captures/R1-allocator-large/report.json": "92fb1369b6bfcc86700c94835c5d66f9c0a66eff81ef23b4bc767d8a0145a7a3",
+    "captures/R1-allocator-medium/report.json": "4cc532c920f7f6f116d07c717b44ef21ca9c793bcee618144191e58b70bc2a98",
+    "captures/R1-allocator-tiny/report.json": "59dc25800a540b8c10ab984dcfa916980cca7147ddc8e2473afeb54eaf64b731",
+    "captures/R1-normal-large/report.json": "7d318f39898ec3300080271eaf249b2d2d33b4d2b4ffee410a6805f67a415117",
+    "captures/R1-normal-medium/report.json": "81cdbefd5170466d06860619c06b311cea77a13c6aff74ac674e433731ab2581",
+    "captures/R1-normal-tiny/report.json": "d4e9c08c1d131d4f01d270e5f8d1c3d2e93f37aaf71a98923f43130c167d8479",
+    "protocol.json": "e4ea1bd41bde36c6eed1f8405dcd8ac7988ff9a373d8f8fb33a8c900d8961745",
+    "source-binding.json": "03fe59b7280d16cc5ec1a419dd8e63a3d727114eb004fc9a31eb3c43363e4ab8",
+    "sources/source.json": "17db263e9709a9965f71f12efe2bd411a568e15689713312e98f51bcb0bcc423"
+  },
+  "stderr": "",
+  "stdout": "{\n  \"identity_shapes\": 3,\n  \"lanes\": 12,\n  \"live\": {\n    \"status\": \"not_checked\"\n  },\n  \"samples\": 360,\n  \"schema\": \"litchi-0474-verification-v1\",\n  \"sealed\": {\n    \"files\": 175,\n    \"status\": \"pass\"\n  },\n  \"shapes\": [\n    \"tiny\",\n    \"medium\",\n    \"large\"\n  ],\n  \"status\": \"pass\",\n  \"validation_receipts\": 16\n}\n",
+  "verified_utc": "2026-09-08T11:24:35.718678+00:00"
+}

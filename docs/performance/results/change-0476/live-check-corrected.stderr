@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 770, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 764, in main
+    result = verify_bundle(args.root, sealed=not args.unsealed, live=args.live)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 736, in verify_bundle
+    rust_validation_summary = verify_rust_validation(root)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 617, in verify_rust_validation
+    require(actual_receipts == set(ledger), "validation directory contains an unledgered or missing receipt")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 45, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0476/verify.py", line 40, in fail
+    raise VerificationError(message)
+VerificationError: validation directory contains an unledgered or missing receipt

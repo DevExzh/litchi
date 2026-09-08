@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-08: shared owned ZIP transport reuse (0476)
+
+[0476](changes/0476-zip-deflate-state-reuse.md) changes the private transport
+used by public fresh streaming writers. The paired PPTX experiment retains
+720 main samples over three sizes. Existing selectors and default coverage
+mappings are unchanged. These fresh-creation observations do not add native
+producer, logical append, arbitrary repackaging, source-variant or scaling
+coverage; the full non-iWork goal remains open.
+
 ## 2026-09-08: PPTX streaming attribution (0475)
 
 [0475](changes/0475-pptx-streaming-attribution.md) adds seven descriptive

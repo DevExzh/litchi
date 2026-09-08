@@ -1,0 +1,27 @@
+{
+  "checks": {
+    "P-candidate-allocator-large": {
+      "allocation_calls": 278153,
+      "archive_bytes": 7940406,
+      "incremental_peak_bytes": 8875252,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527",
+      "requested_bytes": 31428173
+    },
+    "P-candidate-allocator-tiny": {
+      "allocation_calls": 850,
+      "archive_bytes": 36259,
+      "incremental_peak_bytes": 435701,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5",
+      "requested_bytes": 499462
+    },
+    "P-candidate-normal-large": {
+      "archive_bytes": 7940406,
+      "output_sha256": "c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527"
+    },
+    "P-candidate-normal-tiny": {
+      "archive_bytes": 36259,
+      "output_sha256": "951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5"
+    }
+  },
+  "excluded_from_formal": true
+}

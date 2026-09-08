@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "artifacts": {
+    "build-command.stderr": {
+      "bytes": 2897,
+      "sha256": "aa77f18b0c7b34b8d957f74b313e575199a612dea9818dc0e9677907b310b944"
+    },
+    "build-command.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "common_sha256": "865ac2ff6d8ae8c91334555a37aff93fd30c552da8a7c21dd82d17a42ecd2db6",
+  "cwd": "/tmp/litchi-goal-0476/candidate",
+  "driver_sha256": "3991732207d16f385692f32d02fd4134b5141b7ed3673360243b798c62b3d167",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T12:04:24.604477+00:00",
+  "protocol_sha256": "d53dd10fe8e090b098e1bbfc449c3040cc7e4c5a641cec661c484b28880cf3bb",
+  "source_binding_sha256": "0ff33449d1341a62c50495ad8f26c31f0501b0deecedddda9a6cae83b4904c43",
+  "started_utc": "2026-09-08T12:00:49.379417+00:00"
+}

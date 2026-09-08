@@ -1,0 +1,8 @@
+{
+  "identical_to_pre_candidate_head": true,
+  "path": "crates/litchi-keynote/src/document.rs",
+  "pre_candidate_head": "d29cf20ef88136983dbe790adb9c0b677c79518c",
+  "recorded_utc": "2026-09-08T11:55:59.263827+00:00",
+  "scope": "Whole workspace format failure is confined to unchanged Keynote formatting; iWork is explicitly excluded by the user. Scoped ZIP/harness format gates are separate.",
+  "sha256": "f78570708ec5c4c232a8c20ceed67623fece677a6d985d14f409545ee57d1443"
+}

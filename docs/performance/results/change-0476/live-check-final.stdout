@@ -1,0 +1,83 @@
+{
+  "acceptance": {
+    "R1_min_sample_percent": 99.53847282543887,
+    "R1_percent": 99.53847282543887,
+    "R2_min_sample_percent": 99.53847282543887,
+    "R2_percent": 99.53847282543887,
+    "all_samples_passed": true,
+    "large_requested_bytes_reduction_threshold_percent": 95.0,
+    "mean_percent": 99.53847282543887,
+    "passed": true,
+    "scope": "allocator requested_bytes arithmetic across matched large PPTX lanes"
+  },
+  "auxiliary_lanes": 12,
+  "custody": {
+    "counter_lanes": 4,
+    "guard_lanes": 4,
+    "lanes": 36,
+    "main_lanes": 24,
+    "pilot_lanes": 4,
+    "protocol_sha256": "d53dd10fe8e090b098e1bbfc449c3040cc7e4c5a641cec661c484b28880cf3bb",
+    "schema": "litchi-0476-custody-v1",
+    "source_manifests": {
+      "candidate": 7035,
+      "control": 7034
+    },
+    "status": "pass",
+    "validation_receipts": 28
+  },
+  "evidence_validation": {
+    "helper_files": 5,
+    "required_success": 2,
+    "status": "pass"
+  },
+  "formal_lanes": 24,
+  "live": {
+    "candidate": {
+      "binaries": 2,
+      "manifest_files": 7035,
+      "tree": true
+    },
+    "control": {
+      "binaries": 2,
+      "manifest_files": 7034,
+      "tree": true
+    }
+  },
+  "protocol_sha256": "d53dd10fe8e090b098e1bbfc449c3040cc7e4c5a641cec661c484b28880cf3bb",
+  "receipts": 36,
+  "rust_validation": {
+    "receipts": 28,
+    "required_success": 23,
+    "retained_nonzero_attempts": 5,
+    "status": "pass"
+  },
+  "schema": "litchi-0476-verification-v1",
+  "seal": {
+    "status": "unsealed"
+  },
+  "source_manifests": {
+    "candidate": {
+      "hash_only": 7035,
+      "manifest_files": 7035,
+      "materialized_checked": 0
+    },
+    "control": {
+      "hash_only": 7034,
+      "manifest_files": 7034,
+      "materialized_checked": 0
+    }
+  },
+  "validation": {
+    "receipts": 28,
+    "retained_failed_attempts": [
+      "evidence-tests-final",
+      "format",
+      "shared-streaming-tests",
+      "zip-reuse-focused",
+      "zip-reuse-focused-fixed"
+    ],
+    "snapshots": 4,
+    "status": "pass"
+  }
+}

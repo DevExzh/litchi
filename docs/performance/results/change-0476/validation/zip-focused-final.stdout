@@ -1,0 +1,15 @@
+
+running 10 tests
+test dropping_incomplete_owned_deflate_does_not_publish_a_complete_archive ... ok
+test owned_deflate_reports_zero_progress_and_sink_failure_at_finish ... ok
+test direct_write_compressed_limit_preserves_fresh_encoder_timing ... ok
+test direct_write_reports_partial_sink_failure_on_the_same_call_as_fresh_encoder ... ok
+test streaming_writer_maps_owned_deflate_limit_to_typed_failure ... ok
+test owned_deflate_compressed_limit_does_not_publish_a_partial_member ... ok
+test fresh_levels_and_store_interleaving_keep_each_stream_independent ... ok
+test direct_write_acceptance_and_output_timing_matches_fresh_encoder ... ok
+test owned_deflate_matches_reference_through_short_sink_writes ... ok
+test owned_deflate_matches_fresh_entries_across_chunking_flushes_and_store_members ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

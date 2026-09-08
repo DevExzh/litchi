@@ -1,0 +1,29 @@
+
+running 10 tests
+test dropping_incomplete_owned_deflate_does_not_publish_a_complete_archive ... ok
+test owned_deflate_reports_zero_progress_and_sink_failure_at_finish ... ok
+test direct_write_compressed_limit_preserves_fresh_encoder_timing ... FAILED
+test direct_write_reports_partial_sink_failure_on_the_same_call_as_fresh_encoder ... ok
+test owned_deflate_compressed_limit_does_not_publish_a_partial_member ... ok
+test streaming_writer_maps_owned_deflate_limit_to_typed_failure ... ok
+test fresh_levels_and_store_interleaving_keep_each_stream_independent ... ok
+test direct_write_acceptance_and_output_timing_matches_fresh_encoder ... ok
+test owned_deflate_matches_reference_through_short_sink_writes ... ok
+test owned_deflate_matches_fresh_entries_across_chunking_flushes_and_store_members ... ok
+
+failures:
+
+---- direct_write_compressed_limit_preserves_fresh_encoder_timing stdout ----
+
+thread 'direct_write_compressed_limit_preserves_fresh_encoder_timing' (1675545) panicked at crates/soapberry-zip/tests/deflate_reuse.rs:724:5:
+assertion `left == right` failed
+  left: [WriteStep { accepted: Ok(65536), output: [80, 75, 3, 4, 20, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 108, 105, 109, 105, 116, 45, 116, 105, 109, 105, 110, 103, 46, 100, 101, 102, 108, 97, 116, 101] }, WriteStep { accepted: Err(Other), output: [80, 75, 3, 4, 20, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 108, 105, 109, 105, 116, 45, 116, 105, 109, 105, 110, 103, 46, 100, 101, 102, 108, 97, 116, 101] }]
+ right: [WriteStep { accepted: Ok(65536), output: [80, 75, 3, 4, 20, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 108, 105, 109, 105, 116, 45, 116, 105, 109, 105, 110, 103, 46, 100, 101, 102, 108, 97, 116, 101] }, WriteStep { accepted: Err(Other), output: [80, 75, 3, 4, 20, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 108, 105, 109, 105, 116, 45, 116, 105, 109, 105, 110, 103, 46, 100, 101, 102, 108, 97, 116, 101, 0, 255, 63, 0, 192, 205, 42] }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    direct_write_compressed_limit_preserves_fresh_encoder_timing
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

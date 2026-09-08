@@ -1,0 +1,11 @@
+# started on Tue Sep  8 12:12:36 2026
+
+159464877622;;cycles:u;30983974263;83.00;;
+690860463972;;instructions:u;30978627194;83.00;;
+137290822679;;branches:u;30976709402;83.00;;
+263791154;;branch-misses:u;30980738834;83.00;;
+1724981759;;cache-misses:u;30975898684;83.00;;
+0;;L1-dcache-load-misses:u;30954487083;83.00;;
+<not supported>;;LLC-load-misses:u;0;100.00;;
+79540;;page-faults;37170087092;100.00;;
+101;;context-switches;37170087092;100.00;;
