@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Current dense XLSX residual profile (0468)
+
+[0468](changes/0468-xlsx-remaining-commit-profile.md) profiles the committed
+0467 parser from a clean Rust 1.98.1 frame-pointer build. Two uninstrumented
+30-sample runs measure p50 382.299942 / 382.735127 ms and process RSS
+109,728 / 109,732 KiB. These are same-build diagnostic observations, with no
+new cross-build speedup claim. Whole-process counters show IPC 3.3173 and
+branch-miss rate 0.1325%, with full reported counter coverage.
+
+The frame-pointer export contains 15,164 samples and 132,347,593,651 event
+periods. Exact commit ancestors account for 52.21% of whole-process weight;
+within that context eager Parser work is 40.01%, snapshot scanning 24.41%,
+compaction 13.27%, and web validation 10.33%. Inclusive rows overlap and are
+not elapsed phases. Capture/postprocessing chronology is checked. The next
+measured code experiment removes temporary event ownership in compaction while
+retaining its full normalization and validation pass. Default coverage and the
+remaining non-iWork goal requirements are unchanged.
+
 ## Change 0467: single-scan eager XLSX cell attributes
 
 [0467](changes/0467-xlsx-cell-attributes.md) replaces five checked cell-attribute

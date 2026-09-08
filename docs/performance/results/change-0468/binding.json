@@ -1,0 +1,10 @@
+{
+  "binary_path": "/tmp/litchi-goal-0468/profile",
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "build_receipt_sha256": "ee07446b965c0d2ef403676a9ba49238d883d86ff83f59aa0cf5965d9e80627f",
+  "bytes": 463620672,
+  "clean_build": true,
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "schema": "litchi-0468-build-binding-v1",
+  "source_binding_sha256": "41265a5bb1dc2b8ea620bfaf67576c452899846a4b70d681df7bed5927dacb5e"
+}

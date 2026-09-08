@@ -1,0 +1,8 @@
+{
+  "schema": "litchi-0468-policy-test-v1",
+  "exit_code": 0,
+  "verifier_sha256": "d713a93d6bb71f06f9e616b28dd22555c2ccdfc554bb3de8939d87e0da4e399d",
+  "test_sha256": "81df1b0e815c58c3abf97d39156831de1126bf761d09cc052eca25661dff0502",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "74c03fc16fde9a2dfeff03db0ec8f472a5a8dfed04e9e982a912b4b7f64faee3"
+}

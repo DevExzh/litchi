@@ -1,0 +1,11 @@
+{
+  "binary_bytes": 463620672,
+  "binary_path": "/tmp/litchi-goal-0468/profile",
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "removed_utc": "2026-09-08T05:46:56.347457+00:00",
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "schema": "litchi-0468-build-cleanup-v1",
+  "worktree": "/tmp/litchi-goal-0468/profile-tree",
+  "worktree_and_binary_absent": true,
+  "worktree_clean_before_removal": true
+}

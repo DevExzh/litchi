@@ -1,0 +1,40 @@
+{
+  "artifacts": {
+    "capture.json": {
+      "bytes": 1458,
+      "sha256": "f96583fc77de9aefe71b305e6e294461174f94230bc59eb8da62486ba3691b54"
+    },
+    "capture.started.json": {
+      "bytes": 1117,
+      "sha256": "788231762c5cb2e6adb066421d6fffa53b4583babb8597a6895dc638edf8831c"
+    },
+    "capture.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "capture.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "corpus-catalog.json": {
+      "bytes": 6314,
+      "sha256": "c8a36078f090533fb205fcfd50accebe26d1c23b7aeb1401bce2c48b692d2c4c"
+    },
+    "report.json": {
+      "bytes": 22321,
+      "sha256": "3c41f727e3affefa6c568b66922064023ccefe6c6bc0abc55aa788e86cc23390"
+    },
+    "resource.log": {
+      "bytes": 1047,
+      "sha256": "16fc4959ab4c6c3a0ca757d224f2695833ce34e816354e42a8069472dc854296"
+    }
+  },
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "binding_sha256": "dd5d11329f103be16756b1c2068a2b2f21ba9a94fc612e978cb23b1a45253df7",
+  "clean_source_before_and_after": true,
+  "lane": "normal-r2",
+  "protocol_sha256": "ef5c66bfdd4b01a2524bc760e5f9b9fba5eb5770e231f79cdcd84f2fe1526e5a",
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "schema": "litchi-0468-capture-v1",
+  "source_and_binary_unchanged": true
+}

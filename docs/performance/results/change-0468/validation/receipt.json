@@ -1,0 +1,52 @@
+{
+  "driver_sha256": {
+    "analyze.py": "980a1d01520d48ae173f9d9f8c2e863c24f19c022e2f700089071bf554544ffa",
+    "observe.py": "cc83e91a40441831d8b0f4cb73abd2aa3475d3a113035f21859e8e4f19691a18",
+    "test_analyze.py": "aa9155e8b7a04e673371ff984e492307f1c51bc00d7b9f16d1d0e041337f4164",
+    "test_verify.py": "b3e262efc57653643cbdd219d5cbd1df0d8afc1304dfcba6f76916ab51bc3e0d",
+    "verify.py": "5c7bcad1306c4461a6083615f7acccc7a5395d45ead809961e9d3bfbd3f7e3a9"
+  },
+  "records": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0468/test_analyze.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T05:40:22.718920+00:00",
+      "name": "analyzer-tests",
+      "started_utc": "2026-09-08T05:40:22.676646+00:00",
+      "stderr_sha256": "0f7e4b97443e54aca647179972594d13bb587afcbf151fab8228148587ea844a",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0468/test_verify.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T05:40:22.764510+00:00",
+      "name": "verifier-tests",
+      "started_utc": "2026-09-08T05:40:22.718958+00:00",
+      "stderr_sha256": "62cfbeb2911bb226088bfb0918eb4b05008ea70b20bce854ee2ca8a564bd37a5",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0468/verify.py",
+        "--preseal"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T05:40:30.126760+00:00",
+      "name": "preseal",
+      "started_utc": "2026-09-08T05:40:22.764540+00:00",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "59b913f55981c49bc44e4ddc517362c61c77b2b67d4b541928a5a57201073279"
+    }
+  ],
+  "schema": "litchi-0468-validation-v1"
+}

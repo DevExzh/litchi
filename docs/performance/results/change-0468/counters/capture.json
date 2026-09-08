@@ -1,0 +1,60 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0468/counters/resource.log",
+    "perf",
+    "stat",
+    "-x",
+    ";",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0468/counters/counters.csv",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,page-faults",
+    "--",
+    "/tmp/litchi-goal-0468/profile",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0468/counters/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0468/counters/corpus-catalog.json"
+  ],
+  "cwd": "/tmp/litchi-goal-0468/profile-tree",
+  "driver_sha256": "f94d8b8bdc8690a35806888aa8430b99c855cbaab0e759eb08db6f689337b03c",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T05:25:16.697229+00:00",
+  "outputs": {
+    ".stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": "litchi-0468-command-v1",
+  "started_utc": "2026-09-08T05:24:57.201103+00:00"
+}

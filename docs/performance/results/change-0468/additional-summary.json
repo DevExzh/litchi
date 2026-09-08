@@ -1,0 +1,995 @@
+{
+  "compact_changed_subtree": {
+    "inclusive_period_weighted_ranking": [
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "__libc_start_call_main",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "__libc_start_main@@GLIBC_2.34",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "_start",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "litchi_perf_baseline::main",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "litchi_perf_baseline::run",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "litchi_xlsx::raw::compact::changed",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "main",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "std::rt::lang_start_internal",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1034,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+        "weighted_event_period": 9166276979
+      },
+      {
+        "raw_stack_blocks": 1024,
+        "share_of_subset_percent": 99.05773692854935,
+        "share_of_whole_process_percent": 6.8606510216904075,
+        "symbol": "litchi_perf_baseline::run_xlsx_update_commit_save",
+        "weighted_event_period": 9079906536
+      },
+      {
+        "raw_stack_blocks": 264,
+        "share_of_subset_percent": 25.527452480006495,
+        "share_of_whole_process_percent": 1.7680087226748908,
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+        "weighted_event_period": 2339917000
+      },
+      {
+        "raw_stack_blocks": 243,
+        "share_of_subset_percent": 23.504671372422862,
+        "share_of_whole_process_percent": 1.6279126968348328,
+        "symbol": "litchi_xlsx::raw::compact::write_start",
+        "weighted_event_period": 2154503281
+      },
+      {
+        "raw_stack_blocks": 187,
+        "share_of_subset_percent": 18.08444688937214,
+        "share_of_whole_process_percent": 1.2525127554425126,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+        "weighted_event_period": 1657670492
+      },
+      {
+        "raw_stack_blocks": 128,
+        "share_of_subset_percent": 12.382055578292382,
+        "share_of_whole_process_percent": 0.8575701897481567,
+        "symbol": "<quick_xml::events::attributes::IterState>::next",
+        "weighted_event_period": 1134973510
+      },
+      {
+        "raw_stack_blocks": 123,
+        "share_of_subset_percent": 11.897188395009332,
+        "share_of_whole_process_percent": 0.8239887185827651,
+        "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+        "weighted_event_period": 1090529241
+      },
+      {
+        "raw_stack_blocks": 55,
+        "share_of_subset_percent": 5.315416271145171,
+        "share_of_whole_process_percent": 0.36814101757287115,
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+        "weighted_event_period": 487225778
+      },
+      {
+        "raw_stack_blocks": 54,
+        "share_of_subset_percent": 5.223236468818034,
+        "share_of_whole_process_percent": 0.361756726202768,
+        "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+        "weighted_event_period": 478776322
+      },
+      {
+        "raw_stack_blocks": 52,
+        "share_of_subset_percent": 5.030562332519714,
+        "share_of_whole_process_percent": 0.3484122863736827,
+        "symbol": "<quick_xml::events::Event>::into_owned",
+        "weighted_event_period": 461115277
+      },
+      {
+        "raw_stack_blocks": 37,
+        "share_of_subset_percent": 3.580172568992146,
+        "share_of_whole_process_percent": 0.24795957746340214,
+        "symbol": "__memmove_avx512_unaligned_erms",
+        "weighted_event_period": 328168534
+      },
+      {
+        "raw_stack_blocks": 34,
+        "share_of_subset_percent": 3.287748937659502,
+        "share_of_whole_process_percent": 0.2277065760596267,
+        "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+        "weighted_event_period": 301364174
+      },
+      {
+        "raw_stack_blocks": 30,
+        "share_of_subset_percent": 2.901565189545643,
+        "share_of_whole_process_percent": 0.20095983210797908,
+        "symbol": "<alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one",
+        "weighted_event_period": 265965502
+      },
+      {
+        "raw_stack_blocks": 29,
+        "share_of_subset_percent": 2.806230660379437,
+        "share_of_whole_process_percent": 0.19435704715440924,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+        "weighted_event_period": 257226875
+      },
+      {
+        "raw_stack_blocks": 29,
+        "share_of_subset_percent": 2.8055740797400137,
+        "share_of_whole_process_percent": 0.19431157296153598,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+        "weighted_event_period": 257166691
+      },
+      {
+        "raw_stack_blocks": 28,
+        "share_of_subset_percent": 2.7085671594781515,
+        "share_of_whole_process_percent": 0.18759295968364897,
+        "symbol": "<quick_xml::events::BytesStart>::push_attribute::<quick_xml::events::attributes::Attribute>",
+        "weighted_event_period": 248274768
+      },
+      {
+        "raw_stack_blocks": 23,
+        "share_of_subset_percent": 2.2252370779030546,
+        "share_of_whole_process_percent": 0.15411794681954827,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+        "weighted_event_period": 203971394
+      },
+      {
+        "raw_stack_blocks": 19,
+        "share_of_subset_percent": 1.8344528578531403,
+        "share_of_whole_process_percent": 0.12705257826100977,
+        "symbol": "malloc",
+        "weighted_event_period": 168151030
+      },
+      {
+        "raw_stack_blocks": 18,
+        "share_of_subset_percent": 1.7410320827705372,
+        "share_of_whole_process_percent": 0.12058233821827721,
+        "symbol": "<quick_xml::events::BytesStart>::push_attr",
+        "weighted_event_period": 159587823
+      },
+      {
+        "raw_stack_blocks": 16,
+        "share_of_subset_percent": 1.548483711818676,
+        "share_of_whole_process_percent": 0.10724660878556709,
+        "symbol": "<quick_xml::writer::Writer<alloc::vec::Vec<u8>>>::write_event::<quick_xml::events::Event>",
+        "weighted_event_period": 141938306
+      },
+      {
+        "raw_stack_blocks": 15,
+        "share_of_subset_percent": 1.451291492770415,
+        "share_of_whole_process_percent": 0.1005151618780451,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+        "weighted_event_period": 133029398
+      },
+      {
+        "raw_stack_blocks": 14,
+        "share_of_subset_percent": 1.353334361204666,
+        "share_of_whole_process_percent": 0.09373073780783674,
+        "symbol": "<quick_xml::name::NamespaceResolver>::push",
+        "weighted_event_period": 124050376
+      },
+      {
+        "raw_stack_blocks": 10,
+        "share_of_subset_percent": 0.9671927021527984,
+        "share_of_whole_process_percent": 0.06698690890730082,
+        "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow",
+        "weighted_event_period": 88655562
+      },
+      {
+        "raw_stack_blocks": 10,
+        "share_of_subset_percent": 0.9422630714506582,
+        "share_of_whole_process_percent": 0.06526030479085133,
+        "symbol": "litchi_perf_baseline::build_xlsx_corpus",
+        "weighted_event_period": 86370443
+      },
+      {
+        "raw_stack_blocks": 10,
+        "share_of_subset_percent": 0.9422630714506582,
+        "share_of_whole_process_percent": 0.06526030479085133,
+        "symbol": "litchi_perf_baseline::build_xlsx_workbook",
+        "weighted_event_period": 86370443
+      },
+      {
+        "raw_stack_blocks": 9,
+        "share_of_subset_percent": 0.87094661423497,
+        "share_of_whole_process_percent": 0.06032099020290483,
+        "symbol": "cfree@GLIBC_2.2.5",
+        "weighted_event_period": 79833379
+      },
+      {
+        "raw_stack_blocks": 9,
+        "share_of_subset_percent": 0.8675113372875092,
+        "share_of_whole_process_percent": 0.06008306596770464,
+        "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+        "weighted_event_period": 79518492
+      },
+      {
+        "raw_stack_blocks": 8,
+        "share_of_subset_percent": 0.7736606930214823,
+        "share_of_whole_process_percent": 0.05358305356650824,
+        "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>",
+        "weighted_event_period": 70915882
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6771977013373206,
+        "share_of_whole_process_percent": 0.046902112299592215,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw",
+        "weighted_event_period": 62073817
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6770213483857676,
+        "share_of_whole_process_percent": 0.046889898250546014,
+        "symbol": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+        "weighted_event_period": 62057652
+      }
+    ],
+    "interpretive_buckets": {
+      "attribute_iteration_and_duplicate_checks": [
+        "quick_xml::events::attributes::Attributes",
+        "quick_xml::events::attributes::IterState"
+      ],
+      "caution": "These are inclusive CPU symbol families. Their sampled periods may overlap, and CPU stacks do not establish allocation counts.",
+      "event_ownership_and_copy": [
+        "quick_xml::events::Event>::into_owned",
+        "__memmove",
+        "malloc",
+        "__rustc::__rust_alloc",
+        "RawVec",
+        "Vec<"
+      ],
+      "scope": "overlapping symbol-family views inside the compact subtree; not additive",
+      "xml_read_and_namespace": [
+        "quick_xml::reader::",
+        "quick_xml::name::NamespaceResolver"
+      ]
+    },
+    "leaf_period_weighted_ranking": [
+      {
+        "raw_stack_blocks": 251,
+        "share_of_subset_percent": 24.271018747272354,
+        "share_of_whole_process_percent": 1.6809892364697254,
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+        "weighted_event_period": 2224748804
+      },
+      {
+        "raw_stack_blocks": 134,
+        "share_of_subset_percent": 12.961010219545102,
+        "share_of_whole_process_percent": 0.8976680748218677,
+        "symbol": "litchi_xlsx::raw::compact::write_start",
+        "weighted_event_period": 1188042096
+      },
+      {
+        "raw_stack_blocks": 126,
+        "share_of_subset_percent": 12.185756556986101,
+        "share_of_whole_process_percent": 0.843974693597733,
+        "symbol": "litchi_xlsx::raw::compact::changed",
+        "weighted_event_period": 1116980198
+      },
+      {
+        "raw_stack_blocks": 74,
+        "share_of_subset_percent": 7.158819109474349,
+        "share_of_whole_process_percent": 0.4958134635453887,
+        "symbol": "<quick_xml::events::attributes::IterState>::next",
+        "weighted_event_period": 656197188
+      },
+      {
+        "raw_stack_blocks": 52,
+        "share_of_subset_percent": 5.030562332519714,
+        "share_of_whole_process_percent": 0.3484122863736827,
+        "symbol": "<quick_xml::events::Event>::into_owned",
+        "weighted_event_period": 461115277
+      },
+      {
+        "raw_stack_blocks": 48,
+        "share_of_subset_percent": 4.643931259934928,
+        "share_of_whole_process_percent": 0.321634561125837,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+        "weighted_event_period": 425675602
+      },
+      {
+        "raw_stack_blocks": 37,
+        "share_of_subset_percent": 3.580172568992146,
+        "share_of_whole_process_percent": 0.24795957746340214,
+        "symbol": "__memmove_avx512_unaligned_erms",
+        "weighted_event_period": 328168534
+      },
+      {
+        "raw_stack_blocks": 29,
+        "share_of_subset_percent": 2.806230660379437,
+        "share_of_whole_process_percent": 0.19435704715440924,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+        "weighted_event_period": 257226875
+      },
+      {
+        "raw_stack_blocks": 29,
+        "share_of_subset_percent": 2.8055740797400137,
+        "share_of_whole_process_percent": 0.19431157296153598,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+        "weighted_event_period": 257166691
+      },
+      {
+        "raw_stack_blocks": 24,
+        "share_of_subset_percent": 2.3216712792723913,
+        "share_of_whole_process_percent": 0.1607968940947889,
+        "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+        "weighted_event_period": 212810820
+      },
+      {
+        "raw_stack_blocks": 23,
+        "share_of_subset_percent": 2.2252370779030546,
+        "share_of_whole_process_percent": 0.15411794681954827,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+        "weighted_event_period": 203971394
+      },
+      {
+        "raw_stack_blocks": 23,
+        "share_of_subset_percent": 2.2233750023800147,
+        "share_of_whole_process_percent": 0.1539889811199904,
+        "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+        "weighted_event_period": 203800711
+      },
+      {
+        "raw_stack_blocks": 23,
+        "share_of_subset_percent": 2.219772525597385,
+        "share_of_whole_process_percent": 0.1537394767724684,
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+        "weighted_event_period": 203470498
+      },
+      {
+        "raw_stack_blocks": 19,
+        "share_of_subset_percent": 1.8344528578531403,
+        "share_of_whole_process_percent": 0.12705257826100977,
+        "symbol": "malloc",
+        "weighted_event_period": 168151030
+      },
+      {
+        "raw_stack_blocks": 16,
+        "share_of_subset_percent": 1.548483711818676,
+        "share_of_whole_process_percent": 0.10724660878556709,
+        "symbol": "<quick_xml::writer::Writer<alloc::vec::Vec<u8>>>::write_event::<quick_xml::events::Event>",
+        "weighted_event_period": 141938306
+      },
+      {
+        "raw_stack_blocks": 15,
+        "share_of_subset_percent": 1.451291492770415,
+        "share_of_whole_process_percent": 0.1005151618780451,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+        "weighted_event_period": 133029398
+      },
+      {
+        "raw_stack_blocks": 11,
+        "share_of_subset_percent": 1.064080402801016,
+        "share_of_whole_process_percent": 0.07369726514046297,
+        "symbol": "<quick_xml::events::BytesStart>::push_attr",
+        "weighted_event_period": 97536557
+      },
+      {
+        "raw_stack_blocks": 11,
+        "share_of_subset_percent": 1.0625118597564474,
+        "share_of_whole_process_percent": 0.07358862924007845,
+        "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+        "weighted_event_period": 97392780
+      },
+      {
+        "raw_stack_blocks": 9,
+        "share_of_subset_percent": 0.87094661423497,
+        "share_of_whole_process_percent": 0.06032099020290483,
+        "symbol": "cfree@GLIBC_2.2.5",
+        "weighted_event_period": 79833379
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6773313324727104,
+        "share_of_whole_process_percent": 0.04691136747353388,
+        "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow",
+        "weighted_event_period": 62086066
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6771977013373206,
+        "share_of_whole_process_percent": 0.046902112299592215,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw",
+        "weighted_event_period": 62073817
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6770213483857676,
+        "share_of_whole_process_percent": 0.046889898250546014,
+        "symbol": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+        "weighted_event_period": 62057652
+      },
+      {
+        "raw_stack_blocks": 7,
+        "share_of_subset_percent": 0.6770078423570622,
+        "share_of_whole_process_percent": 0.04688896283497415,
+        "symbol": "__memcmp_evex_movbe",
+        "weighted_event_period": 62056414
+      },
+      {
+        "raw_stack_blocks": 6,
+        "share_of_subset_percent": 0.5800905004487537,
+        "share_of_whole_process_percent": 0.04017655367442205,
+        "symbol": "__rustc::__rust_dealloc",
+        "weighted_event_period": 53172702
+      },
+      {
+        "raw_stack_blocks": 6,
+        "share_of_subset_percent": 0.5800733506287821,
+        "share_of_whole_process_percent": 0.040175365893098156,
+        "symbol": "__rustc::__rdl_alloc",
+        "weighted_event_period": 53171130
+      },
+      {
+        "raw_stack_blocks": 6,
+        "share_of_subset_percent": 0.5786874553488223,
+        "share_of_whole_process_percent": 0.040079380014930256,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw",
+        "weighted_event_period": 53044095
+      },
+      {
+        "raw_stack_blocks": 5,
+        "share_of_subset_percent": 0.48374224455125975,
+        "share_of_whole_process_percent": 0.033503558906350366,
+        "symbol": "<quick_xml::name::NamespaceResolver>::push",
+        "weighted_event_period": 44341154
+      },
+      {
+        "raw_stack_blocks": 5,
+        "share_of_subset_percent": 0.48355888766559607,
+        "share_of_whole_process_percent": 0.0334908597710383,
+        "symbol": "core::str::converts::from_utf8",
+        "weighted_event_period": 44324347
+      },
+      {
+        "raw_stack_blocks": 4,
+        "share_of_subset_percent": 0.38715969505725756,
+        "share_of_whole_process_percent": 0.026814337171540904,
+        "symbol": "<quick_xml::events::BytesStart>::push_attribute::<quick_xml::events::attributes::Attribute>",
+        "weighted_event_period": 35488130
+      },
+      {
+        "raw_stack_blocks": 4,
+        "share_of_subset_percent": 0.3869737416975778,
+        "share_of_whole_process_percent": 0.02680145820674087,
+        "symbol": "__rustc::__rust_alloc",
+        "weighted_event_period": 35471085
+      },
+      {
+        "raw_stack_blocks": 4,
+        "share_of_subset_percent": 0.3867460265625473,
+        "share_of_whole_process_percent": 0.02678568685841168,
+        "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>",
+        "weighted_event_period": 35450212
+      },
+      {
+        "raw_stack_blocks": 3,
+        "share_of_subset_percent": 0.28882388193868697,
+        "share_of_whole_process_percent": 0.020003685952774377,
+        "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+        "weighted_event_period": 26474397
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.19363002057064505,
+        "share_of_whole_process_percent": 0.013410643526170295,
+        "symbol": "<alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one",
+        "weighted_event_period": 17748664
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.19362148929887796,
+        "share_of_whole_process_percent": 0.013410052657852688,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_text",
+        "weighted_event_period": 17747882
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.19357475276658886,
+        "share_of_whole_process_percent": 0.013406815727069272,
+        "symbol": "<alloc::raw_vec::RawVec<u8>>::grow_one",
+        "weighted_event_period": 17743598
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.19326992889901412,
+        "share_of_whole_process_percent": 0.013385703896299096,
+        "symbol": "realloc",
+        "weighted_event_period": 17715657
+      },
+      {
+        "raw_stack_blocks": 1,
+        "share_of_subset_percent": 0.09659144078107396,
+        "share_of_whole_process_percent": 0.006689837537467838,
+        "symbol": "__rustc::__rdl_realloc",
+        "weighted_event_period": 8853839
+      }
+    ],
+    "marker": "litchi_xlsx::raw::compact::changed",
+    "raw_stack_blocks": 1034,
+    "scope": "samples retaining the compact::changed ancestor inside exact Edit::commit",
+    "share_of_exact_commit_context_percent": 13.266272617501714,
+    "share_of_whole_process_percent": 6.925911326481258,
+    "weighted_event_period": 9166276979
+  },
+  "inputs": {
+    "analyzer": {
+      "bytes": 25302,
+      "compressed_bytes": 25302,
+      "compressed_sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2",
+      "compression": null,
+      "outside_bundle": false,
+      "path": "analyze.py",
+      "sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2"
+    },
+    "normal_reports": [
+      {
+        "bytes": 26822,
+        "compressed_bytes": 26822,
+        "compressed_sha256": "863180f0771cf149599d77f6ff62956ee8bb3c3dc0b05fe8b37d4a272da1a34b",
+        "compression": null,
+        "outside_bundle": false,
+        "path": "samples-fp/report.json",
+        "sha256": "863180f0771cf149599d77f6ff62956ee8bb3c3dc0b05fe8b37d4a272da1a34b"
+      },
+      {
+        "bytes": 22322,
+        "compressed_bytes": 22322,
+        "compressed_sha256": "5aa75f25a98c3f34ba9cc98d399d5194874666463fdba283e20cec9b86acc89c",
+        "compression": null,
+        "outside_bundle": false,
+        "path": "normal-r1/report.json",
+        "sha256": "5aa75f25a98c3f34ba9cc98d399d5194874666463fdba283e20cec9b86acc89c"
+      },
+      {
+        "bytes": 22321,
+        "compressed_bytes": 22321,
+        "compressed_sha256": "3c41f727e3affefa6c568b66922064023ccefe6c6bc0abc55aa788e86cc23390",
+        "compression": null,
+        "outside_bundle": false,
+        "path": "normal-r2/report.json",
+        "sha256": "3c41f727e3affefa6c568b66922064023ccefe6c6bc0abc55aa788e86cc23390"
+      }
+    ],
+    "perf_script": {
+      "bytes": 25683599,
+      "compressed_bytes": 696993,
+      "compressed_sha256": "02f201c7316db66d8702684f12f37092dbcfd827a620019697037f93bb9d591e",
+      "compression": "gzip",
+      "outside_bundle": false,
+      "path": "samples-fp/perf-script.stdout.gz",
+      "sha256": "23f052e498e2fd142b11e886164c019f59d8ed6796ef015eb387b525c73bacb6"
+    },
+    "shared_analyzer": {
+      "bytes": 33268,
+      "compressed_bytes": 33268,
+      "compressed_sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9",
+      "compression": null,
+      "outside_bundle": true,
+      "path": "../change-0466/analyze.py",
+      "scope": "adjacent-retained-repository-source",
+      "sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9"
+    }
+  },
+  "limitations": [
+    "cycles:u periods are sampled event weights, not elapsed phase durations",
+    "the whole-process denominator includes setup, warmups, verification, and teardown when sampled",
+    "inclusive rows overlap across symbols and source-motivated families",
+    "a missing or inlined frame does not establish zero work",
+    "this artifact does not compare 0466 and 0468 numerically"
+  ],
+  "purpose": "descriptive callchain context and Amdahl-style sample-period bounds for the 0468 XLSX CPU profile",
+  "raw_web_read_context": {
+    "callchain_order": "leaf to caller/root",
+    "interpretation": "The nearest retained caller is the Edit::commit validation path. The nearest child frames are XML event/name/decoding work inside the whole-worksheet web-binding scan; raw::web::read is not a filesystem-I/O claim.",
+    "matched_sample_blocks": 863,
+    "nearest_retained_caller": [
+      {
+        "raw_stack_blocks": 863,
+        "share_of_subset_percent": 100.0,
+        "share_of_whole_process_percent": 5.395366179327618,
+        "symbol": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+        "weighted_event_period": 7140637307
+      }
+    ],
+    "nearest_retained_child": [
+      {
+        "raw_stack_blocks": 294,
+        "share_of_subset_percent": 34.144819085123714,
+        "share_of_whole_process_percent": 1.8422380209113667,
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+        "weighted_event_period": 2438157690
+      },
+      {
+        "raw_stack_blocks": 223,
+        "share_of_subset_percent": 25.817541988762994,
+        "share_of_whole_process_percent": 1.3929509287954254,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+        "weighted_event_period": 1843537035
+      },
+      {
+        "raw_stack_blocks": 171,
+        "share_of_subset_percent": 19.775756466662955,
+        "share_of_whole_process_percent": 1.0669744761085276,
+        "symbol": "<leaf/raw::web::read>",
+        "weighted_event_period": 1412115044
+      },
+      {
+        "raw_stack_blocks": 47,
+        "share_of_subset_percent": 5.349030703822023,
+        "share_of_whole_process_percent": 0.28859979351586346,
+        "symbol": "litchi_xlsx::raw::web::resolved_name",
+        "weighted_event_period": 381954882
+      },
+      {
+        "raw_stack_blocks": 32,
+        "share_of_subset_percent": 3.6734811715315145,
+        "share_of_whole_process_percent": 0.19819776073277928,
+        "symbol": "malloc",
+        "weighted_event_period": 262309967
+      },
+      {
+        "raw_stack_blocks": 28,
+        "share_of_subset_percent": 3.2922299634171854,
+        "share_of_whole_process_percent": 0.17762786199190084,
+        "symbol": "<quick_xml::encoding::Decoder>::decode_cow",
+        "weighted_event_period": 235086201
+      },
+      {
+        "raw_stack_blocks": 26,
+        "share_of_subset_percent": 2.9501471219311153,
+        "share_of_whole_process_percent": 0.1591712400570785,
+        "symbol": "__memmove_avx512_unaligned_erms",
+        "weighted_event_period": 210659306
+      },
+      {
+        "raw_stack_blocks": 10,
+        "share_of_subset_percent": 1.1989865654718375,
+        "share_of_whole_process_percent": 0.0646897156481493,
+        "symbol": "core::str::converts::from_utf8",
+        "weighted_event_period": 85615282
+      },
+      {
+        "raw_stack_blocks": 8,
+        "share_of_subset_percent": 0.9506920192326749,
+        "share_of_whole_process_percent": 0.05129331567524655,
+        "symbol": "__rustc::__rust_alloc",
+        "weighted_event_period": 67885469
+      },
+      {
+        "raw_stack_blocks": 5,
+        "share_of_subset_percent": 0.6104810134701328,
+        "share_of_whole_process_percent": 0.03293768613198403,
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+        "weighted_event_period": 43592235
+      },
+      {
+        "raw_stack_blocks": 5,
+        "share_of_subset_percent": 0.6011480229911641,
+        "share_of_whole_process_percent": 0.03243413712016188,
+        "symbol": "<quick_xml::name::QName>::local_name",
+        "weighted_event_period": 42925800
+      },
+      {
+        "raw_stack_blocks": 5,
+        "share_of_subset_percent": 0.580922475355742,
+        "share_of_whole_process_percent": 0.03134289476345652,
+        "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+        "weighted_event_period": 41481567
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.24505996100440225,
+        "share_of_whole_process_percent": 0.013221882255104967,
+        "symbol": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+        "weighted_event_period": 17498843
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.23994552955663795,
+        "share_of_whole_process_percent": 0.012945939950507397,
+        "symbol": "[unknown]",
+        "weighted_event_period": 17133640
+      },
+      {
+        "raw_stack_blocks": 2,
+        "share_of_subset_percent": 0.21809619128440072,
+        "share_of_whole_process_percent": 0.011767088142960224,
+        "symbol": "<quick_xml::name::NamespaceResolver>::set_level",
+        "weighted_event_period": 15573458
+      },
+      {
+        "raw_stack_blocks": 1,
+        "share_of_subset_percent": 0.12413567051375797,
+        "share_of_whole_process_percent": 0.006697573983380864,
+        "symbol": "__rustc::__rdl_alloc",
+        "weighted_event_period": 8864078
+      },
+      {
+        "raw_stack_blocks": 1,
+        "share_of_subset_percent": 0.12139584503896159,
+        "share_of_whole_process_percent": 0.006549750366341097,
+        "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix",
+        "weighted_event_period": 8668437
+      },
+      {
+        "raw_stack_blocks": 1,
+        "share_of_subset_percent": 0.10613020482878868,
+        "share_of_whole_process_percent": 0.005726113177383591,
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_end",
+        "weighted_event_period": 7578373
+      }
+    ],
+    "retained_frame_position_period": [
+      {
+        "leaf_distance": 0,
+        "share_of_target_percent": 19.775756466662955,
+        "weighted_event_period": 1412115044
+      },
+      {
+        "leaf_distance": 1,
+        "share_of_target_percent": 58.187002719307834,
+        "weighted_event_period": 4154922824
+      },
+      {
+        "leaf_distance": 2,
+        "share_of_target_percent": 13.151180162580408,
+        "weighted_event_period": 939078077
+      },
+      {
+        "leaf_distance": 3,
+        "share_of_target_percent": 7.9931180294016855,
+        "weighted_event_period": 570759568
+      },
+      {
+        "leaf_distance": 4,
+        "share_of_target_percent": 0.7743085473028913,
+        "weighted_event_period": 55290565
+      },
+      {
+        "leaf_distance": 6,
+        "share_of_target_percent": 0.11863407474421947,
+        "weighted_event_period": 8471229
+      }
+    ],
+    "share_of_exact_commit_context_percent": 10.334582011256208,
+    "share_of_whole_process_percent": 5.395366179327618,
+    "source_context": [
+      {
+        "file": {
+          "bytes": 141398,
+          "compressed_bytes": 141398,
+          "compressed_sha256": "03cc3eb5a698dca1c20c3c493d5d1d84fedbcaa39609978f7acafee5342911df",
+          "compression": null,
+          "outside_bundle": false,
+          "path": "source-context/transaction.rs.txt",
+          "repository_path": "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+          "scope": "retained-source-snapshot",
+          "sha256": "03cc3eb5a698dca1c20c3c493d5d1d84fedbcaa39609978f7acafee5342911df"
+        },
+        "line": 1677,
+        "role": "commit validates the complete post-edit worksheet through raw::web::read"
+      },
+      {
+        "file": {
+          "bytes": 28616,
+          "compressed_bytes": 28616,
+          "compressed_sha256": "e31f21c91050bb13c20c1691bfab9314146630bda08632a20a8e8b767cd0705d",
+          "compression": null,
+          "outside_bundle": false,
+          "path": "source-context/web.rs.txt",
+          "repository_path": "crates/litchi-xlsx/src/raw/web.rs",
+          "scope": "retained-source-snapshot",
+          "sha256": "e31f21c91050bb13c20c1691bfab9314146630bda08632a20a8e8b767cd0705d"
+        },
+        "line": 33,
+        "role": "raw::web::read constructs an NsReader over worksheet bytes"
+      },
+      {
+        "file": {
+          "bytes": 28616,
+          "compressed_bytes": 28616,
+          "compressed_sha256": "e31f21c91050bb13c20c1691bfab9314146630bda08632a20a8e8b767cd0705d",
+          "compression": null,
+          "outside_bundle": false,
+          "path": "source-context/web.rs.txt",
+          "repository_path": "crates/litchi-xlsx/src/raw/web.rs",
+          "scope": "retained-source-snapshot",
+          "sha256": "e31f21c91050bb13c20c1691bfab9314146630bda08632a20a8e8b767cd0705d"
+        },
+        "line": 47,
+        "role": "the web-binding validator reads the worksheet event stream to EOF"
+      }
+    ],
+    "symbol": "litchi_xlsx::raw::web::read",
+    "target_occurrences": 863,
+    "target_occurrences_per_sample": {
+      "histogram": {
+        "1": 863
+      },
+      "one": 863
+    },
+    "target_period_inside_exact_commit_context": 7140637307,
+    "target_samples_inside_exact_commit_context": 863,
+    "weighted_event_period": 7140637307
+  },
+  "sample_parser": {
+    "accepted_sample_blocks": 15164,
+    "accepted_weighted_event_period": 132347593651,
+    "parser_diagnostics": {
+      "accepted_cycle_period": 132347593651,
+      "block_separator_lines": 15164,
+      "cycle_headers": 15164,
+      "empty_stack_blocks": 0,
+      "empty_stack_period": 0,
+      "input_lines": 257492,
+      "invalid_cycle_event_headers": 0,
+      "invalid_cycle_period_headers": 0,
+      "invalid_sample_blocks": 0,
+      "invalid_sample_period": 0,
+      "lost_metadata_inside_block": 0,
+      "lost_metadata_lines": 0,
+      "lost_sample_count": 0,
+      "malformed_cycle_headers": 0,
+      "non_cycle_headers": 0,
+      "parsed_frame_lines": 227164,
+      "sample_blocks": 15164,
+      "sample_blocks_seen": 15164,
+      "total_weighted_event_period": 132347593651,
+      "truncated_period": 0,
+      "unknown_frame_blocks": 96,
+      "unknown_frame_lines": 286,
+      "unknown_frame_occurrence_period": 2264677399,
+      "unknown_frame_occurrences": 286,
+      "unknown_frame_period": 783186108,
+      "unparsed_frame_blocks": 0,
+      "unparsed_frame_lines": 0,
+      "unparsed_frame_period": 0,
+      "unquantified_lost_lines": 0,
+      "unterminated_blocks": 0,
+      "zero_or_negative_period_samples": 0
+    }
+  },
+  "sample_period_amdahl_proxy": {
+    "cannot_be_summed": true,
+    "interpretation": "Each row is a separate conditional upper-bound proxy if all of that row's inclusive sampled period vanished while the rest stayed fixed. It is not a measured elapsed-latency prediction.",
+    "rows": [
+      {
+        "matched_sample_blocks": 3207,
+        "name": "worksheet_parser_union",
+        "sample_period_amdahl_proxy": {
+          "exact_commit_context_speedup_if_all_attributed_period_disappeared": 1.6670320190693588,
+          "formula": "1 / (1 - attributed_fraction)",
+          "status": "descriptive_upper_bound_not_measured_latency",
+          "whole_process_speedup_if_all_attributed_period_disappeared": 1.2640567866517323
+        },
+        "share_of_exact_commit_context_percent": 40.013149803909435,
+        "share_of_whole_process_percent": 20.889630073596056,
+        "weighted_event_period": 27646922725
+      },
+      {
+        "matched_sample_blocks": 1936,
+        "name": "snapshot_scan",
+        "sample_period_amdahl_proxy": {
+          "exact_commit_context_speedup_if_all_attributed_period_disappeared": 1.3229546837730506,
+          "formula": "1 / (1 - attributed_fraction)",
+          "status": "descriptive_upper_bound_not_measured_latency",
+          "whole_process_speedup_if_all_attributed_period_disappeared": 1.1460602648537608
+        },
+        "share_of_exact_commit_context_percent": 24.41162102786376,
+        "share_of_whole_process_percent": 12.744553609700295,
+        "weighted_event_period": 16867110024
+      },
+      {
+        "matched_sample_blocks": 1034,
+        "name": "compact_changed",
+        "sample_period_amdahl_proxy": {
+          "exact_commit_context_speedup_if_all_attributed_period_disappeared": 1.1529540239749765,
+          "formula": "1 / (1 - attributed_fraction)",
+          "status": "descriptive_upper_bound_not_measured_latency",
+          "whole_process_speedup_if_all_attributed_period_disappeared": 1.074412883598309
+        },
+        "share_of_exact_commit_context_percent": 13.266272617501714,
+        "share_of_whole_process_percent": 6.925911326481258,
+        "weighted_event_period": 9166276979
+      },
+      {
+        "matched_sample_blocks": 863,
+        "name": "raw_web_read",
+        "sample_period_amdahl_proxy": {
+          "exact_commit_context_speedup_if_all_attributed_period_disappeared": 1.1152571665093176,
+          "formula": "1 / (1 - attributed_fraction)",
+          "status": "descriptive_upper_bound_not_measured_latency",
+          "whole_process_speedup_if_all_attributed_period_disappeared": 1.0570306755750971
+        },
+        "share_of_exact_commit_context_percent": 10.334582011256208,
+        "share_of_whole_process_percent": 5.395366179327618,
+        "weighted_event_period": 7140637307
+      },
+      {
+        "matched_sample_blocks": 315,
+        "name": "attribute_helper",
+        "sample_period_amdahl_proxy": {
+          "exact_commit_context_speedup_if_all_attributed_period_disappeared": 1.0415475784325887,
+          "formula": "1 / (1 - attributed_fraction)",
+          "status": "descriptive_upper_bound_not_measured_latency",
+          "whole_process_speedup_if_all_attributed_period_disappeared": 1.0212683843294688
+        },
+        "share_of_exact_commit_context_percent": 3.9890235734706536,
+        "share_of_whole_process_percent": 2.082546043313856,
+        "weighted_event_period": 2756199575
+      }
+    ],
+    "rows_are_overlapping": true
+  },
+  "schema": "litchi-0468-profile-context-v1",
+  "scope_denominators": {
+    "exact_commit_context": {
+      "marker": "<litchi_xlsx::workbook::edit::semantic::transaction::Edit>::commit",
+      "raw_stack_blocks": 7999,
+      "weighted_event_period": 69094592304
+    },
+    "whole_process": {
+      "raw_stack_blocks": 15164,
+      "weighted_event_period": 132347593651
+    }
+  }
+}

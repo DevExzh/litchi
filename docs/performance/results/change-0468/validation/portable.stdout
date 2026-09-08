@@ -1,0 +1,77 @@
+{
+  "binary_bytes": 463620672,
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "case": "xlsx_one_percent_commit_save",
+  "change": 468,
+  "corpus_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+  "dependencies": {
+    "analyze": {
+      "bytes": 25302,
+      "compressed_bytes": 25302,
+      "compressed_sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2",
+      "path": "analyze.py",
+      "sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2"
+    },
+    "perf_compare": {
+      "bytes": 169266,
+      "compressed_bytes": 169266,
+      "compressed_sha256": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+      "path": "tools/perf_compare.py",
+      "sha256": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+    },
+    "report_policy": {
+      "bytes": 5353,
+      "compressed_bytes": 5353,
+      "compressed_sha256": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c",
+      "path": "report-policy.json",
+      "sha256": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c"
+    }
+  },
+  "lanes": [
+    "normal-r1",
+    "counters",
+    "samples-fp",
+    "normal-r2"
+  ],
+  "live_state": {
+    "binary_absent": true,
+    "mode": "post-cleanup",
+    "tree_absent": true
+  },
+  "mode": "post-cleanup",
+  "normal_samples": 30,
+  "observations": {
+    "helper": {
+      "bytes": 3901,
+      "compressed_bytes": 3901,
+      "compressed_sha256": "cc83e91a40441831d8b0f4cb73abd2aa3475d3a113035f21859e8e4f19691a18",
+      "path": "observe.py",
+      "sha256": "cc83e91a40441831d8b0f4cb73abd2aa3475d3a113035f21859e8e4f19691a18"
+    },
+    "path": "observations.json"
+  },
+  "profile_samples": 50,
+  "schema": "litchi-0468-verification-v1",
+  "sealed_files": 90,
+  "status": "pass",
+  "summary": {
+    "additional": {
+      "path": "additional-summary.json"
+    },
+    "analyzer": {
+      "bytes": 25302,
+      "compressed_bytes": 25302,
+      "compressed_sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2",
+      "path": "analyze.py",
+      "sha256": "305e70177115ea58adcf1155ca4ecac2afd41200401762811ed7f55c1a17b3f2"
+    },
+    "path": "summary-fp.json",
+    "shared_analyzer": {
+      "bytes": 33268,
+      "compressed_bytes": 33268,
+      "compressed_sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9",
+      "path": "../change-0466/analyze.py",
+      "sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9"
+    }
+  }
+}

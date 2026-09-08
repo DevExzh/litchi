@@ -1,0 +1,37 @@
+{
+  "build": "Rust1.98.1 release debug1 forcedframepointers+unwindtables",
+  "capture_driver_sha256": "f94d8b8bdc8690a35806888aa8430b99c855cbaab0e759eb08db6f689337b03c",
+  "corpus_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+  "cpu": 2,
+  "execution": "flock /tmp/litchi-goal-0468/cpu.lock serializes build and all captures. Symbolization only after all captures. Shared KVM host is not exclusive.",
+  "frozen_utc": "2026-09-08T05:20:51.851546+00:00",
+  "lanes": {
+    "counters": {
+      "samples": 30,
+      "warmups": 3
+    },
+    "normal-r1": {
+      "samples": 30,
+      "warmups": 3
+    },
+    "normal-r2": {
+      "samples": 30,
+      "warmups": 3
+    },
+    "samples-fp": {
+      "samples": 50,
+      "warmups": 3
+    }
+  },
+  "order": [
+    "normal-r1",
+    "counters",
+    "samples-fp",
+    "normal-r2"
+  ],
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "schema": "litchi-0468-profile-protocol-v1",
+  "scope": "Whole-process sampled CPU attribution to rank remaining work; no optimization speedup or operation-local counter claim. Two normal uninstrumented processes supply descriptive timed context.",
+  "status": "frozen",
+  "workers": 1
+}

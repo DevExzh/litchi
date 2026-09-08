@@ -1,0 +1,6 @@
+{
+  "change": 468,
+  "error": "normal-r1.report: perf_compare validation failed (policy.metric_classes must be a non-empty list)",
+  "schema": "litchi-0468-verification-v1",
+  "status": "fail"
+}

@@ -1,0 +1,44 @@
+{
+  "artifacts": {
+    "capture.json": {
+      "bytes": 1675,
+      "sha256": "9157a56e858660df888098e35388f6b489538f150f411ec42876595e02892dda"
+    },
+    "capture.started.json": {
+      "bytes": 1332,
+      "sha256": "2d626341b7885b8aa4f040970ed7f526939ab9fea6de964b6a04221c14f020d6"
+    },
+    "capture.stderr": {
+      "bytes": 192,
+      "sha256": "f08e6512754a56d42b08214ffdd855ab10bc9979a7b3177d41feac591b40d6b6"
+    },
+    "capture.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "corpus-catalog.json": {
+      "bytes": 6314,
+      "sha256": "c8a36078f090533fb205fcfd50accebe26d1c23b7aeb1401bce2c48b692d2c4c"
+    },
+    "perf.data": {
+      "bytes": 2719856,
+      "sha256": "6e9779824e5f2e7816e0a43c1a384f390ab2cea9e4a1372141d8486e85c2651c"
+    },
+    "report.json": {
+      "bytes": 26822,
+      "sha256": "863180f0771cf149599d77f6ff62956ee8bb3c3dc0b05fe8b37d4a272da1a34b"
+    },
+    "resource.log": {
+      "bytes": 1188,
+      "sha256": "8961017c412cf58496deff34e3e85566a12aadb8cb52f6a60264a84512dc38ac"
+    }
+  },
+  "binary_sha256": "9c0a203fbf92ea99401371a3ed9817062087f536883cd83e7d5de2373c9e4dcb",
+  "binding_sha256": "dd5d11329f103be16756b1c2068a2b2f21ba9a94fc612e978cb23b1a45253df7",
+  "clean_source_before_and_after": true,
+  "lane": "samples-fp",
+  "protocol_sha256": "ef5c66bfdd4b01a2524bc760e5f9b9fba5eb5770e231f79cdcd84f2fe1526e5a",
+  "revision": "933cb6b80eaed36af21f4dce984bd6b896d3543e",
+  "schema": "litchi-0468-capture-v1",
+  "source_and_binary_unchanged": true
+}
