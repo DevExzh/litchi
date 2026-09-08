@@ -1597,16 +1597,16 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
         check_limit("XML events", limits.max_events, events)?;
         match event {
             Event::Start(start) => {
-                let local = checked_clone(start.local_name().as_ref(), "XML local name")?;
+                let local = start.local_name();
                 let resolved = resolved_word_namespace(namespace)?;
                 if let Some(expected) = word_namespace.as_deref() {
                     if resolved != expected {
                         return Err(Error::Refused(Refusal::ComplexDocument));
                     }
-                } else if local.as_slice() == b"document" && stack.is_empty() {
+                } else if local.as_ref() == b"document" && stack.is_empty() {
                     word_namespace = Some(checked_clone(resolved, "Word namespace")?);
                 }
-                let scope = next_scope(&stack, local.as_slice(), false)?;
+                let scope = next_scope(&stack, local.as_ref(), false)?;
                 validate_attributes(&start, scope, word_namespace.as_deref().unwrap_or(resolved))?;
                 if scope == Scope::Document {
                     if saw_document || finished_document {
@@ -1626,7 +1626,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 check_limit("XML depth", limits.max_depth, stack.len())?;
             },
             Event::Empty(empty) => {
-                let local = checked_clone(empty.local_name().as_ref(), "XML local name")?;
+                let local = empty.local_name();
                 let resolved = resolved_word_namespace(namespace)?;
                 let Some(expected) = word_namespace.as_deref() else {
                     return Err(Error::Refused(Refusal::ComplexDocument));
@@ -1634,7 +1634,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 if resolved != expected {
                     return Err(Error::Refused(Refusal::ComplexDocument));
                 }
-                let scope = next_scope(&stack, local.as_slice(), true)?;
+                let scope = next_scope(&stack, local.as_ref(), true)?;
                 validate_attributes(&empty, scope, expected)?;
                 if scope == Scope::Paragraph {
                     check_limit(
@@ -1651,7 +1651,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 }
             },
             Event::End(end) => {
-                let local = checked_clone(end.local_name().as_ref(), "XML local name")?;
+                let local = end.local_name();
                 let resolved = resolved_word_namespace(namespace)?;
                 let Some(expected) = word_namespace.as_deref() else {
                     return Err(Error::Refused(Refusal::ComplexDocument));
@@ -1662,7 +1662,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 let scope = stack
                     .pop()
                     .ok_or(Error::Refused(Refusal::ComplexDocument))?;
-                if scope_local(scope) != local.as_slice() {
+                if scope_local(scope) != local.as_ref() {
                     return Err(Error::Refused(Refusal::ComplexDocument));
                 }
                 if scope == Scope::Paragraph {
