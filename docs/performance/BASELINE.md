@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Plain XLSX snapshot tag result (0472)
+
+[0472](changes/0472-xlsx-plain-cell-tags.md) omits owned tags only for checked
+plain cells. Fresh-build whole-process allocation calls fall 14.330%, from
+32,012,510 to 27,424,990; rounded peak heap remains `104.38M`. All 1,263 XLSX
+tests pass. Seven-row diagnostic ABBA shows lower XLSX medians, mixed PPT
+results and nearly unchanged RSS. The full guard retains 86 latency flags.
+No registered latency, peak-memory or general regression-free claim is added.
+
 ## Rejected worksheet lifetime experiment (0471)
 
 [0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) adds matched seven-row

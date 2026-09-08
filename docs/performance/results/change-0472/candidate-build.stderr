@@ -1,0 +1,4 @@
+   Compiling litchi-xlsx v0.0.1 (/tmp/litchi-goal-0468/profile-tree/crates/litchi-xlsx)
+   Compiling litchi v0.0.1 (/tmp/litchi-goal-0468/profile-tree/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/tmp/litchi-goal-0468/profile-tree/tools/perf-baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 26s

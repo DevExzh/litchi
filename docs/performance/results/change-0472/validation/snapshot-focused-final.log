@@ -1,0 +1,24 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.28s
+     Running unittests src/lib.rs (target/debug/deps/litchi_xlsx-a61970d59196313c)
+
+running 16 tests
+test raw::worksheet::edit::codec::tests::compact_cell_tag_keeps_attribute_error_order_and_messages ... ok
+test raw::worksheet::edit::codec::tests::compact_cell_tag_matches_owned_serialization_for_plain_cells ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_flat_event_stream_over_event_limit ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_accepts_nesting_at_worksheet_depth_limit ... ok
+test raw::worksheet::edit::codec::tests::compact_cell_writer_matches_empty_style_and_clear_start_shapes ... ok
+test raw::worksheet::edit::codec::tests::sibling_names_retain_the_source_prefix ... ok
+test raw::worksheet::edit::codec::tests::compact_cell_tag_uses_the_niche_without_growing_the_owned_tag ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_mismatched_end_name ... ok
+test raw::worksheet::edit::codec::tests::wire_tags_escape_and_replace_attributes_deterministically ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_accepts_event_count_at_limit ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_marks_only_plain_cells_as_tagless ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_builds_sorted_edit_slots ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_restores_namespace_scope_after_a_rebinding ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_reports_cell_address_errors_before_compact_tag_errors ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_nesting_beyond_worksheet_depth_limit ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_handles_large_flat_event_stream_within_depth_limit ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 940 filtered out; finished in 0.01s
+

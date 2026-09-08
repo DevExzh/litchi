@@ -1,0 +1,19 @@
+{
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "changed_files": [
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs"
+  ],
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "3eac9a4937cf5520583288f66bb5c77f18e70d3c",
+  "schema": "litchi-0472-source-binding-v1",
+  "source_count": 6993,
+  "source_manifest": "sources/candidate.json",
+  "source_manifest_sha256": "3fa8705c5818e66804867c107146c6a94ab43ef75d1ad8f99fc26c4dccbbe2e4"
+}

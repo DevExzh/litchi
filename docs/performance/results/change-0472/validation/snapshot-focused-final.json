@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--all-features",
+    "--lib",
+    "raw::worksheet::edit::codec::tests"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-08T08:37:51.780938+00:00",
+  "finished_utc": "2026-09-08T08:38:11.089810+00:00",
+  "log_sha256": "f649a5db3c232acdc42b53ca258c52f6c24d3e73b04f65e2e8f4bffce13144c9"
+}

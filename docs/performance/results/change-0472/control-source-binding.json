@@ -1,0 +1,13 @@
+{
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "changed_files": [],
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "a82367b52b84ce43848f103dc08c3aa8ea4a306c",
+  "schema": "litchi-0472-source-binding-v1",
+  "source_count": 6993,
+  "source_manifest": "sources/control.json",
+  "source_manifest_sha256": "9f533fa955199c4b23c3d846a5cdfd661269cf6875da7def6c0c1420879361d7"
+}

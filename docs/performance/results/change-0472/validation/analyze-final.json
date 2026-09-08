@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0472/analyze.py"
+  ],
+  "started_utc": "2026-09-08T08:51:58.562849+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T08:51:58.910274+00:00",
+  "stdout_sha256": "ef2c1a036a8ad320650787cf9163d52ea076956bacb80ec6b47ef579443508b9",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

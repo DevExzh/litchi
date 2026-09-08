@@ -1,0 +1,15 @@
+test_chronology_requires_role_build_before_capture (__main__.EvidenceTests.test_chronology_requires_role_build_before_capture) ... ok
+test_duplicate_json_key_is_rejected (__main__.EvidenceTests.test_duplicate_json_key_is_rejected) ... ok
+test_fresh_role_binding_rejects_prior_chain_fields (__main__.EvidenceTests.test_fresh_role_binding_rejects_prior_chain_fields) ... ok
+test_frozen_matrix_has_seven_rows (__main__.EvidenceTests.test_frozen_matrix_has_seven_rows) ... ok
+test_heaptrack_parser_rejects_missing_peak (__main__.EvidenceTests.test_heaptrack_parser_rejects_missing_peak) ... ok
+test_heaptrack_parser_retains_display_and_excludes_latency (__main__.EvidenceTests.test_heaptrack_parser_retains_display_and_excludes_latency) ... ok
+test_live_verification_authenticates_one_shared_checkout_and_both_binaries (__main__.EvidenceTests.test_live_verification_authenticates_one_shared_checkout_and_both_binaries) ... ok
+test_projection_only_removes_empty_source_vectors (__main__.EvidenceTests.test_projection_only_removes_empty_source_vectors) ... ok
+test_seal_requires_exact_regular_file_coverage (__main__.EvidenceTests.test_seal_requires_exact_regular_file_coverage) ... ok
+test_source_inventory_is_bounded_snapshot_wire_change_set (__main__.EvidenceTests.test_source_inventory_is_bounded_snapshot_wire_change_set) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.025s
+
+OK

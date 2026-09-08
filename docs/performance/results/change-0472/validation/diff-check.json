@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0472/A-heap/stderr.log",
+    ":(exclude)docs/performance/results/change-0472/B-heap/stderr.log",
+    ":(exclude)docs/performance/results/change-0472/validation/snapshot-focused-final.log"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "excluded_immutable_raw_logs": [
+    "docs/performance/results/change-0472/A-heap/stderr.log",
+    "docs/performance/results/change-0472/B-heap/stderr.log",
+    "docs/performance/results/change-0472/validation/snapshot-focused-final.log"
+  ],
+  "reason": "Preserve raw Heaptrack trailing spaces and focused-test terminal blank line.",
+  "verified_utc": "2026-09-08T08:52:07.490962+00:00"
+}

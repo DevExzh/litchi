@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## Plain snapshot tag ownership reduced (0472)
+
+[0472](changes/0472-xlsx-plain-cell-tags.md) removes ephemeral owned tags for
+exact plain cells while preserving full attribute validation and rich fallback.
+Whole-process allocation calls fall 14.330%; peak heap does not fall. Residual
+eager parsing and snapshot traversal remain leads, but the next concrete
+coverage gap is measured DOCX fresh streaming creation through the public
+StreamingDocumentWriter; existing buffered creation cases do not exercise it.
+See [next work](results/change-0472/next-work.md). Short-guard regressions and
+PPT variability remain explicit.
+
 ## Pre-compaction lifetime hypothesis rejected (0471)
 
 [0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) tests the old rewrite

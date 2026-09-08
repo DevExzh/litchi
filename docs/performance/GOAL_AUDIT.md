@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current scoped progress (0472)
+
+[0472](changes/0472-xlsx-plain-cell-tags.md) retains plain-cell tag elision after
+a 14.330% whole-process allocation reduction and 1,263 passing XLSX tests.
+The full guard retains 86 latency flags; there is no registered latency or
+peak-memory claim. Independent audit identifies public DOCX fresh streaming
+creation as a missing allocator/scaling measurement, distinct from buffered
+creation and the other three append meanings. Native, source-variant, CRUD,
+streaming and scaling requirements remain open; the full goal is not complete.
+
 ## Latest measured rejection (0471)
 
 [0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) rejects a safe explicit
