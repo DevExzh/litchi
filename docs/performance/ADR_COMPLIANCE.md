@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0480: private shared XML publication handoff
+
+[0480](changes/0480-docx-shared-publication.md) uses an existing OPC shared-payload entry point from the DOCX format
+owner. The two-line change preserves public signatures, immutable snapshot
+ownership, source recapture/fingerprints, limits, exact no-op, XML validation,
+raw untouched-member preservation, inverse retention and typed sink failure.
+No new dependency, unsafe code, provider or execution policy is introduced.
+All 30 previously read ADR/README files retain their recorded hashes.
+
 ## 0479: baseline of the existing DOCX copy contract
 
 [0479](changes/0479-docx-tail-append-baseline.md) changes only the diagnostic harness. It uses public DOCX transactions,

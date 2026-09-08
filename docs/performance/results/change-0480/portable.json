@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "{\"captures\": 48, \"closure\": {\"complete\": true, \"helpers\": 17, \"live_cleanup\": \"pass\"}, \"data_only\": false, \"profiles\": {\"arms\": 2, \"status\": \"pass\"}, \"protocol_sha256\": \"113e7cfa102f9dbbcbda002e84d6a49ec19e809e516b84aa68ebc10d2a4b3899\", \"rust_validation\": {\"receipts\": 28, \"required\": 22, \"required_success\": 22}, \"samples\": 1440, \"schema\": \"docx-shared-publication-comparison-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"attempts\": 28, \"required\": 22, \"required_success\": 22}}\n"
+  },
+  "original_runtime_binaries_absent": true,
+  "probes": {
+    "allocator_live_exit": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0480-portable-ta8xi9tt/bundle/captures/candidate-r1-allocator-64-total.report.json.total_samples[0].allocation: total lifecycle did not return to its entry live bytes\n",
+      "stdout": ""
+    },
+    "final_gate_exclusion": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation.harness-tests: source exclusions are forbidden\n",
+      "stdout": ""
+    },
+    "instrumentation": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0480-portable-ta8xi9tt/bundle/captures/control-r1-normal-64-total.report.json.binary: instrumentation identity differs\n",
+      "stdout": ""
+    },
+    "output_digest": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0480-portable-ta8xi9tt/bundle/captures/control-r1-normal-64-total.report.json.total_samples[0].sink: sink digest differs from candidate archive\n",
+      "stdout": ""
+    },
+    "profile_arithmetic": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: profiles.candidate: recorded PMU values differ from CSV\n",
+      "stdout": ""
+    },
+    "required_gate_omitted": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: rust-validation required labels differ\n",
+      "stdout": ""
+    },
+    "source_reads": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: /tmp/litchi-goal-0480-portable-ta8xi9tt/bundle/captures/control-r1-normal-64-total.report.json.total_samples[0].source_reads: logical-read request histogram does not sum to calls\n",
+      "stdout": ""
+    },
+    "summary_arithmetic": {
+      "exit_code": 1,
+      "stderr": "verify.py: FAIL: summary.rows.control-r1-normal-64-total.elapsed_ns.mean: numeric value differs\n",
+      "stdout": ""
+    }
+  },
+  "status": "pass",
+  "temporary_copy_removed": true,
+  "validation_seal_sha256": "174640f418fd21ca0632957725f569523b9dbc1c12b579ed786ed413313097f7"
+}

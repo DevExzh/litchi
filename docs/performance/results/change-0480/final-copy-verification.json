@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "input_seal_sha256": "11c69b67cba594a06268c1056b393bda2bd3a4f946a8d10e2a63b75c47081047",
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\"captures\": 48, \"closure\": {\"complete\": true, \"helpers\": 17, \"live_cleanup\": \"pass\"}, \"data_only\": false, \"profiles\": {\"arms\": 2, \"status\": \"pass\"}, \"protocol_sha256\": \"113e7cfa102f9dbbcbda002e84d6a49ec19e809e516b84aa68ebc10d2a4b3899\", \"rust_validation\": {\"receipts\": 28, \"required\": 22, \"required_success\": 22}, \"samples\": 1440, \"schema\": \"docx-shared-publication-comparison-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"attempts\": 28, \"required\": 22, \"required_success\": 22}}\n",
+  "temporary_copy_removed": true
+}

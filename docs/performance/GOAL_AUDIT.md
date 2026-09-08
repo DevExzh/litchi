@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## DOCX publication duplicate payload removed; append bound open (0480)
+
+[0480](changes/0480-docx-shared-publication.md) removes one complete target XML copy at the existing OPC handoff.
+The large operation peak is 35,371,102 bytes instead of 41,793,870 bytes;
+retention still grows with document size. This is measured ownership progress,
+not a bounded-window append completion claim. Repeated scanner/layout work,
+the separate tail-only capability and the broader non-iWork scenario/source/
+native/parallel requirements remain open.
+
 ## DOCX logical append baseline captured; window requirement open (0479)
 
 [0479](changes/0479-docx-tail-append-baseline.md) records 720 samples of the existing one-paragraph tail-copy lifecycle.
