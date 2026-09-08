@@ -2366,7 +2366,9 @@ KEYNOTE_MOVIE_GEOMETRY_PACKAGE_METHODS = frozenset(
         "apply_slide_movie_geometry",
     }
 )
-KEYNOTE_MOVIE_GEOMETRY_EDIT_METHODS = frozenset({"set", "commit"})
+KEYNOTE_MOVIE_GEOMETRY_EDIT_METHODS = frozenset(
+    {"set", "restore_original_size", "set_transform", "flip", "commit"}
+)
 KEYNOTE_MOVIE_GEOMETRY_FLAT_ALIASES = frozenset(
     {
         "Geometry",
@@ -2626,6 +2628,29 @@ IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK = re.compile(
 )
 IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES = (
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
+)
+
+# The expanded geometry owner is admitted only with a native-authored source
+# oracle, an accepted native candidate, and checked-in integration tests that
+# exercise the all-media source order.  The source oracle records Arrange's
+# persisted angle/flip/original-size fields; the focused candidate is the
+# operation-level save/reopen receipt.
+KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_movie_geometry_native.rs"
+)
+KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE = (
+    (
+        Path("test-data/iwork/keynote/slide-movie-geometry-source-native.key"),
+        "native_arrange_oracle_retains_original_size_rotation_and_reflection",
+    ),
+    (
+        Path("test-data/iwork/keynote/slide-movie-geometry-focused-native.key"),
+        "native_geometry_saved_candidates_remain_editable_and_reversible",
+    ),
+    (
+        Path("test-data/iwork/keynote/slide-movie-geometry-vertical-focused-native.key"),
+        "native_geometry_saved_candidates_remain_editable_and_reversible",
+    ),
 )
 
 # The existing host audio editor still exposes the raw-ID position reader and
@@ -58473,6 +58498,68 @@ def audit_keynote_movie_geometry_resource_source_topology(
     return sorted(set(violations))
 
 
+def _audit_keynote_movie_geometry_native_evidence(root: Path) -> list[str]:
+    """Require native source and accepted candidate geometry receipts."""
+
+    test_path = root / KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE
+    if not test_path.is_file():
+        return [
+            "focused Keynote movie-geometry completion is missing its native "
+            f"integration test: {KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE}"
+        ]
+
+    raw_test = test_path.read_text(encoding="utf-8")
+    code_test = _mask_rust_non_code(raw_test)
+    violations: list[str] = []
+    for fixture, test_name in KEYNOTE_MOVIE_GEOMETRY_NATIVE_EVIDENCE:
+        fixture_path = root / fixture
+        if not fixture_path.is_file():
+            violations.append(
+                "focused Keynote movie-geometry completion is missing native "
+                f"fixture: {fixture}"
+            )
+        elif fixture_path.stat().st_size == 0:
+            violations.append(
+                "focused Keynote movie-geometry native fixture is empty: "
+                f"{fixture}"
+            )
+
+        if re.search(
+            rf"\binclude_bytes!\s*\([^)]*{re.escape(fixture.as_posix())}",
+            raw_test,
+        ) is None:
+            violations.append(
+                "focused Keynote movie-geometry native integration test must "
+                f"include fixture {fixture}: {KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+            rf"{re.escape(test_name)}\b",
+            code_test,
+        ) is None:
+            violations.append(
+                "focused Keynote movie-geometry native integration test is "
+                f"missing {test_name}: {KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE}"
+            )
+
+    # Keep the acceptance test tied to the expanded typed operation.  The
+    # source-order index catches a regression that silently filters audio or
+    # other MovieArchive siblings before resolving a file movie.
+    required_markers = {
+        "typed source-order selector": r"\bMovieSelector::index\s*\(\s*4\s*\)",
+        "typed original-size restore": r"\.restore_original_size\s*\(",
+        "typed reflection operation": r"\.flip\s*\(",
+        "exact inverse": r"\.inverse\s*\(\)",
+    }
+    for label, marker in required_markers.items():
+        if re.search(marker, code_test) is None:
+            violations.append(
+                "focused Keynote movie-geometry native integration test is missing "
+                f"{label}: {KEYNOTE_MOVIE_GEOMETRY_NATIVE_TEST_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
 def audit_keynote_movie_geometry_completion_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -58514,7 +58601,7 @@ def audit_keynote_movie_geometry_completion_source_topology(
         if semantic_path.is_file()
         else ""
     )
-    violations: list[str] = []
+    violations: list[str] = _audit_keynote_movie_geometry_native_evidence(root)
     feature_source = f"{semantic}\n{owner}\n{codec}"
 
     for label, marker in KEYNOTE_MOVIE_GEOMETRY_COMPLETE_CAPABILITY_MARKERS.items():
@@ -58569,67 +58656,22 @@ def audit_keynote_movie_geometry_completion_source_topology(
         )
         return sorted(set(violations))
 
-    # Keep the completion scan scoped to the movie implementation.  Helpers
-    # such as ``flip_drawable_geometry`` are shared by image/shape editors and
-    # their unrelated uses must not be mistaken for a movie fallback.  The
-    # movie module may be split into child files, so include that directory in
-    # addition to the two historical compatibility sources.
+    # Scan the complete production Keynote editor after the host exit.  The
+    # full source-root walk prevents a removed selector wrapper from being
+    # laundered into a sibling editor module.  Test-only modules are masked
+    # below and may retain source-built oracles.
     movie_source_paths: set[Path] = set()
-    for relative in IWA_KEYNOTE_MOVIE_GEOMETRY_COMPATIBILITY_SOURCES:
-        path = root / relative
-        if path.is_file():
-            movie_source_paths.add(path)
-    movie_module_root = source_root / "slide_movies"
-    if movie_module_root.is_dir():
-        movie_source_paths.update(
-            path
-            for path in movie_module_root.rglob("*.rs")
-            if path.name != "tests.rs" and "tests" not in path.parts
-        )
+    movie_source_paths.update(
+        path
+        for path in source_root.rglob("*.rs")
+        if path.name != "tests.rs" and "tests" not in path.parts
+    )
     if not movie_source_paths:
         violations.append(
             "focused litchi-iwa Keynote movie-geometry completion is missing "
             f"movie implementation source: {IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE}"
         )
         return sorted(set(violations))
-
-    declaration = re.compile(
-        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^)]*\))?[ \t\r\n]+)?"
-        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
-        r"fn[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
-    )
-
-    # Keep a small source-local function parser here so each typed bridge is
-    # checked for a focused Package call, rather than allowing an unrelated
-    # helper elsewhere in the host to satisfy the marker.
-    def function_records(code: str) -> dict[str, list[tuple[str, str, int]]]:
-        records: dict[str, list[tuple[str, str, int]]] = {}
-        for match in declaration.finditer(code):
-            opening = code.find("{", match.end())
-            if opening < 0:
-                continue
-            depth = 1
-            cursor = opening + 1
-            while cursor < len(code) and depth:
-                if code[cursor] == "{":
-                    depth += 1
-                elif code[cursor] == "}":
-                    depth -= 1
-                cursor += 1
-            if depth:
-                continue
-            records.setdefault(match.group("name"), []).append(
-                (
-                    code[match.start() : opening],
-                    code[opening + 1 : cursor - 1],
-                    code.count("\n", 0, match.start()) + 1,
-                )
-            )
-        return records
-
-    typed_records: dict[str, list[tuple[str, str, int, Path]]] = {}
-    focused_read_seen = False
-    focused_edit_seen = False
 
     def focused_package_call(code: str, match: re.Match[str]) -> bool:
         """Return whether a same-spelled call is on the focused Package."""
@@ -58658,16 +58700,37 @@ def audit_keynote_movie_geometry_completion_source_topology(
     for path in sorted(movie_source_paths):
         source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
         code = _mask_rust_non_code(source)
-        records = function_records(code)
-        for method in IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS:
-            for signature, body, line_number in records.get(method, []):
-                if re.search(
-                    r"(?<![A-Za-z0-9_])pub(?:\([^)]*\))?(?![A-Za-z0-9_])",
-                    signature,
-                ) is None:
+        movie_local_source = path in {
+            root / relative
+            for relative in IWA_KEYNOTE_MOVIE_GEOMETRY_COMPATIBILITY_SOURCES
+        } or "slide_movies" in path.parts
+
+        for method in sorted(IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS):
+            for declaration_match in re.finditer(
+                rf"(?<![A-Za-z0-9_#])(?:pub(?:\([^)]*\))?[ \t\r\n]+)?"
+                rf"fn[ \t\r\n]+(?:r#)?{re.escape(method)}\b",
+                code,
+            ):
+                line_number = code.count("\n", 0, declaration_match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote movie-geometry selector wrapper "
+                    f"{method}: {path.relative_to(root)}:{line_number}"
+                )
+
+        for method in sorted(IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS):
+            for call_match in re.finditer(
+                rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(method)}\s*\(", code
+            ):
+                line_start = code.rfind("\n", 0, call_match.start()) + 1
+                line_end = code.find("\n", call_match.end())
+                line_end = len(code) if line_end < 0 else line_end
+                line = code[line_start:line_end]
+                if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
                     continue
-                typed_records.setdefault(method, []).append(
-                    (signature, body, line_number, path)
+                line_number = code.count("\n", 0, call_match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote movie-geometry selector wrapper "
+                    f"call {method}: {path.relative_to(root)}:{line_number}"
                 )
 
         for match in IWA_KEYNOTE_MOVIE_GEOMETRY_RAW_ID_CALL.finditer(code):
@@ -58682,7 +58745,6 @@ def audit_keynote_movie_geometry_completion_source_topology(
             if match.group("method") == "slide_movie_geometry" and focused_package_call(
                 code, match
             ):
-                focused_read_seen = True
                 continue
             line_number = code.count("\n", 0, match.start("method")) + 1
             violations.append(
@@ -58690,16 +58752,6 @@ def audit_keynote_movie_geometry_completion_source_topology(
                 f"method/call {match.group('method')}: "
                 f"{path.relative_to(root)}:{line_number}"
             )
-        for match in re.finditer(
-            r"(?<![A-Za-z0-9_])(?:edit|apply)_slide_movie_geometry\s*\(", code
-        ):
-            if focused_package_call(code, match):
-                focused_edit_seen = True
-        for match in re.finditer(
-            r"(?<![A-Za-z0-9_])slide_movie_transform\s*\(", code
-        ):
-            if focused_package_call(code, match):
-                focused_read_seen = True
         for match in IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK.finditer(
             code
         ):
@@ -58709,25 +58761,26 @@ def audit_keynote_movie_geometry_completion_source_topology(
                 f"identifier fallback {match.group(0).strip()}: "
                 f"{path.relative_to(root)}:{line_number}"
             )
-        for match in IWA_KEYNOTE_MOVIE_GEOMETRY_COMPLETE_RAW_HELPER.finditer(code):
-            line_number = code.count("\n", 0, match.start()) + 1
-            violations.append(
-                "retired litchi-iwa Keynote movie-geometry completion native "
-                f"mutator/helper {match.group(0)}: {path.relative_to(root)}:{line_number}"
-            )
-        for match in KEYNOTE_MOVIE_GEOMETRY_COMPLETE_DIRECT_REWRITE_CALL.finditer(code):
-            line_start = code.rfind("\n", 0, match.start()) + 1
-            line_end = code.find("\n", match.end())
-            if line_end < 0:
-                line_end = len(code)
-            line = code[line_start:line_end]
-            if re.search(r"\bfn[ \t]+rewrite_movie_(?:geometry|transform)\b", line):
-                continue
-            line_number = code.count("\n", 0, match.start()) + 1
-            violations.append(
-                "retired litchi-iwa Keynote movie-geometry completion direct codec "
-                f"rewrite {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
-            )
+        if movie_local_source:
+            for match in IWA_KEYNOTE_MOVIE_GEOMETRY_COMPLETE_RAW_HELPER.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote movie-geometry completion native "
+                    f"mutator/helper {match.group(0)}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MOVIE_GEOMETRY_COMPLETE_DIRECT_REWRITE_CALL.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                if re.search(r"\bfn[ \t]+rewrite_movie_(?:geometry|transform)\b", line):
+                    continue
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote movie-geometry completion direct codec "
+                    f"rewrite {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
         for declaration_text, line_number in _rust_public_declarations(source):
             function_names = {
                 name for name, _nested_line in _rust_function_declarations(declaration_text)
@@ -58747,28 +58800,6 @@ def audit_keynote_movie_geometry_completion_source_topology(
                     f"{path.relative_to(root)}:{line_number}"
                 )
 
-    for method, records in sorted(typed_records.items()):
-        for signature, body, line_number, path in records:
-            if not re.search(r"\bMovieSelector\b", signature):
-                violations.append(
-                    "litchi-iwa Keynote movie-geometry completion typed bridge "
-                    f"{method} must accept MovieSelector: {path.relative_to(root)}:{line_number}"
-                )
-            if method == "slide_movie_geometry_by_selector":
-                required = ("focused_movie_geometry_package", "slide_movie_geometry")
-            else:
-                required = (
-                    "focused_movie_geometry_package",
-                    "edit_slide_movie_geometry",
-                    ".commit(",
-                )
-            if not all(marker in body for marker in required):
-                violations.append(
-                    "litchi-iwa Keynote movie-geometry completion typed bridge "
-                    f"{method} must route through focused Package: "
-                    f"{path.relative_to(root)}:{line_number}"
-                )
-
     for example_path in IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES:
         path = root / example_path
         if not path.is_file():
@@ -58780,23 +58811,12 @@ def audit_keynote_movie_geometry_completion_source_topology(
             if match.group("method") == "slide_movie_geometry" and focused_package_call(
                 code, match
             ):
-                focused_read_seen = True
                 continue
             line_number = code.count("\n", 0, match.start("method")) + 1
             violations.append(
                 "litchi-iwa Keynote movie-geometry completion example retains "
                 f"raw-ID call {match.group('method')}: {example_path}:{line_number}"
             )
-        for match in re.finditer(
-            r"(?<![A-Za-z0-9_])(?:edit|apply)_slide_movie_geometry\s*\(", code
-        ):
-            if focused_package_call(code, match):
-                focused_edit_seen = True
-        for match in re.finditer(
-            r"(?<![A-Za-z0-9_])slide_movie_transform\s*\(", code
-        ):
-            if focused_package_call(code, match):
-                focused_read_seen = True
         for match in IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK.finditer(
             code
         ):
@@ -58817,17 +58837,6 @@ def audit_keynote_movie_geometry_completion_source_topology(
                 "litchi-iwa Keynote movie-geometry completion example retains "
                 f"direct codec rewrite {match.group(0).strip()}: {example_path}:{line_number}"
             )
-
-    if source_root.is_dir() and not focused_read_seen:
-        violations.append(
-            "litchi-iwa Keynote movie-geometry completion must retain a focused "
-            "Package read route"
-        )
-    if source_root.is_dir() and not focused_edit_seen:
-        violations.append(
-            "litchi-iwa Keynote movie-geometry completion must retain a focused "
-            "Package edit route"
-        )
 
     return sorted(set(violations))
 
@@ -63003,14 +63012,14 @@ def audit_iwa_keynote_slide_table_lock_state_source_topology(
 
 
 def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[str]:
-    """Require a typed bridge while retaining the legacy geometry fallback.
+    """Require the historical bridge before completion, then enforce host exit.
 
     MovieGeometry intentionally does not cover native angle/flip/flags and
     synthetic compatibility graphs.  The legacy KeynoteEditor declarations
     and their internal calls therefore remain allowed in the focused host and
-    its geometry helper.  The Wave111 completion audit takes over when the
-    expanded owner explicitly activates, at which point all raw declarations,
-    fallbacks, and native mutators are retired atomically.
+    its geometry helper until the expanded owner explicitly activates.  At
+    activation, the completion audit takes over and retires every selector
+    wrapper, raw declaration, fallback, and native mutator atomically.
     """
 
     if not _keynote_movie_geometry_owner_present(root):

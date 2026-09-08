@@ -4,6 +4,8 @@ use std::time::Duration;
 
 pub mod properties;
 
+use geometry::MovieTransform;
+
 pub use properties::MediaProperties;
 
 /// A slide-drawable position in document points.
@@ -531,9 +533,10 @@ impl MovieKind {
 /// An archive-free summary of one movie drawable owned by a slide.
 ///
 /// The summary is intentionally disjoint from the native graph.  It carries
-/// source-order media semantics only: no package component names, object
-/// identifiers, data-reference identifiers, generated protobuf values, or
-/// borrowed package storage cross this boundary.
+/// source-order media semantics only, including optional validated transform
+/// controls: no package component names, object identifiers, data-reference
+/// identifiers, generated protobuf values, or borrowed package storage cross
+/// this boundary.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MovieInfo {
     kind: MovieKind,
@@ -541,6 +544,7 @@ pub struct MovieInfo {
     size: Option<Size>,
     original_size: Option<Size>,
     natural_size: Option<Size>,
+    transform: Option<MovieTransform>,
     playback: Option<MediaPlaybackSettings>,
 }
 
@@ -565,6 +569,7 @@ impl MovieInfo {
             size,
             original_size: None,
             natural_size,
+            transform: None,
             playback,
         }
     }
@@ -573,6 +578,17 @@ impl MovieInfo {
     #[must_use]
     pub const fn with_original_size(mut self, original_size: Option<Size>) -> Self {
         self.original_size = original_size;
+        self
+    }
+
+    /// Return a copy carrying the optional validated rotation and reflection.
+    ///
+    /// `None` means that both native transform fields were absent. Use
+    /// [`MovieTransform::identity`] inside `Some` when the native fields were
+    /// present and explicitly described the default transform.
+    #[must_use]
+    pub const fn with_transform(mut self, transform: Option<MovieTransform>) -> Self {
+        self.transform = transform;
         self
     }
 
@@ -612,6 +628,16 @@ impl MovieInfo {
         self.natural_size
     }
 
+    /// Return the optional validated rotation and reflection controls.
+    ///
+    /// `None` means that both native transform fields were absent. A present
+    /// native field that resolves to no rotation or reflection is returned as
+    /// `Some(MovieTransform::identity())`.
+    #[must_use]
+    pub const fn transform(self) -> Option<MovieTransform> {
+        self.transform
+    }
+
     /// Return optional trim, repeat, poster, and volume settings.
     #[must_use]
     pub const fn playback(self) -> Option<MediaPlaybackSettings> {
@@ -632,7 +658,7 @@ pub type MediaInfo = MovieInfo;
 mod tests {
     use super::{
         MediaInfo, MediaLoopMode, MediaPlaybackSettings, MediaVolume, MovieInfo, MovieKind, Point,
-        Size,
+        Size, geometry::MovieTransform,
     };
     use std::mem::size_of;
     use std::time::Duration;
@@ -671,10 +697,23 @@ mod tests {
         assert_eq!(movie.position(), Some(Point { x: 12.0, y: 24.0 }));
         assert_eq!(movie.original_size(), None);
         assert_eq!(movie.natural_size(), None);
+        assert_eq!(movie.transform(), None);
         assert_eq!(movie.playback(), Some(playback));
         assert_eq!(movie.duration(), Some(Duration::from_secs(3)));
         let _: MediaInfo = movie;
         assert_eq!(size_of::<MovieInfo>(), size_of::<MediaInfo>());
+    }
+
+    #[test]
+    fn movie_summary_retains_validated_transform_without_losing_copyability() {
+        let transform = MovieTransform::new(45.0, true).unwrap();
+        let movie = MovieInfo::from_parts(MovieKind::File, None, None, None, None)
+            .with_transform(Some(transform));
+        let copied = movie;
+
+        assert_eq!(movie.transform(), Some(transform));
+        assert_eq!(copied.transform(), Some(transform));
+        assert_eq!(movie.with_transform(None).transform(), None);
     }
 
     #[test]
