@@ -1,0 +1,27 @@
+{
+  "checked_utc": "2026-09-08T16:31:58.438877+00:00",
+  "live_state_sha256": "7335c3d9ac670ded7b0074bf43e3c77b7bcb935fe6fa57b25db3e8cd4249cffe",
+  "preliminary_cleanup_sha256": "3fac901c5620500bd2bdf669b1168133d1edfb9a4c2f157c59ffd28498c41d47",
+  "protected_files": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/report/spec-gap-audit.md": "f71288dddc0827d5f5a16bf3936985606ec1b341d6e5c06fced4e612c7972ddf"
+  },
+  "removed_binaries": {
+    "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool": {
+      "bytes": 414504696,
+      "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+    },
+    "/tmp/litchi-goal-0478/normal/pptx_metadata_spool": {
+      "bytes": 414496768,
+      "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969"
+    }
+  },
+  "schema": "pptx-metadata-spool-cleanup-v1",
+  "scratch_files_remaining": 0,
+  "shared_caches_retained": [
+    "/home/zhuhe/code/litchi/target",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+  ],
+  "status": "pass",
+  "temporary_root_absent": true
+}

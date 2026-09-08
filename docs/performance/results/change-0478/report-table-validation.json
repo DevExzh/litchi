@@ -1,0 +1,14 @@
+{
+  "documents": {
+    "docs/performance/changes/0478-pptx-generated-metadata-spool.md": {
+      "normal_rows_checked": 12,
+      "sha256": "f2b7be76bd2f25b3bf3af48fc8ad2055568df86e0ef6c1d2bef10fa4d2e5db11"
+    },
+    "docs/performance/results/change-0478/README.md": {
+      "normal_rows_checked": 12,
+      "sha256": "99b2c39b4dca781ecff1ee49b8b356feeec2973f70c1bbc11bbb75f0342dd264"
+    }
+  },
+  "status": "pass",
+  "summary_sha256": "f3540f48249ba339818209dcc753052afb7e3505f968b679add7eab8f8787773"
+}

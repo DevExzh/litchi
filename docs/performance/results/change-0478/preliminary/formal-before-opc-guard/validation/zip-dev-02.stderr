@@ -1,0 +1,9 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.70s
+     Running unittests src/lib.rs (target/debug/deps/soapberry_zip-d480e689bee7be20)
+     Running tests/central_directory_short_reads.rs (target/debug/deps/central_directory_short_reads-e5ff443b1c4e3196)
+     Running tests/deflate_reuse.rs (target/debug/deps/deflate_reuse-302168905289bf1d)
+     Running tests/directory_spool.rs (target/debug/deps/directory_spool-ca0a41f7c4df3dff)
+     Running tests/generated_name_policy.rs (target/debug/deps/generated_name_policy-0a2c00b22bb61b56)
+     Running tests/generated_name_proof.rs (target/debug/deps/generated_name_proof-95047c71a978a78c)
+error: test failed, to rerun pass `-p soapberry-zip --test generated_name_proof`

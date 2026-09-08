@@ -1,0 +1,87 @@
+{
+  "binaries": {
+    "before-cleanup-allocator": {
+      "bytes": 414505112,
+      "live": false,
+      "path": "/tmp/litchi-goal-0478/preliminary/allocator/pptx_metadata_spool",
+      "sha256": "5fca7f05ec9e5ec70243250a7a45abdfe4948eb8b3fb3e0cc426488578eef5de"
+    },
+    "before-cleanup-normal": {
+      "bytes": 414498768,
+      "live": false,
+      "path": "/tmp/litchi-goal-0478/preliminary/normal/pptx_metadata_spool",
+      "sha256": "243668d9638126b4a2859ac5f072fe948b3f6ec14746333dabc539dafac2cd12"
+    },
+    "before-opc-guard-allocator": {
+      "bytes": 414504248,
+      "live": false,
+      "path": "/tmp/litchi-goal-0478/preliminary-opc-guard/allocator/pptx_metadata_spool",
+      "sha256": "3b70a4ec2acdfa1b3dcd44da466ac9cf11af8a7fc07cf6ee9c778afe86187d47"
+    },
+    "before-opc-guard-normal": {
+      "bytes": 414496264,
+      "live": false,
+      "path": "/tmp/litchi-goal-0478/preliminary-opc-guard/normal/pptx_metadata_spool",
+      "sha256": "66b2d466bc23b2a29eff03a1ccef444d956853b68d9824ecd17a708ff7bfa473"
+    },
+    "final-allocator": {
+      "bytes": 414504696,
+      "live": true,
+      "path": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+      "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+    },
+    "final-normal": {
+      "bytes": 414496768,
+      "live": true,
+      "path": "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+      "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969"
+    }
+  },
+  "checked_utc": "2026-09-08T16:31:37.975408+00:00",
+  "embedded_input_count": 19,
+  "preliminary": {
+    "attempt": "formal-before-opc-guard",
+    "captures": 24,
+    "prior": {
+      "attempt": "formal-before-cleanup-fix",
+      "captures": 24,
+      "protocol_sha256": "a0a64f6fd87e49914ea139784b0cc09a20d91040523f3c46229dd34a4aebc757",
+      "samples": 720,
+      "status": "authenticated",
+      "validation": {
+        "failed": 15,
+        "successful": 17,
+        "total": 32
+      }
+    },
+    "protocol_sha256": "33335a97f50aac8fe5c6bd9cb8708969ed6351786f821dd2a812a5cf8c5d9382",
+    "samples": 720,
+    "status": "authenticated",
+    "validation": {
+      "failed": 15,
+      "successful": 23,
+      "total": 38
+    }
+  },
+  "protected_files": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/report/spec-gap-audit.md": "f71288dddc0827d5f5a16bf3936985606ec1b341d6e5c06fced4e612c7972ddf"
+  },
+  "reconstructed_sources": {
+    "cleanup-before-pptx-source.txt": "399a424310ff29855a22a1bece375925d336d0973a04dc53751dd345a17217f2",
+    "opc-before-percent-guard-source.txt": "d6c41db226b74764831b754c96d13bd434f48a34cba023c50844c0f02d4c3fb1"
+  },
+  "revision": "b16fb3962bcbe0b068e5ef9738251218396d45aa",
+  "schema": "pptx-metadata-spool-live-state-v1",
+  "source": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "status": "pass",
+  "validation": {
+    "receipts": 59,
+    "required_success": 21,
+    "retained_nonzero_attempts": 15
+  }
+}

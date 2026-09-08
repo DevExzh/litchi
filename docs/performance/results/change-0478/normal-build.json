@@ -1,0 +1,69 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "pptx_metadata_spool"
+  ],
+  "artifacts": {
+    "build-normal-opc-guard.stderr": {
+      "bytes": 162,
+      "sha256": "0df432f233d2869bd21c81b34f1586c6106b5d9c2e997d8de2ef09df1af57d62"
+    },
+    "build-normal-opc-guard.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 414496768,
+    "path": "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+    "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969"
+  },
+  "common_sha256": "1087f5baf8e17a12c48b6d90dfc87efcb22c25f8360a784a6b1135edaf398865",
+  "copied_utc": "2026-09-08T16:04:08.073998+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "embedded_inputs": {
+    "bytes": 4980,
+    "path": "embedded-inputs.json",
+    "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+  },
+  "embedded_inputs_unchanged": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T16:04:07.075703+00:00",
+  "original_binary": {
+    "bytes": 414496768,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/pptx_metadata_spool",
+    "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969"
+  },
+  "source_after": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_before": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T16:03:18.310011+00:00",
+  "validation_gate": {
+    "path": "validation/build-normal-opc-guard.json",
+    "sha256": "4361710509687b816062da58b958b5b9dd5919e10dbfd3a1dd36c43f2b8bcd01"
+  }
+}

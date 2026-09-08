@@ -1,0 +1,19 @@
+
+running 14 tests
+test default_limits_round_trip_through_checked_xml_profile ... ok
+test fallible_producer_preserves_ordered_source_and_accepted_progress ... ok
+test exact_empty_content_limit_can_be_smaller_than_fixed_style_member ... ok
+test cancellation_before_middle_and_final_write_is_typed ... ok
+test rejects_cr_and_xml_controls_and_keeps_numeric_cr_literal ... ok
+test execution_budgets::output_budget_tracks_short_interrupted_and_partial_sink_acceptance ... ok
+test mutated_namespace_or_control_cannot_satisfy_the_independent_oracle ... ok
+test short_and_interrupted_sinks_are_retried_and_failures_report_prefix ... ok
+test static_member_sink_errors_retain_custom_cause_and_exact_progress ... ok
+test xml_audit_work_memory_and_output_parent_child_limits_release ... ok
+test exact_and_one_under_provider_limits_have_typed_progress ... ok
+test execution_budgets::execution_context_resources_accept_exact_parent_child_usage_and_refuse_one_under ... ok
+test xml_audit_refusals_preserve_typed_resource_and_accepted_prefix ... ok
+test publishes_independent_whitespace_oracle_and_reopens_five_members ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

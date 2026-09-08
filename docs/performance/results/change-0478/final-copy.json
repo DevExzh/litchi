@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "runtime_root_absent": true,
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\"captures\": 24, \"data_only\": false, \"preliminary\": {\"attempt\": \"formal-before-opc-guard\", \"captures\": 24, \"prior\": {\"attempt\": \"formal-before-cleanup-fix\", \"captures\": 24, \"protocol_sha256\": \"a0a64f6fd87e49914ea139784b0cc09a20d91040523f3c46229dd34a4aebc757\", \"samples\": 720, \"status\": \"authenticated\", \"validation\": {\"failed\": 15, \"successful\": 17, \"total\": 32}}, \"protocol_sha256\": \"33335a97f50aac8fe5c6bd9cb8708969ed6351786f821dd2a812a5cf8c5d9382\", \"samples\": 720, \"status\": \"authenticated\", \"validation\": {\"failed\": 15, \"successful\": 23, \"total\": 38}}, \"protocol_sha256\": \"fe8dcc8db0191f8b0731e794960a5a5653717365bb1922535bd3e7211841bf66\", \"rust_validation\": {\"receipts\": 59, \"required_success\": 21, \"retained_nonzero_attempts\": 15}, \"samples\": 720, \"schema\": \"pptx-metadata-spool-verification-v1\", \"sealed\": true, \"status\": \"pass\", \"validation\": {\"failed\": 15, \"successful\": 44, \"total\": 59}}\n",
+  "temporary_copy_removed": true,
+  "validated_seal_sha256": "d16056a941c94dece77385672a9ee26b49771e06065ceba7ba40e1ad20ae0c38"
+}

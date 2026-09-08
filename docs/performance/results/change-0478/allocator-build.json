@@ -1,0 +1,75 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "pptx_metadata_spool",
+    "--features",
+    "allocator-metrics"
+  ],
+  "artifacts": {
+    "build-allocator-opc-guard.stderr": {
+      "bytes": 161,
+      "sha256": "da068250d87acf5d3d5a9cb10717c7b88cf59144f6aaa909b7a5a100e22d8c55"
+    },
+    "build-allocator-opc-guard.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 414504696,
+    "path": "/tmp/litchi-goal-0478/allocator/pptx_metadata_spool",
+    "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+  },
+  "common_sha256": "1087f5baf8e17a12c48b6d90dfc87efcb22c25f8360a784a6b1135edaf398865",
+  "copied_utc": "2026-09-08T16:06:28.671032+00:00",
+  "copy_recovery": {
+    "path": "build-copy-recovery.json",
+    "sha256": "4aee09999f4d01b39a9db4e47072814442d7c9dd3fa6c70ee8f8128b5726fb88"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "embedded_inputs": {
+    "bytes": 4980,
+    "path": "embedded-inputs.json",
+    "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+  },
+  "embedded_inputs_unchanged": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T16:04:09.512057+00:00",
+  "original_binary": {
+    "bytes": 414504696,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/pptx_metadata_spool",
+    "sha256": "6279bccb61337e572d215b7f788a670e95ea839a6d6dfe9a83e5f61fae52b632"
+  },
+  "source_after": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_before": {
+    "files": 7046,
+    "path": "validation-sources/38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080.json",
+    "sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T16:04:08.093871+00:00",
+  "validation_gate": {
+    "path": "validation/build-allocator-opc-guard.json",
+    "sha256": "381fecf1c0bb24a304a2193f0a2d0b8daa1e85406d419b0dc1a42fa70fa4ec41"
+  }
+}

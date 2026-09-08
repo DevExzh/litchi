@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## Generated-name retention removed from the explicit PPTX route (0478)
+
+[0478](changes/0478-pptx-generated-metadata-spool.md) removes growing ZIP Office
+and OPC name indexes from a checked, finite generated-name mode and integrates
+central-directory scratch into the public fresh PPTX writer. The existing
+serializer emits the same members in the same order. This addresses the name
+and directory owners identified in 0475 after compressor reuse in 0476.
+Serialized scratch and per-member work still grow; the provider's storage is
+separate from the library's replay buffer and active-entry state. Default
+arbitrary-name paths retain their ordinary metadata. The next investigation is
+[DOCX logical-tail append](results/change-0478/next-work.md), with a baseline and
+attribution required before any production change.
+
+The final 24-process, 720-sample matrix passes byte and reopen verification.
+All 180 spool allocator samples have a 432,436-byte operation peak, versus
+8,875,252 bytes for the 8,192-slide control. Scratch extents are 4,074, 40,842
+and 1,237,692 bytes at 8, 256 and 8,192 slides. Small-deck normal mean latency
+increases 3.11% and 3.31% in the two repeats; no registered 5% review threshold
+is crossed. This is an operation-heap result with separate caller storage.
+
 ## Central-directory working heap separated from scratch (0477)
 
 [0477](changes/0477-zip-central-directory-spool.md) gives the ZIP writer

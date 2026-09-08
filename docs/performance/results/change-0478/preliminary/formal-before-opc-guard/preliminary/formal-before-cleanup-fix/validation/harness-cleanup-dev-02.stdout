@@ -1,0 +1,12 @@
+
+running 7 tests
+test zip_directory_spool::tests::both_mode_and_method_lists_deduplicate ... ok
+test zip_directory_spool::tests::default_cli_is_control_only ... ok
+test zip_directory_spool::tests::corpus_generation_is_deterministic ... ok
+test zip_directory_spool::tests::hash_sink_counts_every_accepted_byte ... ok
+test zip_directory_spool::tests::cli_retains_failed_oracle_spool_after_quota_failure ... ok
+test zip_directory_spool::tests::cli_removes_successful_oracle_warmup_and_sample_spools ... ok
+test zip_directory_spool::tests::cli_preserves_preexisting_oracle_warmup_and_sample_spools ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 371 filtered out; finished in 0.00s
+

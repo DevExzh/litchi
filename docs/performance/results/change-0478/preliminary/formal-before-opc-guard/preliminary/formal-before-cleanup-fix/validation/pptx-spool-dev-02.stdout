@@ -1,0 +1,31 @@
+
+running 12 tests
+test explicit_spool_refuses_invalid_configuration_before_output ... ok
+test initialization_spool_failure_is_typed_and_leaves_output_empty ... ok
+test scratch_quota_failure_is_typed_and_does_not_become_a_generic_pptx_error ... ok
+test output_failure_reports_accepted_bytes_and_preserves_the_typed_progress_wrapper ... ok
+test appending_spool_failure_is_typed_after_output_progress ... ok
+test explicit_spool_preserves_validation_for_hostile_content_and_slide_order ... FAILED
+test replay_spool_failure_reports_exactly_the_output_bytes_accepted ... ok
+test interrupted_output_is_retryable_in_the_explicit_scratch_path ... ok
+test short_and_interrupted_scratch_transfers_preserve_the_deck ... ok
+test output_limit_reports_the_exact_accepted_prefix_in_the_spooled_route ... ok
+test convenience_metadata_spool_matches_the_default_writer ... ok
+test explicit_metadata_spool_matches_ordinary_bytes_for_default_and_widescreen_decks ... ok
+
+failures:
+
+---- explicit_spool_preserves_validation_for_hostile_content_and_slide_order stdout ----
+
+thread 'explicit_spool_preserves_validation_for_hostile_content_and_slide_order' (2056037) panicked at crates/litchi-pptx/tests/streaming_metadata_spool.rs:204:5:
+assertion `left == right` failed
+  left: 25701
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    explicit_spool_preserves_validation_for_hostile_content_and_slide_order
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.79s
+

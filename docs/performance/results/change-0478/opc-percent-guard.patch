@@ -1,0 +1,61 @@
+--- before/crates/litchi-opc/src/phys_pkg.rs
++++ after/crates/litchi-opc/src/phys_pkg.rs
+@@ -1042,7 +1042,9 @@
+     /// For each index in `first..first + count`, every `(prefix, suffix)` pair
+     /// emits `prefix + decimal(index) + suffix`.  Prefixes include the
+     /// absolute OPC leading slash; the plan stores the corresponding ZIP
+-    /// member names internally.
++    /// member names internally. Prefixes ending in `%` are refused because
++    /// decimal insertion could change the validity of an OPC percent escape
++    /// between the checked endpoints.
+     pub fn push_indexed(
+         &mut self,
+         first: u64,
+@@ -1083,6 +1085,14 @@
+         let (pattern_count, pattern_bytes, entry_count) =
+             self.next_budget(pattern_count_added, static_bytes, entries_added)?;
+ 
++        for (prefix, _) in patterns {
++            if prefix.as_bytes().last() == Some(&b'%') {
++                return Err(OpcError::InvalidPackUri(
++                    "generated OPC indexed prefixes cannot end with '%'".to_owned(),
++                ));
++            }
++        }
++
+         let last = first.checked_add(count - 1).ok_or_else(|| {
+             OpcError::InvalidPackUri("generated OPC name index range overflows u64".to_owned())
+         })?;
+@@ -2610,6 +2620,10 @@
+ 
+     #[test]
+     fn generated_opc_plan_validates_pack_uri_literals_and_index_endpoints() {
++        assert!(PackURI::new("/%1A").is_ok());
++        assert!(PackURI::new("/%9A").is_ok());
++        assert!(PackURI::new("/%4A").is_err());
++
+         let mut builder =
+             GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(4, 128, 8)).unwrap();
+         assert!(matches!(
+@@ -2628,6 +2642,21 @@
+             builder.push_indexed(u64::MAX, 2, &[("/ppt/slide", ".xml")]),
+             Err(OpcError::InvalidPackUri(_))
+         ));
++
++        let mut percent_boundary =
++            GeneratedPartNamePlanBuilder::new(GeneratedPartNamePlanLimits::new(8, 256, 16))
++                .unwrap();
++        assert!(matches!(
++            percent_boundary.push_indexed(1, 9, &[("/%", "A")]),
++            Err(OpcError::InvalidPackUri(_))
++        ));
++        percent_boundary.push_literal("/after.xml").unwrap();
++        percent_boundary
++            .push_indexed(1, 3, &[("/x%20-slide", ".xml")])
++            .unwrap();
++        let percent_plan = percent_boundary.finish().unwrap();
++        assert_eq!(percent_plan.entry_count(), 4);
++        assert!(PackURI::new("/x%20-slide1.xml").is_ok());
+     }
+ 
+     #[test]

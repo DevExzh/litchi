@@ -1,0 +1,27 @@
+{
+  "binaries": {
+    "before-cleanup-allocator": {
+      "bytes": 414505112,
+      "path": "/tmp/litchi-goal-0478/preliminary/allocator/pptx_metadata_spool",
+      "sha256": "5fca7f05ec9e5ec70243250a7a45abdfe4948eb8b3fb3e0cc426488578eef5de"
+    },
+    "before-cleanup-normal": {
+      "bytes": 414498768,
+      "path": "/tmp/litchi-goal-0478/preliminary/normal/pptx_metadata_spool",
+      "sha256": "243668d9638126b4a2859ac5f072fe948b3f6ec14746333dabc539dafac2cd12"
+    },
+    "before-opc-guard-allocator": {
+      "bytes": 414504248,
+      "path": "/tmp/litchi-goal-0478/preliminary-opc-guard/allocator/pptx_metadata_spool",
+      "sha256": "3b70a4ec2acdfa1b3dcd44da466ac9cf11af8a7fc07cf6ee9c778afe86187d47"
+    },
+    "before-opc-guard-normal": {
+      "bytes": 414496264,
+      "path": "/tmp/litchi-goal-0478/preliminary-opc-guard/normal/pptx_metadata_spool",
+      "sha256": "66b2d466bc23b2a29eff03a1ccef444d956853b68d9824ecd17a708ff7bfa473"
+    }
+  },
+  "checked_utc": "2026-09-08T16:05:05.730734+00:00",
+  "reason": "free owned superseded executables after allocator copy hit errno122; raw captures, build receipts and source custody remain retained",
+  "schema": "pptx-metadata-spool-preliminary-runtime-cleanup-v1"
+}

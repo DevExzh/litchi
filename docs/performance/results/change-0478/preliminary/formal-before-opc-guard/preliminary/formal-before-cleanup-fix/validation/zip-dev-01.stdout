@@ -1,0 +1,36 @@
+
+running 7 tests
+test generated_plan_cannot_raise_streaming_entry_or_name_limits ... FAILED
+test missing_members_refuse_finalization_with_exact_progress ... ok
+test mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads ... FAILED
+test a_completed_plan_rejects_extra_members_but_can_finish ... ok
+test owned_route_refuses_skipped_or_repeated_members_before_header_output ... ok
+test ordinary_name_validation_still_rejects_duplicates ... ok
+test every_borrowed_route_refuses_wrong_names_without_consuming_the_plan ... FAILED
+
+failures:
+
+---- generated_plan_cannot_raise_streaming_entry_or_name_limits stdout ----
+
+thread 'generated_plan_cannot_raise_streaming_entry_or_name_limits' (2024346) panicked at crates/soapberry-zip/tests/generated_name_policy.rs:238:9:
+assertion failed: result.is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads stdout ----
+
+thread 'mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads' (2024348) panicked at crates/soapberry-zip/tests/generated_name_policy.rs:42:10:
+called `Result::unwrap()` on an `Err` value: StreamingArchiveFailure { error: Error { inner: ErrorInner { kind: InvalidInput { msg: "generated member name does not match the next plan item" }, eocd_offset: None } }, progress: StreamingArchiveProgress { output_bytes: 50, poisoned: false }, limit: None }
+
+---- every_borrowed_route_refuses_wrong_names_without_consuming_the_plan stdout ----
+
+thread 'every_borrowed_route_refuses_wrong_names_without_consuming_the_plan' (2024345) panicked at crates/soapberry-zip/tests/generated_name_policy.rs:154:13:
+route 0: /expected.bin
+
+
+failures:
+    every_borrowed_route_refuses_wrong_names_without_consuming_the_plan
+    generated_plan_cannot_raise_streaming_entry_or_name_limits
+    mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

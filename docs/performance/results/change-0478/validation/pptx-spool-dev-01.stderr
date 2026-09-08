@@ -1,0 +1,92 @@
+   Compiling generic-array v0.14.9
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error[E0599]: no method named `is_empty` found for struct `std::io::Bytes<R>` in the current scope
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:663:28
+    |
+663 |     assert!(!store.bytes().is_empty());
+    |                            ^^^^^^^^ method not found in `std::io::Bytes<FaultStore>`
+
+error[E0599]: no method named `finish` found for struct `FaultOutput` in the current scope
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:701:10
+    |
+546 |   struct FaultOutput {
+    |   ------------------ method `finish` not found for this struct
+...
+700 |       let error = writer
+    |  _________________-
+701 | |         .finish()
+    | |         -^^^^^^ method not found in `FaultOutput`
+    | |_________|
+    |
+    |
+note: there's an earlier shadowed binding `writer` of type `StreamingPresentationWriter<FaultOutput>` that has method `finish` available
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:697:9
+    |
+697 |     let writer = construct_fault_writer(output, store.clone()).expect("fault store construction");
+    |         ^^^^^^ `writer` of type `StreamingPresentationWriter<FaultOutput>` that has method `finish` defined earlier here
+698 |     let writer = write_slides(writer, 1).expect("finish slide before replay fault");
+    |         ------ earlier `writer` shadowed here with type `FaultOutput`
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `finish`, perhaps you need to implement one of them:
+            candidate #1: `Hasher`
+            candidate #2: `flate2::zio::Flush`
+            candidate #3: `form_urlencoded::Target`
+
+error[E0308]: mismatched types
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:735:41
+    |
+735 |     assert_reopens_all_authored_content(&bytes, 1, StreamingPresentationOptions::default());
+    |     ----------------------------------- ^^^^^^ expected `&[u8]`, found `&FaultOutput`
+    |     |
+    |     arguments to this function are incorrect
+    |
+    = note: expected reference `&[u8]`
+               found reference `&FaultOutput`
+note: function defined here
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:88:4
+    |
+ 88 | fn assert_reopens_all_authored_content(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 89 |     bytes: &[u8],
+    |     ------------
+
+error[E0502]: cannot borrow `output` as immutable because it is also borrowed as mutable
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:199:18
+    |
+191 |         &mut output,
+    |         ----------- mutable borrow occurs here
+...
+199 |     let before = output.len();
+    |                  ^^^^^^ immutable borrow occurs here
+200 |     assert!(matches!(
+201 |         writer.start_slide(Some("hostile\u{1}")),
+    |         ------ mutable borrow later used here
+
+error[E0382]: use of moved value: `extra`
+   --> crates/litchi-pptx/tests/streaming_metadata_spool.rs:254:5
+    |
+242 |     let mut extra = StreamingPresentationWriter::with_options_and_metadata_spool(
+    |         --------- move occurs because `extra` has type `StreamingPresentationWriter<Vec<u8>>`, which does not implement the `Copy` trait
+...
+253 |     assert!(matches!(extra.start_slide(None), Err(Error::Invalid(_))));
+    |                            ----------------- `extra` moved due to this method call
+254 |     extra.finish().expect("complete one-slide archive");
+    |     ^^^^^ value used here after move
+    |
+note: `StreamingPresentationWriter::<W>::start_slide` takes ownership of the receiver `self`, which moves `extra`
+   --> crates/litchi-pptx/src/writer/streaming.rs:411:24
+    |
+411 |     pub fn start_slide(self, title: Option<&str>) -> Result<StreamingSlideWriter<W>> {
+    |                        ^^^^
+
+Some errors have detailed explanations: E0308, E0382, E0502, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-pptx` (test "streaming_metadata_spool") due to 5 previous errors

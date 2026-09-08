@@ -1,0 +1,83 @@
+{
+  "artifacts": {
+    "r1-normal-8-spool.report.json": {
+      "bytes": 35566,
+      "sha256": "ba8df290482860d64abaaf99660bf2d101e58c29cc2f550c6be466c918ef2ae4"
+    },
+    "r1-normal-8-spool.resource": {
+      "bytes": 1066,
+      "sha256": "de88b83b4283a5c40e5c68dc6ac8a32b5ab251db96d6ff25585e9bfa4fed979f"
+    },
+    "r1-normal-8-spool.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "r1-normal-8-spool.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_gate": "normal-build.json",
+    "build_gate_sha256": "018799b8d33e7d5e1acac9be17646f5398be84936db5f036e12d821020d1fe8f",
+    "bytes": 414496768,
+    "embedded_inputs": {
+      "bytes": 4980,
+      "path": "embedded-inputs.json",
+      "sha256": "6d85f8b4cc16cbd21257265d7933b6f6378aae4d2585da92eed1b6abb859fcee"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+    "sha256": "6b2f543cdbd11868209deed7d0b265496bab9fc3bfbd9d4e49d1357135f0c969",
+    "source_manifest_sha256": "38d17523810931fd9e41d3ea6566f2542869b32e32a09148b58fa35f9fd3f080"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-spool.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-0478/normal/pptx_metadata_spool",
+      "--mode",
+      "spool",
+      "--counts",
+      "8",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--repeats",
+      "1",
+      "--max-spool-bytes",
+      "67108864",
+      "--spool-buffer-bytes",
+      "16384",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0478/captures/r1-normal-8-spool.report.json",
+      "--spool-dir",
+      "/tmp/litchi-goal-0478/spools/r1-normal-8-spool"
+    ],
+    "count": 8,
+    "instrumentation": "normal",
+    "label": "r1-normal-8-spool",
+    "policy": "spool",
+    "repeat": 1
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T16:07:45.094500+00:00",
+  "protocol_sha256": "fe8dcc8db0191f8b0731e794960a5a5653717365bb1922535bd3e7211841bf66",
+  "started_utc": "2026-09-08T16:07:45.050957+00:00"
+}
