@@ -110,7 +110,7 @@ pub(crate) struct PptxStreamingCorpus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct PptxStreamingSpec {
+pub(crate) struct PptxStreamingSpec {
     slides: usize,
     input_text_bytes: usize,
     max_text_bytes: usize,
@@ -120,7 +120,7 @@ struct PptxStreamingSpec {
 }
 
 #[derive(Debug)]
-struct PptxArchiveIdentity {
+pub(crate) struct PptxArchiveIdentity {
     target_payload: Vec<u8>,
     observed_max_slide_xml_bytes: usize,
 }
@@ -223,12 +223,23 @@ fn write_limits(spec: &PptxStreamingSpec) -> Result<StreamingPresentationLimits,
 
 fn write_pptx_stream<W: Write>(sink: W, spec: &PptxStreamingSpec) -> Result<W, Box<dyn Error>> {
     let limits = write_limits(spec)?;
-    let mut writer = StreamingPresentationWriter::with_options(
+    let writer = StreamingPresentationWriter::with_options(
         sink,
         spec.slides,
         StreamingPresentationOptions::standard(),
         limits,
     )?;
+    finish_pptx_stream(writer, spec)
+}
+
+/// Complete the deterministic slide/text-box sequence after a caller has
+/// selected the public writer constructor.  The constructor itself is kept
+/// outside this helper so diagnostics can compare the ordinary and explicit
+/// metadata-spool APIs while sharing this exact corpus producer.
+pub(crate) fn finish_pptx_stream<W: Write>(
+    mut writer: StreamingPresentationWriter<W>,
+    spec: &PptxStreamingSpec,
+) -> Result<W, Box<dyn Error>> {
     let mut expected_text_bytes = 0usize;
     for index in 0..spec.slides {
         let mut slide = writer.start_slide(None)?;
@@ -259,6 +270,77 @@ fn write_pptx_stream<W: Write>(sink: W, spec: &PptxStreamingSpec) -> Result<W, B
         return Err("PPTX streaming final counters differ from its fixture".into());
     }
     Ok(writer.finish()?)
+}
+
+/// Return the opaque writer specification attached to a validated corpus.
+/// Keeping the fields private prevents a diagnostic from creating a corpus
+/// that bypasses the existing text, geometry, and limit calculations.
+pub(crate) fn corpus_spec(corpus: &PptxStreamingCorpus) -> &PptxStreamingSpec {
+    &corpus.spec
+}
+
+pub(crate) fn corpus_archive_sha256(corpus: &PptxStreamingCorpus) -> &str {
+    &corpus.manifest.archive_sha256
+}
+
+pub(crate) fn corpus_archive_bytes(corpus: &PptxStreamingCorpus) -> usize {
+    corpus.manifest.archive_bytes
+}
+
+pub(crate) fn corpus_archive_member_count(corpus: &PptxStreamingCorpus) -> usize {
+    corpus.manifest.archive_member_count
+}
+
+pub(crate) fn corpus_manifest_slide_count(corpus: &PptxStreamingCorpus) -> usize {
+    corpus.manifest.entry_count
+}
+
+pub(crate) fn corpus_source_bytes(corpus: &PptxStreamingCorpus) -> usize {
+    corpus.manifest.uncompressed_payload_bytes
+}
+
+pub(crate) fn corpus_semantic_sha256(corpus: &PptxStreamingCorpus) -> &str {
+    &corpus.spec.semantic_sha256
+}
+
+pub(crate) fn corpus_full_text_sha256(corpus: &PptxStreamingCorpus) -> &str {
+    &corpus.spec.full_text_sha256
+}
+
+/// Build the existing deterministic PPTX corpus for one of its public
+/// scaling counts.  The count mapping is deliberately explicit so the
+/// metadata-spool diagnostic cannot silently drift to a different fixture.
+pub(crate) fn build_corpus_for_slide_count(
+    slide_count: usize,
+) -> Result<PptxStreamingCorpus, Box<dyn Error>> {
+    let shape = match slide_count {
+        8 => SemanticShape::Tiny,
+        256 => SemanticShape::Medium,
+        8_192 => SemanticShape::Large,
+        _ => return Err(format!("unsupported PPTX streaming slide count: {slide_count}").into()),
+    };
+    build_corpus(shape)
+}
+
+/// Compute the same finite limits used by the existing PPTX streaming
+/// producer.  This is kept beside the corpus specification so the new
+/// metadata-spool constructor receives exactly the old writer limits.
+pub(crate) fn corpus_limits(
+    corpus: &PptxStreamingCorpus,
+) -> Result<StreamingPresentationLimits, Box<dyn Error>> {
+    write_limits(&corpus.spec)
+}
+
+/// Re-run the complete physical member, semantic slide, geometry, and
+/// relationship graph oracle used by the original PPTX streaming diagnostic.
+/// The returned identity is intentionally opaque; callers only need the
+/// validation side effect and the archive digest they compute at their own
+/// boundary.
+pub(crate) fn validate_materialized_archive(
+    archive: &[u8],
+    corpus: &PptxStreamingCorpus,
+) -> Result<PptxArchiveIdentity, Box<dyn Error>> {
+    inspect_materialized_archive(archive, &corpus.spec)
 }
 
 fn expected_member_names(slides: usize) -> Result<Vec<String>, Box<dyn Error>> {
