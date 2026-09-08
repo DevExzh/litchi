@@ -1,0 +1,60 @@
+{
+  "binary": {
+    "build_gate": "normal-build.json",
+    "build_gate_sha256": "4a0a4f78d3866dba30616490e57ba5135a2b91173b641b29638f16c26e730c32",
+    "bytes": 413178032,
+    "path": "/tmp/litchi-goal-0477/normal/zip_directory_spool",
+    "sha256": "f70cdf0e7d56575f54796200aa4b1462d80aa9f25359b9c4135d64e422e0cad4",
+    "source_manifest_sha256": "bc6603ba31e99d04513c7990ad5bd641c22385a4fef998d0121e6c35003e1937"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0477/captures/r2-normal-8192-store-spool.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-0477/normal/zip_directory_spool",
+      "--mode",
+      "spool",
+      "--counts",
+      "8192",
+      "--methods",
+      "store",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--repeats",
+      "1",
+      "--max-spool-bytes",
+      "67108864",
+      "--spool-buffer-bytes",
+      "16384",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0477/captures/r2-normal-8192-store-spool.report.json",
+      "--spool-dir",
+      "/tmp/litchi-goal-0477/spools/r2-normal-8192-store-spool"
+    ],
+    "count": 8192,
+    "instrumentation": "normal",
+    "label": "r2-normal-8192-store-spool",
+    "method": "store",
+    "policy": "spool",
+    "repeat": 2
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "protocol_sha256": "dc4b1b07c8854f93cf41876f4aa8e9ed362c90fdf8445dd6bde6b147923cd654",
+  "started_utc": "2026-09-08T13:56:15.545605+00:00"
+}

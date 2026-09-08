@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Explicit ZIP central-directory spool implemented (0477)
+
+[0477](changes/0477-zip-central-directory-spool.md) adds caller-selected central
+metadata storage, limits and replay while preserving exact output and failure
+checks. All 1,440 formal samples pass. Spool library heap peaks stay at 16,574
+bytes for Store and 429,534 bytes for Deflate over the tested counts, separately
+from growing tmpfs scratch. Per-member allocations and I/O increase and Store is
+slower. ZIP/OPC name indexes and semantic integration still prevent an
+end-to-end memory completion claim. The full goal remains open.
+
 ## Owned ZIP Deflate allocation work reduced (0476)
 
 [0476](changes/0476-zip-deflate-state-reuse.md) reuses the raw compressor and

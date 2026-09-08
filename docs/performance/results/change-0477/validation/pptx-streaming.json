@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-pptx",
+    "--test",
+    "streaming_authoring"
+  ],
+  "artifacts": {
+    "pptx-streaming.stderr": {
+      "bytes": 508,
+      "sha256": "29678d9cc2a720f26ba028ffe88b9fa96e060ac75aa9e556acf589f16bac8bec"
+    },
+    "pptx-streaming.stdout": {
+      "bytes": 963,
+      "sha256": "e7ce6d4500e72e3f6d22cceaa5aa046ab2bbfbb1d032d143a7f521763844a87a"
+    }
+  },
+  "common_sha256": "36b8e593ad10d8621c9277b6394b071b30b6911526a5d3a1df7fa8737ee61385",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T13:39:27.906506+00:00",
+  "source_after": {
+    "files": 7040,
+    "path": "validation-sources/0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83.json",
+    "sha256": "0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83"
+  },
+  "source_before": {
+    "files": 7040,
+    "path": "validation-sources/0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83.json",
+    "sha256": "0790a8965b070aad589caafecd6f2981529777aee69c0194cbc0c4c108d56d83"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T13:38:52.456318+00:00"
+}

@@ -1,0 +1,19 @@
+
+running 14 tests
+test encryption_and_signing_are_refused_before_streamed_member_output ... ok
+test exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress ... ok
+test canonical_paths_reopen_through_owned_indexed_and_family_packages ... ok
+test finalization_sink_failure_preserves_nested_source_chain ... ok
+test duplicate_and_xml_refusals_do_not_emit_new_member_headers ... ok
+test manifest_collisions_and_finish_entry_limit_are_atomic_with_progress ... ok
+test reader_failure_preserves_nested_source_chain ... ok
+test typed_mimetype_and_reader_failures_preserve_archive_sources ... ok
+test metadata_is_validated_and_bounded_before_member_output ... ok
+test reader_failure_reports_incomplete_output_and_poisoned_writer ... ok
+test streamed_entry_limit_is_typed_after_the_member_header_starts ... ok
+test manifest_only_paths_use_strict_odf_validation_and_reopen ... ok
+test finalization_failure_preserves_accepted_output_progress ... ok
+test short_non_seek_sink_round_trips_exact_stream_and_is_deterministic ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

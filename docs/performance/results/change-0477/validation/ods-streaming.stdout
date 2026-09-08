@@ -1,0 +1,26 @@
+
+running 11 tests
+test illegal_xml_text_is_a_producer_refusal_and_does_not_pull_a_second_row ... ok
+test memory_scratch_limit_refuses_one_under_before_publication ... ok
+test cancellation_before_middle_and_after_final_sink_write_is_typed_and_exact ... ok
+test finite_numbers_accept_negative_zero_and_nonfinite_values_are_typed_refusals ... ok
+test authored_content_limit_and_output_limit_preserve_the_accepted_prefix ... ok
+test text_escaping_preserves_whitespace_unicode_and_single_decode_entities ... ok
+test short_and_interrupted_sinks_are_retried_but_zero_and_partial_errors_report_prefix ... ok
+test context_resource_limits_accept_exact_usage_and_refuse_one_under ... ok
+test row_cell_text_and_output_limits_accept_exact_and_refuse_one_under ... ok
+test aggregate_xml_audit_limits_are_global_across_fragments ... ok
+test streams_empty_and_variable_rows_and_reopens_fixed_three_member_package ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test required_memory_exact_and_one_under_propagates_through_parent_and_child ... ok
+test cancellation_reports_accepted_progress_and_releases_memory_reservation ... ok
+test row_xml_window_exact_and_one_under_are_checked_for_255_256_257_spans ... ok
+test text_output_matches_independent_reference_for_utf8_escapes_empty_and_span_boundaries ... ok
+test work_budget_exact_and_one_under_preserve_typed_progress_without_compressed_prefix_claims ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

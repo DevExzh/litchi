@@ -1,0 +1,3 @@
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Finished `release` profile [optimized + debuginfo] target(s) in 38.32s
+     Running tests/streaming_plain_paragraphs.rs (target/release/deps/streaming_plain_paragraphs-dc6f07b435c79d79)

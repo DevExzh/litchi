@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Central-directory scratch implemented; name indexes remain (0477)
+
+[0477](changes/0477-zip-central-directory-spool.md) removes growing central
+header/name retention in an explicit low-level spool mode. Its measured heap
+peak is flat across three tested member counts, while caller scratch and
+per-member allocations/I/O remain real costs. ZIP Office and OPC validation
+indexes still grow; the public PPTX route has not met its total-memory
+requirement. A checked generated-name plan and semantic scratch integration are
+next. The full non-iWork goal, including broader CRUD, source/native variants
+and scaling, remains open.
+
 ## Repeated compressor allocation removed; total-memory gap remains (0476)
 
 [0476](changes/0476-zip-deflate-state-reuse.md) implements the allocation owner

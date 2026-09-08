@@ -1,0 +1,3 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `release` profile [optimized + debuginfo] target(s) in 8.74s
+     Running tests/directory_spool.rs (target/release/deps/directory_spool-0074616d36beb97b)

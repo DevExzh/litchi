@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0477: central-directory storage policies
+
+[0477](changes/0477-zip-central-directory-spool.md) retains 1,440 samples from
+48 isolated processes. Spool operation peak heap is 16,574 bytes for Store and
+429,534 bytes for Deflate across 8/256/8,192 ZIP members; control peaks grow
+with count. Scratch grows to 589,824 bytes on tmpfs, separately from heap.
+Allocation calls and Store latency increase. This is a same-source
+preallocated-control policy comparison with exact output/reopen parity, not a
+historical or public-PPTX performance claim.
+
 ## Owned Deflate paired allocation result (0476)
 
 [0476](changes/0476-zip-deflate-state-reuse.md) compares authenticated 0474

@@ -1,0 +1,53 @@
+    Checking typenum v1.20.1
+    Checking serde_core v1.0.229
+    Checking cpufeatures v0.3.1
+    Checking rand_core v0.10.1
+    Checking memchr v2.8.3
+    Checking const-oid v0.10.2
+    Checking num-traits v0.2.19
+    Checking getrandom v0.4.3
+    Checking zmij v1.0.19
+    Checking chacha20 v0.10.2
+    Checking generic-array v0.14.9
+    Checking hybrid-array v0.4.14
+    Checking itoa v1.0.18
+    Checking once_cell v1.21.4
+    Checking iana-time-zone v0.1.65
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking digest v0.10.7
+    Checking thiserror v2.0.18
+    Checking rand v0.10.2
+    Checking sha2 v0.10.9
+    Checking quick-xml v0.41.0
+    Checking serde v1.0.229
+    Checking digest v0.11.3
+    Checking serde_json v1.0.149
+    Checking sha2 v0.11.0
+    Checking chrono v0.4.45
+    Checking zerocopy v0.8.56
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking base64 v0.22.1
+    Checking fast-float2 v0.2.4
+    Checking smallvec v1.16.0
+    Checking debug_unsafe v0.1.4
+    Checking tempfile v3.27.0
+    Checking atoi_simd v0.18.1
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error: this block may be rewritten with the `?` operator
+   --> crates/soapberry-zip/src/writer.rs:231:9
+    |
+231 | /         if let Err(error) = self.healthy() {
+232 | |             return Err(error);
+233 | |         }
+    | |_________^ help: replace it with: `self.healthy()?;`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#question_mark
+    = note: `-D clippy::question-mark` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::question_mark)]`
+
+error: could not compile `soapberry-zip` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

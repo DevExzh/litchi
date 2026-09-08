@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0477: explicit ZIP metadata scratch
+
+The [0477 change](changes/0477-zip-central-directory-spool.md) keeps scratch
+caller-owned, quota-limited and replayable under ADR 0005. ZIP serialization
+stays in soapberry-zip; the OPC adapter exposes no ZIP types. Short transfers,
+ZIP64, typed limits, source-redacted errors and fail-closed publication are
+covered. All 30 previously reviewed ADR/README hashes are unchanged. No ambient
+storage, dependency or production unsafe code is added. The generated-name and
+end-to-end memory requirements remain open.
+
 ## 0476: private owned ZIP Deflate state reuse
 
 All 30 ADR files remain unchanged from the previous complete review.

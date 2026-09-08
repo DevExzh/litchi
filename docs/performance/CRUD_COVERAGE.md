@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-08: explicit central-directory scratch (0477)
+
+[0477](changes/0477-zip-central-directory-spool.md) adds an opt-in low-level ZIP
+creation diagnostic and OPC storage capability. The 48-process matrix covers two
+compression methods and three synthetic member counts. Default selectors and
+taxonomy mappings are unchanged. It is a substrate result; public PPTX
+integration, logical append, Part addition, arbitrary repackaging, native/source
+breadth and scaling remain open.
+
 ## 2026-09-08: shared owned ZIP transport reuse (0476)
 
 [0476](changes/0476-zip-deflate-state-reuse.md) changes the private transport

@@ -1,0 +1,566 @@
+
+running 425 tests
+test accounting::tests::counted_writes_charge_only_accepted_bytes ... ok
+test accounting::tests::every_accounting_counter_add_reports_typed_overflow ... ok
+test archive::tests::central_zip64_extra_rejects_duplicate_truncated_and_missing_values ... ok
+test archive::tests::central_zip64_offset_range_skips_preceding_extra_fields ... ok
+test archive::tests::blank_zip_archive ... ok
+test archive::tests::central_zip64_extra_resolves_sentinels_and_returns_offset_field_range ... ok
+test archive::tests::complete_descriptor_rejects_ambiguous_signature ... ok
+test archive::tests::compatibility_readback_accepts_unsigned_zip64_descriptor_crc_marker ... ok
+test archive::tests::central_zip64_offset_range_tracks_variable_raw_file_names ... ok
+test archive::tests::complete_descriptor_rejects_malformed_and_ambiguous_width_candidates ... ok
+test archive::tests::complete_descriptor_requires_zip64_width_for_zip64_size_sentinels ... ok
+test archive::tests::complete_descriptor_uses_archive_zip64_context_without_changing_zip32_empty_entries ... ok
+test archive::tests::local_zip64_sentinel_requires_version_45 ... ok
+test archive::tests::strict_layout_accepts_archive_zip64_descriptors_at_reader_boundaries ... ok
+test archive::tests::strict_layout_rejects_nonzero_mismatching_zip64_local_sizes ... ok
+test archive::tests::strict_layout_accepts_zero_zip64_local_placeholders_and_checks_descriptor ... ok
+test archive::tests::strict_layout_accepts_local_only_forced_zip64_descriptors ... ok
+test archive::tests::strict_verification_compares_a_zero_crc ... ok
+test archive::tests::test_compressed_data_range ... ok
+test archive::tests::trunc_eocd64 ... ok
+test archive::tests::trunc_comment_zips ... ok
+test archive::tests::trunc_eocd_entry ... ok
+test crc::tests::test_crc ... ok
+test archive::tests::verifier_wrappers_reject_overreported_reads_without_panicking ... ok
+test errors::tests::allocation_error_retains_original_try_reserve_source ... ok
+test extra_fields::tests::test_partial_parsing_with_remaining_bytes ... ok
+test extra_fields::tests::test_extra_fields ... ok
+test extra_fields::tests::test_stack_vec_clone ... ok
+test extra_fields::tests::test_stack_vec_size_constraints ... ok
+test extra_fields::tests::test_stack_vec_u8_inline_operations ... ok
+test extra_fields::tests::test_stack_vec_u8_promote_to_heap ... ok
+test extra_fields::tests::test_unknown_field_id ... ok
+test headers::tests::test_header_bitflags_behavior ... ok
+test headers::tests::test_header_default ... ok
+test locator::tests::classic_eocd_rejects_mismatched_entry_counts ... ok
+test locator::tests::classic_eocd_rejects_nonzero_disk_metadata ... ok
+test locator::tests::classic_eocd_zip64_detection_covers_each_count_size_and_offset_sentinel ... ok
+test locator::tests::explicit_end_offset_preserves_archives_with_suffixes ... ok
+test locator::tests::explicit_end_offset_preserves_the_first_of_concatenated_archives ... ok
+test locator::tests::false_multidisk_hinted_record_does_not_mask_the_real_record ... ok
+test locator::tests::fallback_rejects_ambiguous_valid_zip64_records_in_slice_and_reader ... ok
+test locator::tests::insufficient_search_space_uses_the_existing_search_path ... ok
+test locator::tests::malformed_terminal_eocd_returns_the_existing_error_offset_without_rescanning ... ok
+test locator::tests::opaque_embedded_zip64_signature_is_ignored_by_bounded_fallback ... ok
+test locator::tests::oversized_search_space_remains_bounded_by_the_source_without_panicking ... ok
+test locator::tests::parseable_nonadjacent_hinted_record_falls_back_to_the_real_record ... ok
+test locator::tests::prefixed_zip64_extensible_record_uses_checked_variable_size ... ok
+test locator::tests::reader_zip64_rejects_nonzero_locator_disk_metadata ... ok
+test locator::tests::short_buffer_uses_the_existing_search_path ... ok
+test locator::tests::slice_locator_rejects_central_directory_range_past_eocd_without_panicking ... ok
+test locator::tests::terminal_comment_falls_back_to_backward_search ... ok
+test locator::tests::terminal_zero_comment_eocd_probe_reads_only_the_fixed_record_first ... ok
+test locator::tests::terminal_zip64_eocd_falls_back_to_backward_search ... ok
+test locator::tests::terminal_zip64_eocd_with_short_buffer_never_panics ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_01 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_02 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_03 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_04 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_05 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_06 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_07 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_08 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_09 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_10 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_11 ... ok
+test locator::tests::test_find_end_of_central_dir_signature ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_12 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_13 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_14 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_15 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_16 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_17 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_18 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_19 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_20 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_21 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_22 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_23 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_24 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_25 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_26 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_27 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_28 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_29 ... ok
+test locator::tests::zip64_archive_accepts_prefix_and_suffix_in_slice_and_reader ... ok
+test locator::tests::zip64_central_directory_must_end_at_or_before_the_zip64_eocd ... ok
+test locator::tests::zip64_central_directory_range_overflow_is_a_typed_rejection ... ok
+test locator::tests::zip64_empty_archive_preserves_a_zero_eocd_offset ... ok
+test locator::tests::zip64_eocd_rejects_invalid_record_length ... ok
+test locator::tests::zip64_eocd_rejects_mismatched_entry_counts ... ok
+test locator::tests::zip64_eocd_rejects_nonadjacent_locator ... ok
+test locator::tests::zip64_eocd_rejects_nonzero_disk_metadata ... ok
+test locator::tests::zip64_invalid_offset_is_rejected_before_reader_access ... ok
+test locator::tests::zip64_locator_disk_metadata_precedes_invalid_offset ... ok
+test locator::tests::test_find_end_of_central_dir_signature_random ... ok
+test locator::tests::zip64_locator_rejects_non_single_disk_metadata ... ok
+test locator::tests::zip64_partial_classic_sentinels_resolve_through_the_zip64_record ... ok
+test office::tests::accepts_exact_and_rejects_over_aggregate_uncompressed_limits ... ok
+test office::tests::accepts_exact_and_rejects_over_file_count_limits ... ok
+test office::tests::accepts_exact_and_rejects_over_uncompressed_entry_limits ... ok
+test office::tests::accounted_stream_rejects_source_overreport_without_progress ... ok
+test office::tests::accounted_stream_retries_interrupted_source_and_sink ... ok
+test office::tests::archive_lookups_apply_the_same_normalization_as_ingress ... ok
+test office::tests::archive_readers_reject_duplicate_directories_and_file_directory_collisions ... ok
+test office::tests::archive_read_session_recovers_after_store_and_unsupported_failures ... ok
+test office::tests::cancellation_discards_batch_results_and_does_not_publish_lazy_cache_entries ... ok
+test office::tests::accounting_preserves_partial_deflate_sink_progress ... ok
+test office::tests::borrowed_store_rejects_local_central_metadata_mismatches ... ok
+test office::tests::archive_readers_normalize_lossy_utf8_names_for_lookup ... ok
+test office::tests::borrowed_store_rejects_payload_corruption_with_a_nonzero_crc ... ok
+test office::tests::bounded_output_rejects_sink_overreport_before_progress_accounting ... ok
+test office::tests::consuming_entry_writer_recovers_bounded_archive_for_both_methods ... ok
+test office::tests::archive_read_session_reuses_deflate_state_with_accounting_parity ... ok
+test office::tests::consuming_entry_writer_reports_sink_failure_during_descriptor_finish ... ok
+test office::tests::consuming_entry_writer_retains_nested_sink_source ... ok
+test office::tests::deflate_overrun_keeps_size_error_before_accounting_overflow ... ok
+test office::tests::archive_read_session_resets_after_declared_size_overrun_and_underrun ... ok
+test office::tests::deflate_borrowing_returns_none_and_owned_read_remains_available ... ok
+test office::tests::callback_scoped_reader_drains_after_prefix_and_callback_error ... ok
+test office::tests::directories_consume_metadata_but_not_payload_or_file_budgets ... ok
+test office::tests::consuming_entry_writer_rejects_duplicate_before_header_and_handles_short_sink ... ok
+test office::tests::enforces_compressed_member_limit_before_data_access ... ok
+test office::tests::encrypted_deflate_borrowing_is_rejected_before_ineligible_fallback ... ok
+test office::tests::enforces_member_name_limit_at_the_declared_boundary ... ok
+test office::tests::equal_local_header_offsets_keep_existing_reader_ordering ... ok
+test office::tests::archive_readers_reject_lossy_utf8_name_collisions ... ok
+test office::tests::borrowed_store_refuses_overlapping_local_spans ... ok
+test office::tests::borrowed_store_refuses_an_overlapping_non_target_span ... ok
+test office::tests::archive_readers_reject_lossy_names_colliding_with_valid_replacement_names ... ok
+test office::tests::borrowed_store_accepts_valid_local_zip64_size_extra ... ok
+test office::tests::callback_scoped_reader_drains_descriptor_failures_but_abortable_reader_stops ... ok
+test office::tests::borrowed_store_validates_signed_and_unsigned_descriptors_and_preserves_identity ... ok
+test office::tests::accounting_distinguishes_store_deflate_and_lazy_cache_work ... ok
+test office::tests::archive_read_session_resets_after_crc_and_corrupt_deflate_failures ... ok
+test office::tests::callback_scoped_reader_retains_callback_error_on_archive_failure ... ok
+test office::tests::callback_scoped_reader_streams_store_and_deflate_with_fixed_reads ... ok
+test office::tests::borrowed_store_defers_zip64_eocd_to_owned_fallback ... ok
+test office::tests::consuming_entry_writer_enforces_deflate_and_output_exact_boundaries ... ok
+test office::tests::borrowed_store_validates_descriptors_after_a_nonzero_prelude ... ok
+test office::tests::enforces_aggregate_central_directory_metadata_limit ... ok
+test office::tests::borrowed_store_rejects_corrupt_descriptor_crc_and_sizes ... ok
+test office::tests::indexed_archive_applies_zip64_sizes_from_one_located_archive ... ok
+test office::tests::indexed_archive_borrows_a_preservation_index_with_exact_raw_names ... ok
+test office::tests::indexed_archive_bounds_directory_metadata_before_layout_publication ... ok
+test office::tests::consuming_entry_writer_enforces_store_compressed_and_aggregate_boundaries ... ok
+test office::tests::indexed_archive_defers_crc_validation_until_payload_read ... ok
+test office::tests::indexed_archive_rejects_duplicate_normalized_names_and_limits ... ok
+test office::tests::callback_scoped_reader_defers_invalid_consume_and_retries_interrupts ... ok
+test office::tests::eager_bulk_reads_preserve_source_order_and_all_member_errors ... ok
+test office::tests::consuming_entry_writer_preserves_limits_and_poison_progress ... ok
+test office::tests::indexed_archive_retains_the_located_archive_end_without_rescanning ... ok
+test office::tests::consuming_entry_writer_preflights_raw_names_and_drops_incomplete_publication ... ok
+test office::tests::indexed_read_to_reports_typed_crc_failure_for_data_descriptor ... ok
+test office::tests::indexed_read_to_supports_zip64_member_metadata_and_short_writes ... ok
+test office::tests::indexed_read_to_reports_source_and_zero_progress_sink_errors ... ok
+test office::tests::fused_precompressed_capture_checks_crc_size_and_deflate_end ... ok
+test office::tests::indexed_read_entry_to_with_accounting_uses_strict_preflight ... ok
+test office::tests::indexed_strict_stream_validates_tiny_zip64_descriptors_and_resolution ... ok
+test office::tests::lazy_cache_limits_bound_weight_and_entries_with_exact_lru ... ok
+test office::tests::lazy_cache_limits_reject_zero_capacity ... ok
+test office::tests::lazy_cache_skips_oversized_and_externally_pinned_payloads ... ok
+test office::tests::lazy_read_returns_fresh_vec_while_shared_reads_preserve_arc ... ok
+test office::tests::indexed_archive_can_use_an_explicit_local_session ... ok
+test office::tests::indexed_archive_reads_stored_and_deflated_members_by_stable_id ... ok
+test office::tests::indexed_read_session_resets_after_crc_and_corrupt_deflate_failures ... ok
+test office::tests::indexed_read_session_resets_after_declared_size_overrun_and_underrun ... ok
+test office::tests::indexed_strict_streams_reuse_the_bounded_layout_path ... ok
+test office::tests::indexed_strict_preflight_rejects_local_central_mismatches ... ok
+test office::tests::indexed_strict_zero_crc_handles_store_deflate_and_empty_members ... ok
+test office::tests::indexed_read_session_reuses_deflate_state_with_accounting_parity ... ok
+test office::tests::fused_precompressed_capture_preserves_zero_crc_zip64_and_entry_bounds ... ok
+test office::tests::indexed_strict_layout_accepts_prefix_and_gaps_and_rejects_store_deflate_spans ... ok
+test office::tests::lazy_active_flight_limit_bypasses_and_recovers ... ok
+test office::tests::lazy_bulk_reads_propagate_errors_and_cache_only_successes ... ok
+test office::tests::lazy_flight_key_limit_is_typed_and_does_not_retain_state ... ok
+test office::tests::indexed_strict_first_read_uses_one_single_flight_builder ... ok
+test office::tests::lazy_missing_name_flight_wakes_waiter_and_releases_budget ... ok
+test office::tests::indexed_and_lazy_read_to_stream_without_cache_population ... ok
+test office::tests::lazy_serial_shared_batch_bypasses_full_flight_budget_and_recovers ... ok
+test office::tests::lazy_cache_uses_canonical_member_names_and_clear_fences_flights ... ok
+test office::tests::metadata_lookup_uses_only_the_central_directory_index ... ok
+test office::tests::owned_stream_entries_preserve_order_crc_and_descriptor_metadata ... ok
+test office::tests::owned_stream_deflate_limit_applies_to_compressed_bytes_not_input_bytes ... ok
+test office::tests::lazy_serial_shared_batch_recovers_after_a_failed_cold_member ... ok
+test office::tests::owned_stream_output_enforces_exact_and_one_over_byte_limits ... ok
+test office::tests::owned_stream_output_enforces_finite_metadata_limits ... ok
+test office::tests::owned_stream_output_accepts_short_non_seek_writes ... ok
+test office::tests::materialized_reads_reject_truncated_and_overlong_store_and_deflate_members ... ok
+test office::tests::owned_stream_output_handles_interrupted_and_source_errors_with_poisoning ... ok
+test office::tests::owned_stream_output_rejects_duplicate_normalized_names_before_header ... ok
+test office::tests::owned_stream_output_enforces_compressed_member_limits ... ok
+test office::tests::owned_stream_output_reports_write_zero_and_rejects_post_failure_finish ... ok
+test office::tests::parallel_session_limits_are_finite_and_validated ... ok
+test office::tests::owned_stream_output_reports_failing_sink_after_partial_output ... ok
+test office::tests::positional_iterator_continues_from_ordinary_record_to_oversized_record ... ok
+test office::tests::positional_iterator_continues_from_oversized_record_to_ordinary_record ... ok
+test office::tests::precompressed_capture_handles_zip64_archive_member ... ok
+test office::tests::precompressed_capture_compares_expected_bytes_and_retains_callback_errors ... ok
+test office::tests::precompressed_capture_rejects_corrupt_compressed_payload ... ok
+test office::tests::precompressed_capture_records_actual_crc_for_compatibility_zero_crc ... ok
+test office::tests::owned_stream_output_is_deterministic_and_rejects_unsupported_methods_early ... ok
+test office::tests::precompressed_capture_verifies_store_and_deflate_exact_payloads ... ok
+test office::tests::precompressed_capture_rejects_deflate_without_stream_end ... ok
+test office::tests::precompressed_capture_bounds_source_requests_and_cancels_after_short_read ... ok
+test office::tests::borrowed_store_returns_none_for_nonempty_zero_crc_even_when_payload_is_corrupt ... ok
+test office::tests::fused_precompressed_capture_handles_short_reads_and_cancellation ... ok
+test office::tests::pre_cancelled_session_reads_no_member_and_does_not_populate_lazy_cache ... ok
+test office::tests::generated_central_zip64_extra_size_matches_size_and_offset_fields ... ok
+test office::tests::fused_precompressed_capture_preserves_transport_and_allocation_failures ... ok
+test office::tests::local_session_uses_its_explicit_worker_count ... ok
+test office::tests::lazy_serial_shared_batch_reuses_session_and_preserves_cache_identity ... ok
+test office::tests::prefixed_zip64_uses_locator_resolved_central_size ... ok
+test office::tests::callback_scoped_abortable_reader_stops_short_source_after_callback_error ... ok
+test office::tests::local_sessions_with_one_two_and_four_workers_preserve_results_and_order ... ok
+test office::tests::rejects_inflated_entry_count_before_reserving_across_central_gap ... ok
+test office::tests::prefixed_positional_archive_applies_base_offset_to_oversized_records ... ok
+test office::tests::positional_index_handles_central_records_larger_than_recommended_scratch ... ok
+test office::tests::strict_read_to_accepts_prefix_and_rejects_span_intrusion_before_sink ... ok
+test office::tests::strict_read_to_rejects_target_metadata_before_sink ... ok
+test office::tests::streaming_zip64_metadata_budget_includes_generated_central_extra ... ok
+test office::tests::test_round_trip_stored ... ok
+test office::tests::unrelated_encrypted_store_does_not_block_an_unencrypted_target ... ok
+test office::tests::preservation_ids_follow_central_records_not_office_entry_ordinals ... ok
+test office::tests::read_to_retains_typed_integrity_errors_and_sink_failures ... ok
+test office::tests::read_to_rejects_truncated_and_overlong_store_and_deflate_members ... ok
+test office::tests::rejects_aggregate_uncompressed_size_overflow ... ok
+test office::tests::test_multiple_files ... ok
+test office::tests::rejects_malformed_central_directory_variable_declarations ... ok
+test office::tests::read_to_streams_stored_and_deflated_members_with_short_writes ... ok
+test path::tests::test_needs_utf8_encoding::case_01 ... ok
+test path::tests::test_needs_utf8_encoding::case_02 ... ok
+test office::tests::lazy_cache_take_fences_old_flights_and_wakes_waiters ... ok
+test office::tests::sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor ... ok
+test office::tests::sized_deflated_limit_breach_leaves_the_writer_usable ... ok
+test office::tests::rejects_archives_exceeding_configured_resource_limits ... ok
+test office::tests::streaming_limits_reject_oversized_member_name_before_output ... ok
+test path::tests::test_needs_utf8_encoding::case_03 ... ok
+test path::tests::test_needs_utf8_encoding::case_04 ... ok
+test path::tests::test_needs_utf8_encoding::case_06 ... ok
+test path::tests::test_needs_utf8_encoding::case_09 ... ok
+test path::tests::test_needs_utf8_encoding::case_10 ... ok
+test path::tests::test_needs_utf8_encoding::case_11 ... ok
+test path::tests::test_needs_utf8_encoding::case_12 ... ok
+test path::tests::test_needs_utf8_encoding::case_13 ... ok
+test office::tests::owned_stream_entries_handle_empty_and_large_members ... ok
+test path::tests::test_needs_utf8_encoding::case_19 ... ok
+test path::tests::test_needs_utf8_encoding::case_20 ... ok
+test path::tests::test_needs_utf8_encoding::case_21 ... ok
+test office::tests::lazy_shared_concurrent_cold_reads_share_one_flight ... ok
+test office::tests::precompressed_capture_handles_short_reader_at_chunks ... ok
+test path::tests::test_needs_utf8_encoding::case_31 ... ok
+test path::tests::test_needs_utf8_encoding::case_32 ... ok
+test path::tests::test_path_lifetime_test ... ok
+test path::tests::test_raw_path_lifetime_preservation ... ok
+test path::tests::test_zip_path_normalized::case_01 ... ok
+test path::tests::test_zip_path_normalized::case_02 ... ok
+test path::tests::test_zip_path_normalized::case_03 ... ok
+test path::tests::test_zip_path_normalized::case_04 ... ok
+test path::tests::test_zip_path_normalized::case_05 ... ok
+test path::tests::test_zip_path_normalized::case_06 ... ok
+test office::tests::test_round_trip_deflated ... ok
+test path::tests::test_zip_path_normalized::case_07 ... ok
+test path::tests::test_needs_utf8_encoding::case_07 ... ok
+test path::tests::test_zip_path_normalized::case_08 ... ok
+test path::tests::test_zip_path_normalized::case_09 ... ok
+test path::tests::test_zip_path_normalized::case_10 ... ok
+test path::tests::test_zip_path_normalized::case_11 ... ok
+test path::tests::test_zip_path_normalized::case_12 ... ok
+test path::tests::test_needs_utf8_encoding::case_08 ... ok
+test office::tests::lazy_shared_failed_flight_wakes_waiters_and_allows_retry ... ok
+test path::tests::test_zip_path_normalized::case_13 ... ok
+test path::tests::test_zip_path_normalized::case_14 ... ok
+test path::tests::test_zip_path_normalized::case_15 ... ok
+test path::tests::test_zip_path_normalized::case_16 ... ok
+test path::tests::test_zip_path_normalized::case_17 ... ok
+test path::tests::test_zip_path_normalized::case_18 ... ok
+test path::tests::test_zip_path_normalized::case_19 ... ok
+test office::tests::streaming_zip64_admission_selects_framing_for_borrowed_and_owned_entries ... ok
+test path::tests::test_zip_path_normalized_invalid_utf8::case_1 ... ok
+test path::tests::test_needs_utf8_encoding::case_14 ... ok
+test path::tests::test_zip_path_normalized_invalid_utf8::case_2 ... ok
+test path::tests::test_needs_utf8_encoding::case_15 ... ok
+test path::tests::test_needs_utf8_encoding::case_16 ... ok
+test office::tests::strict_read_to_rejects_target_encryption_but_ignores_unrelated_encryption ... ok
+test preserve::replay_tests::replay_early_callback_flush_does_not_make_late_failure_complete ... ok
+test preserve::replay_tests::replay_layout_promotes_following_member_central_offset_to_zip64 ... ok
+test preserve::replay_tests::replay_detects_equal_length_crc_collision_with_sha256 ... ok
+test preserve::replay_tests::replay_limits_require_nonzero_finite_ceilings ... ok
+test preserve::replay_tests::replay_callback_errors_are_not_swallowed_and_preserve_publication_progress ... ok
+test preserve::replay_tests::replay_layout_rejects_framing_and_compressed_length_overflow ... ok
+test preserve::replay_tests::replay_callback_panic_does_not_flush_extra_output_on_drop ... ok
+test preserve::replay_tests::replay_limits_refuse_before_first_publication_byte ... ok
+test path::tests::test_needs_utf8_encoding::case_17 ... ok
+test path::tests::test_needs_utf8_encoding::case_18 ... ok
+test path::tests::test_needs_utf8_encoding::case_22 ... ok
+test preserve::replay_tests::replay_accounting_charges_only_emitted_compressed_payload ... ok
+test path::tests::test_needs_utf8_encoding::case_23 ... ok
+test preserve::replay_tests::replay_wrong_index_and_name_mismatch_refuse_before_callback_and_output ... ok
+test preserve::replay_tests::replay_sink_error_preserves_typed_io_source ... ok
+test preserve::tests::accounting_charges_generated_payloads_on_partial_publication ... ok
+test preserve::tests::bounded_preservation_counts_files_not_directory_records ... ok
+test preserve::replay_tests::replay_sink_failures_report_zero_overreport_interrupt_and_flush_states ... ok
+test preserve::replay_tests::replay_same_name_preserves_untouched_records_order_and_comment ... ok
+test path::tests::test_needs_utf8_encoding::case_05 ... ok
+test path::tests::test_needs_utf8_encoding::case_26 ... ok
+test path::tests::test_needs_utf8_encoding::case_27 ... ok
+test path::tests::test_needs_utf8_encoding::case_28 ... ok
+test path::tests::test_needs_utf8_encoding::case_29 ... ok
+test path::tests::test_needs_utf8_encoding::case_30 ... ok
+test office::tests::strict_read_to_rejects_deflate_trailing_bytes_after_sink_prefix ... ok
+test path::tests::test_needs_utf8_encoding::case_24 ... ok
+test preserve::tests::bounded_preservation_keeps_non_metadata_error_identity ... ok
+test preserve::tests::bounded_preservation_includes_eocd_comment_in_metadata_and_unbounded_is_exact ... ok
+test preserve::tests::bounded_preservation_rejects_file_count_before_owned_entry_reservation ... ok
+test preserve::tests::bounded_preservation_reports_member_and_metadata_limits_before_ownership ... ok
+test path::tests::test_needs_utf8_encoding::case_25 ... ok
+test preserve::replay_tests::replay_partial_sink_accounting_counts_accepted_generated_payload ... ok
+test preserve::replay_tests::replay_sink_short_writes_produce_exact_output ... ok
+test preserve::replay_tests::replay_swallowed_sticky_failure_does_not_flush_sink_again ... ok
+test office::tests::truncated_oversized_variable_section_returns_typed_eof ... ok
+test office::tests::strict_verified_paths_reject_nonempty_zero_crc_and_accept_empty ... ok
+test preserve::tests::accounting_counts_exact_raw_preservation_and_partial_sink_progress ... ok
+test preserve::tests::central_offset_promotion_rejects_ambiguous_or_unrepresentable_extras ... ok
+test preserve::tests::appends_store_and_deflate_members_after_preserved_source_order ... ok
+test preserve::tests::accounting_distinguishes_changed_store_and_deflate_members ... ok
+test preserve::tests::copies_store_deflate_descriptor_and_directory_members_byte_for_byte ... ok
+test preserve::tests::copies_zip64_central_extras_and_tail_extensible_data_byte_for_byte ... ok
+test preserve::tests::copies_zip64_sources_byte_for_byte_including_tail ... ok
+test preserve::tests::copy_all_reads_each_local_span_once_during_write ... ok
+test preserve::tests::direct_precompressed_central_offset_promotes_to_zip64_before_publication ... ok
+test preserve::tests::empty_archive_prefix_is_refused_before_publication ... ok
+test preserve::tests::generated_deflate_zip64_selector_covers_compression_boundaries ... ok
+test preserve::tests::exposes_compression_methods_and_excludes_trailing_source_suffix ... ok
+test preserve::tests::direct_shared_store_rejects_oversized_name_before_publication ... ok
+test preserve::tests::generated_deflate_zip64_selector_handles_usize_max_without_bound_overflow ... ok
+test preserve::tests::fallible_plan_reservations_and_preparation_errors_leave_sink_untouched ... ok
+test preserve::tests::layout_promotion_synthesizes_zip64_tail_without_sink_output ... ok
+test preserve::tests::non_sentinel_classic_zip64_fields_must_match_resolved_values ... ok
+test preserve::tests::incomplete_or_unrepresentable_append_plan_leaves_sink_untouched ... ok
+test preserve::tests::omitting_a_middle_source_member_reopens_and_preserves_retained_raw_records ... ok
+test preserve::tests::generated_entry_reserves_both_long_member_name_copies ... ok
+test preserve::tests::copy_all_handles_short_reads_and_partial_sink_at_chunk_boundary ... ok
+test preserve::tests::preserves_archive_comments_and_different_local_central_metadata ... ok
+test preserve::replay_tests::replay_replaces_large_and_empty_store_and_deflate_members ... ok
+test preserve::tests::preserves_physical_local_order_when_central_order_differs ... ok
+test preserve::tests::omitting_an_appended_suffix_restores_the_exact_source_archive ... ok
+test preserve::tests::preserves_unsigned_data_descriptors ... ok
+test preserve::tests::public_policy_preserves_zip64_while_internal_zip32_policy_refuses_it ... ok
+test preserve::tests::precompressed_regeneration_matches_writer_framing_and_partial_boundaries ... ok
+test preserve::tests::promotes_fixed32_central_offsets_before_tail_and_retains_metadata ... ok
+test preserve::tests::propagates_sink_failure_after_preflight ... ok
+test preserve::tests::regenerated_entry_can_retain_a_shared_payload ... ok
+test preserve::tests::rejects_ambiguous_malformed_multidisk_and_truncated_zip64_sources ... ok
+test preserve::tests::regenerating_a_zip64_member_keeps_zip64_framing ... ok
+test preserve::tests::generated_entry_splits_large_local_and_central_spans ... ok
+test preserve::tests::rejects_fixed32_offsets_after_zip64_output_grows_past_their_range ... ok
+test preserve::tests::regenerates_a_selected_member_with_writer_semantics ... ok
+test preserve::tests::rejects_malformed_descriptor_at_exact_payload_end_before_writing ... ok
+test preserve::tests::rejects_reader_valid_zip64_local_and_disk_malformed_sources ... ok
+test preserve::tests::regenerated_precompressed_entry_reopens_and_charges_precompressed_bytes ... ok
+test preserve::tests::shifted_zip64_local_offsets_patch_only_existing_zip64_values ... ok
+test preserve::tests::rejects_overlapping_and_truncated_source_spans_before_writing ... ok
+test preserve::tests::validates_signed_and_unsigned_32_and_64_descriptors_at_payload_end_with_decoy ... ok
+test preserve::tests::replacement_then_append_patches_source_and_appended_offsets ... ok
+test preserve::tests::zip64_metadata_limit_reports_aggregate_comment_and_extension ... ok
+test reader_at::tests::test_byte_slice_implementation ... ok
+test reader_at::tests::test_cursor_implementation ... ok
+test preserve::tests::verified_precompressed_payloads_retain_source_storage_after_handles_drop ... ok
+test reader_at::tests::test_range_reader_clone ... ok
+test reader_at::tests::test_range_reader_basic ... ok
+test preserve::tests::zip32_only_refuses_local_only_zip64_framing ... ok
+test reader_at::tests::test_range_reader_empty_range ... ok
+test reader_at::tests::test_range_reader_get_ref_and_into_inner ... ok
+test reader_at::tests::test_range_reader_multiple_reads ... ok
+test reader_at::tests::test_range_reader_range_exceeds_data ... ok
+test reader_at::tests::test_reference_implementations ... ok
+test reader_at::tests::test_smart_pointer_implementations ... ok
+test preserve::replay_tests::replay_output_is_independent_of_callback_chunk_boundaries ... ok
+test preserve::tests::public_policy_preserves_projected_zip64_descriptor_before_publication ... ok
+test time::tests::test_days_from_civil ... ok
+test time::tests::test_dos_datetime_edge_cases ... ok
+test time::tests::test_dos_datetime ... ok
+test time::tests::test_dos_datetime_odd_seconds ... ok
+test time::tests::test_dos_datetime_zero_normalization ... ok
+test time::tests::test_negative_unix_timestamps ... ok
+test time::tests::test_parse_extended_timestamp ... ok
+test time::tests::test_parse_ntfs_timestamp ... ok
+test reader_at::tests::byte_slice_u64_max_offset_is_eof ... ok
+test preserve::tests::zip64_incomplete_plan_leaves_sink_untouched ... ok
+test time::tests::test_parse_unix_timestamp ... ok
+test time::tests::test_to_unix_accuracy ... ok
+test time::tests::test_to_unix_comprehensive ... ok
+test reader_at::tests::reader_at_wrappers_reject_overreported_reads_without_panicking ... ok
+test time::tests::test_zip_datetime_display ... ok
+test reader_at::tests::test_vec_implementation ... ok
+test time::tests::test_zip_datetime_dos ... ok
+test time::tests::test_zip_datetime_ntfs ... ok
+test time::tests::test_zip_datetime_ordering ... ok
+test time::property_tests::prop_dos_timestamp_always_valid ... ok
+test time::property_tests::prop_ntfs_timestamp_conversion ... ok
+test time::tests::test_zip_datetime_unix ... ok
+test writer::tests::explicit_zip64_rejects_user_zip64_extra_before_local_header ... ok
+test writer::tests::precompressed_zip64_metadata_reopens_with_a_small_payload ... ok
+test writer::tests::sized_header_local_zip64_extra_carries_both_sizes ... ok
+test writer::tests::precompressed_accounting_charges_partial_payload_with_provenance ... ok
+test writer::tests::sized_header_zip64_sizes_use_the_sentinel_boundary ... ok
+test writer::tests::explicit_zip64_streaming_deflate_reopens_with_a_small_payload ... ok
+test writer::tests::streaming_counters_reject_u64_overflow_before_sink_write ... ok
+test writer::tests::test_builder_with_offset_and_capacity ... ok
+test writer::tests::test_crc32_options ... ok
+test writer::tests::test_deprecated_create_method ... ok
+test time::tests::test_zip_to_dos_conversion ... ok
+test writer::tests::test_name_lifetime_independence ... ok
+test time::tests::test_zip_to_dos_year_saturation ... ok
+test writer::tests::test_stream_offset_methods ... ok
+test writer::tests::test_tuple_api ... ok
+test writer::tests::zip32_streaming_size_boundary_refuses_before_descriptor ... ok
+test writer::tests::test_owned_entry_writer_recovers_archive_for_store_and_deflate ... ok
+test preserve::replay_tests::replay_measure_and_emit_allow_different_callback_chunk_boundaries ... ok
+test time::property_tests::prop_unix_timestamp_conversion ... ok
+test writer::tests::accounting_distinguishes_low_level_payload_kinds ... ok
+test writer::tests::explicit_zip64_owned_streaming_deflate_reopens_with_a_small_payload ... ok
+test writer::tests::automatic_zip64_rejects_a_central_zip64_extra_collision ... ok
+test preserve::tests::rejects_the_zip32_entry_count_sentinel ... ok
+test office::tests::fused_precompressed_capture_removes_a_cold_source_pass ... ok
+
+test result: ok. 425 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 6 tests
+test exact_final_fixed_header_is_parsed_at_directory_end ... ok
+test fixed_header_refill_counts_bytes_already_buffered ... ok
+test directory_records_are_independent_of_read_and_scratch_boundaries ... ok
+test partial_final_fixed_header_is_not_silently_ignored ... ok
+test exactly_buffered_fixed_header_needs_only_its_variable_field ... ok
+test zip32_and_zip64_extra_fields_survive_short_reads ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test dropping_incomplete_owned_deflate_does_not_publish_a_complete_archive ... ok
+test owned_deflate_reports_zero_progress_and_sink_failure_at_finish ... ok
+test direct_write_compressed_limit_preserves_fresh_encoder_timing ... ok
+test direct_write_reports_partial_sink_failure_on_the_same_call_as_fresh_encoder ... ok
+test streaming_writer_maps_owned_deflate_limit_to_typed_failure ... ok
+test owned_deflate_compressed_limit_does_not_publish_a_partial_member ... ok
+test fresh_levels_and_store_interleaving_keep_each_stream_independent ... ok
+test direct_write_acceptance_and_output_timing_matches_fresh_encoder ... ok
+test owned_deflate_matches_reference_through_short_sink_writes ... ok
+test owned_deflate_matches_fresh_entries_across_chunking_flushes_and_store_members ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 33 tests
+test borrowed_entry_drop_does_not_publish_a_partial_central_record ... ok
+test accounting_through_spooled_sized_writer_counts_accepted_payload ... ok
+test borrowed_output_interrupted_once_then_write_all_and_finish_succeed ... ok
+test borrowed_finish_collision_poisons_archive_before_finish ... ok
+test directory_at_zip64_offset_preserves_and_decodes_offset_extra ... ok
+test dropped_borrowed_entry_rejects_owned_start_without_new_output ... ok
+test borrowed_output_zero_write_poison_rejects_finish ... ok
+test dropped_borrowed_entry_rejects_all_reentrant_writer_operations ... ok
+test exact_record_limit_succeeds_and_one_byte_below_refuses_before_output ... ok
+test explicit_spool_preserves_explicit_zip64_entry_layout ... ok
+test final_output_flush_failure_is_preserved ... ok
+test ignored_borrowed_sink_write_error_cannot_finish_successfully ... ok
+test ignored_borrowed_sink_flush_error_cannot_finish_successfully ... ok
+test empty_and_nonempty_supplied_spools_append_and_replay_only_the_new_extent ... ok
+test invalid_spool_initialization_writes_no_output ... ok
+test explicit_spool_preserves_exact_bytes_for_owned_store_and_deflate ... ok
+test explicit_spool_preserves_exact_bytes_for_sized_entries_and_directories ... ok
+test local_only_extra_fields_do_not_consume_central_spool_quota ... ok
+test explicit_spool_preserves_exact_bytes_for_borrowed_descriptors_and_attributes ... ok
+test no_spool_partial_sized_write_poisons_future_writes_and_finish ... ok
+test no_spool_partial_directory_header_poisons_future_writes_and_finish ... ok
+test office_spool_progress_reports_accepted_output_bytes ... ok
+test overreporting_spool_is_rejected_without_a_process_panic ... ok
+test partial_spool_write_poison_is_retained ... ok
+test replay_seek_failure_is_typed ... ok
+test replay_seek_wrong_offset_is_typed_refusal ... ok
+test offset_only_zip64_sized_records_use_the_exact_spool_budget ... ok
+test short_and_interrupted_spool_transfers_succeed ... ok
+test spool_io_display_omits_provider_text_but_source_retains_it ... ok
+test spooled_writer_remains_send_and_sync ... ok
+test zero_and_truncated_replay_poison_finish_after_partial_spool ... ok
+test zip64_offset_layout_is_identical_with_and_without_spool ... ok
+test zip64_count_layout_is_identical_with_and_without_spool ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 3 tests
+test zero_run_crc_composition_matches_direct_reference ... ok
+test unsupported_generated_compression_refuses_before_sparse_output ... ok
+test generated_store_offset_promotes_at_each_zip32_boundary ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.27s
+
+
+running 10 tests
+test empty_local_only_zip64_signed_and_unsigned_descriptors_keep_width_eight ... ok
+test local_only_zip64_preservation_index_retains_descriptor_and_central_record_spans ... ok
+test malformed_local_zip64_descriptor_and_size_fields_are_rejected_strictly ... ok
+test python_central_zip64_entries_with_zip32_tail_use_borrowed_and_reader_at_paths ... ok
+test python_force_zip64_local_placeholders_use_64_bit_signed_descriptors ... ok
+test python_force_zip64_unsigned_crc_signature_ambiguity_is_verified ... ok
+test python_central_and_local_zip64_signed_descriptor_is_verified ... ok
+test seekable_force_zip64_actual_local_sizes_match_ordinary_central_records ... ok
+test python_zip32_signed_store_and_deflate_are_read_and_verified ... ok
+test many_small_controls_cover_zip32_local_only_and_central_local_zip64 ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 8 tests
+test one_bounded_zero_reader_crosses_zip64_size_boundary ... ignored, bounded multi-gigabyte ZIP64 traversal; run explicitly
+test owned_stream_reports_sink_failure_with_progress ... ok
+test zero_crc_composition_matches_small_direct_hashes ... ok
+test explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens ... ok
+test generated_offset_promotes_at_below_at_and_above_zip32_boundary ... ok
+test output_limit_boundary_is_reported_after_entry_publication ... ok
+test office_owned_entry_round_trips_through_short_borrowed_sink ... ok
+test default_office_streaming_bytes_are_readable_and_accounted ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 31 tests
+test crates/soapberry-zip/src/reader_at.rs - reader_at::RangeReader (line 327) ... ignored
+test crates/soapberry-zip/src/lib.rs - (line 11) - compile ... ok
+test crates/soapberry-zip/src/office.rs - office (line 27) - compile ... ok
+test crates/soapberry-zip/src/office.rs - office (line 9) - compile ... ok
+test crates/soapberry-zip/src/office.rs - office::LazyArchiveCacheLimits (line 6741) - compile ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::compressed_data_range (line 1773) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipFileHeaderRecord<'a>::file_path (line 3159) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::comment (line 1479) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_reader (line 580) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<()>::from_seekable (line 1348) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_file (line 530) ... ok
+test crates/soapberry-zip/src/time.rs - time::ZipDateTime<TZ>::from_components (line 278) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_slice (line 487) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::local_header (line 1819) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::entries (line 1393) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_file (line 1782) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipFileHeaderRecord<'a>::extra_fields (line 3260) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipSliceArchive (line 40) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriterBuilder::with_offset (line 487) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 566) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 580) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::eocd_offset (line 1512) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive (line 1299) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1161) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1174) ... ok
+test crates/soapberry-zip/src/time.rs - time (line 17) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_dir (line 1676) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::max_search_space (line 344) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::extra_field (line 1045) ... ok
+test crates/soapberry-zip/src/path.rs - path (line 45) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::stream_offset (line 892) ... ok
+
+test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.73s
+

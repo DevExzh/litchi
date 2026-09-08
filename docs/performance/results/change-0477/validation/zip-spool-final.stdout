@@ -1,0 +1,24 @@
+
+running 19 tests
+test accounting_through_spooled_sized_writer_counts_accepted_payload ... ok
+test exact_record_limit_succeeds_and_one_byte_below_refuses_before_output ... ok
+test borrowed_entry_drop_does_not_publish_a_partial_central_record ... ok
+test invalid_spool_initialization_writes_no_output ... ok
+test explicit_spool_preserves_explicit_zip64_entry_layout ... ok
+test office_spool_progress_reports_accepted_output_bytes ... ok
+test final_output_flush_failure_is_preserved ... ok
+test explicit_spool_preserves_exact_bytes_for_owned_store_and_deflate ... ok
+test explicit_spool_preserves_exact_bytes_for_sized_entries_and_directories ... ok
+test overreporting_spool_is_rejected_without_a_process_panic ... ok
+test partial_spool_write_poison_is_retained ... ok
+test replay_seek_failure_is_typed ... ok
+test short_and_interrupted_spool_transfers_succeed ... ok
+test spooled_writer_remains_send_and_sync ... ok
+test empty_and_nonempty_supplied_spools_append_and_replay_only_the_new_extent ... ok
+test explicit_spool_preserves_exact_bytes_for_borrowed_descriptors_and_attributes ... ok
+test zero_and_truncated_replay_poison_finish_after_partial_spool ... ok
+test zip64_offset_layout_is_identical_with_and_without_spool ... ok
+test zip64_count_layout_is_identical_with_and_without_spool ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

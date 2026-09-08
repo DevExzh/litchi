@@ -1,0 +1,36 @@
+
+running 19 tests
+test accounting_through_spooled_sized_writer_counts_accepted_payload ... ok
+test borrowed_entry_drop_does_not_publish_a_partial_central_record ... FAILED
+test exact_record_limit_succeeds_and_one_byte_below_refuses_before_output ... ok
+test explicit_spool_preserves_explicit_zip64_entry_layout ... ok
+test final_output_flush_failure_is_preserved ... ok
+test explicit_spool_preserves_exact_bytes_for_sized_entries_and_directories ... ok
+test empty_and_nonempty_supplied_spools_append_and_replay_only_the_new_extent ... ok
+test explicit_spool_preserves_exact_bytes_for_borrowed_descriptors_and_attributes ... ok
+test invalid_spool_initialization_writes_no_output ... ok
+test overreporting_spool_is_rejected_without_a_process_panic ... ok
+test partial_spool_write_poison_is_retained ... ok
+test office_spool_progress_reports_accepted_output_bytes ... ok
+test replay_seek_failure_is_typed ... ok
+test short_and_interrupted_spool_transfers_succeed ... ok
+test spooled_writer_remains_send_and_sync ... ok
+test zero_and_truncated_replay_poison_finish_after_partial_spool ... ok
+test explicit_spool_preserves_exact_bytes_for_owned_store_and_deflate ... ok
+test zip64_offset_layout_is_identical_with_and_without_spool ... ok
+test zip64_count_layout_is_identical_with_and_without_spool ... ok
+
+failures:
+
+---- borrowed_entry_drop_does_not_publish_a_partial_central_record stdout ----
+
+thread 'borrowed_entry_drop_does_not_publish_a_partial_central_record' (1836517) panicked at crates/soapberry-zip/tests/directory_spool.rs:1010:10:
+abandoned entry must poison archive: Cursor { inner: [80, 75, 3, 4, 20, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 97, 98, 97, 110, 100, 111, 110, 101, 100, 46, 98, 105, 110, 80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0], pos: 65 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    borrowed_entry_drop_does_not_publish_a_partial_central_record
+
+test result: FAILED. 18 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

@@ -1,0 +1,20 @@
+{
+  "utc": "2026-09-08T14:04:27.988567+00:00",
+  "owned_runtime_root": "/tmp/litchi-goal-0477",
+  "removed_files_bytes": {
+    "layout-after": 4506472,
+    "validation-remaining.json": 989,
+    "validation-plan.json": 2250,
+    "layout-before": 4506472,
+    "cpu.lock": 0,
+    "allocator/zip_directory_spool": 413186584,
+    "normal/zip_directory_spool": 413178032
+  },
+  "spool_files_remaining_before_cleanup": 0,
+  "runtime_root_removed": true,
+  "shared_caches_preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "worktrees_created": []
+}
