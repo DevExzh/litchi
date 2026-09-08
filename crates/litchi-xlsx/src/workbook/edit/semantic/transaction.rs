@@ -1668,13 +1668,14 @@ impl Edit {
             }
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
-            let after = raw::compact::changed(&after, "compact changed worksheet output")?;
+            let compacted =
+                raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
             let parsed = requires_store_verification
-                .then(|| raw::worksheet::parse(&after, || base.inner.shared_strings()))
+                .then(|| raw::worksheet::parse(compacted.bytes(), || base.inner.shared_strings()))
                 .transpose()?;
-            // Keep the existing whole-worksheet web-binding validation even
-            // when the grid store is intentionally not reparsed.
-            let parsed_web = raw::web::read(&after)?;
+            // Resolve web validation after grid parsing to preserve error order.
+            // Compaction may already prove that an ordinary worksheet has no bindings.
+            let (after, parsed_web) = compacted.into_bytes_and_web()?;
             if let Some(parsed) = parsed.as_ref() {
                 base.inner.validate_styles(parsed)?;
             }
