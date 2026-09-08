@@ -1,0 +1,66 @@
+{
+  "schema": "litchi-0467-fixed-qualification-start-v1",
+  "decided_utc": "2026-09-08T04:43:01.589926+00:00",
+  "decision": "Proceed with frozen500-sampleABBA; same-path DOCpayloadheavy median difference is about0.5%, primarydense XLSX median is lowerabout8.8%. Full201guard andalloriginaladverseobservations remainretained. This15samplepairdoesnotitselfauthorizealatencyclaim.",
+  "protocol_sha256": "636030d25bd4914a97f1da037a4d291152bc72a17c06e92fcb67001814af06ba",
+  "initial_guards": {
+    "A-full-fixed": {
+      "report_sha256": "77df471c22d7f856b5e02ea221afe3d5dc3eb5d20ae52b1d40d695b338a6e04f",
+      "cells": [
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-tiny",
+          "p50_ns": 8420,
+          "mean_ns": 8532.733333333335
+        },
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-large",
+          "p50_ns": 223061,
+          "mean_ns": 225382.33333333334
+        },
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-payload-heavy",
+          "p50_ns": 4268618,
+          "mean_ns": 4310570.600000001
+        },
+        {
+          "case": "xlsx_one_percent_commit_save",
+          "corpus": "xlsx-dense-wide",
+          "p50_ns": 407163791,
+          "mean_ns": 408299962.66666675
+        }
+      ]
+    },
+    "B-full-fixed": {
+      "report_sha256": "1af16081023d478b21baa240de124dd3f54ca5b7003c5e40fe4f7150da6bf3c7",
+      "cells": [
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-tiny",
+          "p50_ns": 8540,
+          "mean_ns": 8571.333333333334
+        },
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-large",
+          "p50_ns": 221461,
+          "mean_ns": 223754.93333333332
+        },
+        {
+          "case": "doc_fresh_write_to",
+          "corpus": "doc-payload-heavy",
+          "p50_ns": 4290148,
+          "mean_ns": 4298879.266666667
+        },
+        {
+          "case": "xlsx_one_percent_commit_save",
+          "corpus": "xlsx-dense-wide",
+          "p50_ns": 371279934,
+          "mean_ns": 372601911.26666665
+        }
+      ]
+    }
+  }
+}

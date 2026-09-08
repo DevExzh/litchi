@@ -1,0 +1,90 @@
+{
+  "status": "canonical supplementalABBA rejected source counter identity; raw reports unchanged",
+  "case": "cfb_shared_concurrent_reads",
+  "corpus": "cfb-few-large-incompressible",
+  "variations": [
+    {
+      "lane": "A1-guard-clean",
+      "source_value_counts": {
+        "read_calls": {
+          "2": 100
+        },
+        "read_bytes": {
+          "8388608": 100
+        },
+        "ordinary_payload_read_calls": {
+          "0": 100
+        },
+        "ordinary_payload_read_bytes": {
+          "0": 100
+        },
+        "max_in_flight_reads": {
+          "1": 98,
+          "2": 2
+        }
+      }
+    },
+    {
+      "lane": "B1-guard-clean",
+      "source_value_counts": {
+        "read_calls": {
+          "2": 100
+        },
+        "read_bytes": {
+          "8388608": 100
+        },
+        "ordinary_payload_read_calls": {
+          "0": 100
+        },
+        "ordinary_payload_read_bytes": {
+          "0": 100
+        },
+        "max_in_flight_reads": {
+          "1": 99,
+          "2": 1
+        }
+      }
+    },
+    {
+      "lane": "B2-guard-clean",
+      "source_value_counts": {
+        "read_calls": {
+          "2": 100
+        },
+        "read_bytes": {
+          "8388608": 100
+        },
+        "ordinary_payload_read_calls": {
+          "0": 100
+        },
+        "ordinary_payload_read_bytes": {
+          "0": 100
+        },
+        "max_in_flight_reads": {
+          "1": 100
+        }
+      }
+    },
+    {
+      "lane": "A2-guard-clean",
+      "source_value_counts": {
+        "read_calls": {
+          "2": 100
+        },
+        "read_bytes": {
+          "8388608": 100
+        },
+        "ordinary_payload_read_calls": {
+          "0": 100
+        },
+        "ordinary_payload_read_bytes": {
+          "0": 100
+        },
+        "max_in_flight_reads": {
+          "1": 100
+        }
+      }
+    }
+  ],
+  "required_handling": "Retain all29rows and explicit source-counter variability. Do not normalize vectors or present affected rows as strict comparable latency evidence. Other scoped summaries must use unchanged raw reports and retain canonical rejection."
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "litchi-0467-capture-fixed-v1",
+  "lane": "A1-fixed",
+  "role": "control",
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854",
+  "binding_sha256": "d36932caa5a21c7ac563a3e4763709a3f285ff2375b3a9a983f53daa8be8e1af",
+  "driver_sha256": "600eff9aaa8be3bc7bba5ba18f01f2b0aa5d0e7524da4235be391916a95d1905",
+  "checkout_verify_argv": [
+    "git",
+    "cat-file",
+    "-e",
+    "33243bc2e6bd63ab056eb45493b0717818501f4b^{commit}"
+  ],
+  "checkout_argv": [
+    "git",
+    "checkout",
+    "--detach",
+    "33243bc2e6bd63ab056eb45493b0717818501f4b"
+  ],
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/resource.log",
+    "/tmp/litchi-goal-0467/control-fixed",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "500",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/corpus-catalog.json",
+    "--case",
+    "doc_fresh_write_to,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/shared-tree",
+  "samples": 500,
+  "warmups": 5,
+  "cases": [
+    "doc_fresh_write_to",
+    "xlsx_one_percent_commit_save"
+  ],
+  "xlsx_shape": "dense-wide",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T04:43:02.228588+00:00",
+  "clean_before": true
+}

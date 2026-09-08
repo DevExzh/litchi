@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-0467-supplemental-guard-protocol-v1",
+  "status": "frozen",
+  "primary_case": "xlsx_one_percent_commit_save",
+  "primary_corpus": "xlsx-dense-wide",
+  "roles": [
+    "control",
+    "candidate"
+  ],
+  "order": [
+    "A1-guard-clean",
+    "B1-guard-clean",
+    "B2-guard-clean",
+    "A2-guard-clean"
+  ],
+  "samples": 100,
+  "warmups": 5,
+  "cases": [
+    "cfb_list_streams",
+    "cfb_read_one",
+    "cfb_shared_concurrent_reads",
+    "doc_fresh_write_to",
+    "xlsx_source_first_cell",
+    "xlsx_source_narrow_column_range_scan"
+  ],
+  "shapes": [
+    "medium"
+  ],
+  "cpu": 2,
+  "workers": 1,
+  "execution": "serialized task-owned builds/tests/profile/captures; independent light source review and edits may proceed",
+  "normal": "no external profiler; matched release debug1, frame pointers and unwind tables for both roles",
+  "review_triggers": {
+    "latency_percent": 5,
+    "process_rss_percent": 5
+  },
+  "retention_rule": "Retain only useful measured benefit with semantics preserved; inspect individual rows and ABBA same-role drift; no global aggregate claims",
+  "additional_lanes": [
+    "A-full-clean",
+    "B-full-clean",
+    "A-heap-clean",
+    "B-heap-clean"
+  ],
+  "additional_scope": "Full default15/3 guard on both revisions; wholeprocess Heaptrack5/1 dense1percent. Do not compare instrumented latency to normal.",
+  "capture_driver_sha256": "116840af7bd2d16a1a06c189fd2cb571b5924672828f03bcfb5fa0a05ea16e14",
+  "supersedes": null,
+  "correction": null,
+  "scope": "Follow up every fullguard scenario whose mean or p50 increased more than5% and whose baseline exceeded0.1ms; allCFB/doc shapes retained, XLSXmedium matches flaggedscope. Selectedafter initialfullguard, not a predeclared improvementclaim.",
+  "selection_threshold": {
+    "latency_increase_percent": 5,
+    "baseline_latency_ns": 100000,
+    "statistics": [
+      "mean",
+      "p50"
+    ]
+  },
+  "selection_inputs": {
+    "A-full-clean": "c09806f75c0eedb61b3e61cbb37e0b34b22cc720cb5f4846c1987e9a34db8891",
+    "B-full-clean": "d47fc77ef870d3ea7c1c596f33c2a041c2774af5e0a4ac3cb371516e94122c00"
+  }
+}

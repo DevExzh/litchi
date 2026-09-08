@@ -1,0 +1,23 @@
+{
+  "checker_sha256": "d53ab2fdab5d5a492a23ac0f85fb58b19cabec396ecfdb1edc3a5c89964f7fbc",
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T05:14:14.764003+00:00",
+  "registry_sha256": "b8847b7e2fe2c5d15d5fe091f7f7f6bca8f2ec38a25decfe20a36a76f5eef955",
+  "schema": "litchi-0467-registry-strict-v1",
+  "started_utc": "2026-09-08T05:13:02.924262+00:00",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+}

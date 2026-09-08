@@ -1,0 +1,30 @@
+{
+  "role": "candidate",
+  "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/candidate-tree",
+  "clean_before": true,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "DEBUGINFOD_URLS": ""
+  },
+  "started_utc": "2026-09-08T04:09:15.153445+00:00",
+  "exit_code": 0,
+  "clean_after": true,
+  "finished_utc": "2026-09-08T04:12:53.489699+00:00"
+}

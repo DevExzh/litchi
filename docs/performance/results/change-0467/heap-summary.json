@@ -1,0 +1,33 @@
+{
+  "deltas": {
+    "allocation_calls": {
+      "candidate_minus_control": -11534336,
+      "candidate_over_control": 0.7953083208594657,
+      "reduction_percent": 20.469167914053433
+    },
+    "temporary_allocations": {
+      "candidate_minus_control": -11534339,
+      "candidate_over_control": 0.5581370911595308,
+      "reduction_percent": 44.18629088404692
+    }
+  },
+  "peak_heap_precision": "Heaptrack human-readable rounded value only; no exact peak-byte reduction inferred.",
+  "roles": {
+    "candidate": {
+      "allocation_calls": 44815468,
+      "path": "B-heap-clean/print.txt",
+      "rounded_peak_heap": "104.38M",
+      "sha256": "52bd77906c968f2aed626882a3c76220cb852490bed0957f9a9d9323ca3ef9c4",
+      "temporary_allocations": 14569547
+    },
+    "control": {
+      "allocation_calls": 56349804,
+      "path": "A-heap-clean/print.txt",
+      "rounded_peak_heap": "104.38M",
+      "sha256": "a4fff7cf8e5eeb9a41018fd37acdcb93597e1c81a534f2376403e98108967f9b",
+      "temporary_allocations": 26103886
+    }
+  },
+  "schema": "litchi-0467-whole-process-heap-summary-v1",
+  "scope": "Separate Heaptrack runs, five samples plus one warmup; includes generation, expected output, setup, timed commit/write, verification, and teardown. Not allocations per commit or normal latency/RSS."
+}

@@ -1,0 +1,53 @@
+{
+  "schema": "litchi-0467-fixed-build-v1",
+  "role": "candidate",
+  "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+  "original_binding": "candidate-binding.json",
+  "original_binding_sha256": "4ee003d750f8e6bf7a2adeb0b414838296b75e8e357eb1da32070a63afc7eade",
+  "original_build_receipt": "candidate-build.json",
+  "original_build_receipt_sha256": "4a3e7c5cb85c80477bf3029f253beb35e9aa5d6b7837daa695438ca2287324f4",
+  "checkout_verify_argv": [
+    "git",
+    "cat-file",
+    "-e",
+    "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7^{commit}"
+  ],
+  "checkout_argv": [
+    "git",
+    "checkout",
+    "--detach",
+    "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7"
+  ],
+  "source_manifest": "candidate.json",
+  "source_manifest_sha256": "c886ef74e98613ea3d19169f22fc9c0e32b82b12c098338f92250be185a713dd",
+  "source_manifest_files": 6992,
+  "included_fixtures": 2,
+  "source_manifest_verified_before_build": true,
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/shared-tree",
+  "clean_before": true,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "DEBUGINFOD_URLS": ""
+  },
+  "started_utc": "2026-09-08T04:39:09.243700+00:00",
+  "exit_code": 0,
+  "clean_after": true,
+  "source_manifest_verified_after_build": true,
+  "finished_utc": "2026-09-08T04:40:24.632115+00:00"
+}

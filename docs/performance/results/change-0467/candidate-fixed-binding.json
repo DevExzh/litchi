@@ -1,0 +1,9 @@
+{
+  "role": "candidate",
+  "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+  "binary_sha256": "267f57da465374070fdcb406e61eb68ca53941a9ac3a8ba1405e219262cf3de9",
+  "bytes": 463666632,
+  "build_receipt": "candidate-fixed-build.json",
+  "build_receipt_sha256": "4be15e3f78ca5825459822144b737a29320e2ab8869b4e72d7b1d367050b4351",
+  "clean_build": true
+}

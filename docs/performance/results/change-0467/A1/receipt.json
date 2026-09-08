@@ -1,0 +1,75 @@
+{
+  "schema": "litchi-0467-capture-v1",
+  "lane": "A1",
+  "role": "control",
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+  "binding_sha256": "7f4bd30aedb71a2289b00176cc7ca6f5bf5e0a4cab88bff62bd7f2767103cc24",
+  "driver_sha256": "a15601546a460f53e8f05f58ee6eb829816426eba5f94941347ca3040f8c7086",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1/resource.log",
+    "/tmp/litchi-goal-0467/control",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "100",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1/corpus-catalog.json",
+    "--case",
+    "xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/control-tree",
+  "samples": 100,
+  "warmups": 5,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T03:44:24.258654+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "finished_utc": "2026-09-08T03:45:58.121718+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "bbdd7b9c67eea0704194ff8fbb26ee715e7ea3a827c532e7628c4454b489cac3",
+      "bytes": 1404
+    },
+    "corpus-catalog.json": {
+      "sha256": "0cc9d4bcae422415ea59e3dda79e46d6e50bed6a36c5a91d897b34d26b995f5d",
+      "bytes": 18770
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "512db4bdcd3e6ab2246274a172d8d53ac17821fae492016f75f49704d9d5d86a",
+      "bytes": 210034
+    },
+    "resource.log": {
+      "sha256": "c8dd5149b367cf9330c5ccf6790b1b9da08246d65422f679a65efa373c3ea0a6",
+      "bytes": 1075
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

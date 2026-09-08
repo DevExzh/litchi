@@ -1,0 +1,10 @@
+{
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+  "bytes": 463587824,
+  "source_manifest_sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+  "original_build": "../change-0466/profile-build.json",
+  "original_binding": "../change-0466/profile-binding.json",
+  "original_binding_sha256": "971f6304e95e83741683e17a9cd409d8fc22e723e3d38db965b24c2d7d7f05c0",
+  "note": "Same-source previously-built release executable with debug1/frame pointers/unwind tables; both roles will use these identical flags."
+}

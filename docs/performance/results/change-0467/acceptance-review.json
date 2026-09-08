@@ -1,0 +1,64 @@
+{
+  "accepted_statistics": [
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": "xlsx-dense-wide",
+      "statistic": "p50"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": "xlsx-dense-wide",
+      "statistic": "mean"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": "xlsx-dense-wide",
+      "statistic": "p95"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": "xlsx-dense-wide",
+      "statistic": "p99"
+    }
+  ],
+  "decision": "retain production change and register primary dense XLSX latency only after standard package strict verification",
+  "doc_500_guard_review": "All three rows have no >5% latency pairing or same-role drift trigger. Earlier separate-path payload-heavy regression did not repeat; exact build/layout cause remains unproven.",
+  "full_guard_review": {
+    "assessment": "Full matrix uses 15 samples and is descriptive. All 53 canonical flags are latency. The sole >0.1 ms mean/median five-percent flag is an unrelated concurrent OPC read mean (+6.80%), without median flag. Tail and short-operation flags remain unresolved observations; no blanket regression-free claim. Fixed full RSS decreases 10.41%, but different matrix and prior variability preclude a memory claim.",
+    "canonical_regression_cells": 53,
+    "five_percent_cells": 98,
+    "five_percent_scenario_corpus_rows": 41,
+    "mean_or_median_flags_over_0_1_ms": [
+      {
+        "baseline_ns": 416072.4666666667,
+        "candidate_ns": 444373.86666666676,
+        "case": "opc_source_concurrent_same_part",
+        "corpus": "few-large-compressible",
+        "delta_percent": 6.802036247852361,
+        "statistic": "mean"
+      }
+    ]
+  },
+  "inputs": {
+    "analysis.json": "f4fbd148e016b242d16b1942dfb5be89f14c717f1733ec0fc7755202afe60ed1",
+    "fixed-qualification.json": "73d6b2a394077ce28895ac46d94cd2851b06c7646117d53919d66089ccf0b1f3",
+    "full-guard.json": "26d317ce0ad4cea583cab88243fbb47555727a036e03f54bed8a0496b90f8715",
+    "guard-summary.json": "7913bc5f02214e2299dfec4a5e94eff41e9c07a1eaf1d3b1161237f2463c808f",
+    "heap-summary.json": "0ff73e6503839232f83f147c03774455924c63e5771a85f3496f17e3afda3e95",
+    "review.json": "e7d7b01ff2454a2eabb715ccbca7bf4cedbbecbafc3ad28438b6af3ead1e64d2"
+  },
+  "limits": [
+    "single CPU, worker and shared KVM host",
+    "synthetic owned-byte dense corpus",
+    "normal timer is ordinary commit plus sequential write",
+    "whole-process allocation counts are not per operation",
+    "original CFB supplemental identity rejection retained",
+    "no new cold/range/native/scaling coverage",
+    "broader non-iWork goal remains open"
+  ],
+  "primary_adverse_statistics": [],
+  "reviewed_utc": "2026-09-08T05:03:49.226386+00:00",
+  "rss_review": "Fixed normal whole-process RSS pairings change less than 0.31%; same-role drift less than 0.22%. Earlier separate-path RSS drift and full guard increase are retained. No memory reduction claim.",
+  "schema": "litchi-0467-acceptance-review-v1",
+  "source_revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7"
+}

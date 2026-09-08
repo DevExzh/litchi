@@ -1,0 +1,71 @@
+{
+  "schema": "litchi-0467-capture-v1",
+  "lane": "A-full",
+  "role": "control",
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+  "binding_sha256": "7f4bd30aedb71a2289b00176cc7ca6f5bf5e0a4cab88bff62bd7f2767103cc24",
+  "driver_sha256": "a15601546a460f53e8f05f58ee6eb829816426eba5f94941347ca3040f8c7086",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A-full/resource.log",
+    "/tmp/litchi-goal-0467/control",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "15",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A-full/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A-full/corpus-catalog.json"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/control-tree",
+  "samples": 15,
+  "warmups": 3,
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T03:46:31.656105+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "finished_utc": "2026-09-08T03:47:25.906811+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "d4f16778e6547def54e1fc0b93ae930da3b0834781f20db746ef66c6f334223f",
+      "bytes": 1292
+    },
+    "corpus-catalog.json": {
+      "sha256": "f7ac92258b301eafbeab547247bbcef46464e22f66981b822dfd32ab775266a3",
+      "bytes": 221922
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "cee8f587e583e3ec836e87eceba3df6bb2be0d10a13cb2238f1fcd73d36a86ad",
+      "bytes": 1158698
+    },
+    "resource.log": {
+      "sha256": "dd470ae08360c7078e23bca70106ca44f07b6377359b0e4aa18ba58b02d1b854",
+      "bytes": 985
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

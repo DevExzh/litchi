@@ -1,0 +1,59 @@
+{
+  "schema": "litchi-0467-fixed-path-protocol-v1",
+  "status": "frozen",
+  "frozen_utc": "2026-09-08T04:33:37.282745+00:00",
+  "roles": [
+    "control",
+    "candidate"
+  ],
+  "order": [
+    "A1-fixed",
+    "B1-fixed",
+    "B2-fixed",
+    "A2-fixed"
+  ],
+  "samples": 500,
+  "warmups": 5,
+  "cases": [
+    "doc_fresh_write_to",
+    "xlsx_one_percent_commit_save"
+  ],
+  "shapes": [
+    "dense-wide"
+  ],
+  "expected_result_count": 4,
+  "cpu": 2,
+  "workers": 1,
+  "shared_tree": "/tmp/litchi-goal-0467/shared-tree",
+  "flags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+  "debug_level": 1,
+  "toolchain": "1.98.1",
+  "build_driver_sha256": "5e4b45c830d64f34968ea021859238e5eb9e024359c29dc6407039bd1a3f966e",
+  "capture_driver_sha256": "600eff9aaa8be3bc7bba5ba18f01f2b0aa5d0e7524da4235be391916a95d1905",
+  "role_binding_files": {
+    "control": "control-fixed-binding.json",
+    "candidate": "candidate-fixed-binding.json"
+  },
+  "initial_guards": [
+    "A-full-fixed",
+    "B-full-fixed"
+  ],
+  "initial_guard_samples": 15,
+  "initial_guard_warmups": 3,
+  "initial_guard_expected_rows": 201,
+  "execution": "All heavy tasks serialized by flock /tmp/litchi-goal-0467/cpu.lock; independent light source review and edits may proceed. Both builds use same absolute checkout path. Before each run require clean checkout and switch to exactly the binary source revision.",
+  "review_trigger_percent": 5,
+  "strict_policy_drift_ceilings_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "decision": "Inspect initial same-path full guards before500ABBA. Keep only useful representative benefit with semantics preserved and individual adverse outcomes reviewed. Primary claim scope is dense XLSX one-percent commit/save; allDOC rows are retained as explicit guards.",
+  "motivation": "build-path-review.json",
+  "supersedes_unexecuted": "protocol-500.json",
+  "prior_evidence_retained": [
+    "protocol-r1.json",
+    "protocol-guard.json"
+  ]
+}

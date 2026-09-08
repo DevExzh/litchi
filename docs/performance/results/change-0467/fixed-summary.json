@@ -1,0 +1,952 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-1011-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "doc_fresh_write_to",
+        "xlsx_one_percent_commit_save"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "opc_cache_lock_diagnostics": false,
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 5,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "dense-wide"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 463666632,
+        "binary_sha256": "267f57da465374070fdcb406e61eb68ca53941a9ac3a8ba1405e219262cf3de9",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0467/candidate-fixed",
+        "profile": "release"
+      },
+      "binary_sha256": "267f57da465374070fdcb406e61eb68ca53941a9ac3a8ba1405e219262cf3de9",
+      "git_revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 463619408,
+        "binary_sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0467/control-fixed",
+        "profile": "release"
+      },
+      "binary_sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854",
+      "git_revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "cec62676ab7f2e4c99c87564e0428bd119b5fcb9b6f7c277c48b0245f3947937"
+    },
+    "a2": {
+      "canonical_sha256": "ec72548a0710911015dac8ea5ebb0dd0ea5c52b91aedf3a51d99455761f8575e"
+    },
+    "b1": {
+      "canonical_sha256": "9fc587decaa555199ce7adfbe1b258d69d8388fa16081851d72bdb031c666dcd"
+    },
+    "b2": {
+      "canonical_sha256": "4e8d36c833157ba8f4208c2ef1ae771df9ad83cb404fc1f01992b46c246995e4"
+    }
+  },
+  "results": [
+    {
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 15360,
+        "archive_member_count": 5,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 3,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-tiny",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "tiny",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "uncompressed_payload_bytes": 189,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -1.0794328154024595,
+            "p50": -0.7926023778071334,
+            "p95": -1.0416666666666665,
+            "p99": -1.9447287615148412
+          },
+          "a2_to_b2": {
+            "mean": 0.983379413191774,
+            "p50": 1.3123359580052494,
+            "p95": 0.9122401847575058,
+            "p99": -2.691511387163561
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 7749.812382073581,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7881.359617926423
+            },
+            "max": 16780,
+            "mean": 7815.586000000002,
+            "min": 7390,
+            "p50": 7570,
+            "p95": 8640,
+            "p99": 9770,
+            "sample_count": 500,
+            "standard_deviation": 748.5727117746326
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 7790.377947005473,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7914.242052994517
+            },
+            "max": 17021,
+            "mean": 7852.309999999995,
+            "min": 7420,
+            "p50": 7620,
+            "p95": 8660,
+            "p99": 9660,
+            "sample_count": 500,
+            "standard_deviation": 704.8516763627248
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 7815.259207140389,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7984.640792859616
+            },
+            "max": 21310,
+            "mean": 7899.950000000003,
+            "min": 7430,
+            "p50": 7630,
+            "p95": 8730,
+            "p99": 9960,
+            "sample_count": 500,
+            "standard_deviation": 963.8699903080458
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 7703.0589408399555,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7847.1250591600365
+            },
+            "max": 19680,
+            "mean": 7775.091999999996,
+            "min": 7360,
+            "p50": 7520,
+            "p95": 8581,
+            "p99": 9920,
+            "sample_count": 500,
+            "standard_deviation": 819.8117137660685
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree",
+          "p50": "paired directions disagree",
+          "p95": "paired directions disagree",
+          "p99": "candidate is not lower in both paired directions"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -1.580491015766005,
+            "p50": -1.4416775884665793,
+            "p95": -1.706758304696449,
+            "p99": -0.4016064257028112
+          },
+          "control": {
+            "mean": 0.46988159301161647,
+            "p50": 0.6605019815059445,
+            "p95": 0.23148148148148145,
+            "p99": -1.1258955987717503
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":15360,\"archive_member_count\":5,\"archive_sha256\":\"ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b\",\"compression\":\"none\",\"entry_bytes\":0,\"entry_count\":3,\"generator\":\"litchi-legacy-writer-v1\",\"name\":\"doc-tiny\",\"package_format\":\"DOC/CFB\",\"payload_kind\":\"not-applicable\",\"shape\":\"tiny\",\"target_entry\":\"WordDocument\",\"target_payload_bytes\":4096,\"target_payload_sha256\":\"9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a\",\"uncompressed_payload_bytes\":189,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": null
+    },
+    {
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 5179904,
+        "archive_member_count": 5,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 128,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-payload-heavy",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "payload-heavy",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 5128192,
+        "target_payload_sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+        "uncompressed_payload_bytes": 2560000,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 0.5060676927789067,
+            "p50": 0.529284116323512,
+            "p95": 0.5482453375612858,
+            "p99": 0.6674679717600626
+          },
+          "a2_to_b2": {
+            "mean": 0.6928327728958096,
+            "p50": 0.6346641853883566,
+            "p95": 1.3313956646199216,
+            "p99": 2.255319205030876
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 5900746.863238334,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 5905873.644761666
+            },
+            "max": 6098219,
+            "mean": 5903310.254,
+            "min": 5846568,
+            "p50": 5899478,
+            "p95": 5948979,
+            "p99": 6016019,
+            "sample_count": 500,
+            "standard_deviation": 29174.073652825497
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 5905291.006678209,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 5911672.509321785
+            },
+            "max": 6176975,
+            "mean": 5908481.757999997,
+            "min": 5846954,
+            "p50": 5902334,
+            "p95": 5965244,
+            "p99": 6068764,
+            "sample_count": 500,
+            "standard_deviation": 36314.09438691568
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 5871164.047852619,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 5875706.968147384
+            },
+            "max": 6068835,
+            "mean": 5873435.508000001,
+            "min": 5830504,
+            "p50": 5868253,
+            "p95": 5916364,
+            "p99": 5975864,
+            "sample_count": 500,
+            "standard_deviation": 25851.597278963076
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 5865825.463557119,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 5869266.256442886
+            },
+            "max": 6100185,
+            "mean": 5867545.860000002,
+            "min": 5843523,
+            "p50": 5864874,
+            "p95": 5885823,
+            "p99": 5931894,
+            "sample_count": 500,
+            "standard_deviation": 19579.91473143229
+          }
+        },
+        "rejected_statistics": {},
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -0.10027603081666649,
+            "p50": -0.05758102113184282,
+            "p95": -0.5162123222979519,
+            "p99": -0.7357931840483652
+          },
+          "control": {
+            "mean": 0.08760345937252396,
+            "p50": 0.04841106280928584,
+            "p95": 0.2734082604762935,
+            "p99": 0.8767425767771012
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":5179904,\"archive_member_count\":5,\"archive_sha256\":\"707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388\",\"compression\":\"none\",\"entry_bytes\":0,\"entry_count\":128,\"generator\":\"litchi-legacy-writer-v1\",\"name\":\"doc-payload-heavy\",\"package_format\":\"DOC/CFB\",\"payload_kind\":\"not-applicable\",\"shape\":\"payload-heavy\",\"target_entry\":\"WordDocument\",\"target_payload_bytes\":5128192,\"target_payload_sha256\":\"55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7\",\"uncompressed_payload_bytes\":2560000,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "payload-heavy",
+      "sink": null,
+      "source": null
+    },
+    {
+      "case": "doc_fresh_write_to",
+      "corpus": {
+        "archive_bytes": 97792,
+        "archive_member_count": 5,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 512,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-large",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 81920,
+        "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "uncompressed_payload_bytes": 32256,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p95"
+        ],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -0.03655790428249409,
+            "p50": -0.2949219797308167,
+            "p95": 0.6294029040781859,
+            "p99": -0.3735413211409446
+          },
+          "a2_to_b2": {
+            "mean": 1.0958636218375746,
+            "p50": 0.703625523090027,
+            "p95": 1.9519870929833034,
+            "p99": 4.151795820268663
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 187991.97645765965,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 188747.34354234053
+            },
+            "max": 215890,
+            "mean": 188369.6600000001,
+            "min": 183570,
+            "p50": 186490,
+            "p95": 197171,
+            "p99": 200781,
+            "sample_count": 500,
+            "standard_deviation": 4298.434575983171
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 190911.18880245104,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 191783.5111975491
+            },
+            "max": 219501,
+            "mean": 191347.35000000006,
+            "min": 185751,
+            "p50": 189021,
+            "p95": 200821,
+            "p99": 207621,
+            "sample_count": 500,
+            "standard_deviation": 4963.971584859268
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 188051.0208233973,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 188826.027176603
+            },
+            "max": 242841,
+            "mean": 188438.52400000015,
+            "min": 182840,
+            "p50": 187040,
+            "p95": 195930,
+            "p99": 201531,
+            "sample_count": 500,
+            "standard_deviation": 4410.192306212832
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 188914.7218757207,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 189586.166124279
+            },
+            "max": 214480,
+            "mean": 189250.44399999984,
+            "min": 185001,
+            "p50": 187691,
+            "p95": 196901,
+            "p99": 199001,
+            "sample_count": 500,
+            "standard_deviation": 3820.869657124937
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree",
+          "p50": "paired directions disagree",
+          "p99": "paired directions disagree"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.43086731033814085,
+            "p50": 0.34805389221556887,
+            "p95": 0.4955851579645792,
+            "p99": -1.2553899896293872
+          },
+          "control": {
+            "mean": 1.58076942964168,
+            "p50": 1.3571773285430855,
+            "p95": 1.8511850119946647,
+            "p99": 3.406696848805415
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":97792,\"archive_member_count\":5,\"archive_sha256\":\"3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6\",\"compression\":\"none\",\"entry_bytes\":0,\"entry_count\":512,\"generator\":\"litchi-legacy-writer-v1\",\"name\":\"doc-large\",\"package_format\":\"DOC/CFB\",\"payload_kind\":\"not-applicable\",\"shape\":\"large\",\"target_entry\":\"WordDocument\",\"target_payload_bytes\":81920,\"target_payload_sha256\":\"33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb\",\"uncompressed_payload_bytes\":32256,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "large",
+      "sink": null,
+      "source": null
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 8.664908881378691,
+            "p50": 8.675629037103457,
+            "p95": 8.67635662010561,
+            "p99": 8.82444940200647
+          },
+          "a2_to_b2": {
+            "mean": 7.468333533670446,
+            "p50": 7.855316406871052,
+            "p95": 6.073374577744409,
+            "p99": 5.85995030088464
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 409614328.4339477,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 409901395.4140526
+            },
+            "max": 416009768,
+            "mean": 409757861.92400014,
+            "min": 406386746,
+            "p50": 409517775,
+            "p95": 413033426,
+            "p99": 414991614,
+            "sample_count": 500,
+            "standard_deviation": 1633561.5595794723
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 396600470.9393605,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 396942899.7846391
+            },
+            "max": 403334045,
+            "mean": 396771685.3619998,
+            "min": 392640611,
+            "p50": 396278436,
+            "p95": 399848761,
+            "p99": 400918605,
+            "sample_count": 500,
+            "standard_deviation": 1948599.5858308924
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 374140926.7569206,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 374364506.35107946
+            },
+            "max": 380505543,
+            "mean": 374252716.554,
+            "min": 371888208,
+            "p50": 373989532,
+            "p95": 377197173,
+            "p99": 378370889,
+            "sample_count": 500,
+            "standard_deviation": 1272285.0618028424
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 366715988.053347,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 367562917.0106534
+            },
+            "max": 378464465,
+            "mean": 367139452.5320002,
+            "min": 360979926,
+            "p50": 365149511,
+            "p95": 375564448,
+            "p99": 377424974,
+            "sample_count": 500,
+            "standard_deviation": 4819469.615921822
+          }
+        },
+        "rejected_statistics": {},
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -1.9006579531329817,
+            "p50": -2.363708137157165,
+            "p95": -0.43285716778158356,
+            "p99": -0.24999676970391874
+          },
+          "control": {
+            "mean": -3.169231824137384,
+            "p50": -3.2329094872621833,
+            "p95": -3.1921544771052015,
+            "p99": -3.391155031870114
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":384525,\"archive_member_count\":7,\"archive_sha256\":\"5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714\",\"compression\":\"deflate\",\"entry_bytes\":4,\"entry_count\":131072,\"generator\":\"litchi-xlsx-synthetic-v1\",\"name\":\"xlsx-dense-wide\",\"package_format\":\"XLSX/OPC/ZIP\",\"payload_kind\":\"deterministic-integer-grid\",\"shape\":\"dense-wide\",\"target_entry\":\"Sheet1!A1\",\"target_payload_bytes\":1,\"target_payload_sha256\":\"5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9\",\"uncompressed_payload_bytes\":524288,\"xlsx\":{\"columns_per_sheet\":256,\"one_percent_update_count\":1311,\"rows_per_sheet\":256,\"sheet_count\":2,\"source_members\":{\"shared_strings\":null,\"styles\":\"xl/styles.xml\",\"workbook\":\"xl/workbook.xml\",\"worksheets\":[\"xl/worksheets/sheet1.xml\",\"xl/worksheets/sheet2.xml\"]}}}",
+        "operation_metrics_canonical_json": "{\"alignment\":\"elapsed_ns.samples_by_elapsed_then_sample_index\",\"cfb_phases\":{\"atomic_publication\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"open\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"plan\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"status\":\"not_applicable\"},\"latency_claim\":\"comparable_timed_operation\",\"materialization\":{\"opc_parts\":{\"scope\":\"logical_materialization_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"process\":{\"cancelled_write_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"clock_ticks_per_second\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"major_faults\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"minor_faults\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"nonvoluntary_context_switches\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"peak_rss_bytes\":{\"scope\":\"process_lifetime_high_water_after_not_operation_peak\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"rchar\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"read_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"rss_delta_bytes\":{\"scope\":\"procfs_operation_delta_not_peak\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\",\"syscr\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"syscw\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"system_cpu_ticks\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"user_cpu_ticks\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"voluntary_context_switches\":{\"scope\":\"procfs_operation_delta\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"wchar\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"write_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"publication\":{\"changed_spans\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"published_bytes\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"sample_count\":500,\"sample_indices\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499],\"sink\":{\"accepted_bytes\":{\"scope\":\"logical_sink_accepted_write_bytes\",\"status\":\"measured\",\"values\":\"present\"},\"largest_write\":{\"scope\":\"logical_sink_largest_accepted_write\",\"status\":\"measured\",\"values\":\"present\"},\"output_bytes\":{\"scope\":\"post_operation_output_length_not_sink_write_volume\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\",\"write_calls\":{\"scope\":\"logical_sink_accepted_write_calls\",\"status\":\"measured\",\"values\":\"present\"},\"write_size_buckets\":{\"bytes_0\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_16385_to_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_1_to_512\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_4097_to_16384\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_513_to_4096\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_over_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"status\":\"measured\"},\"write_status\":\"measured\"},\"source\":{\"compressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_compressed_member_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"counter_scope\":\"not_applicable_in_process_sink\",\"decompressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_decompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_pattern\":{\"scope\":\"operation_logical_read_at_range_order_not_physical_io\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"max_concurrent_reads\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"recompressed_bytes\":{\"scope\":\"unavailable_atomic_save_has_no_recompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"}}",
+        "operation_metrics_status": "verified_equal",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": "{\"accepted_bytes\":388095,\"largest_write\":65536,\"write_calls\":37,\"write_size_buckets\":{\"bytes_0\":0,\"bytes_16385_to_65536\":6,\"bytes_1_to_512\":31,\"bytes_4097_to_16384\":0,\"bytes_513_to_4096\":0,\"bytes_over_65536\":0}}",
+        "sink_present": true,
+        "sink_status": "verified_equal",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "dense-wide",
+      "sink": {
+        "accepted_bytes": 388095,
+        "largest_write": 65536,
+        "write_calls": 37,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 6,
+          "bytes_1_to_512": 31,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": null
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 3,
+      "verified_equal": 1
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 4,
+      "verified_equal": 0
+    },
+    "output_sha256_identity_verified": false,
+    "result_count": 4,
+    "sink_identity": {
+      "consistently_absent": 3,
+      "verified_equal": 1
+    },
+    "sink_identity_verified": false,
+    "source_identity": {
+      "consistently_absent": 4,
+      "verified_equal": 0
+    },
+    "source_identity_verified": false,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}

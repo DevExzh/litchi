@@ -1,0 +1,18 @@
+{
+  "copied_bundle_file_count": 241,
+  "copied_dependency_sha256": {
+    "docs/performance/perf-regression-policy-v1.json": "6938e65cb4130ff2ab95cee21f4aa3c26d5bf3a1dcd4b118a6427447b2f0c00c",
+    "tools/perf_abba_summary.py": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+  },
+  "exit_code": 0,
+  "live_binaries_absent": true,
+  "schema": "litchi-0467-portable-replay-v1",
+  "stage_has_git": false,
+  "stage_seal_sha256": "a6f0e3724513f6a2d1c6f7d189ec7071bf20f69156458e8c5d037bdf76f0b8fb",
+  "stage_seal_unchanged": true,
+  "staging_root": "/tmp/litchi-goal-0467/portable-stage",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "e8e8f458f88737ae55264cf38853dde44a5394543714e31fa2ed2e20e1599170",
+  "verified_utc": "2026-09-08T05:11:51.598108+00:00"
+}

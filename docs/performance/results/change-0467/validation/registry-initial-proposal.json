@@ -1161,8 +1161,7 @@
             "corpus": "xlsx-dense-wide",
             "statistic": "p99"
           }
-        ],
-        "adverse_both_statistics": []
+        ]
       },
       "documentation": [
         "docs/performance/changes/0467-xlsx-cell-attributes.md"

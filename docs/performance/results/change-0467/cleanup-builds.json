@@ -1,0 +1,50 @@
+{
+  "binaries": [
+    {
+      "absent": true,
+      "bytes": 463670432,
+      "path": "/tmp/litchi-goal-0467/control",
+      "sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad"
+    },
+    {
+      "absent": true,
+      "bytes": 463692944,
+      "path": "/tmp/litchi-goal-0467/candidate",
+      "sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82"
+    },
+    {
+      "absent": true,
+      "bytes": 463619408,
+      "path": "/tmp/litchi-goal-0467/control-fixed",
+      "sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854"
+    },
+    {
+      "absent": true,
+      "bytes": 463666632,
+      "path": "/tmp/litchi-goal-0467/candidate-fixed",
+      "sha256": "267f57da465374070fdcb406e61eb68ca53941a9ac3a8ba1405e219262cf3de9"
+    }
+  ],
+  "binary_bytes_removed": 1854649416,
+  "finished_utc": "2026-09-08T05:10:27.301102+00:00",
+  "remaining_temporary_scope": "CPU lock and Python package/registry scratch retained until final validation completes.",
+  "schema": "litchi-0467-owned-build-cleanup-v1",
+  "started_utc": "2026-09-08T05:10:25.922641+00:00",
+  "worktrees": [
+    {
+      "absent": true,
+      "clean": true,
+      "path": "/tmp/litchi-goal-0467/control-tree"
+    },
+    {
+      "absent": true,
+      "clean": true,
+      "path": "/tmp/litchi-goal-0467/candidate-tree"
+    },
+    {
+      "absent": true,
+      "clean": true,
+      "path": "/tmp/litchi-goal-0467/shared-tree"
+    }
+  ]
+}

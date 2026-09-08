@@ -1,0 +1,72 @@
+{
+  "schema": "litchi-0467-build-path-followup-v1",
+  "status": "hypothesis requiring matched fixed-path builds",
+  "observations": [
+    {
+      "lane": "A-full",
+      "report_sha256": "cee8f587e583e3ec836e87eceba3df6bb2be0d10a13cb2238f1fcd73d36a86ad",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+      "p50_ns": 4275977,
+      "mean_ns": 4293724.2,
+      "samples": 15
+    },
+    {
+      "lane": "A-full-clean",
+      "report_sha256": "c09806f75c0eedb61b3e61cbb37e0b34b22cc720cb5f4846c1987e9a34db8891",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "binary_sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad",
+      "p50_ns": 3889006,
+      "mean_ns": 3900335.733333333,
+      "samples": 15
+    },
+    {
+      "lane": "B-full-clean",
+      "report_sha256": "d47fc77ef870d3ea7c1c596f33c2a041c2774af5e0a4ac3cb371516e94122c00",
+      "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+      "binary_sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82",
+      "p50_ns": 4254347,
+      "mean_ns": 4278665.466666668,
+      "samples": 15
+    },
+    {
+      "lane": "A1-guard-clean",
+      "report_sha256": "3891551d610d7596fad1a628f8a75ae9bf25d559aa3a93768ebe21b8bdd08d89",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "binary_sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad",
+      "p50_ns": 3830985,
+      "mean_ns": 3846913.829999999,
+      "samples": 100
+    },
+    {
+      "lane": "B1-guard-clean",
+      "report_sha256": "2d3adbb2fd12b91f311b9b29839589273df1f6fbaf23f9c004b3b78f0c816b82",
+      "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+      "binary_sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82",
+      "p50_ns": 4258993,
+      "mean_ns": 4311699.029999998,
+      "samples": 100
+    },
+    {
+      "lane": "B2-guard-clean",
+      "report_sha256": "3e58678d143fd826dc30352c39426778b6ce8eab91cdf4d02fb2bae980d34738",
+      "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+      "binary_sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82",
+      "p50_ns": 4328157,
+      "mean_ns": 4339391.79,
+      "samples": 100
+    },
+    {
+      "lane": "A2-guard-clean",
+      "report_sha256": "1309ca76b6d410fb3ba0d07709cd0f09de34e1b555252537a5c7b24fd15a4a62",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "binary_sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad",
+      "p50_ns": 3832530,
+      "mean_ns": 3850752.2500000005,
+      "samples": 100
+    }
+  ],
+  "finding": "DOC payload-heavy slowdown repeats across the separate-role-path ABBA. An earlier executable built from the same control source at the root path also has the slower DOC result. This suggests a build/layout effect but does not establish its cause.",
+  "next_experiment": "Build both source revisions in the same absolute clean shared-tree path. Before each capture, require clean status and checkout the exact revision matching that immutable binary. The compiled-in manifest path then truthfully reports that role revision. Preserve earlier results and bindings. Compare full guards, then strict500 primary plus DOC guards if supported.",
+  "unexecuted_superseded_protocol": "protocol-500.json (separate-role paths, primary only)"
+}
