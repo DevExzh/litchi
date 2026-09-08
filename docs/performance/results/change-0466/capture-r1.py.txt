@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Serialized descriptive XLSX captures using the unchanged 0465 normal build."""
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+BUNDLE = Path(__file__).resolve().parent
+REPO = BUNDLE.parents[3]
+PRIOR = BUNDLE.parent / 'change-0465'
+TEMP = Path('/tmp/litchi-goal-0466')
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def source_check():
+    binding = json.loads((PRIOR / 'binding.json').read_text())['binaries']['normal']
+    source = PRIOR / binding['source']['path']
+    assert sha(source) == binding['source']['sha256']
+    for path, digest in json.loads(source.read_text()).items():
+        assert sha(REPO / path) == digest, path
+    for path, digest in json.loads((PRIOR / 'adr-refresh.json').read_text())['files'].items():
+        assert sha(REPO / path) == digest, path
+    return binding
+
+
+def main():
+    lane = sys.argv[1]
+    assert lane in ('normal-r1', 'normal-r2', 'counters', 'samples', 'heaptrack')
+    binding = source_check()
+    TEMP.mkdir(exist_ok=True)
+    binary = TEMP / 'normal'
+    if not binary.exists():
+        cached = REPO / 'tools/perf-baseline/target/release/litchi-perf-baseline'
+        assert sha(cached) == binding['sha256']
+        shutil.copy2(cached, binary)
+    assert sha(binary) == binding['sha256']
+    output = BUNDLE / lane
+    recover = sys.argv[2:] == ['--recover-completed']
+    output.mkdir(exist_ok=recover)
+    samples = 50 if lane == 'samples' else 5 if lane == 'heaptrack' else 30
+    warmup = 1 if lane == 'heaptrack' else 3
+    workload = [str(binary), '--case', 'xlsx_one_percent_commit_save',
+                '--xlsx-shape', 'dense-wide', '--workers', '1',
+                '--warmup', str(warmup), '--samples', str(samples),
+                '--json', str(output / 'report.json'),
+                '--corpus-manifest', str(output / 'corpus-catalog.json')]
+    command = ['taskset', '-c', '2', '/usr/bin/time', '-v', '-o', str(output / 'resource.log')]
+    if lane == 'counters':
+        command += ['perf', 'stat', '-x', ';', '-o', str(output / 'counters.csv'),
+                    '-e', 'cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,page-faults', '--']
+    elif lane == 'samples':
+        command += ['perf', 'record', '-F', '499', '-e', 'cycles:u', '--call-graph', 'dwarf,16384',
+                    '-o', str(output / 'perf.data'), '--']
+    elif lane == 'heaptrack':
+        command += ['heaptrack', '-o', str(output / 'heaptrack'), '--']
+    command += workload
+    receipt = {'schema': 'litchi-0466-capture-v1', 'lane': lane,
+               'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
+               'status_before': subprocess.check_output(['git', 'status', '--short'], cwd=REPO, text=True),
+               'driver_sha256': sha(Path(__file__)), 'binary_sha256': sha(binary),
+               'original_build_binding': '../change-0465/binding.json',
+               'original_build_binding_sha256': sha(PRIOR / 'binding.json'),
+               'source_manifest_sha256': binding['source']['sha256'],
+               'samples': samples, 'warmups': warmup, 'cpu': 2, 'argv': command,
+               'scope': 'ordinary commit plus sequential write timer; external tools include whole-process setup, warmup, verification and teardown',
+               'started_utc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    env = dict(os.environ, LC_ALL='C', PYTHONDONTWRITEBYTECODE='1')
+    if recover:
+        assert lane == 'samples'
+        assert 'Exit status: 0' in (output / 'resource.log').read_text()
+        assert len(json.loads((output / 'report.json').read_text())['results']) == 1
+        receipt['started_utc'] = None
+        receipt['recovery'] = 'Original capture completed successfully; initial driver failed serializing stat.st_size after source/binary checks. Raw outputs retained without rerun. Receipt timestamps record recovery; original start timestamp unavailable.'
+        receipt['original_driver_sha256'] = sha(BUNDLE / 'capture-initial.py.txt')
+        result = subprocess.CompletedProcess(command, 0)
+    else:
+        (output / 'started.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        with (output / 'stdout.log').open('w') as stdout, (output / 'stderr.log').open('w') as stderr:
+            result = subprocess.run(command, cwd=REPO, env=env, stdout=stdout, stderr=stderr)
+    receipt.update(exit_code=result.returncode, finished_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
+    source_check()
+    assert sha(binary) == binding['sha256']
+    receipt['source_and_binary_unchanged'] = True
+    receipt['artifacts'] = {p.name: {'sha256': sha(p), 'bytes': p.stat().st_size}
+                            for p in sorted(output.iterdir()) if p.is_file()}
+    (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    print(json.dumps({'lane': lane, 'exit_code': result.returncode}), flush=True)
+    raise SystemExit(result.returncode)
+
+
+if __name__ == '__main__':
+    main()

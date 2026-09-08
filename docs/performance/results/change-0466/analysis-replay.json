@@ -1,0 +1,31 @@
+{
+  "status": "pass",
+  "analyzer_sha256": "41c0190170c54ab0ff97d740eb97579a43dff0577a369d0d146981be2cb202d9",
+  "checks": [
+    {
+      "profile": "dwarf",
+      "python_hash_seed": "1",
+      "status": "pass",
+      "stdout": "{\"output\": \"/tmp/litchi-0466-analysis-ju_1t_mi/dwarf-1.json\", \"scope_partition_exact\": true, \"truncated_period\": 0, \"unknown_frame_period\": 9336143732, \"whole_process_blocks\": 15291, \"whole_process_period\": 133775549774}\n"
+    },
+    {
+      "profile": "fp",
+      "python_hash_seed": "1",
+      "status": "pass",
+      "stdout": "{\"output\": \"/tmp/litchi-0466-analysis-ju_1t_mi/fp-1.json\", \"scope_partition_exact\": true, \"truncated_period\": 0, \"unknown_frame_period\": 811107897, \"whole_process_blocks\": 15483, \"whole_process_period\": 135131742466}\n"
+    },
+    {
+      "profile": "dwarf",
+      "python_hash_seed": "2",
+      "status": "pass",
+      "stdout": "{\"output\": \"/tmp/litchi-0466-analysis-ju_1t_mi/dwarf-2.json\", \"scope_partition_exact\": true, \"truncated_period\": 0, \"unknown_frame_period\": 9336143732, \"whole_process_blocks\": 15291, \"whole_process_period\": 133775549774}\n"
+    },
+    {
+      "profile": "fp",
+      "python_hash_seed": "2",
+      "status": "pass",
+      "stdout": "{\"output\": \"/tmp/litchi-0466-analysis-ju_1t_mi/fp-2.json\", \"scope_partition_exact\": true, \"truncated_period\": 0, \"unknown_frame_period\": 811107897, \"whole_process_blocks\": 15483, \"whole_process_period\": 135131742466}\n"
+    }
+  ],
+  "temporary_directory_removed": true
+}

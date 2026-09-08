@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## Current dense XLSX lead (0466)
+
+[0466](changes/0466-xlsx-dense-commit-profile.md) profiles the ordinary owned
+one-percent commit/save path on 131,072 cells and 1,311 updates. The source
+path performs two original and two rewritten worksheet Store parses, full XML
+rewrite/compaction and publication audit. Repeated checked cell-attribute scans
+are a concrete allocation lead. The retained CPU profiles distinguish normal
+release callchain limitations from a separate frame-pointer build; whole-process
+ancestors are not retained-sample-only phase timers. Use this evidence before
+changing parsing or retention. The old unrestricted validated-Store handoff
+failed its memory gate and is not reinstated. Broader CRUD, remote/cold-input
+and scaling gaps remain open.
+
+The 0466 frame-pointer profile attributes 55.13% of whole-process sampled
+weight to exact commit ancestors. Within commit, worksheet Parser ancestors
+account for 47.66% and the shared attribute lookup for 15.38% (inclusive and
+overlapping). The next narrow experiment is eliminating the repeated cell
+attribute scans while preserving all validation and refusal behavior.
+
 ## Change 0465: checked-default ODP append coverage
 
 0465 measures the existing materialized ODP append lifecycle as the 37th

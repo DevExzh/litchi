@@ -1,0 +1,69 @@
+{
+  "schema": "litchi-0466-capture-v1",
+  "lane": "normal-r3",
+  "revision": "418edc42a365819837b393e42a49e4cd459d1624",
+  "status_before": "?? docs/GOAL.md\n?? docs/performance/results/change-0466/\n",
+  "driver_sha256": "97848614241b6be34d4a1680ff991fcddb76899aaf2bcace33b30abc74b57a70",
+  "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+  "original_build_binding": "../change-0465/binding.json",
+  "original_build_binding_sha256": "ef8d59bcba6606a43e1e0eee0f26c65ecf249d9ceeb7eeb2dff18e239288140e",
+  "source_manifest_sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+  "samples": 30,
+  "warmups": 3,
+  "cpu": 2,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/normal-r3/resource.log",
+    "/tmp/litchi-goal-0466/normal",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/normal-r3/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/normal-r3/corpus-catalog.json"
+  ],
+  "scope": "ordinary commit plus sequential write timer; external tools include whole-process setup, warmup, verification and teardown",
+  "started_utc": "2026-09-07T20:31:44.834231+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T20:32:04.144145+00:00",
+  "source_and_binary_unchanged": true,
+  "artifacts": {
+    "corpus-catalog.json": {
+      "sha256": "291fe8a4ebb14a1cc6b63b0441212276f68624e07e8f48b66998e1a64460720b",
+      "bytes": 6313
+    },
+    "report.json": {
+      "sha256": "1300035c249fcc01c44055231df24dee3b3b810e350b1477ad58cc12ae1ecb9e",
+      "bytes": 22265
+    },
+    "resource.log": {
+      "sha256": "8d42d1aafa54c446bb4f240d3d437043a2cd11a3b19060ba5b73914778661537",
+      "bytes": 1046
+    },
+    "started.json": {
+      "sha256": "4cca6edc3565f4f4d022a551e42304509cd71e67f04bb2168343f43cb9037f0a",
+      "bytes": 1482
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "litchi-0466-capture-v1",
+  "lane": "heaptrack",
+  "revision": "418edc42a365819837b393e42a49e4cd459d1624",
+  "status_before": "?? docs/GOAL.md\n?? docs/performance/results/change-0466/\n",
+  "driver_sha256": "159d243b8e1d9bae692c1e54c00ce86c01f173b7052d798185d564ee01307007",
+  "binary_sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+  "original_build_binding": "../change-0465/binding.json",
+  "original_build_binding_sha256": "ef8d59bcba6606a43e1e0eee0f26c65ecf249d9ceeb7eeb2dff18e239288140e",
+  "source_manifest_sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+  "samples": 5,
+  "warmups": 1,
+  "cpu": 2,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/heaptrack/resource.log",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/heaptrack/heaptrack",
+    "--",
+    "/tmp/litchi-goal-0466/normal",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--workers",
+    "1",
+    "--warmup",
+    "1",
+    "--samples",
+    "5",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/heaptrack/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0466/heaptrack/corpus-catalog.json"
+  ],
+  "scope": "ordinary commit plus sequential write timer; external tools include whole-process setup, warmup, verification and teardown",
+  "started_utc": "2026-09-07T20:30:25.782489+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T20:30:46.956591+00:00",
+  "source_and_binary_unchanged": true,
+  "artifacts": {
+    "corpus-catalog.json": {
+      "sha256": "291fe8a4ebb14a1cc6b63b0441212276f68624e07e8f48b66998e1a64460720b",
+      "bytes": 6313
+    },
+    "heaptrack.zst": {
+      "sha256": "a6930c9054148ec5e65650fb7371c29b115717a9ec375e4342065990bb76aa30",
+      "bytes": 641573
+    },
+    "report.json": {
+      "sha256": "60aced18b0c5ca453e693d68bee5a4197ef55e5aa3a5365e3c8c6eb819c5b688",
+      "bytes": 16653
+    },
+    "resource.log": {
+      "sha256": "5d15525dc50496f75dee98171983ba3f95f47b0516c9087b0cd63184cc9c6454",
+      "bytes": 1153
+    },
+    "started.json": {
+      "sha256": "a852d8f30c2d88c0e471385d4e4fb10c68028e260ac0ba8a6b5b77f5853a02ec",
+      "bytes": 1605
+    },
+    "stderr.log": {
+      "sha256": "a6ea14fbd07a3eb624e5326fa28733e9d176a778b9f67539ede648bd32430cb7",
+      "bytes": 300
+    },
+    "stdout.log": {
+      "sha256": "19f9d7a4effd75d8e0614eaa16dcb34b836bca2056fb0923dffc389623e08b32",
+      "bytes": 351
+    }
+  }
+}

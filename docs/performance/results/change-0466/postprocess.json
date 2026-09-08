@@ -1,0 +1,64 @@
+{
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "commands": [
+    {
+      "argv": [
+        "perf",
+        "script",
+        "--no-inline",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0466/samples/perf.data",
+        "-F",
+        "comm,pid,tid,time,event,period,ip,sym,dso"
+      ],
+      "started_utc": "2026-09-07T20:33:11.934554+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T20:33:12.612689+00:00",
+      "artifacts": {
+        "samples/perf-script.txt": "95a842b2a759c96abd721008ff831c1125c8fb030080f532560d66002b10351b",
+        "samples/perf-script.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "perf",
+        "report",
+        "--stdio",
+        "--no-children",
+        "--no-inline",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0466/samples/perf.data",
+        "--sort",
+        "symbol",
+        "--percent-limit",
+        "0.5"
+      ],
+      "started_utc": "2026-09-07T20:33:12.613853+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T20:33:13.309550+00:00",
+      "artifacts": {
+        "samples/top-symbols.txt": "c3bb2aa9254f0f76de6e8bce92182f0050de33f46d8d71914cd77121620e5b42",
+        "samples/top-symbols.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "heaptrack_print",
+        "-f",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0466/heaptrack/heaptrack.zst",
+        "-n",
+        "30"
+      ],
+      "started_utc": "2026-09-07T20:33:13.309715+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-07T20:33:17.461313+00:00",
+      "artifacts": {
+        "heaptrack/print.txt": "76d2be54ec94f58ba05efc73a00b72a6f6fb55dc77c79bd3c41877f54d899cbb",
+        "heaptrack/print.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "finished_utc": "2026-09-08T03:38:39.108374+00:00",
+  "files_removed": [
+    {
+      "path": "/tmp/litchi-goal-0466/normal",
+      "bytes": 58346112,
+      "sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5"
+    },
+    {
+      "path": "/tmp/litchi-goal-0466/profile",
+      "bytes": 463587824,
+      "sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90"
+    }
+  ],
+  "removed_bytes": 521933936,
+  "task_directory_absent": true
+}

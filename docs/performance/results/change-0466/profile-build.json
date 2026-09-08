@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "DEBUGINFOD_URLS": ""
+  },
+  "started_utc": "2026-09-07T20:34:29.407804+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T20:38:05.175752+00:00"
+}

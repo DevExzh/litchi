@@ -1,0 +1,7 @@
+{
+  "binary_sha256": "01b9bcba2efe7db89700c084443e32dc828d8a391358037612ec097b1fa52e90",
+  "bytes": 463587824,
+  "source_manifest_sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+  "revision": "418edc42a365819837b393e42a49e4cd459d1624",
+  "scope": "same source as normal, different profiling build flags; not normal latency evidence"
+}
