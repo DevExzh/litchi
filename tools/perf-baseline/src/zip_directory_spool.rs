@@ -5,9 +5,12 @@
 //! archive generation, and all reopen oracles are outside the timed interval.
 //! A timed operation constructs a fixed hashing sink and owns the complete ZIP writer lifetime;
 //! for the spool lane it also opens the caller-selected `File`, writes the
-//! archive, flushes the writer, and closes the spool.  Removing that file is
-//! benchmark-artifact cleanup after the process snapshots and is reported as
-//! excluded from the operation boundary.  No implicit temporary path is used.
+//! archive, flushes the writer, and closes the spool.  Removing a successfully
+//! completed file is benchmark-artifact cleanup after the process snapshots
+//! and is reported as excluded from the operation boundary.  A failed oracle
+//! or timed operation retains its create-new scratch path for diagnosis.  No
+//! implicit temporary path is used.  The caller must keep the scratch
+//! directory exclusively accessible during the run.
 
 use std::{
     collections::BTreeSet,
@@ -312,22 +315,16 @@ where
                     usize::MAX,
                     "oracle",
                 );
-                let spool_result = oracle_archive(
+                // Propagate an oracle failure before cleanup.  `create_new`
+                // may have refused a caller-owned path, and any path created
+                // for a failed oracle remains available for diagnosis.
+                let spool = oracle_archive(
                     corpus,
                     method,
                     Mode::Spool,
                     Some(&oracle_path),
                     spool_limits,
-                );
-                let cleanup_result = remove_owned_file(&oracle_path);
-                let spool = match spool_result {
-                    Ok(spool) => spool,
-                    Err(error) => {
-                        cleanup_result?;
-                        return Err(error);
-                    },
-                };
-                cleanup_result?;
+                )?;
                 let byte_exact = spool.bytes == control.bytes;
                 if !byte_exact {
                     return Err(format!(
@@ -338,6 +335,7 @@ where
                     .into());
                 }
                 validate_oracle(corpus, &spool.bytes)?;
+                remove_owned_file(&oracle_path)?;
                 insert_oracle_record(
                     &mut oracle_records,
                     &mut oracle_keys,
@@ -362,16 +360,9 @@ where
             let corpus = &corpora[case.corpus_index];
             for warmup in 0..config.warmups {
                 let path = operation_spool_path(&config, case, repeat, warmup, true);
-                let timed_result = run_timed_operation(corpus, case, path.as_deref(), spool_limits);
-                let cleanup_result = cleanup_operation_path(path.as_deref());
-                let timed = match timed_result {
-                    Ok(timed) => timed,
-                    Err(error) => {
-                        cleanup_result?;
-                        return Err(error);
-                    },
-                };
-                cleanup_result?;
+                // Propagate a timed-operation failure before cleanup so a
+                // caller can inspect the failed create-new scratch file.
+                let timed = run_timed_operation(corpus, case, path.as_deref(), spool_limits)?;
                 if !matches_expected(case, &timed.sink) {
                     return Err(format!(
                         "warmup output failed oracle for {} members / {} / {:?}",
@@ -381,19 +372,13 @@ where
                     )
                     .into());
                 }
+                cleanup_operation_path(path.as_deref())?;
             }
             for sample in 0..config.samples {
                 let path = operation_spool_path(&config, case, repeat, sample, false);
-                let timed_result = run_timed_operation(corpus, case, path.as_deref(), spool_limits);
-                let cleanup_result = cleanup_operation_path(path.as_deref());
-                let timed = match timed_result {
-                    Ok(timed) => timed,
-                    Err(error) => {
-                        cleanup_result?;
-                        return Err(error);
-                    },
-                };
-                cleanup_result?;
+                // Preserve the failed operation's scratch file for review;
+                // cleanup is owned by successful operations only.
+                let timed = run_timed_operation(corpus, case, path.as_deref(), spool_limits)?;
                 let matches = matches_expected(case, &timed.sink);
                 let record = OperationRecord {
                     mode: case.mode,
@@ -421,6 +406,7 @@ where
                     )
                     .into());
                 }
+                cleanup_operation_path(path.as_deref())?;
                 operations.push(record);
             }
         }
@@ -438,9 +424,9 @@ where
         } else {
             "Rust system allocator"
         },
-        timing_scope: "corpus references, expected output, and metric observers are prepared before the clock; a fixed hashing sink is constructed at operation entry, and the clock includes explicit spool File creation/open, every local header/member payload/data descriptor, complete writer finish including central-directory publication, sink acceptance and digest updates, writer flush, and spool File close; process and allocator endpoint snapshots plus digest finalization, reopen oracles, and artifact unlink are outside",
+        timing_scope: "corpus references, expected output, and metric observers are prepared before the clock; a fixed hashing sink is constructed at operation entry, and the clock includes explicit spool File creation/open, every local header/member payload/data descriptor, complete writer finish including central-directory publication, sink acceptance and digest updates, writer flush, and spool File close; process and allocator endpoint snapshots plus digest finalization, reopen oracles, and successful artifact unlink are outside",
         oracle_scope: "one control oracle and, when selected, one explicit-spool oracle per member-count/method pair; each oracle is byte-compared and reopened through ArchiveReader, then every generated member is decompressed and compared to the deterministic source payload",
-        cleanup_scope: "the caller-selected spool directory is created before capture; each per-operation File uses create_new and is removed after endpoint snapshots; unlink is excluded from elapsed_ns and no ambient temporary path is selected",
+        cleanup_scope: "the caller-selected spool directory is created before capture; each per-operation File uses create_new and is removed after successful endpoint snapshots; failed oracle or timed-operation paths are retained for diagnosis, unlink is excluded from elapsed_ns, the caller must keep the scratch directory exclusively accessible during the run, and no ambient temporary path is selected",
         control_storage_policy: "ZipArchiveWriterBuilder::with_capacity(member_count).build uses the existing in-memory Vec<FileHeader> plus contiguous member-name buffer; this is the measured control policy",
         storage_capability: "explicit caller-owned std::fs::File opened read/write/seek and passed to DirectorySpoolLimits; no sync_all is issued by the harness",
         samples: config.samples,
@@ -908,6 +894,72 @@ fn usage() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TestSpoolDirectory {
+        path: PathBuf,
+    }
+
+    impl TestSpoolDirectory {
+        fn new(label: &str) -> Self {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("test clock is after the Unix epoch")
+                .as_nanos();
+            let base = std::env::temp_dir();
+            for attempt in 0..128_u32 {
+                let path = base.join(format!(
+                    "litchi-zip-directory-spool-{label}-{}-{stamp}-{attempt}",
+                    std::process::id()
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Self { path },
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {},
+                    Err(error) => panic!("create test spool directory: {error}"),
+                }
+            }
+            panic!("could not create a unique test spool directory");
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestSpoolDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn tiny_cli_args(spool_dir: &Path, report: &Path) -> Vec<OsString> {
+        vec![
+            OsString::from("--mode"),
+            OsString::from("spool"),
+            OsString::from("--counts"),
+            OsString::from("1"),
+            OsString::from("--methods"),
+            OsString::from("store"),
+            OsString::from("--samples"),
+            OsString::from("1"),
+            OsString::from("--warmups"),
+            OsString::from("1"),
+            OsString::from("--repeats"),
+            OsString::from("1"),
+            OsString::from("--spool-dir"),
+            spool_dir.as_os_str().to_os_string(),
+            OsString::from("--json"),
+            report.as_os_str().to_os_string(),
+        ]
+    }
+
+    fn tiny_spool_paths(root: &Path) -> [PathBuf; 3] {
+        [
+            spool_path(root, 1, Method::Store, usize::MAX, usize::MAX, "oracle"),
+            spool_path(root, 0, Method::Store, 0, 0, "warmup"),
+            spool_path(root, 0, Method::Store, 0, 0, "sample"),
+        ]
+    }
 
     #[test]
     fn default_cli_is_control_only() {
@@ -967,5 +1019,63 @@ mod tests {
             summary.sha256,
             "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721"
         );
+    }
+
+    #[test]
+    fn cli_preserves_preexisting_oracle_warmup_and_sample_spools() {
+        for (label, preexisting_index) in [("oracle", 0), ("warmup", 1), ("sample", 2)] {
+            let directory = TestSpoolDirectory::new(label);
+            let paths = tiny_spool_paths(directory.path());
+            let report = directory.path().join("report.json");
+            let sentinel = format!("caller-owned-{label}-sentinel").into_bytes();
+            fs::write(&paths[preexisting_index], &sentinel).expect("write preexisting spool");
+
+            let error = run_from_args(tiny_cli_args(directory.path(), &report))
+                .expect_err("preexisting create_new path must refuse the CLI run");
+            let io_error = error
+                .downcast_ref::<io::Error>()
+                .expect("preexisting path failure must preserve io::Error");
+            assert_eq!(io_error.kind(), io::ErrorKind::AlreadyExists);
+            assert_eq!(
+                fs::read(&paths[preexisting_index]).expect("read preserved spool"),
+                sentinel
+            );
+            for path in &paths[..preexisting_index] {
+                assert!(
+                    !path.exists(),
+                    "successful earlier phase left scratch file {}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cli_removes_successful_oracle_warmup_and_sample_spools() {
+        let directory = TestSpoolDirectory::new("successful-cleanup");
+        let paths = tiny_spool_paths(directory.path());
+        let report = directory.path().join("report.json");
+        run_from_args(tiny_cli_args(directory.path(), &report)).expect("successful CLI run");
+        for path in paths {
+            assert!(
+                !path.exists(),
+                "successful CLI run left scratch file {}",
+                path.display()
+            );
+        }
+        let report_text = fs::read_to_string(&report).expect("read successful report");
+        assert!(report_text.contains("failed oracle or timed-operation paths are retained"));
+    }
+
+    #[test]
+    fn cli_retains_failed_oracle_spool_after_quota_failure() {
+        let directory = TestSpoolDirectory::new("quota-failure");
+        let paths = tiny_spool_paths(directory.path());
+        let report = directory.path().join("report.json");
+        let mut args = tiny_cli_args(directory.path(), &report);
+        args.extend([OsString::from("--max-spool-bytes"), OsString::from("1")]);
+        assert!(run_from_args(args).is_err());
+        assert!(paths[0].exists(), "failed oracle spool must be retained");
+        assert!(!report.exists());
     }
 }

@@ -23,6 +23,7 @@ mod opc_part_add;
 mod operation_metrics;
 mod parallel_metrics;
 pub mod pptx_cache_retention;
+pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
 pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
