@@ -250,6 +250,25 @@ RETIRED_IWA_KEYNOTE_METHODS = (
     "slide_notes_storage",
 )
 RETIRED_IWA_KEYNOTE_METHOD_SET = frozenset(RETIRED_IWA_KEYNOTE_METHODS)
+# The direct drawable-comment wrappers are retired as a single Keynote host
+# surface.  Keep this inventory separate from the generic comment editor: the
+# latter remains the compatibility route used by the Pages and Numbers hosts
+# while their focused owners finish their own migrations.
+RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHODS = (
+    "slide_drawable_comment",
+    "set_slide_drawable_comment",
+    "clear_slide_drawable_comment",
+    "slide_drawable_comment_replies",
+    "add_slide_drawable_comment_reply",
+    "set_slide_drawable_comment_reply",
+    "remove_slide_drawable_comment_reply",
+)
+RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHODS
+)
+IWA_SHARED_DRAWABLE_COMMENT_SOURCE = IWA_CORE_SOURCE_ROOT / "comments.rs"
+IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE = IWA_CORE_SOURCE_ROOT / "lib.rs"
+IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE = "IWorkDrawableCommentEditor"
 RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS = (
     "show_settings",
     "set_show_settings",
@@ -22578,6 +22597,82 @@ def _rust_root_canonical_exports(
         if any(_rust_root_level_matches(source, pattern) for pattern in patterns):
             exported.add(name)
     return frozenset(exported)
+
+
+def audit_iwa_keynote_drawable_comment_host_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired direct-comment routes out of the Keynote host.
+
+    The focused Keynote package owns the selector-first drawable-comment API.
+    The migration host must therefore have no production or test-only
+    identifier for any of the seven former ``KeynoteEditor`` routes.  Scan
+    the complete iwa source tree after masking comments and literals so a
+    private helper or public re-export cannot quietly recreate the old route.
+    The generic ``IWorkDrawableCommentEditor`` remains an intentional shared
+    host API for Pages and Numbers and is checked explicitly below.
+    """
+
+    source_root = root / IWA_CORE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        for match in RUST_IDENTIFIER.finditer(source):
+            name = match.group(1)
+            if name not in RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHOD_SET:
+                continue
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Keynote drawable-comment host route "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+
+    shared_source_path = root / IWA_SHARED_DRAWABLE_COMMENT_SOURCE
+    if not shared_source_path.is_file():
+        violations.append(
+            "shared litchi-iwa drawable-comment editor source is missing: "
+            f"{IWA_SHARED_DRAWABLE_COMMENT_SOURCE}"
+        )
+    else:
+        shared_source = _mask_rust_non_code(
+            shared_source_path.read_text(encoding="utf-8")
+        )
+        if re.search(
+            rf"\bpub\s+struct\s+{re.escape(IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE)}\b",
+            shared_source,
+        ) is None:
+            violations.append(
+                "shared litchi-iwa drawable-comment editor type is missing: "
+                f"{IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE}: "
+                f"{IWA_SHARED_DRAWABLE_COMMENT_SOURCE}"
+            )
+
+    export_source_path = root / IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE
+    if not export_source_path.is_file():
+        violations.append(
+            "shared litchi-iwa drawable-comment editor export source is missing: "
+            f"{IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE}"
+        )
+    else:
+        export_source = _mask_rust_non_code(
+            export_source_path.read_text(encoding="utf-8")
+        )
+        if re.search(
+            rf"\bpub(?:\s*\([^)]*\))?\s+use\s+"
+            rf"[^;\n]*\b{re.escape(IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE)}\b",
+            export_source,
+        ) is None:
+            violations.append(
+                "shared litchi-iwa drawable-comment editor export is missing: "
+                f"{IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE}: "
+                f"{IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE}"
+            )
+
+    return sorted(set(violations))
 
 
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
@@ -67267,6 +67362,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwork_example_source_topology()
         + audit_retired_iwa_obsolete_examples_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_keynote_drawable_comment_host_source_topology()
         + audit_iwa_keynote_build_order_source_topology()
         + audit_iwa_direct_core_path_source_topology()
         + audit_iwa_bundle_source_topology()

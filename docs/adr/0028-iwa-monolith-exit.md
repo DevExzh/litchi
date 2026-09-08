@@ -10330,11 +10330,13 @@ is 753,541 bytes with SHA-256
 authored, saved, closed to the theme chooser, reopened, and inspected in
 Keynote 14.4; the newly authored square comment text was confirmed natively.
 This receipt is limited to source fixture evidence. Focused candidate/native
-CRUD evidence is tracked per operation below; cross-component parity, rooted-
-registry policy, host method retirement, and the generic Keynote cleanup
-debt remain open. No monolith-exit gate or ordered migration debt closes here.
+CRUD evidence is tracked per operation below. Cross-component parity, rooted-
+registry policy, and host method retirement now have separate native receipts;
+the generic Pages/Numbers comment host remains among the eleven ordered
+dependency debts. No overall monolith-exit gate or ordered migration debt
+closes here.
 
-### Scope correction: cross-component contract is bounded; native parity remains pending
+### Scope correction: bounded cross-component contract with native parity receipt
 
 The host audit confirms package-global comment graph resolution: legacy editor
 routes can follow a comment root or reply whose archive component differs from
@@ -10356,23 +10358,45 @@ preservation. The rooted author registry remains authoritative; only an absent
 optional `Document -> TSA -> TSK` (`3 -> 1 -> 7`) reference permits a bounded
 global type-213 fallback. Zero fallback sources preserve supported authorless
 creation; ambiguous or malformed fallback sources remain fail-closed. Native
-cross-component parity and rooted-registry fixture proof remain pending. All
-seven legacy host comment methods remain retained for
-this migration turn:
+cross-component parity and rooted-registry fixture proof are now closed by the
+permanent native golden set under
+`test-data/iwork/keynote/drawable-comments-cross-component-native/` and its
+`native-receipt.json`. The host deletion target was exactly these seven legacy
+comment methods:
 `slide_drawable_comment`, `set_slide_drawable_comment`,
 `clear_slide_drawable_comment`, `slide_drawable_comment_replies`,
 `add_slide_drawable_comment_reply`, `set_slide_drawable_comment_reply`, and
 `remove_slide_drawable_comment_reply`. Local native or focused progress does
-not retire a host route or close a monolith-exit debt. Generic shared host
-comment cleanup remains a separate migration responsibility.
+not satisfy a host retirement gate by itself; the seven methods are now absent
+from the migration host and its public return/re-export surface under the
+boundary ratchet. Generic shared host comment cleanup remains a separate
+migration responsibility.
 
-### Current cross-component implementation verification (native gate pending)
+### Host drawable-comment deletion boundary (native gate closed)
+
+The boundary checker now rejects every exact identifier in the seven-method
+inventory throughout `crates/litchi-iwa/src`, including test-only items and
+public re-exports. This prevents a private compatibility helper or a second
+public return route from recreating the retired Keynote host surface. The same
+check explicitly requires the generic `IWorkDrawableCommentEditor` type and
+its root export to remain available for Pages and Numbers. The final native
+receipt now closes the associated cross-component and rooted-registry gate:
+Keynote 14.4 opened all ten permanent goldens without repair, saved each with
+a real hash change, closed to the theme chooser, reopened the exact path, and
+passed strict readback.
+
+### Current cross-component implementation verification (native gate closed)
 
 The focused implementation checks currently pass 12/12 local-graph cases,
-5/5 rooted-author-registry cases, and 7/7 cross-component cases, including
+6/6 rooted-author-registry cases, and 7/7 cross-component cases, including
 four payload UUID/map combinations and current-data-owner atomic rejection. The broader
 Keynote library run passes 281 cases and the old-host compatibility run passes
-9/9 cases. These results cover the package-scope reader, copy-on-write engine,
+9/9 cases. The final focused pass inventory is 281 Keynote library cases,
+12 local-graph cases, 6 registry cases, 7 cross-component cases, 2 native-fixture
+tests (one opt-in exporter and one default readback over 9 permanent foreign
+files), and 9/9 host-parity cases. The registry suite includes the tenth
+permanent native file; the legacy backend comparison passes 6/6 cases.
+These results cover the package-scope reader, copy-on-write engine,
 per-component metadata transitions, authorless fallback, and source
 immutability checks. The registered-reply path now passes focused strict UUID
 and reachable-graph checks: removal atomically preserves UUID/current-
@@ -10387,21 +10411,33 @@ focused graph cleanup removes it; selected-thread author payload bytes,
 unrelated authors, semantic values, non-comment objects, metadata, save tokens,
 UUIDs, and liveness remain strict. Unregistered and UUID-less storage with a
 `DataReference` owner is covered by the current data-owner atomic rejection.
+The final native readback passes all nine cross-component cases in 4.05 seconds
+and the unique unrooted-registry case in 0.24 seconds. The foreign drawable is
+the intentionally empty Author-and-Date footer; native visual inspection
+confirmed the expected foreign root/reply comments. In creation and shared-
+footer cases, the unselected movie and square comments remained present;
+clear/remove cases were checked against their operation-specific expected
+state. The permanent golden readback also preserves the baseline slide names,
+titles, and movie summaries.
 The final ASAN run passes 128 executions in 321 seconds at 647 MiB, including
 registered ordinal-0 SetReply/RemoveReply and exact inverse restoration.
-Normal commit hooks pass Rust formatting, workspace lint, all-feature workspace
-library/integration tests, and documentation tests. The boundary suite passes
-997 tests; the full scanner reports 64 packages, 238 dependency edges, and
-11 explicit migration debts. Scoped `cargo clean` for Keynote, the legacy IWA
-host, and the protobuf crate reclaimed 3.4 GiB. This turn's owned scratch files
-and sanitizer target (1.70 GiB logical bytes), generated fuzz lock, and empty
-artifact directories were removed; permanent fixtures and corpus seeds remain.
-Computer Use reached the Keynote theme chooser during native verification,
-but no foreign-topology candidate was opened or
-verified because subsequent Open-dialog inspection repeatedly failed with
-`SCStreamError -3802`. No native receipt is recorded. The seven legacy host
-comment methods remain retained, and the prior same-component sanitizer and
-hook receipts do not satisfy this native gate.
+Final normal commit hooks passed Rust formatting, workspace lint, all-feature
+workspace library/integration tests, and documentation tests. Cargo manifest
+sorting was automatically skipped because no manifests changed. The boundary suite passes 1,001
+tests; the full scanner reports 64 packages, 238 dependency edges, and 11
+explicit migration debts. Scoped `cargo clean` for Keynote, the legacy IWA
+host, and the protobuf crate reclaimed 3.4 GiB. The prior implementation
+turn's owned scratch files and sanitizer target (1.70 GiB logical bytes),
+generated fuzz lock, and empty artifact directories were removed. After the
+current native-verification commit hooks passed, scoped `cargo clean` for
+Keynote and the legacy IWA host removed 550 files (1.1 GiB). The owned
+`/private/tmp/litchi-native-cross-component-20260908` directory was removed
+(13,606,885 logical bytes), including temporary candidates and logs. All ten
+permanent native goldens, their receipt, prior fixtures, and corpus seeds remain.
+An earlier Computer Use attempt failed with `SCStreamError -3802`, but the
+later successful native run supersedes that transient tooling failure. The
+seven legacy host comment methods are removed, and their native retirement gate
+is closed by the permanent readback above.
 
 ### Operation ledger: direct-drawable comment CRUD closeout
 
@@ -10410,15 +10446,10 @@ a generic CRUD claim. The six native candidate gates below are closed by the
 strict `native_resaved_drawable_comment_candidates_read_back` readback, which
 also checks the baseline slide names, titles, and movie summaries:
 
-These six receipts cover the existing same-component candidate layouts. They do
-not exercise foreign drawable, root, or reply components. A separate native
-cross-component fixture must be saved, actually closed, reopened at its exact
-path, and read back before that topology is treated as parity evidence.
-
-No cross-component native receipt or completion claim is recorded here yet;
-the prior same-component
-`native_resaved_drawable_comment_candidates_read_back` receipt remains
-unchanged and does not satisfy this gate.
+These six receipts cover the existing same-component candidate layouts. The
+separate cross-component and rooted-registry matrix below supplies the native
+foreign-topology evidence and is checked by strict focused semantic readback of
+permanent goldens in CI.
 
 | Operation | Current evidence/status |
 | --- | --- |
@@ -10429,9 +10460,38 @@ unchanged and does not satisfy this gate.
 | Reply update (set) | **Native candidate gate closed.** Keynote 14.4 showed `duplicate reply updated` on the original root; strict focused readback confirmed the updated reply. |
 | Reply remove | **Native candidate gate closed.** Keynote 14.4 retained the original root and only the first duplicate reply; strict focused readback confirmed the removal. |
 
+### Native cross-component and rooted-registry operation matrix
+
+Each operation below passed the same native lifecycle: Keynote 14.4 opened the
+permanent golden without repair, displayed the expected comment state, saved
+with a real hash change, closed to the theme chooser, reopened the exact file
+URL, and passed strict readback. The nine cross-component cases completed in
+4.05 seconds; the unique unrooted-registry case completed in 0.24 seconds.
+
+| Operation | Current evidence/status |
+| --- | --- |
+| Foreign root set | **Native gate closed.** Strict readback preserved the foreign root mutation. |
+| Foreign root clear | **Native gate closed.** Strict readback preserved the foreign root removal. |
+| Foreign reply add | **Native gate closed.** Strict readback preserved the added foreign reply. |
+| Foreign reply set | **Native gate closed.** Strict readback preserved the updated foreign reply. |
+| Foreign reply remove | **Native gate closed.** Strict readback preserved the removed foreign reply. |
+| Foreign drawable root create | **Native gate closed.** The empty Author-and-Date footer drawable accepted the foreign root. |
+| Shared foreign root set | **Native gate closed.** Strict readback preserved the shared foreign root mutation. |
+| Shared foreign reply clear | **Native gate closed.** Strict readback preserved the shared foreign reply clear. |
+| Foreign drawable root and reply | **Native gate closed.** Strict readback preserved the foreign root and reply together. |
+| Unrooted unique native create/reply | **Native gate closed.** The unique registry fallback preserved the created root and reply. |
+
+Creation and shared-footer cases retained the movie and square comments
+alongside the foreign footer comment; clear/remove cases were checked against
+their operation-specific expected state. The permanent goldens and
+`native-receipt.json` are owned by the focused readback test, so CI repeats the
+strict focused semantic readback of checked-in files. The native GUI
+save/close/reopen lifecycle was verified manually in Keynote 14.4.
+
 Scratch candidate paths and hashes are intentionally omitted. These gates do
-not retire a host route, broaden the same-component contract, or close the
-cross-component or rooted-registry debt.
+not broaden the same-component contract. The seven legacy Keynote host routes
+are removed under the source ratchet, while the generic Pages/Numbers comment
+host remains a separate migration debt.
 
 The comment payload policy is intentionally split at this boundary. Media
 lifecycle cloning reconstructs selected payloads and retains the strict
@@ -10442,4 +10502,6 @@ opaque source bytes for the wire-preserving rewrite, while nested
 date/reference/UUID envelopes and the exact ArchiveInfo reference census remain
 strict. Permanent regressions prove root/reply extension preservation and
 atomic rejection of unknown archive-header metadata. Native cross-component
-save/close/reopen parity is still a separate gate.
+save/close/reopen parity is closed by the permanent ten-golden native receipt.
+The eleven ordered dependency debts remain open, including the generic
+Pages/Numbers host comment cleanup.

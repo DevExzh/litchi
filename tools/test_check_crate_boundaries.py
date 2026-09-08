@@ -8683,6 +8683,159 @@ class BoundaryPolicyTests(unittest.TestCase):
             ),
         )
 
+    def test_retired_iwa_keynote_drawable_comment_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHODS,
+            (
+                "slide_drawable_comment",
+                "set_slide_drawable_comment",
+                "clear_slide_drawable_comment",
+                "slide_drawable_comment_replies",
+                "add_slide_drawable_comment_reply",
+                "set_slide_drawable_comment_reply",
+                "remove_slide_drawable_comment_reply",
+            ),
+        )
+
+    def test_retired_iwa_keynote_drawable_comment_routes_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    f"pub fn {name}() {{}}"
+                    for name in boundaries.RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHODS
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            shared = root / boundaries.IWA_SHARED_DRAWABLE_COMMENT_SOURCE
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "pub struct IWorkDrawableCommentEditor;\n", encoding="utf-8"
+            )
+            export = root / boundaries.IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE
+            export.parent.mkdir(parents=True, exist_ok=True)
+            export.write_text(
+                "pub use comments::IWorkDrawableCommentEditor;\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root)
+            )
+            self.assertEqual(
+                violations,
+                sorted(
+                    "retired litchi-iwa Keynote drawable-comment host route "
+                    f"{name}: crates/litchi-iwa/src/keynote/editor.rs:{index}"
+                    for index, name in enumerate(
+                        boundaries.RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHODS,
+                        start=1,
+                    )
+                ),
+            )
+
+            # Comments and string literals do not reactivate a route, while a
+            # test-only item remains visible to this retirement ratchet.
+            host.write_text(
+                "// pub fn slide_drawable_comment() {}\n"
+                'const NOTE: &str = "set_slide_drawable_comment";\n'
+                "#[cfg(test)]\n"
+                "fn clear_slide_drawable_comment() {}\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root)
+            )
+            self.assertEqual(
+                violations,
+                [
+                    "retired litchi-iwa Keynote drawable-comment host route "
+                    "clear_slide_drawable_comment: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:4"
+                ],
+            )
+
+            # A public re-export is part of the retired host surface even when
+            # no function declaration remains in the editor module.
+            reexport = root / "crates/litchi-iwa/src/keynote/reexport.rs"
+            reexport.write_text(
+                "pub use crate::comments::slide_drawable_comment;\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root)
+            )
+            self.assertEqual(
+                violations,
+                [
+                    "retired litchi-iwa Keynote drawable-comment host route "
+                    "clear_slide_drawable_comment: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:4",
+                    "retired litchi-iwa Keynote drawable-comment host route "
+                    "slide_drawable_comment: "
+                    "crates/litchi-iwa/src/keynote/reexport.rs:1",
+                ],
+            )
+
+    def test_iwa_keynote_drawable_comment_retirement_keeps_shared_host(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / "crates/litchi-iwa/src/keynote"
+            source_root.mkdir(parents=True)
+            shared = root / boundaries.IWA_SHARED_DRAWABLE_COMMENT_SOURCE
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "pub struct IWorkDrawableCommentEditor;\n", encoding="utf-8"
+            )
+            export = root / boundaries.IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE
+            export.parent.mkdir(parents=True, exist_ok=True)
+            export.write_text(
+                "pub use comments::IWorkDrawableCommentEditor;\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            host.write_text("pub fn slide_drawables() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root),
+                [],
+            )
+
+            shared.write_text("pub struct Other;\n", encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root)
+            )
+            self.assertIn(
+                "shared litchi-iwa drawable-comment editor type is missing: "
+                "IWorkDrawableCommentEditor: "
+                "crates/litchi-iwa/src/comments.rs",
+                violations,
+            )
+
+            shared.write_text(
+                "pub struct IWorkDrawableCommentEditor;\n", encoding="utf-8"
+            )
+            export.write_text("pub use comments::Other;\n", encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_drawable_comment_host_source_topology(root)
+            )
+            self.assertIn(
+                "shared litchi-iwa drawable-comment editor export is missing: "
+                "IWorkDrawableCommentEditor: "
+                "crates/litchi-iwa/src/lib.rs",
+                violations,
+            )
+
+    def test_iwa_keynote_drawable_comment_retirement_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_drawable_comment_host_source_topology()",
+            main_source,
+        )
+
     def test_retired_iwa_keynote_methods_cannot_return(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
