@@ -1,5 +1,20 @@
 # Performance CRUD coverage
 
+## 2026-09-08: PPTX fresh streaming allocation scaling (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) adds opt-in
+`pptx_streaming_create` for 8/256/8,192 fresh slides. Its 360 samples use public
+forward creation, exact member topology, all authored text/geometry/layout
+owners and a zero-retaining sink. Actual operation heap grows with deck size;
+a single active slide does not satisfy the full explicit-window requirement.
+Logical existing-structure append, adding a Part and arbitrary edits/repackaging
+remain separate scenarios.
+
+Selectable/default counts become 441/37. The checked default remains 201 rows,
+31 corpora and 15 categories with 33 mappings (11 measured, 22 correctness-only).
+This opt-in evidence does not silently promote the representative/default
+coverage table. Native, source-variant, feature-breadth and scaling gaps remain.
+
 ## 2026-09-08: DOCX fresh streaming operation memory (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) adds the opt-in

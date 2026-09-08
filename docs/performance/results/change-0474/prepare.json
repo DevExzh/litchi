@@ -1,0 +1,12 @@
+{
+  "build_path": "/tmp/litchi-goal-0474/tree",
+  "clean_after": true,
+  "driver_sha256": "f60c143c7bc53592f89b7eb9c72d4d1ebde3aca23c1ad038b8a72d1f15613a9a",
+  "finished_utc": "2026-09-08T10:04:27.858507+00:00",
+  "revision": "60a1a4300a2844f372c0c916b5be69c50ce38668",
+  "selected_files": 9777,
+  "selected_patterns_sha256": "ce63c3dcb60735237884bd03bb5aed139d0562d15cd43a94b9fe36dbc9faa3a1",
+  "source_binding_sha256": "03fe59b7280d16cc5ec1a419dd8e63a3d727114eb004fc9a31eb3c43363e4ab8",
+  "started_utc": "2026-09-08T10:04:24.646033+00:00",
+  "status": "pass"
+}

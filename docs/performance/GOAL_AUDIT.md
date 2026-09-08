@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## PPTX fresh streaming memory requirement remains open (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) adds a missing public
+fresh-creation baseline and rejects constant total memory for the tested path:
+operation peak rises from 435,541 to 8,875,092 bytes over 8/256/8,192 slides.
+All 360 samples and authored-slide oracles pass, with zero allocator live exit
+delta. This advances measurement, not closure of the explicit-window requirement.
+ZIP/OPC metadata and repeated allocation work need profiling and implementation.
+Fresh creation remains distinct from logical append, Part addition and edits
+followed by repackaging. Native breadth, source variants, scaling and the full
+non-iWork goal remain open.
+
 ## DOCX fresh-creation evidence added (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) advances the explicit-window

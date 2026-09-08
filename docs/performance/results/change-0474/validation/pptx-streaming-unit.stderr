@@ -1,0 +1,3 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.45s
+     Running unittests src/lib.rs (target/debug/deps/litchi_pptx-4ff5cfc72c60db9a)

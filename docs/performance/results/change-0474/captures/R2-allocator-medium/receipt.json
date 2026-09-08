@@ -1,0 +1,78 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0474/captures/R2-allocator-medium/resource.log",
+    "/tmp/litchi-goal-0474/allocator",
+    "--workers",
+    "1",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--case",
+    "pptx_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0474/captures/R2-allocator-medium/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0474/captures/R2-allocator-medium/corpus-catalog.json"
+  ],
+  "artifacts": {
+    "corpus-catalog.json": {
+      "bytes": 4907,
+      "sha256": "2e3ab557f46a501b2993bffa8baf46d1f15d22ddb95c79d40ec55219ac1b9179"
+    },
+    "report.json": {
+      "bytes": 43482,
+      "sha256": "edc32e6559be7175a4287cf235a11d9d3464003a8a5e7a496daec7af91a8ebfb"
+    },
+    "resource.log": {
+      "bytes": 1076,
+      "sha256": "f54880a15292210f5032570c74ef4e5c6043c4c81b8859ff636666374b684505"
+    },
+    "started.json": {
+      "bytes": 1574,
+      "sha256": "45ac33af4ecfcd9f0a4ba98abac4acad743b9c6fffba3dd99f4bcee96be3dab4"
+    },
+    "stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary_sha256": "e7f50f245bf0a525cc24967f8dcf1604d53d5e94fd1fd36341d73506211b404d",
+  "binary_unchanged": true,
+  "build_sha256": "1081b05ce9eec6b03e309d08f1b0de67ba9bfc573e43f6c18844ec4ea0e4dc78",
+  "clean_after": true,
+  "clean_before": true,
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "driver_sha256": "67f3fd6e6434874b3b8bfd0d23720bb82c5b30f5d8c630697ef990a6f42d34dc",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T10:13:27.335076+00:00",
+  "lane": "R2-allocator-medium",
+  "mode": "allocator",
+  "protocol_sha256": "e4ea1bd41bde36c6eed1f8405dcd8ac7988ff9a373d8f8fb33a8c900d8961745",
+  "repeat": "R2",
+  "revision": "60a1a4300a2844f372c0c916b5be69c50ce38668",
+  "samples": 30,
+  "schema": "litchi-0474-capture-v1",
+  "shape": "medium",
+  "started_utc": "2026-09-08T10:13:26.294684+00:00",
+  "warmups": 3
+}

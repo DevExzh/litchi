@@ -1,0 +1,23 @@
+{
+  "commands": [
+    [
+      "flock",
+      "/tmp/litchi-goal-0474/cpu.lock",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0474/build.py"
+    ],
+    [
+      "flock",
+      "/tmp/litchi-goal-0474/cpu.lock",
+      "python3",
+      "-B",
+      "docs/performance/results/change-0474/run.py"
+    ]
+  ],
+  "lock_path": "/tmp/litchi-goal-0474/cpu.lock",
+  "measurement_overlap": "Capture chronology is independently checked by verify.py; all owned heavy validation/build/capture commands were serialized with the same lock.",
+  "recorded_utc": "2026-09-08T10:21:03.588450+00:00",
+  "schema": "litchi-0474-orchestration-v1",
+  "scope": "Root record of actual parent commands; child receipts retain exact measured argv and chronology."
+}

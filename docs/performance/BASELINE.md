@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## PPTX fresh streaming allocation baseline (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) adds the opt-in public
+PPTX streaming case with 360 samples over 8/256/8,192 slides. Operation peak
+above entry is 435,541 / 681,659 / 8,875,092 bytes, identical in each of sixty
+allocator samples per shape, with zero live exit delta. Normal p50 R1/R2 is
+1.035935/1.032350, 8.565925/8.493936 and 259.277908/258.604302 ms.
+All normal repeat flags are below one percent. This is a descriptive baseline,
+with growing transport/name metadata and no constant-total-memory or production
+speedup claim. Source/build/capture identities and strict replay are retained.
+
 ## DOCX fresh streaming memory baseline (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) adds opt-in public DOCX

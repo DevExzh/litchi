@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## PPTX streaming metadata growth measured (0474)
+
+[0474](changes/0474-pptx-streaming-operation-memory.md) measures operation peak
+growth from 435,541 to 8,875,092 bytes across 8 to 8,192 fresh slides. The large
+operation also requests 6.81 GB of allocations. The public writer emits XML
+directly, but OPC/ZIP name validation and ZIP header/name storage persist until
+finalization. Fresh Deflate setup and transient name preparation are additional
+allocation-work leads; no per-owner peak attribution is claimed. The next step
+is stack attribution before a shared transport change. An explicit directory
+spool alone would leave growing name indexes. See [next work](results/change-0474/next-work.md).
+
 ## DOCX streaming memory gap measured (0473)
 
 [0473](changes/0473-docx-streaming-operation-memory.md) measures the already-public

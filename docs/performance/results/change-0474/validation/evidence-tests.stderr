@@ -1,0 +1,16 @@
+test_allocator_vector_mutation_is_rejected (__main__.EvidenceTests.test_allocator_vector_mutation_is_rejected) ... ok
+test_chronology_rejects_capture_before_build (__main__.EvidenceTests.test_chronology_rejects_capture_before_build) ... ok
+test_duplicate_json_keys_are_rejected (__main__.EvidenceTests.test_duplicate_json_keys_are_rejected) ... ok
+test_frozen_protocol_contains_reversed_twelve_lane_matrix (__main__.EvidenceTests.test_frozen_protocol_contains_reversed_twelve_lane_matrix) ... ok
+test_identity_matrix_rejects_sink_counter_mutation (__main__.EvidenceTests.test_identity_matrix_rejects_sink_counter_mutation) ... ok
+test_identity_matrix_requires_equal_output_sink_and_writer_projection (__main__.EvidenceTests.test_identity_matrix_requires_equal_output_sink_and_writer_projection) ... ok
+test_real_allocator_byte_balance_failure_and_scope_are_rejected (__main__.EvidenceTests.test_real_allocator_byte_balance_failure_and_scope_are_rejected) ... ok
+test_real_report_semantic_and_statistic_mutations_are_rejected (__main__.EvidenceTests.test_real_report_semantic_and_statistic_mutations_are_rejected) ... ok
+test_rss_parser_requires_one_whole_process_value (__main__.EvidenceTests.test_rss_parser_requires_one_whole_process_value) ... ok
+test_seal_requires_exact_regular_file_coverage (__main__.EvidenceTests.test_seal_requires_exact_regular_file_coverage) ... ok
+test_signed_allocator_deltas_are_retained (__main__.EvidenceTests.test_signed_allocator_deltas_are_retained) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.008s
+
+OK

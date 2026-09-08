@@ -1,0 +1,52 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0474/allocator",
+    "--case",
+    "pptx_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0474/pilots/allocator/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0474/pilots/allocator/corpus-catalog.json"
+  ],
+  "cwd": "/tmp/litchi-goal-0474/tree",
+  "started_utc": "2026-09-08T10:11:10.261654+00:00",
+  "driver_sha256": "e7c2837bd5bcd432c2a864e7abc6860305d38980fdeaf84666910b86f5051e24",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T10:11:10.555035+00:00",
+  "artifacts": {
+    "corpus-catalog.json": {
+      "sha256": "f1a45d9b54c5758fa3e7b571bc7c2f4e098a9b9b54625a44e449bb6623d84755",
+      "bytes": 4880
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "6322cec2fc3a0fff49984af340ab70300b05e85fa2f6dca2bdc2f1a090fbaf57",
+      "bytes": 21677
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

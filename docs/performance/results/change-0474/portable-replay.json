@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/tmp/litchi-goal-0474-portable-1li7acth/bundle/verify.py",
+    "--sealed",
+    "--portable-check"
+  ],
+  "cwd": "/tmp/litchi-goal-0474-portable-1li7acth",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T10:23:31.999559+00:00",
+  "seal_unchanged": true,
+  "source_seal_sha256": "80909dc50d00a72f11b043985cf589e6320169215e1bbcba556d7e2deacd64e0",
+  "started_utc": "2026-09-08T10:23:31.476468+00:00",
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\n  \"identity_shapes\": 3,\n  \"lanes\": 12,\n  \"live\": {\n    \"status\": \"not_checked\"\n  },\n  \"portable\": [\n    \"isolated export passed\",\n    \"output identity mutation rejected\"\n  ],\n  \"samples\": 360,\n  \"schema\": \"litchi-0474-verification-v1\",\n  \"sealed\": {\n    \"files\": 173,\n    \"status\": \"pass\"\n  },\n  \"shapes\": [\n    \"tiny\",\n    \"medium\",\n    \"large\"\n  ],\n  \"status\": \"pass\",\n  \"validation_receipts\": 16\n}\n",
+  "temporary_copy_removed": true
+}

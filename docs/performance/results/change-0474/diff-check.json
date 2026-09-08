@@ -1,0 +1,29 @@
+{
+  "raw_exit": 2,
+  "raw_stdout": "docs/performance/results/change-0474/validation/harness-focused.stdout:10: new blank line at EOF.\ndocs/performance/results/change-0474/validation/harness-tests-final.stdout:380: new blank line at EOF.\ndocs/performance/results/change-0474/validation/harness-tests-formatted.stdout:380: new blank line at EOF.\ndocs/performance/results/change-0474/validation/pptx-streaming-tests.stdout:18: new blank line at EOF.\ndocs/performance/results/change-0474/validation/pptx-streaming-unit.stdout:5: new blank line at EOF.\ndocs/performance/results/change-0474/validation/pptx-unit-all.stdout:553: new blank line at EOF.\n",
+  "raw_stderr": "",
+  "raw_artifacts_preserved": true,
+  "scoped_argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0474/validation/harness-focused.stdout",
+    ":(exclude)docs/performance/results/change-0474/validation/harness-tests-final.stdout",
+    ":(exclude)docs/performance/results/change-0474/validation/harness-tests-formatted.stdout",
+    ":(exclude)docs/performance/results/change-0474/validation/pptx-streaming-tests.stdout",
+    ":(exclude)docs/performance/results/change-0474/validation/pptx-streaming-unit.stdout",
+    ":(exclude)docs/performance/results/change-0474/validation/pptx-unit-all.stdout"
+  ],
+  "scoped_exit": 0,
+  "excluded_exact_paths": [
+    "docs/performance/results/change-0474/validation/harness-focused.stdout",
+    "docs/performance/results/change-0474/validation/harness-tests-final.stdout",
+    "docs/performance/results/change-0474/validation/harness-tests-formatted.stdout",
+    "docs/performance/results/change-0474/validation/pptx-streaming-tests.stdout",
+    "docs/performance/results/change-0474/validation/pptx-streaming-unit.stdout",
+    "docs/performance/results/change-0474/validation/pptx-unit-all.stdout"
+  ]
+}
