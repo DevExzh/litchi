@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0471/A-heap/stderr.log",
+    ":(exclude)docs/performance/results/change-0471/B-heap/stderr.log"
+  ],
+  "exit_code": 0,
+  "raw_exclusions": [
+    "docs/performance/results/change-0471/A-heap/stderr.log",
+    "docs/performance/results/change-0471/B-heap/stderr.log"
+  ],
+  "reason": "Retain the original Heaptrack stderr line-1 trailing space in both immutable raw artifacts."
+}

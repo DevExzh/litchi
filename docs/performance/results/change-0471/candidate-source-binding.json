@@ -1,0 +1,15 @@
+{
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "changed_files": [
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs"
+  ],
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "aea5b744f35775272c0a5919049f06385aa89804",
+  "schema": "litchi-0471-source-binding-v1",
+  "source_count": 6993,
+  "source_manifest": "sources/candidate.json",
+  "source_manifest_sha256": "ef04a86d13c675aea2a3653b8f53cca3745907dee3c788100ec712a3a45dc4c9"
+}

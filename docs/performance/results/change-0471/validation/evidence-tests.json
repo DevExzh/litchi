@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0471/test_evidence.py"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-08T08:17:57.069911+00:00",
+  "finished_utc": "2026-09-08T08:17:57.153288+00:00",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "f424b7c4c65eede308674fc04daa61517a351d3b3626bfbde3f0333ae4241500"
+}

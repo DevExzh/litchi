@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## Rejected worksheet buffer-lifetime experiment (0471)
+
+[0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) keeps compaction, grid,
+web, style and change-verification ordering intact while testing an earlier
+`Vec` drop. Independent ownership review confirms no returned borrow into the
+released vector, unchanged no-op handling and unchanged Store adoption guards.
+All 30 previously read ADR files retain their hashes. The memory gate fails,
+so the production change is reverted under ADR 0005's measurement requirement;
+no new API, cache, runtime, unsafe code or dependency edge remains.
+
 ## 0470: bounded worksheet web-validation reuse
 
 All 30 previously read ADR files retain their authenticated hashes. The

@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Rejected early worksheet-buffer release (0471)
+
+[0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) finds no practical peak
+memory benefit from dropping pre-compaction bytes before verification. Both
+whole-process Heaptrack runs report 32,012,510 allocation calls and rounded
+peak heap `104.38M`; normal RSS is 117,576 / 118,332 / 118,216 / 116,980 KiB
+in ABBA order. The candidate is reverted. The seven-row timing probe and
+201-row guard retain individual regressions and control drift, without a
+qualified latency, exact peak-memory or program-completion claim.
+
 ## Current result: bounded XLSX web-validation reuse (0470)
 
 [0470](changes/0470-xlsx-empty-web-proof.md) adds a finite success proof during

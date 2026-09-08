@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/tmp/litchi-goal-0471-portable/docs/performance/results/change-0471/verify.py"
+  ],
+  "cwd": "/tmp/litchi-goal-0471-portable",
+  "exit_code": 0,
+  "verified_utc": "2026-09-08T08:20:19.307378+00:00",
+  "verified_seal_sha256": "5b7569c338d584f5f17f5169e634734bca0a1b8bdba0cfd5b02d222abb7d91c7",
+  "stdout_sha256": "24e88fc9363207483b1237a2ec8aabe73086302a20cf1d61e463202c8f5e4f5b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "copy_removed_after_success": true
+}

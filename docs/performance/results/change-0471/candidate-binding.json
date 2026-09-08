@@ -1,0 +1,19 @@
+{
+  "binary_path": "/tmp/litchi-goal-0471/candidate",
+  "binary_sha256": "24126b84b0d44ca99a3fa1fde6e18c19f94d53989fb748fd1d5eb392d782c904",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "build_receipt_path": "build.json",
+  "build_receipt_sha256": "e50097921556a6b6a5acd3ea9a696d331963b8a1d31066cc4ad8cbd2fe4f9184",
+  "bytes": 463616624,
+  "clean_build": true,
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "aea5b744f35775272c0a5919049f06385aa89804",
+  "role": "candidate",
+  "schema": "litchi-0471-role-binding-v1",
+  "source_binding_sha256": "4ee1327f93f9b535f697bed87b2160b4241c70b6955df3d9a53f85599517a1fd",
+  "source_manifest": "sources/candidate.json",
+  "source_manifest_sha256": "ef04a86d13c675aea2a3653b8f53cca3745907dee3c788100ec712a3a45dc4c9"
+}
