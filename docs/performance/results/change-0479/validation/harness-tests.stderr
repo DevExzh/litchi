@@ -1,0 +1,4 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 52.02s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-6738dde4fca20249)
+     Running unittests src/bin/docx_plain_paragraph_tail_append.rs (tools/perf-baseline/target/release/deps/docx_plain_paragraph_tail_append-2eb84045c8561d23)

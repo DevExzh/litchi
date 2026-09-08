@@ -1,0 +1,457 @@
+{
+  "cases": {
+    "131072": {
+      "candidate_archive_bytes": 343949,
+      "candidate_archive_sha256": "2152458e09392b4aa836b8f22c4d27fd11d58d3af4dbabc261f202ce09714e4e",
+      "candidate_main_xml_archive_verified": true,
+      "candidate_main_xml_bytes": 6422728,
+      "candidate_main_xml_oracle_verified": true,
+      "candidate_main_xml_sha256": "2283078ddbdf199b0eba8b5891c146d02994495d60789af768d7f21631c93d8f",
+      "candidate_member_count": 4,
+      "candidate_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 342164,
+          "compressed_sha256": "f080c24c9c72cbe30969c15247de2e521622281c16a78cf48e005df39ab47673",
+          "compression_method": "Deflate",
+          "crc32": 1249488977,
+          "data_descriptor": true,
+          "decoded_bytes": 6422728,
+          "decoded_sha256": "2283078ddbdf199b0eba8b5891c146d02994495d60789af768d7f21631c93d8f",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "candidate_semantic": {
+        "order_sha256": "874f87a0ab23b092d8155a146380bead47a973192a7e7961f98eeaefc2cb2ef1",
+        "paragraph_count": 131073,
+        "text_bytes": 2097168,
+        "text_sha256": "c8e16169650ddcb59ade824ced1c5efd8056e355c723b46c6252143d252af14b"
+      },
+      "candidate_semantic_reopen_verified": true,
+      "count": 131072,
+      "format": "DOCX/OOXML/OPC/ZIP",
+      "generator": "litchi-docx-plain-paragraph-tail-append-v1",
+      "limits": {
+        "max_depth": 16,
+        "max_durable_bytes": 67108864,
+        "max_events": 1048712,
+        "max_output_bytes": 8519831,
+        "max_paragraphs": 131073,
+        "max_xml_bytes": 7471255
+      },
+      "opaque_bytes": 32768,
+      "opaque_member_exact_verified": true,
+      "opaque_path": "word/perf-opaque.bin",
+      "patch": {
+        "copied_before_position": 131072,
+        "copied_bytes": 49,
+        "copied_paragraphs": 1,
+        "copied_source_position": 0,
+        "durable_bytes": 12845513,
+        "durable_canonical_verified": true,
+        "inverse_verified": true,
+        "publication_inverse_verified": true,
+        "replay_verified": true,
+        "stale_source_refusal_verified": true
+      },
+      "physical_order_verified": true,
+      "source_archive_bytes": 343945,
+      "source_archive_sha256": "b545060378379ffcd21a72d6534c5128875dbb368a588c68a2a07f73d4edbd42",
+      "source_main_xml_archive_verified": true,
+      "source_main_xml_bytes": 6422679,
+      "source_main_xml_sha256": "24d43839e52d4aa836c7c4e3a574b722baab3f366e17e354aa0e96d28d6a962a",
+      "source_member_count": 4,
+      "source_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 342160,
+          "compressed_sha256": "e01a07dd2a48b182979e44c19ca4e50f9b1dd9a702578cdd0c51314494f1aa5d",
+          "compression_method": "Deflate",
+          "crc32": 3927202071,
+          "data_descriptor": true,
+          "decoded_bytes": 6422679,
+          "decoded_sha256": "24d43839e52d4aa836c7c4e3a574b722baab3f366e17e354aa0e96d28d6a962a",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "source_semantic": {
+        "order_sha256": "af881412d4fa0a8853d179be2adca044201b4282f62415ce36fd601b8716a79d",
+        "paragraph_count": 131072,
+        "text_bytes": 2097152,
+        "text_sha256": "34e9a2e7d3ba59fc2543a59846d37adcdf4730e1162eeff95c8548fd1eba16e3"
+      },
+      "source_semantic_reopen_verified": true,
+      "source_unchanged_verified": true,
+      "tail_copy_exactly_one_verified": true,
+      "untouched_members_verified": true
+    },
+    "64": {
+      "candidate_archive_bytes": 2112,
+      "candidate_archive_sha256": "297f40d52e7494cd3f4601ef75a7f93e53bd5999dfa90cf4ecf5501aa7a61ca8",
+      "candidate_main_xml_archive_verified": true,
+      "candidate_main_xml_bytes": 3336,
+      "candidate_main_xml_oracle_verified": true,
+      "candidate_main_xml_sha256": "65fea96781565784866917b629db330827813dae70dbf726497d6c6c4eb73921",
+      "candidate_member_count": 4,
+      "candidate_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 327,
+          "compressed_sha256": "4efe7598a9f31d7bc168a809ca28237bc4595b3d8a74f76b19ea28e3cabcc3e8",
+          "compression_method": "Deflate",
+          "crc32": 3925234908,
+          "data_descriptor": true,
+          "decoded_bytes": 3336,
+          "decoded_sha256": "65fea96781565784866917b629db330827813dae70dbf726497d6c6c4eb73921",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "candidate_semantic": {
+        "order_sha256": "1cb242d129bfd0dad9dae9112f3da417371b2fdadd0bf794e1228ddcab2ac334",
+        "paragraph_count": 65,
+        "text_bytes": 1040,
+        "text_sha256": "310019d72a23340045b5a24b176822df10ae5d20c04e5573de491cd143ac18b8"
+      },
+      "candidate_semantic_reopen_verified": true,
+      "count": 64,
+      "format": "DOCX/OOXML/OPC/ZIP",
+      "generator": "litchi-docx-plain-paragraph-tail-append-v1",
+      "limits": {
+        "max_depth": 16,
+        "max_durable_bytes": 67108864,
+        "max_events": 648,
+        "max_output_bytes": 2100439,
+        "max_paragraphs": 65,
+        "max_xml_bytes": 1051863
+      },
+      "opaque_bytes": 32768,
+      "opaque_member_exact_verified": true,
+      "opaque_path": "word/perf-opaque.bin",
+      "patch": {
+        "copied_before_position": 64,
+        "copied_bytes": 49,
+        "copied_paragraphs": 1,
+        "copied_source_position": 0,
+        "durable_bytes": 6729,
+        "durable_canonical_verified": true,
+        "inverse_verified": true,
+        "publication_inverse_verified": true,
+        "replay_verified": true,
+        "stale_source_refusal_verified": true
+      },
+      "physical_order_verified": true,
+      "source_archive_bytes": 2108,
+      "source_archive_sha256": "b8756cc3ca2cf55572d989ec95629d71d1e6f515b08d42253db78d0a493539a9",
+      "source_main_xml_archive_verified": true,
+      "source_main_xml_bytes": 3287,
+      "source_main_xml_sha256": "6c6bf4974aa8ac4cc18ae89ebeb75cdbbe0255173fbbc78418a937a647db37fa",
+      "source_member_count": 4,
+      "source_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 323,
+          "compressed_sha256": "a823f2d8db396ae895c5f6c2851a289cd2ff7be8a1dd071442afd8c08f8e7c15",
+          "compression_method": "Deflate",
+          "crc32": 3542831113,
+          "data_descriptor": true,
+          "decoded_bytes": 3287,
+          "decoded_sha256": "6c6bf4974aa8ac4cc18ae89ebeb75cdbbe0255173fbbc78418a937a647db37fa",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "source_semantic": {
+        "order_sha256": "e1cb88086b8622e8777b9818c41fcf7818dcd0e2d79baf6994e6a7ff3afbb09f",
+        "paragraph_count": 64,
+        "text_bytes": 1024,
+        "text_sha256": "dfd19a3bc8a52bc21a76e6fb9509ab39e281ce63cc418a089dba649b9ed43c36"
+      },
+      "source_semantic_reopen_verified": true,
+      "source_unchanged_verified": true,
+      "tail_copy_exactly_one_verified": true,
+      "untouched_members_verified": true
+    },
+    "8192": {
+      "candidate_archive_bytes": 23362,
+      "candidate_archive_sha256": "c29151eb2672bd2910fdbdf55f922dfdd01aa39d1cdfa2ffb6136d6579c4fdc9",
+      "candidate_main_xml_archive_verified": true,
+      "candidate_main_xml_bytes": 401608,
+      "candidate_main_xml_oracle_verified": true,
+      "candidate_main_xml_sha256": "5db002ddff00bd44e51fc3e53b7f0454fbdb5c5b2647dbdcebc2a5917d1ff697",
+      "candidate_member_count": 4,
+      "candidate_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 21577,
+          "compressed_sha256": "9268adf28f97180938c7ebf8e7a8cb925f0dc4fa175d09935fb3553fc7d1999e",
+          "compression_method": "Deflate",
+          "crc32": 1585480662,
+          "data_descriptor": true,
+          "decoded_bytes": 401608,
+          "decoded_sha256": "5db002ddff00bd44e51fc3e53b7f0454fbdb5c5b2647dbdcebc2a5917d1ff697",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "candidate_semantic": {
+        "order_sha256": "290ca4acae1221d7b28c5595a75231c14a7ab92ad0f5dc5ccf4f6753a1daf6cb",
+        "paragraph_count": 8193,
+        "text_bytes": 131088,
+        "text_sha256": "dbb5842afe0c538f3d6e220abcda0b4e19876efbacc5deef72b5cfa7de7845f6"
+      },
+      "candidate_semantic_reopen_verified": true,
+      "count": 8192,
+      "format": "DOCX/OOXML/OPC/ZIP",
+      "generator": "litchi-docx-plain-paragraph-tail-append-v1",
+      "limits": {
+        "max_depth": 16,
+        "max_durable_bytes": 67108864,
+        "max_events": 65672,
+        "max_output_bytes": 2498711,
+        "max_paragraphs": 8193,
+        "max_xml_bytes": 1450135
+      },
+      "opaque_bytes": 32768,
+      "opaque_member_exact_verified": true,
+      "opaque_path": "word/perf-opaque.bin",
+      "patch": {
+        "copied_before_position": 8192,
+        "copied_bytes": 49,
+        "copied_paragraphs": 1,
+        "copied_source_position": 0,
+        "durable_bytes": 803273,
+        "durable_canonical_verified": true,
+        "inverse_verified": true,
+        "publication_inverse_verified": true,
+        "replay_verified": true,
+        "stale_source_refusal_verified": true
+      },
+      "physical_order_verified": true,
+      "source_archive_bytes": 23357,
+      "source_archive_sha256": "aca7dc0072331b91f04fd2bf7a4262575dd9329f75db1453501bb890d967881d",
+      "source_main_xml_archive_verified": true,
+      "source_main_xml_bytes": 401559,
+      "source_main_xml_sha256": "4268bed02a76ff093b425c87e61c691df76518b4bee447039336d951a77da68a",
+      "source_member_count": 4,
+      "source_members": [
+        {
+          "compressed_bytes": 267,
+          "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+          "compression_method": "Deflate",
+          "crc32": 2913692623,
+          "data_descriptor": true,
+          "decoded_bytes": 512,
+          "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+          "path": "[Content_Types].xml"
+        },
+        {
+          "compressed_bytes": 183,
+          "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+          "compression_method": "Deflate",
+          "crc32": 3929537947,
+          "data_descriptor": true,
+          "decoded_bytes": 297,
+          "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+          "path": "_rels/.rels"
+        },
+        {
+          "compressed_bytes": 21572,
+          "compressed_sha256": "b5d64648c9feb162951cc6547f9c291189c1f1f33d1988d18739951c529375dd",
+          "compression_method": "Deflate",
+          "crc32": 3442827955,
+          "data_descriptor": true,
+          "decoded_bytes": 401559,
+          "decoded_sha256": "4268bed02a76ff093b425c87e61c691df76518b4bee447039336d951a77da68a",
+          "path": "word/document.xml"
+        },
+        {
+          "compressed_bytes": 811,
+          "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+          "compression_method": "Deflate",
+          "crc32": 528510375,
+          "data_descriptor": true,
+          "decoded_bytes": 32768,
+          "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+          "path": "word/perf-opaque.bin"
+        }
+      ],
+      "source_semantic": {
+        "order_sha256": "f13cf6afd38cab71dc54507b0f2dbb7fafe62e5f98c55135b5f0fb2ca2b4c340",
+        "paragraph_count": 8192,
+        "text_bytes": 131072,
+        "text_sha256": "3640ce5ea2de3524e1e5fe432e1bbe569c246f934ac71bff7fce9c5a0ccc63cd"
+      },
+      "source_semantic_reopen_verified": true,
+      "source_unchanged_verified": true,
+      "tail_copy_exactly_one_verified": true,
+      "untouched_members_verified": true
+    }
+  },
+  "frozen_utc": "2026-09-08T17:19:20.976467+00:00",
+  "pilots": {
+    "pilot-allocator-phases": {
+      "bytes": 53720,
+      "path": "pilot-allocator-phases.report.json",
+      "sha256": "b07fc2ad740467089bea20c8208e6c79311012083deadaa228c8fe7365f2c3b7"
+    },
+    "pilot-allocator-total": {
+      "bytes": 26380,
+      "path": "pilot-allocator-total.report.json",
+      "sha256": "0aadd98ff7fdb06f49df7362566fc4dbe31101c84dc5551872d001720bda30c1"
+    },
+    "pilot-normal-phases": {
+      "bytes": 43094,
+      "path": "pilot-normal-phases.report.json",
+      "sha256": "c93e8a9521b3bf4ca94cfec08f1fad9a3125026df9cafbddf75ac7df7eac3885"
+    },
+    "pilot-normal-total": {
+      "bytes": 24585,
+      "path": "pilot-normal-total.report.json",
+      "sha256": "8de931ebe94fd1fe7dfd15932f1a333a785f6725d6dcb23c4a03c8e43ce08567"
+    }
+  },
+  "schema": "docx-plain-paragraph-tail-append-corpus-manifest-v1"
+}

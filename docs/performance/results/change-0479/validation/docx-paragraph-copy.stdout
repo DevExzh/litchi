@@ -1,0 +1,17 @@
+
+running 12 tests
+test changed_source_version_is_rejected_before_publication_output ... ok
+test empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing ... ok
+test enforced_protection_is_refused ... ok
+test publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact ... ok
+test positions_operation_count_and_resource_limits_are_failure_atomic ... ok
+test empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous ... ok
+test partial_sinks_complete_and_write_zero_fails_without_false_progress ... ok
+test strict_and_ordinary_producer_namespace_declarations_are_supported ... ok
+test copies_exact_fragment_at_first_middle_and_last_source_order_slots ... ok
+test durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness ... ok
+test relationships_dependencies_signatures_macros_and_paths_are_refused ... ok
+test structured_paragraphs_sections_and_hostile_namespaces_are_refused ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

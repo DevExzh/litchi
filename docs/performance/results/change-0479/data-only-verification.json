@@ -1,0 +1,12 @@
+{
+  "captures": 24,
+  "closure": {
+    "profiles": "pass"
+  },
+  "data_only": true,
+  "protocol_sha256": "99b75c3d91c972dad834118e4da7a91a18e3b1cdf847cdfe7661dee1c56a6cdb",
+  "samples": 720,
+  "schema": "docx-plain-paragraph-tail-append-verification-v1",
+  "sealed": false,
+  "status": "pass"
+}

@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 2026-09-08: one logical DOCX paragraph append (0479)
+
+[0479](changes/0479-docx-tail-append-baseline.md) measures copying source paragraph zero to the tail of an existing
+64 / 8,192 / 131,072-paragraph document, through commit and sequential
+publication. The current edit permits one operation and refuses section
+properties. Repeated bulk appends and documents containing section properties
+remain separate missing workloads. Fresh creation, package-Part addition and
+arbitrary edit/repackaging are separate checklist categories. This warm
+in-memory source baseline supplies no cold/range/native or worker-scaling claim.
+
 ## 2026-09-08: public PPTX generated-name scratch route (0478)
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) adds explicit metadata

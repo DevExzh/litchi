@@ -1,0 +1,755 @@
+{
+  "binary": {
+    "comm": "docx_plain_para",
+    "path": "/tmp/litchi-goal-0479/normal/docx_plain_paragraph_tail_append",
+    "sha256": "a90fd6934985f7763414d1f4d5ac98d87312ea031e87812aa52cb0270042112f"
+  },
+  "inputs": {
+    "perf_report": {
+      "bytes": 987153,
+      "path": "validation/profile-perf-report.stdout",
+      "sha256": "670f1dd22a6fcc135bcd566dbb1bf236aa8e2d7d18a5d1747188e241e2b4f07c"
+    },
+    "perf_script": {
+      "bytes": 2937662,
+      "path": "validation/profile-perf-script.stdout",
+      "sha256": "85b63a7bb0a1456db96d09f0d6f08f7d5609c440afc7f5c8eab3af721c0f14e8"
+    },
+    "perf_stat": {
+      "bytes": 0,
+      "path": "validation/profile-perf-stat.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_stat_csv": {
+      "bytes": 301,
+      "path": "profiles/perf-stat.csv",
+      "sha256": "045e7021f626f41856f0fc2a7c89cd7c9697ea3f252da3a9c405f1bcf8dd09b2"
+    },
+    "strace": {
+      "bytes": 0,
+      "path": "validation/profile-strace.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "strace_txt": {
+      "bytes": 1923,
+      "path": "profiles/strace.txt",
+      "sha256": "12321d557ed1bffe01ca0355de178eda6d67a6b61bbac568f311cb1241ac735b"
+    }
+  },
+  "perf_report_no_children": {
+    "event": "cpu/cycles/P",
+    "event_count_approx": 45568709549,
+    "target_top_level_row_count": 71,
+    "target_top_rows": [
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 18.49,
+        "shared_object": "libc.so.6",
+        "symbol": "__memcmp_evex_movbe"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 15.9,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "litchi_docx::source_backed::paragraph_copy::scan_document"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 13.13,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 10.07,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "xml_minifier::audit::verify_with_policy"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 9.38,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 3.16,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 3.06,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 2.37,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 2.37,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.78,
+        "shared_object": "libc.so.6",
+        "symbol": "cfree@GLIBC_2.2.5"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.68,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.48,
+        "shared_object": "libc.so.6",
+        "symbol": "__memmove_avx512_unaligned_erms"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.34,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.18,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 1.18,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 0.99,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 0.79,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "<quick_xml::events::attributes::IterState>::next"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 0.79,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 0.59,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "sha2::sha256::x86_sha::compress"
+      },
+      {
+        "command": "docx_plain_para",
+        "reported_percent": 0.49,
+        "shared_object": "docx_plain_paragraph_tail_append",
+        "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+      }
+    ],
+    "top_level_reported_percent_sum": 100.05,
+    "top_level_row_count": 73,
+    "total_lost_samples": 0
+  },
+  "perf_script_weighted": {
+    "all_period": 45568709549,
+    "event": "cpu/cycles/P",
+    "helper_percent_of_all_period": 1.3072566809456043e-05,
+    "helper_period": 5957,
+    "helper_sample_blocks": 5,
+    "sample_blocks": 1017,
+    "scan_document_partition": {
+      "source_backed_scan_in_lifecycle": {
+        "marker": "litchi_docx::source_backed::paragraph_copy::scan_document within run_total_iteration",
+        "percent_of_lifecycle_period": 68.03739511346946,
+        "percent_of_target_period": 60.316606625660796,
+        "period": 27485495690,
+        "representative_stack": [
+          "7da13e7b2ca5 __memcmp_evex_movbe+0x25 (/usr/lib/x86_64-linux-gnu/libc.so.6)",
+          "628e7180c308 read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e7180c308 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e718102f3 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x2c3 (inlined)",
+          "628e718102f3 read_resolved_event_into<&[u8]>+0x2c3 (inlined)",
+          "628e718102f3 scan_document+0x2c3 (inlined)",
+          "628e7180e34b branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x3b (inlined)",
+          "628e7180e34b with_xml+0x3b (inlined)",
+          "628e7180fcb1 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x271 (inlined)",
+          "628e7180fcb1 copy_fragment+0x271 (inlined)",
+          "628e7180e555 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x65 (inlined)",
+          "628e7180e555 copy_plain_paragraph+0x65 (inlined)"
+        ],
+        "sample_blocks": 611
+      },
+      "source_backed_scan_outside_lifecycle": {
+        "marker": "litchi_docx::source_backed::paragraph_copy::scan_document outside run_total_iteration",
+        "percent_of_lifecycle_period": 6.578937050951749,
+        "percent_of_target_period": 5.832368471124532,
+        "period": 2657734701,
+        "representative_stack": [
+          "628e718103f2 scan_document+0x3c2 (inlined)",
+          "628e7181a32c branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x120c (inlined)",
+          "628e7181a32c plain_paragraph_copy_snapshot_with_limits+0x120c (inlined)",
+          "628e717f58a5 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x755 (inlined)",
+          "628e717f58a5 build_candidate+0x755 (inlined)",
+          "628e717f58a5 build_corpus+0x755 (inlined)",
+          "628e717b4d75 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xd25 (inlined)",
+          "628e717bf936 main+0x26 (inlined)",
+          "628e717bed56 __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x6 (inlined)",
+          "628e717bf835 report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>+0x15 (inlined)",
+          "628e717bf835 {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x15 (inlined)",
+          "628e71975787 {closure#0}+0x4c7 (inlined)"
+        ],
+        "sample_blocks": 59
+      }
+    },
+    "target_comm": "docx_plain_para",
+    "target_non_lifecycle_percent": 11.347860209716014,
+    "target_non_lifecycle_period": 5171072783,
+    "target_non_lifecycle_sample_blocks": 114,
+    "target_percent_of_all_period": 99.99998692743318,
+    "target_period": 45568703592,
+    "target_sample_blocks": 1012,
+    "top_leaf_symbols": [
+      {
+        "percent_of_target_period": 18.491826378135862,
+        "period": 8426485551,
+        "symbol": "__memcmp_evex_movbe"
+      },
+      {
+        "percent_of_target_period": 13.12956004535175,
+        "period": 5982970300,
+        "symbol": "process_event<&[u8]>"
+      },
+      {
+        "percent_of_target_period": 9.278480544138803,
+        "period": 4228083297,
+        "symbol": "resolve_event"
+      },
+      {
+        "percent_of_target_period": 8.588918306833538,
+        "period": 3913858725,
+        "symbol": "map_err<quick_xml::events::Event, quick_xml::errors::Error, xml_minifier::audit::Error, xml_minifier::audit::verify_with_policy::{closure_env#1}>"
+      },
+      {
+        "percent_of_target_period": 7.79919849996333,
+        "period": 3553993647,
+        "symbol": "branch<quick_xml::events::Event, quick_xml::errors::Error>"
+      },
+      {
+        "percent_of_target_period": 3.356458954141756,
+        "period": 1529494832,
+        "symbol": "map_err<(quick_xml::name::ResolveResult, quick_xml::events::Event), quick_xml::errors::Error, litchi_docx::source_backed::paragraph_copy::Error, litchi_docx::source_backed::paragraph_copy::scan_document::{closure_env#3}>"
+      },
+      {
+        "percent_of_target_period": 2.666274041672105,
+        "period": 1214986515,
+        "symbol": "[unknown]"
+      },
+      {
+        "percent_of_target_period": 1.9813755073745614,
+        "period": 902887132,
+        "symbol": "scan_document"
+      },
+      {
+        "percent_of_target_period": 1.8763971401418402,
+        "period": 855049851,
+        "symbol": "search_chunk<core::core_arch::x86::__m256i, fn(memchr::vector::SensibleMoveMask) -> usize>"
+      },
+      {
+        "percent_of_target_period": 1.679231473976667,
+        "period": 765204013,
+        "symbol": "__libc_free"
+      },
+      {
+        "percent_of_target_period": 1.481205585840929,
+        "period": 674966183,
+        "symbol": "__memmove_avx512_unaligned_erms"
+      },
+      {
+        "percent_of_target_period": 1.4810480105878716,
+        "period": 674894378,
+        "symbol": "read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>"
+      },
+      {
+        "percent_of_target_period": 1.4810272507258297,
+        "period": 674884918,
+        "symbol": "verify_with_policy"
+      },
+      {
+        "percent_of_target_period": 1.185155781115556,
+        "period": 540060125,
+        "symbol": "next"
+      },
+      {
+        "percent_of_target_period": 1.185089689702753,
+        "period": 540030008,
+        "symbol": "splat<i8, 32>"
+      },
+      {
+        "percent_of_target_period": 1.1849805687577175,
+        "period": 539980283,
+        "symbol": "new_unchecked"
+      },
+      {
+        "percent_of_target_period": 1.184852919745534,
+        "period": 539922115,
+        "symbol": "read_with<&[u8], quick_xml::parser::element::ElementParser>"
+      },
+      {
+        "percent_of_target_period": 0.8884053156848474,
+        "period": 404834785,
+        "symbol": "branch<(), litchi_docx::source_backed::paragraph_copy::Error>"
+      },
+      {
+        "percent_of_target_period": 0.789110149412126,
+        "period": 359587265,
+        "symbol": "feed"
+      },
+      {
+        "percent_of_target_period": 0.6912417211169013,
+        "period": 314989891,
+        "symbol": "read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>"
+      }
+    ],
+    "unresolved_percent_of_target_period": 2.666274041672105,
+    "unresolved_target_period": 1214986515,
+    "unresolved_target_sample_blocks": 27,
+    "weighted_callstack_markers": {
+      "build_corpus": {
+        "marker": "build_corpus",
+        "percent_of_target_period": 11.34637077519956,
+        "period": 5170394067,
+        "representative_stack": [
+          "7da13e7b2c84 __memcmp_evex_movbe+0x4 (/usr/lib/x86_64-linux-gnu/libc.so.6)",
+          "628e7181a32c branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x120c (inlined)",
+          "628e7181a32c plain_paragraph_copy_snapshot_with_limits+0x120c (inlined)",
+          "628e717f58a5 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x755 (inlined)",
+          "628e717f58a5 build_candidate+0x755 (inlined)",
+          "628e717f58a5 build_corpus+0x755 (inlined)",
+          "628e717b4d75 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xd25 (inlined)",
+          "628e717bf936 main+0x26 (inlined)",
+          "628e717bed56 __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x6 (inlined)",
+          "628e717bf835 report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>+0x15 (inlined)",
+          "628e717bf835 {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x15 (inlined)",
+          "628e71975787 {closure#0}+0x4c7 (inlined)"
+        ],
+        "sample_blocks": 113
+      },
+      "copy_plain_paragraph": {
+        "marker": "copy_plain_paragraph",
+        "percent_of_target_period": 19.150723362979452,
+        "period": 8726736365,
+        "representative_stack": [
+          "7da13e7b2ca5 __memcmp_evex_movbe+0x25 (/usr/lib/x86_64-linux-gnu/libc.so.6)",
+          "628e7180c308 read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e7180c308 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e718102f3 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x2c3 (inlined)",
+          "628e718102f3 read_resolved_event_into<&[u8]>+0x2c3 (inlined)",
+          "628e718102f3 scan_document+0x2c3 (inlined)",
+          "628e7180e34b branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x3b (inlined)",
+          "628e7180e34b with_xml+0x3b (inlined)",
+          "628e7180fcb1 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x271 (inlined)",
+          "628e7180fcb1 copy_fragment+0x271 (inlined)",
+          "628e7180e555 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x65 (inlined)",
+          "628e7180e555 copy_plain_paragraph+0x65 (inlined)"
+        ],
+        "sample_blocks": 194
+      },
+      "deflate_medium": {
+        "marker": "deflate_medium",
+        "percent_of_target_period": 2.46863319411503,
+        "period": 1124924143,
+        "representative_stack": [
+          "628e7193182a send_bits_overflow+0x4a (inlined)",
+          "628e71934eb5 send_bits+0x2305 (inlined)",
+          "628e71934eb5 send_code+0x2305 (inlined)",
+          "628e71934eb5 emit_lit+0x2305 (inlined)",
+          "628e71934eb5 compress_block_help+0x2305 (inlined)",
+          "628e71934eb5 compress_block_dynamic_trees+0x2305 (inlined)",
+          "628e71934eb5 zng_tr_flush_block+0x2305 (inlined)",
+          "628e71934eb5 flush_block_only+0x2305 (inlined)",
+          "628e71939a93 deflate_medium+0xf03 (inlined)",
+          "628e71936196 deflate+0x6b6 (inlined)",
+          "628e7192a2e0 from+0x40 (inlined)",
+          "628e7192a2e0 into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>>+0x40 (inlined)"
+        ],
+        "sample_blocks": 25
+      },
+      "lifecycle": {
+        "marker": "run_total_iteration",
+        "percent_of_target_period": 88.65213979028398,
+        "period": 40397630809,
+        "representative_stack": [
+          "7da13e7b2ca5 __memcmp_evex_movbe+0x25 (/usr/lib/x86_64-linux-gnu/libc.so.6)",
+          "628e7180c308 read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e7180c308 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x918 (inlined)",
+          "628e718102f3 read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>>+0x2c3 (inlined)",
+          "628e718102f3 read_resolved_event_into<&[u8]>+0x2c3 (inlined)",
+          "628e718102f3 scan_document+0x2c3 (inlined)",
+          "628e7180e34b branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x3b (inlined)",
+          "628e7180e34b with_xml+0x3b (inlined)",
+          "628e7180fcb1 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x271 (inlined)",
+          "628e7180fcb1 copy_fragment+0x271 (inlined)",
+          "628e7180e555 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x65 (inlined)",
+          "628e7180e555 copy_plain_paragraph+0x65 (inlined)"
+        ],
+        "sample_blocks": 898
+      },
+      "publish_plain_paragraph": {
+        "marker": "publish_plain_paragraph",
+        "percent_of_target_period": 55.08940254645987,
+        "period": 25103526557,
+        "representative_stack": [
+          "7da13e7b2c9e __memcmp_evex_movbe+0x1e (/usr/lib/x86_64-linux-gnu/libc.so.6)",
+          "628e7180e34b branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x3b (inlined)",
+          "628e7180e34b with_xml+0x3b (inlined)",
+          "628e7180f040 apply+0xe0 (inlined)",
+          "628e717c02ea publish_plain_paragraph_copy_patch_to_stream<&mut litchi_perf_baseline::docx_plain_paragraph_tail_append::HashingSink>+0x12a (inlined)",
+          "628e717c02ea publish_plain_paragraph_copy_to_stream<&mut litchi_perf_baseline::docx_plain_paragraph_tail_append::HashingSink>+0x12a (inlined)",
+          "628e717ffbe2 branch<litchi_docx::source_backed::paragraph_copy::Publication, litchi_docx::source_backed::paragraph_copy::Error>+0x3792 (inlined)",
+          "628e717ffbe2 run_total_iteration+0x3792 (inlined)",
+          "628e717ffbe2 run_case+0x3792 (inlined)",
+          "628e717b4de0 branch<litchi_perf_baseline::docx_plain_paragraph_tail_append::CaseReport, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>+0xd90 (inlined)",
+          "628e717b4de0 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xd90 (inlined)",
+          "628e717bf936 main+0x26 (inlined)"
+        ],
+        "sample_blocks": 558
+      },
+      "scan_document": {
+        "marker": "litchi_docx::source_backed::paragraph_copy::scan_document",
+        "percent_of_target_period": 66.14897509678532,
+        "period": 30143230391,
+        "representative_stack": [
+          "628e718103f2 scan_document+0x3c2 (inlined)",
+          "628e7181a32c branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x120c (inlined)",
+          "628e7181a32c plain_paragraph_copy_snapshot_with_limits+0x120c (inlined)",
+          "628e717f58a5 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x755 (inlined)",
+          "628e717f58a5 build_candidate+0x755 (inlined)",
+          "628e717f58a5 build_corpus+0x755 (inlined)",
+          "628e717b4d75 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xd25 (inlined)",
+          "628e717bf936 main+0x26 (inlined)",
+          "628e717bed56 __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x6 (inlined)",
+          "628e717bf835 report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>+0x15 (inlined)",
+          "628e717bf835 {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x15 (inlined)",
+          "628e71975787 {closure#0}+0x4c7 (inlined)"
+        ],
+        "sample_blocks": 670
+      },
+      "scan_document_any": {
+        "marker": "scan_document",
+        "percent_of_target_period": 67.13681569025577,
+        "period": 30593376543,
+        "representative_stack": [
+          "628e718103f2 scan_document+0x3c2 (inlined)",
+          "628e7181a32c branch<litchi_docx::source_backed::paragraph_copy::Layout, litchi_docx::source_backed::paragraph_copy::Error>+0x120c (inlined)",
+          "628e7181a32c plain_paragraph_copy_snapshot_with_limits+0x120c (inlined)",
+          "628e717f58a5 branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error>+0x755 (inlined)",
+          "628e717f58a5 build_candidate+0x755 (inlined)",
+          "628e717f58a5 build_corpus+0x755 (inlined)",
+          "628e717b4d75 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xd25 (inlined)",
+          "628e717bf936 main+0x26 (inlined)",
+          "628e717bed56 __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x6 (inlined)",
+          "628e717bf835 report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>+0x15 (inlined)",
+          "628e717bf835 {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>>+0x15 (inlined)",
+          "628e71975787 {closure#0}+0x4c7 (inlined)"
+        ],
+        "sample_blocks": 680
+      },
+      "semantic_record": {
+        "marker": "semantic_record",
+        "percent_of_target_period": 2.172745035419045,
+        "period": 990091745,
+        "representative_stack": [
+          "628e7194cce3 splat<i8, 32>+0x13 (inlined)",
+          "628e7194cce3 _mm256_set1_epi8+0x13 (inlined)",
+          "628e7194cce3 splat+0x13 (inlined)",
+          "628e7194cce3 new<core::core_arch::x86::__m256i>+0x13 (inlined)",
+          "628e7194cce3 new_unchecked+0x13 (inlined)",
+          "628e7194cce3 find_avx2+0x13 (inlined)",
+          "628e7180d190 memchr3_raw+0x680 (inlined)",
+          "628e7180d190 memchr3_raw+0x680 (inlined)",
+          "628e7180d190 {closure#0}+0x680 (inlined)",
+          "628e7180d190 next<memchr::memchr::{impl#9}::next::{closure_env#0}>+0x680 (inlined)",
+          "628e7180d190 next+0x680 (inlined)",
+          "628e7180d190 feed+0x680 (inlined)"
+        ],
+        "sample_blocks": 22
+      },
+      "verify_with_policy": {
+        "marker": "verify_with_policy",
+        "percent_of_target_period": 13.280769378882356,
+        "period": 6051874433,
+        "representative_stack": [
+          "628e718fc36e read_event_impl<&[u8], ()>+0x9ce (inlined)",
+          "628e718f9d80 map_err<quick_xml::events::Event, quick_xml::errors::Error, xml_minifier::audit::Error, xml_minifier::audit::verify_with_policy::{closure_env#1}>+0x180 (inlined)",
+          "628e718f9d80 verify_with_policy+0x180 (inlined)",
+          "628e718f95a4 verify_authored+0x14 (inlined)",
+          "628e718d4777 map<xml_minifier::audit::Report, xml_minifier::audit::Error, (), litchi_opc::pkgwriter::{impl#4}::validate_authored_xml::{closure_env#0}>+0x67 (inlined)",
+          "628e718d4777 validate_authored_xml+0x67 (inlined)",
+          "628e718d3f17 branch<(), litchi_opc::error::OpcError>+0x1bd7 (inlined)",
+          "628e718d3f17 from_package+0x1bd7 (inlined)",
+          "628e718d4976 branch<litchi_opc::pkgwriter::PublicationPlan, litchi_opc::error::OpcError>+0xc6 (inlined)",
+          "628e718d4976 to_bytes+0xc6 (inlined)",
+          "628e717f9d2c branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError>+0x56c (inlined)",
+          "628e717f9d2c source_archive+0x56c (inlined)"
+        ],
+        "sample_blocks": 134
+      }
+    }
+  },
+  "perf_stat": {
+    "derived": {
+      "branch_misses_percent_of_branches": 0.3746012953583947,
+      "cache_misses_per_cycle": 0.00022429457952163962,
+      "instructions_per_cycle": 4.196646588764176
+    },
+    "events": {
+      "branch-misses": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 142458513
+      },
+      "branches": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 38029370097
+      },
+      "cache-misses": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 10174103
+      },
+      "cycles": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 45360449734
+      },
+      "instructions": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 190361776641
+      },
+      "page-faults": {
+        "metric": "",
+        "metric_unit": "",
+        "running_percent": 100.0,
+        "runtime_field": 10124158626,
+        "unit": "",
+        "value": 37201
+      }
+    },
+    "scope": "separate perf stat whole-process run including corpus, warmups, lifecycles, report serialization and teardown"
+  },
+  "reconciliation": {
+    "perf_report_and_perf_stat_must_not_be_subtracted": true,
+    "perf_stat_is_separate_run": true,
+    "script_all_period_equals_report_event_count": true,
+    "target_period_excludes_perf_helper": true
+  },
+  "schema": "docx-plain-paragraph-tail-append-profile-summary-v1",
+  "scope": "whole process including corpus generation, independent oracles, warmup, measured lifecycles, report JSON serialization and teardown",
+  "status": "pass",
+  "strace": {
+    "row_count": 28,
+    "scope": "whole process including corpus, warmups, lifecycles, report JSON serialization and teardown; syscall time is not sink attribution",
+    "top_rows": [
+      {
+        "calls": 306,
+        "errors": 0,
+        "percent": 50.7,
+        "seconds": 0.02521,
+        "syscall": "brk",
+        "usecs_per_call": 82
+      },
+      {
+        "calls": 19025,
+        "errors": 0,
+        "percent": 43.94,
+        "seconds": 0.021848,
+        "syscall": "write",
+        "usecs_per_call": 1
+      },
+      {
+        "calls": 1193,
+        "errors": 0,
+        "percent": 2.55,
+        "seconds": 0.001268,
+        "syscall": "read",
+        "usecs_per_call": 1
+      },
+      {
+        "calls": 203,
+        "errors": 0,
+        "percent": 1.29,
+        "seconds": 0.00064,
+        "syscall": "openat",
+        "usecs_per_call": 3
+      },
+      {
+        "calls": 8,
+        "errors": 0,
+        "percent": 0.76,
+        "seconds": 0.000379,
+        "syscall": "munmap",
+        "usecs_per_call": 47
+      },
+      {
+        "calls": 203,
+        "errors": 0,
+        "percent": 0.4,
+        "seconds": 0.0002,
+        "syscall": "close",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 198,
+        "errors": 0,
+        "percent": 0.35,
+        "seconds": 0.000172,
+        "syscall": "statx",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 0,
+        "percent": 0.01,
+        "seconds": 3e-06,
+        "syscall": "prctl",
+        "usecs_per_call": 3
+      },
+      {
+        "calls": 44,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 1e-06,
+        "syscall": "futex",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 3,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 1e-06,
+        "syscall": "sigaltstack",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 1,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "access",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "arch_prctl",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "execve",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 4,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "fstat",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 2,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "getrandom",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "gettid",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 2,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "lseek",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 21,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "mmap",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 5,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "mprotect",
+        "usecs_per_call": 0
+      },
+      {
+        "calls": 1,
+        "errors": 0,
+        "percent": 0.0,
+        "seconds": 0.0,
+        "syscall": "poll",
+        "usecs_per_call": 0
+      }
+    ],
+    "total": {
+      "calls": 21238,
+      "errors": 1,
+      "percent": 100.0,
+      "seconds": 0.049722,
+      "usecs_per_call": 2
+    }
+  }
+}

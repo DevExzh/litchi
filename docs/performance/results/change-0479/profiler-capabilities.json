@@ -1,0 +1,33 @@
+{
+  "perf_counters": {
+    "argv": [
+      "perf",
+      "stat",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses",
+      "--",
+      "true"
+    ],
+    "exit_code": 0,
+    "stderr": "\n Performance counter stats for 'true':\n\n            945018      cycles                                                                \n            769870      instructions                                                          \n            141179      branches                                                              \n              7077      branch-misses                                                         \n             23517      cache-misses                                                          \n\n       0.027068412 seconds time elapsed\n\n       0.008586000 seconds user\n       0.017172000 seconds sys\n\n\n",
+    "stdout": ""
+  },
+  "perf_version": {
+    "argv": [
+      "perf",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "perf version 7.0.14\n"
+  },
+  "strace_version": {
+    "argv": [
+      "strace",
+      "-V"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "strace -- version 6.19\nCopyright (c) 1991-2026 The strace developers <https://strace.io>.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\nOptional features enabled: stack-trace=libunwind stack-demangle m32-mpers mx32-mpers\n"
+  }
+}

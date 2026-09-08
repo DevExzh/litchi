@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## DOCX logical append baseline captured; window requirement open (0479)
+
+[0479](changes/0479-docx-tail-append-baseline.md) records 720 samples of the existing one-paragraph tail-copy lifecycle.
+The 41,793,870-byte incremental heap peak at 131,072 source paragraphs confirms
+that this materialized transaction is not a bounded-window append solution.
+Its current one-operation and section-property restrictions also leave the
+proposed 64/256 repeated-append workloads uncovered. Production changes follow
+measured ownership/CPU attribution. Broader CRUD, native/source variants,
+parallel scaling and the full non-iWork objective remain open.
+
 ## Explicit public PPTX metadata window implemented (0478)
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) integrates a bounded

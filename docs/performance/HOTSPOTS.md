@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## DOCX logical append retains document-sized state (0479)
+
+[0479](changes/0479-docx-tail-append-baseline.md) measures the current one-copy tail transaction. Its incremental
+operation heap grows from 509,974 bytes at 64 paragraphs to 41,793,870 bytes at
+131,072 paragraphs. Snapshot, staged candidate and publication owners retain
+whole main-story XML and paragraph indexes. The phase and CPU evidence in the
+linked bundle guide the next compatible production change. Requested allocator
+bytes include complete realloc sizes and must not be interpreted as physical
+memory-copy traffic. The explicit-window append requirement remains open.
+
 ## Generated-name retention removed from the explicit PPTX route (0478)
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) removes growing ZIP Office

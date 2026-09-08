@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0479: baseline of the existing DOCX copy contract
+
+[0479](changes/0479-docx-tail-append-baseline.md) changes only the diagnostic harness. It uses public DOCX transactions,
+an explicit immutable positional source and a sequential hashing sink. Source
+checks, reversible patches, finite limits, typed one-operation/section-property
+refusals, untouched-member preservation and semantic reopening remain checked.
+All 30 previously read ADR/README hashes remain unchanged; the
+[batch matrix](results/change-0479/adr-matrix.md) maps the relevant obligations.
+No new production storage or execution policy is introduced.
+
 ## 0478: checked generated names and public PPTX scratch
 
 [0478](changes/0478-pptx-generated-metadata-spool.md) keeps the finite-name
