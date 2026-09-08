@@ -1,0 +1,10 @@
+{
+  "expected_removed_payload_bytes": {
+    "131072": 6422728,
+    "64": 3336,
+    "8192": 401608
+  },
+  "hypothesis": "Sharing the existing target Arc removes the publication replacement Vec payload and new Arc header; all validation and serialization remain identical. Requested-byte and peak reductions are predicted, not yet measured.",
+  "keep_rule": "Practical measured heap or latency benefit with unchanged output/inverse/I/O and all required correctness gates; review every >5% latency/RSS increase.",
+  "performance_claim": "none"
+}

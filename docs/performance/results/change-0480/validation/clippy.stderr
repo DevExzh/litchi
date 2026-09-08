@@ -1,0 +1,80 @@
+    Checking zerofrom v0.1.4
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking generic-array v0.14.9
+    Checking thiserror v2.0.18
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking yoke v0.7.4
+    Checking zerovec v0.10.4
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking tinystr v0.7.6
+    Checking icu_collections v1.5.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking icu_locid v1.5.0
+    Checking icu_provider v1.5.0
+    Checking icu_locid_transform v1.5.0
+    Checking icu_properties v1.5.1
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking icu_normalizer v1.5.0
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/package/codec.rs:14:5
+   |
+14 |     clippy::used_underscore_binding,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: the named ignored error records intentional source collapse
+   = note: requested on the command line with `-D unfulfilled-lint-expectations`
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/package/model.rs:6:5
+  |
+6 |     clippy::shadow_reuse,
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: parser bindings are intentionally refined after validation
+
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/package/model.rs:10:5
+   |
+10 |     clippy::shadow_unrelated,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: local parser names mirror the OOXML role currently being decoded
+
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/settings/document/codec.rs:14:5
+   |
+14 |     clippy::shadow_unrelated,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: local parser names mirror the OOXML role currently being decoded
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/writer/hyperlink.rs:2:5
+  |
+2 |     clippy::arbitrary_source_item_ordering,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: items remain grouped by OOXML schema family and package lifecycle
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/writer/run.rs:2:5
+  |
+2 |     clippy::arbitrary_source_item_ordering,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: items remain grouped by OOXML schema family and package lifecycle
+
+error: could not compile `litchi-docx` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-docx` (lib) due to 6 previous errors
+error: could not compile `litchi-docx` (lib test) due to 5 previous errors

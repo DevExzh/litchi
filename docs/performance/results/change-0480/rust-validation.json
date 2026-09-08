@@ -1,0 +1,537 @@
+{
+  "attempts": {
+    "analyze": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0480/analyze.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/analyze.json",
+      "sha256": "f9e59d4d6d272f85ebcab4f91e67d0ffdb63b995273089323ee72649fc44fef1",
+      "source_unchanged": true
+    },
+    "analyze-final": {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0480/analyze.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/analyze-final.json",
+      "sha256": "5bfb727a109e1e9a25ea0bc8531b1fc9639a3866ce78cf77d1b9cdad57af0115",
+      "source_unchanged": true
+    },
+    "boundaries": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/boundaries.json",
+      "sha256": "deddfba92bfb6af5a9855440740724b5688388d0ed5b14148cee1dabb5b225eb",
+      "source_unchanged": true
+    },
+    "build-candidate-allocator": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-candidate-allocator.json",
+      "sha256": "3619910f9fc60d59589b6c068132781e5f53ca2221d094582a5db11522e0702c",
+      "source_unchanged": true
+    },
+    "build-candidate-normal": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-candidate-normal.json",
+      "sha256": "97777c9f5f9b33564195742031383271043a5d0aff714cd1c7bb181a2262d682",
+      "source_unchanged": true
+    },
+    "build-control-allocator": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append",
+        "--features",
+        "allocator-metrics"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-control-allocator.json",
+      "sha256": "4d2ce2d7a3e9738a57c7f20aa4c1a0943bf674de1a4152938d8590cc55c9cd26",
+      "source_unchanged": true
+    },
+    "build-control-normal": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "docx_plain_paragraph_tail_append"
+      ],
+      "exit_code": 0,
+      "path": "validation/build-control-normal.json",
+      "sha256": "2cf97b503eef52deb9725d474363fa9b1acc75f07accd0609489f254ec49cd9b",
+      "source_unchanged": true
+    },
+    "clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--lib",
+        "--tests",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "path": "validation/clippy.json",
+      "sha256": "1bb5a71612f4d26a55fd3436f8ba787bec6c54c970262d8130c373d2db2b7ee2",
+      "source_unchanged": true
+    },
+    "clippy-all-features": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-features",
+        "--lib",
+        "--tests",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "path": "validation/clippy-all-features.json",
+      "sha256": "dfd92c8624264391dc36f1c0951715ae1d13d9afd8f21f9070fded904691b93e",
+      "source_unchanged": true
+    },
+    "docx-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--lib",
+        "--test",
+        "source_backed_paragraph_copy",
+        "--test",
+        "source_backed_paragraph_removal"
+      ],
+      "exit_code": 0,
+      "path": "validation/docx-tests.json",
+      "sha256": "5970ec28e15ebfcfe51949c750c61601746ce8bfc0f94795b0d4542b0dfdf898",
+      "source_unchanged": true
+    },
+    "evidence-tests": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0480",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests.json",
+      "sha256": "ef6451e2407f70e5007ddabcb49dc9a820fd4d867c79046d24d94b9d9c804f51",
+      "source_unchanged": true
+    },
+    "evidence-tests-final": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/performance/results/change-0480",
+        "-p",
+        "test_evidence.py"
+      ],
+      "exit_code": 0,
+      "path": "validation/evidence-tests-final.json",
+      "sha256": "5dae22967f5a437b45d9d03caf71f08a34c2a41c99c565acf1ff8b7dfef57967",
+      "source_unchanged": true
+    },
+    "format": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 1,
+      "path": "validation/format.json",
+      "sha256": "3288626b23f83720067fd5ea23f095e6167c6f979e13c8073957b7d80e3ee852",
+      "source_unchanged": true
+    },
+    "format-docx": {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--package",
+        "litchi-docx",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "path": "validation/format-docx.json",
+      "sha256": "db9eb50604db09ebb820536d9878dae87fc8d4a19a82a9805d6112033616507c",
+      "source_unchanged": true
+    },
+    "harness-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "docx_plain_paragraph_tail_append::tests"
+      ],
+      "exit_code": 0,
+      "path": "validation/harness-tests.json",
+      "sha256": "6b0afc0694a1cceb6b6a837a27d2d6ad8529c8b0486a62aeb740b8cc587c9228",
+      "source_unchanged": true
+    },
+    "opc-shared-tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--lib",
+        "shared_"
+      ],
+      "exit_code": 0,
+      "path": "validation/opc-shared-tests.json",
+      "sha256": "c53e2b679df7200da4d6f6bf6908d73abaaab2d67b1617e6af51a05c108fc7dc",
+      "source_unchanged": true
+    },
+    "pilot-candidate-allocator-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0480/candidate-allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-candidate-allocator-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-candidate-allocator-phases.json",
+      "sha256": "869ffae0f7f723099cac7e8f1c97af4ab5431f49b005d3568ca9c6696a1e7159",
+      "source_unchanged": true
+    },
+    "pilot-candidate-allocator-total": {
+      "argv": [
+        "/tmp/litchi-goal-0480/candidate-allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-candidate-allocator-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-candidate-allocator-total.json",
+      "sha256": "4c5c5161b5e5cccb05c8109f39202f6ead8283c64c533aa30f9aff2f104411d6",
+      "source_unchanged": true
+    },
+    "pilot-candidate-normal-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-candidate-normal-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-candidate-normal-phases.json",
+      "sha256": "55eeaac1d48cfa7f36bcc4decc34f2f8e4f4cc4d1c66a6a53f3abf8b06493c3d",
+      "source_unchanged": true
+    },
+    "pilot-candidate-normal-total": {
+      "argv": [
+        "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-candidate-normal-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-candidate-normal-total.json",
+      "sha256": "4a43ccc6c0310b5d7b4e1c9f6c4bdf0c18b62fb39ad8a8ca247a460f3e17f811",
+      "source_unchanged": true
+    },
+    "pilot-control-allocator-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0480/control-allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-control-allocator-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-control-allocator-phases.json",
+      "sha256": "d08b64a5a462d5bddfdfb16376a8c26328fe5e483e39d7ff67e66ca5712b17f0",
+      "source_unchanged": true
+    },
+    "pilot-control-allocator-total": {
+      "argv": [
+        "/tmp/litchi-goal-0480/control-allocator/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-control-allocator-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-control-allocator-total.json",
+      "sha256": "8408271bcfd193f4ae92de418014e7de3c7f8c02c062de8d0a715ee859b223a6",
+      "source_unchanged": true
+    },
+    "pilot-control-normal-phases": {
+      "argv": [
+        "/tmp/litchi-goal-0480/control-normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "phases",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-control-normal-phases.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-control-normal-phases.json",
+      "sha256": "f66aa6247dfebf5d1f446ab4c04fb0bccf7160f090de42931da71b15428cf7f4",
+      "source_unchanged": true
+    },
+    "pilot-control-normal-total": {
+      "argv": [
+        "/tmp/litchi-goal-0480/control-normal/docx_plain_paragraph_tail_append",
+        "--counts",
+        "64,8192,131072",
+        "--mode",
+        "total",
+        "--samples",
+        "1",
+        "--warmups",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/pilot-control-normal-total.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/pilot-control-normal-total.json",
+      "sha256": "e0102f76379ed44e324b81031bf226654544fe3e660f45eb4786d2c2adc03bbb",
+      "source_unchanged": true
+    },
+    "profile-candidate": {
+      "argv": [
+        "/usr/bin/taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/profiles/candidate.csv",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "--",
+        "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+        "--mode",
+        "total",
+        "--counts",
+        "131072",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/profiles/candidate.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-candidate.json",
+      "sha256": "5d63a74f764f0a188d86bbef35a97cbc4ca259a09c9a41dd3a2a2f6cbdeea7a7",
+      "source_unchanged": true
+    },
+    "profile-control": {
+      "argv": [
+        "/usr/bin/taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/profiles/control.csv",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "--",
+        "/tmp/litchi-goal-0480/control-normal/docx_plain_paragraph_tail_append",
+        "--mode",
+        "total",
+        "--counts",
+        "131072",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0480/profiles/control.report.json"
+      ],
+      "exit_code": 0,
+      "path": "validation/profile-control.json",
+      "sha256": "e7ba63fbcdf02eaf093691a036fed2a3a8bf82fe45b7911c4add886ade0843f8",
+      "source_unchanged": true
+    },
+    "registry-strict": {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "path": "validation/registry-strict.json",
+      "sha256": "848cccea0f82a17c9cd13000330aeea644fbeedd85e13423bc3c7a2bbf030bb9",
+      "source_unchanged": true
+    },
+    "rustdoc": {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--lib",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "path": "validation/rustdoc.json",
+      "sha256": "cde71f6ea466259d7f75a613cc50df805caf796adcd4586126b5da1730685144",
+      "source_unchanged": true
+    }
+  },
+  "required": [
+    "format-docx",
+    "docx-tests",
+    "opc-shared-tests",
+    "harness-tests",
+    "clippy-all-features",
+    "rustdoc",
+    "boundaries",
+    "registry-strict",
+    "evidence-tests-final",
+    "analyze-final",
+    "build-control-normal",
+    "build-control-allocator",
+    "build-candidate-normal",
+    "build-candidate-allocator",
+    "pilot-control-normal-total",
+    "pilot-control-normal-phases",
+    "pilot-control-allocator-total",
+    "pilot-control-allocator-phases",
+    "pilot-candidate-normal-total",
+    "pilot-candidate-normal-phases",
+    "pilot-candidate-allocator-total",
+    "pilot-candidate-allocator-phases"
+  ],
+  "schema": "docx-shared-publication-validation-v1",
+  "source_sha256": {
+    "candidate": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893",
+    "control": "1e507ffe4d143b8d7a6907a164e9ab248b04d52fa0be94ca64dd27fb7856aa9a"
+  }
+}

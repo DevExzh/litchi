@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## Shared DOCX publication payload measured (0480)
+
+[0480](changes/0480-docx-shared-publication.md) uses the target's existing immutable Arc rather than copying its XML
+into the publication overlay. All 1,440 formal operations preserve the same
+corpus/output/patch/inverse identities. At 131,072 source paragraphs, the
+incremental operation peak decreases by 6,422,768 bytes and normal whole-process
+RSS is about 5.5% lower across the two repeats. Timing is retained as scoped
+comparison evidence; no general DOCX speedup or bounded-append claim follows.
+
 ## Existing DOCX logical append baseline and attribution (0479)
 
 [0479](changes/0479-docx-tail-append-baseline.md) adds total and phase observations for one existing-document paragraph

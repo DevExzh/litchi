@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## One DOCX publication XML copy removed (0480)
+
+[0480](changes/0480-docx-shared-publication.md) passes the immutable target Arc into the existing shared OPC overlay
+entry point. It removes one payload allocation and the separate Arc allocation;
+the large measured operation peak falls by 6,422,768 bytes. The underlying
+validation/writer is unchanged. Complete XML snapshots, repeated scanner work
+and paragraph indexes remain significant; this does not close the explicit
+window requirement for logical append.
+
 ## DOCX logical append retains document-sized state (0479)
 
 [0479](changes/0479-docx-tail-append-baseline.md) measures the current one-copy tail transaction. Its incremental

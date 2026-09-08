@@ -1,0 +1,12 @@
+
+running 7 tests
+test docx_plain_paragraph_tail_append::tests::cli_accepts_only_frozen_shapes_and_modes ... ok
+test docx_plain_paragraph_tail_append::tests::large_policy_is_explicitly_above_default_paragraph_ceiling ... ok
+test docx_plain_paragraph_tail_append::tests::sink_keeps_only_scalar_counters_and_fixed_histogram ... ok
+test docx_plain_paragraph_tail_append::tests::source_adapter_counts_logical_reads_without_ranges ... ok
+test docx_plain_paragraph_tail_append::tests::section_properties_are_a_typed_refusal ... ok
+test docx_plain_paragraph_tail_append::tests::copy_errors_remain_typed_and_atomic ... ok
+test docx_plain_paragraph_tail_append::tests::generated_corpus_has_distinct_tail_and_opaque_identity ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 378 filtered out; finished in 0.00s
+

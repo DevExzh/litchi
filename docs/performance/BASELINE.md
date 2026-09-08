@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0480: DOCX publication target ownership comparison
+
+[0480](changes/0480-docx-shared-publication.md) retains 1,440 samples from fresh control/candidate normal and allocator
+builds in A1/B1/B2/A2 order. Incremental operation peaks at 64/8,192/131,072
+paragraphs change from 509,974/3,071,310/41,793,870 to
+506,598/2,669,662/35,371,102 bytes. The reduction equals one candidate XML
+payload plus 40 bytes of allocation overhead. Individual timing intervals,
+whole-process RSS, phase and I/O observations remain in the linked record.
+
 ## 0479: existing DOCX single-paragraph tail append
 
 [0479](changes/0479-docx-tail-append-baseline.md) adds a baseline of the public source-backed paragraph-copy transaction

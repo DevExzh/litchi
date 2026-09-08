@@ -1,0 +1,30 @@
+{
+  "allocator": {
+    "build_gate": "candidate-allocator-build.json",
+    "build_gate_sha256": "4fc0d7e572dd86cc97901c6c2322b3820f29a853e41e2aa07b77d3b4a2229366",
+    "bytes": 417467144,
+    "embedded_inputs": {
+      "bytes": 2045,
+      "path": "embedded-inputs.json",
+      "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0480/candidate-allocator/docx_plain_paragraph_tail_append",
+    "sha256": "75023ee8d5fd2a96fdd5cfc9c2dd2ce0b1fa7d6f4b861f3d10e0d3b0bf8afad5",
+    "source_manifest_sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  },
+  "normal": {
+    "build_gate": "candidate-normal-build.json",
+    "build_gate_sha256": "40b4c2b7cf1db481aca8c8fa9430d2ca5b4f661463cdd053c62bdedec7f735e2",
+    "bytes": 417451456,
+    "embedded_inputs": {
+      "bytes": 2045,
+      "path": "embedded-inputs.json",
+      "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+    },
+    "embedded_inputs_unchanged": true,
+    "path": "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+    "sha256": "6ba440419a205face22a08153cabec913d26db7ee623622de57d54628730c045",
+    "source_manifest_sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  }
+}

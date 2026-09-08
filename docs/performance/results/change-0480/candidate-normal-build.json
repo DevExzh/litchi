@@ -1,0 +1,69 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "docx_plain_paragraph_tail_append"
+  ],
+  "artifacts": {
+    "build-candidate-normal.stderr": {
+      "bytes": 306,
+      "sha256": "f0a13230d5de67b230ff1b59ec358c92c1e548c12fcab2792b148761cec55199"
+    },
+    "build-candidate-normal.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 417451456,
+    "path": "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+    "sha256": "6ba440419a205face22a08153cabec913d26db7ee623622de57d54628730c045"
+  },
+  "common_sha256": "5e4e63652de2defe6238ff07747fef1be84779b5350d2feaec1dcdfc640755ff",
+  "copied_utc": "2026-09-08T17:43:44.194114+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "9615dc01c0cf435d279a4a8b856e3619bd6573eb963e693144a1c1df5f29efa2",
+  "embedded_inputs": {
+    "bytes": 2045,
+    "path": "embedded-inputs.json",
+    "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+  },
+  "embedded_inputs_unchanged": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T17:43:43.193077+00:00",
+  "original_binary": {
+    "bytes": 417451456,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/docx_plain_paragraph_tail_append",
+    "sha256": "6ba440419a205face22a08153cabec913d26db7ee623622de57d54628730c045"
+  },
+  "source_after": {
+    "files": 7048,
+    "path": "validation-sources/87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893.json",
+    "sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  },
+  "source_before": {
+    "files": 7048,
+    "path": "validation-sources/87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893.json",
+    "sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T17:42:36.273065+00:00",
+  "validation_gate": {
+    "path": "validation/build-candidate-normal.json",
+    "sha256": "97777c9f5f9b33564195742031383271043a5d0aff714cd1c7bb181a2262d682"
+  }
+}

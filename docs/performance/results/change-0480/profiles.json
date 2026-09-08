@@ -1,0 +1,125 @@
+{
+  "excluded_samples": 60,
+  "formal_samples": false,
+  "records": {
+    "candidate": {
+      "binary": {
+        "build_gate": "candidate-normal-build.json",
+        "build_gate_sha256": "40b4c2b7cf1db481aca8c8fa9430d2ca5b4f661463cdd053c62bdedec7f735e2",
+        "bytes": 417451456,
+        "embedded_inputs": {
+          "bytes": 2045,
+          "path": "embedded-inputs.json",
+          "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+        },
+        "embedded_inputs_unchanged": true,
+        "path": "/tmp/litchi-goal-0480/candidate-normal/docx_plain_paragraph_tail_append",
+        "sha256": "6ba440419a205face22a08153cabec913d26db7ee623622de57d54628730c045",
+        "source_manifest_sha256": "87acdfee1a43725688a0c4ffee0a623463b45a87168faaf683829fe99bb95893"
+      },
+      "counters": {
+        "bytes": 294,
+        "path": "profiles/candidate.csv",
+        "sha256": "327b7a04f6b88de00f9a14affb90dc4ab3f1082f893868d26210708e25ef5e71"
+      },
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1999,
+        "path": "validation/profile-candidate.json",
+        "sha256": "5d63a74f764f0a188d86bbef35a97cbc4ca259a09c9a41dd3a2a2f6cbdeea7a7"
+      },
+      "report": {
+        "bytes": 54541,
+        "path": "profiles/candidate.report.json",
+        "sha256": "41cd92db87b5da290043cf67230bb993442a98a3279f15fab1f6e10fa152bfcf"
+      },
+      "values": {
+        "branch-misses": {
+          "running_percent": 100.0,
+          "value": 107606006
+        },
+        "branches": {
+          "running_percent": 100.0,
+          "value": 38035131100
+        },
+        "cache-misses": {
+          "running_percent": 100.0,
+          "value": 8196329
+        },
+        "cycles": {
+          "running_percent": 100.0,
+          "value": 44721467111
+        },
+        "instructions": {
+          "running_percent": 100.0,
+          "value": 190388694874
+        },
+        "page-faults": {
+          "running_percent": 100.0,
+          "value": 42433
+        }
+      }
+    },
+    "control": {
+      "binary": {
+        "build_gate": "control-normal-build.json",
+        "build_gate_sha256": "5a5b2f7e56127da7a82802c3c93ac8bea40df8f7093b359b4e2928897172f111",
+        "bytes": 417455632,
+        "embedded_inputs": {
+          "bytes": 2045,
+          "path": "embedded-inputs.json",
+          "sha256": "4947461b280a602c8fcbd2e55be1d751f90c6e8d6d84ddddf2486b84a2659f66"
+        },
+        "embedded_inputs_unchanged": true,
+        "path": "/tmp/litchi-goal-0480/control-normal/docx_plain_paragraph_tail_append",
+        "sha256": "a90fd6934985f7763414d1f4d5ac98d87312ea031e87812aa52cb0270042112f",
+        "source_manifest_sha256": "1e507ffe4d143b8d7a6907a164e9ab248b04d52fa0be94ca64dd27fb7856aa9a"
+      },
+      "counters": {
+        "bytes": 302,
+        "path": "profiles/control.csv",
+        "sha256": "c0f513784cc62f12da1c550208b15fa54e5584253e722b700a4ce64851aab4bc"
+      },
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1989,
+        "path": "validation/profile-control.json",
+        "sha256": "e7ba63fbcdf02eaf093691a036fed2a3a8bf82fe45b7911c4add886ade0843f8"
+      },
+      "report": {
+        "bytes": 54631,
+        "path": "profiles/control.report.json",
+        "sha256": "82bb3075b82d7ed659639373d34551e1780830eed45154321afe44bf5d22f79c"
+      },
+      "values": {
+        "branch-misses": {
+          "running_percent": 100.0,
+          "value": 116505098
+        },
+        "branches": {
+          "running_percent": 100.0,
+          "value": 38186718211
+        },
+        "cache-misses": {
+          "running_percent": 100.0,
+          "value": 12551761
+        },
+        "cycles": {
+          "running_percent": 100.0,
+          "value": 45495146335
+        },
+        "instructions": {
+          "running_percent": 100.0,
+          "value": 191274111072
+        },
+        "page-faults": {
+          "running_percent": 100.0,
+          "value": 210020
+        }
+      }
+    }
+  },
+  "schema": "docx-shared-publication-paired-pmu-v1",
+  "scope": "separate whole-process normal runs including corpus/oracles, warmups, 30 lifecycles and report teardown; no isolated operation PMU delta",
+  "status": "pass"
+}

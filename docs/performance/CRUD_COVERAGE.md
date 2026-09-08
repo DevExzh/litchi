@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-08: existing DOCX copy publication ownership (0480)
+
+[0480](changes/0480-docx-shared-publication.md) measures the same one-paragraph tail-copy lifecycle as 0479 with a
+shared publication payload. It changes ownership without expanding admission:
+section properties and multiple operations per edit remain refused. The
+materialized transaction still differs from fresh streaming creation, explicit
+window append, Part addition and arbitrary edit/repackaging. Native, cold/range
+source, repeated-append and worker-scaling requirements remain open.
+
 ## 2026-09-08: one logical DOCX paragraph append (0479)
 
 [0479](changes/0479-docx-tail-append-baseline.md) measures copying source paragraph zero to the tail of an existing
