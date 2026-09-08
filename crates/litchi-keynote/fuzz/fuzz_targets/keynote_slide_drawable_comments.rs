@@ -13,6 +13,9 @@
 
 mod support;
 
+#[path = "../../tests/support/drawable_comment_fixtures.rs"]
+mod drawable_comment_fixtures;
+
 use std::{collections::BTreeSet, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
@@ -32,6 +35,8 @@ use self::support::{
     observe_error, package_bytes, read_options,
 };
 
+use self::drawable_comment_fixtures as fixtures;
+
 const TARGET_SET: &[u8] = b"target-drawable-comment-set";
 const TARGET_CLEAR: &[u8] = b"target-drawable-comment-clear";
 const TARGET_REPLY: &[u8] = b"target-drawable-comment-reply";
@@ -48,6 +53,7 @@ const NATIVE_KEYNOTE: &[u8] =
 fuzz_target!(|data: &[u8]| {
     exercise_arbitrary_input(data);
     exercise_native_seed(data);
+    exercise_cross_component_seed(data);
     exercise_hostile_native_once();
     exercise_limit_budget_once();
 });
@@ -172,6 +178,373 @@ fn native_reply_package() -> &'static Package {
         assert_eq!(package_bytes(package), source_bytes);
         candidate
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CrossComponentKind {
+    ForeignRoot,
+    ForeignReply,
+    SharedForeignRoot,
+    SharedForeignReply,
+    ForeignDrawable,
+}
+
+struct CrossComponentSeed {
+    package: Package,
+    kind: CrossComponentKind,
+    target_position: usize,
+    sibling_position: Option<usize>,
+}
+
+fn exercise_cross_component_seed(data: &[u8]) {
+    let seed = match usize::from(control(data, 5)) % 5 {
+        0 => foreign_root_seed(),
+        1 => foreign_reply_seed(),
+        2 => shared_foreign_root_seed(),
+        3 => shared_foreign_reply_seed(),
+        _ => foreign_drawable_seed(),
+    };
+    // The fixture is selected per input so one fuzz iteration pays for one
+    // package-wide semantic census. The seed initializer performs the fixed
+    // success contract once, while this path keeps arbitrary operations and
+    // source-preserving replay under fuzz control.
+    exercise_package(&seed.package, data);
+}
+
+fn foreign_root_seed() -> &'static CrossComponentSeed {
+    static SEED: OnceLock<CrossComponentSeed> = OnceLock::new();
+    SEED.get_or_init(|| {
+        build_cross_component_seed(
+            fixtures::root_foreign_fixture,
+            CrossComponentKind::ForeignRoot,
+            "foreign-root",
+        )
+    })
+}
+
+fn foreign_reply_seed() -> &'static CrossComponentSeed {
+    static SEED: OnceLock<CrossComponentSeed> = OnceLock::new();
+    SEED.get_or_init(|| {
+        build_cross_component_seed(
+            fixtures::reply_foreign_fixture,
+            CrossComponentKind::ForeignReply,
+            "foreign-reply",
+        )
+    })
+}
+
+fn shared_foreign_root_seed() -> &'static CrossComponentSeed {
+    static SEED: OnceLock<CrossComponentSeed> = OnceLock::new();
+    SEED.get_or_init(|| {
+        build_cross_component_seed(
+            fixtures::shared_foreign_root_fixture,
+            CrossComponentKind::SharedForeignRoot,
+            "shared-foreign-root",
+        )
+    })
+}
+
+fn shared_foreign_reply_seed() -> &'static CrossComponentSeed {
+    static SEED: OnceLock<CrossComponentSeed> = OnceLock::new();
+    SEED.get_or_init(|| {
+        build_cross_component_seed(
+            fixtures::shared_foreign_reply_fixture,
+            CrossComponentKind::SharedForeignReply,
+            "shared-foreign-reply",
+        )
+    })
+}
+
+fn foreign_drawable_seed() -> &'static CrossComponentSeed {
+    static SEED: OnceLock<CrossComponentSeed> = OnceLock::new();
+    SEED.get_or_init(|| {
+        build_cross_component_seed(
+            fixtures::foreign_drawable_fixture,
+            CrossComponentKind::ForeignDrawable,
+            "foreign-drawable",
+        )
+    })
+}
+
+fn build_cross_component_seed(
+    build: fn() -> fixtures::TestResult<fixtures::RelocatedFixture>,
+    kind: CrossComponentKind,
+    label: &str,
+) -> CrossComponentSeed {
+    let fixture = build().unwrap_or_else(|error| panic!("{label} fixture must build: {error}"));
+    let moved = match kind {
+        CrossComponentKind::ForeignDrawable => fixture.target.identifier,
+        CrossComponentKind::ForeignReply | CrossComponentKind::SharedForeignReply => fixture
+            .reply_identifier
+            .unwrap_or_else(|| panic!("{label} fixture must expose its relocated reply")),
+        CrossComponentKind::ForeignRoot | CrossComponentKind::SharedForeignRoot => fixture
+            .root_identifier
+            .unwrap_or_else(|| panic!("{label} fixture must expose its relocated root")),
+    };
+    fixtures::assert_metadata_relocated(&fixture.metadata_source, &fixture.bytes, moved)
+        .unwrap_or_else(|error| panic!("{label} fixture metadata must relocate: {error}"));
+    let target_position = fixture.target.position;
+    let sibling_position = fixture.sibling.as_ref().map(|target| target.position);
+    let package = Package::from_bytes_with_options(&fixture.bytes, native_read_options())
+        .unwrap_or_else(|error| panic!("{label} fixture must open: {error}"));
+    let seed = CrossComponentSeed {
+        package,
+        kind,
+        target_position,
+        sibling_position,
+    };
+    verify_cross_component_contract(&seed, label);
+    seed
+}
+
+fn verify_cross_component_contract(seed: &CrossComponentSeed, label: &str) {
+    let source_bytes = package_bytes(&seed.package);
+    let inventory = read_inventory(&seed.package, &source_bytes)
+        .unwrap_or_else(|| panic!("{label} fixture inventory must read"));
+    let target = inventory
+        .get(seed.target_position)
+        .unwrap_or_else(|| panic!("{label} fixture target is outside source order"));
+    let slide = SlideSelector::index(0);
+    let selector = target.selector();
+    match seed.kind {
+        CrossComponentKind::ForeignRoot => {
+            assert!(target.has_comment(), "{label} fixture must retain its root");
+            let before = seed
+                .package
+                .slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} root read must succeed: {error}"));
+            let commit = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} edit must stage: {error}"))
+                .set("fuzz foreign root contract")
+                .unwrap_or_else(|error| panic!("{label} set must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} set must commit: {error}"));
+            assert_eq!(
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, selector)
+                    .unwrap_or_else(|error| panic!("{label} candidate read failed: {error}"))
+                    .as_ref()
+                    .map(|comment| comment.text()),
+                Some("fuzz foreign root contract")
+            );
+            assert_ne!(
+                before,
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, selector)
+                    .unwrap()
+            );
+            let restored = commit
+                .package()
+                .apply_slide_drawable_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+        CrossComponentKind::ForeignReply => {
+            assert!(target.has_comment(), "{label} fixture must retain its root");
+            assert!(
+                target.reply_count() > 0,
+                "{label} fixture must retain its reply"
+            );
+            let before = seed
+                .package
+                .slide_drawable_comment_replies(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} replies read must succeed: {error}"));
+            let registered_set = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} registered edit must stage: {error}"))
+                .set_reply(ReplySelector::index(0), "fuzz registered foreign reply")
+                .unwrap_or_else(|error| panic!("{label} registered set must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} registered set must commit: {error}"));
+            let after_registered_set = registered_set
+                .package()
+                .slide_drawable_comment_replies(slide, selector)
+                .unwrap_or_else(|error| {
+                    panic!("{label} registered set candidate read failed: {error}")
+                });
+            assert_eq!(after_registered_set.len(), before.len());
+            assert_eq!(
+                after_registered_set.first().map(|reply| reply.text()),
+                Some("fuzz registered foreign reply")
+            );
+            let restored_registered_set = registered_set
+                .package()
+                .apply_slide_drawable_comment(&registered_set.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} registered set inverse failed: {error}"));
+            assert_eq!(
+                package_bytes(restored_registered_set.package()),
+                source_bytes
+            );
+
+            let registered_remove = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} registered remove must stage: {error}"))
+                .remove_reply(ReplySelector::index(0))
+                .unwrap_or_else(|error| panic!("{label} registered remove must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} registered remove must commit: {error}"));
+            let after_registered_remove = registered_remove
+                .package()
+                .slide_drawable_comment_replies(slide, selector)
+                .unwrap_or_else(|error| {
+                    panic!("{label} registered remove candidate read failed: {error}")
+                });
+            assert_eq!(after_registered_remove.len(), before.len() - 1);
+            let restored_registered_remove = registered_remove
+                .package()
+                .apply_slide_drawable_comment(&registered_remove.patch().inverse())
+                .unwrap_or_else(|error| {
+                    panic!("{label} registered remove inverse failed: {error}")
+                });
+            assert_eq!(
+                package_bytes(restored_registered_remove.package()),
+                source_bytes
+            );
+
+            let commit = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} edit must stage: {error}"))
+                .add_reply("fuzz foreign reply contract")
+                .unwrap_or_else(|error| panic!("{label} add must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} add must commit: {error}"));
+            let after = commit
+                .package()
+                .slide_drawable_comment_replies(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} candidate replies failed: {error}"));
+            assert_eq!(after.len(), before.len() + 1);
+            assert_eq!(
+                after.last().map(|reply| reply.text()),
+                Some("fuzz foreign reply contract")
+            );
+            let restored = commit
+                .package()
+                .apply_slide_drawable_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+        CrossComponentKind::SharedForeignRoot => {
+            assert!(target.has_comment(), "{label} fixture must retain its root");
+            let sibling_position = seed
+                .sibling_position
+                .unwrap_or_else(|| panic!("{label} fixture must have a sibling"));
+            let sibling = DrawableSelector::index(sibling_position);
+            let before_sibling = seed
+                .package
+                .slide_drawable_comment(slide, sibling)
+                .unwrap_or_else(|error| panic!("{label} sibling read failed: {error}"));
+            let commit = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} edit must stage: {error}"))
+                .set("fuzz shared foreign root contract")
+                .unwrap_or_else(|error| panic!("{label} set must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} set must commit: {error}"));
+            assert_eq!(
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, selector)
+                    .unwrap_or_else(|error| panic!("{label} selected read failed: {error}"))
+                    .as_ref()
+                    .map(|comment| comment.text()),
+                Some("fuzz shared foreign root contract")
+            );
+            assert_eq!(
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, sibling)
+                    .unwrap_or_else(|error| panic!(
+                        "{label} sibling candidate read failed: {error}"
+                    )),
+                before_sibling
+            );
+            let restored = commit
+                .package()
+                .apply_slide_drawable_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+        CrossComponentKind::SharedForeignReply => {
+            assert!(target.has_comment(), "{label} fixture must retain its root");
+            let sibling_position = seed
+                .sibling_position
+                .unwrap_or_else(|| panic!("{label} fixture must have a sibling"));
+            let sibling = DrawableSelector::index(sibling_position);
+            let before_sibling = seed
+                .package
+                .slide_drawable_comment_replies(slide, sibling)
+                .unwrap_or_else(|error| panic!("{label} sibling replies failed: {error}"));
+            assert!(
+                !before_sibling.is_empty(),
+                "{label} sibling must retain a reply"
+            );
+            let commit = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} edit must stage: {error}"))
+                .clear()
+                .unwrap_or_else(|error| panic!("{label} clear must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} clear must commit: {error}"));
+            assert!(
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, selector)
+                    .unwrap_or_else(|error| panic!("{label} selected read failed: {error}"))
+                    .is_none()
+            );
+            assert_eq!(
+                commit
+                    .package()
+                    .slide_drawable_comment_replies(slide, sibling)
+                    .unwrap_or_else(|error| panic!(
+                        "{label} sibling candidate replies failed: {error}"
+                    )),
+                before_sibling
+            );
+            let restored = commit
+                .package()
+                .apply_slide_drawable_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+        CrossComponentKind::ForeignDrawable => {
+            assert!(
+                !target.has_comment(),
+                "{label} fixture starts without a root"
+            );
+            let commit = seed
+                .package
+                .edit_slide_drawable_comment(slide, selector)
+                .unwrap_or_else(|error| panic!("{label} edit must stage: {error}"))
+                .set("fuzz foreign drawable contract")
+                .unwrap_or_else(|error| panic!("{label} set must stage: {error}"))
+                .commit()
+                .unwrap_or_else(|error| panic!("{label} set must commit: {error}"));
+            assert_eq!(
+                commit
+                    .package()
+                    .slide_drawable_comment(slide, selector)
+                    .unwrap_or_else(|error| panic!("{label} candidate read failed: {error}"))
+                    .as_ref()
+                    .map(|comment| comment.text()),
+                Some("fuzz foreign drawable contract")
+            );
+            let restored = commit
+                .package()
+                .apply_slide_drawable_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("{label} inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+    }
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {

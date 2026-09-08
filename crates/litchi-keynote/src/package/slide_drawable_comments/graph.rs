@@ -28,7 +28,7 @@ use super::super::Package;
 use super::{Budget, DrawableKind, DrawableSelector, DrawableSummary, Error};
 use crate::SlideSelector;
 use crate::package::slide_media_lifecycle::comment_graph::{
-    CommentGraphPlan, plan_comment_graph_preserving_extensions,
+    CommentGraphPlan, plan_comment_graph_cross_component,
 };
 use crate::slide::comment::{Comment, CommentAuthor, CommentTimestamp, Reply};
 
@@ -152,7 +152,6 @@ impl ArchiveReferenceVisitor for RootReferenceVisitor {
 struct SlideContext {
     slide_position: Position,
     slide_identifier: u64,
-    component_name: Box<str>,
     drawables: Vec<(Position, u64)>,
 }
 
@@ -180,7 +179,10 @@ pub(super) fn select_drawable(
         Some(identifier) => global_direct_users(package, identifier, limits, budget)?,
         None => 0,
     };
-    let component_name = copy_arc(context.component_name.as_ref(), budget)?;
+    let (drawable_component_name, _) = package
+        .object_with_component(resolved.identifier)
+        .ok_or(Error::InvalidSource)?;
+    let component_name = copy_arc(drawable_component_name, budget)?;
     Ok(Selection {
         slide_position: context.slide_position,
         drawable_position,
@@ -241,7 +243,7 @@ pub(super) fn read_comment_graph(
     }
     let limits = package.semantic_wire_limits().map_err(|_| Error::Read)?;
     let component_name = selection.component_name.as_ref();
-    let plan = plan_comment_graph_preserving_extensions(
+    let plan = plan_comment_graph_cross_component(
         package,
         component_name,
         root_identifier,
@@ -256,10 +258,11 @@ pub(super) fn read_comment_graph(
         let node = read_storage_node(package, &plan, identifier, limits, budget)?;
         nodes.push(node);
     }
+    let lookup_work = binary_search_work(nodes.len())?;
+    budget.charge_wire_work(lookup_work)?;
     let root_index = nodes
-        .iter()
-        .position(|node| node.identifier == root_identifier)
-        .ok_or(Error::InvalidSource)?;
+        .binary_search_by_key(&root_identifier, |node| node.identifier)
+        .map_err(|_| Error::InvalidSource)?;
     // The decoded text and author values already own their bounded storage.
     // Move them into the public snapshot instead of cloning them a second
     // time.  The node keeps its identity and graph edges for the mutation
@@ -277,6 +280,14 @@ pub(super) fn read_comment_graph(
             root.reply_identifiers.len(),
         )
     };
+    let comment_allocation = size_of::<Comment>()
+        .checked_add(
+            size_of::<usize>()
+                .checked_mul(2)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(comment_allocation)?;
     let comment = Arc::new(Comment::with_metadata(
         root_text,
         root_timestamp,
@@ -286,10 +297,10 @@ pub(super) fn read_comment_graph(
     reserve_vec(&mut replies, reply_count, budget)?;
     for reply_ordinal in 0..reply_count {
         let reply_identifier = nodes[root_index].reply_identifiers[reply_ordinal];
+        budget.charge_wire_work(lookup_work)?;
         let reply_index = nodes
-            .iter()
-            .position(|node| node.identifier == reply_identifier)
-            .ok_or(Error::InvalidSource)?;
+            .binary_search_by_key(&reply_identifier, |node| node.identifier)
+            .map_err(|_| Error::InvalidSource)?;
         let reply = &mut nodes[reply_index];
         let text = reply.text.take().unwrap_or_default();
         let timestamp = reply
@@ -322,7 +333,7 @@ fn resolve_slide_context(
         .slide_record_at(slide_position.get())
         .map_err(|_| Error::Read)?
         .ok_or(Error::InvalidSource)?;
-    let (component_name, slide) = package
+    let (_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
     validate_object_shape(slide, record.slide_identifier)?;
@@ -346,18 +357,9 @@ fn resolve_slide_context(
         let position = Position::new(index);
         drawables.push((position, identifier));
     }
-    let mut owned_component = String::new();
-    budget.charge_allocations(component_name.len())?;
-    owned_component
-        .try_reserve_exact(component_name.len())
-        .map_err(|_| Error::Allocation {
-            amount: component_name.len(),
-        })?;
-    owned_component.push_str(component_name);
     Ok(SlideContext {
         slide_position,
         slide_identifier: record.slide_identifier,
-        component_name: owned_component.into_boxed_str(),
         drawables,
     })
 }
@@ -404,13 +406,11 @@ fn resolve_drawables(
     let mut output = Vec::new();
     reserve_vec(&mut output, context.drawables.len(), budget)?;
     for &(position, identifier) in &context.drawables {
-        let Some((component_name, object)) = package.object_with_component(identifier) else {
+        let Some((_component_name, object)) = package.object_with_component(identifier) else {
             return Err(Error::InvalidSource);
         };
-        if component_name != context.component_name.as_ref() {
-            return Err(Error::InvalidSource);
-        }
         validate_object_shape(object, identifier)?;
+        charge_message_scan_work(object.messages.len(), budget)?;
         let mut resolved = None;
         for (message_index, message) in object.messages.iter().enumerate() {
             let Some(route) = route_for(message.type_) else {
@@ -458,9 +458,6 @@ fn global_direct_users(
     budget: &mut Budget,
 ) -> Result<usize, Error> {
     validate_comment_storage_target(package, root_identifier)?;
-    let (root_component, _) = package
-        .object_with_component(root_identifier)
-        .ok_or(Error::InvalidSource)?;
     let archive_limits = package
         .limits()
         .effective_archive_limits()
@@ -475,6 +472,7 @@ fn global_direct_users(
             validate_object_shape(object, object_identifier)?;
             let mut owns_root =
                 census_core_header_root_reference(object, root_identifier, archive_limits, budget)?;
+            charge_message_scan_work(object.messages.len(), budget)?;
             let mut recognized = false;
             for (message_index, message) in object.messages.iter().enumerate() {
                 let Some(route) = route_for(message.type_) else {
@@ -506,9 +504,6 @@ fn global_direct_users(
             // or producer-specific metadata. It is not an incoming owner;
             // cycles are rejected by the rooted graph planner below.
             if owns_root && object_identifier != root_identifier {
-                if component.name() != root_component {
-                    return Err(Error::UnsupportedDependency);
-                }
                 users = users.checked_add(1).ok_or(Error::InvalidSource)?;
             }
         }
@@ -597,9 +592,10 @@ fn read_storage_node(
     let (component_name, object) = package
         .object_with_component(identifier)
         .ok_or(Error::InvalidSource)?;
-    if component_name != plan.component_name.as_ref()
-        || object.archive_info.identifier != Some(identifier)
-    {
+    let expected_component = plan
+        .storage_component(identifier)
+        .ok_or(Error::InvalidSource)?;
+    if component_name != expected_component || object.archive_info.identifier != Some(identifier) {
         return Err(Error::InvalidSource);
     }
     validate_object_shape(object, identifier)?;
@@ -1172,6 +1168,37 @@ fn reserve_vec<T>(
     output
         .try_reserve_exact(additional)
         .map_err(|_| Error::Allocation { amount: bytes })
+}
+
+/// Charge the type-dispatch work performed before a route can be recognized.
+///
+/// Unknown and unsupported native messages are intentionally left opaque, but
+/// their type tags still have to be inspected. Charge that scan before the
+/// loop so a source containing only unsupported messages cannot bypass the
+/// operation-wide work ceiling.
+fn charge_message_scan_work(message_count: usize, budget: &mut Budget) -> Result<(), Error> {
+    let bytes = message_count
+        .checked_mul(size_of::<u32>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_wire_work(bytes)?;
+    Ok(())
+}
+
+/// Return a bounded upper bound for one `binary_search_by_key` pass.
+fn binary_search_work(length: usize) -> Result<usize, Error> {
+    if length == 0 {
+        return Ok(0);
+    }
+    let search_length = length.checked_add(1).ok_or(Error::InvalidSource)?;
+    let leading_zeroes =
+        usize::try_from(search_length.leading_zeros()).map_err(|_| Error::InvalidSource)?;
+    let comparisons = usize::try_from(usize::BITS)
+        .map_err(|_| Error::InvalidSource)?
+        .checked_sub(leading_zeroes)
+        .ok_or(Error::InvalidSource)?;
+    comparisons
+        .checked_mul(size_of::<u64>())
+        .ok_or(Error::InvalidSource)
 }
 
 fn map_lifecycle_error(

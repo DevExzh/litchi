@@ -35,7 +35,10 @@ use super::engine::WorkingSet;
 use super::{Budget, Error};
 
 mod identities;
-pub(super) use identities::remove_storage_identity;
+pub(super) use identities::{
+    register_storage_identity_if_registered, reject_data_reference_owners_for_removed_objects,
+    remove_storage_identity,
+};
 
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
@@ -102,6 +105,19 @@ pub(super) enum EdgeEdit {
     },
 }
 
+/// One source-component ownership transition for a copied comment storage
+/// object.  The metadata edge is optional in native packages; a missing old
+/// edge therefore remains missing unless the source census proves that the
+/// package already carried the dependency witness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct CommentStorageEdgeTransition<'a> {
+    pub(super) source_component: &'a str,
+    pub(super) old_target_component: Option<&'a str>,
+    pub(super) old_identifier: Option<u64>,
+    pub(super) new_target_component: Option<&'a str>,
+    pub(super) new_identifier: Option<u64>,
+}
+
 impl EdgeEdit {
     pub(super) fn add_author(
         component: &str,
@@ -145,10 +161,10 @@ pub(super) struct AuthorBinding {
 impl AuthorBinding {
     /// Return the native identifier when an author was found or allocated.
     ///
-    /// The `Option` shape lets the engine represent a package with no root
-    /// annotation-author-storage witness without manufacturing an ID.  A
-    /// drawable operation that needs an author must reject that `None` before
-    /// allocating any comment object.
+    /// The `Option` shape lets the engine represent a package with no rooted
+    /// or compatibility author-storage witness without manufacturing an ID.
+    /// Root creation may preserve that authorless state; operations that
+    /// require an existing author reject `None` before using the identifier.
     #[must_use]
     pub(super) const fn identifier(&self) -> Option<u64> {
         self.author_identifier
@@ -167,8 +183,13 @@ struct MessageLocation<'a> {
     payload: &'a [u8],
 }
 
-/// Resolve the unique root Document field that points at annotation-author
-/// storage and then resolve the pointed object dynamically.
+/// Resolve annotation-author storage from the rooted Document ownership edge.
+///
+/// A valid field-7 edge is authoritative and unrelated type-213 objects are
+/// ignored.  Only an absent optional field-7 edge enters the narrow legacy
+/// fallback, which accepts one globally unique type-213 message or preserves
+/// the authorless no-registry state when none exists.  A present malformed,
+/// ambiguous, or dangling rooted edge never falls back to that scan.
 ///
 /// This is intentionally stricter than scanning for a basename.  The root
 /// Document reference is the native ownership witness; a second unreferenced
@@ -194,7 +215,7 @@ pub(super) fn annotation_author_storage_location(
         3,
     )?;
     let Some(reference_payload) = reference_payload else {
-        return Ok(None);
+        return global_annotation_author_storage_location(package, budget);
     };
     let storage_identifier = strict_reference_identifier(reference_payload, limits, budget, 3)?;
     let Some((component, object)) = package.object_with_component(storage_identifier) else {
@@ -211,6 +232,71 @@ pub(super) fn annotation_author_storage_location(
         component: component.into(),
         object_identifier: storage_identifier,
         message_index: location.message_index,
+    }))
+}
+
+/// Find the compatibility registry used by the legacy comment host.
+///
+/// The rooted Document field is the authoritative route whenever it exists.
+/// This scan is therefore reached only when the optional field-7 registry
+/// reference is absent.  In that narrow case the old host accepted exactly
+/// one type-213 message anywhere in the package, so retain that source-order
+/// behavior while keeping the candidate source-bound and bounded.
+fn global_annotation_author_storage_location(
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<Option<AuthorStorageLocation>, Error> {
+    let mut selected: Option<(&str, u64, usize)> = None;
+    for component in package.state.source.components().iter() {
+        let archive = component.archive();
+        budget.charge_entries(archive.objects.len())?;
+        let mut message_count = 0usize;
+        for object in &archive.objects {
+            message_count = message_count
+                .checked_add(object.messages.len())
+                .ok_or(Error::InvalidSource)?;
+        }
+        budget.charge_wire_work(message_count.max(1))?;
+
+        budget.charge_entries(archive.objects.len())?;
+        budget.charge_wire_work(message_count.max(1))?;
+        for object in &archive.objects {
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE {
+                    continue;
+                }
+                if selected.is_some() {
+                    return Err(Error::InvalidSource);
+                }
+                selected = Some((component.name(), identifier, message_index));
+            }
+        }
+    }
+
+    let Some((component_name, identifier, message_index)) = selected else {
+        return Ok(None);
+    };
+    let (actual_component, object) = package
+        .object_with_component(identifier)
+        .ok_or(Error::InvalidSource)?;
+    if actual_component != component_name {
+        return Err(Error::InvalidSource);
+    }
+    let location = unique_message_location(
+        actual_component,
+        object,
+        identifier,
+        ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
+    )?;
+    if location.message_index != message_index {
+        return Err(Error::InvalidSource);
+    }
+    budget.charge_allocations(component_name.len())?;
+    Ok(Some(AuthorStorageLocation {
+        component: component_name.into(),
+        object_identifier: identifier,
+        message_index,
     }))
 }
 
@@ -909,11 +995,22 @@ struct ObjectUuidWitness {
     current: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DataReferenceOwnerWitness {
+    component_identifier: u64,
+    data_identifier: u64,
+    object_identifier: u64,
+    count: u32,
+    current: bool,
+    unknown_fields: bool,
+}
+
 #[derive(Debug, Default)]
 struct MetadataCensus {
     components: Vec<ComponentWitness>,
     external_references: Vec<ExternalWitness>,
     object_uuids: Vec<ObjectUuidWitness>,
+    data_reference_owners: Vec<DataReferenceOwnerWitness>,
     last_identifier: u64,
 }
 
@@ -922,6 +1019,7 @@ struct MetadataCensusCounts {
     components: usize,
     external_references: usize,
     object_uuids: usize,
+    data_reference_owners: usize,
     locator_bytes: usize,
 }
 
@@ -956,6 +1054,13 @@ impl identity_codec::PackageMetadataVisitor for MetadataCensusCounts {
     ) -> Result<(), identity_codec::RewriteError> {
         Self::add(&mut self.object_uuids, 1)
     }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        _owner: identity_codec::DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), identity_codec::RewriteError> {
+        Self::add(&mut self.data_reference_owners, 1)
+    }
 }
 
 impl MetadataCensus {
@@ -986,13 +1091,18 @@ impl MetadataCensus {
             .object_uuids
             .checked_mul(size_of::<ObjectUuidWitness>())
             .ok_or(Error::InvalidSource)?;
+        let data_owner_bytes = counts
+            .data_reference_owners
+            .checked_mul(size_of::<DataReferenceOwnerWitness>())
+            .ok_or(Error::InvalidSource)?;
         let allocation_bytes = component_bytes
             .checked_add(external_bytes)
             .and_then(|bytes| bytes.checked_add(uuid_bytes))
+            .and_then(|bytes| bytes.checked_add(data_owner_bytes))
             .ok_or(Error::InvalidSource)?;
         let allocation_events = counts
             .components
-            .checked_add(3)
+            .checked_add(4)
             .ok_or(Error::InvalidSource)?;
         budget.charge_allocation_plan(allocation_bytes, allocation_events)?;
 
@@ -1013,6 +1123,12 @@ impl MetadataCensus {
             .object_uuids
             .try_reserve_exact(counts.object_uuids)
             .map_err(|_| Error::Allocation { amount: uuid_bytes })?;
+        visitor
+            .data_reference_owners
+            .try_reserve_exact(counts.data_reference_owners)
+            .map_err(|_| Error::Allocation {
+                amount: data_owner_bytes,
+            })?;
         let inspection =
             identity_codec::inspect_package_metadata_with_visitor(source, options, &mut visitor)
                 .map_err(|_| Error::InvalidSource)?;
@@ -1026,6 +1142,7 @@ impl MetadataCensus {
 
     fn current_component(&self, name: &str, budget: &mut Budget) -> Result<ComponentRef, Error> {
         let locator = metadata_locator(name).ok_or(Error::InvalidSource)?;
+        budget.charge_wire_work(self.components.len().max(1))?;
         let mut selected = None;
         for component in &self.components {
             if !component.current || component.locator.as_ref() != locator {
@@ -1045,11 +1162,27 @@ impl MetadataCensus {
         selected.ok_or(Error::InvalidSource)
     }
 
+    fn current_component_identifier(&self, name: &str, budget: &mut Budget) -> Result<u64, Error> {
+        let locator = metadata_locator(name).ok_or(Error::InvalidSource)?;
+        budget.charge_wire_work(self.components.len().max(1))?;
+        let mut selected = None;
+        for component in &self.components {
+            if !component.current || component.locator.as_ref() != locator {
+                continue;
+            }
+            if selected.replace(component.identifier).is_some() {
+                return Err(Error::InvalidSource);
+            }
+        }
+        selected.ok_or(Error::InvalidSource)
+    }
+
     fn component_by_identifier(
         &self,
         identifier: u64,
         budget: &mut Budget,
     ) -> Result<ComponentRef, Error> {
+        budget.charge_wire_work(self.components.len().max(1))?;
         let mut selected = None;
         for component in &self.components {
             if !component.current || component.identifier != identifier {
@@ -1074,9 +1207,11 @@ impl MetadataCensus {
         source: &ComponentRef,
         target: &ComponentRef,
         object_identifier: u64,
-    ) -> EdgeState {
+        budget: &mut Budget,
+    ) -> Result<EdgeState, Error> {
         let mut state = EdgeState::Missing;
         for edge in &self.external_references {
+            budget.charge_wire_work(1)?;
             if edge.source_identifier != source.identifier
                 || edge.target_identifier != target.identifier
                 || edge.object_identifier != Some(object_identifier)
@@ -1089,7 +1224,7 @@ impl MetadataCensus {
                 _ => EdgeState::Hostile,
             };
         }
-        state
+        Ok(state)
     }
 
     fn object_uuid_state(
@@ -1097,15 +1232,17 @@ impl MetadataCensus {
         component: &ComponentRef,
         object_identifier: u64,
         uuid: identity_codec::UuidBits,
-    ) -> ObjectUuidState {
+        budget: &mut Budget,
+    ) -> Result<ObjectUuidState, Error> {
         let mut state = ObjectUuidState::Missing;
         for binding in &self.object_uuids {
+            budget.charge_wire_work(1)?;
             if !binding.current {
                 continue;
             }
             if binding.object_identifier == object_identifier {
                 if binding.component_identifier != component.identifier || binding.uuid != uuid {
-                    return ObjectUuidState::Hostile;
+                    return Ok(ObjectUuidState::Hostile);
                 }
                 state = ObjectUuidState::Current;
             }
@@ -1113,10 +1250,69 @@ impl MetadataCensus {
                 && (binding.component_identifier != component.identifier
                     || binding.object_identifier != object_identifier)
             {
-                return ObjectUuidState::Hostile;
+                return Ok(ObjectUuidState::Hostile);
             }
         }
-        state
+        Ok(state)
+    }
+
+    fn object_uuid_for_object(
+        &self,
+        component: &ComponentRef,
+        object_identifier: u64,
+        budget: &mut Budget,
+    ) -> Result<Option<identity_codec::UuidBits>, Error> {
+        let mut selected = None;
+        for binding in &self.object_uuids {
+            budget.charge_wire_work(1)?;
+            if !binding.current {
+                continue;
+            }
+            if binding.object_identifier == object_identifier
+                && binding.component_identifier != component.identifier
+            {
+                return Err(Error::InvalidSource);
+            }
+            if binding.object_identifier == object_identifier
+                && binding.component_identifier == component.identifier
+            {
+                if selected.replace(binding.uuid).is_some() {
+                    return Err(Error::InvalidSource);
+                }
+            }
+        }
+        if let Some(uuid) = selected {
+            for binding in &self.object_uuids {
+                budget.charge_wire_work(1)?;
+                if !binding.current || binding.uuid != uuid {
+                    continue;
+                }
+                if binding.object_identifier != object_identifier
+                    || binding.component_identifier != component.identifier
+                {
+                    return Err(Error::InvalidSource);
+                }
+            }
+        }
+        Ok(selected)
+    }
+
+    fn component_witness_by_identifier(
+        &self,
+        identifier: u64,
+        budget: &mut Budget,
+    ) -> Result<&ComponentWitness, Error> {
+        budget.charge_wire_work(self.components.len().max(1))?;
+        let mut selected = None;
+        for component in &self.components {
+            if !component.current || component.identifier != identifier {
+                continue;
+            }
+            if selected.replace(component).is_some() {
+                return Err(Error::InvalidSource);
+            }
+        }
+        selected.ok_or(Error::InvalidSource)
     }
 }
 
@@ -1160,6 +1356,164 @@ impl identity_codec::PackageMetadataVisitor for MetadataCensus {
         });
         Ok(())
     }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: identity_codec::DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), identity_codec::RewriteError> {
+        self.data_reference_owners.push(DataReferenceOwnerWitness {
+            component_identifier: owner.component().identifier(),
+            data_identifier: owner.data_identifier(),
+            object_identifier: owner.object_identifier(),
+            count: owner.count(),
+            current: owner.component().is_current(),
+            unknown_fields: owner.has_unknown_fields(),
+        });
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        _object_identifier: u64,
+        _has_unknown_fields: bool,
+    ) -> Result<(), identity_codec::RewriteError> {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct ArchiveObjectReferenceCounts {
+    object_references: usize,
+}
+
+impl ArchiveReferenceVisitor for ArchiveObjectReferenceCounts {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object {
+            self.object_references = self.object_references.checked_add(1).ok_or(
+                litchi_iwa_core::Error::InvalidArchive {
+                    offset: 0,
+                    reason: "reference count overflow",
+                },
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ArchiveObjectReferenceWitness {
+    component_identifier: u64,
+    referenced_identifier: u64,
+}
+
+struct ArchiveObjectReferenceCollector<'a> {
+    component_identifier: u64,
+    witnesses: &'a mut Vec<ArchiveObjectReferenceWitness>,
+}
+
+impl ArchiveReferenceVisitor for ArchiveObjectReferenceCollector<'_> {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object {
+            self.witnesses.push(ArchiveObjectReferenceWitness {
+                component_identifier: self.component_identifier,
+                referenced_identifier: occurrence.referenced_identifier,
+            });
+        }
+        Ok(())
+    }
+}
+
+fn effective_object_reference_census(
+    source: &Package,
+    working: &WorkingSet<'_>,
+    metadata: &MetadataCensus,
+    budget: &mut Budget,
+) -> Result<Vec<ArchiveObjectReferenceWitness>, Error> {
+    let archive_limits = source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let mut reference_count = 0usize;
+    working.for_each_archive(|name, archive| {
+        if name == METADATA_COMPONENT {
+            return Ok(());
+        }
+        metadata.current_component_identifier(name, budget)?;
+        budget.charge_entries(archive.objects.len())?;
+        for object in &archive.objects {
+            let mut counts = ArchiveObjectReferenceCounts::default();
+            let references = object
+                .inspect_references_with_policy_and_limits(
+                    &mut counts,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    archive_limits,
+                )
+                .map_err(|_| Error::InvalidSource)?;
+            budget.charge_references(references)?;
+            budget.charge_wire_work(references.max(1))?;
+            reference_count = reference_count
+                .checked_add(counts.object_references)
+                .ok_or(Error::InvalidSource)?;
+        }
+        Ok(())
+    })?;
+
+    let witness_bytes = reference_count
+        .checked_mul(size_of::<ArchiveObjectReferenceWitness>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(witness_bytes)?;
+    let mut witnesses = Vec::new();
+    witnesses
+        .try_reserve_exact(reference_count)
+        .map_err(|_| Error::Allocation {
+            amount: witness_bytes,
+        })?;
+    working.for_each_archive(|name, archive| {
+        if name == METADATA_COMPONENT {
+            return Ok(());
+        }
+        let component_identifier = metadata.current_component_identifier(name, budget)?;
+        budget.charge_entries(archive.objects.len())?;
+        for object in &archive.objects {
+            let mut collector = ArchiveObjectReferenceCollector {
+                component_identifier,
+                witnesses: &mut witnesses,
+            };
+            let references = object
+                .inspect_references_with_policy_and_limits(
+                    &mut collector,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    archive_limits,
+                )
+                .map_err(|_| Error::InvalidSource)?;
+            budget.charge_references(references)?;
+            budget.charge_wire_work(references.max(1))?;
+        }
+        Ok(())
+    })?;
+    if witnesses.len() != reference_count {
+        return Err(Error::InvalidSource);
+    }
+    Ok(witnesses)
+}
+
+fn has_surviving_object_reference(
+    witnesses: &[ArchiveObjectReferenceWitness],
+    component_identifier: u64,
+    object_identifier: u64,
+    budget: &mut Budget,
+) -> Result<bool, Error> {
+    budget.charge_wire_work(witnesses.len().max(1))?;
+    Ok(witnesses.iter().any(|witness| {
+        witness.component_identifier == component_identifier
+            && witness.referenced_identifier == object_identifier
+    }))
 }
 
 fn metadata_payload(
@@ -1224,6 +1578,138 @@ enum EdgeState {
     Hostile,
 }
 
+#[derive(Debug)]
+struct ExternalEdgePlan {
+    source: ComponentRef,
+    target: ComponentRef,
+    object_identifier: u64,
+    is_weak: Option<bool>,
+}
+
+fn current_external_edge_state(
+    census: &MetadataCensus,
+    source: &ComponentRef,
+    target: &ComponentRef,
+    object_identifier: u64,
+    budget: &mut Budget,
+) -> Result<EdgeState, Error> {
+    let mut current = None;
+    for edge in &census.external_references {
+        budget.charge_wire_work(1)?;
+        if edge.source_identifier != source.identifier()
+            || edge.target_identifier != target.identifier()
+            || edge.object_identifier != Some(object_identifier)
+        {
+            continue;
+        }
+        if edge.versioned {
+            // Historical records are intentionally preserved by the neutral
+            // removal codec and do not make a unique current witness
+            // ambiguous.
+            continue;
+        }
+        if edge.unknown_fields {
+            return Err(Error::InvalidSource);
+        }
+        if current.replace(edge.is_weak).is_some() {
+            return Err(Error::InvalidSource);
+        }
+    }
+    Ok(current.map_or(EdgeState::Missing, EdgeState::Current))
+}
+
+struct SourceEdgeStateProbe {
+    source_identifier: u64,
+    target_identifier: u64,
+    object_identifier: u64,
+    state: EdgeState,
+}
+
+impl identity_codec::PackageMetadataVisitor for SourceEdgeStateProbe {
+    fn visit_external_reference(
+        &mut self,
+        reference: identity_codec::ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), identity_codec::RewriteError> {
+        if reference.source().identifier() != self.source_identifier
+            || reference.target_component_identifier() != self.target_identifier
+            || reference.object_identifier() != Some(self.object_identifier)
+            || reference.is_versioned()
+            || !reference.source().is_current()
+        {
+            return Ok(());
+        }
+        if reference.has_unknown_fields() {
+            self.state = EdgeState::Hostile;
+        } else if matches!(self.state, EdgeState::Missing) {
+            self.state = EdgeState::Current(reference.is_weak());
+        } else {
+            self.state = EdgeState::Hostile;
+        }
+        Ok(())
+    }
+}
+
+fn source_external_edge_state(
+    source: &Package,
+    source_component: &ComponentRef,
+    target_component: &ComponentRef,
+    object_identifier: u64,
+    budget: &mut Budget,
+) -> Result<EdgeState, Error> {
+    let source_archive = source
+        .state
+        .source
+        .components()
+        .get(METADATA_COMPONENT)
+        .ok_or(Error::InvalidSource)?;
+    let payload = unique_message_payload(source_archive.archive(), PACKAGE_METADATA_MESSAGE_TYPE)?;
+    let options = metadata_options(source, payload.len(), budget)?;
+    let mut probe = SourceEdgeStateProbe {
+        source_identifier: source_component.identifier(),
+        target_identifier: target_component.identifier(),
+        object_identifier,
+        state: EdgeState::Missing,
+    };
+    let inspection =
+        identity_codec::inspect_package_metadata_with_visitor(payload, options, &mut probe)
+            .map_err(|_| Error::InvalidSource)?;
+    budget.charge_wire_fields(inspection.report().fields())?;
+    budget.charge_wire_work(inspection.report().work_bytes())?;
+    budget.charge_nesting(inspection.report().max_depth() as usize)?;
+    budget.charge_references(inspection.report().references_scanned())?;
+    Ok(probe.state)
+}
+
+fn push_external_edge_plan(
+    plans: &mut Vec<ExternalEdgePlan>,
+    source: &ComponentRef,
+    target: &ComponentRef,
+    object_identifier: u64,
+    is_weak: Option<bool>,
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    for existing in plans.iter() {
+        budget.charge_wire_work(1)?;
+        if existing.source.identifier() != source.identifier()
+            || existing.target.identifier() != target.identifier()
+            || existing.object_identifier != object_identifier
+        {
+            continue;
+        }
+        if existing.is_weak != is_weak {
+            return Err(Error::InvalidSource);
+        }
+        return Ok(());
+    }
+    plans.push(ExternalEdgePlan {
+        source: clone_component_ref(source, budget)?,
+        target: clone_component_ref(target, budget)?,
+        object_identifier,
+        is_weak,
+    });
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ObjectUuidState {
     Missing,
@@ -1235,6 +1721,47 @@ fn metadata_locator(component: &str) -> Option<&str> {
     component
         .strip_prefix("Index/")
         .and_then(|component| component.strip_suffix(".iwa"))
+}
+
+fn copy_boxed_name(value: &str, budget: &mut Budget) -> Result<Box<str>, Error> {
+    budget.charge_allocations(value.len())?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|_| Error::Allocation {
+            amount: value.len(),
+        })?;
+    output.push_str(value);
+    Ok(output.into_boxed_str())
+}
+
+fn clone_component_ref(
+    component: &ComponentRef,
+    budget: &mut Budget,
+) -> Result<ComponentRef, Error> {
+    budget.charge_allocations(size_of::<ComponentRef>())?;
+    Ok(ComponentRef {
+        identifier: component.identifier,
+        locator: copy_boxed_name(&component.locator, budget)?,
+    })
+}
+
+fn package_component_name_for_ref<'source>(
+    source: &'source Package,
+    component: &ComponentRef,
+    budget: &mut Budget,
+) -> Result<&'source str, Error> {
+    let mut selected = None;
+    for candidate in source.state.source.components().iter() {
+        budget.charge_wire_work(1)?;
+        if metadata_locator(candidate.name()) != Some(component.locator.as_ref()) {
+            continue;
+        }
+        if selected.replace(candidate.name()).is_some() {
+            return Err(Error::InvalidSource);
+        }
+    }
+    selected.ok_or(Error::InvalidSource)
 }
 
 /// Rewrite one or more exact author dependency edges in the staged metadata
@@ -1250,8 +1777,7 @@ pub(super) fn rewrite_for_comment_edges(
     let payload = metadata_payload(source, working, budget)?;
     let options = metadata_options(source, payload.len(), budget)?;
     let census = MetadataCensus::inspect(&payload, options, budget)?;
-    let (source_component, target_component, object_identifier, add, expected_is_weak) = match edit
-    {
+    let (source_component, target_component, object_identifier, source_name) = match edit {
         EdgeEdit::AddAuthor {
             component,
             author_identifier,
@@ -1265,8 +1791,7 @@ pub(super) fn rewrite_for_comment_edges(
                 source_component,
                 target_component,
                 author_identifier,
-                true,
-                None,
+                component,
             )
         },
     };
@@ -1276,98 +1801,344 @@ pub(super) fn rewrite_for_comment_edges(
     if source_component.identifier() == target_component.identifier() {
         return Ok(());
     }
-    let state = census.edge_state(&source_component, &target_component, object_identifier);
-    let archive_limits = source
-        .limits()
-        .effective_archive_limits()
+    let state = census.edge_state(
+        &source_component,
+        &target_component,
+        object_identifier,
+        budget,
+    )?;
+    match state {
+        // Replaying an already committed strong edge is an idempotent
+        // operation.  A weak or structurally hostile witness cannot be
+        // silently upgraded because that would discard source metadata.
+        EdgeState::Current(Some(true)) | EdgeState::Hostile => {
+            return Err(Error::InvalidSource);
+        },
+        EdgeState::Current(None | Some(false)) => return Ok(()),
+        EdgeState::Missing => {},
+    }
+    if object_identifier == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let additions = [identity_codec::ExternalReferenceAddition::new(
+        source_component.selector(),
+        target_component.selector(),
+        object_identifier,
+        None,
+    )];
+    let new_last = census
+        .last_identifier
+        .checked_add(1)
+        .ok_or(Error::InvalidSource)?
+        .max(object_identifier);
+    let batch = identity_codec::Batch::new(census.last_identifier, new_last, &[], &additions);
+    let output = identity_codec::rewrite_package_metadata(&payload, batch, options)
         .map_err(|_| Error::InvalidSource)?;
-    let candidate = if add {
-        match state {
-            // Replaying an already committed strong edge is an idempotent
-            // operation.  A weak or structurally hostile witness cannot be
-            // silently upgraded because that would discard source metadata.
-            EdgeState::Current(Some(true)) | EdgeState::Hostile => {
-                return Err(Error::InvalidSource);
-            },
-            EdgeState::Current(None | Some(false)) => return Ok(()),
-            EdgeState::Missing => {},
-        }
-        if object_identifier == 0 {
+    charge_identity_report(budget, output.report())?;
+    working.mark_save_token_component(&source_name, budget)?;
+    replace_metadata_payload(working, output.into_bytes(), source, budget)
+}
+
+/// Reconcile PackageMetadata edges after comment-storage copy-on-write.
+///
+/// The archive ownership census is intentionally performed once for the whole
+/// transition set.  This matters for recursive reply deletion: a removed
+/// reply can be the source of a foreign metadata edge even when no explicit
+/// drawable transition names that component.  Current records are removed
+/// only when no effective ArchiveInfo object-reference witness remains in the
+/// same source component.  Historical records and optional native edges stay
+/// byte-preserved, while a selected current record with unknown fields or
+/// duplicate ownership fails closed.
+pub(super) fn reconcile_comment_storage_edges(
+    source: &Package,
+    working: &mut WorkingSet<'_>,
+    transitions: &[CommentStorageEdgeTransition<'_>],
+    removed_storage_ids: &[u64],
+    budget: &mut Budget,
+) -> Result<(), Error> {
+    if transitions.is_empty() && removed_storage_ids.is_empty() {
+        return Ok(());
+    }
+    for (index, identifier) in removed_storage_ids.iter().copied().enumerate() {
+        budget.charge_wire_work(index.saturating_add(1))?;
+        if identifier == 0 || removed_storage_ids[..index].contains(&identifier) {
             return Err(Error::InvalidSource);
         }
-        let additions = [identity_codec::ExternalReferenceAddition::new(
-            source_component.selector(),
-            target_component.selector(),
+    }
+
+    let payload = metadata_payload(source, working, budget)?;
+    let options = metadata_options(source, payload.len(), budget)?;
+    let metadata = MetadataCensus::inspect(&payload, options, budget)?;
+    let witnesses = effective_object_reference_census(source, working, &metadata, budget)?;
+
+    let transition_capacity = transitions
+        .len()
+        .checked_mul(2)
+        .ok_or(Error::InvalidSource)?;
+    let edge_capacity = metadata
+        .external_references
+        .len()
+        .checked_add(transition_capacity)
+        .ok_or(Error::InvalidSource)?;
+    let edge_bytes = edge_capacity
+        .checked_mul(size_of::<ExternalEdgePlan>())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(edge_bytes.checked_mul(2).ok_or(Error::InvalidSource)?)?;
+    let mut removals = Vec::new();
+    removals
+        .try_reserve_exact(edge_capacity)
+        .map_err(|_| Error::Allocation { amount: edge_bytes })?;
+    let mut additions = Vec::new();
+    additions
+        .try_reserve_exact(edge_capacity)
+        .map_err(|_| Error::Allocation { amount: edge_bytes })?;
+
+    for transition in transitions {
+        if transition.source_component.is_empty() {
+            return Err(Error::InvalidSource);
+        }
+        let source_component = metadata.current_component(transition.source_component, budget)?;
+        let source_identifier = source_component.identifier();
+        let old = match (transition.old_target_component, transition.old_identifier) {
+            (None, None) => None,
+            (Some(target), Some(identifier)) if identifier != 0 => {
+                Some((metadata.current_component(target, budget)?, identifier))
+            },
+            _ => return Err(Error::InvalidSource),
+        };
+        let new = match (transition.new_target_component, transition.new_identifier) {
+            (None, None) => None,
+            (Some(target), Some(identifier)) if identifier != 0 => {
+                Some((metadata.current_component(target, budget)?, identifier))
+            },
+            _ => return Err(Error::InvalidSource),
+        };
+
+        let candidate_old_state_result =
+            old.as_ref()
+                .map_or(Ok(EdgeState::Missing), |(target, identifier)| {
+                    current_external_edge_state(
+                        &metadata,
+                        &source_component,
+                        target,
+                        *identifier,
+                        budget,
+                    )
+                });
+        let candidate_old_state = candidate_old_state_result?;
+        let source_old_state =
+            old.as_ref()
+                .map_or(Ok(EdgeState::Missing), |(target, identifier)| {
+                    if source_component.identifier() == target.identifier() {
+                        Ok(EdgeState::Missing)
+                    } else {
+                        source_external_edge_state(
+                            source,
+                            &source_component,
+                            target,
+                            *identifier,
+                            budget,
+                        )
+                    }
+                })?;
+        if matches!(source_old_state, EdgeState::Hostile) {
+            return Err(Error::InvalidSource);
+        }
+        let old_state_for_addition = match (candidate_old_state, source_old_state) {
+            (EdgeState::Missing, EdgeState::Current(is_weak)) => EdgeState::Current(is_weak),
+            (candidate, _) => candidate,
+        };
+        let old_witness = old.as_ref().map_or(Ok(false), |(_, identifier)| {
+            has_surviving_object_reference(&witnesses, source_identifier, *identifier, budget)
+        })?;
+        if matches!(candidate_old_state, EdgeState::Hostile) && (new.is_some() || !old_witness) {
+            return Err(Error::InvalidSource);
+        }
+
+        if let Some((old_target, old_identifier)) = old.as_ref()
+            && !old_witness
+            && let EdgeState::Current(is_weak) = candidate_old_state
+        {
+            push_external_edge_plan(
+                &mut removals,
+                &source_component,
+                old_target,
+                *old_identifier,
+                is_weak,
+                budget,
+            )?;
+        }
+
+        let Some((new_target, new_identifier)) = new.as_ref() else {
+            continue;
+        };
+        if new_target.identifier() == source_identifier {
+            continue;
+        }
+        let new_witness =
+            has_surviving_object_reference(&witnesses, source_identifier, *new_identifier, budget)?;
+        if !new_witness {
+            continue;
+        }
+        let EdgeState::Current(is_weak) = old_state_for_addition else {
+            continue;
+        };
+        let new_state = current_external_edge_state(
+            &metadata,
+            &source_component,
+            new_target,
+            *new_identifier,
+            budget,
+        )?;
+        if matches!(new_state, EdgeState::Hostile) {
+            return Err(Error::InvalidSource);
+        }
+        if matches!(new_state, EdgeState::Missing) {
+            push_external_edge_plan(
+                &mut additions,
+                &source_component,
+                new_target,
+                *new_identifier,
+                is_weak,
+                budget,
+            )?;
+        }
+    }
+
+    for edge in &metadata.external_references {
+        let Some(object_identifier) = edge.object_identifier else {
+            continue;
+        };
+        budget.charge_wire_work(removed_storage_ids.len().max(1))?;
+        if !removed_storage_ids.contains(&object_identifier) || edge.versioned {
+            continue;
+        }
+        let source_component = metadata.component_by_identifier(edge.source_identifier, budget)?;
+        if has_surviving_object_reference(
+            &witnesses,
+            source_component.identifier(),
             object_identifier,
-            expected_is_weak,
-        )];
-        let new_last = census
+            budget,
+        )? {
+            continue;
+        }
+        let target_component = metadata.component_by_identifier(edge.target_identifier, budget)?;
+        let state = current_external_edge_state(
+            &metadata,
+            &source_component,
+            &target_component,
+            object_identifier,
+            budget,
+        )?;
+        match state {
+            EdgeState::Current(is_weak) => {
+                push_external_edge_plan(
+                    &mut removals,
+                    &source_component,
+                    &target_component,
+                    object_identifier,
+                    is_weak,
+                    budget,
+                )?;
+            },
+            EdgeState::Missing => {},
+            EdgeState::Hostile => return Err(Error::InvalidSource),
+        }
+    }
+
+    if removals.is_empty() && additions.is_empty() {
+        return Ok(());
+    }
+    let conflict_work = removals
+        .len()
+        .checked_mul(additions.len())
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_wire_work(conflict_work.max(1))?;
+    for removal in &removals {
+        if additions.iter().any(|addition| {
+            addition.source.identifier() == removal.source.identifier()
+                && addition.target.identifier() == removal.target.identifier()
+                && addition.object_identifier == removal.object_identifier
+        }) {
+            return Err(Error::InvalidSource);
+        }
+    }
+
+    let request_bytes = removals
+        .len()
+        .checked_mul(size_of::<identity_codec::ExternalReferenceRemoval<'_>>())
+        .and_then(|bytes| {
+            bytes.checked_add(
+                additions
+                    .len()
+                    .checked_mul(size_of::<identity_codec::ExternalReferenceAddition<'_>>())?,
+            )
+        })
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_allocations(request_bytes)?;
+    let mut removal_requests = Vec::new();
+    removal_requests
+        .try_reserve_exact(removals.len())
+        .map_err(|_| Error::Allocation {
+            amount: request_bytes,
+        })?;
+    for removal in &removals {
+        removal_requests.push(identity_codec::ExternalReferenceRemoval::new(
+            removal.source.selector(),
+            removal.target.selector(),
+            removal.object_identifier,
+            removal.is_weak,
+        ));
+    }
+    let mut addition_requests = Vec::new();
+    addition_requests
+        .try_reserve_exact(additions.len())
+        .map_err(|_| Error::Allocation {
+            amount: request_bytes,
+        })?;
+    for addition in &additions {
+        addition_requests.push(identity_codec::ExternalReferenceAddition::new(
+            addition.source.selector(),
+            addition.target.selector(),
+            addition.object_identifier,
+            addition.is_weak,
+        ));
+    }
+
+    let mut candidate = payload;
+    if !removal_requests.is_empty() {
+        let batch = identity_codec::RemovalBatch::new(
+            metadata.last_identifier,
+            &[],
+            &removal_requests,
+            &[],
+        );
+        let output = identity_codec::remove_package_metadata(&candidate, batch, options)
+            .map_err(|_| Error::InvalidSource)?;
+        charge_identity_report(budget, output.report())?;
+        candidate = output.into_bytes();
+    }
+    if !addition_requests.is_empty() {
+        let mut new_last = metadata
             .last_identifier
             .checked_add(1)
-            .ok_or(Error::InvalidSource)?
-            .max(object_identifier);
-        let batch = identity_codec::Batch::new(census.last_identifier, new_last, &[], &additions);
-        let source_selector = source_component.selector();
-        let selectors = [source_selector];
-        let output = identity_codec::rewrite_package_metadata_additions_and_save_tokens(
-            &payload,
-            identity_codec::AdditionSaveTokenBatch::new(
-                batch,
-                identity_codec::SaveTokenBatch::new(&selectors),
-            ),
-            options,
-        )
-        .map_err(|_| Error::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        for addition in &additions {
+            new_last = new_last.max(addition.object_identifier);
+        }
+        let batch =
+            identity_codec::Batch::new(metadata.last_identifier, new_last, &[], &addition_requests);
+        let output = identity_codec::rewrite_package_metadata(&candidate, batch, options)
+            .map_err(|_| Error::InvalidSource)?;
         charge_identity_report(budget, output.report())?;
-        output.into_bytes()
-    } else {
-        let expected = match state {
-            EdgeState::Current(current) => {
-                if expected_is_weak.is_some() && expected_is_weak != current {
-                    return Err(Error::InvalidSource);
-                }
-                current
-            },
-            EdgeState::Missing | EdgeState::Hostile => return Err(Error::InvalidSource),
-        };
-        let removals = [identity_codec::ExternalReferenceRemoval::new(
-            source_component.selector(),
-            target_component.selector(),
-            object_identifier,
-            expected,
-        )];
-        let batch = identity_codec::RemovalBatch::new(census.last_identifier, &[], &removals, &[]);
-        let source_selector = source_component.selector();
-        let selectors = [source_selector];
-        let output = identity_codec::rewrite_package_metadata_removals_and_save_tokens(
-            &payload,
-            identity_codec::RemovalSaveTokenBatch::new(
-                batch,
-                identity_codec::SaveTokenBatch::new(&selectors),
-            ),
-            options,
-        )
-        .map_err(|_| Error::InvalidSource)?;
-        charge_identity_report(budget, output.report())?;
-        output.into_bytes()
-    };
+        candidate = output.into_bytes();
+    }
 
-    let archive = working.load(METADATA_COMPONENT, budget)?;
-    let (object_identifier, message_index) =
-        unique_message_location_in_archive(archive, PACKAGE_METADATA_MESSAGE_TYPE)?;
-    archive
-        .object_mut(object_identifier)
-        .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
-            message_index,
-            litchi_iwa_core::RawMessage {
-                type_: PACKAGE_METADATA_MESSAGE_TYPE,
-                data: candidate,
-            },
-            archive_limits,
-        )
-        .map_err(|_| Error::InvalidSource)?;
-    Ok(())
+    for edge in removals.iter().chain(additions.iter()) {
+        let name = package_component_name_for_ref(source, &edge.source, budget)?;
+        working.mark_save_token_component(name, budget)?;
+    }
+    replace_metadata_payload(working, candidate, source, budget)
 }
 
 /// Advance the package watermark to cover a newly staged object identifier.
@@ -1425,6 +2196,7 @@ pub(super) fn advance_save_tokens(
         })?;
     for name in component_names {
         let component = census.current_component(name, budget)?;
+        budget.charge_wire_work(components.len().max(1))?;
         if components
             .iter()
             .any(|selected: &ComponentRef| selected == &component)
@@ -1491,8 +2263,11 @@ pub(super) fn release_identifier_suffix(
     }
 
     // The working archives already exclude reclaimed objects. Bind the
-    // removed watermark to the immutable source, then prove that every
-    // effective survivor lies below it.
+    // removed watermark to the immutable source, then inspect every
+    // effective survivor. A staged clone or a pre-existing object above the
+    // current watermark is valid: it means this edit cannot lower the scalar
+    // watermark, so leave the metadata payload unchanged after validating the
+    // removal set.
     if source.object_with_component(last).is_none() {
         return Err(Error::InvalidSource);
     }
@@ -1510,7 +2285,7 @@ pub(super) fn release_identifier_suffix(
             if identifier == 0 {
                 return Err(Error::InvalidSource);
             }
-            if removed.binary_search(&identifier).is_ok() || identifier >= last {
+            if removed.binary_search(&identifier).is_ok() {
                 return Err(Error::InvalidSource);
             }
             maximum_remaining = maximum_remaining.max(identifier);
@@ -1519,6 +2294,9 @@ pub(super) fn release_identifier_suffix(
     })?;
     if maximum_remaining == 0 {
         return Err(Error::InvalidSource);
+    }
+    if maximum_remaining >= last {
+        return Ok(());
     }
     let batch = identity_codec::RemovalBatch::new(last, &[], &[], &[])
         .with_new_last_object_identifier(maximum_remaining);
@@ -1838,12 +2616,6 @@ fn remove_author_external_edges(
         .map_err(|_| Error::Allocation {
             amount: match_bytes,
         })?;
-    let mut selectors = Vec::new();
-    selectors
-        .try_reserve_exact(matches.len())
-        .map_err(|_| Error::Allocation {
-            amount: match_bytes,
-        })?;
     for (component, expected_is_weak) in &matches {
         removals.push(identity_codec::ExternalReferenceRemoval::new(
             component.selector(),
@@ -1851,21 +2623,17 @@ fn remove_author_external_edges(
             author_identifier,
             *expected_is_weak,
         ));
-        selectors.push(component.selector());
     }
 
     let batch = identity_codec::RemovalBatch::new(census.last_identifier, &[], &removals, &[]);
-    let output = identity_codec::rewrite_package_metadata_removals_and_save_tokens(
-        &payload,
-        identity_codec::RemovalSaveTokenBatch::new(
-            batch,
-            identity_codec::SaveTokenBatch::new(&selectors),
-        ),
-        options,
-    )
-    .map_err(|_| Error::InvalidSource)?;
+    let output = identity_codec::remove_package_metadata(&payload, batch, options)
+        .map_err(|_| Error::InvalidSource)?;
     charge_identity_report(budget, output.report())?;
     replace_metadata_payload(working, output.into_bytes(), source, budget)?;
+    for (component, _) in &matches {
+        let name = package_component_name_for_ref(source, component, budget)?;
+        working.mark_save_token_component(name, budget)?;
+    }
     Ok(())
 }
 
@@ -2199,7 +2967,26 @@ pub(super) fn cleanup_generated_author_for_identifier(
 
 #[cfg(test)]
 mod tests {
-    use super::metadata_locator;
+    use super::{
+        Budget, ComponentRef, EdgeState, Error, ExternalWitness, MetadataCensus, Package,
+        current_external_edge_state, metadata_locator,
+    };
+
+    const TEST_SOURCE: &[u8] = include_bytes!(
+        "../../../../../test-data/iwork/keynote/drawable-comments-source-native.key"
+    );
+
+    fn edge_census(external_references: Vec<ExternalWitness>) -> MetadataCensus {
+        MetadataCensus {
+            external_references,
+            ..MetadataCensus::default()
+        }
+    }
+
+    fn test_budget() -> Budget {
+        let package = Package::from_bytes(TEST_SOURCE).expect("native drawable-comment package");
+        Budget::for_package(&package).expect("drawable-comment test budget")
+    }
 
     #[test]
     fn metadata_locator_matches_native_component_entry_names() {
@@ -2207,5 +2994,92 @@ mod tests {
         assert_eq!(metadata_locator("Index/Metadata.iwa"), Some("Metadata"));
         assert_eq!(metadata_locator("Document.iwa"), None);
         assert_eq!(metadata_locator("Index/Document"), None);
+    }
+
+    #[test]
+    fn current_external_edge_state_rejects_unknown_current_records() {
+        let source = ComponentRef::new(11, "Slide");
+        let target = ComponentRef::new(22, "AnnotationAuthorStorage");
+        let census = edge_census(vec![ExternalWitness {
+            source_identifier: source.identifier(),
+            target_identifier: target.identifier(),
+            object_identifier: Some(33),
+            is_weak: None,
+            versioned: false,
+            unknown_fields: true,
+        }]);
+        let mut budget = test_budget();
+
+        assert!(matches!(
+            current_external_edge_state(&census, &source, &target, 33, &mut budget),
+            Err(Error::InvalidSource)
+        ));
+    }
+
+    #[test]
+    fn current_external_edge_state_rejects_duplicate_current_records() {
+        let source = ComponentRef::new(11, "Slide");
+        let target = ComponentRef::new(22, "AnnotationAuthorStorage");
+        let witness = ExternalWitness {
+            source_identifier: source.identifier(),
+            target_identifier: target.identifier(),
+            object_identifier: Some(33),
+            is_weak: None,
+            versioned: false,
+            unknown_fields: false,
+        };
+        let census = edge_census(vec![witness, witness]);
+        let mut budget = test_budget();
+
+        assert!(matches!(
+            current_external_edge_state(&census, &source, &target, 33, &mut budget),
+            Err(Error::InvalidSource)
+        ));
+    }
+
+    #[test]
+    fn current_external_edge_state_preserves_historical_records() {
+        let source = ComponentRef::new(11, "Slide");
+        let target = ComponentRef::new(22, "AnnotationAuthorStorage");
+        let historical = ExternalWitness {
+            source_identifier: source.identifier(),
+            target_identifier: target.identifier(),
+            object_identifier: Some(33),
+            is_weak: None,
+            versioned: true,
+            unknown_fields: true,
+        };
+
+        let mut historical_only_budget = test_budget();
+        assert_eq!(
+            current_external_edge_state(
+                &edge_census(vec![historical]),
+                &source,
+                &target,
+                33,
+                &mut historical_only_budget,
+            )
+            .expect("historical records are not current witnesses"),
+            EdgeState::Missing
+        );
+
+        let current = ExternalWitness {
+            versioned: false,
+            unknown_fields: false,
+            is_weak: Some(false),
+            ..historical
+        };
+        let mut mixed_budget = test_budget();
+        assert_eq!(
+            current_external_edge_state(
+                &edge_census(vec![historical, current]),
+                &source,
+                &target,
+                33,
+                &mut mixed_budget,
+            )
+            .expect("historical records must not make a valid current edge hostile"),
+            EdgeState::Current(Some(false))
+        );
     }
 }

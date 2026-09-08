@@ -8,12 +8,13 @@
 //!
 //! Direct comments use a slide selector, a source-order drawable selector,
 //! and an ordinal reply selector. Each edit stages exactly one operation and
-//! returns an immutable package plus an exact-source patch. The selected
-//! drawable, root comment, and reply-storage closure must resolve to one
-//! physical IWA component. The annotation-author registry is followed through
-//! its package ownership witness and may live in another component. Shared
-//! local threads use copy-on-write; cross-component root or reply storage
-//! and ambiguous ownership fail closed.
+//! returns an immutable package plus an exact-source patch. A slide-owned
+//! drawable and its comment or reply storage may live in different package
+//! components. Edits preserve their storage locations and isolate shared
+//! threads through copy-on-write. A valid rooted annotation-author registry
+//! remains authoritative; when that optional reference is absent, discovery
+//! accepts one unambiguous registry elsewhere in the package. Malformed
+//! references and ambiguous ownership fail before a candidate is published.
 //!
 //! ```no_run
 //! use litchi_keynote::{DrawableSelector, Package, ReplySelector, SlideSelector};

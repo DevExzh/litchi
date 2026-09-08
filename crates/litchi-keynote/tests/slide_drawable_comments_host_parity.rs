@@ -5,8 +5,8 @@
 //! `KeynoteEditor` comment methods accepted but which a native fixture cannot
 //! express on its own: two drawables sharing one root, two roots sharing one
 //! reply, and a package with no annotation-author storage.  The physical
-//! oracle is kept in this test so the public assertions remain selector and
-//! value based.
+//! oracle is shared with the cross-component parity tests so the public
+//! assertions remain selector and value based.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -22,6 +22,9 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
 use litchi_keynote::{DrawableKind, DrawableSelector, Package, SlideSelector};
 use prost::Message as _;
+
+#[path = "support/drawable_comment_fixtures.rs"]
+mod cross_component_fixtures;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -103,7 +106,8 @@ fn route_path(message_type: u32) -> Option<&'static [u32]> {
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    let catalog = Catalog::from_bytes(source)?;
+    for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
@@ -769,27 +773,6 @@ fn native_watermark(source: &[u8]) -> TestResult<u64> {
     Ok(tsp::PackageMetadata::decode(message.data.as_slice())?.last_object_identifier)
 }
 
-fn move_object_to_component(
-    source: &[u8],
-    identifier: u64,
-    destination_name: &str,
-) -> TestResult<Vec<u8>> {
-    let (source_name, mut source_archive) = component_containing_object(source, identifier)?;
-    if source_name == destination_name {
-        return Err(io::Error::other("cross-component fixture uses one component").into());
-    }
-    let object = source_archive
-        .remove_object(identifier)
-        .ok_or_else(|| io::Error::other("cross-component source object disappeared"))?;
-    let source = replace_component(source, &source_name, source_archive)?;
-    let mut destination_archive = component_archives(&source)?
-        .into_iter()
-        .find_map(|(name, archive)| (name == destination_name).then_some(archive))
-        .ok_or_else(|| io::Error::other("author storage component is missing"))?;
-    destination_archive.insert_object(object)?;
-    replace_component(&source, destination_name, destination_archive)
-}
-
 fn shared_root_fixture() -> TestResult<SharedGraphFixture> {
     let profile = fixture_profile(SOURCE)?;
     let root_identifier =
@@ -1123,28 +1106,134 @@ fn clearing_non_tail_comment_preserves_watermark_until_tail_release() -> TestRes
 }
 
 #[test]
-fn cross_component_root_read_and_edit_fail_closed_without_mutation() -> TestResult {
-    let profile = fixture_profile(SOURCE)?;
-    let root_identifier =
-        comment_identifier_for_entry(SOURCE, &profile.drawables[profile.commented_position])?
-            .ok_or_else(|| io::Error::other("native fixture has no commented root"))?;
-    let source =
-        move_object_to_component(SOURCE, root_identifier, "Index/AnnotationAuthorStorage.iwa")?;
-    let package = match Package::from_bytes(&source) {
-        Ok(package) => package,
-        Err(_) => return Ok(()),
-    };
+fn cross_component_root_read_and_edit_commit_without_source_mutation() -> TestResult {
+    let fixture = cross_component_fixtures::root_foreign_fixture()?;
+    let package = Package::from_bytes(&fixture.bytes)?;
     let before = exact_bytes(&package)?;
     let slide = SlideSelector::index(0);
-    let target = DrawableSelector::index(profile.commented_position);
-    assert!(package.slide_drawable_comment(slide, target).is_err());
-    assert!(
-        package
-            .edit_slide_drawable_comment(slide, target)
-            .and_then(|edit| edit.set("cross-component mutation"))
-            .is_err()
+    let target = DrawableSelector::index(fixture.target.position);
+    assert!(package.slide_drawable_comment(slide, target)?.is_some());
+    let commit = package
+        .edit_slide_drawable_comment(slide, target)?
+        .set("cross-component mutation")?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_drawable_comment(slide, target)?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("cross-component mutation")
     );
     assert_eq!(exact_bytes(&package)?, before);
+    let restored = commit
+        .package()
+        .apply_slide_drawable_comment(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, before);
+
+    let changed = commit
+        .package()
+        .edit_slide_drawable_comment(slide, target)?
+        .set("different source")?
+        .commit()?;
+    let changed_before = exact_bytes(changed.package())?;
+    assert!(
+        changed
+            .package()
+            .apply_slide_drawable_comment(commit.patch())
+            .is_err()
+    );
+    assert_eq!(exact_bytes(changed.package())?, changed_before);
+    Ok(())
+}
+
+#[test]
+fn all_cross_component_fixture_builders_preserve_native_metadata() -> TestResult<()> {
+    let (primary, sibling) =
+        cross_component_fixtures::primary_targets(cross_component_fixtures::SOURCE)?;
+    assert_ne!(primary.position, sibling.position);
+
+    let builders: [(
+        &str,
+        fn() -> cross_component_fixtures::TestResult<cross_component_fixtures::RelocatedFixture>,
+    ); 5] = [
+        ("root", cross_component_fixtures::root_foreign_fixture),
+        ("reply", cross_component_fixtures::reply_foreign_fixture),
+        (
+            "shared-root",
+            cross_component_fixtures::shared_foreign_root_fixture,
+        ),
+        (
+            "shared-reply",
+            cross_component_fixtures::shared_foreign_reply_fixture,
+        ),
+        (
+            "empty-drawable",
+            cross_component_fixtures::foreign_drawable_fixture,
+        ),
+    ];
+
+    for (name, build) in builders {
+        let fixture = build()?;
+        let package = Package::from_bytes(&fixture.bytes)?;
+        let slide = SlideSelector::index(0);
+        let target = DrawableSelector::index(fixture.target.position);
+        let summaries = package.slide_drawables(slide)?;
+        assert!(
+            fixture.target.position < summaries.len(),
+            "{name} fixture target is outside the slide inventory"
+        );
+        let selected = package.slide_drawable_comment(slide, target)?;
+        if fixture.root_identifier.is_some() {
+            assert!(selected.is_some(), "{name} fixture lost its root comment");
+        } else {
+            assert!(
+                selected.is_none(),
+                "{name} fixture unexpectedly has a root comment"
+            );
+        }
+        if fixture.reply_identifier.is_some() {
+            assert!(
+                !package
+                    .slide_drawable_comment_replies(slide, target)?
+                    .is_empty(),
+                "{name} fixture lost its relocated reply"
+            );
+        }
+
+        let moved = fixture
+            .reply_identifier
+            .or(fixture.root_identifier)
+            .unwrap_or(fixture.target.identifier);
+        cross_component_fixtures::assert_metadata_relocated(
+            &fixture.metadata_source,
+            &fixture.bytes,
+            moved,
+        )?;
+
+        let archives = cross_component_fixtures::component_archives(&fixture.bytes)?;
+        let destination = if fixture.root_identifier.is_some() || fixture.reply_identifier.is_some()
+        {
+            cross_component_fixtures::AUTHOR_STORAGE_COMPONENT
+        } else {
+            cross_component_fixtures::STYLESHEET_COMPONENT
+        };
+        let moved_object = archives
+            .iter()
+            .find(|(component, archive)| {
+                component == destination && archive.object(moved).is_some()
+            })
+            .and_then(|(_, archive)| archive.object(moved))
+            .ok_or_else(|| io::Error::other(format!("{name} object was not relocated")))?;
+        if fixture.root_identifier.is_some() || fixture.reply_identifier.is_some() {
+            assert!(
+                moved_object.messages.iter().any(|message| message.type_
+                    == cross_component_fixtures::COMMENT_STORAGE_MESSAGE_TYPE),
+                "{name} relocation did not retain comment storage payload"
+            );
+        }
+        assert_archive_references_are_live(&fixture.bytes)?;
+    }
     Ok(())
 }
 
