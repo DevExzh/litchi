@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## Checked plain-cell tag elision (0472)
+
+The [0472 source review](results/change-0472/source-review.md) preserves address
+and attribute error order, source spans, rich metadata, no-op and publication
+semantics while omitting redundant ephemeral ownership. All 30 ADR hashes are
+unchanged, the Store handoff stays at 4,096 cells / 1 MiB, and no API, unsafe,
+runtime or dependency change is introduced. The allocation gate is met; all
+1,263 XLSX tests and scoped gates pass. Latency flags remain disclosed.
+
 ## Rejected worksheet buffer-lifetime experiment (0471)
 
 [0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) keeps compaction, grid,

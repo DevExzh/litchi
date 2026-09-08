@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "removed": [
+    "/tmp/litchi-goal-0468/profile-tree",
+    "/tmp/litchi-goal-0468",
+    "/tmp/litchi-goal-0472/control",
+    "/tmp/litchi-goal-0472/candidate",
+    "/tmp/litchi-goal-0472/cpu.lock",
+    "/tmp/litchi-goal-0472",
+    "/tmp/litchi-goal-0472-portable"
+  ],
+  "preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "user_file_sha256": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/report/spec-gap-audit.md": "f71288dddc0827d5f5a16bf3936985606ec1b341d6e5c06fced4e612c7972ddf"
+  },
+  "verified_utc": "2026-09-08T08:53:15.745537+00:00"
+}

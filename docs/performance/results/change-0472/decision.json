@@ -1,0 +1,9 @@
+{
+  "status": "retained",
+  "candidate_revision": "3eac9a4937cf5520583288f66bb5c77f18e70d3c",
+  "reason": "Frozen allocation gate met: whole-process calls fall 14.330%; correctness passes. No peak/RSS or registered latency claim; individual latency flags remain unresolved and retained.",
+  "allocation_calls_control": 32012510,
+  "allocation_calls_candidate": 27424990,
+  "allocation_reduction_percent": 14.330397710145192,
+  "verified_utc": "2026-09-08T08:50:58.570322+00:00"
+}

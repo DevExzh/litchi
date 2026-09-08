@@ -1,0 +1,19 @@
+{
+  "binary_path": "/tmp/litchi-goal-0472/control",
+  "binary_sha256": "f64c7dd28b2e440a1d8bb69bf667719e557166e62c31234e3d59848469c8cdc9",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "build_receipt_path": "control-build.json",
+  "build_receipt_sha256": "0ea00dc181e69df5509fc2173dc3a471b5954d276ffcd631bfbb6cc8876d997a",
+  "bytes": 463645008,
+  "clean_build": true,
+  "included_fixtures": {
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "revision": "a82367b52b84ce43848f103dc08c3aa8ea4a306c",
+  "role": "control",
+  "schema": "litchi-0472-role-binding-v1",
+  "source_binding_sha256": "06a7967b3adaa014650e1f0f85eb0beb842a1fede6810ddb720d8b88d793a87e",
+  "source_manifest": "sources/control.json",
+  "source_manifest_sha256": "9f533fa955199c4b23c3d846a5cdfd661269cf6875da7def6c0c1420879361d7"
+}

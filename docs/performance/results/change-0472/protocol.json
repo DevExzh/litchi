@@ -1,0 +1,48 @@
+{
+  "allocation_scope": "Whole process including generation, expected output, warmups, verification and teardown; instrumented time/RSS excluded from comparisons.",
+  "build_path": "/tmp/litchi-goal-0468/profile-tree",
+  "capture_driver_sha256": "9fa6b3b87c076c5036820cc59f09c6688105998d401a898e39ed2900bdf10553",
+  "cpu": 2,
+  "decision": "Retain only with meaningful allocation or peak-heap reduction, correctness intact, and individual latency/RSS regression flags reviewed. No registered latency claim.",
+  "frozen_utc": "2026-09-08T08:25:34.393783+00:00",
+  "full_guard_order": [
+    "A-full",
+    "B-full"
+  ],
+  "full_guard_samples": 15,
+  "full_guard_warmups": 3,
+  "heap_case": "xlsx_one_percent_commit_save",
+  "heap_order": [
+    "A-heap",
+    "B-heap"
+  ],
+  "heap_samples": 5,
+  "heap_shape": "dense-wide",
+  "heap_warmups": 1,
+  "hypothesis": "Avoid owning plain unprefixed cell tags whose only optional attribute is r: validate all attributes as before, then retain an implicit tag because changed-cell writing always regenerates r and untouched cells are copied verbatim.",
+  "lock": "/tmp/litchi-goal-0472/cpu.lock",
+  "performance_claim": "none; 100-sample diagnostic probe and whole-process allocation comparison",
+  "probe_cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save",
+    "ppt_fresh_write_to"
+  ],
+  "probe_order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "probe_samples": 100,
+  "probe_shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "probe_warmups": 5,
+  "schema": "litchi-0472-protocol-v1",
+  "workers": 1,
+  "writer_shapes": [
+    "payload-heavy"
+  ]
+}

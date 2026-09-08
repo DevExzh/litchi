@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0472/verify.py",
+    "--live"
+  ],
+  "started_utc": "2026-09-08T08:52:45.327178+00:00",
+  "stdout_sha256": "11ce9baab32f2555247727decbc9160598b313a98480f548da4f311de9982ecb",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T08:52:46.418482+00:00"
+}

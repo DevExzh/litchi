@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Current result: plain worksheet tag elision (0472)
+
+[0472](changes/0472-xlsx-plain-cell-tags.md) retains a checked plain-cell
+snapshot representation with 14.330% fewer whole-process allocation calls
+(32,012,510 to 27,424,990). Rounded peak heap remains `104.38M`; normal RSS is
+nearly unchanged. All 1,263 XLSX tests pass. Ordinary XLSX diagnostic medians
+improve, PPT varies, and the full guard retains 86 latency flags. No registered
+latency or program-completion claim follows. The next audited gap is operation
+memory evidence for the public DOCX fresh streaming writer.
+
 ## Rejected early worksheet-buffer release (0471)
 
 [0471](changes/0471-xlsx-rewrite-buffer-lifetime.md) finds no practical peak

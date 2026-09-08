@@ -1,0 +1,6 @@
+{
+  "dedicated_xlsx_fuzz_manifest_exists": false,
+  "cargo_fuzz_binary_exists": false,
+  "new_fuzz_campaign": false,
+  "covered_here": "Full XLSX unit/integration/doc suite including new tag/error/serialization differential cases; no new native Office execution."
+}

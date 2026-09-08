@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "cargo",
+    "fmt",
+    "-p",
+    "litchi-xlsx"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-08T08:37:50.702488+00:00",
+  "finished_utc": "2026-09-08T08:37:51.780674+00:00",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
