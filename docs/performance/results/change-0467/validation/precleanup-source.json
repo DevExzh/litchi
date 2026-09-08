@@ -1,0 +1,28 @@
+{
+  "schema": "litchi-0467-precleanup-source-v1",
+  "verified_utc": "2026-09-08T05:08:00.205672+00:00",
+  "worktrees": [
+    {
+      "path": "/tmp/litchi-goal-0467/control-tree",
+      "role": "control",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "clean": true,
+      "verified_source_and_fixture_files": 6994
+    },
+    {
+      "path": "/tmp/litchi-goal-0467/candidate-tree",
+      "role": "candidate",
+      "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+      "clean": true,
+      "verified_source_and_fixture_files": 6994
+    },
+    {
+      "path": "/tmp/litchi-goal-0467/shared-tree",
+      "role": "control",
+      "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+      "clean": true,
+      "verified_source_and_fixture_files": 6994
+    }
+  ],
+  "user_goal_unchanged": true
+}

@@ -1,0 +1,42 @@
+{
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "commands": [
+    {
+      "argv": [
+        "heaptrack_print",
+        "-f",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A-heap-clean/heaptrack.zst",
+        "-n",
+        "30"
+      ],
+      "lane": "A-heap-clean",
+      "started_utc": "2026-09-08T04:19:49.406186+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:19:53.566925+00:00",
+      "artifacts": {
+        "print.txt": "a4fff7cf8e5eeb9a41018fd37acdcb93597e1c81a534f2376403e98108967f9b",
+        "print.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "heaptrack_print",
+        "-f",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0467/B-heap-clean/heaptrack.zst",
+        "-n",
+        "30"
+      ],
+      "lane": "B-heap-clean",
+      "started_utc": "2026-09-08T04:19:53.567575+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:19:56.830421+00:00",
+      "artifacts": {
+        "print.txt": "52bd77906c968f2aed626882a3c76220cb852490bed0957f9a9d9323ca3ef9c4",
+        "print.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ]
+}

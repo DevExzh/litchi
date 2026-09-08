@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Current dense XLSX result and next lead (0467)
+
+[0467](changes/0467-xlsx-cell-attributes.md) removes the five repeated checked
+attribute scans identified by 0466. The fixed-path 500-sample ABBA measures
+8.68% / 7.86% lower dense one-percent commit/save median latency; mean and
+tails also qualify. Whole-process Heaptrack allocation calls fall 20.47%,
+without an operation-local allocation or reduced peak-memory claim. All 1,242
+XLSX tests and applicable scoped correctness gates pass.
+
+The next profile should measure the candidate before ranking remaining parser
+and writer work. The ordinary path still performs complete worksheet Store
+parses, XML rewriting/compaction and publication validation. The bounded Store
+handoff remains at 4,096 cells / 1 MiB; the earlier unrestricted approach failed
+its memory gate. Retained full-matrix latency flags and build-path sensitivity
+limit broader claims. No new remote/cold, native or scaling coverage follows.
+
 ## Current dense XLSX lead (0466)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) profiles the ordinary owned
@@ -16,8 +32,8 @@ and scaling gaps remain open.
 The 0466 frame-pointer profile attributes 55.13% of whole-process sampled
 weight to exact commit ancestors. Within commit, worksheet Parser ancestors
 account for 47.66% and the shared attribute lookup for 15.38% (inclusive and
-overlapping). The next narrow experiment is eliminating the repeated cell
-attribute scans while preserving all validation and refusal behavior.
+overlapping). 0467 completes the narrow experiment of eliminating repeated cell attribute
+scans while preserving validation and refusal behavior.
 
 ## Change 0465: checked-default ODP append coverage
 

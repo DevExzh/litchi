@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0467/verify.py"
+  ],
+  "exit_code": 0,
+  "owned_temporary_root_absent": true,
+  "schema": "litchi-0467-postcleanup-verification-v1",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "af21461fe30249eb7a8fb911fe514ca5258feadb40d7c16b0ae34da3860e82d1",
+  "verified_seal_entries": 257,
+  "verified_utc": "2026-09-08T05:15:41.684428+00:00"
+}

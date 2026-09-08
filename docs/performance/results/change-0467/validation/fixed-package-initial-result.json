@@ -1,0 +1,325 @@
+{
+  "claim_registration": {
+    "accepted_primary_cells": [
+      {
+        "case": "xlsx_one_percent_commit_save",
+        "corpus": "xlsx-dense-wide",
+        "statistic": "p50"
+      },
+      {
+        "case": "xlsx_one_percent_commit_save",
+        "corpus": "xlsx-dense-wide",
+        "statistic": "mean"
+      },
+      {
+        "case": "xlsx_one_percent_commit_save",
+        "corpus": "xlsx-dense-wide",
+        "statistic": "p95"
+      },
+      {
+        "case": "xlsx_one_percent_commit_save",
+        "corpus": "xlsx-dense-wide",
+        "statistic": "p99"
+      }
+    ],
+    "adverse_primary_cells": [],
+    "doc_rows_are_guards_only": true,
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "latency_policy": "latency-abba-v1",
+    "minimum_samples_per_case": 500,
+    "reason": "proposal only; review individual outcomes and package custody before registration",
+    "registry_entry_proposal": {
+      "entry": {
+        "change_id": "0467-xlsx-cell-attributes-abba",
+        "claim_class": "optimization",
+        "code_state": "landed",
+        "documentation": [
+          "docs/performance/changes/0467-xlsx-cell-attributes.md"
+        ],
+        "id": "claim-0467-xlsx-cell-attributes",
+        "latency_evidence": {
+          "accepted_cells": 4,
+          "accepted_statistics": [
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "corpus": "xlsx-dense-wide",
+              "statistic": "p50"
+            },
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "corpus": "xlsx-dense-wide",
+              "statistic": "mean"
+            },
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "corpus": "xlsx-dense-wide",
+              "statistic": "p95"
+            },
+            {
+              "case": "xlsx_one_percent_commit_save",
+              "corpus": "xlsx-dense-wide",
+              "statistic": "p99"
+            }
+          ],
+          "adverse_both_cells": 0,
+          "adverse_both_statistics": [],
+          "allowed_statistics": [
+            "p50",
+            "mean",
+            "p95",
+            "p99"
+          ],
+          "doc_rows_are_guards_only": true,
+          "evidence_id": "abba-0467-xlsx-cell-attributes-fixed-checkout"
+        },
+        "reason_codes": [
+          "accepted_primary_latency_cells"
+        ],
+        "scope": {
+          "corpora": [
+            {
+              "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "generator": "litchi-xlsx-synthetic-v1",
+              "name": "xlsx-dense-wide",
+              "package_format": "XLSX/OPC/ZIP",
+              "shape": "dense-wide"
+            }
+          ],
+          "format": "xlsx",
+          "selectors": [
+            "xlsx_one_percent_commit_save"
+          ]
+        },
+        "status": "landed"
+      },
+      "proposal_only": true
+    },
+    "registry_entry_ready": false,
+    "registry_path": "docs/performance/claim-registry-v1.json",
+    "strict_latency_claim_eligible": true
+  },
+  "package": {
+    "directory": "fixed-package",
+    "manifest": {
+      "artifacts": [
+        {
+          "bytes": 9146,
+          "canonical_sha256": "111604e467de18bd70e040fac1992882e28e0f436dbe40fe0a0270e0bf3589f1",
+          "compression": "zstd",
+          "path": "a1-fixed.json.zst",
+          "role": "a1",
+          "sha256": "8827bca3ec0c770dc005d7aabf9d35f731d9ae236af08c7c0fd36197296a1ddb",
+          "uncompressed_bytes": 128880,
+          "uncompressed_sha256": "80f3376c8ba22c2de17bebde658157464eb238b4ffd67e0cd0b745c2eea7d769"
+        },
+        {
+          "bytes": 8836,
+          "canonical_sha256": "37bd1354a54bc178189397438742200cb937a3fc77763430767f73975fffd48c",
+          "compression": "zstd",
+          "path": "b1-fixed.json.zst",
+          "role": "b1",
+          "sha256": "11f74a84fcd249fb0bdd0317abf25667fdcc1b7c9663cba4937c03320b7276ab",
+          "uncompressed_bytes": 128878,
+          "uncompressed_sha256": "8cc9ea4be7dfadd0fed9c45cda29bf5fc80fb1db10c5fe08e296cccd5af447ef"
+        },
+        {
+          "bytes": 9217,
+          "canonical_sha256": "7381ef4f16d2e5f0a721cdf07a10500c444eb989f316258b766755c96e547759",
+          "compression": "zstd",
+          "path": "b2-fixed.json.zst",
+          "role": "b2",
+          "sha256": "64187cfa2b324959698f45264d4f24c419fd92c809cb5bd793dd22b24ed2329b",
+          "uncompressed_bytes": 128879,
+          "uncompressed_sha256": "449917b2e0e9c306c718de469ca4bd53e8df128500c2ae9f087f39f648a5f825"
+        },
+        {
+          "bytes": 9105,
+          "canonical_sha256": "add1568dcda99b918c1bf4a707ce930dc0d32f7f7789f6215260325b45a6f43f",
+          "compression": "zstd",
+          "path": "a2-fixed.json.zst",
+          "role": "a2",
+          "sha256": "5c411c6253172c8db390742a86bf3bca8a57260ab7c294c9ed9e85b11ba7ab81",
+          "uncompressed_bytes": 128879,
+          "uncompressed_sha256": "007557bf1d1dcccfc3f3772dbfb06472b672bc3fb7e85f8718158941102fdcf0"
+        }
+      ],
+      "change": "0467-xlsx-cell-attributes-abba",
+      "change_id": "0467-xlsx-cell-attributes-abba",
+      "compression": {
+        "checksum": "XXH64",
+        "content_size": true,
+        "executable": {
+          "bytes": 1037784,
+          "path": "/usr/bin/zstd",
+          "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+          "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+        },
+        "format": "zstd",
+        "level": 3,
+        "threads": 1
+      },
+      "manifest_kind": "litchi-perf-abba-artifacts",
+      "manifest_path": "0467-xlsx-cell-attributes-abba-manifest.json",
+      "schema_version": 1,
+      "self_excluded": true,
+      "summary": {
+        "bytes": 24580,
+        "canonical_bytes": 20116,
+        "canonical_sha256": "b1784cc8504ea777f6d534fa820413b98ab085193feecd66fc65f7b055284086",
+        "path": "summary.json",
+        "report_identity": {
+          "a1": {
+            "canonical_sha256": "111604e467de18bd70e040fac1992882e28e0f436dbe40fe0a0270e0bf3589f1"
+          },
+          "a2": {
+            "canonical_sha256": "add1568dcda99b918c1bf4a707ce930dc0d32f7f7789f6215260325b45a6f43f"
+          },
+          "b1": {
+            "canonical_sha256": "37bd1354a54bc178189397438742200cb937a3fc77763430767f73975fffd48c"
+          },
+          "b2": {
+            "canonical_sha256": "7381ef4f16d2e5f0a721cdf07a10500c444eb989f316258b766755c96e547759"
+          }
+        },
+        "result_count": 1,
+        "schema_version": 1,
+        "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7",
+        "tool": {
+          "name": "litchi-perf-abba-summary",
+          "version": "0.1.0"
+        }
+      },
+      "summary_identity": {
+        "bytes": 24580,
+        "canonical_bytes": 20116,
+        "canonical_sha256": "b1784cc8504ea777f6d534fa820413b98ab085193feecd66fc65f7b055284086",
+        "path": "summary.json",
+        "report_identity": {
+          "a1": {
+            "canonical_sha256": "111604e467de18bd70e040fac1992882e28e0f436dbe40fe0a0270e0bf3589f1"
+          },
+          "a2": {
+            "canonical_sha256": "add1568dcda99b918c1bf4a707ce930dc0d32f7f7789f6215260325b45a6f43f"
+          },
+          "b1": {
+            "canonical_sha256": "37bd1354a54bc178189397438742200cb937a3fc77763430767f73975fffd48c"
+          },
+          "b2": {
+            "canonical_sha256": "7381ef4f16d2e5f0a721cdf07a10500c444eb989f316258b766755c96e547759"
+          }
+        },
+        "result_count": 1,
+        "schema_version": 1,
+        "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7",
+        "tool": {
+          "name": "litchi-perf-abba-summary",
+          "version": "0.1.0"
+        }
+      }
+    },
+    "manifest_path": "fixed-package/0467-xlsx-cell-attributes-abba-manifest.json"
+  },
+  "package_inputs": {
+    "custody": [
+      {
+        "projected_claim_rows": 1,
+        "projected_report": "fixed-package-inputs/a1-primary.json",
+        "projected_report_sha256": "80f3376c8ba22c2de17bebde658157464eb238b4ffd67e0cd0b745c2eea7d769",
+        "removed_guard_case": "doc_fresh_write_to",
+        "removed_guard_shapes": [
+          "tiny",
+          "large",
+          "payload-heavy"
+        ],
+        "retained_source_rows": 4,
+        "role": "a1",
+        "source_report": "A1-fixed/report.json",
+        "source_report_sha256": "1ba59dee467d701b853349cf8085ebac84805f65aa663d2905bcbbe5fb3d99ee"
+      },
+      {
+        "projected_claim_rows": 1,
+        "projected_report": "fixed-package-inputs/b1-primary.json",
+        "projected_report_sha256": "8cc9ea4be7dfadd0fed9c45cda29bf5fc80fb1db10c5fe08e296cccd5af447ef",
+        "removed_guard_case": "doc_fresh_write_to",
+        "removed_guard_shapes": [
+          "tiny",
+          "large",
+          "payload-heavy"
+        ],
+        "retained_source_rows": 4,
+        "role": "b1",
+        "source_report": "B1-fixed/report.json",
+        "source_report_sha256": "9fe3dc65ce6904b0c7b02d3d5e2cffcaf989ff68dbdfc87e9c01944a2c358ed6"
+      },
+      {
+        "projected_claim_rows": 1,
+        "projected_report": "fixed-package-inputs/b2-primary.json",
+        "projected_report_sha256": "449917b2e0e9c306c718de469ca4bd53e8df128500c2ae9f087f39f648a5f825",
+        "removed_guard_case": "doc_fresh_write_to",
+        "removed_guard_shapes": [
+          "tiny",
+          "large",
+          "payload-heavy"
+        ],
+        "retained_source_rows": 4,
+        "role": "b2",
+        "source_report": "B2-fixed/report.json",
+        "source_report_sha256": "a820e1ef39e0f82d33828e007759c92443b1117634062cbdeee28064a572bc38"
+      },
+      {
+        "projected_claim_rows": 1,
+        "projected_report": "fixed-package-inputs/a2-primary.json",
+        "projected_report_sha256": "007557bf1d1dcccfc3f3772dbfb06472b672bc3fb7e85f8718158941102fdcf0",
+        "removed_guard_case": "doc_fresh_write_to",
+        "removed_guard_shapes": [
+          "tiny",
+          "large",
+          "payload-heavy"
+        ],
+        "retained_source_rows": 4,
+        "role": "a2",
+        "source_report": "A2-fixed/report.json",
+        "source_report_sha256": "44b3dab02414d37198415f3e41d81296bdd6725a0efb24a22bdf2000e68ae768"
+      }
+    ],
+    "directory": "fixed-package-inputs",
+    "full_source_reports_retained_in_qualification": true,
+    "scope": {
+      "case": "xlsx_one_percent_commit_save",
+      "rows_per_role": 1,
+      "shape": "dense-wide"
+    }
+  },
+  "qualification": {
+    "path": "/tmp/litchi-goal-0467/fixed-qualification-pack.json",
+    "sha256": "73d6b2a394077ce28895ac46d94cd2851b06c7646117d53919d66089ccf0b1f3"
+  },
+  "schema": "litchi-0467-fixed-package-v1",
+  "scope": {
+    "artifact_roles": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "guard_case": "doc_fresh_write_to",
+    "guard_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "primary_case": "xlsx_one_percent_commit_save",
+    "primary_shape": "dense-wide"
+  },
+  "summary": {
+    "canonical_sha256": "87765e2d41a5ce85b1948fd2c4d5e63bc07ff5e7f44d9af12b11a43491c6036b",
+    "package_path": "fixed-package/summary.json",
+    "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7",
+    "source_path": "/tmp/litchi-goal-0467/fixed-primary-summary.json"
+  }
+}

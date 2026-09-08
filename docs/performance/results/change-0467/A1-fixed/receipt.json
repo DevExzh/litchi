@@ -1,0 +1,95 @@
+{
+  "schema": "litchi-0467-capture-fixed-v1",
+  "lane": "A1-fixed",
+  "role": "control",
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854",
+  "binding_sha256": "d36932caa5a21c7ac563a3e4763709a3f285ff2375b3a9a983f53daa8be8e1af",
+  "driver_sha256": "600eff9aaa8be3bc7bba5ba18f01f2b0aa5d0e7524da4235be391916a95d1905",
+  "checkout_verify_argv": [
+    "git",
+    "cat-file",
+    "-e",
+    "33243bc2e6bd63ab056eb45493b0717818501f4b^{commit}"
+  ],
+  "checkout_argv": [
+    "git",
+    "checkout",
+    "--detach",
+    "33243bc2e6bd63ab056eb45493b0717818501f4b"
+  ],
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/resource.log",
+    "/tmp/litchi-goal-0467/control-fixed",
+    "--workers",
+    "1",
+    "--warmup",
+    "5",
+    "--samples",
+    "500",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0467/A1-fixed/corpus-catalog.json",
+    "--case",
+    "doc_fresh_write_to,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide"
+  ],
+  "cwd": "/tmp/litchi-goal-0467/shared-tree",
+  "samples": 500,
+  "warmups": 5,
+  "cases": [
+    "doc_fresh_write_to",
+    "xlsx_one_percent_commit_save"
+  ],
+  "xlsx_shape": "dense-wide",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C"
+  },
+  "started_utc": "2026-09-08T04:43:02.228588+00:00",
+  "clean_before": true,
+  "exit_code": 0,
+  "clean_after": true,
+  "binary_unchanged": true,
+  "report_metadata_matches_clean_role": true,
+  "finished_utc": "2026-09-08T04:47:56.243539+00:00",
+  "artifacts": {
+    "started.json": {
+      "sha256": "b7ae062ac94898e2861d6571194440a52828eb10d48132c427a5bd076a392ac5",
+      "bytes": 1830
+    },
+    "corpus-catalog.json": {
+      "sha256": "bd4e2cf03234b5f2021bf58e6a1bfc92033f78a7ceb0c0f310eac39cb06c8f3f",
+      "bytes": 21399
+    },
+    "stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "report.json": {
+      "sha256": "1ba59dee467d701b853349cf8085ebac84805f65aa663d2905bcbbe5fb3d99ee",
+      "bytes": 185231
+    },
+    "resource.log": {
+      "sha256": "c28ca15e404beef71e21ab3c44e7cefb90c60ac82a2352107c147ceaa1ee389f",
+      "bytes": 1076
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

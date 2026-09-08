@@ -1,0 +1,162 @@
+{
+  "checks": [
+    {
+      "command": "python3 -B docs/performance/results/change-0467/test_fixed_qualify.py",
+      "status": "pass",
+      "tests": 9
+    },
+    {
+      "command": "python3 -B docs/performance/results/change-0467/test_analyze.py",
+      "status": "pass",
+      "tests": 7
+    },
+    {
+      "command": "python3 -B -c validate_registry(docs/performance/claim-registry-v1.json)",
+      "status": "pass"
+    },
+    {
+      "command": "python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-08T05:11:38.772178+00:00",
+  "package": {
+    "artifact_roles": [
+      {
+        "bytes": 9146,
+        "canonical_sha256": "111604e467de18bd70e040fac1992882e28e0f436dbe40fe0a0270e0bf3589f1",
+        "path": "fixed-package/a1-fixed.json.zst",
+        "role": "a1",
+        "sha256": "8827bca3ec0c770dc005d7aabf9d35f731d9ae236af08c7c0fd36197296a1ddb",
+        "uncompressed_sha256": "80f3376c8ba22c2de17bebde658157464eb238b4ffd67e0cd0b745c2eea7d769"
+      },
+      {
+        "bytes": 8836,
+        "canonical_sha256": "37bd1354a54bc178189397438742200cb937a3fc77763430767f73975fffd48c",
+        "path": "fixed-package/b1-fixed.json.zst",
+        "role": "b1",
+        "sha256": "11f74a84fcd249fb0bdd0317abf25667fdcc1b7c9663cba4937c03320b7276ab",
+        "uncompressed_sha256": "8cc9ea4be7dfadd0fed9c45cda29bf5fc80fb1db10c5fe08e296cccd5af447ef"
+      },
+      {
+        "bytes": 9217,
+        "canonical_sha256": "7381ef4f16d2e5f0a721cdf07a10500c444eb989f316258b766755c96e547759",
+        "path": "fixed-package/b2-fixed.json.zst",
+        "role": "b2",
+        "sha256": "64187cfa2b324959698f45264d4f24c419fd92c809cb5bd793dd22b24ed2329b",
+        "uncompressed_sha256": "449917b2e0e9c306c718de469ca4bd53e8df128500c2ae9f087f39f648a5f825"
+      },
+      {
+        "bytes": 9105,
+        "canonical_sha256": "add1568dcda99b918c1bf4a707ce930dc0d32f7f7789f6215260325b45a6f43f",
+        "path": "fixed-package/a2-fixed.json.zst",
+        "role": "a2",
+        "sha256": "5c411c6253172c8db390742a86bf3bca8a57260ab7c294c9ed9e85b11ba7ab81",
+        "uncompressed_sha256": "007557bf1d1dcccfc3f3772dbfb06472b672bc3fb7e85f8718158941102fdcf0"
+      }
+    ],
+    "compression": {
+      "checksum": "XXH64",
+      "content_size": true,
+      "executable": {
+        "bytes": 1037784,
+        "path": "/usr/bin/zstd",
+        "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+        "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+      },
+      "format": "zstd",
+      "level": 3,
+      "threads": 1
+    },
+    "directory": "fixed-package",
+    "manifest": {
+      "bytes": 4193,
+      "path": "fixed-package/0467-xlsx-cell-attributes-abba-manifest.json",
+      "sha256": "1853b2cc157baf92ff372e3c5f107b3b9e738018cfa09b0a2b32e3b2d45eaf85"
+    },
+    "replay_command": "python3 -B docs/performance/results/change-0467/pack_fixed.py --root docs/performance/results/change-0467",
+    "replay_requires_empty_package_directory": true,
+    "summary": {
+      "bytes": 24580,
+      "canonical_sha256": "b1784cc8504ea777f6d534fa820413b98ab085193feecd66fc65f7b055284086",
+      "path": "fixed-package/summary.json",
+      "result_count": 1,
+      "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7"
+    }
+  },
+  "primary_projection_inputs": [
+    {
+      "bytes": 128880,
+      "case": "xlsx_one_percent_commit_save",
+      "path": "fixed-package-inputs/a1-primary.json",
+      "role": "a1",
+      "rows": 1,
+      "sha256": "80f3376c8ba22c2de17bebde658157464eb238b4ffd67e0cd0b745c2eea7d769",
+      "shape": "dense-wide"
+    },
+    {
+      "bytes": 128879,
+      "case": "xlsx_one_percent_commit_save",
+      "path": "fixed-package-inputs/a2-primary.json",
+      "role": "a2",
+      "rows": 1,
+      "sha256": "007557bf1d1dcccfc3f3772dbfb06472b672bc3fb7e85f8718158941102fdcf0",
+      "shape": "dense-wide"
+    },
+    {
+      "bytes": 128878,
+      "case": "xlsx_one_percent_commit_save",
+      "path": "fixed-package-inputs/b1-primary.json",
+      "role": "b1",
+      "rows": 1,
+      "sha256": "8cc9ea4be7dfadd0fed9c45cda29bf5fc80fb1db10c5fe08e296cccd5af447ef",
+      "shape": "dense-wide"
+    },
+    {
+      "bytes": 128879,
+      "case": "xlsx_one_percent_commit_save",
+      "path": "fixed-package-inputs/b2-primary.json",
+      "role": "b2",
+      "rows": 1,
+      "sha256": "449917b2e0e9c306c718de469ca4bd53e8df128500c2ae9f087f39f648a5f825",
+      "shape": "dense-wide"
+    }
+  ],
+  "qualification_custody": {
+    "full_summary": {
+      "bytes": 41445,
+      "canonical_sha256": "87765e2d41a5ce85b1948fd2c4d5e63bc07ff5e7f44d9af12b11a43491c6036b",
+      "path": "fixed-summary.json",
+      "sha256": "25b1d4a72179b1121abde80b51ac3b2cb5689743ae1afd5a758337bd8b75b28d"
+    },
+    "qualification": {
+      "bytes": 2397025,
+      "path": "fixed-qualification.json",
+      "sha256": "73d6b2a394077ce28895ac46d94cd2851b06c7646117d53919d66089ccf0b1f3"
+    }
+  },
+  "registry": {
+    "claim_id": "claim-0467-xlsx-cell-attributes",
+    "evidence_id": "abba-0467-xlsx-cell-attributes-fixed-checkout",
+    "path": "docs/performance/claim-registry-v1.json",
+    "post_addition_sha256": "b8847b7e2fe2c5d15d5fe091f7f7f6bca8f2ec38a25decfe20a36a76f5eef955",
+    "pre_addition_sha256": "d5308258d26446d7afb1fb3055b6538ea67bdf0669432de7ef46180f89ba67a3",
+    "strict_validation": {
+      "message": "OK: 10 performance claims validated (strict)",
+      "status": "pass"
+    },
+    "structural_validation": {
+      "claims": 10,
+      "evidence_entries": 11,
+      "status": "pass"
+    }
+  },
+  "schema": "litchi-0467-fixed-package-registry-receipt-v1",
+  "scope": {
+    "doc_guard_rows_retained_in_fixed_qualification": 3,
+    "full_retained_summary_rows": 4,
+    "primary_case": "xlsx_one_percent_commit_save",
+    "primary_shape": "dense-wide",
+    "primary_summary_rows": 1
+  }
+}

@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0467: single-scan eager XLSX cell attributes
+
+[0467](changes/0467-xlsx-cell-attributes.md) replaces five checked cell-attribute
+scans with one, preserving duplicate rejection, entity handling and error order.
+A fixed-path, clean-build ABBA uses 500 samples and five warmups per row on
+CPU 2 with one worker. Dense one-percent ordinary commit/save p50 in
+A1/B1/B2/A2 order is 409.517775 / 373.989532 / 365.149511 / 396.278436 ms:
+paired reductions of 8.68% and 7.86%. Mean, p95 and p99 also pass the unchanged
+latency policy; same-role primary drift stays below 3.40%.
+
+All three DOC guard rows and normal process RSS stay within the five-percent
+review threshold. Normal RSS is 115,648 / 115,300 / 115,552 / 115,796 KiB;
+no memory reduction is claimed. Separate whole-process Heaptrack captures
+record 56,349,804 / 44,815,468 allocation calls, 20.47% fewer, with identical
+rounded `104.38M` peak heap. Those counts include setup and verification.
+The fixed 201-row short full guard retains 53 latency policy flags; earlier
+separate-path DOC/RSS differences and a supplemental CFB source-counter
+identity rejection remain documented. This is a single-scenario latency result,
+with no blanket regression-free, cold, range, native or scaling claim.
+
 ## Current dense XLSX investigation (0466)
 
 The unchanged ordinary `xlsx_one_percent_commit_save` dense-wide path is

@@ -1,0 +1,39 @@
+{
+  "build_cleanup_receipt": "cleanup-builds.json",
+  "completed_utc": "2026-09-08T05:15:40.154582+00:00",
+  "final_registry_snapshot": "validation/registry-snapshot.json",
+  "final_registry_strict_check": "validation/registry-strict-receipt.json",
+  "owned_temporary_root": "/tmp/litchi-goal-0467",
+  "owned_temporary_root_absent": true,
+  "registry_draft_retained": "validation/registry-initial-proposal.json",
+  "removed_portable_stage": "/tmp/litchi-goal-0467/portable-stage",
+  "removed_scratch_files": [
+    {
+      "bytes": 38521,
+      "path": "/tmp/litchi-goal-0467/registry-fixed.json",
+      "sha256": "13c89e77979697f8155737d004c8d1ec6f3077077250d7658d4a3f77d8bef913"
+    },
+    {
+      "bytes": 11391,
+      "path": "/tmp/litchi-goal-0467/fixed-package-result.json",
+      "sha256": "a16e2f56c1e5e358d21f330aa62c4c4a213811b8908010689600d90771606853"
+    },
+    {
+      "bytes": 24580,
+      "path": "/tmp/litchi-goal-0467/fixed-primary-summary.json",
+      "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7"
+    },
+    {
+      "bytes": 2397025,
+      "path": "/tmp/litchi-goal-0467/fixed-qualification-pack.json",
+      "sha256": "73d6b2a394077ce28895ac46d94cd2851b06c7646117d53919d66089ccf0b1f3"
+    },
+    {
+      "bytes": 0,
+      "path": "/tmp/litchi-goal-0467/cpu.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "schema": "litchi-0467-cleanup-v1",
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "litchi-0467-protocol-v2",
+  "status": "frozen",
+  "primary_case": "xlsx_one_percent_commit_save",
+  "primary_corpus": "xlsx-dense-wide",
+  "roles": [
+    "control",
+    "candidate"
+  ],
+  "order": [
+    "A1-clean",
+    "B1-clean",
+    "B2-clean",
+    "A2-clean"
+  ],
+  "samples": 100,
+  "warmups": 5,
+  "cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save"
+  ],
+  "shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "cpu": 2,
+  "workers": 1,
+  "execution": "serialized task-owned builds/tests/profile/captures; independent light source review and edits may proceed",
+  "normal": "no external profiler; matched release debug1, frame pointers and unwind tables for both roles",
+  "review_triggers": {
+    "latency_percent": 5,
+    "process_rss_percent": 5
+  },
+  "retention_rule": "Retain only useful measured benefit with semantics preserved; inspect individual rows and ABBA same-role drift; no global aggregate claims",
+  "additional_lanes": [
+    "A-full-clean",
+    "B-full-clean",
+    "A-heap-clean",
+    "B-heap-clean"
+  ],
+  "additional_scope": "Full default15/3 guard on both revisions; wholeprocess Heaptrack5/1 dense1percent. Do not compare instrumented latency to normal.",
+  "capture_driver_sha256": "4548e07c8d36c94c218e3d9b0b61ab9b5ce591203df6ce526e245c60d64e49f9",
+  "supersedes": "protocol.json",
+  "correction": "Bothrolesmustbebuiltwithinrolecleanworktreesbecausecompiled-inmanifestdirectorycontrolsGitmetadata."
+}

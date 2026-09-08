@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0467/test_verify.py"
+  ],
+  "cpu_lock": "/tmp/litchi-goal-0467/cpu.lock",
+  "cwd": "/home/zhuhe/code/litchi",
+  "duration_ms": 3636.231,
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T05:03:07.326431+00:00",
+  "python": "3.14.4 (main, Jun 18 2026, 14:25:02) [GCC 15.2.0]",
+  "schema": "litchi-0467-verifier-tests-v1",
+  "started_utc": "2026-09-08T05:03:03.690024+00:00",
+  "stderr": {
+    "bytes": 110,
+    "path": "validation/verify-tests.stderr.log",
+    "sha256": "2ca17ad768539d29bce2c908d956c67f25c469b7d5df8bb90fe9462a6f99aaf0"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "validation/verify-tests.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "test_source_sha256": "6ccae1982c0d979c4bfb74970f4a7e51141c53f75ed284b6f44821b1f7f3ed0f",
+  "verifier_source_sha256": "acb0709768b606ba834e3af3e7544e77fb4d6f56df16b24e36149ef4febf3a52"
+}

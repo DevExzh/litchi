@@ -1,0 +1,115 @@
+{
+  "lanes": [
+    {
+      "binding": {
+        "binary_sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad",
+        "binding_sha256": "d0fe0eb8cc2d353fb7b1ab0227fc68fa56250c64bba2f0ab097ad8ab22871fc1",
+        "build_receipt": "control-build.json",
+        "build_receipt_sha256": "8d0993bdf8dd30cb589a0e7838da222e8ed825005868d6a3a28d5b329a4aaa24",
+        "bytes": 463670432,
+        "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+        "source_binding": {
+          "build_receipt_canonical_sha256": "925666f654f2ed0b2f20754879da355f395aaa73165d040fdb387efac65838d7",
+          "build_receipt_path": "control-build.json",
+          "build_receipt_sha256": "8d0993bdf8dd30cb589a0e7838da222e8ed825005868d6a3a28d5b329a4aaa24",
+          "kind": "clean_build_receipt_revision",
+          "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b"
+        }
+      },
+      "binding_path": "control-binding.json",
+      "catalog": {
+        "bytes": 6314,
+        "canonical_sha256": "0bf3e98bbb51c54e048f3b61315e72a7b3ecf137416a2b4e43eee57ff862e83c",
+        "catalog_id": "litchi-perf-corpus-v2",
+        "catalog_sha256": "d6183b7a17bbc8febe4a64b78793c3d892bbd050f2695eeeee1840630e508f06",
+        "content_set_sha256": "66889d1124b43cd8ec4580ba0675509d97419df2d10e0d8a6130a3a509076936",
+        "corpus_identity_sha256": "7f9a5e0d6ded878580d529a2ddcfd5623429042494d16d7f975e3db4463e32a8",
+        "manifest_version": 2,
+        "path": "A-heap-clean/corpus-catalog.json",
+        "sha256": "61165c4022c95b9b066a3ffcf9db846a05506ddccf8fefb82a74045396b2c3eb"
+      },
+      "heaptrack": [
+        {
+          "bytes": 704179,
+          "path": "heaptrack.zst",
+          "sha256": "07ea2d0b194934de558e949315bacee7d947a255cc6df7be14832cf54615e344"
+        }
+      ],
+      "lane": "A-heap-clean",
+      "report": {
+        "bytes": 16705,
+        "canonical_sha256": "238fc143d32e44356ef560d2ff2e851cbe977b339c4f83e9ac3efc5f70a59fdf",
+        "path": "report.json",
+        "sha256": "02b5db4acf989221cf0fc13a40f670579daf1613f9b2a606b51724f6129d4658"
+      },
+      "resource": {
+        "bytes": 1161,
+        "max_rss_kib": 349312,
+        "path": "resource.log",
+        "sha256": "78a586a5cbd5c464f121d994bb3e75ff1d7c337705467e9505147abba9b8e140"
+      },
+      "role": "control"
+    },
+    {
+      "binding": {
+        "binary_sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82",
+        "binding_sha256": "4ee003d750f8e6bf7a2adeb0b414838296b75e8e357eb1da32070a63afc7eade",
+        "build_receipt": "candidate-build.json",
+        "build_receipt_sha256": "4a3e7c5cb85c80477bf3029f253beb35e9aa5d6b7837daa695438ca2287324f4",
+        "bytes": 463692944,
+        "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+        "source_binding": {
+          "build_receipt_canonical_sha256": "954c7f3862ccd0f957b747efa70a38ad700f6bdcc45c6ab6ded3c9b53bdddccf",
+          "build_receipt_path": "candidate-build.json",
+          "build_receipt_sha256": "4a3e7c5cb85c80477bf3029f253beb35e9aa5d6b7837daa695438ca2287324f4",
+          "kind": "clean_build_receipt_revision",
+          "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7"
+        }
+      },
+      "binding_path": "candidate-binding.json",
+      "catalog": {
+        "bytes": 6314,
+        "canonical_sha256": "7c43eef99f41fdeb9cd59d0682d61610f018143fd5f517c14b5a41edfeb8ad0c",
+        "catalog_id": "litchi-perf-corpus-v2",
+        "catalog_sha256": "9d9555cd0bbfb74a6a0c567f23810947b82e8cecf9e439fd5e0d113fe106d968",
+        "content_set_sha256": "66889d1124b43cd8ec4580ba0675509d97419df2d10e0d8a6130a3a509076936",
+        "corpus_identity_sha256": "7f9a5e0d6ded878580d529a2ddcfd5623429042494d16d7f975e3db4463e32a8",
+        "manifest_version": 2,
+        "path": "B-heap-clean/corpus-catalog.json",
+        "sha256": "fd0c7f0065d575282052646bb192b933374187155fdf90ebbe3da31649cf8bb9"
+      },
+      "heaptrack": [
+        {
+          "bytes": 1193313,
+          "path": "heaptrack.zst",
+          "sha256": "ba92a291cf1d7ce05046950edd0c1b8818b2a23019decf3fae9c00fd828a3127"
+        }
+      ],
+      "lane": "B-heap-clean",
+      "report": {
+        "bytes": 16711,
+        "canonical_sha256": "2f88e209b1618e357ff8fa523844f90cc329fb7fb7be276f00d0b9e43b52bf74",
+        "path": "report.json",
+        "sha256": "b034af5254aaad0274d0e718fa88e7e1095a16653c857aa34ebfdcbc01cd6248"
+      },
+      "resource": {
+        "bytes": 1163,
+        "max_rss_kib": 345464,
+        "path": "resource.log",
+        "sha256": "0cdc443bd9b76922f65910083e27d3b87e34b5d359a078acd63e1c0fa4554650"
+      },
+      "role": "candidate"
+    }
+  ],
+  "schema": "litchi-0467-heaptrack-guard-v1",
+  "scope": "whole-process Heaptrack dense-wide one-percent commit/save, 5 samples/1 warmup",
+  "verification": {
+    "build_receipt_bindings_verified": true,
+    "catalog_identity_verified": true,
+    "clean_worktrees_verified": true,
+    "distinct_binaries_verified": true,
+    "distinct_revisions_verified": true,
+    "heaptrack_artifacts_verified": true,
+    "latency_comparison_forbidden": true
+  }
+}

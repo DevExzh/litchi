@@ -1,0 +1,8 @@
+{
+  "revision": "87733cf3b86c5500ee7aee4cf6a4cb0f3cabf6a7",
+  "binary_sha256": "cd7760a6c740af49ef4e9c23e88c4400b9c859b5e275738e9eb80851ade0ca82",
+  "bytes": 463692944,
+  "build_receipt": "candidate-build.json",
+  "build_receipt_sha256": "4a3e7c5cb85c80477bf3029f253beb35e9aa5d6b7837daa695438ca2287324f4",
+  "clean_build": true
+}

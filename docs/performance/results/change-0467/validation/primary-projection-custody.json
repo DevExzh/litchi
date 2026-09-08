@@ -1,0 +1,67 @@
+{
+  "driver_sha256": "93b335c4f1969e12b8332c0842bf9f0996d8e454ed5c929cadb1954fe81a627b",
+  "method": "Exact equality of retained projected reports against current _primary_report_projection applied to each full source report",
+  "rows": [
+    {
+      "projected_claim_rows": 1,
+      "projected_report": "fixed-package-inputs/a1-primary.json",
+      "projected_report_sha256": "80f3376c8ba22c2de17bebde658157464eb238b4ffd67e0cd0b745c2eea7d769",
+      "removed_guard_case": "doc_fresh_write_to",
+      "removed_guard_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "retained_source_rows": 4,
+      "role": "a1",
+      "source_report": "A1-fixed/report.json",
+      "source_report_sha256": "1ba59dee467d701b853349cf8085ebac84805f65aa663d2905bcbbe5fb3d99ee"
+    },
+    {
+      "projected_claim_rows": 1,
+      "projected_report": "fixed-package-inputs/b1-primary.json",
+      "projected_report_sha256": "8cc9ea4be7dfadd0fed9c45cda29bf5fc80fb1db10c5fe08e296cccd5af447ef",
+      "removed_guard_case": "doc_fresh_write_to",
+      "removed_guard_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "retained_source_rows": 4,
+      "role": "b1",
+      "source_report": "B1-fixed/report.json",
+      "source_report_sha256": "9fe3dc65ce6904b0c7b02d3d5e2cffcaf989ff68dbdfc87e9c01944a2c358ed6"
+    },
+    {
+      "projected_claim_rows": 1,
+      "projected_report": "fixed-package-inputs/b2-primary.json",
+      "projected_report_sha256": "449917b2e0e9c306c718de469ca4bd53e8df128500c2ae9f087f39f648a5f825",
+      "removed_guard_case": "doc_fresh_write_to",
+      "removed_guard_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "retained_source_rows": 4,
+      "role": "b2",
+      "source_report": "B2-fixed/report.json",
+      "source_report_sha256": "a820e1ef39e0f82d33828e007759c92443b1117634062cbdeee28064a572bc38"
+    },
+    {
+      "projected_claim_rows": 1,
+      "projected_report": "fixed-package-inputs/a2-primary.json",
+      "projected_report_sha256": "007557bf1d1dcccfc3f3772dbfb06472b672bc3fb7e85f8718158941102fdcf0",
+      "removed_guard_case": "doc_fresh_write_to",
+      "removed_guard_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "retained_source_rows": 4,
+      "role": "a2",
+      "source_report": "A2-fixed/report.json",
+      "source_report_sha256": "44b3dab02414d37198415f3e41d81296bdd6725a0efb24a22bdf2000e68ae768"
+    }
+  ],
+  "schema": "litchi-0467-primary-projection-custody-v1"
+}

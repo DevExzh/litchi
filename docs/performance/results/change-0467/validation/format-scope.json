@@ -1,0 +1,7 @@
+{
+  "scope": "Formatting-only difference under Rust 1.98.1 in unchanged excluded iWork source; not modified in this batch. Workspace fmt failure is retained, XLSX scoped formatting passed.",
+  "file": "crates/litchi-keynote/src/document.rs",
+  "base_revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "sha256": "f78570708ec5c4c232a8c20ceed67623fece677a6d985d14f409545ee57d1443",
+  "identical_to_base": true
+}

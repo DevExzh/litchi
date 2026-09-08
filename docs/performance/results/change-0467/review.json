@@ -1,0 +1,17 @@
+{
+  "schema": "litchi-0467-candidate-review-v1",
+  "files": {
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "69719bc7a0aa0754ab4745f49baba077303ca7909f4e9adbc5243189e85fb9a7",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb216659affe6788dc451abb95f53e98a02c654ba3be634b3c1936ee5d5e4f08"
+  },
+  "independent_review": "xlsx_attrs_review_0467: no semantic blocker; code and tests reviewed before capture. Root strengthened r-decode precedence assertion and retained original reference drop timing.",
+  "properties": [
+    "One complete checked attribute traversal retains malformed/duplicate checks for modeled, unknown, and qualified raw names.",
+    "Coordinate entity decoding occurs during encounter; coordinate parsing follows complete raw attribute scan.",
+    "Style, cell metadata, value metadata and type errors retain existing validation order.",
+    "Fixed borrowed slots do not retain document-sized attribute state.",
+    "Shared helper, source-backed parser, public API, Store handoff limit, publication verification, dependencies and unsafe policies unchanged."
+  ],
+  "correctness_log": "validation/xlsx-tests.log",
+  "test_total_passed": 1242
+}

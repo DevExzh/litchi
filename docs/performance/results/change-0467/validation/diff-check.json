@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-0467-diff-check-v1",
+  "full_exit_code": 2,
+  "full_output": "docs/performance/results/change-0467/A-heap-clean/stderr.log:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0467/B-heap-clean/stderr.log:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \n",
+  "scoped_command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0467/A-heap-clean/stderr.log",
+    ":(exclude)docs/performance/results/change-0467/B-heap-clean/stderr.log"
+  ],
+  "scoped_exit_code": 0,
+  "exception": "Two authenticated raw Heaptrack stderr lines have tool-emitted trailing spaces; preserve evidence bytes. Authored files pass.",
+  "excluded_raw_files": [
+    "docs/performance/results/change-0467/A-heap-clean/stderr.log",
+    "docs/performance/results/change-0467/B-heap-clean/stderr.log"
+  ]
+}

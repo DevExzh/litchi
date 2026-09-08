@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-0467-protocol-v1",
+  "status": "frozen",
+  "primary_case": "xlsx_one_percent_commit_save",
+  "primary_corpus": "xlsx-dense-wide",
+  "roles": [
+    "control",
+    "candidate"
+  ],
+  "order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "samples": 100,
+  "warmups": 5,
+  "cases": [
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit_save"
+  ],
+  "shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "cpu": 2,
+  "workers": 1,
+  "execution": "serialized task-owned builds/tests/profile/captures; independent light source review and edits may proceed",
+  "normal": "no external profiler; matched release debug1, frame pointers and unwind tables for both roles",
+  "review_triggers": {
+    "latency_percent": 5,
+    "process_rss_percent": 5
+  },
+  "retention_rule": "Retain only useful measured benefit with semantics preserved; inspect individual rows and ABBA same-role drift; no global aggregate claims",
+  "additional_lanes": [
+    "A-full",
+    "B-full",
+    "A-heap",
+    "B-heap"
+  ],
+  "additional_scope": "Full default15/3 guard on both revisions; wholeprocess Heaptrack5/1 dense1percent. Do not compare instrumented latency to normal.",
+  "capture_driver_sha256": "a15601546a460f53e8f05f58ee6eb829816426eba5f94941347ca3040f8c7086"
+}

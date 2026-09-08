@@ -1,0 +1,123 @@
+{
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-08T04:01:58.395206+00:00",
+      "exit_code": 1,
+      "finished_utc": "2026-09-08T04:02:15.096672+00:00",
+      "log": "fmt.log",
+      "log_sha256": "eadf42f952690a5e689f1a02e2a9f30a466fa532e5cb2f60673cdbfc3bd0f13c"
+    },
+    {
+      "name": "xlsx-fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-xlsx",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-08T04:02:46.441257+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:02:47.493240+00:00",
+      "log": "xlsx-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "xlsx-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features"
+      ],
+      "started_utc": "2026-09-08T04:02:47.493400+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:03:26.793280+00:00",
+      "log": "xlsx-tests.log",
+      "log_sha256": "d260cdb2ebe95def601497a62666a5f886329a0e85588d702f40ef085d549df4"
+    },
+    {
+      "name": "workspace-check",
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "started_utc": "2026-09-08T04:03:26.794505+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:04:08.521765+00:00",
+      "log": "workspace-check.log",
+      "log_sha256": "328a8e279572b0db615f5d58d90c9cd9b0f0052158b743a0121c40c88b3f9e03"
+    },
+    {
+      "name": "xlsx-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-09-08T04:04:08.522047+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:04:21.031187+00:00",
+      "log": "xlsx-clippy.log",
+      "log_sha256": "0170064ef19ecd10ce6ce147f398f53e2be958a1186e3faaee8c5c22cf820cef"
+    },
+    {
+      "name": "xlsx-rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--no-deps"
+      ],
+      "started_utc": "2026-09-08T04:04:21.031461+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:04:34.685620+00:00",
+      "log": "xlsx-rustdoc.log",
+      "log_sha256": "c4b3b42dd1ebb79694ef894ceeab4e36faf83c1eee9493d5c8cb873409f90374"
+    },
+    {
+      "name": "boundaries",
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "started_utc": "2026-09-08T04:04:34.685869+00:00",
+      "exit_code": 0,
+      "finished_utc": "2026-09-08T04:08:23.466011+00:00",
+      "log": "boundaries.log",
+      "log_sha256": "f8848b3b5b2af663f6e1cdaf5977217dcef281e027ff8028d6b3d7e179c8dc71"
+    }
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0467-preseal-v1",
+  "started_utc": "2026-09-08T05:07:10.393316+00:00",
+  "finished_utc": "2026-09-08T05:07:12.863233+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0467/verify.py",
+    "--preseal"
+  ],
+  "exit_code": 0,
+  "verifier_sha256": "acb0709768b606ba834e3af3e7544e77fb4d6f56df16b24e36149ef4febf3a52",
+  "stdout_sha256": "7c3462262436ef5c41410a182f2ff7361f490ec2f4d0d78f5e9461388a6a3a1a",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

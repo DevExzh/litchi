@@ -1,0 +1,45 @@
+{
+  "schema": "litchi-0467-qualification-protocol-v1",
+  "status": "frozen",
+  "primary_case": "xlsx_one_percent_commit_save",
+  "primary_corpus": "xlsx-dense-wide",
+  "roles": [
+    "control",
+    "candidate"
+  ],
+  "order": [
+    "A1-500-clean",
+    "B1-500-clean",
+    "B2-500-clean",
+    "A2-500-clean"
+  ],
+  "samples": 500,
+  "warmups": 5,
+  "cases": [
+    "xlsx_one_percent_commit_save"
+  ],
+  "shapes": [
+    "dense-wide"
+  ],
+  "cpu": 2,
+  "workers": 1,
+  "execution": "serialized task-owned builds/tests/profile/captures; independent light source review and edits may proceed",
+  "normal": "no external profiler; matched release debug1, frame pointers and unwind tables for both roles",
+  "review_triggers": {
+    "latency_percent": 5,
+    "process_rss_percent": 5
+  },
+  "retention_rule": "Retain only useful measured benefit with semantics preserved; inspect individual rows and ABBA same-role drift; no global aggregate claims",
+  "additional_lanes": [
+    "A-full-clean",
+    "B-full-clean",
+    "A-heap-clean",
+    "B-heap-clean"
+  ],
+  "additional_scope": "Full default15/3 guard on both revisions; wholeprocess Heaptrack5/1 dense1percent. Do not compare instrumented latency to normal.",
+  "capture_driver_sha256": "76349cc7fede3b07f87a2e569b7604b1f009a10bbafd9c4fa33754e920355091",
+  "supersedes": null,
+  "correction": null,
+  "scope": "Additional strict primary-cell qualification if descriptive100 ABBA supports useful benefit; initial100 results remain descriptive guards.",
+  "policy": "docs/performance/claim-registry-v1.json latency-abba-v1; minimum500, p50/mean/p95/p99 drift ceilings5/5/10/15 percent. No policy weakening."
+}

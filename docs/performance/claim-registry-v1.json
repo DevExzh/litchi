@@ -181,6 +181,22 @@
         "canonical_sha256": "cf039272e382cdfe839bb9866fda00dc1810c1bbe8f4cb5b908b3a72d2f3ced1",
         "schema_version": 1
       }
+    },
+    {
+      "id": "abba-0467-xlsx-cell-attributes-fixed-checkout",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/change-0467/fixed-package",
+      "manifest": {
+        "path": "0467-xlsx-cell-attributes-abba-manifest.json",
+        "sha256": "1853b2cc157baf92ff372e3c5f107b3b9e738018cfa09b0a2b32e3b2d45eaf85",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "97b9a52ee638e7d18a566de3042f55b36f4ca2ce9cf52c0ff1a3563082e3a9a7",
+        "canonical_sha256": "b1784cc8504ea777f6d534fa820413b98ab085193feecd66fc65f7b055284086",
+        "schema_version": 1
+      }
     }
   ],
   "claims": [
@@ -1088,6 +1104,68 @@
       },
       "documentation": [
         "docs/performance/changes/0418-pptx-cross-copy-candidate-reuse.md"
+      ]
+    },
+    {
+      "id": "claim-0467-xlsx-cell-attributes",
+      "change_id": "0467-xlsx-cell-attributes-abba",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_primary_latency_cells"
+      ],
+      "scope": {
+        "format": "xlsx",
+        "selectors": [
+          "xlsx_one_percent_commit_save"
+        ],
+        "corpora": [
+          {
+            "name": "xlsx-dense-wide",
+            "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+            "generator": "litchi-xlsx-synthetic-v1",
+            "shape": "dense-wide",
+            "package_format": "XLSX/OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0467-xlsx-cell-attributes-fixed-checkout",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 4,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xlsx_one_percent_commit_save",
+            "corpus": "xlsx-dense-wide",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_one_percent_commit_save",
+            "corpus": "xlsx-dense-wide",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_one_percent_commit_save",
+            "corpus": "xlsx-dense-wide",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_one_percent_commit_save",
+            "corpus": "xlsx-dense-wide",
+            "statistic": "p99"
+          }
+        ],
+        "adverse_both_statistics": []
+      },
+      "documentation": [
+        "docs/performance/changes/0467-xlsx-cell-attributes.md"
       ]
     }
   ]

@@ -1,0 +1,9 @@
+{
+  "role": "control",
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "52a67a0fb82d4fc0c2ef3725615d222e126cc382a32d87310df00ef534865854",
+  "bytes": 463619408,
+  "build_receipt": "control-fixed-build.json",
+  "build_receipt_sha256": "b780db53dfeae69227c0c07b8f50fc8c1e14aea9f501ab45bc86b39642aa50e8",
+  "clean_build": true
+}

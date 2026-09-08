@@ -1,0 +1,10 @@
+{
+  "status": "recorded",
+  "initial_lanes": [
+    "A1",
+    "A-full"
+  ],
+  "reason": "Compiled-in CARGO_MANIFEST_DIR makes harness Git metadata refer to the original dirty repository, regardless of runtime cwd. Both initial reports retain git_worktree_dirty=true and cannot enter clean comparison.",
+  "resolution": "Build each role in its own clean worktree, preserving original captures and bindings; protocol-r1 defines fresh named clean lanes.",
+  "source_oracle_outcome": "Both initial workloads succeeded and have valid descriptive timing/oracle outputs; they are not ABBA comparison evidence."
+}

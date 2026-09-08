@@ -1,0 +1,8 @@
+{
+  "revision": "33243bc2e6bd63ab056eb45493b0717818501f4b",
+  "binary_sha256": "9a2e9227cd0f7a4506cbb698336e452ac63cce4e0f6cf9cdb6b0f3a2186262ad",
+  "bytes": 463670432,
+  "build_receipt": "control-build.json",
+  "build_receipt_sha256": "8d0993bdf8dd30cb589a0e7838da222e8ed825005868d6a3a28d5b329a4aaa24",
+  "clean_build": true
+}
