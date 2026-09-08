@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## DOCX fresh streaming memory baseline (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) adds opt-in public DOCX
+streaming creation at 64 / 8,192 / 131,072 paragraphs. All 180 allocator samples
+have an identical 414,732-byte operation peak above entry and zero live-byte
+change at exit. All 360 formal samples pass. The 64-byte semantic scratch,
+zero retained sink output and whole-process RSS remain separate quantities.
+Normal repeat statistics stay within five percent; no registered latency or
+production speedup claim is added. The default 37-case matrix is unchanged.
+
 ## Plain XLSX snapshot tag result (0472)
 
 [0472](changes/0472-xlsx-plain-cell-tags.md) omits owned tags only for checked

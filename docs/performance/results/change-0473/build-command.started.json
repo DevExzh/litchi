@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "cwd": "/tmp/litchi-goal-0473/tree",
+  "driver_sha256": "2ece10cc7e4f70336592aceb4c83b8039f22c3d8a5f6cfe263a25edd7d00bfc4",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "protocol_sha256": "1ef264d15924ea712f0cb7cbb843ccdd9211daa146e1737862001f150db7fd3b",
+  "source_binding_sha256": "1b44c426720ab63775a74e811c5c2ebc1a60105566e09aeccb287c7bbd011405",
+  "started_utc": "2026-09-08T09:24:53.234916+00:00"
+}

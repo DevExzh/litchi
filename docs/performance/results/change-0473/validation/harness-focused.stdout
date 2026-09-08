@@ -1,0 +1,10 @@
+
+running 5 tests
+test docx_streaming_create::tests::tiny_materialized_package_has_exact_members_and_semantics ... ok
+test tests::docx_streaming_creation_is_opt_in_and_reports_public_writer_evidence ... ok
+test docx_streaming_create::tests::tiny_timed_run_reports_window_counters_and_operation_metrics ... ok
+test docx_streaming_create::tests::materialized_oracle_rejects_extra_member_changed_text_and_split_run ... ok
+test docx_streaming_create::tests::spec_uses_requested_scaling_shapes_and_is_deterministic ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 354 filtered out; finished in 0.03s
+

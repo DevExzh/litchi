@@ -1,0 +1,11 @@
+{
+  "status": "baseline_retained",
+  "revision": "a1bd623b3dd0ab23259d2d6f692392ee275475e0",
+  "formal_samples": 360,
+  "allocator_samples": 180,
+  "observed_operation_peak_above_entry_bytes": 414732,
+  "all_allocator_live_exit_deltas_zero": true,
+  "registered_latency_claim": false,
+  "scope": "Tested fresh plain DOCX streaming creation only; explicit64-byte semantic scratch and observed operation heap are distinct. Full goal open.",
+  "recorded_utc": "2026-09-08T09:33:53.678212+00:00"
+}

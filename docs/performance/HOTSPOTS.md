@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## DOCX streaming memory gap measured (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) measures the already-public
+StreamingDocumentWriter rather than buffered Package creation. Incremental
+operation heap is 414,732 bytes in every allocator sample across a 2,048-fold
+paragraph-count range. Requested bytes/calls grow with input, so this does not
+remove allocation work or prove general RSS bounds. The next streaming gap is
+PPTX, whose retained ZIP directory/part metadata requires explicit measurement
+and accounting before a fixed-memory claim. Larger edit bottlenecks remain open.
+
 ## Plain snapshot tag ownership reduced (0472)
 
 [0472](changes/0472-xlsx-plain-cell-tags.md) removes ephemeral owned tags for

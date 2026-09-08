@@ -1,5 +1,22 @@
 # Performance CRUD coverage
 
+## 2026-09-08: DOCX fresh streaming operation memory (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) adds the opt-in
+`docx_streaming_create` selector through public StreamingDocumentWriter.
+Three paragraph counts (64 / 8,192 / 131,072), normal/allocator targets and
+two reversed repeats retain 360 samples. Full paragraph/run/member oracles
+pass; all 180 allocator samples observe a 414,732-byte incremental peak with
+zero live-byte exit change. The 64-byte scratch reservation is reported
+separately from total requested heap and process RSS.
+
+Selectable/default counts become 440/37. The checked default remains 201 rows
+and 31 corpora; the representative index remains 15 categories/33 mappings,
+11 measured and 22 correctness-only because this is supplementary opt-in
+evidence. This is fresh plain-text creation, not logical append, package Part
+addition or arbitrary editing/repackaging. Other streaming, native, source and
+scaling obligations remain open.
+
 ## 2026-09-07: change 0465 checks ordinary ODP append in the default matrix
 
 0465 promotes the existing `odp_existing_append_lifecycle` scenario to the

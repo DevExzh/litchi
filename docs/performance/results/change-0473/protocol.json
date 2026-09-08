@@ -1,0 +1,97 @@
+{
+  "acceptance": "Every output passes complete untimed paragraph/run/membership oracle and timed archive hash/bytes/counters. All 12 lanes retained with source/build identity and all individual normal repeat flags above5percent. Stable incremental allocator peak across sizes and zero exitdelta support only tested scoped bounded-memory observation; if peak grows, investigate and do not substitute modeled scratch.",
+  "build_driver_sha256": "2ece10cc7e4f70336592aceb4c83b8039f22c3d8a5f6cfe263a25edd7d00bfc4",
+  "capture_driver_sha256": "d436af9d0f7e3a68935ec040657869dbced1c9c3f6a3529b6c355452e1314ed1",
+  "cpu": 2,
+  "declared_utc": "2026-09-08T09:03:24.944225+00:00",
+  "limits": "No logical append, Part addition, arbitrary edits/repackaging, native Office, broad-format feature, source-variant or worker-scaling proof. Full-process RSS includes materializing preflight; no RSS causality claim.",
+  "memory_scope": "Allocator target callback-order operation requested-heap peak minus entry and live exit minus entry, including writer/helper/context/transport allocations and other process threads. Excludes allocator-internal realloc overlap, physical copies, RSS and retained preflight. 64-byte semantic scratch and zero retained sink output are separate properties.",
+  "order": [
+    {
+      "lane": "R1-normal-tiny",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "lane": "R1-normal-medium",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "lane": "R1-normal-large",
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "lane": "R1-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "lane": "R1-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "lane": "R1-allocator-large",
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "lane": "R2-allocator-large",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "lane": "R2-allocator-medium",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "lane": "R2-allocator-tiny",
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "lane": "R2-normal-large",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "lane": "R2-normal-medium",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "lane": "R2-normal-tiny",
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "tiny"
+    }
+  ],
+  "repeats": 2,
+  "samples": 30,
+  "schema": "litchi-0473-protocol-v1",
+  "scope": "Descriptive fresh plain DOCX paragraph creation only; no before/after production or registered latency claim.",
+  "scratch_bytes": 64,
+  "selector": "docx_streaming_create",
+  "shapes": {
+    "large": 131072,
+    "medium": 8192,
+    "tiny": 64
+  },
+  "timing_scope": "Writer helper context/limits construction, deterministic paragraph text generation, public writer new/start/write/finish, Deflate/ZIP finalization and writer/context destruction. Sink construction and digest extraction, process/allocator boundary reads, materialized preflight and reopen are excluded.",
+  "warmups": 3,
+  "workers": 1
+}

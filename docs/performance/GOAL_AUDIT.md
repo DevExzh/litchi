@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## DOCX fresh-creation evidence added (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) advances the explicit-window
+streaming requirement with 360 samples and full paragraph/run/package oracles.
+The observed operation allocation peak is constant at 414,732 bytes over the
+three tested sizes, separately from the 64-byte scratch reservation. Production
+and the default matrix are unchanged. This adds fresh plain DOCX coverage;
+logical append, Part addition, arbitrary repackaging, PPTX streaming, native
+breadth, source variants and parallel scaling remain open. The full non-iWork
+goal is not complete.
+
 ## Current scoped progress (0472)
 
 [0472](changes/0472-xlsx-plain-cell-tags.md) retains plain-cell tag elision after

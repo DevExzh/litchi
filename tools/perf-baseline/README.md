@@ -2512,6 +2512,34 @@ The corpus contains deterministic numeric cells and untouched media members;
 the row-visibility evidence does not reuse the multi-sheet scalar-cell CRUD
 shape or make a claim about broad worksheet/row structural editing.
 
+## Opt-in DOCX fresh streaming creation
+
+`docx_streaming_create` exercises the public `StreamingDocumentWriter` with
+one UTF-8, XML-significant text run per paragraph. `--semantic-shape` selects
+64 (`tiny`), 8,192 (`medium`) or 131,072 (`large`) paragraphs. It is excluded
+from the default matrix.
+
+```sh
+RUSTUP_TOOLCHAIN=1.98.1 cargo run --release --locked \
+  --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline -- \
+  --case docx_streaming_create --semantic-shape tiny,medium,large \
+  --workers 1 --warmup 3 --samples 30 --json docx-streaming.json
+```
+
+The timed writer sends output to a non-seek hashing discard sink. A separate
+materialized preflight checks the exact three-member package, every paragraph
+and its one-run structure, full text, XML byte counters and deterministic
+hashes. Each timed output must match the preflight archive and counters.
+Operation allocation metrics are available through the existing
+`litchi-perf-baseline-alloc` target with `--features allocator-metrics`.
+
+The 64-byte XML-escaping scratch reservation and zero retained sink output are
+separate from operation heap and process RSS. Context construction, generated
+text, the writer lifecycle and ZIP finalization are inside the timed/allocator
+interval; preflight and sink digest extraction are outside. This is fresh
+plain-document creation; it does not cover logical append, Part addition or
+editing followed by repackaging. See the [0473 evidence record](../../docs/performance/changes/0473-docx-streaming-operation-memory.md).
+
 ## Opt-in bounded streaming creation
 
 `xlsx_streaming_create` and `rtf_streaming_create` exercise the public

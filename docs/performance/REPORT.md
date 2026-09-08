@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Current result: DOCX streaming operation memory (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) retains 360 formal samples
+for public fresh DOCX streaming creation. Every allocator sample has the same
+414,732-byte peak above entry and zero live-byte exit change at 64 / 8,192 /
+131,072 paragraphs. Normal repeat statistics stay within five percent. The
+result is scoped to the tested plain-text subset; no production speedup or
+general RSS claim follows. All scoped gates pass. Temporary-storage recovery
+and initial test findings remain recorded. The full goal stays open.
+
 ## Current result: plain worksheet tag elision (0472)
 
 [0472](changes/0472-xlsx-plain-cell-tags.md) retains a checked plain-cell

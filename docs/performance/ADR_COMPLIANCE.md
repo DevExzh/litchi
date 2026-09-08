@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## Public DOCX streaming measurement (0473)
+
+[0473](changes/0473-docx-streaming-operation-memory.md) adds opt-in harness coverage
+using the existing public writer and allocator observer. All 30 previously
+read ADR hashes are unchanged. Explicit 64-byte semantic scratch, transport
+allocations, zero retained sink output and process RSS have separate scopes.
+Exact membership/run/text negative oracles, 363 harness/allocator tests and
+22 writer tests pass, as do formatting, strict Clippy/rustdoc and boundaries.
+No production API, unsafe code, dependency or execution-provider change occurs.
+
 ## Checked plain-cell tag elision (0472)
 
 The [0472 source review](results/change-0472/source-review.md) preserves address

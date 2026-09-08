@@ -1,0 +1,33 @@
+{
+  "reason": "Build command passed; copying first binary to tmp failed with Errno122 disk quota. Capture orchestration stopped before any pilot or formal process.",
+  "started_utc": "2026-09-08T09:29:09.938061+00:00",
+  "removed_partial_binary_bytes": 184442880,
+  "argv": [
+    "git",
+    "sparse-checkout",
+    "set",
+    "--no-cone",
+    "--stdin"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "retained_tracked_paths": 7033,
+  "source_hashes_unchanged": true,
+  "clean_after": true,
+  "finished_utc": "2026-09-08T09:29:11.749768+00:00",
+  "binaries_copied": true,
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0473/normal",
+      "sha256": "2b86d46e3ec91bbcb84d26f1417f8481e6c3807c86bcb3584b6d52ee65227f14",
+      "bytes": 464660032
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0473/allocator",
+      "sha256": "3535253a2ee6c3ea797e3a07c27cfd65c1dc185d5e176672606b487633d1aa6d",
+      "bytes": 464358152
+    }
+  },
+  "publication_finished_utc": "2026-09-08T09:29:48.942667+00:00"
+}

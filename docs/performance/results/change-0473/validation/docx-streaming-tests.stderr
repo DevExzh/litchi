@@ -1,0 +1,9 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.49s
+     Running tests/streaming.rs (target/debug/deps/streaming-1fa428ef1e19a80a)
