@@ -1,0 +1,32 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "formula-envelope-native.numbers",
+  "size": 104582,
+  "sha256": "abc286af2d7457e6aa9e2964a53ad270a0b8129bc03a645ec47de91c4135e85c",
+  "source": "formula-events-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 4,
+  "columns": 3,
+  "formulas": {
+    "B4": {
+      "input": "=IF(AND(B2>0,C2=6),SUM(B2:C2),0)",
+      "native_display": "48.5"
+    }
+  },
+  "preserved_results": {
+    "C2": "6",
+    "C3": "北京",
+    "C4": "48.5"
+  },
+  "lifecycle": [
+    "Copied the prior native event formula control into a disposable directory.",
+    "Pasted the nested conditional/comparison/range formula through Numbers UI.",
+    "Saved and closed the document window.",
+    "Reopened the exact saved path using Open Finder item; accessibility confirmed the nested formula result and preserved results.",
+    "Closed to the template chooser."
+  ],
+  "scope": "Native nested formula envelope save/close/reopen control; synthetic tests cover malformed wire and budget failure behavior."
+}

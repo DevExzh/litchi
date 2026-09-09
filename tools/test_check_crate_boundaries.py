@@ -922,6 +922,52 @@ def add_iwa_numbers_wire_formula_render_scaffold(
         path.write_text(reader, encoding="utf-8")
 
 
+def add_iwa_numbers_wire_formula_envelope_scaffold(
+    root: Path,
+    *,
+    envelope_source: str | None = None,
+    reader_suffix: str = "",
+) -> None:
+    """Install the shared FormulaArchive envelope owner and reader imports."""
+
+    envelope = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE
+    envelope.parent.mkdir(parents=True, exist_ok=True)
+    envelope.write_text(
+        envelope_source
+        if envelope_source is not None
+        else (
+            "use litchi_iwa_common::wire::{WireDescent, WireLimits};\n"
+            "use litchi_iwa_protos::numbers_formula_codec;\n"
+            "pub struct FormulaEnvelopeLimits;\n"
+            "pub struct AttemptedFormulaEnvelopeCost;\n"
+            "pub struct FormulaEnvelopeReport;\n"
+            "pub struct FormulaEnvelopeFailure;\n"
+            "pub struct FormulaEnvelopeCost;\n"
+            "struct FormulaEnvelopeField;\n"
+            "enum FormulaScalar {}\n"
+            "pub fn preflight_formula_envelope() {}\n"
+            "fn required_formula_ast_node_type() {}\n"
+            "fn require_formula_fields() {}\n"
+            "fn formula_field_is_repeated() {}\n"
+            "fn validate_formula_scalar() {}\n"
+            "fn formula_envelope_field() {}\n"
+        ),
+        encoding="utf-8",
+    )
+    reader = (
+        "use litchi_numbers_wire::formula_envelope::"
+        "preflight_formula_envelope;\n"
+        "struct FormulaArchiveBytes;\n"
+        "fn decode_formula_archive_with_visitor() {}\n"
+        "fn decode_formula_archive_for_render() {}\n"
+        + reader_suffix
+    )
+    for relative in boundaries.IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reader, encoding="utf-8")
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -27274,6 +27320,182 @@ fn rewrite_movie_title_operation(
             (root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE).unlink()
             self.assertEqual(
                 boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_envelope_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_requires_schema_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(
+                root,
+                envelope_source=(
+                    "pub fn preflight_formula_envelope() {}\n"
+                ),
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(
+                len(violations),
+                len(boundaries.IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS) + 1,
+            )
+            for marker in boundaries.IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS:
+                if marker == "preflight_formula_envelope":
+                    continue
+                self.assertTrue(any(marker in item for item in violations), marker)
+            self.assertTrue(any("common wire import" in item for item in violations))
+            self.assertTrue(any("generated-free codec import" in item for item in violations))
+
+    def test_iwa_numbers_wire_formula_envelope_owner_rejects_duplicate_schema_routes(
+        self,
+    ) -> None:
+        duplicate_sources = {
+            "cost": "struct FormulaEnvelopeCost;\n",
+            "field": "type FormulaEnvelopeField = ();\n",
+            "scalar": "enum FormulaScalar {}\n",
+            "preflight": "fn preflight_formula_envelope() {}\n",
+            "required": "fn require_formula_fields() {}\n",
+            "schema": "fn formula_envelope_field() {}\n",
+            "repeated": "fn formula_field_is_repeated() {}\n",
+            "scalar_validation": "fn validate_formula_scalar() {}\n",
+            "node_type": "fn required_formula_ast_node_type() {}\n",
+            "constant": "const FORMULA_REQUIRED_NODE: &[u32] = &[];\n",
+        }
+        for label, duplicate in duplicate_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_formula_envelope_scaffold(
+                        root,
+                        reader_suffix=duplicate,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                        root
+                    )
+                    self.assertEqual(len(violations), 2)
+                    self.assertTrue(
+                        all("redeclares the Numbers wire FormulaArchive envelope" in item
+                            for item in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_masks_test_only_schema_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(
+                root,
+                reader_suffix=(
+                    "#[cfg(test)]\n"
+                    "struct FormulaEnvelopeField;\n"
+                    "#[cfg(test)]\n"
+                    "fn formula_envelope_field() {}\n"
+                    "#[cfg(test)]\n"
+                    "const FORMULA_REQUIRED_TEST: &[u32] = &[];\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_does_not_mask_broad_cfg(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8")
+                + '#[cfg(any(test, feature = "oracle"))]\n'
+                + "fn preflight_formula_envelope() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("redeclares the Numbers wire FormulaArchive envelope", violations[0])
+
+    def test_iwa_numbers_wire_formula_envelope_owner_is_mandatory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                Path(directory)
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("owner is missing", violations[0])
+
+    def test_iwa_numbers_wire_formula_envelope_owner_requires_reader_import(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::formula_envelope::"
+                    "preflight_formula_envelope;\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("missing the Numbers wire FormulaArchive envelope import", violations[0])
+
+    def test_iwa_numbers_wire_formula_envelope_owner_allows_retired_reader_source(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            (root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_formula_renderer_accepts_moved_envelope_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_table_scaffold(root)
+            add_iwa_numbers_formula_renderer_scaffold(
+                root,
+                source=(
+                    "struct FormulaArchiveBytes;\n"
+                    "fn decode_formula_archive_with_visitor() {}\n"
+                    "fn decode_formula_archive_for_render() {}\n"
+                    "mod numbers_formula_codec {}\n"
+                    "fn charge_formula_wire() {}\n"
+                    "fn charge_formula_render_work() {}\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
                 [],
             )
 

@@ -13346,7 +13346,6 @@ IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_ADAPTER_USE = re.compile(
 )
 IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS = (
     "FormulaArchiveBytes",
-    "preflight_formula_archive_envelope",
     "decode_formula_archive_with_visitor",
     "decode_formula_archive_for_render",
     "numbers_formula_codec",
@@ -13412,6 +13411,115 @@ IWA_FORMULA_RENDER_LOCAL_VISITOR_DECLARATIONS = (
             r"(?:r#)?render_scalar_formula_nodes\b"
         ),
     ),
+)
+# Wave109 moves the strict FormulaArchive envelope walk and schema validator
+# beside the shared formula event adapter.  It remains a generated-code
+# boundary: ``litchi-numbers-wire`` may inspect the generated-free codec, while
+# format readers retain only their owned byte wrapper, decoder calls, report
+# charging, and format-specific error mapping.
+IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/formula_envelope.rs"
+)
+IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS = (
+    "FormulaEnvelopeLimits",
+    "AttemptedFormulaEnvelopeCost",
+    "FormulaEnvelopeReport",
+    "FormulaEnvelopeFailure",
+    "FormulaEnvelopeCost",
+    "FormulaEnvelopeField",
+    "preflight_formula_envelope",
+    "required_formula_ast_node_type",
+    "require_formula_fields",
+    "formula_field_is_repeated",
+    "validate_formula_scalar",
+    "formula_envelope_field",
+)
+IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_COMMON_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::"
+)
+IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_PROTOS_IMPORT = re.compile(
+    r"\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*"
+    r"numbers_formula_codec\b"
+)
+IWA_FORMULA_ENVELOPE_WIRE_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*"
+    r"formula_envelope\b"
+)
+IWA_FORMULA_ENVELOPE_LOCAL_SCHEMA_DECLARATIONS = (
+    (
+        "FormulaEnvelopeCost",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?FormulaEnvelopeCost\b"
+        ),
+    ),
+    (
+        "FormulaEnvelopeField",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?FormulaEnvelopeField\b"
+        ),
+    ),
+    (
+        "FormulaScalar",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?FormulaScalar\b"
+        ),
+    ),
+    (
+        "preflight_formula_envelope",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?preflight_formula_envelope\b"
+        ),
+    ),
+    (
+        "required_formula_ast_node_type",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?required_formula_ast_node_type\b"
+        ),
+    ),
+    (
+        "require_formula_fields",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?require_formula_fields\b"
+        ),
+    ),
+    (
+        "formula_field_is_repeated",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?formula_field_is_repeated\b"
+        ),
+    ),
+    (
+        "validate_formula_scalar",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?validate_formula_scalar\b"
+        ),
+    ),
+    (
+        "formula_envelope_field",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?formula_envelope_field\b"
+        ),
+    ),
+)
+IWA_FORMULA_ENVELOPE_LOCAL_SCHEMA_CONSTANTS = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?const[ \t]+"
+    r"(?:r#)?(?:FORMULA_REQUIRED_[A-Za-z0-9_]+|FORMULA_ENVELOPE_UNKNOWN)\b"
+)
+IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_PUBLIC_ENTRY = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+fn[ \t]+"
+    r"(?:r#)?preflight_formula_envelope\b"
 )
 # Wave107 moves the allocation-conscious expression arena out of both format
 # readers.  The readers retain only their format-specific budget adapters,
@@ -45240,6 +45348,85 @@ def audit_iwa_numbers_wire_formula_render_ownership(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_wire_formula_envelope_ownership(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep FormulaArchive envelope admission in the low-level wire owner.
+
+    The envelope walk validates native wire types, required fields, repeated
+    fields, scalar canonicality, UTF-8, and bounded nested paths before a
+    format adapter retains bytes.  It is shared independently of the event
+    renderer because the adapters still own their error and aggregate-budget
+    mapping.  Missing reader files are accepted for monolith retirement, but
+    every reader that remains must import this owner and must not carry a
+    second schema table or strict preflight implementation.
+    """
+
+    violations: list[str] = []
+    envelope_path = root / IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE
+    if not envelope_path.is_file():
+        return [
+            "Numbers wire FormulaArchive envelope owner is missing: "
+            f"{IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE}"
+        ]
+
+    envelope_raw = envelope_path.read_text(encoding="utf-8")
+    envelope_code = _mask_rust_non_code(_mask_rust_cfg_test_items(envelope_raw))
+    for marker in IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", envelope_code) is None:
+            violations.append(
+                "Numbers wire FormulaArchive envelope owner is missing "
+                f"{marker} route: {IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE}"
+            )
+    if IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_PUBLIC_ENTRY.search(envelope_code) is None:
+        violations.append(
+            "Numbers wire FormulaArchive envelope owner must expose its "
+            f"preflight entry: {IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_COMMON_IMPORT.search(envelope_code) is None:
+        violations.append(
+            "Numbers wire FormulaArchive envelope owner is missing its common "
+            f"wire import: {IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_PROTOS_IMPORT.search(envelope_code) is None:
+        violations.append(
+            "Numbers wire FormulaArchive envelope owner is missing its "
+            "generated-free codec import: "
+            f"{IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE}"
+        )
+
+    for relative in IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            # A deleted host reader is the intended monolith-exit state.  The
+            # focused reader receives the same allowance when it is retired.
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+        if IWA_FORMULA_ENVELOPE_WIRE_IMPORT.search(production_code) is None:
+            violations.append(
+                "formula renderer reader is missing the Numbers wire "
+                f"FormulaArchive envelope import: {relative}"
+            )
+        for label, declaration in IWA_FORMULA_ENVELOPE_LOCAL_SCHEMA_DECLARATIONS:
+            for match in declaration.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "formula renderer reader redeclares the Numbers wire "
+                    f"FormulaArchive envelope {label}: {relative}:{line_number}"
+                )
+        for match in IWA_FORMULA_ENVELOPE_LOCAL_SCHEMA_CONSTANTS.finditer(
+            production_code
+        ):
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "formula renderer reader redeclares the Numbers wire "
+                f"FormulaArchive envelope schema constant: {relative}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_common_formula_render_ownership(
     root: Path = ROOT,
 ) -> list[str]:
@@ -69231,6 +69418,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
         + audit_iwa_numbers_wire_formula_render_ownership()
+        + audit_iwa_numbers_wire_formula_envelope_ownership()
         + audit_iwa_common_formula_render_ownership()
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()

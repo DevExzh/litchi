@@ -187,6 +187,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "formula_envelope"
+path = "fuzz_targets/formula_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_cell_api"
 path = "fuzz_targets/numbers_table_cell_api.rs"
 test = false
