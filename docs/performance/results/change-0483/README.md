@@ -1,16 +1,19 @@
 # Change 0483: bounded DOCX tail append evidence
 
 This bundle is the reproducibility boundary for the focused DOCX main-story
-tail-append comparison. It is being prepared for a same-executable comparison
-between the existing materialized paragraph-copy route and the bounded
-caller-supplied plain-text tail-append route.
+tail-append comparison. The accepted same-executable matrix compares the
+existing materialized paragraph-copy route and the bounded caller-supplied
+plain-text tail-append route across 24 processes and 720 samples.
 
 The [source checkpoint](docx-source-checkpoint.md) has passed the accepted
 DOCX feature configurations, lints, documentation, non-iWork workspace and
 boundary checks, five focused benchmark tests, independent LibreOffice
 readback, and two 10,000-iteration sanitizer smoke runs. The evidence helpers
-have separate corruption tests. Formal captures and performance claims remain
-pending; the full authored-stream and broader CRUD objective remains open.
+have separate corruption tests. The [independent measurements](measurements.md)
+and [CPU/syscall profiles](profile-review.md) retain the tradeoff: large-source
+operation heap falls from 35.37 MB to 0.61 MB, normal latency roughly doubles,
+and whole-process RSS stays near 100 MiB. The full authored-stream and broader
+CRUD objective remains open.
 
 The comparison uses deterministic DOCX/OOXML/OPC/ZIP sources containing 64,
 8,192, or 131,072 plain body paragraphs and one opaque 32 KiB member. The
@@ -38,6 +41,20 @@ DOCX memory bound; caller storage, package metadata and ZIP codec state remain
 separate costs. The route's typed admission/refusal contract limits the scope
 of any performance result.
 
+## Retained first formal attempt
+
+The first 24 captures all succeeded. Their analyzer failed when a process
+counter rose from zero: its undefined percentage became infinity, which strict
+JSON cannot serialize. The [complete first attempt](attempt-history/first-formal/README.md)
+is retained as an archive with a verified per-file inventory, including every
+sample, the original frozen protocol, helpers, failure streams and partial
+summary. [formal-attempt-reset.json](formal-attempt-reset.json) records the
+verified archival boundary. The correction represents undefined percentages
+explicitly and preserves the corresponding review flags. All 26 focused tests
+pass, and a [regression replay](zero-baseline-regression.json) successfully
+serializes all 720 archived samples with ten undefined changes retained.
+The accepted matrix uses a new protocol frozen after those checks. No timing outlier was removed.
+
 ## Reproduction
 
 The coordinator must first confirm the harness CLI and report schema described
@@ -58,30 +75,15 @@ pilot gate may use the direct harness form or the exact
 `/usr/bin/time -v -o PILOT.resource /usr/bin/taskset -c 2` wrapper. Fuzz
 receipts use `LABEL=KIND:PATH`.
 
-For example, after the accepted receipts exist, the coordinator supplies the
-actual labels and report paths (the values below are placeholders for the
-coordinator's real retained records):
-
-```sh
-python3 -B docs/performance/results/change-0483/write-plans.py \
-  --attempt accepted \
-  --required-label build-normal-accepted \
-  --required-label build-allocator-accepted \
-  --required-label <accepted-required-gate-label> \
-  --pilot <label>:normal:materialized:64:1:1:<pilots/report.json> \
-  --classify <developmental-label>=developmental:<recorded reason> \
-  --seed-manifest fuzz/seed-manifest-v2.json \
-  --generator fuzz/generator-v2.json \
-  --fuzz-receipt <prepared-label>=prepared:fuzz/accepted/prepared.json \
-  --fuzz-receipt <build-label>=build:fuzz/accepted/build.json \
-  --fuzz-receipt <smoke-label>=smoke:fuzz/accepted/smoke.json
-```
-
-Repeat `--pilot`, `--required-label`, and `--classify` for the complete
-retained set. For a long receipt directory, `--classification-file` accepts a
-JSON object mapping each non-final receipt label to
-`{"classification":"developmental"|"historical","reason":"..."}`. The
-planner writes both plans only after all checks pass.
+The exact successful planner invocation is retained in
+[plans-command.json](plans-command.json). It binds 32 required accepted gates,
+12 pilots and 85 explicitly classified historical/developmental receipts.
+[classifications.json](classifications.json) explains each retained earlier
+outcome. To inspect or replay the planner command in a fresh reproduction
+checkout, use that JSON argv rather than inventing labels. Paths in historical
+commands describe the original checkout and must be mapped explicitly when
+reproducing in another location. The existing accepted bundle uses exclusive
+outputs and must be copied or given a new attempt for new measurements.
 
 `validation-plan.json` contains `required_labels`, `pilot_labels`, an `argv`
 object whose keys are exactly their union, a `pilot_reports` object, and a
@@ -123,10 +125,20 @@ owned helper hash, exact capture and gate argv, environment, source manifest,
 binary metadata, route labels, pilot and required validation labels, fuzz
 seed/receipt custody, and sample matrix.
 
-The bundle is portable after the temporary executables and lock are removed.
-The final accepted bundle must retain `SHA256SUMS`, the final validation
-receipts, independently generated measurements, and copied-bundle corruption
-refusal evidence before it is sealed.
+The [copied-bundle closure](evidence-validation/closure-check.json) passed all
+12 cases after the temporary benchmark/fuzzer binaries were removed: live and
+copied verification, copied sealing and replay, plus eight expected corruption
+refusals. Those cover altered summaries, missing captures/gates/fuzz receipts,
+and seal rejection of extra, missing, tampered or symlinked files. The first
+closure preflight refused generated Python bytecode; that record is retained
+under `attempt-history/first-closure`, and [closure-retry.json](closure-retry.json)
+records its removal. [Final cleanup](final-cleanup.json) confirms the copied
+bundle and this batch's remaining runtime scratch were removed.
+
+`SHA256SUMS` covers every regular file in the final bundle except itself. Run
+`python3 -B seal.py --verify --root /absolute/path/to/copied/change-0483` to
+check both the complete file inventory and the structured evidence after
+copying; temporary executables are unnecessary.
 
 The settings/MCE fuzz extension is generated separately with
 `python3 -B docs/performance/results/change-0483/fuzz-seeds.py
@@ -136,9 +148,10 @@ writes the 62-seed `fuzz/seed-manifest-v2.json` and
 `fuzz/generator-v2.json` records. The fuzz runner inventories every file in `fuzz/seeds`; the accepted custody
 plan binds that inventory to the v2 manifest and generator explicitly.
 
-No performance claim is authorized until the accepted source, binary builds,
-formal captures, independent analysis, focused tests, required Rust gates and
-final portability checks are all present and reviewed.
+The accepted source, binary builds, formal captures, independent analysis,
+focused tests, required Rust gates and portability records are retained here.
+The [per-change record](../../changes/0483-docx-bounded-tail-append.md) scopes
+both improvements and regressions; it does not certify the broader goal.
 
 ## Settings fuzz corpus and temporary storage
 

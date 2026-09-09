@@ -1,0 +1,29 @@
+{
+  "accepted": true,
+  "case": "sealed-verify",
+  "command": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/sealed/seal.py",
+    "--root",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/sealed",
+    "--verify"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/sealed",
+  "exit_code": 0,
+  "expected_acceptance": true,
+  "finished_utc": "2026-09-09T05:48:23.297997+00:00",
+  "mutation": null,
+  "schema": "docx-tail-append-closure-case-v1",
+  "started_utc": "2026-09-09T05:48:11.687085+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "evidence-validation/sealed-verify.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 656,
+    "path": "evidence-validation/sealed-verify.stdout",
+    "sha256": "cdc27f793a507cf7807d64f7747da1306034cc6425b172f5105c1a108b6b1763"
+  }
+}

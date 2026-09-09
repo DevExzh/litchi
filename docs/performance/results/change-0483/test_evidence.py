@@ -6,6 +6,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 import unittest
 import zlib
 
@@ -303,6 +306,39 @@ class EvidenceTests(unittest.TestCase):
                 "pilot-accepted",
             )
 
+    def test_resource_rss_accepts_gnu_time_leading_whitespace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "captures").mkdir()
+            (root / "captures/test.resource").write_text(
+                "\tMaximum resident set size (kbytes): 1432\n", encoding="utf-8"
+            )
+            with patch.object(analyze, "ROOT", root):
+                self.assertEqual(analyze._resource_rss({"label": "test"}), 1432 * 1024)
+
+    def test_resource_rss_rejects_duplicate_observations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "captures").mkdir()
+            (root / "captures/test.resource").write_text(
+                "Maximum resident set size (kbytes): 1\n"
+                "\tMaximum resident set size (kbytes): 2\n", encoding="utf-8"
+            )
+            with patch.object(analyze, "ROOT", root):
+                with self.assertRaises(analyze.AnalysisError):
+                    analyze._resource_rss({"label": "test"})
+
+    def test_resource_rss_rejects_malformed_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "captures").mkdir()
+            (root / "captures/test.resource").write_text(
+                "\tMaximum resident set size (kbytes): not-a-number\n", encoding="utf-8"
+            )
+            with patch.object(analyze, "ROOT", root):
+                with self.assertRaises(analyze.AnalysisError):
+                    analyze._resource_rss({"label": "test"})
+
     def test_validation_plan_classifies_successful_developmental_receipt(self) -> None:
         digest = "a" * 64
         protocol = {
@@ -446,6 +482,26 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(result["p50"], 3.0)
         self.assertEqual(result["p95"], 4.8)
         self.assertEqual(result["p99"], 4.96)
+
+    def test_zero_baseline_increase_is_json_safe_and_flagged(self) -> None:
+        first = {"process": {"major_faults": {"mean": 0}}}
+        second = {"process": {"major_faults": {"mean": 1}}}
+        with patch.object(analyze, "_comparison_metrics", return_value=["process.major_faults"]):
+            changes, flags = analyze._comparison_changes(first, second, "normal", "first_mean", "second_mean")
+        self.assertIsNone(changes["process.major_faults"]["percent"])
+        self.assertEqual(changes["process.major_faults"]["percent_status"], "undefined_zero_baseline")
+        self.assertEqual(flags[0]["percent"], None)
+        self.assertTrue(flags[0]["adverse"])
+        json.dumps({"changes": changes, "flags": flags}, allow_nan=False)
+
+    def test_zero_to_zero_comparison_keeps_zero_change_without_flag(self) -> None:
+        first = {"process": {"major_faults": {"mean": 0}}}
+        second = {"process": {"major_faults": {"mean": 0}}}
+        with patch.object(analyze, "_comparison_metrics", return_value=["process.major_faults"]):
+            changes, flags = analyze._comparison_changes(first, second, "normal", "first_mean", "second_mean")
+        self.assertEqual(changes["process.major_faults"]["percent"], 0.0)
+        self.assertNotIn("percent_status", changes["process.major_faults"])
+        self.assertEqual(flags, [])
 
     def test_safe_relative_rejects_escape(self) -> None:
         with self.assertRaises(verify.VerificationError):

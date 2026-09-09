@@ -6,10 +6,8 @@ must run after the accepted normal binary has been built and copied into
 immutable formal protocol. It does not build the binary, modify the Rust
 harness, freeze the protocol, or interpret profiler output.
 
-The coordinator must add `profile.py` to the helper lists in `common.py` and
-`analyze.py`, and bind it in the protocol/verifier script set before freezing.
-This task intentionally leaves those existing lists unchanged so the helper's
-own hash can be reviewed first.
+`profile.py` is included in the helper lists in `common.py` and `analyze.py`;
+the frozen protocol binds its hash with the other evidence drivers.
 
 Run the driver once with a fresh attempt token. The outer lock must be distinct
 from the lock used by `gate.py`, because the driver invokes the gate once per

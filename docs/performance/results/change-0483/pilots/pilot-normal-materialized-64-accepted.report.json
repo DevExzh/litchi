@@ -1,0 +1,383 @@
+{
+  "schema": "docx-bounded-tail-append-comparison-v1",
+  "version": 1,
+  "binary": {
+    "binary": "litchi-perf-baseline",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "config": {
+    "counts": [
+      64
+    ],
+    "samples": 1,
+    "warmups": 1,
+    "route": "materialized_paragraph_copy",
+    "lifecycle": "source-backed open + route preparation + commit/plan + sequential publication + sink finalization + operation drops; corpus construction and independent oracles outside",
+    "sink": "non_seek_hashing_scalar_sha256_shortwrite_16k",
+    "source": "caller_owned_arc_positional_read_at_scalar_counters_requested_returned_fixed_histogram",
+    "text_authoring": "bounded route borrows caller-owned UTF-8 text matching source paragraph zero and authors a locally xmlns:w-bound xml:space=preserve run; text value/storage outside clock; materialized route copies paragraph zero"
+  },
+  "cases": [
+    {
+      "count": 64,
+      "corpus": {
+        "generator": "litchi-docx-bounded-tail-append-comparison-v1",
+        "format": "DOCX/OOXML/OPC/ZIP",
+        "count": 64,
+        "append_text": "tail-text-000064-café <&> plain",
+        "append_text_sha256": "e07c201e59e0dfcdd99c5c75e3893dd5debae95d9f87c57fe0793bbcffa0db01",
+        "source_archive_bytes": 2144,
+        "source_archive_sha256": "d9a3af767a57612f58107e4456d10e024ccbfc5dec82644b16f322ad6851e873",
+        "source_main_xml_bytes": 3313,
+        "source_main_xml_sha256": "7752b21b162fb36cdc6089b0943c23eba3eca8d859c8bf4c1f378bd5c16b8810",
+        "source_semantic": {
+          "paragraph_count": 64,
+          "order_sha256": "ba767d439ce20c73f87572e198cd4c4cfa7dd0e3ff7571ff05d5158036a1ddd4",
+          "text_sha256": "296ec2edc090eccdb923dcd875a749acacc46fbd5593ca7bc7966212abd6df3a",
+          "text_bytes": 1040
+        },
+        "source_members": [
+          {
+            "path": "[Content_Types].xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 2913692623,
+            "decoded_bytes": 512,
+            "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+            "compressed_bytes": 267,
+            "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+          },
+          {
+            "path": "_rels/.rels",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 3929537947,
+            "decoded_bytes": 297,
+            "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+            "compressed_bytes": 183,
+            "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+          },
+          {
+            "path": "word/document.xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 4026772253,
+            "decoded_bytes": 3313,
+            "decoded_sha256": "7752b21b162fb36cdc6089b0943c23eba3eca8d859c8bf4c1f378bd5c16b8810",
+            "compressed_bytes": 359,
+            "compressed_sha256": "831ddf63494023fabecd4b6812361357cc8fbf646aca0a5485f602d3d6c34386"
+          },
+          {
+            "path": "word/perf-opaque.bin",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 528510375,
+            "decoded_bytes": 32768,
+            "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+            "compressed_bytes": 811,
+            "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+          }
+        ],
+        "source_member_count": 4,
+        "source_unchanged_verified": true,
+        "source_main_xml_archive_verified": true,
+        "source_opaque_member_exact_verified": true,
+        "route_semantics_equal_verified": true,
+        "route_untouched_members_equal_verified": true,
+        "route_outputs_physical_equal": false,
+        "route_untouched_raw_members_equal_verified": true,
+        "bounded_noop_verified": true,
+        "materialized": {
+          "route": "materialized_paragraph_copy",
+          "output_archive_bytes": 2149,
+          "output_archive_sha256": "2534ca36f51ad00416b8d9082ac7d621d5491a13edec434a6274115d706aa85a",
+          "output_main_xml_bytes": 3388,
+          "output_main_xml_sha256": "9eb5b3765f819882187f9890d90696a953daae02dc8e18f68fc7879890537c5d",
+          "output_main_xml_expected_semantic_verified": true,
+          "output_main_xml_expected_raw_verified": true,
+          "scalar_proof": null,
+          "output_semantic": {
+            "paragraph_count": 65,
+            "order_sha256": "3b76b269276b80e2cb2f9db060009f7d81957621818ed63be3c0e0fc149a4508",
+            "text_sha256": "ccf87f3833e795de9f7c7b114ef4ca328af0277ecf19560d0acfa8c0f4185e87",
+            "text_bytes": 1072
+          },
+          "output_members": [
+            {
+              "path": "[Content_Types].xml",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 2913692623,
+              "decoded_bytes": 512,
+              "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+              "compressed_bytes": 267,
+              "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+            },
+            {
+              "path": "_rels/.rels",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 3929537947,
+              "decoded_bytes": 297,
+              "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+              "compressed_bytes": 183,
+              "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+            },
+            {
+              "path": "word/document.xml",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 50646476,
+              "decoded_bytes": 3388,
+              "decoded_sha256": "9eb5b3765f819882187f9890d90696a953daae02dc8e18f68fc7879890537c5d",
+              "compressed_bytes": 364,
+              "compressed_sha256": "029c762a75ca2d8c164a55baaca73213a0815bcb728791fbeef56752f93f558b"
+            },
+            {
+              "path": "word/perf-opaque.bin",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 528510375,
+              "decoded_bytes": 32768,
+              "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+              "compressed_bytes": 811,
+              "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+            }
+          ],
+          "output_member_count": 4,
+          "output_untouched_members_verified": true,
+          "output_untouched_raw_members_verified": true,
+          "output_opaque_member_exact_verified": true,
+          "output_physical_order_verified": true,
+          "output_main_compressed_equal_source": false,
+          "route_output_replay_verified": true,
+          "route_inverse_verified": true,
+          "stale_source_refusal_verified": true
+        },
+        "bounded": {
+          "route": "bounded_plain_text_tail_append",
+          "output_archive_bytes": 2147,
+          "output_archive_sha256": "5c8f9cf1f9815dce454e4709f2fd9c2669038878c3e6c85df1b7dc857d4e8bfb",
+          "output_main_xml_bytes": 3480,
+          "output_main_xml_sha256": "4a38a8308a95e9b464cf561183975594010d98aeaf07474abe6e66a692f3c1db",
+          "output_main_xml_expected_semantic_verified": true,
+          "output_main_xml_expected_raw_verified": true,
+          "scalar_proof": {
+            "source_version_id": 3,
+            "source_version_revision": 0,
+            "source_len": 3313,
+            "source_sha256": "7752b21b162fb36cdc6089b0943c23eba3eca8d859c8bf4c1f378bd5c16b8810",
+            "insertion_offset": 3291,
+            "source_paragraph_count": 64,
+            "source_event_count": 458,
+            "source_max_depth": 5,
+            "source_strict_namespace": false,
+            "source_sect_pr_len": 0,
+            "source_sect_pr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "candidate_len": 3480,
+            "candidate_sha256": "4a38a8308a95e9b464cf561183975594010d98aeaf07474abe6e66a692f3c1db",
+            "candidate_paragraph_count": 65,
+            "candidate_event_count": 469,
+            "candidate_max_depth": 5,
+            "generated_offset": 3291,
+            "generated_once": true,
+            "candidate_sect_pr_len": 0,
+            "candidate_sect_pr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "output_semantic": {
+            "paragraph_count": 65,
+            "order_sha256": "3b76b269276b80e2cb2f9db060009f7d81957621818ed63be3c0e0fc149a4508",
+            "text_sha256": "ccf87f3833e795de9f7c7b114ef4ca328af0277ecf19560d0acfa8c0f4185e87",
+            "text_bytes": 1072
+          },
+          "output_members": [
+            {
+              "path": "[Content_Types].xml",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 2913692623,
+              "decoded_bytes": 512,
+              "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+              "compressed_bytes": 267,
+              "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+            },
+            {
+              "path": "_rels/.rels",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 3929537947,
+              "decoded_bytes": 297,
+              "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+              "compressed_bytes": 183,
+              "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+            },
+            {
+              "path": "word/document.xml",
+              "compression_method": "Deflate",
+              "data_descriptor": false,
+              "crc32": 1368141380,
+              "decoded_bytes": 3480,
+              "decoded_sha256": "4a38a8308a95e9b464cf561183975594010d98aeaf07474abe6e66a692f3c1db",
+              "compressed_bytes": 378,
+              "compressed_sha256": "25edfb59bee5cfaace8a4a1ad9d299c9e16a4843a683f040c63be09785234395"
+            },
+            {
+              "path": "word/perf-opaque.bin",
+              "compression_method": "Deflate",
+              "data_descriptor": true,
+              "crc32": 528510375,
+              "decoded_bytes": 32768,
+              "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+              "compressed_bytes": 811,
+              "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+            }
+          ],
+          "output_member_count": 4,
+          "output_untouched_members_verified": true,
+          "output_untouched_raw_members_verified": true,
+          "output_opaque_member_exact_verified": true,
+          "output_physical_order_verified": true,
+          "output_main_compressed_equal_source": false,
+          "route_output_replay_verified": true,
+          "route_inverse_verified": true,
+          "stale_source_refusal_verified": true
+        },
+        "limits": {
+          "copy_max_xml_bytes": 1051889,
+          "copy_max_paragraphs": 65,
+          "copy_max_events": 648,
+          "copy_max_depth": 16,
+          "copy_max_output_bytes": 2100465,
+          "bounded": "Limits { max_source_xml_bytes: 1051889, max_text_bytes: 65536, max_fragment_bytes: 65536, max_candidate_xml_bytes: 2100465, max_events: 648, max_depth: 16, max_paragraphs: 65, max_settings_xml_bytes: 4194304, max_workspace_bytes: 2097152, max_output_bytes: 4197617, max_token_bytes: 4096 }"
+        }
+      },
+      "routes": [
+        {
+          "route": "materialized_paragraph_copy",
+          "corpus": {
+            "route": "materialized_paragraph_copy",
+            "output_archive_bytes": 2149,
+            "output_archive_sha256": "2534ca36f51ad00416b8d9082ac7d621d5491a13edec434a6274115d706aa85a",
+            "output_main_xml_bytes": 3388,
+            "output_main_xml_sha256": "9eb5b3765f819882187f9890d90696a953daae02dc8e18f68fc7879890537c5d",
+            "output_main_xml_expected_semantic_verified": true,
+            "output_main_xml_expected_raw_verified": true,
+            "scalar_proof": null,
+            "output_semantic": {
+              "paragraph_count": 65,
+              "order_sha256": "3b76b269276b80e2cb2f9db060009f7d81957621818ed63be3c0e0fc149a4508",
+              "text_sha256": "ccf87f3833e795de9f7c7b114ef4ca328af0277ecf19560d0acfa8c0f4185e87",
+              "text_bytes": 1072
+            },
+            "output_members": [
+              {
+                "path": "[Content_Types].xml",
+                "compression_method": "Deflate",
+                "data_descriptor": true,
+                "crc32": 2913692623,
+                "decoded_bytes": 512,
+                "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+                "compressed_bytes": 267,
+                "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+              },
+              {
+                "path": "_rels/.rels",
+                "compression_method": "Deflate",
+                "data_descriptor": true,
+                "crc32": 3929537947,
+                "decoded_bytes": 297,
+                "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+                "compressed_bytes": 183,
+                "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+              },
+              {
+                "path": "word/document.xml",
+                "compression_method": "Deflate",
+                "data_descriptor": true,
+                "crc32": 50646476,
+                "decoded_bytes": 3388,
+                "decoded_sha256": "9eb5b3765f819882187f9890d90696a953daae02dc8e18f68fc7879890537c5d",
+                "compressed_bytes": 364,
+                "compressed_sha256": "029c762a75ca2d8c164a55baaca73213a0815bcb728791fbeef56752f93f558b"
+              },
+              {
+                "path": "word/perf-opaque.bin",
+                "compression_method": "Deflate",
+                "data_descriptor": true,
+                "crc32": 528510375,
+                "decoded_bytes": 32768,
+                "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+                "compressed_bytes": 811,
+                "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+              }
+            ],
+            "output_member_count": 4,
+            "output_untouched_members_verified": true,
+            "output_untouched_raw_members_verified": true,
+            "output_opaque_member_exact_verified": true,
+            "output_physical_order_verified": true,
+            "output_main_compressed_equal_source": false,
+            "route_output_replay_verified": true,
+            "route_inverse_verified": true,
+            "stale_source_refusal_verified": true
+          },
+          "samples": [
+            {
+              "sample": 0,
+              "route": "materialized_paragraph_copy",
+              "elapsed_ns": 165571,
+              "source_reads": {
+                "calls": 42,
+                "requested_bytes": 8077,
+                "returned_bytes": 8077,
+                "request_histogram": {
+                  "bytes_0": 3,
+                  "bytes_1_to_512": 36,
+                  "bytes_513_to_4096": 3,
+                  "bytes_4097_to_16384": 0,
+                  "bytes_16385_to_65536": 0,
+                  "bytes_over_65536": 0
+                }
+              },
+              "sink": {
+                "accepted_bytes": 2149,
+                "write_calls": 19,
+                "largest_write": 877,
+                "histogram": {
+                  "bytes_0": 0,
+                  "bytes_1_to_512": 18,
+                  "bytes_513_to_4096": 1,
+                  "bytes_4097_to_16384": 0,
+                  "bytes_16385_to_65536": 0,
+                  "bytes_over_65536": 0
+                },
+                "sha256": "2534ca36f51ad00416b8d9082ac7d621d5491a13edec434a6274115d706aa85a"
+              },
+              "allocation": null,
+              "process": {
+                "rchar": 1969,
+                "wchar": 0,
+                "read_bytes": 0,
+                "write_bytes": 0,
+                "cancelled_write_bytes": 0,
+                "syscr": 18,
+                "syscw": 0,
+                "minor_faults": 0,
+                "major_faults": 0,
+                "user_cpu_ticks": 0,
+                "system_cpu_ticks": 0,
+                "clock_ticks_per_second": 100,
+                "voluntary_context_switches": 0,
+                "nonvoluntary_context_switches": 0,
+                "rss_bytes": 0,
+                "peak_rss_bytes": 6033408
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "capture_count": 24,
+  "fuzz": {
+    "receipts": 3,
+    "seeds": 62
+  },
+  "protocol_sha256": "751b54edf4f53671a6e4e875e5d15f64b7a52849249ab1b4f1514501ca399e39",
+  "sample_count": 720,
+  "schema": "docx-tail-append-verification-v1",
+  "status": "pass",
+  "temporary_binaries_required": false,
+  "validation": {
+    "pilots": 12,
+    "required": 32,
+    "retained": 129
+  }
+}

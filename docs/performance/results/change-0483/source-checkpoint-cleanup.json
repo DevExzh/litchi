@@ -1,0 +1,15 @@
+{
+  "active_benchmark_scratch_retained": true,
+  "recorded_utc": "2026-09-09T05:11:33.206156+00:00",
+  "removed_scratch_directories": [
+    "consumer-accepted",
+    "consumer-utf8",
+    "consumer-final",
+    "fuzz-docx-accepted",
+    "fuzz-parse-accepted"
+  ],
+  "retained_parse_corpus_inventory_verified": true,
+  "retained_tail_custody_verified_after_cleanup": true,
+  "shared_build_caches_removed": false,
+  "source_commit": "59b1b27ce"
+}

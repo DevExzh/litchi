@@ -1,5 +1,22 @@
 # Performance CRUD coverage
 
+## 0483: one-paragraph source-backed DOCX logical append
+
+[0483](changes/0483-docx-bounded-tail-append.md) adds a public one-plain-paragraph
+tail edit for the admitted main-story closure. The source checkpoint covers
+Strict/Transitional grammar, an opaque final section-properties span, typed
+refusals, settings/MCE, bounded parser/fragment storage, source freshness,
+no-op, immediate inverse and sequential publication. The comparison authenticates
+semantic text/order and untouched physical members across 720 operations;
+[validation and scope](results/change-0483/docx-source-checkpoint.md) bind the
+feature, native readback, sanitizer and non-iWork gates.
+
+This is existing-document logical append. Fresh creation, adding a new Part,
+arbitrary repackaging, a very-large authored stream, durable forward/inverse
+recipes and general paragraph CRUD remain distinct requirements. The measured
+operation-heap benefit comes with roughly doubled normal latency. Broader
+source providers, cold/warm/concurrent work and the full checklist remain open.
+
 ## 0482: shared support for existing-document logical insertion
 
 [0482](changes/0482-bounded-xml-opc-splice.md) measures generic XML audit routes and tests the low-level decoded OPC

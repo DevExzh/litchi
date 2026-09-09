@@ -1,0 +1,53 @@
+{
+  "binary": {
+    "build_path": "builds/allocator-accepted.json",
+    "build_sha256": "b716050fe092e71f37653e9a3aec08a430ae9b8bcd3adbeebf8227662ad3d1bc",
+    "bytes": 420510936,
+    "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+    "sha256": "b62c5700ffdcdbfdcf970fad2dad406c4787b3dc38cbd466b72f7032e6ee4c90",
+    "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/a1-allocator-131072-materialized.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+      "--route",
+      "materialized",
+      "--counts",
+      "131072",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/a1-allocator-131072-materialized.report.json"
+    ],
+    "arm": "a1",
+    "attempt": "accepted",
+    "count": 131072,
+    "instrumentation": "allocator",
+    "label": "a1-allocator-131072-materialized",
+    "repeat": 1,
+    "route": "materialized",
+    "route_name": "materialized_paragraph_copy"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "protocol_sha256": "751b54edf4f53671a6e4e875e5d15f64b7a52849249ab1b4f1514501ca399e39",
+  "schema": "docx-tail-append-capture-v1",
+  "started_utc": "2026-09-09T05:40:06.379702+00:00"
+}

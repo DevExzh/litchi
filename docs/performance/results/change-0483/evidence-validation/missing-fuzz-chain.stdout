@@ -1,0 +1,1 @@
+verification failed: fuzz receipt docx-fuzz-smoke-accepted.path: cannot resolve: [Errno 2] No such file or directory: '/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/missing-fuzz-chain/fuzz/accepted/smoke.json'

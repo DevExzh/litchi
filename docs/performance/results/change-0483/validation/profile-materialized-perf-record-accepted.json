@@ -1,0 +1,68 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/perf",
+    "record",
+    "-e",
+    "cycles",
+    "--call-graph",
+    "fp",
+    "-F",
+    "99",
+    "-o",
+    "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data",
+    "--",
+    "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+    "--route",
+    "materialized",
+    "--counts",
+    "131072",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-record.report.json"
+  ],
+  "artifacts": {
+    "profile-materialized-perf-record-accepted.stderr": {
+      "bytes": 817,
+      "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+    },
+    "profile-materialized-perf-record-accepted.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "accepted",
+  "common_sha256": "6194a02817dc8f9c99e5b6a17941ecde54cbf214a4b5e2e6c1b9f46dffe83c60",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T05:14:37.776341+00:00",
+  "label": "profile-materialized-perf-record-accepted",
+  "schema": "docx-tail-append-gate-v1",
+  "source_after": {
+    "files": 7142,
+    "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+    "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "source_before": {
+    "files": 7142,
+    "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+    "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-09T05:14:27.532551+00:00"
+}

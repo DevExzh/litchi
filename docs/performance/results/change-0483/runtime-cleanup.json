@@ -1,0 +1,22 @@
+{
+  "accepted_runtime_directory_removed": true,
+  "all_removed_files_verified_against_build_custody": true,
+  "data_verification_passed_before_cleanup": true,
+  "independent_measurements_match": true,
+  "recorded_utc": "2026-09-09T05:46:01.642086+00:00",
+  "removed": [
+    {
+      "bytes": 420510936,
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+      "sha256": "b62c5700ffdcdbfdcf970fad2dad406c4787b3dc38cbd466b72f7032e6ee4c90"
+    },
+    {
+      "bytes": 420503104,
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+      "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+    }
+  ],
+  "schema": "docx-tail-append-runtime-cleanup-v1",
+  "shared_build_caches_removed": false,
+  "source_files_changed": false
+}

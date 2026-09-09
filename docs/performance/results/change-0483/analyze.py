@@ -846,8 +846,14 @@ def _resource_rss(spec: Mapping[str, Any]) -> int:
         fail(f"{spec['label']}: /usr/bin/time resource receipt missing")
     values = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("Maximum resident set size (kbytes):"):
-            values.append(int(line.rsplit(":", 1)[1].strip()))
+        line = line.strip()
+        prefix = "Maximum resident set size (kbytes):"
+        if line.startswith(prefix):
+            raw_value = line[len(prefix):].strip()
+            try:
+                values.append(int(raw_value))
+            except ValueError:
+                fail(f"{spec['label']}: malformed RSS observation")
     if len(values) != 1 or values[0] < 0:
         fail(f"{spec['label']}: expected exactly one RSS observation")
     return values[0] * 1024
@@ -931,9 +937,9 @@ def metric_row(spec: Mapping[str, Any], checked: Mapping[str, Any]) -> dict[str,
     return row
 
 
-def _percent_change(before: float, after: float) -> float:
+def _percent_change(before: float, after: float) -> float | None:
     if before == 0:
-        return 0.0 if after == 0 else math.inf
+        return 0.0 if after == 0 else None
     return (after - before) / before * 100.0
 
 
@@ -982,12 +988,16 @@ def _comparison_changes(
         before = _metric_mean(first, metric)
         after = _metric_mean(second, metric)
         change = _percent_change(before, after)
-        changes[metric] = {first_key: before, second_key: after, "percent": change}
-        if abs(change) > REGRESSION_REVIEW_PERCENT:
+        change_record: dict[str, Any] = {first_key: before, second_key: after, "percent": change}
+        zero_baseline_increase = before == 0 and after > 0
+        if zero_baseline_increase:
+            change_record["percent_status"] = "undefined_zero_baseline"
+        changes[metric] = change_record
+        if zero_baseline_increase or (change is not None and abs(change) > REGRESSION_REVIEW_PERCENT):
             flags.append({
                 "metric": metric,
                 "percent": change,
-                "adverse": change < 0 if metric == "throughput_bytes_per_second" else change > 0,
+                "adverse": after < before if metric == "throughput_bytes_per_second" else after > before,
             })
     return changes, flags
 

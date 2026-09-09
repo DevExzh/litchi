@@ -1,0 +1,42 @@
+{
+  "attempt": "accepted",
+  "generator": {
+    "bytes": 1065,
+    "path": "fuzz/generator-v2.json",
+    "sha256": "4630d760af1caebcd5d45c4b32a1788d8778f73ff068ce42471198cc08077ea0"
+  },
+  "receipts": [
+    {
+      "bytes": 19705,
+      "kind": "prepared",
+      "label": "docx-fuzz-prepare-accepted",
+      "path": "fuzz/accepted/prepared.json",
+      "sha256": "f9a006ecd8bbff393ff121d7f1d8657136fb7fcb303920e144b5987280cedc23"
+    },
+    {
+      "bytes": 21943,
+      "kind": "build",
+      "label": "docx-fuzz-build-accepted",
+      "path": "fuzz/accepted/build.json",
+      "sha256": "9fac538038265ed56e5bf80def3e2130ac259498c2d7722c2ce96f278e464107"
+    },
+    {
+      "bytes": 62291,
+      "kind": "smoke",
+      "label": "docx-fuzz-smoke-accepted",
+      "path": "fuzz/accepted/smoke.json",
+      "sha256": "b5c7a83265e85b1d52d01fd6e08f9fe8ae8e29eeb33d37d62b4a936974c2acb4"
+    }
+  ],
+  "required_labels": [
+    "docx-fuzz-prepare-accepted",
+    "docx-fuzz-build-accepted",
+    "docx-fuzz-smoke-accepted"
+  ],
+  "seed_manifest": {
+    "bytes": 14770,
+    "path": "fuzz/seed-manifest-v2.json",
+    "sha256": "af718d53b76a05c6d979c03bed16458291dddbc5868c4ba834119d168057f253"
+  },
+  "seed_root": "fuzz/seeds"
+}

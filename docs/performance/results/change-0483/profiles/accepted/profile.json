@@ -1,0 +1,1035 @@
+{
+  "attempt": "accepted",
+  "binary": {
+    "binary": {
+      "bytes": 420503104,
+      "name": "docx_bounded_tail_append_compare",
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+      "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+    },
+    "build": {
+      "path": "builds/normal-accepted.json",
+      "sha256": "5daf114c5bdb7c901a54e5276f1bcaa6914a685c270be6c905ff120da4c1067f"
+    },
+    "custody": {
+      "bytes": 1262,
+      "path": "builds/binaries-accepted.json",
+      "sha256": "8e5972d2e8e7f4f1043a391f410bf01629303fcb1ab55fdb5688e8926ab28160"
+    },
+    "custody_attempt": "accepted",
+    "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "configuration": {
+    "call_graph": "fp",
+    "count": 131072,
+    "cpu": 2,
+    "instrumented_timing_excluded_from_formal_evidence": true,
+    "record_event": "cycles",
+    "record_frequency_hz": 99,
+    "routes": [
+      "materialized",
+      "bounded"
+    ],
+    "same_normal_binary_for_both_routes": true,
+    "samples": 30,
+    "stat_events": [
+      "cycles",
+      "instructions",
+      "branches",
+      "branch-misses",
+      "cache-misses",
+      "page-faults"
+    ],
+    "warmups": 3
+  },
+  "drivers": {
+    "common.py": {
+      "path": "common.py",
+      "sha256": "6194a02817dc8f9c99e5b6a17941ecde54cbf214a4b5e2e6c1b9f46dffe83c60"
+    },
+    "gate.py": {
+      "path": "gate.py",
+      "sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800"
+    },
+    "profile.py": {
+      "path": "profile.py",
+      "sha256": "f1bf67b81f39750e9adf070fabf9d50478a5968fb5cb53b9c8f8c8a936a3d455"
+    }
+  },
+  "excluded_samples": {
+    "planned_workload_runs": 6,
+    "planned_workload_samples": 180,
+    "successful_workload_runs": 6,
+    "successful_workload_samples": 180,
+    "unit": "retained harness samples from successful profiler workload reports"
+  },
+  "finished_utc": "2026-09-09T05:17:06.926944+00:00",
+  "formal_samples": false,
+  "routes": {
+    "bounded": {
+      "binary": {
+        "bytes": 420503104,
+        "name": "docx_bounded_tail_append_compare",
+        "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+        "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+      },
+      "count": 131072,
+      "records": {
+        "perf-record": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "record",
+            "-e",
+            "cycles",
+            "--call-graph",
+            "fp",
+            "-F",
+            "99",
+            "-o",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-record.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:16:10.687533+00:00",
+          "gate_artifacts": {
+            "profile-bounded-perf-record-accepted.stderr": {
+              "bytes": 813,
+              "sha256": "d6edd1094397a61f952983feb090198b677cc5492e906c4a7f2389e19b89d89a"
+            },
+            "profile-bounded-perf-record-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-bounded-perf-record",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "record",
+            "-e",
+            "cycles",
+            "--call-graph",
+            "fp",
+            "-F",
+            "99",
+            "-o",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-record.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2174,
+            "path": "validation/profile-bounded-perf-record-accepted.json",
+            "sha256": "676b3211fb981da78e364928c82df7715331737c73dd0198d069f75be144de6e"
+          },
+          "harness_report": {
+            "bytes": 71997,
+            "path": "profiles/accepted/bounded/perf-record.report.json",
+            "sha256": "e8b2f2c203cc370f296cd5374fe485336f9c6578e42ffb8c79a4ca3d6fb63200"
+          },
+          "kind": "perf-record",
+          "label": "profile-bounded-perf-record",
+          "route": "bounded",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:15:52.501959+00:00",
+          "status": "pass",
+          "workload_sample_count": 30
+        },
+        "perf-report": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:16:47.997901+00:00",
+          "gate_artifacts": {
+            "profile-bounded-perf-report-accepted.stderr": {
+              "bytes": 635,
+              "sha256": "15c19452b05d86abf7c0fcb20ad6a41f7a6a85ebc55d34b9acd5c063d62383e7"
+            },
+            "profile-bounded-perf-report-accepted.stdout": {
+              "bytes": 4189545,
+              "sha256": "55e5c94f42918955af1ed68cab4ccd93c0bc9b600279cd46d44fe9731eb262e5"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-bounded-perf-report",
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 1784,
+            "path": "validation/profile-bounded-perf-report-accepted.json",
+            "sha256": "13e94cc19109a9088cd49c5f22c62d35cfc2e30531996dde6851b11ce6c1a8cf"
+          },
+          "kind": "perf-report",
+          "label": "profile-bounded-perf-report",
+          "route": "bounded",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:16:29.372694+00:00",
+          "status": "pass"
+        },
+        "perf-script": {
+          "argv": [
+            "/usr/bin/perf",
+            "script",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:17:06.904895+00:00",
+          "gate_artifacts": {
+            "profile-bounded-perf-script-accepted.stderr": {
+              "bytes": 357,
+              "sha256": "161a0c27f0d3f1b31c3ecd04ff6b2f001ea12c6497bdb0c99a91fbbb13fd8aa7"
+            },
+            "profile-bounded-perf-script-accepted.stdout": {
+              "bytes": 9863945,
+              "sha256": "ca5b8f04ff6fbb6ebcf28496b841411629bbf12fb383d267154a2fa58711d9f6"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-bounded-perf-script",
+            "/usr/bin/perf",
+            "script",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/bounded/perf-record.data"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 1716,
+            "path": "validation/profile-bounded-perf-script-accepted.json",
+            "sha256": "fe6e7de956e3317b8367b590892b6617988d2e4d79b0134e430ec1f1733872cf"
+          },
+          "kind": "perf-script",
+          "label": "profile-bounded-perf-script",
+          "route": "bounded",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:16:48.283479+00:00",
+          "status": "pass"
+        },
+        "perf-stat": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-stat.csv",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-stat.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "counter_output": {
+            "bytes": 300,
+            "path": "profiles/accepted/bounded/perf-stat.csv",
+            "sha256": "4b0b2c58eaca8314e182400507b3fef71138a8cfda0d22aedaf7232dfcd4db39"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:15:52.213449+00:00",
+          "gate_artifacts": {
+            "profile-bounded-perf-stat-accepted.stderr": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "profile-bounded-perf-stat-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-bounded-perf-stat",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-stat.csv",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/perf-stat.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2206,
+            "path": "validation/profile-bounded-perf-stat-accepted.json",
+            "sha256": "64820c2b893aa3d47e2d6eddc595759f4610566da69ab17af4864cf28ff10867"
+          },
+          "harness_report": {
+            "bytes": 71997,
+            "path": "profiles/accepted/bounded/perf-stat.report.json",
+            "sha256": "e662ad47c72ef19ae1e28c3e49e66b8d086f6c2d9f0dabcee70272a5d1cdc061"
+          },
+          "kind": "perf-stat",
+          "label": "profile-bounded-perf-stat",
+          "route": "bounded",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:15:34.198219+00:00",
+          "status": "pass",
+          "workload_sample_count": 30
+        },
+        "raw_profile": {
+          "compressed": {
+            "bytes": 37776,
+            "sha256": "26c75773c737a5610f16bc74a920f8e767d502f38a7ba7a5534027ba77667a66"
+          },
+          "path": "profiles/accepted/bounded/perf-record.data.gz",
+          "status": "pass",
+          "uncompressed": {
+            "bytes": 423192,
+            "sha256": "b97b059770fc9c55efecf711d13b75da7b97603e482bb8f27050373932292f04"
+          }
+        },
+        "strace": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/strace",
+            "-c",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/strace.txt",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/strace.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:16:29.088821+00:00",
+          "gate_artifacts": {
+            "profile-bounded-strace-accepted.stderr": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "profile-bounded-strace-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-bounded-strace",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/strace",
+            "-c",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/strace.txt",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "bounded",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/bounded/strace.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2095,
+            "path": "validation/profile-bounded-strace-accepted.json",
+            "sha256": "fa19f1ff3863fab8649bb9587fa868ff14fb9489115e4b657b6ac7e24c68c93b"
+          },
+          "harness_report": {
+            "bytes": 72028,
+            "path": "profiles/accepted/bounded/strace.report.json",
+            "sha256": "2c950ad6e1b9b394c6b98957fa496bed2dea82a26f8fe0edaeff773caf3be1a8"
+          },
+          "kind": "strace",
+          "label": "profile-bounded-strace",
+          "route": "bounded",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:16:10.971306+00:00",
+          "status": "pass",
+          "syscall_output": {
+            "bytes": 1923,
+            "path": "profiles/accepted/bounded/strace.txt",
+            "sha256": "217a4db59281941bbda086c0b4cec11453fe3a1fceb7a8981498e748969c9352"
+          },
+          "workload_sample_count": 30
+        }
+      },
+      "route": "bounded",
+      "route_name": "bounded_plain_text_tail_append",
+      "samples": 30,
+      "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+      "status": "pass",
+      "successful_workload_runs": 3,
+      "successful_workload_samples": 90,
+      "warmups": 3
+    },
+    "materialized": {
+      "binary": {
+        "bytes": 420503104,
+        "name": "docx_bounded_tail_append_compare",
+        "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+        "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+      },
+      "count": 131072,
+      "records": {
+        "perf-record": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "record",
+            "-e",
+            "cycles",
+            "--call-graph",
+            "fp",
+            "-F",
+            "99",
+            "-o",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-record.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:14:37.776341+00:00",
+          "gate_artifacts": {
+            "profile-materialized-perf-record-accepted.stderr": {
+              "bytes": 817,
+              "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+            },
+            "profile-materialized-perf-record-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-materialized-perf-record",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "record",
+            "-e",
+            "cycles",
+            "--call-graph",
+            "fp",
+            "-F",
+            "99",
+            "-o",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-record.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2204,
+            "path": "validation/profile-materialized-perf-record-accepted.json",
+            "sha256": "47a69050e3c9fdc4725892e1735a4d887799866ea70ac0cbfe0e187b1ffade84"
+          },
+          "harness_report": {
+            "bytes": 70762,
+            "path": "profiles/accepted/materialized/perf-record.report.json",
+            "sha256": "1e2803e73b0c49b554026f117a12e4b43928c2aa39b67ca313720c83037cc9c1"
+          },
+          "kind": "perf-record",
+          "label": "profile-materialized-perf-record",
+          "route": "materialized",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:14:27.532551+00:00",
+          "status": "pass",
+          "workload_sample_count": 30
+        },
+        "perf-report": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:15:11.067235+00:00",
+          "gate_artifacts": {
+            "profile-materialized-perf-report-accepted.stderr": {
+              "bytes": 754,
+              "sha256": "df762ca318a6d3422b95c954b16a77fa2903ab7236281b45e5b74d891175447c"
+            },
+            "profile-materialized-perf-report-accepted.stdout": {
+              "bytes": 1161908,
+              "sha256": "2c86d033a296360c05e708a8070dab476531341fde0e9d09704517daa6213907"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-materialized-perf-report",
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 1804,
+            "path": "validation/profile-materialized-perf-report-accepted.json",
+            "sha256": "86866ef2083f17bbb1357d24fac8f3643b7227ea598c4bad6ef751793fbee47d"
+          },
+          "kind": "perf-report",
+          "label": "profile-materialized-perf-report",
+          "route": "materialized",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:14:48.522428+00:00",
+          "status": "pass"
+        },
+        "perf-script": {
+          "argv": [
+            "/usr/bin/perf",
+            "script",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:15:33.902788+00:00",
+          "gate_artifacts": {
+            "profile-materialized-perf-script-accepted.stderr": {
+              "bytes": 476,
+              "sha256": "f1ee7583772b65edde9d136e28e0a7097f86e1b47d73147d056d014584d6e50c"
+            },
+            "profile-materialized-perf-script-accepted.stdout": {
+              "bytes": 3105779,
+              "sha256": "67d2b0b6a7a047a0c47ae2bf627d9498fecb9ba4b8cf95f8f6a5fd09308951ea"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-materialized-perf-script",
+            "/usr/bin/perf",
+            "script",
+            "-i",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/profiles/materialized/perf-record.data"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 1736,
+            "path": "validation/profile-materialized-perf-script-accepted.json",
+            "sha256": "bdf60473777c32510133f8cc53accf747c5c5942270304c77f4c0f282f5a896b"
+          },
+          "kind": "perf-script",
+          "label": "profile-materialized-perf-script",
+          "route": "materialized",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:15:11.358004+00:00",
+          "status": "pass"
+        },
+        "perf-stat": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-stat.csv",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-stat.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "counter_output": {
+            "bytes": 293,
+            "path": "profiles/accepted/materialized/perf-stat.csv",
+            "sha256": "024886b3e35f8bc8647798390fb6b6cf5b3fed0a579ea0ffe604468fbfa82dfa"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:14:27.249045+00:00",
+          "gate_artifacts": {
+            "profile-materialized-perf-stat-accepted.stderr": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "profile-materialized-perf-stat-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-materialized-perf-stat",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-stat.csv",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/perf-stat.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2236,
+            "path": "validation/profile-materialized-perf-stat-accepted.json",
+            "sha256": "6638bad11b61e49c4cc3d175ff89f7fcb8cad19ed516b0c3da24d0a7671d8fc4"
+          },
+          "harness_report": {
+            "bytes": 70762,
+            "path": "profiles/accepted/materialized/perf-stat.report.json",
+            "sha256": "803737a5145ce7ee5d1f2597a20943140013d45aed5fd715618461251571433b"
+          },
+          "kind": "perf-stat",
+          "label": "profile-materialized-perf-stat",
+          "route": "materialized",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:14:17.157579+00:00",
+          "status": "pass",
+          "workload_sample_count": 30
+        },
+        "raw_profile": {
+          "compressed": {
+            "bytes": 20140,
+            "sha256": "501281bc35d1007396da1671695aeda78d6947127a3d63c6526acce13268f25a"
+          },
+          "path": "profiles/accepted/materialized/perf-record.data.gz",
+          "status": "pass",
+          "uncompressed": {
+            "bytes": 217520,
+            "sha256": "b69253d21ed482a82dfccaa4dac1ad261c66824baf215bac565916f6b7b0c0df"
+          }
+        },
+        "strace": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/strace",
+            "-c",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/strace.txt",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/strace.report.json"
+          ],
+          "binary": {
+            "bytes": 420503104,
+            "name": "docx_bounded_tail_append_compare",
+            "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+          },
+          "exit_code": 0,
+          "finished_utc": "2026-09-09T05:14:48.234698+00:00",
+          "gate_artifacts": {
+            "profile-materialized-strace-accepted.stderr": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "profile-materialized-strace-accepted.stdout": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "gate_command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/gate.py",
+            "--attempt",
+            "accepted",
+            "profile-materialized-strace",
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/strace",
+            "-c",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/strace.txt",
+            "--",
+            "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+            "--route",
+            "materialized",
+            "--counts",
+            "131072",
+            "--samples",
+            "30",
+            "--warmups",
+            "3",
+            "--json",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0483/profiles/accepted/materialized/strace.report.json"
+          ],
+          "gate_exit_code": 0,
+          "gate_receipt": {
+            "bytes": 2125,
+            "path": "validation/profile-materialized-strace-accepted.json",
+            "sha256": "52a01efeebeeeac69cf15b6c1d132400742c915727a76d327e1c94a1bf573d01"
+          },
+          "harness_report": {
+            "bytes": 70792,
+            "path": "profiles/accepted/materialized/strace.report.json",
+            "sha256": "c194fdeba44fb959554685888844d7a5802650f21fbb374cc5309f581d1407bb"
+          },
+          "kind": "strace",
+          "label": "profile-materialized-strace",
+          "route": "materialized",
+          "source_after": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_before": {
+            "files": 7142,
+            "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+            "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+          },
+          "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "source_unchanged": true,
+          "started_utc": "2026-09-09T05:14:38.065814+00:00",
+          "status": "pass",
+          "syscall_output": {
+            "bytes": 1923,
+            "path": "profiles/accepted/materialized/strace.txt",
+            "sha256": "b8e528b424bf412b5384db6f6e9a03695bfe93c99838e05c51db0ffb9eb66fdf"
+          },
+          "workload_sample_count": 30
+        }
+      },
+      "route": "materialized",
+      "route_name": "materialized_paragraph_copy",
+      "samples": 30,
+      "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+      "status": "pass",
+      "successful_workload_runs": 3,
+      "successful_workload_samples": 90,
+      "warmups": 3
+    }
+  },
+  "schema": "docx-tail-append-process-profiles-v1",
+  "scope": "separate whole-process normal runs including corpus construction, untimed independent oracles, warmups, 30 harness lifecycles, report serialization and teardown; no transaction-only attribution",
+  "started_utc": "2026-09-09T05:14:16.878826+00:00",
+  "status": "pass",
+  "status_note": "A partial status retains failed tool receipts and omits unavailable metrics; no profiler failure is converted into a value."
+}

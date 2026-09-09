@@ -19,13 +19,13 @@ The older public plain_paragraph_copy operation opens a materialized main
 document, owns complete XML, builds a paragraph range vector, constructs a
 candidate, and then publishes through the ordinary patch path. The 0479 audit
 records that contract in
-[contract-audit.md](../../change-0479/contract-audit.md), while the 0480
+[contract-audit.md](../change-0479/contract-audit.md), while the 0480
 publication change and 0481 profile keep the complete source XML and paragraph
 index in that route. The 0481 follow-up identifies the missing replay substrate
 and makes clear that a local allocation reduction is not an explicit-window
-tail API. See [0481 source review](../../change-0481/source-review.md),
-[0481 window contract](../../change-0481/window-contract.md), and the 0482
-[OPC/XML audit boundary](../../change-0482/xml-audit-review.md).
+tail API. See [0481 source review](../change-0481/source-review.md),
+[0481 window contract](../change-0481/window-contract.md), and the 0482
+[OPC/XML audit boundary](../change-0482/xml-audit-review.md).
 
 The 0483 materialized-versus-bounded harness therefore has a narrower purpose:
 it supplies the same UTF-8 first-paragraph text to the existing materialized
@@ -106,16 +106,18 @@ Edit::prepare follows this source-derived phase path (the implementation's
 phase order is in
 [tail_append.rs](../../../../crates/litchi-docx/src/source_backed/tail_append.rs#L551)):
 
-1. Validate finite limits, source identity/version, topology, package dialect,
-   relationships, settings, and all refusal conditions. A stale source is
-   rejected before a plan is returned.
-2. Admit the caller text, charge its owned capacity when applicable, and
-   encode one bounded paragraph fragment. The temporary text owner and its
-   reservation are released after fragment ownership is established.
-3. Scan the decoded source with a guarded BufRead. This pass computes the
-   source scalar proof, direct grammar facts, event/depth/paragraph counters,
+1. Validate finite limits and source identity/version, admit caller text length
+   and owned capacity, and reserve owned text storage when applicable. Validate
+   topology, relationships and settings. A stale source is rejected before a
+   plan is returned.
+2. Scan the decoded source with a guarded BufRead and match its dialect to the
+   package. This pass computes the source scalar proof, direct grammar facts,
+   event/depth/paragraph counters,
    insertion offset, and opaque final-section span hash without retaining the
    complete source XML.
+3. Encode one bounded paragraph fragment using the proved source dialect.
+   Release the temporary text owner and its reservation after fragment
+   ownership is established.
 4. Scan a TailSpliceReader over source prefix, bounded fragment, and source
    suffix. This candidate readback authenticates the exact candidate length,
    generated paragraph count and offset, namespace/grammar facts, and unchanged
@@ -143,9 +145,9 @@ physical reads for every provider or ZIP implementation.
 
 The package-owned ExecutionContext is the authority for semantic scanning,
 fragment storage, settings admission, and OPC publication. Edit::with_options
-can add its cooperative cancellation token, but effective_options replaces
-any caller-supplied execution context with the package context; an edit cannot
-bypass the package's hierarchical budget. The relevant authority and guards
+can add its cooperative cancellation token. Options exposes no execution-context
+setter; effective_options obtains that authority from the package, so an edit
+cannot bypass the package's hierarchical budget. The relevant authority and guards
 are [tail_append.rs](../../../../crates/litchi-docx/src/source_backed/tail_append.rs#L701)
 and [source_backed.rs](../../../../crates/litchi-docx/src/source_backed.rs#L405).
 
@@ -320,9 +322,11 @@ full-workspace iWork example type error is recorded separately in
 [workspace-iwork-exclusion.json](workspace-iwork-exclusion.json). Neither
 failure is represented as a passing full-workspace result.
 
-Formal performance captures and their independent review remain pending.
-The checkpoint is a measured-bottleneck enabler with the 0479–0481 baseline
-motivation above; it makes no after-measurement speed, allocation, or RSS claim.
+Formal measurements followed this source checkpoint. The accepted
+[720-sample comparison](measurements.md) and [process profiles](profile-review.md)
+record lower large-source operation heap, roughly doubled normal latency and
+similar whole-process RSS. This checkpoint describes the source contract;
+those separate artifacts are the performance evidence.
 
 ## Open boundary and nonclaims
 
@@ -333,12 +337,13 @@ leaves the following work open:
   larger tails, including a durable source provider and rehydratable patch
   semantics;
 * repeated-append scaling as a separate sequence of source-backed lifecycles,
-  batch append, and any claim about source size versus retained memory;
+  batch append, and authored-size memory scaling beyond the measured
+  three-source-size, one-paragraph comparison;
 * general paragraph CRUD, non-plain story content, broader producer diversity,
   arbitrary section rewriting, native Office save/reopen breadth, and
   cold/warm/concurrency evidence; and
-* accepted formal capture, final evidence custody and portability,
-  independent measurement review, and performance attribution.
+* phase attribution and removal of repeated CPU work without weakening the
+  source, semantic and publication proof obligations.
 
 The source checkpoint and the later performance closure are separate commits.
 The complete non-iWork objective remains open in [next-work.md](next-work.md).
