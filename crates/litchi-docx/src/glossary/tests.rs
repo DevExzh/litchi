@@ -124,6 +124,18 @@ fn xsd_all_is_order_independent_and_last_duplicate_wins() {
 }
 
 #[test]
+fn word_2023_revision_utc_is_retained_in_glossary_mce_projection() {
+    let xml = format!(
+        r#"<w:glossaryDocument xmlns:w="{W}" xmlns:mc="{MC}" xmlns:du="{date_utc}" mc:Ignorable="du"><w:docParts><w:docPart><w:docPartPr><w:name w:val="Utc"/></w:docPartPr><w:docPartBody><w:p><w:ins w:id="1" w:author="Alice" du:dateUtc="2026-07-17T00:00:00Z"><w:r><w:t>added</w:t></w:r></w:ins></w:p></w:docPartBody></w:docPart></w:docParts></w:glossaryDocument>"#,
+        date_utc = crate::revision::WORD_2023_DATE_UTC_NAMESPACE,
+    );
+    let (catalog, _) = read(xml.as_bytes()).unwrap();
+    let body = std::str::from_utf8(catalog.at(0).unwrap().body().unwrap()).unwrap();
+    assert!(body.contains("dateUtc"));
+    assert!(body.contains("2026-07-17T00:00:00Z"));
+}
+
+#[test]
 fn compact_option_flags_collapse_duplicates_and_reject_unknown_or_empty_values() {
     let xml = format!(
         r#"<w:glossaryDocument xmlns:w="{W}"><w:docParts><w:docPart><w:docPartPr><w:name w:val="Flags"/><w:types><w:type w:val="normal"/><w:type w:val="toolbar"/></w:types><w:behaviors><w:behavior w:val="content"/><w:behavior w:val="pg"/></w:behaviors></w:docPartPr></w:docPart></w:docParts></w:glossaryDocument>"#

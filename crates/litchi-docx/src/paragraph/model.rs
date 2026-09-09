@@ -5,9 +5,10 @@ use crate::color::Theme;
 use crate::font::OpenType;
 use crate::hyperlink::Hyperlink;
 use crate::image::InlineImage;
+use crate::namespace::NamespaceBindings;
 use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// Internal storage for paragraph XML data.
 /// Supports both owned data (for standalone parsing) and shared slices (for arena-based parsing).
@@ -16,7 +17,10 @@ pub(super) enum XmlData {
     /// Owned data for standalone paragraphs
     Owned(Box<[u8]>),
     /// Shared slice into an arena for zero-copy batch parsing
-    Shared(XmlSlice),
+    Shared {
+        slice: XmlSlice,
+        namespaces: NamespaceBindings,
+    },
 }
 
 impl XmlData {
@@ -24,7 +28,7 @@ impl XmlData {
     pub(super) fn as_bytes(&self) -> &[u8] {
         match self {
             XmlData::Owned(bytes) => bytes,
-            XmlData::Shared(slice) => slice.as_bytes(),
+            XmlData::Shared { slice, .. } => slice.as_bytes(),
         }
     }
 
@@ -35,10 +39,20 @@ impl XmlData {
     pub(super) fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
         match self {
             XmlData::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
-            XmlData::Shared(slice) => (slice.arc(), slice.start()),
+            XmlData::Shared { slice, .. } => (slice.arc(), slice.start()),
+        }
+    }
+
+    #[inline]
+    pub(super) fn namespace_bindings(&self) -> &NamespaceBindings {
+        match self {
+            XmlData::Owned(_) => &EMPTY_NAMESPACE_BINDINGS,
+            XmlData::Shared { namespaces, .. } => namespaces,
         }
     }
 }
+
+static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| Arc::from([]));
 
 /// A paragraph in a Word document.
 ///
@@ -249,7 +263,10 @@ impl Paragraph {
     #[must_use]
     pub fn from_slice(slice: XmlSlice) -> Self {
         Self {
-            xml_data: XmlData::Shared(slice),
+            xml_data: XmlData::Shared {
+                slice,
+                namespaces: Arc::clone(&EMPTY_NAMESPACE_BINDINGS),
+            },
         }
     }
 
@@ -259,7 +276,21 @@ impl Paragraph {
     #[inline]
     #[must_use]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
-        Self::from_slice(XmlSlice::new(arena, start, len))
+        Self::from_arc_range_with_context(arena, start, len, Arc::clone(&EMPTY_NAMESPACE_BINDINGS))
+    }
+
+    pub(crate) fn from_arc_range_with_context(
+        arena: Arc<Vec<u8>>,
+        start: u32,
+        len: u32,
+        namespaces: NamespaceBindings,
+    ) -> Self {
+        Self {
+            xml_data: XmlData::Shared {
+                slice: XmlSlice::new(arena, start, len),
+                namespaces,
+            },
+        }
     }
 
     /// Get the raw XML bytes.

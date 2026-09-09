@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::image::{InlineImage, parse_inline_images};
 use crate::math::OfficeMath;
 use crate::namespace::scan_word_element_ranges;
-use crate::revision::{Revision, parse_revisions};
+use crate::revision::{Revision, parse_revisions_with_context};
 use litchi_ooxml_common::xml::{omml_formula_xml, scan_omml_formula_ranges};
 use smallvec::SmallVec;
 
@@ -151,7 +151,7 @@ impl Paragraph {
     /// for para in document.paragraphs()? {
     ///     for revision in para.revisions()? {
     ///         println!("Revision by {}: {} - {}",
-    ///             revision.author(),
+    ///             revision.author().unwrap_or("Unattributed"),
     ///             revision.revision_type(),
     ///             revision.text()
     ///         );
@@ -164,7 +164,23 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<SmallVec<[Revision; 4]>> {
-        parse_revisions(self.xml_bytes())
+        parse_revisions_with_context(self.xml_bytes(), self.xml_data.namespace_bindings())
+    }
+
+    /// Read revisions in source order using explicit finite resource limits.
+    /// Nested annotations retain their own metadata and affected text.
+    ///
+    /// # Errors
+    /// Returns an error for malformed revision XML or an exceeded resource limit.
+    pub fn revisions_with_limits(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<SmallVec<[Revision; 4]>> {
+        crate::revision::parse_revisions_with_limits(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            limits,
+        )
     }
 
     /// Extract paragraph-level OMML formulas.

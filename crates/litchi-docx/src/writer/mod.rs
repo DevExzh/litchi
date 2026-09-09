@@ -57,7 +57,7 @@ pub use paragraph::{ListType, MutableParagraph};
 pub use revision::{
     CellRevisionKind, ConflictKind, MutableConflict, MutableCustomXmlConflictRange,
     MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
-    TableCellMergeRevisionState, TableRevisionKind,
+    TableCellMergeRevisionState,
 };
 pub use run::{MutableRun, RunContent};
 

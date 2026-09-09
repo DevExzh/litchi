@@ -880,6 +880,7 @@ fn inspect_main_document(
 
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
     let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: bytes.len(),
         max_output_bytes: limits.max_mce_output_bytes,

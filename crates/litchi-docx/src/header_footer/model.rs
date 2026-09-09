@@ -6,6 +6,7 @@
 
 use crate::error::Result;
 use crate::namespace::scan_word_element_ranges;
+use crate::namespace::scan_word_element_ranges_with_context;
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::table::Table;
 use crate::writer::Watermark;
@@ -175,10 +176,20 @@ impl Story {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let xml = self.semantic_xml()?;
         let mut paragraphs = Vec::new();
-        scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
-            paragraphs.push(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            xml.as_slice(),
+            &[],
+            &[b"p".as_slice()],
+            |_, start, length, namespaces| {
+                paragraphs.push(Paragraph::from_arc_range_with_context(
+                    Arc::clone(&xml),
+                    start,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(paragraphs)
     }
 
@@ -190,10 +201,20 @@ impl Story {
     pub fn tables(&self) -> Result<Vec<Table>> {
         let xml = self.semantic_xml()?;
         let mut tables = Vec::new();
-        scan_word_element_ranges(xml.as_slice(), &[b"tbl".as_slice()], |_, start, length| {
-            tables.push(Table::from_arc_range(Arc::clone(&xml), start, length));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            xml.as_slice(),
+            &[],
+            &[b"tbl".as_slice()],
+            |_, start, length, namespaces| {
+                tables.push(Table::from_arc_range_with_context(
+                    Arc::clone(&xml),
+                    start,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(tables)
     }
 
