@@ -28,9 +28,9 @@ use crate::{SheetSelector, TableSelector};
 use crate::package::{comments_metadata, metadata, table_cell_edit::tile};
 
 use super::{
-    Comment, Commit, Diagnostics, Error, Located, MessageRoute, Package, Patch, Path,
-    cell_position_for_path, message_at_route, physical_source, root_preview_deletions,
-    table_cell_decode_options,
+    Comment, CommentAuthor, CommentTimestamp, Commit, Diagnostics, Error, Located, MessageRoute,
+    Package, Patch, Path, cell_position_for_path, message_at_route, physical_source,
+    root_preview_deletions, table_cell_decode_options,
 };
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
@@ -323,12 +323,30 @@ pub(super) fn create_root_comment(
     let package = Package::from_shared_bytes_with_options(output.into(), source.state.options)
         .map_err(|_| Error::Verification)?;
     let position = cell_position_for_path(path)?;
-    if package.table_cell_comment(
-        SheetSelector::index(path.sheet()),
-        TableSelector::index(path.table()),
-        position,
-    )? != Some(after.clone())
-    {
+    let expected_author = if author_fresh.is_some() {
+        CommentAuthor::new(Some(GENERATED_AUTHOR_NAME.into()), None)
+    } else {
+        super::decode_comment_author(
+            source,
+            graph.author_identifier,
+            source.state.options.semantic().max_output_text_bytes(),
+            path,
+        )?
+        .0
+    };
+    let expected = Comment::with_metadata(
+        after.text().to_owned(),
+        Some(CommentTimestamp::new(0.0).ok_or(Error::Verification)?),
+        Some(expected_author),
+    );
+    let actual = package
+        .table_cell_comment(
+            SheetSelector::index(path.sheet()),
+            TableSelector::index(path.table()),
+            position,
+        )?
+        .ok_or(Error::Verification)?;
+    if actual != expected {
         return Err(Error::Verification);
     }
     let target_owner = physical_source(&package)?.__source_owner();
@@ -338,7 +356,7 @@ pub(super) fn create_root_comment(
             artifacts: OwnedExactArtifacts::new(physical.__source_owner(), target_owner),
             path,
             before: None,
-            after: Some(after),
+            after: Some(actual),
             source_cell,
             target_cell: Arc::from(target_cell.into_boxed_slice()),
             source_previews: previews.len(),

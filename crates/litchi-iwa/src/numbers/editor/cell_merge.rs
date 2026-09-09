@@ -344,9 +344,11 @@ mod tests {
     use crate::wire::{
         repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
     };
+    use litchi_numbers::table::CellPosition;
     use litchi_numbers::table::topology::{
         ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
+    use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
     const RANGE_PROXY_OWNER_KIND: u32 = 5;
     const RANGE_PROXY_UUID_LOWER: u64 = 0x4d45_5247_4550_524f;
@@ -540,12 +542,16 @@ mod tests {
             vec![Region::new(1, 1, 2, 3).unwrap()]
         );
         assert_eq!(
-            editor
-                .cell_comment(table_id, 1, 1)
+            FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap())
+                .unwrap()
+                .table_cell_comment(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1),
+                )
                 .unwrap()
                 .unwrap()
-                .comment
-                .text,
+                .text(),
             "Merged anchor"
         );
 
@@ -582,12 +588,16 @@ mod tests {
             Some(&CellValue::Text("Merged".to_owned()))
         );
         assert_eq!(
-            editor
-                .cell_comment(table_id, 1, 1)
+            FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap())
+                .unwrap()
+                .table_cell_comment(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1),
+                )
                 .unwrap()
                 .unwrap()
-                .comment
-                .text,
+                .text(),
             "Merged anchor"
         );
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();

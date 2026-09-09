@@ -1433,10 +1433,13 @@ assert_eq!(restored_bytes, original);
 
 See `litchi-numbers/examples/edit_table_cells.rs` for bounded batch parsing
 and synchronized sibling-temporary, distinct-output, no-clobber publication.
-Selector-first `litchi_numbers::Package` reads provide ID-free root-comment
-and admitted direct-reply projections. The compatibility example below
-intentionally retains deprecated native-ID `NumbersEditor` calls for reply
-creation, replacement, removal, and graph cleanup.
+Selector-first `litchi_numbers::Package` reads and A1 edits provide root
+comments and ordered direct replies with optional checked timestamps and
+author display metadata. Native object identifiers stay inside the adapter.
+The deprecated `NumbersEditor::cell_comment` and
+`NumbersEditor::cell_comment_replies` readers remain available for shared,
+cross-component, and segmented comment graphs until their semantic parity is
+proven.
 
 ```rust
 #![allow(deprecated)]
@@ -1445,7 +1448,9 @@ use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::pages::PagesEditor;
-use litchi_numbers::{SheetSelector, TableSelector};
+use litchi_numbers::{
+    Package, SheetSelector, TableCellCommentReplyIndex, TableSelector,
+};
 use litchi_pages::header_footer::Kind;
 use litchi_pages::Package as PagesPackage;
 use litchi_iwa::keynote::{
@@ -1455,20 +1460,45 @@ use litchi_iwa::keynote::{
 };
 use litchi_keynote::{DrawableSelector, Package as KeynotePackage, SlideSelector};
 
+// Focused comment reads and edits use selectors, A1 addresses, and semantic
+// reply ordinals. D2 is an admitted existing root with no replies in this
+// example, so the clear operation remains valid after the reply round-trip.
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+let cell = "D2";
+if let Some(comment) = package.table_cell_comment_a1(sheet, table, cell)? {
+    println!("comment: {}", comment.text());
+    if let Some(author) = comment.author().and_then(|author| author.display_name()) {
+        println!("author: {author}");
+    }
+    for reply in package.table_cell_comment_replies_a1(sheet, table, cell)? {
+        println!("reply: {}", reply.text());
+    }
+}
+let package = package
+    .set_table_cell_comment_a1(sheet, table, cell, "Check this value")?
+    .into_package();
+let package = package
+    .add_table_cell_comment_reply_a1(sheet, table, cell, "Looks good")?
+    .into_package();
+let first_reply = TableCellCommentReplyIndex::new(0);
+let package = package
+    .set_table_cell_comment_reply_a1(
+        sheet,
+        table,
+        cell,
+        first_reply,
+        "Verified",
+    )?
+    .into_package();
+let package = package
+    .remove_table_cell_comment_reply_a1(sheet, table, cell, first_reply)?
+    .into_package();
+let _cleared = package.clear_table_cell_comment_a1(sheet, table, cell)?;
+
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
-numbers.set_cell_comment(table.id(), 1, 3, "Check this value")?;
-let _comment = numbers.cell_comment(table.id(), 1, 3)?;
-let reply_id = numbers.add_cell_comment_reply(table.id(), 1, 3, "Looks good")?;
-let reply_id = numbers.set_cell_comment_reply(
-    table.id(),
-    1,
-    3,
-    reply_id,
-    "Verified",
-)?;
-numbers.remove_cell_comment_reply(table.id(), 1, 3, reply_id)?;
-numbers.clear_cell_comment(table.id(), 1, 3)?;
 numbers.set_formula(
     table.id(),
     2,

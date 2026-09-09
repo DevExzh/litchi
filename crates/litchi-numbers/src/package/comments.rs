@@ -2,9 +2,10 @@
 //!
 //! This module is deliberately separate from the scalar-cell and formula
 //! editors.  A cell comment is a format-owned annotation graph, not a cell
-//! value.  The public boundary therefore exposes only a small text-bearing
+//! value.  The public boundary therefore exposes only a small archive-free
 //! semantic value; native object identifiers, table-list keys, protobuf
-//! messages, and archive member names remain private to this adapter.
+//! messages, and archive member names remain private to this adapter while
+//! timestamps and author display metadata are projected safely.
 //!
 //! The exact-source write seam is intentionally narrow: it can create a root
 //! comment in an already-addressable cell whose strict comment list and
@@ -43,6 +44,8 @@ use super::Package;
 
 #[path = "comments_create.rs"]
 mod comments_create;
+#[path = "comments_read.rs"]
+mod comments_read;
 #[path = "comments_reply.rs"]
 mod comments_reply;
 pub use comments_reply::{
@@ -58,14 +61,108 @@ const DEFAULT_TILE_SIZE: usize = 256;
 const COMMENT_MAX_NESTING: u32 = 64;
 const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
+/// A checked finite comment timestamp measured in seconds from Apple's
+/// 2001-01-01 reference date.
+///
+/// Numbers stores this value as a native floating-point scalar. The public
+/// wrapper rejects non-finite values and canonicalizes both signed-zero
+/// spellings, retaining the existing `Eq` guarantee of Numbers comments.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CommentTimestamp(u64);
+
+impl CommentTimestamp {
+    /// Construct a timestamp from Apple-epoch seconds.
+    #[must_use]
+    pub const fn new(seconds: f64) -> Option<Self> {
+        if !seconds.is_finite() {
+            return None;
+        }
+        let seconds = if seconds == 0.0 { 0.0 } else { seconds };
+        Some(Self(seconds.to_bits()))
+    }
+
+    /// Return Apple-epoch seconds.
+    #[must_use]
+    pub const fn as_f64(self) -> f64 {
+        f64::from_bits(self.0)
+    }
+}
+
+impl fmt::Debug for CommentTimestamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("CommentTimestamp")
+            .field(&self.as_f64())
+            .finish()
+    }
+}
+
+impl PartialOrd for CommentTimestamp {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_f64().partial_cmp(&other.as_f64())
+    }
+}
+
+impl fmt::Display for CommentTimestamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_f64().fmt(formatter)
+    }
+}
+
+/// Display metadata for a comment author.
+///
+/// Native author object identifiers, storage UUIDs, and registry references
+/// never cross the Numbers package boundary. `public_id` is the semantic
+/// identifier carried by the author payload itself.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct CommentAuthor {
+    display_name: Option<Arc<str>>,
+    public_id: Option<Arc<str>>,
+}
+
+impl fmt::Debug for CommentAuthor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CommentAuthor")
+            .field("display_name", &"<redacted>")
+            .field("public_id", &"<redacted>")
+            .finish()
+    }
+}
+
+impl CommentAuthor {
+    /// Construct display metadata with optional semantic fields.
+    #[must_use]
+    pub fn new(display_name: Option<Box<str>>, public_id: Option<Box<str>>) -> Self {
+        Self {
+            display_name: display_name.map(Arc::from),
+            public_id: public_id.map(Arc::from),
+        }
+    }
+
+    /// Return the optional display name.
+    #[must_use]
+    pub fn display_name(&self) -> Option<&str> {
+        self.display_name.as_deref()
+    }
+
+    /// Return the optional semantic public author identifier.
+    #[must_use]
+    pub fn public_id(&self) -> Option<&str> {
+        self.public_id.as_deref()
+    }
+}
+
 /// A semantic comment attached to one table cell.
 ///
-/// Numbers comment metadata (authors, reply identities, and storage UUIDs)
-/// is format-owned.  The focused package seam intentionally publishes only
-/// the editable text, so callers cannot depend on native identifiers.
+/// Native object identifiers, reply identities, and storage UUIDs remain
+/// private to the Numbers adapter. Optional creation and author metadata is
+/// retained as an archive-free semantic projection.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Comment {
     text: Arc<str>,
+    timestamp: Option<CommentTimestamp>,
+    author: Option<CommentAuthor>,
 }
 
 impl fmt::Debug for Comment {
@@ -73,21 +170,35 @@ impl fmt::Debug for Comment {
         formatter
             .debug_struct("Comment")
             .field("text", &"<redacted>")
+            .field("timestamp", &self.timestamp)
+            .field("author", &self.author)
             .finish()
     }
 }
 
 impl Comment {
-    /// Construct a semantic comment value.
+    /// Construct a semantic comment value with no optional metadata.
     ///
     /// This convenience constructor has no limit-bearing `Result` return
-    /// type.  Source-backed edits use [`Edit::set`], which validates the
-    /// caller's text against the package's semantic limit and copies it with
-    /// a fallible reservation before staging it.
+    /// type. Source-backed edits use [`Edit::set`], which validates caller
+    /// text against the package's semantic limit and copies it with a
+    /// fallible reservation before staging it.
     #[must_use]
     pub fn new(text: impl Into<String>) -> Self {
+        Self::with_metadata(text, None, None)
+    }
+
+    /// Construct a semantic comment snapshot with optional metadata.
+    #[must_use]
+    pub fn with_metadata(
+        text: impl Into<String>,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Self {
         Self {
             text: Arc::from(text.into().into_boxed_str()),
+            timestamp,
+            author,
         }
     }
 
@@ -112,7 +223,29 @@ impl Comment {
         self.text.as_ref()
     }
 
+    /// Return the optional creation timestamp.
+    #[must_use]
+    pub const fn timestamp(&self) -> Option<CommentTimestamp> {
+        self.timestamp
+    }
+
+    /// Borrow optional author display metadata.
+    #[must_use]
+    pub fn author(&self) -> Option<&CommentAuthor> {
+        self.author.as_ref()
+    }
+
     fn try_from_text(text: &str, maximum: usize, path: Path) -> Result<Self, Error> {
+        Self::try_from_text_with_metadata(text, maximum, path, None, None)
+    }
+
+    fn try_from_text_with_metadata(
+        text: &str,
+        maximum: usize,
+        path: Path,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Result<Self, Error> {
         if text.len() > maximum {
             return Err(Error::LimitExceeded {
                 kind: LimitKind::TextBytes,
@@ -131,18 +264,22 @@ impl Comment {
         retained.push_str(text);
         Ok(Self {
             text: Arc::from(retained.into_boxed_str()),
+            timestamp,
+            author,
         })
     }
 }
 
 /// One archive-free semantic reply attached to a table-cell comment.
 ///
-/// Reply authors, native object identifiers, storage UUIDs, and the physical
-/// archive graph remain private to the Numbers adapter. Only the reply text is
-/// retained at this boundary.
+/// Native object identifiers, storage UUIDs, and the physical archive graph
+/// remain private to the Numbers adapter. Optional creation and author
+/// metadata is retained as an archive-free semantic projection.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CommentReply {
     text: Arc<str>,
+    timestamp: Option<CommentTimestamp>,
+    author: Option<CommentAuthor>,
 }
 
 impl fmt::Debug for CommentReply {
@@ -150,15 +287,49 @@ impl fmt::Debug for CommentReply {
         formatter
             .debug_struct("CommentReply")
             .field("text", &"<redacted>")
+            .field("timestamp", &self.timestamp)
+            .field("author", &self.author)
             .finish()
     }
 }
 
 impl CommentReply {
+    /// Construct a reply snapshot with no optional metadata.
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self::with_metadata(text, None, None)
+    }
+
+    /// Construct a reply snapshot with optional metadata.
+    #[must_use]
+    pub fn with_metadata(
+        text: impl Into<String>,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Self {
+        Self {
+            text: Arc::from(text.into().into_boxed_str()),
+            timestamp,
+            author,
+        }
+    }
+
     /// Borrow the reply text.
     #[must_use]
     pub fn text(&self) -> &str {
         self.text.as_ref()
+    }
+
+    /// Return the optional creation timestamp.
+    #[must_use]
+    pub const fn timestamp(&self) -> Option<CommentTimestamp> {
+        self.timestamp
+    }
+
+    /// Borrow optional author display metadata.
+    #[must_use]
+    pub fn author(&self) -> Option<&CommentAuthor> {
+        self.author.as_ref()
     }
 }
 
@@ -381,7 +552,18 @@ impl Edit<'_> {
     /// bounded, fallible allocation before the edit is staged.
     pub fn set(mut self, text: impl AsRef<str>) -> Self {
         let maximum = self.source.state.options.semantic().max_output_text_bytes();
-        match Comment::try_from_text(text.as_ref(), maximum, self.target.path) {
+        let (timestamp, author) = self
+            .before
+            .as_ref()
+            .map(|comment| (comment.timestamp, comment.author.clone()))
+            .unwrap_or((None, None));
+        match Comment::try_from_text_with_metadata(
+            text.as_ref(),
+            maximum,
+            self.target.path,
+            timestamp,
+            author,
+        ) {
             Ok(comment) => {
                 self.after = Some(comment);
                 self.staging_error = None;
@@ -762,6 +944,8 @@ impl Package {
             return Ok(Box::default());
         }
 
+        let mut text_budget =
+            CommentTextBudget::new(self.state.options.semantic().max_output_text_bytes());
         let mut replies = Vec::new();
         replies
             .try_reserve_exact(located.reply_ids.len())
@@ -790,13 +974,17 @@ impl Package {
             if resolved.messages.len() != 1 {
                 return Err(Error::InvalidSource { path });
             }
-            let details = decode_comment_storage(
+            let details = decode_comment_storage_with_budget(
                 self,
                 resolved.messages[message_index].data.as_slice(),
                 path,
+                &mut text_budget,
             )?;
+            let comment = details.comment;
             replies.push(CommentReply {
-                text: details.comment.text,
+                text: comment.text,
+                timestamp: comment.timestamp,
+                author: comment.author,
             });
         }
         Ok(replies.into_boxed_slice())
@@ -1587,9 +1775,56 @@ fn map_table_codec_error(
 struct CommentStorageDetails {
     comment: Comment,
     replies: usize,
+    reply_ids: Vec<u64>,
+}
+
+#[derive(Debug)]
+struct CommentStorageGraphDetails {
+    replies: usize,
     author_id: Option<u64>,
     storage_uuid: Option<(u64, u64)>,
     reply_ids: Vec<u64>,
+}
+
+#[derive(Debug)]
+struct CommentTextBudget {
+    maximum: usize,
+    retained: usize,
+}
+
+impl CommentTextBudget {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            maximum,
+            retained: 0,
+        }
+    }
+
+    const fn remaining(&self) -> usize {
+        self.maximum.saturating_sub(self.retained)
+    }
+
+    fn retain(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        let observed = self
+            .retained
+            .checked_add(amount)
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::TextBytes,
+                observed: usize::MAX,
+                maximum: self.maximum,
+                path,
+            })?;
+        if observed > self.maximum {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::TextBytes,
+                observed,
+                maximum: self.maximum,
+                path,
+            });
+        }
+        self.retained = observed;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1628,6 +1863,92 @@ fn decode_comment_storage(
     path: Path,
 ) -> Result<CommentStorageDetails, Error> {
     let max_text = source.state.options.semantic().max_output_text_bytes();
+    let mut text_budget = CommentTextBudget::new(max_text);
+    decode_comment_storage_with_budget(source, data, path, &mut text_budget)
+}
+
+fn decode_comment_storage_graph(
+    source: &Package,
+    data: &[u8],
+    path: Path,
+) -> Result<CommentStorageGraphDetails, Error> {
+    let max_text = source.state.options.semantic().max_output_text_bytes();
+    let (snapshot, report, reply_ids) = decode_comment_storage_wire(source, data, max_text, path)?;
+    let author_id = snapshot
+        .author()
+        .map(|reference| comment_author_id(reference, path))
+        .transpose()?;
+    Ok(CommentStorageGraphDetails {
+        replies: report.replies(),
+        author_id,
+        storage_uuid: snapshot
+            .storage_uuid()
+            .map(|uuid| (uuid.lower(), uuid.upper())),
+        reply_ids,
+    })
+}
+
+fn decode_comment_storage_with_budget(
+    source: &Package,
+    data: &[u8],
+    path: Path,
+    text_budget: &mut CommentTextBudget,
+) -> Result<CommentStorageDetails, Error> {
+    let max_text = text_budget.maximum;
+    let (snapshot, report, reply_ids) = decode_comment_storage_wire(source, data, max_text, path)?;
+    let text = snapshot.text().unwrap_or_default();
+    text_budget.retain(text.len(), path)?;
+    let author_id = snapshot
+        .author()
+        .map(|reference| comment_author_id(reference, path))
+        .transpose()?;
+    let author = author_id
+        .map(|identifier| decode_comment_author(source, identifier, text_budget.remaining(), path))
+        .transpose()?;
+    if let Some((_, amount)) = author.as_ref() {
+        text_budget.retain(*amount, path)?;
+    }
+    let author = author.map(|(author, _)| author);
+    let timestamp = snapshot
+        .creation_date()
+        .map(|date| CommentTimestamp::new(date.seconds()).ok_or(Error::InvalidSource { path }))
+        .transpose()?;
+    let comment = Comment::try_from_text_with_metadata(text, max_text, path, timestamp, author)?;
+    Ok(CommentStorageDetails {
+        comment,
+        replies: report.replies(),
+        reply_ids,
+    })
+}
+
+fn comment_author_id(
+    reference: comment_storage_codec::ReferenceSnapshot,
+    path: Path,
+) -> Result<u64, Error> {
+    if reference.identifier() == 0
+        || reference
+            .deprecated_type()
+            .is_some_and(|deprecated_type| deprecated_type != 0)
+        || reference.deprecated_is_external() == Some(true)
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(reference.identifier())
+}
+
+fn decode_comment_storage_wire<'data>(
+    source: &Package,
+    data: &'data [u8],
+    max_text: usize,
+    path: Path,
+) -> Result<
+    (
+        comment_storage_codec::CommentStorageSnapshot<'data>,
+        comment_storage_codec::DecodeReport,
+        Vec<u64>,
+    ),
+    Error,
+> {
     let options = comment_storage_codec::DecodeOptions::new(
         data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
         data.len().clamp(1, WireLimits::MAX_FIELDS),
@@ -1651,17 +1972,44 @@ fn decode_comment_storage(
     if replies.unsupported_reference {
         return Err(Error::InvalidSource { path });
     }
-    let text = snapshot.text().unwrap_or_default();
-    let comment = Comment::try_from_text(text, max_text, path)?;
-    Ok(CommentStorageDetails {
-        comment,
-        replies: report.replies(),
-        author_id: snapshot.author().map(|reference| reference.identifier()),
-        storage_uuid: snapshot
-            .storage_uuid()
-            .map(|uuid| (uuid.lower(), uuid.upper())),
-        reply_ids: replies.ids,
-    })
+    Ok((snapshot, report, replies.ids))
+}
+
+fn decode_comment_author(
+    source: &Package,
+    identifier: u64,
+    max_text: usize,
+    path: Path,
+) -> Result<(CommentAuthor, usize), Error> {
+    let resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    let object = source
+        .state
+        .components
+        .catalog()
+        .get_index(resolved.component_index)
+        .and_then(|component| component.archive().objects.get(resolved.object_index))
+        .ok_or(Error::InvalidSource { path })?;
+    if object.archive_info.identifier != Some(identifier)
+        || object.messages.len() != 1
+        || object.archive_info.message_infos.len() != 1
+        || object.messages[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        || object.archive_info.message_infos[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        || usize::try_from(object.archive_info.message_infos[0].length).ok()
+            != Some(object.messages[0].data.len())
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    comments_read::decode_author(
+        object.messages[0].data.as_slice(),
+        max_text,
+        source.state.options.semantic().max_references(),
+        path,
+    )
 }
 
 fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path) -> Error {
@@ -1922,7 +2270,11 @@ fn rewrite_existing(
     let cell = located.cell_bytes.as_ref().ok_or(Error::InvalidSource {
         path: located.target.path,
     })?;
-    if before.text == comment.text {
+    // A semantic no-op must include every projected field.  Text-only
+    // comparison would silently discard a future metadata change (or accept
+    // a stale staged snapshot) while the wire rewrite below only owns the
+    // text field.
+    if before == *comment {
         return Ok((source.snapshot(), Arc::clone(cell), 0, 0));
     }
     let data = patch_length_delimited_field_checked(
@@ -3530,7 +3882,7 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                     },
                     COMMENT_STORAGE_MESSAGE_TYPE => {
                         let details =
-                            decode_comment_storage(source, message.data.as_slice(), path)?;
+                            decode_comment_storage_graph(source, message.data.as_slice(), path)?;
                         let mut expected = Vec::new();
                         expected
                             .try_reserve(
@@ -4182,8 +4534,9 @@ fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> 
 #[cfg(test)]
 mod tests {
     use super::{
-        ArchiveMutation, Comment, CommentOwnershipCensus, CommentStorageFact, Error, LimitKind,
-        MessageRoute, Path, WireLimits, cell_ranges, census_alias_checks,
+        ArchiveMutation, Comment, CommentAuthor, CommentOwnershipCensus, CommentReply,
+        CommentStorageFact, CommentTimestamp, Error, LimitKind, MessageRoute, Path, WireLimits,
+        cell_ranges, census_alias_checks,
     };
 
     #[test]
@@ -4389,5 +4742,49 @@ mod tests {
                 path: Path::Package,
             }
         );
+    }
+
+    #[test]
+    fn comment_metadata_rejects_non_finite_timestamps_and_canonicalizes_zero() {
+        assert_eq!(CommentTimestamp::new(f64::NAN), None);
+        assert_eq!(CommentTimestamp::new(f64::INFINITY), None);
+        assert_eq!(CommentTimestamp::new(f64::NEG_INFINITY), None);
+        assert_eq!(CommentTimestamp::new(-0.0), CommentTimestamp::new(0.0));
+        assert_eq!(
+            CommentTimestamp::new(-42.5).map(CommentTimestamp::as_f64),
+            Some(-42.5)
+        );
+    }
+
+    #[test]
+    fn comment_metadata_is_archive_free_and_debug_redacted() {
+        let author = CommentAuthor::new(Some("Ada Lovelace".into()), Some("public-42".into()));
+        let comment = Comment::with_metadata(
+            "authored text",
+            CommentTimestamp::new(42.5),
+            Some(author.clone()),
+        );
+        let reply = CommentReply::with_metadata("reply text", None, Some(author));
+
+        assert_eq!(comment.text(), "authored text");
+        assert_ne!(Comment::new("authored text"), comment);
+        assert_eq!(
+            comment.timestamp().map(CommentTimestamp::as_f64),
+            Some(42.5)
+        );
+        assert_eq!(
+            comment.author().and_then(CommentAuthor::display_name),
+            Some("Ada Lovelace")
+        );
+        assert_eq!(
+            comment.author().and_then(CommentAuthor::public_id),
+            Some("public-42")
+        );
+        assert_eq!(reply.text(), "reply text");
+        let debug = format!("{comment:?} {reply:?}");
+        assert!(!debug.contains("authored text"));
+        assert!(!debug.contains("reply text"));
+        assert!(!debug.contains("Ada Lovelace"));
+        assert!(!debug.contains("public-42"));
     }
 }

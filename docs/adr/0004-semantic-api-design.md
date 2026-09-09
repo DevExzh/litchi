@@ -3310,10 +3310,11 @@ table topology, general data formats, or Pages/Keynote controls.
 Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` makes
 source-ordered direct table-cell replies readable through
 `Package::{table_cell_comment_replies,table_cell_comment_replies_a1}`.
-`CommentReply` retains only authored text behind a borrowed `text()` accessor;
+The initial `CommentReply` retained only authored text behind a borrowed `text()` accessor;
 its custom `Debug`, and the existing `Comment` and transaction debug surfaces,
 redact authored content. Authors, dates, storage UUIDs, native identities, and
-physical ownership are intentionally absent from the public value.
+physical ownership were intentionally absent from that initial public value.
+The September 9 metadata amendment below supersedes the author/date omission.
 
 A cell without a root comment returns `CommentNotFound`; a root with no direct
 replies returns an empty slice. Missing native comment text retains the
@@ -3696,3 +3697,24 @@ allocation, shared-media closure, lazy Buffa validation, ZIP preservation,
 candidate reopen, fuzzing, and native application acceptance remain private
 implementation gates. Until those gates are complete, the legacy item surface
 and its migration debt stay in place.
+
+
+## 2026-09-09 Numbers comment metadata projection
+
+Root `Comment` and ordered `CommentReply` snapshots expose optional
+`timestamp()` and `author()` values alongside `text()`. `CommentTimestamp`
+contains finite Apple-epoch seconds, accepts historical negative values,
+canonicalizes signed zero, and retains value equality. `CommentAuthor`
+exposes optional `display_name()` and `public_id()` strings. The latter is
+semantic author data, not a native archive identifier. The `litchi-numbers` crate root exports
+`TableCellCommentTimestamp` and `TableCellCommentAuthor` aliases. Author strings
+are shared across snapshot clones and redacted by `Debug`.
+
+Text-only constructors keep optional metadata absent. Source-backed reads
+preserve its native presence, and text edits preserve selected metadata.
+Append inherits the same source template metadata as the native writer; root
+creation reports the writer's zero-epoch date and selected/generated author.
+Patches and candidate checks carry complete metadata-aware snapshots. Public
+values continue to exclude storage UUIDs, native object/list/reply IDs,
+protobuf messages, and archive handles. Graph admission and native-reply
+limitations remain explicit in ADR 0008 and ADR 0028.

@@ -31,8 +31,9 @@ use super::super::table_cell_pop_up_menu::{
     Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
 };
 use super::{
-    CommentReply, Error as RootError, LimitKind as RootLimitKind, Located, Package,
-    Path as RootPath, census_comment_ownership, physical_source, resolve_comment,
+    Comment, CommentAuthor, CommentReply, CommentTimestamp, Error as RootError,
+    LimitKind as RootLimitKind, Located, Package, Path as RootPath, census_comment_ownership,
+    physical_source, resolve_comment,
 };
 
 /// A checked zero-based ordinal in one comment's direct-reply list.
@@ -384,7 +385,9 @@ impl CommentReplyEdit<'_> {
     /// Append one direct reply. Appending never selects by text.
     #[must_use]
     pub fn append(mut self, text: impl AsRef<str>) -> Self {
-        match reply_from_text(self.source, text.as_ref(), self.path) {
+        let (timestamp, author) =
+            reply_metadata_from_template(self.before.first(), self.target.comment.as_ref());
+        match reply_from_text(self.source, text.as_ref(), self.path, timestamp, author) {
             Ok(reply) => {
                 let Ok(after) = clone_replies(&self.before, self.path) else {
                     self.staging_error = Some(CommentReplyError::Allocation {
@@ -415,7 +418,18 @@ impl CommentReplyEdit<'_> {
             });
             return self;
         }
-        match reply_from_text(self.source, text.as_ref(), self.path.reply(index)) {
+        let (timestamp, author) = self
+            .before
+            .get(ordinal)
+            .map(|reply| (reply.timestamp, reply.author.clone()))
+            .unwrap_or((None, None));
+        match reply_from_text(
+            self.source,
+            text.as_ref(),
+            self.path.reply(index),
+            timestamp,
+            author,
+        ) {
             Ok(reply) => {
                 let Ok(after) = clone_replies(&self.before, self.path) else {
                     self.staging_error = Some(CommentReplyError::Allocation {
@@ -802,6 +816,8 @@ fn reply_from_text(
     source: &Package,
     text: &str,
     path: CommentReplyPath,
+    timestamp: Option<CommentTimestamp>,
+    author: Option<CommentAuthor>,
 ) -> Result<CommentReply, CommentReplyError> {
     let maximum = source.state.options.semantic().max_output_text_bytes();
     if text.len() > maximum {
@@ -822,7 +838,19 @@ fn reply_from_text(
     retained.push_str(text);
     Ok(CommentReply {
         text: Arc::from(retained.into_boxed_str()),
+        timestamp,
+        author,
     })
+}
+
+fn reply_metadata_from_template(
+    reply: Option<&CommentReply>,
+    root: Option<&Comment>,
+) -> (Option<CommentTimestamp>, Option<CommentAuthor>) {
+    reply
+        .map(|reply| (reply.timestamp, reply.author.clone()))
+        .or_else(|| root.map(|comment| (comment.timestamp, comment.author.clone())))
+        .unwrap_or((None, None))
 }
 
 fn clone_replies(
