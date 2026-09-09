@@ -1354,7 +1354,7 @@ const CANONICAL_RELATIONSHIPS_HEADER: &[u8] = br#"<?xml version="1.0" encoding="
 const CANONICAL_RELATIONSHIPS_FOOTER: &[u8] = b"</Relationships>";
 const CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES: usize = 4096;
 
-fn canonical_relationship_xml_len(relationships: &Relationships) -> Result<usize> {
+pub(crate) fn canonical_relationship_xml_len(relationships: &Relationships) -> Result<usize> {
     relationships.iter().try_fold(
         CANONICAL_RELATIONSHIPS_HEADER
             .len()
@@ -1382,10 +1382,9 @@ fn canonical_relationship_serializer_memory_bound(
     relationships: &Relationships,
     serialized_len: usize,
 ) -> Result<u64> {
-    // try_to_xml_bytes first materializes one pointer per relationship for
-    // sorting, then appends independently reserved literal/escaped fragments.
-    // Charge the exact final XML bytes, one equally sized transient allowance
-    // for Vec growth/coexisting old storage, the sorted reference Vec, and a
+    // try_to_xml_bytes reserves the checked final XML size and materializes
+    // one pointer per relationship for sorting. Retain the conservative
+    // second XML-sized transient allowance, the sorted reference Vec, and a
     // fixed allocator/state allowance before invoking that serializer. A
     // source relationship payload is charged separately by
     // relationship_xml_working_memory_bound before this helper is called.
