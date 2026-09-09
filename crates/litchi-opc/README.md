@@ -85,6 +85,13 @@ Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://git
 validating bounded XML. Noncompact XML must match retained source bytes; new XML
 must satisfy the authored compactness audit. The token shares its source buffer.
 
+`source_content_types_with_limits` and `source_relationships_with_limits` capture
+package metadata under a caller-selected `ReadLimits` profile. They check XML
+bytes, declaration or relationship counts, and XML attributes for both retained
+and regenerated XML. Their existing convenience methods use default limits.
+Relationship capture compares the current graph with borrowed source bindings,
+avoiding metadata clones just to decide whether source bytes can be retained.
+
 `OwnedXmlPart::replace_attributes` accepts ordered, complete attribute-value
 ranges and XML-escaped replacements. It checks the source spans and assembled
 XML, retains all other source bytes, and caps source/output/replacement XML at

@@ -115,6 +115,149 @@ impl RelationshipBinding {
         entries.sort_unstable_by(|left, right| left.r_id.cmp(&right.r_id));
         Ok(Self { entries })
     }
+
+    /// Compare a captured semantic binding with the current relationship
+    /// collection without cloning any of the current relationship fields.
+    ///
+    /// `Relationships` is keyed by relationship ID, so this keeps the
+    /// comparison linear while retaining the binding's deterministic ID
+    /// ordering.  Source capture uses this before admitting a retained XML
+    /// allocation under a caller's byte limits.
+    fn matches(&self, relationships: &Relationships) -> bool {
+        self.entries.len() == relationships.len()
+            && self.entries.iter().all(|entry| {
+                relationships.get(&entry.r_id).is_some_and(|relationship| {
+                    relationship.reltype() == entry.reltype
+                        && relationship.target_ref() == entry.target_ref
+                        && relationship.target_mode() == entry.target_mode
+                })
+            })
+    }
+}
+
+fn check_relationship_capture_limits(
+    relationships: &Relationships,
+    limits: ReadLimits,
+) -> Result<()> {
+    limits.check(
+        crate::ReadResource::RelationshipsPerPart,
+        relationships.len() as u64,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    limits.check(
+        crate::ReadResource::TotalRelationships,
+        relationships.len() as u64,
+        limits.max_total_relationships() as u64,
+    )?;
+    for relationship in relationships.iter() {
+        limits.check(
+            crate::ReadResource::XmlAttributeBytes,
+            relationship.r_id().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::XmlAttributeBytes,
+            relationship.reltype().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::XmlAttributeBytes,
+            relationship.target_ref().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::RelationshipTargetBytes,
+            relationship.target_ref().len() as u64,
+            limits.max_relationship_target_bytes() as u64,
+        )?;
+    }
+    Ok(())
+}
+
+fn escaped_relationship_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length.checked_add(encoded).ok_or_else(|| {
+            OpcError::InvalidRelationship(
+                "canonical relationship XML attribute length overflows".to_owned(),
+            )
+        })
+    })
+}
+
+fn check_canonical_relationship_attribute_limits(
+    relationships: &Relationships,
+    limits: ReadLimits,
+) -> Result<()> {
+    limits.check(
+        crate::ReadResource::XmlAttributeBytes,
+        "xmlns".len() as u64 + crate::constants::namespace::OPC_RELATIONSHIPS.len() as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    for relationship in relationships.iter() {
+        for (key, value) in [
+            ("Id", relationship.r_id()),
+            ("Type", relationship.reltype()),
+            ("Target", relationship.target_ref()),
+        ] {
+            let encoded = escaped_relationship_attribute_len(value)?;
+            let actual = key.len().checked_add(encoded).ok_or_else(|| {
+                OpcError::InvalidRelationship(
+                    "canonical relationship XML attribute length overflows".to_owned(),
+                )
+            })?;
+            limits.check(
+                crate::ReadResource::XmlAttributeBytes,
+                actual as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+        }
+        if relationship.target_mode() == RelationshipTargetMode::External {
+            let actual = "TargetMode".len() + b"External".len();
+            limits.check(
+                crate::ReadResource::XmlAttributeBytes,
+                actual as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn check_canonical_relationship_structure(
+    relationships: &Relationships,
+    bytes: usize,
+    limits: ReadLimits,
+) -> Result<()> {
+    let events = relationships.len().checked_add(4).ok_or_else(|| {
+        OpcError::InvalidRelationship("canonical relationship XML event count overflows".to_owned())
+    })?;
+    limits.check(
+        crate::ReadResource::XmlEvents,
+        events as u64,
+        limits.max_xml_events() as u64,
+    )?;
+    limits.check(
+        crate::ReadResource::TotalRelationshipXmlEvents,
+        events as u64,
+        limits.max_total_relationship_xml_events() as u64,
+    )?;
+    let depth = if relationships.is_empty() { 1 } else { 2 };
+    limits.check(
+        crate::ReadResource::XmlDepth,
+        depth,
+        limits.max_xml_depth() as u64,
+    )?;
+    limits.check(
+        crate::ReadResource::TotalRelationshipXmlBytes,
+        bytes as u64,
+        limits.max_total_relationship_xml_bytes() as u64,
+    )
 }
 
 fn clone_relationship_binding_text(value: &str) -> Result<String> {
@@ -384,6 +527,36 @@ impl OpcPackage {
         self.source_relationships_xml.contains_key(partname)
     }
 
+    fn check_source_content_types_limits(
+        &self,
+        name: &PackURI,
+        bytes: &[u8],
+        source: &ContentTypeMap,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        limits.check(
+            crate::ReadResource::ContentTypesBytes,
+            bytes.len() as u64,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::PartBytes,
+            bytes.len() as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            crate::ReadResource::Parts,
+            self.parts.len() as u64,
+            limits.max_parts() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::ContentTypeMappings,
+            source.mapping_count() as u64,
+            limits.max_content_type_mappings() as u64,
+        )?;
+        crate::OwnedXmlPart::check_capture_size(name, bytes.len(), limits)
+    }
+
     pub(crate) fn source_content_types_source(&self) -> Result<Option<(&[u8], &ContentTypeMap)>> {
         let (bytes, map) = match (
             self.source_content_types_xml.as_ref(),
@@ -491,33 +664,58 @@ impl OpcPackage {
     /// arbitrary XML, and replacement is accepted only for the current
     /// expected view.
     pub fn source_content_types(&self) -> Result<OwnedContentTypes> {
+        self.source_content_types_with_limits(ReadLimits::default())
+    }
+
+    /// Capture the current `[Content_Types].xml` publication view under an
+    /// explicit bounded read policy. Retained source bytes and declarations
+    /// are checked before compatibility indexing; authored fallback uses the
+    /// same limits for its two-pass size and mapping preflight.
+    pub fn source_content_types_with_limits(
+        &self,
+        limits: ReadLimits,
+    ) -> Result<OwnedContentTypes> {
+        let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
+        crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
         let retained = match (
             self.source_content_types_xml.as_ref(),
             self.source_content_types.as_ref(),
         ) {
-            (Some(bytes), Some(binding))
-                if self.source_content_types_matches_current_parts(binding)? =>
-            {
-                Some((Arc::clone(bytes), Arc::clone(binding)))
+            (Some(bytes), Some(binding)) => {
+                self.check_source_content_types_limits(&name, bytes, binding, limits)?;
+                if self.source_content_types_matches_current_parts(binding)? {
+                    Some((Arc::clone(bytes), Arc::clone(binding)))
+                } else {
+                    None
+                }
             },
             _ => None,
         };
         let (bytes, binding) = match retained {
             Some(source) => source,
             None => {
-                let bytes = Arc::new(crate::pkgwriter::authored_content_types_xml(self)?);
-                let binding = Arc::new(ContentTypeMap::from_xml(
-                    bytes.as_slice(),
-                    ReadLimits::default(),
+                let bytes = Arc::new(crate::pkgwriter::authored_content_types_xml_with_limits(
+                    self, limits,
                 )?);
+                limits.check(
+                    crate::ReadResource::ContentTypesBytes,
+                    bytes.len() as u64,
+                    limits.max_content_types_bytes() as u64,
+                )?;
+                limits.check(
+                    crate::ReadResource::PartBytes,
+                    bytes.len() as u64,
+                    limits.max_part_bytes(),
+                )?;
+                let binding = Arc::new(ContentTypeMap::from_xml(bytes.as_slice(), limits)?);
                 (bytes, binding)
             },
         };
-        let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
-        let xml = crate::OwnedXmlPart::capture(
+        let xml = crate::OwnedXmlPart::capture_with_limits(
             name,
             crate::constants::content_type::XML.to_owned(),
             bytes,
+            limits,
         )?;
         Ok(OwnedContentTypes { xml, binding })
     }
@@ -2236,6 +2434,33 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn large_content_types_archive() -> (Vec<u8>, Vec<u8>) {
+        let mut content_types = Vec::new();
+        content_types.extend_from_slice(
+            br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><!--"#,
+        );
+        content_types.resize(
+            content_types.len() + ReadLimits::default().max_content_types_bytes() + 1,
+            b'x',
+        );
+        content_types.extend_from_slice(
+            br#"--><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/document.xml" ContentType="application/xml"/></Types>"#,
+        );
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", &content_types)
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.write_stored("document.xml", b"<document/>").unwrap();
+        (writer.finish_to_bytes().unwrap(), content_types)
+    }
+
     fn create_source_with_explicit_relationship_overrides(empty: bool) -> (Vec<u8>, Vec<u8>) {
         let content_types = br#"<?xml version='1.0'?>
 <Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>
@@ -2448,6 +2673,208 @@ mod tests {
                 .unwrap()
                 .contains("PartName=\"/custom/item.bin\"")
         );
+    }
+
+    #[test]
+    fn bounded_content_types_capture_checks_retained_and_authored_quota_boundaries() {
+        let package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
+        let retained = package.source_content_types().unwrap();
+        let exact = ReadLimits::builder()
+            .max_content_types_bytes(retained.bytes().len())
+            .unwrap()
+            .max_part_bytes(retained.bytes().len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            package
+                .source_content_types_with_limits(exact)
+                .unwrap()
+                .bytes(),
+            retained.bytes()
+        );
+        let under = ReadLimits::builder()
+            .max_content_types_bytes(retained.bytes().len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.source_content_types_with_limits(under),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+        let part_under = ReadLimits::builder()
+            .max_content_types_bytes(retained.bytes().len())
+            .unwrap()
+            .max_part_bytes((retained.bytes().len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.source_content_types_with_limits(part_under),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::PartBytes,
+                ..
+            })
+        ));
+        let over = ReadLimits::builder()
+            .max_content_types_bytes(retained.bytes().len() + 1)
+            .unwrap()
+            .max_part_bytes((retained.bytes().len() + 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.source_content_types_with_limits(over).is_ok());
+
+        let mut authored = OpcPackage::new();
+        authored.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/item.bin").unwrap(),
+            "application/octet-stream".to_owned(),
+            Vec::new(),
+        )));
+        let authored_token = authored.source_content_types().unwrap();
+        let authored_exact = ReadLimits::builder()
+            .max_content_types_bytes(authored_token.bytes().len())
+            .unwrap()
+            .max_part_bytes(authored_token.bytes().len() as u64)
+            .unwrap()
+            .max_content_type_mappings(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            authored
+                .source_content_types_with_limits(authored_exact)
+                .unwrap()
+                .bytes(),
+            authored_token.bytes()
+        );
+        let authored_events = authored_token
+            .bytes()
+            .iter()
+            .filter(|&&byte| byte == b'<')
+            .count()
+            + 1;
+        let authored_structure_exact = ReadLimits::builder()
+            .max_xml_events(authored_events)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            authored
+                .source_content_types_with_limits(authored_structure_exact)
+                .is_ok()
+        );
+        let authored_events_under = ReadLimits::builder()
+            .max_xml_events(authored_events - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_content_types_with_limits(authored_events_under),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::XmlEvents,
+                actual,
+                maximum,
+            }) if actual == authored_events as u64 && maximum == (authored_events - 1) as u64
+        ));
+        let authored_depth_under = ReadLimits::builder()
+            .max_xml_depth(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_content_types_with_limits(authored_depth_under),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::XmlDepth,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+        let mapping_under = ReadLimits::builder()
+            .max_content_type_mappings(2)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_content_types_with_limits(mapping_under),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypeMappings,
+                actual: 3,
+                maximum: 2,
+            })
+        ));
+    }
+
+    #[test]
+    fn ordinary_save_keeps_explicitly_admitted_large_content_types_source() {
+        let (archive, content_types) = large_content_types_archive();
+        let explicit = ReadLimits::builder()
+            .max_content_types_bytes(content_types.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = OpcPackage::from_vec_with_limits(archive, explicit).unwrap();
+
+        assert!(matches!(
+            package.source_content_types(),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+        let captured = package.source_content_types_with_limits(explicit).unwrap();
+        assert_eq!(captured.bytes(), content_types.as_slice());
+
+        let saved = crate::PackageWriter::to_bytes(&package).unwrap();
+        let saved_archive = soapberry_zip::office::ArchiveReader::new(&saved).unwrap();
+        assert_eq!(
+            saved_archive.read("[Content_Types].xml").unwrap(),
+            content_types.as_slice()
+        );
+    }
+
+    #[test]
+    fn bounded_content_types_checks_retained_provenance_before_fallback() {
+        let (archive, content_types) = large_content_types_archive();
+        let admission = ReadLimits::builder()
+            .max_content_types_bytes(content_types.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut package = OpcPackage::from_vec_with_limits(archive, admission).unwrap();
+        let document = PackURI::new("/document.xml").unwrap();
+        package
+            .get_part_mut(&document)
+            .unwrap()
+            .set_content_type("application/example+xml".to_owned())
+            .unwrap();
+
+        // The invalidated package has a small canonical fallback, so the
+        // caller's reduced bound is sufficient for authored output. Capture
+        // still inspects the retained provenance first and must reject its
+        // oversized source bytes under that same bound.
+        let fallback_limit = ReadLimits::builder()
+            .max_content_types_bytes(content_types.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let saved = crate::PackageWriter::to_bytes(&package).unwrap();
+        let saved_archive = soapberry_zip::office::ArchiveReader::new(&saved).unwrap();
+        assert!(
+            saved_archive.read("[Content_Types].xml").unwrap().len()
+                < fallback_limit.max_content_types_bytes()
+        );
+        assert!(matches!(
+            package.source_content_types_with_limits(fallback_limit),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                actual,
+                maximum,
+            }) if actual == content_types.len() as u64 && maximum == (content_types.len() - 1) as u64
+        ));
     }
 
     #[test]

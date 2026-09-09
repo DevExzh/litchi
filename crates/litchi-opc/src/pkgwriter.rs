@@ -1077,15 +1077,58 @@ struct AuthoredContentTypesBudget {
 }
 
 impl AuthoredContentTypesBudget {
-    fn charge(&mut self, prefix: &[u8], name: &str, content_type: &str) -> Result<()> {
+    fn check_attribute(&self, key: &str, value: &str) -> Result<()> {
+        let encoded = value.bytes().try_fold(0usize, |length, byte| {
+            length.checked_add(match byte {
+                b'&' => 5,
+                b'<' | b'>' => 4,
+                b'"' | b'\'' => 6,
+                _ => 1,
+            })
+        });
+        let actual = key
+            .len()
+            .checked_add(encoded.ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types attribute size overflows".into(),
+                )
+            })?)
+            .ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types attribute size overflows".into(),
+                )
+            })?;
+        self.limits.check(
+            crate::ReadResource::XmlAttributeBytes,
+            actual as u64,
+            self.limits.max_xml_attribute_bytes() as u64,
+        )
+    }
+
+    fn charge(
+        &mut self,
+        prefix: &[u8],
+        name_attribute: &str,
+        name: &str,
+        content_type: &str,
+    ) -> Result<()> {
         use crate::ReadResource;
         let maximum = self.limits.max_content_types_bytes();
-        self.mappings += 1; // Bounded by the admitted part count plus fixed defaults.
+        self.mappings = self
+            .mappings
+            .checked_add(1)
+            .ok_or_else(|| crate::OpcError::ReadLimit {
+                resource: ReadResource::ContentTypeMappings,
+                actual: u64::MAX,
+                maximum: self.limits.max_content_type_mappings() as u64,
+            })?;
         self.limits.check(
             ReadResource::ContentTypeMappings,
             self.mappings as u64,
             self.limits.max_content_type_mappings() as u64,
         )?;
+        self.check_attribute(name_attribute, name)?;
+        self.check_attribute("ContentType", content_type)?;
         self.bytes = self
             .bytes
             .checked_add(prefix.len() + b"\" ContentType=\"".len() + b"\"/>".len())
@@ -1136,7 +1179,7 @@ impl AuthoredContentTypesBudget {
     }
 }
 
-fn authored_content_types_xml_with_limits(
+pub(crate) fn authored_content_types_xml_with_limits(
     package: &OpcPackage,
     limits: crate::ReadLimits,
 ) -> Result<Vec<u8>> {
@@ -1146,6 +1189,9 @@ fn authored_content_types_xml_with_limits(
     const FOOTER: &[u8] = b"</Types>";
     const DEFAULT_PREFIX: &[u8] = b"<Default Extension=\"";
     const OVERRIDE_PREFIX: &[u8] = b"<Override PartName=\"";
+
+    let name = PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
+    crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
 
     limits.check(
         ReadResource::Parts,
@@ -1157,6 +1203,7 @@ fn authored_content_types_xml_with_limits(
         bytes: HEADER.len() + FOOTER.len(),
         mappings: 0,
     };
+    budget.check_attribute("xmlns", crate::constants::namespace::OPC_CONTENT_TYPES)?;
     let mut defaults = [false; AUTHORED_CONTENT_TYPE_DEFAULTS.len()];
     // Only borrowed metadata is retained before the complete escaped output
     // size is admitted. Repeated default mappings do not consume output quota.
@@ -1165,6 +1212,7 @@ fn authored_content_types_xml_with_limits(
         defaults[index] = true;
         budget.charge(
             DEFAULT_PREFIX,
+            "Extension",
             AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
             AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
         )?;
@@ -1181,6 +1229,7 @@ fn authored_content_types_xml_with_limits(
             if !defaults[index] {
                 budget.charge(
                     DEFAULT_PREFIX,
+                    "Extension",
                     AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
                     AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
                 )?;
@@ -1189,12 +1238,32 @@ fn authored_content_types_xml_with_limits(
         } else {
             budget.charge(
                 OVERRIDE_PREFIX,
+                "PartName",
                 part.partname().as_str(),
                 part.content_type(),
             )?;
             override_count += 1;
         }
     }
+
+    // The canonical stream has one declaration, one root start/end pair and
+    // one event per mapping plus EOF.  Admit its structure and fixed owned
+    // XML ceiling before retaining borrowed mapping metadata or allocating the
+    // final output buffer.
+    let events = budget.mappings.checked_add(4).ok_or_else(|| {
+        crate::OpcError::InvalidContentTypesManifest(
+            "authored content-types event count overflows".into(),
+        )
+    })?;
+    limits.check(
+        ReadResource::XmlEvents,
+        events as u64,
+        limits.max_xml_events() as u64,
+    )?;
+    let depth = if budget.mappings == 0 { 1 } else { 2 };
+    limits.check(ReadResource::XmlDepth, depth, limits.max_xml_depth() as u64)?;
+    crate::OwnedXmlPart::check_capture_size(&name, budget.bytes, limits)?;
+
     let mut overrides = Vec::new();
     overrides
         .try_reserve_exact(override_count)
@@ -1226,6 +1295,11 @@ fn authored_content_types_xml_with_limits(
     }
     overrides.sort_unstable_by_key(|(name, _)| *name);
     let mut output = Vec::new();
+    limits.check(
+        ReadResource::PartBytes,
+        budget.bytes as u64,
+        limits.max_part_bytes(),
+    )?;
     output
         .try_reserve_exact(budget.bytes)
         .map_err(|source| crate::OpcError::Allocation {

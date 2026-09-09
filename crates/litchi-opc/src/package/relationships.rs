@@ -1,6 +1,10 @@
 //! Source-bound eager relationship edits and exact restoration.
 
-use super::{OpcPackage, RelationshipBinding, SourceRelationshipsXml};
+use super::{
+    OpcPackage, RelationshipBinding, SourceRelationshipsXml,
+    check_canonical_relationship_attribute_limits, check_canonical_relationship_structure,
+    check_relationship_capture_limits,
+};
 use crate::{
     OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits,
     ReadResource, Result, TargetMode,
@@ -14,9 +18,10 @@ use std::sync::Arc;
 ///
 /// Capture with [`OpcPackage::source_relationships`]. Clones share source bytes;
 /// an original token can restore its exact XML after a changed save/reopen.
-/// Tokens use the default OPC relationship read limits. Part-member presence
-/// is retained, including explicit empty members. The package root always has
-/// a relationship member in authored publication.
+/// `source_relationships_with_limits` applies the caller's bounded read
+/// profile; the compatibility wrapper uses the default profile. Part-member
+/// presence is retained, including explicit empty members. The package root
+/// always has a relationship member in authored publication.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedRelationships {
     owner: PackURI,
@@ -339,24 +344,48 @@ impl OpcPackage {
     /// Capture source-bound relationship XML without exposing mutable provenance.
     /// Newly authored or changed collections receive a validated canonical view.
     pub fn source_relationships(&self, owner: &PackURI) -> Result<OwnedRelationships> {
-        let (owner, relationships) = if owner.as_str() == "/" {
-            (owner.clone(), self.rels())
+        self.source_relationships_with_limits(owner, ReadLimits::default())
+    }
+
+    /// Capture source-bound relationship XML under an explicit bounded read
+    /// policy. Relationship counts and field lengths are checked before
+    /// semantic binding clones; retained XML and canonical output are checked
+    /// before parsing or allocation.
+    pub fn source_relationships_with_limits(
+        &self,
+        owner: &PackURI,
+        limits: ReadLimits,
+    ) -> Result<OwnedRelationships> {
+        let (owner_ref, relationships) = if owner.as_str() == "/" {
+            (owner, self.rels())
         } else {
             let part = self.get_part(owner)?;
-            (part.partname().clone(), part.rels())
+            (part.partname(), part.rels())
         };
-        let limits = ReadLimits::default();
-        limits.check(
-            ReadResource::RelationshipsPerPart,
-            relationships.len() as u64,
-            limits.max_relationships_per_part() as u64,
-        )?;
-        let binding = RelationshipBinding::from_relationships(relationships)?;
+        OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;
+        let relationship_uri = owner_ref.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        check_relationship_capture_limits(relationships, limits)?;
         let source = self
             .source_relationships_xml
-            .get(&owner)
-            .filter(|source| source.binding == binding);
+            .get(owner_ref)
+            .filter(|source| source.binding.matches(relationships));
         let bytes = if let Some(source) = source {
+            limits.check(
+                ReadResource::RelationshipXmlBytes,
+                source.bytes.len() as u64,
+                limits.max_relationship_xml_bytes() as u64,
+            )?;
+            limits.check(
+                ReadResource::TotalRelationshipXmlBytes,
+                source.bytes.len() as u64,
+                limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+            limits.check(
+                ReadResource::PartBytes,
+                source.bytes.len() as u64,
+                limits.max_part_bytes(),
+            )?;
+            OwnedXmlPart::check_capture_size(&relationship_uri, source.bytes.len(), limits)?;
             Arc::clone(&source.bytes)
         } else {
             let length = crate::source_backed::canonical_relationship_xml_len(relationships)?;
@@ -365,16 +394,28 @@ impl OpcPackage {
                 length as u64,
                 limits.max_relationship_xml_bytes() as u64,
             )?;
+            limits.check(
+                ReadResource::PartBytes,
+                length as u64,
+                limits.max_part_bytes(),
+            )?;
+            check_canonical_relationship_attribute_limits(relationships, limits)?;
+            check_canonical_relationship_structure(relationships, length, limits)?;
+            OwnedXmlPart::check_capture_size(&relationship_uri, length, limits)?;
             Arc::new(relationships.try_to_xml_bytes()?)
         };
-        crate::pkgreader::PackageReader::parse_owned_relationships(&bytes, &owner)?;
-        let member_present = owner.as_str() == "/"
+        crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            &bytes, owner_ref, limits,
+        )?;
+        let member_present = owner_ref.as_str() == "/"
             || !relationships.is_empty()
-            || self.source_relationships_member_present(&owner);
-        let xml = OwnedXmlPart::capture(
-            owner.rels_uri().map_err(OpcError::InvalidPackUri)?,
+            || self.source_relationships_member_present(owner_ref);
+        let owner = owner_ref.clone();
+        let xml = OwnedXmlPart::capture_with_limits(
+            relationship_uri,
             crate::constants::content_type::OPC_RELATIONSHIPS.into(),
             bytes,
+            limits,
         )?;
         Ok(OwnedRelationships {
             owner,
@@ -672,5 +713,194 @@ mod tests {
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         assert_eq!(package.source_relationships(&owner).unwrap(), empty);
+    }
+
+    #[test]
+    fn bounded_relationship_capture_checks_retained_and_authored_quotas() {
+        let archive = source(XML);
+        let package = OpcPackage::from_bytes(&archive).unwrap();
+        let root = PackURI::new("/").unwrap();
+        let exact = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len())
+            .unwrap()
+            .max_part_bytes(XML.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            package
+                .source_relationships_with_limits(&root, exact)
+                .unwrap()
+                .bytes(),
+            XML
+        );
+
+        let root_member = root.rels_uri().unwrap().membername().len();
+        let root_name_exact = ReadLimits::builder()
+            .max_archive_member_name_bytes(root_member as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            package
+                .source_relationships_with_limits(&root, root_name_exact)
+                .is_ok()
+        );
+        let root_name_under = ReadLimits::builder()
+            .max_archive_member_name_bytes((root_member - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.source_relationships_with_limits(&root, root_name_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveMemberNameBytes,
+                actual,
+                maximum,
+            }) if actual == root_member as u64 && maximum == (root_member - 1) as u64
+        ));
+
+        let custom_owner = PackURI::new("/custom/item.bin").unwrap();
+        let custom_member = custom_owner.rels_uri().unwrap().membername().len();
+        let custom_name_exact = ReadLimits::builder()
+            .max_archive_member_name_bytes(custom_member as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            package
+                .source_relationships_with_limits(&custom_owner, custom_name_exact)
+                .is_ok()
+        );
+        let custom_name_under = ReadLimits::builder()
+            .max_archive_member_name_bytes((custom_member - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.source_relationships_with_limits(&custom_owner, custom_name_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveMemberNameBytes,
+                actual,
+                maximum,
+            }) if actual == custom_member as u64 && maximum == (custom_member - 1) as u64
+        ));
+
+        let under = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.source_relationships_with_limits(&root, under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            })
+        ));
+
+        let over = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len() + 1)
+            .unwrap()
+            .max_part_bytes((XML.len() + 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            package
+                .source_relationships_with_limits(&root, over)
+                .is_ok()
+        );
+
+        let mut authored = OpcPackage::new();
+        authored
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "https://example.test/a&b".to_owned(),
+                "rId1".to_owned(),
+                TargetMode::External,
+            )
+            .unwrap();
+        let authored_token = authored.source_relationships(&root).unwrap();
+        let authored_exact = ReadLimits::builder()
+            .max_relationship_xml_bytes(authored_token.bytes().len())
+            .unwrap()
+            .max_part_bytes(authored_token.bytes().len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            authored
+                .source_relationships_with_limits(&root, authored_exact)
+                .unwrap()
+                .bytes(),
+            authored_token.bytes()
+        );
+
+        let event_under = ReadLimits::builder()
+            .max_xml_events(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_relationships_with_limits(&root, event_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlEvents,
+                actual: 5,
+                maximum: 4,
+            })
+        ));
+        let depth_under = ReadLimits::builder()
+            .max_xml_depth(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_relationships_with_limits(&root, depth_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+        let aggregate_bytes_under = ReadLimits::builder()
+            .max_total_relationship_xml_bytes(authored_token.bytes().len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.source_relationships_with_limits(&root, aggregate_bytes_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlBytes,
+                ..
+            })
+        ));
+
+        let mut too_many = authored.clone();
+        too_many
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "https://example.test/c".to_owned(),
+                "rId2".to_owned(),
+                TargetMode::External,
+            )
+            .unwrap();
+        let count_limit = ReadLimits::builder()
+            .max_relationships_per_part(1)
+            .unwrap()
+            .max_total_relationships(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            too_many.source_relationships_with_limits(&root, count_limit),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipsPerPart,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
     }
 }

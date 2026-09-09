@@ -69,6 +69,71 @@ impl fmt::Debug for OwnedXmlPart {
 }
 
 impl OwnedXmlPart {
+    pub(crate) fn check_capture_member_name(name: &PackURI, limits: ReadLimits) -> Result<()> {
+        limits.check(
+            crate::ReadResource::ArchiveMemberNameBytes,
+            name.membername().len() as u64,
+            limits.max_archive_member_name_bytes(),
+        )
+    }
+
+    /// Check the member-name quota for the `.rels` URI derived from an owner
+    /// without constructing that URI.  This keeps a tight caller ceiling ahead
+    /// of the allocation performed by [`PackURI::rels_uri`].
+    pub(crate) fn check_derived_capture_member_name(
+        owner: &PackURI,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        let base_uri = owner.base_uri();
+        let prefix_len = if base_uri == "/" {
+            b"_rels/".len()
+        } else {
+            base_uri
+                .len()
+                .checked_sub(1)
+                .and_then(|length| length.checked_add(b"/_rels/".len()))
+                .ok_or_else(|| {
+                    OpcError::InvalidPackUri(
+                        "derived relationship member name length overflows".to_owned(),
+                    )
+                })?
+        };
+        let member_name_len = prefix_len
+            .checked_add(owner.filename().len())
+            .and_then(|length| length.checked_add(b".rels".len()))
+            .ok_or_else(|| {
+                OpcError::InvalidPackUri(
+                    "derived relationship member name length overflows".to_owned(),
+                )
+            })?;
+        limits.check(
+            crate::ReadResource::ArchiveMemberNameBytes,
+            member_name_len as u64,
+            limits.max_archive_member_name_bytes(),
+        )
+    }
+
+    /// Check the bounded resources that must be admitted before retaining or
+    /// parsing one owned XML publication.  Callers that have not allocated
+    /// the source/output bytes yet use this preflight to keep the fixed XML
+    /// ceiling and caller part quota ahead of that work.
+    pub(crate) fn check_capture_size(
+        name: &PackURI,
+        bytes_len: usize,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        Self::check_capture_member_name(name, limits)?;
+        limits.check(
+            crate::ReadResource::PartBytes,
+            bytes_len as u64,
+            limits.max_part_bytes(),
+        )?;
+        if bytes_len > MAX_OWNED_XML_BYTES {
+            return Err(invalid_source("owned XML exceeds 32 MiB"));
+        }
+        Ok(())
+    }
+
     /// Update attributes in one source scan and one output allocation.
     /// Updates must be ordered by opening-tag position; names within a tag
     /// must be unique. Namespace declarations and qualified names are refused.
@@ -270,13 +335,20 @@ impl OwnedXmlPart {
         content_type: String,
         bytes: Arc<Vec<u8>>,
     ) -> Result<Self> {
-        if bytes.len() > MAX_OWNED_XML_BYTES {
-            return Err(invalid_source("owned XML exceeds 32 MiB"));
-        }
+        Self::capture_with_limits(name, content_type, bytes, ReadLimits::default())
+    }
+
+    pub(crate) fn capture_with_limits(
+        name: PackURI,
+        content_type: String,
+        bytes: Arc<Vec<u8>>,
+        limits: ReadLimits,
+    ) -> Result<Self> {
+        Self::check_capture_size(&name, bytes.len(), limits)?;
         if !xml_minifier::audit::package::is_xml_part(name.as_str(), &content_type) {
             return Err(invalid_source("owned XML source is not an XML part"));
         }
-        validate_source_xml(&name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&name, &bytes, limits, None)?;
         Ok(Self {
             name,
             content_type,
@@ -1288,5 +1360,88 @@ mod tests {
             xml.replace("<s:empty />", "<s:empty ><new/></s:empty>")
                 .as_bytes()
         );
+    }
+
+    #[test]
+    fn bounded_owned_xml_capture_checks_part_quota_before_malformed_source() {
+        let name = PackURI::new("/part.xml").unwrap();
+        let malformed = Arc::new(b"<broken".to_vec());
+        let under = ReadLimits::builder()
+            .max_part_bytes((malformed.len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            OwnedXmlPart::capture_with_limits(
+                name.clone(),
+                "application/xml".to_owned(),
+                Arc::clone(&malformed),
+                under,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::PartBytes,
+                actual,
+                maximum,
+            }) if actual == malformed.len() as u64 && maximum == (malformed.len() - 1) as u64
+        ));
+
+        let exact = ReadLimits::builder()
+            .max_part_bytes(malformed.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            OwnedXmlPart::capture_with_limits(name, "application/xml".to_owned(), malformed, exact,),
+            Err(OpcError::XmlError(_))
+        ));
+    }
+
+    #[test]
+    fn bounded_owned_xml_capture_checks_member_name_and_fixed_size_before_xml() {
+        let name = PackURI::new("/part.xml").unwrap();
+        let member_name_bytes = name.membername().len();
+        let exact = ReadLimits::builder()
+            .max_archive_member_name_bytes(member_name_bytes as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            OwnedXmlPart::capture_with_limits(
+                name.clone(),
+                "application/xml".to_owned(),
+                Arc::new(b"<part/>".to_vec()),
+                exact,
+            )
+            .is_ok()
+        );
+
+        let under = ReadLimits::builder()
+            .max_archive_member_name_bytes((member_name_bytes - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            OwnedXmlPart::capture_with_limits(
+                name.clone(),
+                "application/xml".to_owned(),
+                Arc::new(b"<broken".to_vec()),
+                under,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::ArchiveMemberNameBytes,
+                actual,
+                maximum,
+            }) if actual == member_name_bytes as u64 && maximum == (member_name_bytes - 1) as u64
+        ));
+
+        assert!(matches!(
+            OwnedXmlPart::check_capture_size(
+                &name,
+                MAX_OWNED_XML_BYTES + 1,
+                ReadLimits::default(),
+            ),
+            Err(OpcError::SourceBackedOverlayUnavailable { reason })
+                if reason.contains("32 MiB")
+        ));
     }
 }

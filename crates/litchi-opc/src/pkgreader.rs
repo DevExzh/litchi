@@ -562,7 +562,17 @@ impl PackageReader {
         xml: &[u8],
         owner: &PackURI,
     ) -> Result<crate::Relationships> {
-        let limits = ReadLimits::default();
+        Self::parse_owned_relationships_with_limits(xml, owner, ReadLimits::default())
+    }
+
+    pub(crate) fn parse_owned_relationships_with_limits(
+        xml: &[u8],
+        owner: &PackURI,
+        limits: ReadLimits,
+    ) -> Result<crate::Relationships> {
+        crate::OwnedXmlPart::check_derived_capture_member_name(owner, limits)?;
+        let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        crate::OwnedXmlPart::check_capture_size(&relationship_uri, xml.len(), limits)?;
         let mut ledger = RelationshipLedger::default();
         ledger.preflight_xml_bytes(limits, xml.len() as u64)?;
         ledger.retain_xml_bytes(limits, xml.len() as u64)?;
