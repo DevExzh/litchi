@@ -3,6 +3,7 @@
 use super::codec::{checked_usize, crc32, invalid, limit};
 use super::model::{
     BOM, BackupLog, CRC_SIZE, FileEntry, FileGroupClass, GeneratedNameKind, MAX_PATH_BYTES,
+    StorageProfile,
 };
 use crate::error::Result;
 use std::collections::{HashMap, HashSet};
@@ -12,7 +13,14 @@ pub(super) fn validate_backup_log(
     directory: &[FileEntry],
     partitions: usize,
     backup: usize,
+    bytes: &[u8],
+    profile: StorageProfile,
 ) -> Result<()> {
+    if profile == StorageProfile::Tabular150 {
+        return super::tabular_paths::validate_backup_log(
+            log, directory, partitions, backup, bytes,
+        );
+    }
     let mut expected = HashMap::<String, &FileEntry>::new();
     for (index, entry) in directory.iter().enumerate() {
         if index != partitions && index != backup {
@@ -342,6 +350,7 @@ fn classify_idf(value: &str) -> Result<GeneratedNameKind> {
 }
 pub(super) fn validate_kind_location(kind: GeneratedNameKind, parents: &[&str]) -> Result<()> {
     let valid = match kind {
+        GeneratedNameKind::CryptographicKey => false,
         GeneratedNameKind::DatabaseDefinition => parents.is_empty(),
         GeneratedNameKind::DataSourceViewDefinition
         | GeneratedNameKind::CubeDefinition
@@ -408,6 +417,7 @@ pub(super) fn kind_allowed_for_group(kind: GeneratedNameKind, class: FileGroupCl
                 | GeneratedNameKind::MeasureGroupMetadata
                 | GeneratedNameKind::PartitionMetadata
                 | GeneratedNameKind::PartitionInformation
+                | GeneratedNameKind::CryptographicKey
         ),
     }
 }
@@ -477,9 +487,16 @@ pub(super) fn validate_allocations(
     directory_offset: usize,
     files: &mut [FileEntry],
     order: &[usize],
+    profile: StorageProfile,
 ) -> Result<()> {
+    let allocation_start = data_offset
+        + if profile == StorageProfile::Xldm140 {
+            BOM.len()
+        } else {
+            0
+        };
     let first_start = checked_usize(files[order[0]].offset.0, "file offset")?;
-    if first_start != data_offset + BOM.len() {
+    if first_start != allocation_start {
         return Err(invalid(
             "partition allocation must immediately follow the files-section byte-order mark",
         ));
@@ -500,15 +517,18 @@ pub(super) fn validate_allocations(
         let end = start
             .checked_add(size)
             .ok_or_else(|| limit("allocation range"))?;
-        if start < data_offset + BOM.len() || end > directory_offset {
+        if start < allocation_start || end > directory_offset {
             return Err(invalid(format!(
                 "allocation '{}' crosses the files-section boundary",
                 entry.path
             )));
         }
         if position > 0 {
+            if start < previous_end {
+                return Err(invalid("overlapping MS-XLDM file allocations"));
+            }
             let gap = &bytes[previous_end..start];
-            if position == last_position {
+            if position == last_position && profile == StorageProfile::Xldm140 {
                 if gap != BOM {
                     return Err(invalid(
                         "backup log must be preceded by exactly one byte-order mark",
@@ -522,6 +542,11 @@ pub(super) fn validate_allocations(
         }
         let payload_end = end - CRC_SIZE;
         let expected = crc32(&bytes[start..payload_end]);
+        let expected = if profile == StorageProfile::Tabular150 {
+            !expected
+        } else {
+            expected
+        };
         let marker =
             u32::from_le_bytes(bytes[payload_end..end].try_into().unwrap_or_else(|error| {
                 crate::error::panic_error_invariant(

@@ -6,8 +6,9 @@ use super::codec::{
 };
 use super::model::{
     BackupLog, FileGroup, FileGroupClass, GeneratedPath, LoggedFile, MAX_FILES, MAX_PARTITIONS,
-    Node, WriteAccess, XmlEncoding,
+    Node, StorageProfile, WriteAccess, XmlEncoding,
 };
+use super::tabular_paths::{classify_tabular_source_path, kind_allowed_for_native_group};
 use super::validation::{
     classify_generated_name, kind_allowed_for_group, normalize_generated_path,
     validate_generated_hierarchy, validate_kind_location,
@@ -32,7 +33,11 @@ pub fn classify_generated_path(path: &str) -> Result<GeneratedPath> {
     })
 }
 
-pub(super) fn parse_backup_log(root: &Node, encoding: XmlEncoding) -> Result<BackupLog> {
+pub(super) fn parse_backup_log(
+    root: &Node,
+    encoding: XmlEncoding,
+    profile: StorageProfile,
+) -> Result<BackupLog> {
     let names = [
         "BackupRestoreSyncVersion",
         "ServerRoot",
@@ -50,23 +55,28 @@ pub(super) fn parse_backup_log(root: &Node, encoding: XmlEncoding) -> Result<Bac
         "FileGroups",
     ];
     let values = exact_children(root, "BackupLog", &names)?;
-    let backup_restore_sync_version = i32_value(values[0])?;
-    if backup_restore_sync_version != 1153 {
-        return Err(invalid(
-            "backup-log BackupRestoreSyncVersion must equal 1153",
-        ));
-    }
+    let backup_restore_sync_version = parse_backup_restore_sync_version(values[0], profile)?;
     let server_root = bounded_leaf(values[1], "server root")?;
     if !bool_value(values[2])? {
         return Err(invalid("backup-log SvrEncryptPwdFlag must be true"));
     }
-    if bool_value(values[3])?
-        || bool_value(values[4])?
-        || bool_value(values[5])?
-        || bool_value(values[6])?
-    {
+    let binary_xml = bool_value(values[3])?;
+    let server_compression = bool_value(values[4])?;
+    let compression = bool_value(values[5])?;
+    let encryption = bool_value(values[6])?;
+    if binary_xml || server_compression || encryption {
         return Err(invalid(
-            "backup-log binary XML, compression, and encryption flags must be false",
+            "backup-log binary XML, server compression, and encryption flags must be false",
+        ));
+    }
+    if profile == StorageProfile::Xldm140 && compression {
+        return Err(invalid(
+            "backup-log compression flag must be false for the version-140 profile",
+        ));
+    }
+    if profile == StorageProfile::Tabular150 && !compression {
+        return Err(invalid(
+            "backup-log compression flag must be true for the tabular version-150 profile",
         ));
     }
     let object_name = bounded_leaf(values[7], "object name")?;
@@ -78,9 +88,15 @@ pub(super) fn parse_backup_log(root: &Node, encoding: XmlEncoding) -> Result<Bac
         _ => return Err(invalid("unknown backup-log Write value")),
     };
     let is_olap = bool_value(values[10])?;
-    let collations = parse_repeated_strings(values[11], "Collations", "Collation", "collation")?;
+    let collations = parse_repeated_strings(
+        values[11],
+        "Collations",
+        "Collation",
+        "collation",
+        profile == StorageProfile::Tabular150,
+    )?;
     let languages = parse_languages(values[12])?;
-    let file_groups = parse_file_groups(values[13])?;
+    let file_groups = parse_file_groups(values[13], profile, &server_root)?;
     Ok(BackupLog {
         backup_restore_sync_version,
         server_root,
@@ -95,16 +111,36 @@ pub(super) fn parse_backup_log(root: &Node, encoding: XmlEncoding) -> Result<Bac
     })
 }
 
+fn parse_backup_restore_sync_version(node: &Node, profile: StorageProfile) -> Result<i32> {
+    match profile {
+        StorageProfile::Xldm140 => {
+            let value = i32_value(node)?;
+            if value == 1153 {
+                Ok(value)
+            } else {
+                Err(invalid(
+                    "backup-log BackupRestoreSyncVersion must equal 1153",
+                ))
+            }
+        },
+        StorageProfile::Tabular150 if leaf_text(node)?.trim() == "11.53" => Ok(1153),
+        StorageProfile::Tabular150 => Err(invalid(
+            "tabular backup-log BackupRestoreSyncVersion must equal 11.53",
+        )),
+    }
+}
+
 fn parse_repeated_strings(
     node: &Node,
     root: &str,
     child: &str,
     label: &str,
+    allow_empty: bool,
 ) -> Result<Vec<String>> {
     if node.name != root
         || node.attributes != 0
         || !node.text.trim().is_empty()
-        || node.children.is_empty()
+        || (!allow_empty && node.children.is_empty())
     {
         return Err(invalid(format!("{root} must contain at least one {child}")));
     }
@@ -151,7 +187,11 @@ fn parse_languages(node: &Node) -> Result<Vec<i32>> {
     Ok(output)
 }
 
-fn parse_file_groups(node: &Node) -> Result<Vec<FileGroup>> {
+fn parse_file_groups(
+    node: &Node,
+    profile: StorageProfile,
+    server_root: &str,
+) -> Result<Vec<FileGroup>> {
     if node.name != "FileGroups"
         || node.attributes != 0
         || !node.text.trim().is_empty()
@@ -195,7 +235,7 @@ fn parse_file_groups(node: &Node) -> Result<Vec<FileGroup>> {
         if !identities.insert((class, object_id.clone())) {
             return Err(invalid("duplicate file-group class and ObjectID"));
         }
-        let files = parse_logged_files(values[8], class)?;
+        let files = parse_logged_files(values[8], class, profile, server_root)?;
         total_files = total_files
             .checked_add(files.len())
             .ok_or_else(|| limit("logged file count"))?;
@@ -217,7 +257,12 @@ fn parse_file_groups(node: &Node) -> Result<Vec<FileGroup>> {
     Ok(output)
 }
 
-fn parse_logged_files(node: &Node, class: FileGroupClass) -> Result<Vec<LoggedFile>> {
+fn parse_logged_files(
+    node: &Node,
+    class: FileGroupClass,
+    profile: StorageProfile,
+    server_root: &str,
+) -> Result<Vec<LoggedFile>> {
     if node.name != "FileList"
         || node.attributes != 0
         || !node.text.trim().is_empty()
@@ -240,8 +285,17 @@ fn parse_logged_files(node: &Node, class: FileGroupClass) -> Result<Vec<LoggedFi
             if signed_size < 0 {
                 return Err(invalid("logged file size cannot be negative"));
             }
-            let generated = classify_generated_path(&storage_path)?;
-            if !kind_allowed_for_group(generated.kind, class) {
+            let generated = match profile {
+                StorageProfile::Xldm140 => classify_generated_path(&storage_path)?,
+                StorageProfile::Tabular150 => {
+                    classify_tabular_source_path(&source_path, server_root)?
+                },
+            };
+            let allowed = match profile {
+                StorageProfile::Xldm140 => kind_allowed_for_group(generated.kind, class),
+                StorageProfile::Tabular150 => kind_allowed_for_native_group(generated.kind, class),
+            };
+            if !allowed {
                 return Err(invalid(format!(
                     "generated path '{}' is incompatible with file-group class {}",
                     storage_path,

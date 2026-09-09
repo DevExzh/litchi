@@ -167,6 +167,11 @@ pub fn parse_system_generated_file<'a>(
 pub fn inspect_system_generated<'a>(
     storage: &'a Storage<'a>,
 ) -> GeneratedDataResult<SystemGeneratedModel<'a>> {
+    if storage.profile() != super::StorageProfile::Xldm140 {
+        return Err(GeneratedDataError::new(
+            "version-150 compressed logical members require owned inner-model decoding",
+        ));
+    }
     let mut files = Vec::new();
     for group in &storage.backup_log.file_groups {
         for logged in &group.files {

@@ -3,12 +3,12 @@
 use super::model::{
     BOM, CRC_SIZE, Compression, FileEntry, FileKind, Header, MAX_DIRECTORY_BYTES, MAX_FILES,
     MAX_PARTITIONS, MAX_PATH_BYTES, MAX_STORAGE_BYTES, MAX_XML_DEPTH, MAX_XML_NODES,
-    MAX_XML_TEXT_BYTES, Node, Offset, PartitionMarker, Size, Storage, XLDM_PAGE_SIZE,
-    XLDM_STREAM_SIGNATURE, XmlEncoding,
+    MAX_XML_TEXT_BYTES, Node, Offset, PartitionMarker, Size, Storage, StorageProfile,
+    XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, XmlEncoding,
 };
 use super::semantic::parse_backup_log;
 use super::validation::{validate_allocations, validate_backup_log, validate_paths};
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, allocation};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
@@ -45,6 +45,11 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     }
     let (header_xml, header_encoding) = decode_xml(&bytes[header_xml_start..header_xml_end], true)?;
     let header = parse_header(&parse_xml(&header_xml)?)?;
+    let profile = if header.backup_restore_sync_version == 140 {
+        StorageProfile::Xldm140
+    } else {
+        StorageProfile::Tabular150
+    };
     let data_offset = checked_usize(header.data_offset.0, "data offset")?;
     let directory_offset = checked_usize(header.directory_offset.0, "directory offset")?;
     let directory_size = checked_usize(header.directory_size.0, "directory size")?;
@@ -96,19 +101,27 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     validate_paths(&files)?;
     let mut order: Vec<usize> = (0..files.len()).collect();
     order.sort_by_key(|index| files[*index].offset);
-    validate_allocations(bytes, data_offset, directory_offset, &mut files, &order)?;
+    validate_allocations(
+        bytes,
+        data_offset,
+        directory_offset,
+        &mut files,
+        &order,
+        profile,
+    )?;
     let first = order[0];
     let partition_bytes = payload_slice(bytes, &files[first])?;
-    let (partitions_xml, partition_encoding) = decode_xml(partition_bytes, false)?;
-    let partition_count = parse_partitions(&parse_xml(&partitions_xml)?)?;
+    let (partitions_xml, partition_encoding) = decode_marker_xml(partition_bytes, profile)?;
+    let partition_count = parse_partitions(&parse_xml(&partitions_xml)?, profile)?;
     files[first].kind = FileKind::Partitions;
     let last = *order.last().unwrap_or_else(|| {
         crate::error::panic_missing_invariant("required value was checked before extraction")
     });
     files[last].kind = FileKind::BackupLog;
-    let (backup_xml, backup_encoding) = decode_xml(payload_slice(bytes, &files[last])?, false)?;
-    let backup_log = parse_backup_log(&parse_xml(&backup_xml)?, backup_encoding)?;
-    validate_backup_log(&backup_log, &files, first, last)?;
+    let (backup_xml, backup_encoding) =
+        decode_marker_xml(payload_slice(bytes, &files[last])?, profile)?;
+    let backup_log = parse_backup_log(&parse_xml(&backup_xml)?, backup_encoding, profile)?;
+    validate_backup_log(&backup_log, &files, first, last, bytes, profile)?;
     Ok(Storage {
         header,
         header_encoding,
@@ -121,6 +134,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
         backup_log,
         files,
         bytes,
+        profile,
     })
 }
 
@@ -155,8 +169,10 @@ fn parse_header(root: &Node) -> Result<Header> {
     ];
     let values = exact_children(root, "BackupLog", &names)?;
     let backup_restore_sync_version = i32_value(values[0])?;
-    if backup_restore_sync_version != 140 {
-        return Err(invalid("BackupRestoreSyncVersion must equal 140"));
+    if !matches!(backup_restore_sync_version, 140 | 150) {
+        return Err(Error::Unsupported {
+            feature: "XLDM header version",
+        });
     }
     if bool_value(values[1])? {
         return Err(invalid("header Fault must be false"));
@@ -246,31 +262,53 @@ fn parse_directory(root: &Node) -> Result<Vec<FileEntry>> {
         .collect()
 }
 
-fn parse_partitions(root: &Node) -> Result<usize> {
+fn parse_partitions(root: &Node, profile: StorageProfile) -> Result<usize> {
     if root.name != "Partitions" || root.attributes != 0 || !root.text.trim().is_empty() {
         return Err(invalid("expected attribute-free Partitions root"));
     }
     if root.children.len() > MAX_PARTITIONS {
         return Err(limit("partition count"));
     }
-    let names = [
-        "ObjectPath",
-        "Name",
-        "DataSize",
-        "Location",
-        "DataSourceID",
-        "ConnectionString",
-    ];
+    let names: &[&str] = match profile {
+        StorageProfile::Xldm140 => &[
+            "ObjectPath",
+            "Name",
+            "DataSize",
+            "Location",
+            "DataSourceID",
+            "ConnectionString",
+        ],
+        StorageProfile::Tabular150 => &[
+            "ObjectPath",
+            "Name",
+            "DataSize",
+            "Location",
+            "DataSourceID",
+            "DataSourceName",
+            "ConnectionString",
+        ],
+    };
     for partition in &root.children {
-        let values = exact_children(partition, "Partition", &names)?;
+        let values = exact_children(partition, "Partition", names)?;
         let _ = i64_value(values[2])?;
-        for index in [0usize, 1, 3, 4, 5] {
-            if leaf_text(values[index])?.len() > MAX_XML_TEXT_BYTES {
+        for value in &values {
+            if leaf_text(value)?.len() > MAX_XML_TEXT_BYTES {
                 return Err(limit("partition field bytes"));
             }
         }
     }
     Ok(root.children.len())
+}
+
+fn decode_marker_xml(bytes: &[u8], profile: StorageProfile) -> Result<(String, XmlEncoding)> {
+    if profile == StorageProfile::Tabular150 {
+        let bytes = bytes
+            .strip_prefix(&BOM)
+            .ok_or_else(|| invalid("tabular XML marker BOM is missing"))?;
+        decode_xml(bytes, true)
+    } else {
+        decode_xml(bytes, false)
+    }
 }
 
 fn payload_slice<'a>(bytes: &'a [u8], entry: &FileEntry) -> Result<&'a [u8]> {
@@ -461,28 +499,53 @@ pub(super) fn i32_value(node: &Node) -> Result<i32> {
         .map_err(|_source| invalid(format!("{} is not a signed 32-bit integer", node.name)))
 }
 
-fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XmlEncoding)> {
+pub(super) fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XmlEncoding)> {
     if bytes.is_empty() {
         return Err(invalid("empty XML allocation"));
     }
     if bytes.starts_with(&BOM) {
         return Err(invalid("unexpected XML byte-order mark"));
     }
-    if require_utf16 || bytes.get(1) == Some(&0) {
+    let utf16 = require_utf16 || bytes.get(1) == Some(&0);
+    if utf16 {
+        let encoded_limit = MAX_DIRECTORY_BYTES
+            .checked_mul(2)
+            .ok_or_else(|| limit("XML bytes"))?;
+        if bytes.len() > encoded_limit {
+            return Err(limit("XML bytes"));
+        }
         if !bytes.len().is_multiple_of(2) {
             return Err(invalid("odd-length UTF-16LE XML"));
         }
-        let words: Vec<u16> = bytes
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
-        Ok((
-            String::from_utf16(&words).map_err(xml_error)?,
-            XmlEncoding::Utf16Le,
-        ))
+        let words = || {
+            bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| u16::from_le_bytes(*pair))
+        };
+        let mut decoded_bytes = 0usize;
+        for value in std::char::decode_utf16(words()) {
+            let character = value.map_err(xml_error)?;
+            decoded_bytes = decoded_bytes
+                .checked_add(character.len_utf8())
+                .ok_or_else(|| limit("XML bytes"))?;
+            if decoded_bytes > MAX_DIRECTORY_BYTES {
+                return Err(limit("XML bytes"));
+            }
+        }
+        let mut output = String::new();
+        output
+            .try_reserve_exact(decoded_bytes)
+            .map_err(|source| allocation("MS-XLDM XML bytes", source))?;
+        for value in std::char::decode_utf16(words()) {
+            output.push(value.map_err(xml_error)?);
+        }
+        Ok((output, XmlEncoding::Utf16Le))
     } else {
+        if bytes.len() > MAX_DIRECTORY_BYTES {
+            return Err(limit("XML bytes"));
+        }
         Ok((
             std::str::from_utf8(bytes).map_err(xml_error)?.to_owned(),
             XmlEncoding::Utf8,

@@ -49,7 +49,8 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<
         GeneratedNameKind::ColumnHierarchyMetadata => MetadataFileKind::ColumnHierarchy,
         GeneratedNameKind::UserHierarchyMetadata => MetadataFileKind::UserHierarchy,
         GeneratedNameKind::TableRelationshipMetadata => MetadataFileKind::TableRelationship,
-        GeneratedNameKind::DatabaseDefinition
+        GeneratedNameKind::CryptographicKey
+        | GeneratedNameKind::DatabaseDefinition
         | GeneratedNameKind::DataSourceViewDefinition
         | GeneratedNameKind::CubeDefinition
         | GeneratedNameKind::DataSourceOrDimensionDefinition
@@ -90,6 +91,11 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<
 
 /// Discover every logged `.tbl.xml` member and derive its section 2.3 policy.
 pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>> {
+    if storage.profile() != super::super::StorageProfile::Xldm140 {
+        return Err(MetadataError::new(
+            "version-150 compressed logical members require owned inner-model decoding",
+        ));
+    }
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     for group in &storage.backup_log.file_groups {

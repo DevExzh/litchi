@@ -27,6 +27,15 @@ pub enum Compression {
     Xpress,
 }
 
+/// Storage rules selected from the header, retained through exact writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageProfile {
+    /// Canonical MS-XLDM version-140 storage and metadata.
+    Xldm140,
+    /// Version-150 tabular compatibility rules backed by the native fixture.
+    Tabular150,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind {
     Partitions,
@@ -88,6 +97,7 @@ impl FileGroupClass {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GeneratedNameKind {
+    CryptographicKey,
     DatabaseDefinition,
     DataSourceViewDefinition,
     CubeDefinition,
@@ -116,6 +126,8 @@ pub enum GeneratedNameKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeneratedPath {
+    /// Logical path relative to the model's storage root. In the tabular profile
+    /// this comes from the source Path, separately from the opaque StoragePath key.
     pub normalized_path: String,
     pub kind: GeneratedNameKind,
 }
@@ -125,6 +137,7 @@ pub struct LoggedFile {
     pub source_path: String,
     pub storage_path: String,
     pub last_write_timestamp: i64,
+    /// Stored payload bytes for Xldm140; decoded member bytes for Tabular150.
     pub size: u32,
     pub generated: GeneratedPath,
 }
@@ -145,6 +158,8 @@ pub struct FileGroup {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackupLog {
+    /// Semantic version 1153. Tabular150's lexical spelling is 11.53; the
+    /// original spelling remains in the retained storage bytes.
     pub backup_restore_sync_version: i32,
     /// Originating filesystem root; retained as text and never accessed.
     pub server_root: String,
@@ -209,9 +224,15 @@ pub struct Storage<'a> {
     pub backup_log: BackupLog,
     pub files: Vec<FileEntry>,
     pub(super) bytes: &'a [u8],
+    pub(super) profile: StorageProfile,
 }
 
 impl Storage<'_> {
+    #[must_use]
+    pub fn profile(&self) -> StorageProfile {
+        self.profile
+    }
+
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.bytes

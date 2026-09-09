@@ -1,0 +1,772 @@
+{
+  "fixture": "tdf167689_x15_namespace.xlsx",
+  "sha256": "b9064db5694c5e60928a7b6732aabf440c7d2f997d907834e38f927342ec8688",
+  "model_sha256": "c0cbb38b2f6dd0163da6be154ab13891d458113d3410fbb07ceab64def71b8d4",
+  "header_version": "150",
+  "backup_log_version": "11.53",
+  "directory_offset": 90112,
+  "directory_size": 26562,
+  "complemented_crc_matches": 48,
+  "raw_frames": 3,
+  "compressed_frames": 75,
+  "members": [
+    {
+      "storage_path": "C7CCDAAB8C848F1B7A0",
+      "offset": 4584,
+      "stored_without_crc": 1077,
+      "decoded_from_backup_log": 3877,
+      "frames": [
+        {
+          "original": 3877,
+          "stored": 1073,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "48C1D90C36044D6AE60",
+      "offset": 5665,
+      "stored_without_crc": 148,
+      "decoded_from_backup_log": 144,
+      "frames": [
+        {
+          "original": 144,
+          "stored": 144,
+          "raw": true
+        }
+      ]
+    },
+    {
+      "storage_path": "22851B8F9C74D1BB034",
+      "offset": 5817,
+      "stored_without_crc": 1936,
+      "decoded_from_backup_log": 7692,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1200,
+          "raw": false
+        },
+        {
+          "original": 3596,
+          "stored": 728,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "ECAF293734743F19EF0",
+      "offset": 7757,
+      "stored_without_crc": 135,
+      "decoded_from_backup_log": 169,
+      "frames": [
+        {
+          "original": 169,
+          "stored": 131,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "A9C8D1BB71F04FB4A1B7",
+      "offset": 7896,
+      "stored_without_crc": 2203,
+      "decoded_from_backup_log": 6497,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1563,
+          "raw": false
+        },
+        {
+          "original": 2401,
+          "stored": 632,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "842FB183798A4261A9E3",
+      "offset": 10103,
+      "stored_without_crc": 1195,
+      "decoded_from_backup_log": 3114,
+      "frames": [
+        {
+          "original": 3114,
+          "stored": 1191,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "A20B403EB3FE44E2A284",
+      "offset": 11302,
+      "stored_without_crc": 224,
+      "decoded_from_backup_log": 405,
+      "frames": [
+        {
+          "original": 405,
+          "stored": 220,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "763C81EF75CE43F3A0B6",
+      "offset": 11530,
+      "stored_without_crc": 1047,
+      "decoded_from_backup_log": 2535,
+      "frames": [
+        {
+          "original": 2535,
+          "stored": 1043,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "BE1FEEF449014CF7BF8E",
+      "offset": 12581,
+      "stored_without_crc": 8992,
+      "decoded_from_backup_log": 33156,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1051,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1534,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1073,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1023,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1046,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1038,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 990,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 971,
+          "raw": false
+        },
+        {
+          "original": 388,
+          "stored": 230,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "C95254F2A5A24C07B829",
+      "offset": 21577,
+      "stored_without_crc": 792,
+      "decoded_from_backup_log": 4701,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 477,
+          "raw": false
+        },
+        {
+          "original": 605,
+          "stored": 307,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "8233AA8A4CD6496A87C7",
+      "offset": 22373,
+      "stored_without_crc": 33,
+      "decoded_from_backup_log": 152,
+      "frames": [
+        {
+          "original": 152,
+          "stored": 29,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "B1D8CD9FDB044E4C9995",
+      "offset": 22410,
+      "stored_without_crc": 22,
+      "decoded_from_backup_log": 144,
+      "frames": [
+        {
+          "original": 144,
+          "stored": 18,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "FDD039009CA940E1A582",
+      "offset": 22436,
+      "stored_without_crc": 83,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 79,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "EDB6820ADB34450C8EC9",
+      "offset": 22523,
+      "stored_without_crc": 140,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 136,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "8ADAE6B1FE1C4EBF8A2C",
+      "offset": 22667,
+      "stored_without_crc": 45,
+      "decoded_from_backup_log": 168,
+      "frames": [
+        {
+          "original": 168,
+          "stored": 41,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "ADAD6B653503472CACBA",
+      "offset": 22716,
+      "stored_without_crc": 1656,
+      "decoded_from_backup_log": 5965,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1049,
+          "raw": false
+        },
+        {
+          "original": 1869,
+          "stored": 599,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "C4C86899A96847CCAEBC",
+      "offset": 24376,
+      "stored_without_crc": 33,
+      "decoded_from_backup_log": 152,
+      "frames": [
+        {
+          "original": 152,
+          "stored": 29,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "FB9815629EF94079A89B",
+      "offset": 24413,
+      "stored_without_crc": 43,
+      "decoded_from_backup_log": 168,
+      "frames": [
+        {
+          "original": 168,
+          "stored": 39,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "490AB0DA5485424390FC",
+      "offset": 24460,
+      "stored_without_crc": 35,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 31,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "AF7BD31575C4083AF41",
+      "offset": 24499,
+      "stored_without_crc": 24,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 20,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "7257C3BBFD84F5D8C6",
+      "offset": 24527,
+      "stored_without_crc": 38,
+      "decoded_from_backup_log": 168,
+      "frames": [
+        {
+          "original": 168,
+          "stored": 34,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "ADB1DCBE2E65407BB0C1",
+      "offset": 24569,
+      "stored_without_crc": 13228,
+      "decoded_from_backup_log": 48873,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1253,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1102,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1037,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1069,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1146,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1189,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1089,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 966,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1171,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1137,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 1057,
+          "raw": false
+        },
+        {
+          "original": 3817,
+          "stored": 964,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "9EDF4D3CD7E4F86B442",
+      "offset": 37801,
+      "stored_without_crc": 37,
+      "decoded_from_backup_log": 160,
+      "frames": [
+        {
+          "original": 160,
+          "stored": 33,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "A73B681AC2E640619F63",
+      "offset": 37842,
+      "stored_without_crc": 101,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 97,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "8828AB3037114C968E46",
+      "offset": 37947,
+      "stored_without_crc": 45,
+      "decoded_from_backup_log": 72,
+      "frames": [
+        {
+          "original": 72,
+          "stored": 41,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "C4FF283229D74EFDA95",
+      "offset": 37996,
+      "stored_without_crc": 1506,
+      "decoded_from_backup_log": 5020,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1052,
+          "raw": false
+        },
+        {
+          "original": 924,
+          "stored": 446,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "EB3341F8D650461684D3",
+      "offset": 39506,
+      "stored_without_crc": 2497,
+      "decoded_from_backup_log": 10589,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1050,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 835,
+          "raw": false
+        },
+        {
+          "original": 2397,
+          "stored": 600,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "EDDC262A52F40A09FFB",
+      "offset": 42007,
+      "stored_without_crc": 38,
+      "decoded_from_backup_log": 168,
+      "frames": [
+        {
+          "original": 168,
+          "stored": 34,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "96D93D4B643349CAA516",
+      "offset": 42049,
+      "stored_without_crc": 83,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 79,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "6C9BE0FB502A4E85ADD9",
+      "offset": 42136,
+      "stored_without_crc": 1518,
+      "decoded_from_backup_log": 5020,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1063,
+          "raw": false
+        },
+        {
+          "original": 924,
+          "stored": 447,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "FD98DCB9F69D4ECE9F8A",
+      "offset": 43658,
+      "stored_without_crc": 1657,
+      "decoded_from_backup_log": 5969,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1052,
+          "raw": false
+        },
+        {
+          "original": 1873,
+          "stored": 597,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "BF02BB9A5A9942FCA8DF",
+      "offset": 45319,
+      "stored_without_crc": 1519,
+      "decoded_from_backup_log": 5021,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1065,
+          "raw": false
+        },
+        {
+          "original": 925,
+          "stored": 446,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "8B67F96CDE3646AF9FBB",
+      "offset": 46842,
+      "stored_without_crc": 95,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 91,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "FA7B28187E7E4142AC82",
+      "offset": 46941,
+      "stored_without_crc": 1520,
+      "decoded_from_backup_log": 5020,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1060,
+          "raw": false
+        },
+        {
+          "original": 924,
+          "stored": 452,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "B34DFC3EF1B64A169A21",
+      "offset": 48465,
+      "stored_without_crc": 86,
+      "decoded_from_backup_log": 155,
+      "frames": [
+        {
+          "original": 155,
+          "stored": 82,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "DFB5B4F639A4449F9628",
+      "offset": 48555,
+      "stored_without_crc": 52,
+      "decoded_from_backup_log": 48,
+      "frames": [
+        {
+          "original": 48,
+          "stored": 48,
+          "raw": true
+        }
+      ]
+    },
+    {
+      "storage_path": "9941721C67CA41EBB989",
+      "offset": 48611,
+      "stored_without_crc": 86,
+      "decoded_from_backup_log": 155,
+      "frames": [
+        {
+          "original": 155,
+          "stored": 82,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "79D83D85EC4A47F7AA69",
+      "offset": 48701,
+      "stored_without_crc": 52,
+      "decoded_from_backup_log": 48,
+      "frames": [
+        {
+          "original": 48,
+          "stored": 48,
+          "raw": true
+        }
+      ]
+    },
+    {
+      "storage_path": "C433B4D460F6485A949A",
+      "offset": 48757,
+      "stored_without_crc": 32,
+      "decoded_from_backup_log": 56,
+      "frames": [
+        {
+          "original": 56,
+          "stored": 28,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "BAFE1659938A47D182A4",
+      "offset": 48793,
+      "stored_without_crc": 2520,
+      "decoded_from_backup_log": 10610,
+      "frames": [
+        {
+          "original": 4096,
+          "stored": 1060,
+          "raw": false
+        },
+        {
+          "original": 4096,
+          "stored": 841,
+          "raw": false
+        },
+        {
+          "original": 2418,
+          "stored": 607,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "BB61FB907D2A4F91ADF",
+      "offset": 51317,
+      "stored_without_crc": 34,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 30,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "188BF754A5374C44AB9B",
+      "offset": 51355,
+      "stored_without_crc": 32,
+      "decoded_from_backup_log": 152,
+      "frames": [
+        {
+          "original": 152,
+          "stored": 28,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "B16573E520C4CC9ACC0",
+      "offset": 51391,
+      "stored_without_crc": 22,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 18,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "9D20507395A84294AAF2",
+      "offset": 51417,
+      "stored_without_crc": 95,
+      "decoded_from_backup_log": 1213,
+      "frames": [
+        {
+          "original": 1213,
+          "stored": 91,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "578562B8EA3A460190C2",
+      "offset": 51516,
+      "stored_without_crc": 35,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 31,
+          "raw": false
+        }
+      ]
+    },
+    {
+      "storage_path": "C284DA99260047C1B593",
+      "offset": 51555,
+      "stored_without_crc": 34,
+      "decoded_from_backup_log": 64,
+      "frames": [
+        {
+          "original": 64,
+          "stored": 30,
+          "raw": false
+        }
+      ]
+    }
+  ]
+}

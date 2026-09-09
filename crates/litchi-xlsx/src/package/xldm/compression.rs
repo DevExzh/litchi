@@ -5,6 +5,18 @@
 
 use std::fmt;
 
+mod xpress_stream;
+pub use xpress_stream::{XpressFraming, decompress_xpress_framed};
+
+/// Validate frame ranges and declared output size without decoding the payload.
+pub(super) fn xpress_stream_size(
+    input: &[u8],
+    framing: XpressFraming,
+    limits: CodecLimits,
+) -> CodecResult<usize> {
+    xpress_stream::stream_size(input, framing, limits)
+}
+
 const XPRESS_BLOCK_MAX: usize = 65_535;
 const XPRESS_LITERAL_BLOCK: usize = 58_000;
 
@@ -774,12 +786,32 @@ pub fn decompress_xpress_block(
     if input.len() > XPRESS_BLOCK_MAX || expected_size > XPRESS_BLOCK_MAX {
         return Err(CodecError::Invalid("Xpress block exceeds 65,535 bytes"));
     }
+    if input.len() > limits.max_input_bytes {
+        return Err(CodecError::LimitExceeded("max_input_bytes"));
+    }
     checked_output(expected_size, 1, limits)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(expected_size)
+        .map_err(|_| CodecError::LimitExceeded("Xpress output allocation"))?;
+    decode_xpress_block_into(input, expected_size, limits, &mut output)?;
+    Ok(output)
+}
+
+fn decode_xpress_block_into(
+    input: &[u8],
+    expected_size: usize,
+    limits: CodecLimits,
+    output: &mut Vec<u8>,
+) -> CodecResult<()> {
+    let base = output.len();
+    let end = base
+        .checked_add(expected_size)
+        .ok_or(CodecError::IntegerOverflow)?;
     let mut input_position = 0usize;
     let mut flags = 0u32;
     let mut flag_count = 0u8;
     let mut saved_nibble = None::<u8>;
-    let mut output = Vec::with_capacity(expected_size);
     loop {
         if flag_count == 0 {
             flags = u32::from_le_bytes(
@@ -794,7 +826,7 @@ pub fn decompress_xpress_block(
         flag_count -= 1;
         let is_match = flags & (1u32 << flag_count) != 0;
         if !is_match {
-            if output.len() >= expected_size {
+            if output.len() >= end {
                 return Err(CodecError::Invalid(
                     "Xpress block expands beyond declared size",
                 ));
@@ -803,12 +835,12 @@ pub fn decompress_xpress_block(
             continue;
         }
         if input_position == input.len() {
-            if output.len() != expected_size {
+            if output.len() != end {
                 return Err(CodecError::Invalid(
                     "Xpress end marker precedes declared size",
                 ));
             }
-            return Ok(output);
+            return Ok(());
         }
         let match_bytes = u16::from_le_bytes(
             take(input, &mut input_position, 2)?
@@ -859,14 +891,14 @@ pub fn decompress_xpress_block(
             length = length.checked_add(7).ok_or(CodecError::IntegerOverflow)?;
         }
         length = length.checked_add(3).ok_or(CodecError::IntegerOverflow)?;
-        if offset > output.len() {
+        if offset > output.len() - base {
             return Err(CodecError::Invalid("Xpress match offset precedes output"));
         }
         let new_size = output
             .len()
             .checked_add(length)
             .ok_or(CodecError::IntegerOverflow)?;
-        if new_size > expected_size || new_size > limits.max_output_bytes {
+        if new_size > end || new_size > limits.max_output_bytes {
             return Err(CodecError::LimitExceeded("Xpress expanded block size"));
         }
         for _ in 0..length {
@@ -920,47 +952,9 @@ pub fn compress_xpress_block_literals(input: &[u8], limits: CodecLimits) -> Code
     Ok(output)
 }
 
+/// Decode the signed-32-bit framing specified by MS-WUSP 2.1.1.
 pub fn decompress_xpress(input: &[u8], limits: CodecLimits) -> CodecResult<Vec<u8>> {
-    if input.len() > limits.max_input_bytes {
-        return Err(CodecError::LimitExceeded("max_input_bytes"));
-    }
-    let mut position = 0usize;
-    let mut output = Vec::new();
-    while position < input.len() {
-        let original = i32::from_le_bytes(
-            take(input, &mut position, 4)?
-                .try_into()
-                .unwrap_or_else(|error| {
-                    crate::error::panic_error_invariant("length checked", error)
-                }),
-        );
-        let compressed = i32::from_le_bytes(
-            take(input, &mut position, 4)?
-                .try_into()
-                .unwrap_or_else(|error| {
-                    crate::error::panic_error_invariant("length checked", error)
-                }),
-        );
-        let original = usize::try_from(original)
-            .map_err(|_source| CodecError::Invalid("negative Xpress original block size"))?;
-        let compressed = usize::try_from(compressed)
-            .map_err(|_source| CodecError::Invalid("negative Xpress compressed block size"))?;
-        if original > XPRESS_BLOCK_MAX || compressed > XPRESS_BLOCK_MAX {
-            return Err(CodecError::Invalid(
-                "Xpress block header exceeds 65,535 bytes",
-            ));
-        }
-        let new_size = output
-            .len()
-            .checked_add(original)
-            .ok_or(CodecError::IntegerOverflow)?;
-        if new_size > limits.max_output_bytes {
-            return Err(CodecError::LimitExceeded("max_output_bytes"));
-        }
-        let block = take(input, &mut position, compressed)?;
-        output.extend_from_slice(&decompress_xpress_block(block, original, limits)?);
-    }
-    Ok(output)
+    decompress_xpress_framed(input, XpressFraming::Wusp32, limits)
 }
 
 pub fn compress_xpress(input: &[u8], limits: CodecLimits) -> CodecResult<Vec<u8>> {
@@ -1296,6 +1290,104 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn xpress_framing_is_explicit_and_equal_sizes_are_profile_specific() {
+        let compressed = [0xff, 0xff, 0xff, 0x7f, b'a', 3, 0];
+        let mut wusp = Vec::new();
+        wusp.extend_from_slice(&7i32.to_le_bytes());
+        wusp.extend_from_slice(&7i32.to_le_bytes());
+        wusp.extend_from_slice(&compressed);
+        assert_eq!(decompress_xpress(&wusp, limits()).unwrap(), b"aaaaaaa");
+        let mut native = Vec::new();
+        native.extend_from_slice(&7u16.to_le_bytes());
+        native.extend_from_slice(&7u16.to_le_bytes());
+        native.extend_from_slice(&compressed);
+        assert_eq!(
+            decompress_xpress_framed(&native, XpressFraming::Tabular16, limits()).unwrap(),
+            compressed
+        );
+        assert!(decompress_xpress(&native, limits()).is_err());
+    }
+
+    #[test]
+    fn xpress_stream_admission_and_matches_respect_block_boundaries() {
+        let first = [1u8, 0, 1, 0, b'x'];
+        let mut input = first.to_vec();
+        // A match with no literal history must not borrow the previous block's x.
+        input.extend_from_slice(&3u16.to_le_bytes());
+        input.extend_from_slice(&6u16.to_le_bytes());
+        input.extend_from_slice(&[0xff, 0xff, 0xff, 0xff, 0, 0]);
+        assert!(decompress_xpress_framed(&input, XpressFraming::Tabular16, limits()).is_err());
+        let valid = [first, [1, 0, 1, 0, b'y']].concat();
+        let exact = CodecLimits {
+            max_input_bytes: valid.len(),
+            max_output_bytes: 2,
+            ..limits()
+        };
+        assert_eq!(
+            decompress_xpress_framed(&valid, XpressFraming::Tabular16, exact).unwrap(),
+            b"xy"
+        );
+        for policy in [
+            CodecLimits {
+                max_input_bytes: valid.len() - 1,
+                ..exact
+            },
+            CodecLimits {
+                max_output_bytes: 1,
+                ..exact
+            },
+        ] {
+            assert!(decompress_xpress_framed(&valid, XpressFraming::Tabular16, policy).is_err());
+        }
+        for length in [1, 2, 3, 4, 6, 7, 8, 9] {
+            assert!(
+                decompress_xpress_framed(&valid[..length], XpressFraming::Tabular16, exact)
+                    .is_err()
+            );
+        }
+        assert!(
+            decompress_xpress_block(
+                &[0xff; 4],
+                0,
+                CodecLimits {
+                    max_input_bytes: 3,
+                    ..limits()
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn xpress_stream_preflights_late_frames_before_decoding() {
+        // The first payload is invalid Xpress. A later declared size must still
+        // be admitted before any decode work or result allocation.
+        let mut input = Vec::new();
+        for (original, compressed) in [(1i32, 1i32), (65_535, 0)] {
+            input.extend_from_slice(&original.to_le_bytes());
+            input.extend_from_slice(&compressed.to_le_bytes());
+            input.extend(std::iter::repeat_n(0, usize::try_from(compressed).unwrap()));
+        }
+        assert_eq!(
+            decompress_xpress(
+                &input,
+                CodecLimits {
+                    max_output_bytes: 65_535,
+                    ..limits()
+                }
+            ),
+            Err(CodecError::LimitExceeded("max_output_bytes"))
+        );
+        for sizes in [(-1i32, 0i32), (0, -1), (65_536, 0), (0, 65_536)] {
+            let input = [sizes.0.to_le_bytes(), sizes.1.to_le_bytes()].concat();
+            assert!(matches!(
+                decompress_xpress(&input, limits()),
+                Err(CodecError::Invalid(_))
+            ));
+        }
     }
 
     #[test]
