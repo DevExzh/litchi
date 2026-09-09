@@ -1,5 +1,22 @@
 # Performance program phase report
 
+## 0483: measured DOCX tail append memory/latency tradeoff
+
+[0483](changes/0483-docx-bounded-tail-append.md) integrates bounded source and
+candidate scanning with OPC publication for one caller-supplied plain paragraph.
+The accepted 720-sample comparison reduces the largest-source incremental
+operation heap from 35.37 MB to 0.61 MB, while normal latency roughly doubles
+and whole-process RSS stays near 100 MiB. Small-source peak heap and requested
+allocation bytes increase. Every individual result and adverse flag remains
+in the [measurements](results/change-0483/measurements.md).
+
+The source passes the accepted DOCX and non-iWork validation scopes, independent
+LibreOffice readback and two sanitizer smoke runs. The first formal attempt
+is retained in full after an analysis serialization failure; corrected rules
+were tested before a new freeze and complete rerun. This batch establishes no
+speedup, durable forward patch or very-large authored-stream completion. The
+full non-iWork objective remains open.
+
 ## 0482: bounded XML audit and decoded OPC insertion
 
 [0482](changes/0482-bounded-xml-opc-splice.md) implements a caller-reader XML audit and source-checked OPC insertion

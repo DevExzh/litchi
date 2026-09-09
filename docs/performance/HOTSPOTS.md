@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0483: bounded DOCX heap with repeated audit/replay CPU cost
+
+[0483](changes/0483-docx-bounded-tail-append.md) removes full source/candidate
+XML and the paragraph range vector from a new one-paragraph tail route. Its
+609,875-byte incremental operation peak is invariant across the tested source
+sizes, but normal latency increases about 98–104%. Logical source calls rise
+from 62 to 119 on the largest source. Whole-process RSS stays near 100 MiB.
+
+The [profile review](results/change-0483/profile-review.md) records 1.934×
+whole-process instructions. Bounded lifecycle intersections include streaming
+XML auditing and replay; those inclusive stack shares overlap. Phase
+attribution should establish which repeated work can be eliminated while
+preserving semantic validation, freshness and publication proofs. The
+[authored-stream design](results/change-0484/design.md) preserves the separate
+requirement for many generated paragraphs, bounded replay and durable patches.
+
 ## 0482: prerequisites for bounded DOCX publication implemented
 
 [0482](changes/0482-bounded-xml-opc-splice.md) adds the finite XML reader audit and decoded OPC insertion path selected

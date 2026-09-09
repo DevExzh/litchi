@@ -1,0 +1,73 @@
+{
+  "artifacts": {
+    "b2-normal-131072-bounded.report.json": {
+      "bytes": 71997,
+      "sha256": "710fbdb2cf33a94f90bea5a98e41976e45e6f3af1f46e7d876edad7e02796dc1"
+    },
+    "b2-normal-131072-bounded.resource": {
+      "bytes": 999,
+      "sha256": "8db750c5d62297e5ade368a79ffa0194afbf3c476820e91c8fafaa1107c002bc"
+    },
+    "b2-normal-131072-bounded.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "b2-normal-131072-bounded.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_path": "builds/normal-accepted.json",
+    "build_sha256": "5daf114c5bdb7c901a54e5276f1bcaa6914a685c270be6c905ff120da4c1067f",
+    "bytes": 420503104,
+    "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+    "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d",
+    "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/b2-normal-131072-bounded.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+      "--route",
+      "bounded",
+      "--counts",
+      "131072",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/b2-normal-131072-bounded.report.json"
+    ],
+    "arm": "b2",
+    "attempt": "accepted",
+    "count": 131072,
+    "instrumentation": "normal",
+    "label": "b2-normal-131072-bounded",
+    "repeat": 2,
+    "route": "bounded",
+    "route_name": "bounded_plain_text_tail_append"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T05:41:14.613139+00:00",
+  "protocol_sha256": "751b54edf4f53671a6e4e875e5d15f64b7a52849249ab1b4f1514501ca399e39",
+  "schema": "docx-tail-append-capture-v1",
+  "started_utc": "2026-09-09T05:40:56.815784+00:00"
+}

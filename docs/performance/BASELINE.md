@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0483: bounded DOCX tail append route comparison
+
+[0483](changes/0483-docx-bounded-tail-append.md) measures one plain-paragraph
+append to 64, 8,192 and 131,072 existing paragraphs, comparing two public routes
+in the same executable. The 24-process, 720-sample matrix uses normal and
+allocator binaries separately. The [bundle](results/change-0483/README.md)
+retains machine, compiler, source, binary, corpus, protocol and raw evidence.
+
+At 131,072 paragraphs, incremental operation heap falls from 35,371,290 to
+609,875 bytes. Normal mean latency increases from 243.769324 / 240.863305 ms
+to 481.701301 / 485.276936 ms across R1/R2. Whole-process RSS remains about
+100 MiB. At 64 paragraphs, bounded incremental heap is 20.34% higher and
+requested allocation bytes are 89.60% higher. All sizes, intervals, tails,
+logical I/O, profiles and adverse flags are retained in the
+[complete tables](results/change-0483/measurements.md). This is a memory/latency
+tradeoff, not a general speedup or very-large authored-stream result.
+
 ## 0482: XML audit route comparison and decoded OPC insertion
 
 [0482](changes/0482-bounded-xml-opc-splice.md) compares the existing materialized slice audit with a bounded reader

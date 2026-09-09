@@ -1,0 +1,14 @@
+cmd__addr2line /home/zhuhe/.debug/.build-id/33/7fa741c7d7697a55892d1e23eb91d1755b99b3/elf: could not read first record
+cmd__addr2line /home/zhuhe/.debug/.build-id/33/7fa741c7d7697a55892d1e23eb91d1755b99b3/elf: could not read first record
+cmd__addr2line /home/zhuhe/.debug/.build-id/33/7fa741c7d7697a55892d1e23eb91d1755b99b3/elf: could not read first record
+cmd__addr2line /home/zhuhe/.debug/.build-id/33/7fa741c7d7697a55892d1e23eb91d1755b99b3/elf: could not read first record
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+

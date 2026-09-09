@@ -1,0 +1,342 @@
+{
+  "crate-boundaries-dev-01": {
+    "classification": "historical",
+    "reason": "Historical crate boundary gate failed with an unclassified required normal edge litchi-docx -> xml-minifier (target=*); later crate-boundaries-accepted passed at the accepted source checkpoint."
+  },
+  "crate-boundaries-dev-02": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 3ef0477fe1e4a60d507a818d6eac80540299233c1d120726a75950aec24ab1f6 to 78f709f173295457cfa109791931ab734710b279d6f2c56c9655616dbac5fedb; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "crate-boundaries-final-39": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by crate-boundaries-accepted at the accepted source checkpoint."
+  },
+  "docx-all-features-clippy-dev-25": {
+    "classification": "historical",
+    "reason": "Historical all-features Clippy gate failed on three clippy::needless_as_bytes diagnostics in source_backed_tail_append.rs tests (lines 901, 904, and 1183); later docx-all-features-clippy-accepted passed."
+  },
+  "docx-all-features-clippy-final-35": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-all-features-clippy-accepted at the accepted source checkpoint."
+  },
+  "docx-all-features-unit-dev-28": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 93faf73834504f25196dd183e7372b9b131e0bc9e24006f09c0e7fb52c98c6f1 to 2d42a95cbde37d7b650d304b7ba2db63b525723645974e5b634f33dbe6d84b93; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-check-dev-01": {
+    "classification": "historical",
+    "reason": "Historical DOCX check failed to compile: unused PackURI/SourceBackedPackage imports, non-exhaustive VerifiedDecodedReaderError matches, and a mutable reader borrow conflict; later accepted DOCX gates passed."
+  },
+  "docx-check-dev-02": {
+    "classification": "historical",
+    "reason": "Historical DOCX check failed under dead-code denial because Plan.package and Plan.fragment_generation_reservation were never read; later accepted DOCX gates passed."
+  },
+  "docx-check-dev-03": {
+    "classification": "historical",
+    "reason": "Historical DOCX check failed to parse an unexpected closing brace at tail_append.rs:1541 (the prefix_b literal was malformed); the run also changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-check-dev-04": {
+    "classification": "historical",
+    "reason": "Historical DOCX check failed to compile with an undeclared token_window, nonexistent MCE Output.as_ref, namespace comparison type errors, missing NsReader.resolve_attribute, and an unused mut; later accepted DOCX gates passed."
+  },
+  "docx-check-dev-05": {
+    "classification": "historical",
+    "reason": "Historical DOCX check failed to compile with an undeclared token_window, nonexistent MCE Output.as_ref, and an unused declared variable; the run changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-clippy-dev-15": {
+    "classification": "historical",
+    "reason": "Historical DOCX Clippy gate failed on useless conversion, field_reassign_with_default, a clamp-like pattern, and unfulfilled lint expectations; later docx-clippy-accepted passed."
+  },
+  "docx-clippy-dev-24": {
+    "classification": "historical",
+    "reason": "Historical DOCX Clippy gate failed on three clippy::needless_as_bytes diagnostics in source_backed_tail_append.rs tests; later docx-all-features-clippy-accepted passed."
+  },
+  "docx-clippy-final-34": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-clippy-accepted at the accepted source checkpoint."
+  },
+  "docx-consumer-final-47": {
+    "classification": "historical",
+    "reason": "Historical consumer probe failed while decoding the default LibreOffice TXT output as UTF-8 at byte 0xe9; the fixture was corrected to UTF-8 and later docx-consumer-accepted passed."
+  },
+  "docx-consumer-final-53": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source 372109d065d5cbd5810cccfd4db002249299f4a6867cbd0ef286e009ee514fe2; it is superseded by docx-consumer-accepted at the accepted source checkpoint."
+  },
+  "docx-docs-dev-26": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source a9259bb834ed974e0dd0e2de587013950b2e57054062ea62676292d2d43d0ba5; it is superseded by docx-docs-accepted at the accepted source checkpoint."
+  },
+  "docx-docs-final-36": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-docs-accepted at the accepted source checkpoint."
+  },
+  "docx-example-build-final-46": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source 372109d065d5cbd5810cccfd4db002249299f4a6867cbd0ef286e009ee514fe2; it is superseded by docx-example-build-accepted at the accepted source checkpoint."
+  },
+  "docx-full-all-features-dev-29": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from de01b5af409c3f83dd39ca8ba8fb68d640009299983d26e7f1ac811eced6b4be to af589e91e3dbc239c102d0f1fda17db24b345fd16790204e287a3e0995125ba4; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-full-all-features-final-32": {
+    "classification": "historical",
+    "reason": "Historical full all-features tests compiled but 53 fixture tests failed with OS error 122 (Disk quota exceeded) while saving packages; rerun docx-full-all-features-final-41 succeeded with a temporary directory and docx-full-all-features-accepted later passed."
+  },
+  "docx-full-all-features-final-41": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-full-all-features-accepted at the accepted source checkpoint."
+  },
+  "docx-full-no-default-final-33": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-full-no-default-accepted at the accepted source checkpoint."
+  },
+  "docx-fuzz-build-accepted": {
+    "classification": "historical",
+    "reason": "Historical outer fuzz build gate retained for custody chronology; its terminal gate attempt was None, and the dedicated accepted fuzz receipt is bound separately in fuzz-plan.json."
+  },
+  "docx-fuzz-prepare-accepted": {
+    "classification": "historical",
+    "reason": "Historical outer fuzz prepare gate retained for custody chronology; its terminal gate attempt was None, and the dedicated accepted fuzz receipt is bound separately in fuzz-plan.json."
+  },
+  "docx-fuzz-smoke-accepted": {
+    "classification": "historical",
+    "reason": "Historical outer fuzz smoke gate retained for custody chronology; its terminal gate attempt was None, and the dedicated accepted fuzz receipt is bound separately in fuzz-plan.json."
+  },
+  "docx-main-tests-dev-11": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 2285b723d2cb5a82eec5cbfb29421de340633ebe2dbc7bbe6180484e4e4b296d to a3dd8b90d4842dc0a8dffb1c9be243bd857d7f40009a08acb4091512ec6cc8ee; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-main-tests-dev-12": {
+    "classification": "historical",
+    "reason": "Historical DOCX test build failed with usize.windows at tail_append.rs:1160 and mismatched argument types at lines 1686 and 2777; the run changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-main-tests-dev-13": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 4d38282d6afcd1b1383900d388c0fa271bf73b3382c0b18acd2a777f6092c0c8, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-mce-unit-dev-20": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is b15791ee8af7d8b98802bac7700d368a25d36fe8ebc49bf80767538bcf63b4f0, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-owned-format-dev-22": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 089985aa38aaffc6f4237ebdacc0ff9605abb241daf873df247284aae22774f1 to a9259bb834ed974e0dd0e2de587013950b2e57054062ea62676292d2d43d0ba5; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-owned-format-dev-30": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from af589e91e3dbc239c102d0f1fda17db24b345fd16790204e287a3e0995125ba4 to dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-tail-all-tests-dev-14": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 4d38282d6afcd1b1383900d388c0fa271bf73b3382c0b18acd2a777f6092c0c8, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "docx-tail-all-tests-dev-16": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests build failed under unused/dead-code denial for MCE_NAMESPACE, two quick-XML namespace constants, and SettingsGuardFacts; later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-17": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests build failed because settings::extensions was private and because reader mutable/immutable borrows conflicted at tail_append.rs; the run changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-18": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests build failed under dead-code denial because process_bytes_with_mce_limits was never used; later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-19": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests run had two runtime failures: nested_long_mce_directives hit the namespace-bindings limit, and duplicate documentProtection enforcement attributes returned a generic invalid-attribute scan error; later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-21": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests run had one runtime failure: nested_long_mce_directives hit the output-bytes limit; later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-23": {
+    "classification": "historical",
+    "reason": "Historical DOCX all-tests run had one runtime failure: unsupported_settings_mce_fails_closed did not fail closed as its assertion required; later accepted DOCX gates passed."
+  },
+  "docx-tail-all-tests-dev-31": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by docx-full-all-features-accepted at the accepted source checkpoint."
+  },
+  "docx-test-dev-06": {
+    "classification": "historical",
+    "reason": "Historical DOCX test build failed with two E0499 mutable parser borrow errors at tail_append.rs:2100 and 2124; the run changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-test-dev-07": {
+    "classification": "historical",
+    "reason": "Historical DOCX test build failed because TailAppendPublication lacked Debug and because five Arc trait-object conversions were denied as trivial casts; the run changed the source manifest, and later accepted DOCX gates passed."
+  },
+  "docx-test-dev-08": {
+    "classification": "historical",
+    "reason": "Historical DOCX test build failed under unused-import denial for SettingsSecurityInspection in settings/mod.rs; later accepted DOCX gates passed."
+  },
+  "docx-test-dev-09": {
+    "classification": "historical",
+    "reason": "Historical DOCX test build failed under unused-import denial for SettingsSecurityInspection in settings/document/mod.rs; later accepted DOCX gates passed."
+  },
+  "docx-test-dev-10": {
+    "classification": "historical",
+    "reason": "Historical DOCX runtime run had seven failures: lexical prefix preservation, short-write cancellation typing, opaque namespace refusal, settings workspace quota masking protection/relationship/topology results, and interrupted-read retry; later accepted DOCX gates passed."
+  },
+  "evidence-tests-accepted": {
+    "classification": "historical",
+    "reason": "Earlier evidence-tests-accepted receipt retained as historical because its formal resource parser did not accept the captured GNU time format; the corrected evidence-tests-rss-accepted gate passed all 24 tests source-stably at the accepted checkpoint."
+  },
+  "evidence-tests-dev-27": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 7fd9956542686d6d208651fafcebf544a1f965328602a2ebc91f1052426246bf, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "evidence-tests-rss-accepted": {
+    "classification": "historical",
+    "reason": "Earlier evidence-tests-rss-accepted gate passed all 24 tests source-stably but predated the zero-baseline percentage fix; it is retained as the first corrected-analyzer attempt and superseded by evidence-tests-zero-baseline-accepted."
+  },
+  "example-targets-final-40": {
+    "classification": "historical",
+    "reason": "Historical example-target checker found four cross-package duplicate iWork-only names: edit_chart_arrangement, edit_image_adjustments, edit_table_cell_number_format, and save_package; the scoped non-iWork check later passed as non-iwork-examples-accepted."
+  },
+  "harness-check-dev-02": {
+    "classification": "historical",
+    "reason": "Historical harness check failed to compile with E0505 moving borrowed output_members and E0382 using moved append_text; the run changed the source manifest, and later accepted harness gates passed."
+  },
+  "harness-check-dev-03": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 9f5ddf82acbd2cd7d1661f5d73b4d57443ad951b43faf21ca9e6b92f04bbc68e, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "harness-clippy-final-44": {
+    "classification": "historical",
+    "reason": "Historical harness Clippy gate failed because ReadObservation::delta was dead and a block returned a let binding directly; later harness-clippy-accepted passed."
+  },
+  "harness-clippy-final-50": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source 144df95573634bf75ceb3a50e434779191883bb164fa09916cca451232481b45; it is superseded by harness-clippy-accepted at the accepted source checkpoint."
+  },
+  "harness-format-final-43": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by harness-format-accepted at the accepted source checkpoint."
+  },
+  "harness-lock-check-dev-01": {
+    "classification": "historical",
+    "reason": "Historical harness lock/check run failed in the DOCX dependency with undeclared token_window, unused validate_mail_merge_relationships_in, and unused declared; the run changed the source manifest, and later accepted harness/DOCX gates passed."
+  },
+  "harness-scoped-format-dev-49": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from cca1d77b1e5de82538decb62eb6ff4cd8987a0425671e199acdd6f5cb89ce56f to 144df95573634bf75ceb3a50e434779191883bb164fa09916cca451232481b45; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "harness-tests-final-45": {
+    "classification": "historical",
+    "reason": "Historical harness tests failed to compile because Vec<u8> has no matches method in the assertion at docx_bounded_tail_append_compare.rs:1552; later harness-tests-accepted passed."
+  },
+  "harness-tests-final-51": {
+    "classification": "historical",
+    "reason": "Historical harness tests failed to compile after moving xml into String::from_utf8 and then borrowing it for windows at docx_bounded_tail_append_compare.rs:1552; later harness-tests-accepted passed."
+  },
+  "harness-tests-final-52": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source 372109d065d5cbd5810cccfd4db002249299f4a6867cbd0ef286e009ee514fe2; it is superseded by harness-tests-accepted at the accepted source checkpoint."
+  },
+  "libreoffice-version": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 07fc16fdc3c4a380b84460dc15421f2628f24f512414bca1c6c3e0dc6127393c to fe477b82814eb07cba41f56d8f80c3da73815ba132fe954b1366ea44538829c0; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "non-iwork-workspace-check-final-48": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by non-iwork-workspace-check-accepted at the accepted source checkpoint."
+  },
+  "opc-all-features-clippy-final-16": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 10597dc82a140605101af0343caaa6f5db68c6a68b98ceb0f34b5bc57fea52cb to 4127c1e06db6846271d45844adaf3ff15b24df0d12a4ee291615a07a3b22aefa; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-all-features-tests-final-14": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from c521d7dc3d48dad15325a99739b5f5552c65d09c2aca890484ebc570253f0842 to d464a5535e9d6f6668f195fffa79d873a5a2bb7340e5e23898a393bee6e36c1c; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-all-tests-dev-06": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 96edbe3b2f6eaf4ec94c169d372cf532c56a448a143cc69d3579e7f3ed229455, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-clippy-dev-01": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 1f69148a5d7ddbdd2c9cb51d25d08aee19955d7b1533d22549ccdddf7ff133fc, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-clippy-final-11": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 4d38282d6afcd1b1383900d388c0fa271bf73b3382c0b18acd2a777f6092c0c8, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-docs-final-15": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 75df77d66a81359541ff00073193b7b1b992f404726f6a5e4d37a2705df1a693 to 61e680f72477478e4d715f5e6768169ef85ea20d6a1b27c076ce9a5e5224e5ae; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-foundation-format-dev-09": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 4d38282d6afcd1b1383900d388c0fa271bf73b3382c0b18acd2a777f6092c0c8, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-fragment-test-dev-01": {
+    "classification": "historical",
+    "reason": "Historical OPC fragment test run failed authored_fragment_refusals_release_memory_and_preserve_typed_limits: it expected ExecutionError::Cancelled but received another error; the run changed the source manifest and no accepted OPC gate superseded it."
+  },
+  "opc-fragment-test-dev-02": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 4f7ae14ab8a1074a0288c19d39a6feee2d46210719137e68c158133a7ddf9ebd to 06e4c14725fca4e117b58ee419a10ef60d8e439fa6682a0ec8f315fec1b13584; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-interrupted-tests-dev-07": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 0b9456b73071fc607388b9b2b61263936e55af1ddaee368d49843ff15b08ef30, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-io-error-test-dev-08": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 6cdb67c817acecc61209e73ef1e419ed364db8ab96c226f3fe84121165951859 to 8f9e01a3a33337c3f6d8db271d86143c17d7048449eee97ca7fb15430b4d4de9; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-oracle-format-dev-12": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from ed65c6b68364ca3e290ddcf46028161bfe8ad1e1cdc0a461d28304d25f8e0a9e to 286c33d99ea37e01a6cc243c3425b4b4328fc2c640b149c8b350dc44bbb4b76a; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-oracle-test-dev-05": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 5881087b2194d3ccda5dcbd49850e71b7a41f5df1748ed94b99aef62d9a35116, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-splice-test-dev-03": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is ea4afdad396bcc1fe7caaef950822c5f3685c2d8474e458593801c05b099e5d4, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-splice-test-dev-04": {
+    "classification": "historical",
+    "reason": "Historical OPC splice test run failed raw_record_oracle_includes_descriptor_mode_compressed_payload: the deferred-local-size fixture reported 58 where the assertion expected 0; the run changed the source manifest and no accepted OPC gate superseded it."
+  },
+  "opc-splice-tests-final-13": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 286c33d99ea37e01a6cc243c3425b4b4328fc2c640b149c8b350dc44bbb4b76a, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-tests-final-10": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 4d38282d6afcd1b1383900d388c0fa271bf73b3382c0b18acd2a777f6092c0c8, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "opc-xml-format-final-17": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is c5de592658e815c9456f71d40722bbedcf317057c360e550299b2f29ecb7dcd7, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "workspace-check-final-38": {
+    "classification": "historical",
+    "reason": "Historical whole-workspace check failed in the litchi-iwa-protos custom build because protoc hit Disk quota exceeded while generating its descriptor set; later scoped non-iWork workspace validation passed as non-iwork-workspace-check-accepted."
+  },
+  "workspace-check-final-42": {
+    "classification": "historical",
+    "reason": "Historical whole-workspace check failed in the iWork-only create_keynote_audio example: MediaPlaybackSettings had no TryFrom conversion between the common and keynote types; later scoped non-iWork workspace validation passed as non-iwork-workspace-check-accepted."
+  },
+  "workspace-format-final-37": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without attempt=accepted binding at source dac566de4b0f46ce8e4c0c48615a66fcf37c2387fde5c4a7bd368f1736d63d32; it is superseded by workspace-format-accepted at the accepted source checkpoint."
+  },
+  "xml-audit-test-dev-01": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is 1e46676e38802496287c5db5ce7b367c141b5f4f2bfefcb7924d997bfe982206, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "xml-clippy-final-18": {
+    "classification": "historical",
+    "reason": "Historical successful validation retained without the accepted attempt binding; its source manifest is c5de592658e815c9456f71d40722bbedcf317057c360e550299b2f29ecb7dcd7, while the accepted checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  },
+  "xml-tests-dev-02": {
+    "classification": "historical",
+    "reason": "Historical validation retained because the gate observed source mutation from 9c18c8f617ca08d4105a3ff1c1f35af3132b252e01a5a83167d7b477efeca939 to fe2d7a7f14c860a9d62ecd6e2a6cdd811e6839e1b01f9e4b87a230c90cb2daee; accepted source checkpoint is 30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf."
+  }
+}

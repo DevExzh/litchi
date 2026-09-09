@@ -1,0 +1,28 @@
+{
+  "accepted": true,
+  "case": "live-verify",
+  "command": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/verify.py",
+    "--root",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0483",
+  "exit_code": 0,
+  "expected_acceptance": true,
+  "finished_utc": "2026-09-09T05:46:20.375431+00:00",
+  "mutation": null,
+  "schema": "docx-tail-append-closure-case-v1",
+  "started_utc": "2026-09-09T05:46:08.824704+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "evidence-validation/live-verify.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 333,
+    "path": "evidence-validation/live-verify.stdout",
+    "sha256": "70b9090b856a8b599c3ef29e421d1b8e5980c250ecd0765789cdb7976560b965"
+  }
+}

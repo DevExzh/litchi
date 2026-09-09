@@ -1,0 +1,28 @@
+{
+  "accepted": false,
+  "case": "missing-fuzz-chain",
+  "command": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/missing-fuzz-chain/verify.py",
+    "--root",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/missing-fuzz-chain"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/missing-fuzz-chain",
+  "exit_code": 1,
+  "expected_acceptance": false,
+  "finished_utc": "2026-09-09T05:48:00.030645+00:00",
+  "mutation": "fuzz/accepted/smoke.json",
+  "schema": "docx-tail-append-closure-case-v1",
+  "started_utc": "2026-09-09T05:47:50.643604+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "evidence-validation/missing-fuzz-chain.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 227,
+    "path": "evidence-validation/missing-fuzz-chain.stdout",
+    "sha256": "a2cdb2c5472857053ce0b148f24971e13c1691cc87f824f85be5d000ad2fd369"
+  }
+}

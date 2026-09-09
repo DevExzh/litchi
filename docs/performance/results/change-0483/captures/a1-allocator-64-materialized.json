@@ -1,0 +1,73 @@
+{
+  "artifacts": {
+    "a1-allocator-64-materialized.report.json": {
+      "bytes": 88474,
+      "sha256": "c3803404d75d9e6978bf1b197ec093eee3434b071fd7daf80048cf02e93d0cc2"
+    },
+    "a1-allocator-64-materialized.resource": {
+      "bytes": 1001,
+      "sha256": "6e7d0c7344fbd59ea2d1d6fc44aa40da96889d862b5f1a49469a5b8f0d3b78dc"
+    },
+    "a1-allocator-64-materialized.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "a1-allocator-64-materialized.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_path": "builds/allocator-accepted.json",
+    "build_sha256": "b716050fe092e71f37653e9a3aec08a430ae9b8bcd3adbeebf8227662ad3d1bc",
+    "bytes": 420510936,
+    "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+    "sha256": "b62c5700ffdcdbfdcf970fad2dad406c4787b3dc38cbd466b72f7032e6ee4c90",
+    "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+  },
+  "capture": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/a1-allocator-64-materialized.resource",
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+      "--route",
+      "materialized",
+      "--counts",
+      "64",
+      "--samples",
+      "30",
+      "--warmups",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0483/captures/a1-allocator-64-materialized.report.json"
+    ],
+    "arm": "a1",
+    "attempt": "accepted",
+    "count": 64,
+    "instrumentation": "allocator",
+    "label": "a1-allocator-64-materialized",
+    "repeat": 1,
+    "route": "materialized",
+    "route_name": "materialized_paragraph_copy"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T05:40:05.338651+00:00",
+  "protocol_sha256": "751b54edf4f53671a6e4e875e5d15f64b7a52849249ab1b4f1514501ca399e39",
+  "schema": "docx-tail-append-capture-v1",
+  "started_utc": "2026-09-09T05:40:05.321859+00:00"
+}

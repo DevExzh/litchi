@@ -1,0 +1,36 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0483/analyze.py", line 1097, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0483/analyze.py", line 1092, in main
+    write_json(ROOT / options.summary, summary)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0483/analyze.py", line 129, in write_json
+    json.dump(value, stream, indent=2, sort_keys=True, allow_nan=False)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/json/__init__.py", line 181, in dump
+    for chunk in iterable:
+                 ^^^^^^^^
+  File "/usr/lib/python3.14/json/encoder.py", line 444, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/usr/lib/python3.14/json/encoder.py", line 413, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.14/json/encoder.py", line 326, in _iterencode_list
+    yield from chunks
+  File "/usr/lib/python3.14/json/encoder.py", line 413, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.14/json/encoder.py", line 413, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.14/json/encoder.py", line 405, in _iterencode_dict
+    yield _floatstr(value)
+          ~~~~~~~~~^^^^^^^
+  File "/usr/lib/python3.14/json/encoder.py", line 242, in floatstr
+    raise ValueError(
+        "Out of range float values are not JSON compliant: " +
+        repr(o))
+ValueError: Out of range float values are not JSON compliant: inf
+when serializing dict item 'percent'
+when serializing dict item 'process.user_cpu_ticks'
+when serializing dict item 'changes'
+when serializing list item 0
+when serializing dict item 'comparisons'

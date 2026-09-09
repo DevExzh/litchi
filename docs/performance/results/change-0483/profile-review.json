@@ -1,0 +1,2128 @@
+{
+  "attempt": "accepted",
+  "binding": {
+    "binary": {
+      "actual": {
+        "bytes": 420503104,
+        "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+      },
+      "actual_matches_profile": true,
+      "bytes": 420503104,
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+      "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d"
+    },
+    "binary_custody": {
+      "actual": {
+        "bytes": 1262,
+        "sha256": "8e5972d2e8e7f4f1043a391f410bf01629303fcb1ab55fdb5688e8926ab28160"
+      },
+      "actual_matches_profile": true,
+      "bytes": 1262,
+      "path": "builds/binaries-accepted.json",
+      "sha256": "8e5972d2e8e7f4f1043a391f410bf01629303fcb1ab55fdb5688e8926ab28160"
+    },
+    "binary_name": "docx_bounded_tail_append_compare",
+    "build": {
+      "path": "builds/normal-accepted.json",
+      "sha256": "5daf114c5bdb7c901a54e5276f1bcaa6914a685c270be6c905ff120da4c1067f"
+    },
+    "profile_driver_sha256": "f1bf67b81f39750e9adf070fabf9d50478a5968fb5cb53b9c8f8c8a936a3d455",
+    "profile_manifest": {
+      "bytes": 41561,
+      "path": "profiles/accepted/profile.json",
+      "sha256": "a596a90f0b950c1ae402fff4975eb0eb1efb267985240f362ec655a071f60e1c"
+    },
+    "source_manifest": {
+      "actual": {
+        "bytes": 870501,
+        "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+      },
+      "actual_matches_digest": true,
+      "all_profile_receipts_source_unchanged": true,
+      "files": 7142,
+      "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+      "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+    }
+  },
+  "callstack_attribution": {
+    "method": "Inclusive ancestry shares from weighted perf-script periods over target benchmark blocks; matching block intersections are explicit.",
+    "routes": {
+      "bounded": {
+        "lifecycle": {
+          "blocks": 1593,
+          "marker": "run_bounded_iteration",
+          "outside_lifecycle": {
+            "blocks": 176,
+            "target_share_percent": 9.992146755523,
+            "weighted_cycles": 7961230284
+          },
+          "target_share_percent": 90.007853244477,
+          "weighted_cycles": 71713643182
+        },
+        "markers": {
+          "audit_splice": {
+            "inclusive_target_ancestry": {
+              "blocks": 1057,
+              "target_share_percent": 59.720133739911,
+              "weighted_cycles": 47581940991
+            },
+            "lifecycle_intersection": {
+              "blocks": 1014,
+              "lifecycle_share_percent": 63.650840700082,
+              "target_share_percent": 57.290755286206,
+              "weighted_cycles": 45646336782
+            },
+            "outside_lifecycle": {
+              "blocks": 43,
+              "target_share_percent": 2.429378453705,
+              "weighted_cycles": 1935604209
+            }
+          },
+          "build_corpus": {
+            "inclusive_target_ancestry": {
+              "blocks": 173,
+              "target_share_percent": 9.878337008415,
+              "weighted_cycles": 7870552512
+            },
+            "lifecycle_intersection": {
+              "blocks": 0,
+              "lifecycle_share_percent": 0.0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            },
+            "outside_lifecycle": {
+              "blocks": 173,
+              "target_share_percent": 9.878337008415,
+              "weighted_cycles": 7870552512
+            }
+          },
+          "run_bounded_iteration": {
+            "inclusive_target_ancestry": {
+              "blocks": 1593,
+              "target_share_percent": 90.007853244477,
+              "weighted_cycles": 71713643182
+            },
+            "lifecycle_intersection": {
+              "blocks": 1593,
+              "lifecycle_share_percent": 100.0,
+              "target_share_percent": 90.007853244477,
+              "weighted_cycles": 71713643182
+            },
+            "outside_lifecycle": {
+              "blocks": 0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            }
+          },
+          "run_replay": {
+            "inclusive_target_ancestry": {
+              "blocks": 633,
+              "target_share_percent": 35.773667196551,
+              "weighted_cycles": 28502624073
+            },
+            "lifecycle_intersection": {
+              "blocks": 614,
+              "lifecycle_share_percent": 38.551918744158,
+              "target_share_percent": 34.699754446172,
+              "weighted_cycles": 27646985448
+            },
+            "outside_lifecycle": {
+              "blocks": 19,
+              "target_share_percent": 1.073912750379,
+              "weighted_cycles": 855638625
+            }
+          },
+          "scan_main_part": {
+            "inclusive_target_ancestry": {
+              "blocks": 611,
+              "target_share_percent": 34.525227695201,
+              "weighted_cycles": 27507931480
+            },
+            "lifecycle_intersection": {
+              "blocks": 577,
+              "lifecycle_share_percent": 36.223537593918,
+              "target_share_percent": 32.604028557492,
+              "weighted_cycles": 25977218498
+            },
+            "outside_lifecycle": {
+              "blocks": 34,
+              "target_share_percent": 1.92119913771,
+              "weighted_cycles": 1530712982
+            }
+          },
+          "semantic_record": {
+            "inclusive_target_ancestry": {
+              "blocks": 34,
+              "target_share_percent": 1.925652253034,
+              "weighted_cycles": 1534260996
+            },
+            "lifecycle_intersection": {
+              "blocks": 0,
+              "lifecycle_share_percent": 0.0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            },
+            "outside_lifecycle": {
+              "blocks": 34,
+              "target_share_percent": 1.925652253034,
+              "weighted_cycles": 1534260996
+            }
+          },
+          "verify_reader_with_policy": {
+            "inclusive_target_ancestry": {
+              "blocks": 1052,
+              "target_share_percent": 59.437629416768,
+              "weighted_cycles": 47356856029
+            },
+            "lifecycle_intersection": {
+              "blocks": 1010,
+              "lifecycle_share_percent": 63.399778964809,
+              "target_share_percent": 57.064780007968,
+              "weighted_cycles": 45466291265
+            },
+            "outside_lifecycle": {
+              "blocks": 42,
+              "target_share_percent": 2.3728494088,
+              "weighted_cycles": 1890564764
+            }
+          }
+        },
+        "raw_report_reference": "validation/profile-bounded-perf-report-accepted.stdout",
+        "raw_script_reference": "validation/profile-bounded-perf-script-accepted.stdout",
+        "target_blocks": 1769,
+        "target_cycles": 79674873466
+      },
+      "materialized": {
+        "lifecycle": {
+          "blocks": 807,
+          "marker": "run_materialized_iteration",
+          "outside_lifecycle": {
+            "blocks": 175,
+            "target_share_percent": 17.903931568832,
+            "weighted_cycles": 7921093318
+          },
+          "target_share_percent": 82.096068431168,
+          "weighted_cycles": 36321107271
+        },
+        "markers": {
+          "build_corpus": {
+            "inclusive_target_ancestry": {
+              "blocks": 173,
+              "target_share_percent": 17.800723126684,
+              "weighted_cycles": 7875431632
+            },
+            "lifecycle_intersection": {
+              "blocks": 0,
+              "lifecycle_share_percent": 0.0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            },
+            "outside_lifecycle": {
+              "blocks": 173,
+              "target_share_percent": 17.800723126684,
+              "weighted_cycles": 7875431632
+            }
+          },
+          "copy_plain_paragraph": {
+            "inclusive_target_ancestry": {
+              "blocks": 169,
+              "target_share_percent": 17.198650278919,
+              "weighted_cycles": 7609061355
+            },
+            "lifecycle_intersection": {
+              "blocks": 160,
+              "lifecycle_share_percent": 19.833915927315,
+              "target_share_percent": 16.282865192269,
+              "weighted_cycles": 7203897880
+            },
+            "outside_lifecycle": {
+              "blocks": 9,
+              "target_share_percent": 0.91578508665,
+              "weighted_cycles": 405163475
+            }
+          },
+          "publish_plain_paragraph": {
+            "inclusive_target_ancestry": {
+              "blocks": 497,
+              "target_share_percent": 50.552318287171,
+              "weighted_cycles": 22365458059
+            },
+            "lifecycle_intersection": {
+              "blocks": 482,
+              "lifecycle_share_percent": 59.718557810374,
+              "target_share_percent": 49.026588086111,
+              "weighted_cycles": 21690441443
+            },
+            "outside_lifecycle": {
+              "blocks": 15,
+              "target_share_percent": 1.52573020106,
+              "weighted_cycles": 675016616
+            }
+          },
+          "run_materialized_iteration": {
+            "inclusive_target_ancestry": {
+              "blocks": 807,
+              "target_share_percent": 82.096068431168,
+              "weighted_cycles": 36321107271
+            },
+            "lifecycle_intersection": {
+              "blocks": 807,
+              "lifecycle_share_percent": 100.0,
+              "target_share_percent": 82.096068431168,
+              "weighted_cycles": 36321107271
+            },
+            "outside_lifecycle": {
+              "blocks": 0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            }
+          },
+          "scan_document": {
+            "inclusive_target_ancestry": {
+              "blocks": 691,
+              "target_share_percent": 70.310960116966,
+              "weighted_cycles": 31107116011
+            },
+            "lifecycle_intersection": {
+              "blocks": 629,
+              "lifecycle_share_percent": 77.951875750236,
+              "target_share_percent": 63.995425259293,
+              "weighted_cycles": 28312984411
+            },
+            "outside_lifecycle": {
+              "blocks": 62,
+              "target_share_percent": 6.315534857673,
+              "weighted_cycles": 2794131600
+            }
+          },
+          "semantic_record": {
+            "inclusive_target_ancestry": {
+              "blocks": 34,
+              "target_share_percent": 3.467392949666,
+              "weighted_cycles": 1534050944
+            },
+            "lifecycle_intersection": {
+              "blocks": 0,
+              "lifecycle_share_percent": 0.0,
+              "target_share_percent": 0.0,
+              "weighted_cycles": 0
+            },
+            "outside_lifecycle": {
+              "blocks": 34,
+              "target_share_percent": 3.467392949666,
+              "weighted_cycles": 1534050944
+            }
+          },
+          "verify_with_policy": {
+            "inclusive_target_ancestry": {
+              "blocks": 137,
+              "target_share_percent": 13.997960656459,
+              "weighted_cycles": 6193005832
+            },
+            "lifecycle_intersection": {
+              "blocks": 132,
+              "lifecycle_share_percent": 16.349913026307,
+              "target_share_percent": 13.422635786513,
+              "weighted_cycles": 5938469449
+            },
+            "outside_lifecycle": {
+              "blocks": 5,
+              "target_share_percent": 0.575324869946,
+              "weighted_cycles": 254536383
+            }
+          }
+        },
+        "raw_report_reference": "validation/profile-materialized-perf-report-accepted.stdout",
+        "raw_script_reference": "validation/profile-materialized-perf-script-accepted.stdout",
+        "target_blocks": 982,
+        "target_cycles": 44242200589
+      }
+    }
+  },
+  "limits": [
+    "No perf counter, stack share, or syscall row isolates a single transaction or operation.",
+    "perf stat and perf record are separate whole-process invocations; their cycle totals must not be subtracted or expected to match.",
+    "The no-children report rows are self/leaf overhead percentages; inclusive marker shares overlap and are not additive.",
+    "perf record retained zero lost samples, but restricted kernel address maps leave some kernel frames unresolved.",
+    "strace includes startup, oracles, report serialization and teardown; its write time does not establish a sink syscall bottleneck.",
+    "The profile covers only the normal binary at count 131072 and does not establish formal timing, allocator behavior, or a speedup claim."
+  ],
+  "next_measured_work": {
+    "basis": [
+      {
+        "lifecycle_intersection_blocks": 629,
+        "lifecycle_intersection_cycles": 28312984411,
+        "marker": "scan_document",
+        "route": "materialized",
+        "target_share_percent": 63.995425259293
+      },
+      {
+        "lifecycle_intersection_blocks": 1010,
+        "lifecycle_intersection_cycles": 45466291265,
+        "marker": "verify_reader_with_policy",
+        "route": "bounded",
+        "target_share_percent": 57.064780007968
+      },
+      {
+        "lifecycle_intersection_blocks": 614,
+        "lifecycle_intersection_cycles": 27646985448,
+        "marker": "run_replay",
+        "route": "bounded",
+        "target_share_percent": 34.699754446172
+      }
+    ],
+    "measurement_controls": [
+      "retain the accepted normal binary, source snapshot, count, route, warmup and sample shape",
+      "separate setup/oracle ancestry from measured lifecycle ancestry using matching sample blocks",
+      "preserve XML/member/semantic validation proofs and unchanged-member checks",
+      "treat any result as diagnostic until rerun under the formal protocol"
+    ],
+    "selection": "Run phase-attributed measurements for repeated XML scanning/layout and bounded replay/validation paths next."
+  },
+  "perf_record": {
+    "configuration": {
+      "call_graph": "fp",
+      "event": "cycles",
+      "frequency_hz": 99,
+      "period_unit": "cycles",
+      "report_options": [
+        "--stdio",
+        "--no-children",
+        "--percent-limit",
+        "0"
+      ]
+    },
+    "reconciliation": {
+      "script_period_sum_equals_report_event_count": true,
+      "stat_and_record_are_separate_invocations": true
+    },
+    "routes": {
+      "bounded": {
+        "raw_profile": {
+          "artifact": {
+            "bytes": 37776,
+            "metadata_matches_profile": true,
+            "path": "profiles/accepted/bounded/perf-record.data.gz",
+            "sha256": "26c75773c737a5610f16bc74a920f8e767d502f38a7ba7a5534027ba77667a66"
+          },
+          "profile_status": "pass",
+          "uncompressed": {
+            "bytes": 423192,
+            "metadata_matches_profile": true,
+            "sha256": "b97b059770fc9c55efecf711d13b75da7b97603e482bb8f27050373932292f04"
+          }
+        },
+        "record_stderr": {
+          "actual": {
+            "bytes": 813,
+            "sha256": "d6edd1094397a61f952983feb090198b677cc5492e906c4a7f2389e19b89d89a"
+          },
+          "expected": {
+            "bytes": 813,
+            "sha256": "d6edd1094397a61f952983feb090198b677cc5492e906c4a7f2389e19b89d89a"
+          },
+          "matches": true,
+          "path": "validation/profile-bounded-perf-record-accepted.stderr"
+        },
+        "report": {
+          "artifact": {
+            "bytes": 4189545,
+            "path": "validation/profile-bounded-perf-report-accepted.stdout",
+            "sha256": "55e5c94f42918955af1ed68cab4ccd93c0bc9b600279cd46d44fe9731eb262e5"
+          },
+          "event": "cycles",
+          "event_count_approx": 79674879354,
+          "interpretation": "Top rows are self/leaf overhead from perf report --no-children; callchain annotations are sampled ancestry shares and overlap.",
+          "lost_samples": 0,
+          "options": [
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0"
+          ],
+          "primary_callchain_annotations": [
+            {
+              "line": 14,
+              "overhead_percent": 12.37,
+              "symbol": "map_err<quick_xml::events::Event, quick_xml::errors::Error, xml_minifier::audit::StreamError, xml_minifier::audit::verify_reader_with_policy::{closure_env#3}<&mut litchi_opc::source_backed::splice::SpliceAuditReader>> (inlined)"
+            },
+            {
+              "line": 21,
+              "overhead_percent": 7.06,
+              "symbol": "branch<(u64, [u8; 32], u64, [u8; 32]), litchi_opc::error::OpcError> (inlined)"
+            },
+            {
+              "line": 27,
+              "overhead_percent": 6.89,
+              "symbol": "with_verified_decoded_reader<(), litchi_opc::error::OpcError, litchi_opc::source_backed::splice::{impl#6}::write_to_stream_inner::{closure#3}::{closure_env#0}<&mut litchi_perf_baseline::docx_bounded_tail_append_compare::HashingSink>> (inlined)"
+            },
+            {
+              "line": 32,
+              "overhead_percent": 3.73,
+              "symbol": "measure_callback<&mut litchi_opc::source_backed::splice::{impl#6}::write_to_stream_inner::{closure_env#3}<&mut litchi_perf_baseline::docx_bounded_tail_append_compare::HashingSink>, litchi_opc::error::OpcError> (inlined)"
+            },
+            {
+              "line": 90,
+              "overhead_percent": 0.11,
+              "symbol": "emit_callback<&mut litchi_opc::source_backed::splice::{impl#6}::write_to_stream_inner::{closure_env#3}<&mut alloc::vec::Vec<u8, alloc::alloc::Global>>, litchi_opc::error::OpcError, litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_opc::source_backed::splice::HashingSink<&mut alloc::vec::Vec<u8, alloc::alloc::Global>>>>>>> (inlined)"
+            },
+            {
+              "line": 145,
+              "overhead_percent": 2.94,
+              "symbol": "with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, (u64, [u8; 32], u64, [u8; 32]), litchi_opc::error::OpcError, litchi_opc::source_backed::splice::verify_candidate_proof::{closure_env#0}> (inlined)"
+            },
+            {
+              "line": 158,
+              "overhead_percent": 2.71,
+              "symbol": "run_bounded_iteration (inlined)"
+            },
+            {
+              "line": 177,
+              "overhead_percent": 0.17,
+              "symbol": "bounded_stale_source_refusal (inlined)"
+            }
+          ],
+          "sample_header": "1K",
+          "top_no_children_rows": [
+            {
+              "line": 12,
+              "overhead_percent": 13.28,
+              "symbol": "xml_minifier::audit::verify_reader_with_policy::<&mut litchi_opc::source_backed::splice::SpliceAuditReader>"
+            },
+            {
+              "line": 544,
+              "overhead_percent": 5.71,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "line": 2314,
+              "overhead_percent": 5.25,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "line": 4917,
+              "overhead_percent": 5.08,
+              "symbol": "<litchi_opc::source_backed::splice::SpliceAuditReader as std::io::BufRead>::consume"
+            },
+            {
+              "line": 6501,
+              "overhead_percent": 4.97,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "line": 7204,
+              "overhead_percent": 3.39,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "line": 7447,
+              "overhead_percent": 3.16,
+              "symbol": "crc32fast::baseline::update_fast_16"
+            },
+            {
+              "line": 8389,
+              "overhead_percent": 2.94,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<litchi_docx::source_backed::tail_append::GuardedBufRead<&mut dyn std::io::BufRead>>>::read_resolved_event_into"
+            },
+            {
+              "line": 8510,
+              "overhead_percent": 2.94,
+              "symbol": "<xml_minifier::audit::GuardedBufRead<&mut litchi_opc::source_backed::splice::SpliceAuditReader> as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "line": 9324,
+              "overhead_percent": 2.88,
+              "symbol": "<quick_xml::reader::Reader<xml_minifier::audit::GuardedBufRead<&mut litchi_opc::source_backed::splice::SpliceAuditReader>>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            }
+          ]
+        },
+        "report_stderr_warning_limit": "Kernel address maps are restricted in retained perf-record stderr; some kernel frames may remain unresolved. User binary symbols in perf report remain retained.",
+        "script": {
+          "all_periods": {
+            "blocks": 1774,
+            "weighted_cycles": 79674879354
+          },
+          "artifact": {
+            "bytes": 9863945,
+            "path": "validation/profile-bounded-perf-script-accepted.stdout",
+            "sha256": "ca5b8f04ff6fbb6ebcf28496b841411629bbf12fb383d267154a2fa58711d9f6"
+          },
+          "event": "cycles",
+          "helper_process": {
+            "blocks": 5,
+            "command": "perf-exec",
+            "share_of_all_periods_percent": 7.390033e-06,
+            "weighted_cycles": 5888
+          },
+          "lifecycle": {
+            "blocks": 1593,
+            "marker": "run_bounded_iteration",
+            "outside_lifecycle": {
+              "blocks": 176,
+              "target_share_percent": 9.992146755523,
+              "weighted_cycles": 7961230284
+            },
+            "target_share_percent": 90.007853244477,
+            "weighted_cycles": 71713643182
+          },
+          "marker_method": "A marker counts once per target sample block when any resolved frame contains it. Lifecycle intersections use matching block identities; marker shares are inclusive and overlap.",
+          "markers": {
+            "audit_splice": {
+              "inclusive_target_ancestry": {
+                "blocks": 1057,
+                "target_share_percent": 59.720133739911,
+                "weighted_cycles": 47581940991
+              },
+              "lifecycle_intersection": {
+                "blocks": 1014,
+                "lifecycle_share_percent": 63.650840700082,
+                "target_share_percent": 57.290755286206,
+                "weighted_cycles": 45646336782
+              },
+              "outside_lifecycle": {
+                "blocks": 43,
+                "target_share_percent": 2.429378453705,
+                "weighted_cycles": 1935604209
+              }
+            },
+            "build_corpus": {
+              "inclusive_target_ancestry": {
+                "blocks": 173,
+                "target_share_percent": 9.878337008415,
+                "weighted_cycles": 7870552512
+              },
+              "lifecycle_intersection": {
+                "blocks": 0,
+                "lifecycle_share_percent": 0.0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              },
+              "outside_lifecycle": {
+                "blocks": 173,
+                "target_share_percent": 9.878337008415,
+                "weighted_cycles": 7870552512
+              }
+            },
+            "run_bounded_iteration": {
+              "inclusive_target_ancestry": {
+                "blocks": 1593,
+                "target_share_percent": 90.007853244477,
+                "weighted_cycles": 71713643182
+              },
+              "lifecycle_intersection": {
+                "blocks": 1593,
+                "lifecycle_share_percent": 100.0,
+                "target_share_percent": 90.007853244477,
+                "weighted_cycles": 71713643182
+              },
+              "outside_lifecycle": {
+                "blocks": 0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              }
+            },
+            "run_replay": {
+              "inclusive_target_ancestry": {
+                "blocks": 633,
+                "target_share_percent": 35.773667196551,
+                "weighted_cycles": 28502624073
+              },
+              "lifecycle_intersection": {
+                "blocks": 614,
+                "lifecycle_share_percent": 38.551918744158,
+                "target_share_percent": 34.699754446172,
+                "weighted_cycles": 27646985448
+              },
+              "outside_lifecycle": {
+                "blocks": 19,
+                "target_share_percent": 1.073912750379,
+                "weighted_cycles": 855638625
+              }
+            },
+            "scan_main_part": {
+              "inclusive_target_ancestry": {
+                "blocks": 611,
+                "target_share_percent": 34.525227695201,
+                "weighted_cycles": 27507931480
+              },
+              "lifecycle_intersection": {
+                "blocks": 577,
+                "lifecycle_share_percent": 36.223537593918,
+                "target_share_percent": 32.604028557492,
+                "weighted_cycles": 25977218498
+              },
+              "outside_lifecycle": {
+                "blocks": 34,
+                "target_share_percent": 1.92119913771,
+                "weighted_cycles": 1530712982
+              }
+            },
+            "semantic_record": {
+              "inclusive_target_ancestry": {
+                "blocks": 34,
+                "target_share_percent": 1.925652253034,
+                "weighted_cycles": 1534260996
+              },
+              "lifecycle_intersection": {
+                "blocks": 0,
+                "lifecycle_share_percent": 0.0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              },
+              "outside_lifecycle": {
+                "blocks": 34,
+                "target_share_percent": 1.925652253034,
+                "weighted_cycles": 1534260996
+              }
+            },
+            "verify_reader_with_policy": {
+              "inclusive_target_ancestry": {
+                "blocks": 1052,
+                "target_share_percent": 59.437629416768,
+                "weighted_cycles": 47356856029
+              },
+              "lifecycle_intersection": {
+                "blocks": 1010,
+                "lifecycle_share_percent": 63.399778964809,
+                "target_share_percent": 57.064780007968,
+                "weighted_cycles": 45466291265
+              },
+              "outside_lifecycle": {
+                "blocks": 42,
+                "target_share_percent": 2.3728494088,
+                "weighted_cycles": 1890564764
+              }
+            }
+          },
+          "sample_blocks": 1774,
+          "target_process": {
+            "blocks": 1769,
+            "command": "docx_bounded_ta",
+            "pid": 3725069,
+            "share_of_all_periods_percent": 99.999992609967,
+            "weighted_cycles": 79674873466
+          }
+        }
+      },
+      "materialized": {
+        "raw_profile": {
+          "artifact": {
+            "bytes": 20140,
+            "metadata_matches_profile": true,
+            "path": "profiles/accepted/materialized/perf-record.data.gz",
+            "sha256": "501281bc35d1007396da1671695aeda78d6947127a3d63c6526acce13268f25a"
+          },
+          "profile_status": "pass",
+          "uncompressed": {
+            "bytes": 217520,
+            "metadata_matches_profile": true,
+            "sha256": "b69253d21ed482a82dfccaa4dac1ad261c66824baf215bac565916f6b7b0c0df"
+          }
+        },
+        "record_stderr": {
+          "actual": {
+            "bytes": 817,
+            "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+          },
+          "expected": {
+            "bytes": 817,
+            "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+          },
+          "matches": true,
+          "path": "validation/profile-materialized-perf-record-accepted.stderr"
+        },
+        "report": {
+          "artifact": {
+            "bytes": 1161908,
+            "path": "validation/profile-materialized-perf-report-accepted.stdout",
+            "sha256": "2c86d033a296360c05e708a8070dab476531341fde0e9d09704517daa6213907"
+          },
+          "event": "cycles",
+          "event_count_approx": 44242206368,
+          "interpretation": "Top rows are self/leaf overhead from perf report --no-children; callchain annotations are sampled ancestry shares and overlap.",
+          "lost_samples": 0,
+          "options": [
+            "--stdio",
+            "--no-children",
+            "--percent-limit",
+            "0"
+          ],
+          "primary_callchain_annotations": [
+            {
+              "line": 14,
+              "overhead_percent": 8.65,
+              "symbol": "branch<quick_xml::events::Event, quick_xml::errors::Error> (inlined)"
+            },
+            {
+              "line": 19,
+              "overhead_percent": 5.09,
+              "symbol": "with_xml (inlined)"
+            },
+            {
+              "line": 21,
+              "overhead_percent": 2.75,
+              "symbol": "branch<litchi_docx::source_backed::paragraph_copy::Snapshot, litchi_docx::source_backed::paragraph_copy::Error> (inlined)"
+            },
+            {
+              "line": 26,
+              "overhead_percent": 2.54,
+              "symbol": "branch<&mut litchi_docx::source_backed::paragraph_copy::Edit, litchi_docx::source_backed::paragraph_copy::Error> (inlined)"
+            },
+            {
+              "line": 68,
+              "overhead_percent": 2.24,
+              "symbol": "publish_plain_paragraph_copy_patch_to_stream<&mut litchi_perf_baseline::docx_bounded_tail_append_compare::HashingSink> (inlined)"
+            },
+            {
+              "line": 109,
+              "overhead_percent": 3.46,
+              "symbol": "plain_paragraph_copy_snapshot_with_limits (inlined)"
+            },
+            {
+              "line": 112,
+              "overhead_percent": 1.93,
+              "symbol": "run_materialized_iteration (inlined)"
+            },
+            {
+              "line": 173,
+              "overhead_percent": 5.19,
+              "symbol": "map_err<(quick_xml::name::ResolveResult, quick_xml::events::Event), quick_xml::errors::Error, litchi_docx::source_backed::paragraph_copy::Error, litchi_docx::source_backed::paragraph_copy::scan_document::{closure_env#3}> (inlined)"
+            }
+          ],
+          "sample_header": "987",
+          "top_no_children_rows": [
+            {
+              "line": 12,
+              "overhead_percent": 15.77,
+              "symbol": "litchi_docx::source_backed::paragraph_copy::scan_document"
+            },
+            {
+              "line": 607,
+              "overhead_percent": 13.33,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "line": 948,
+              "overhead_percent": 11.66,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "line": 1108,
+              "overhead_percent": 11.29,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "line": 1499,
+              "overhead_percent": 9.86,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "line": 1819,
+              "overhead_percent": 4.07,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "line": 2533,
+              "overhead_percent": 2.85,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "line": 2993,
+              "overhead_percent": 2.34,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "line": 3295,
+              "overhead_percent": 2.14,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "line": 3753,
+              "overhead_percent": 2.04,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            }
+          ]
+        },
+        "report_stderr_warning_limit": "Kernel address maps are restricted in retained perf-record stderr; some kernel frames may remain unresolved. User binary symbols in perf report remain retained.",
+        "script": {
+          "all_periods": {
+            "blocks": 987,
+            "weighted_cycles": 44242206368
+          },
+          "artifact": {
+            "bytes": 3105779,
+            "path": "validation/profile-materialized-perf-script-accepted.stdout",
+            "sha256": "67d2b0b6a7a047a0c47ae2bf627d9498fecb9ba4b8cf95f8f6a5fd09308951ea"
+          },
+          "event": "cycles",
+          "helper_process": {
+            "blocks": 5,
+            "command": "perf-exec",
+            "share_of_all_periods_percent": 1.3062188e-05,
+            "weighted_cycles": 5779
+          },
+          "lifecycle": {
+            "blocks": 807,
+            "marker": "run_materialized_iteration",
+            "outside_lifecycle": {
+              "blocks": 175,
+              "target_share_percent": 17.903931568832,
+              "weighted_cycles": 7921093318
+            },
+            "target_share_percent": 82.096068431168,
+            "weighted_cycles": 36321107271
+          },
+          "marker_method": "A marker counts once per target sample block when any resolved frame contains it. Lifecycle intersections use matching block identities; marker shares are inclusive and overlap.",
+          "markers": {
+            "build_corpus": {
+              "inclusive_target_ancestry": {
+                "blocks": 173,
+                "target_share_percent": 17.800723126684,
+                "weighted_cycles": 7875431632
+              },
+              "lifecycle_intersection": {
+                "blocks": 0,
+                "lifecycle_share_percent": 0.0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              },
+              "outside_lifecycle": {
+                "blocks": 173,
+                "target_share_percent": 17.800723126684,
+                "weighted_cycles": 7875431632
+              }
+            },
+            "copy_plain_paragraph": {
+              "inclusive_target_ancestry": {
+                "blocks": 169,
+                "target_share_percent": 17.198650278919,
+                "weighted_cycles": 7609061355
+              },
+              "lifecycle_intersection": {
+                "blocks": 160,
+                "lifecycle_share_percent": 19.833915927315,
+                "target_share_percent": 16.282865192269,
+                "weighted_cycles": 7203897880
+              },
+              "outside_lifecycle": {
+                "blocks": 9,
+                "target_share_percent": 0.91578508665,
+                "weighted_cycles": 405163475
+              }
+            },
+            "publish_plain_paragraph": {
+              "inclusive_target_ancestry": {
+                "blocks": 497,
+                "target_share_percent": 50.552318287171,
+                "weighted_cycles": 22365458059
+              },
+              "lifecycle_intersection": {
+                "blocks": 482,
+                "lifecycle_share_percent": 59.718557810374,
+                "target_share_percent": 49.026588086111,
+                "weighted_cycles": 21690441443
+              },
+              "outside_lifecycle": {
+                "blocks": 15,
+                "target_share_percent": 1.52573020106,
+                "weighted_cycles": 675016616
+              }
+            },
+            "run_materialized_iteration": {
+              "inclusive_target_ancestry": {
+                "blocks": 807,
+                "target_share_percent": 82.096068431168,
+                "weighted_cycles": 36321107271
+              },
+              "lifecycle_intersection": {
+                "blocks": 807,
+                "lifecycle_share_percent": 100.0,
+                "target_share_percent": 82.096068431168,
+                "weighted_cycles": 36321107271
+              },
+              "outside_lifecycle": {
+                "blocks": 0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              }
+            },
+            "scan_document": {
+              "inclusive_target_ancestry": {
+                "blocks": 691,
+                "target_share_percent": 70.310960116966,
+                "weighted_cycles": 31107116011
+              },
+              "lifecycle_intersection": {
+                "blocks": 629,
+                "lifecycle_share_percent": 77.951875750236,
+                "target_share_percent": 63.995425259293,
+                "weighted_cycles": 28312984411
+              },
+              "outside_lifecycle": {
+                "blocks": 62,
+                "target_share_percent": 6.315534857673,
+                "weighted_cycles": 2794131600
+              }
+            },
+            "semantic_record": {
+              "inclusive_target_ancestry": {
+                "blocks": 34,
+                "target_share_percent": 3.467392949666,
+                "weighted_cycles": 1534050944
+              },
+              "lifecycle_intersection": {
+                "blocks": 0,
+                "lifecycle_share_percent": 0.0,
+                "target_share_percent": 0.0,
+                "weighted_cycles": 0
+              },
+              "outside_lifecycle": {
+                "blocks": 34,
+                "target_share_percent": 3.467392949666,
+                "weighted_cycles": 1534050944
+              }
+            },
+            "verify_with_policy": {
+              "inclusive_target_ancestry": {
+                "blocks": 137,
+                "target_share_percent": 13.997960656459,
+                "weighted_cycles": 6193005832
+              },
+              "lifecycle_intersection": {
+                "blocks": 132,
+                "lifecycle_share_percent": 16.349913026307,
+                "target_share_percent": 13.422635786513,
+                "weighted_cycles": 5938469449
+              },
+              "outside_lifecycle": {
+                "blocks": 5,
+                "target_share_percent": 0.575324869946,
+                "weighted_cycles": 254536383
+              }
+            }
+          },
+          "sample_blocks": 987,
+          "target_process": {
+            "blocks": 982,
+            "command": "docx_bounded_ta",
+            "pid": 3723929,
+            "share_of_all_periods_percent": 99.999986937812,
+            "weighted_cycles": 44242200589
+          }
+        }
+      }
+    }
+  },
+  "perf_stat": {
+    "bounded_over_materialized_ratio": {
+      "branch-misses": 1.563098176345,
+      "branches": 1.943194842519,
+      "cache-misses": 0.42995305436,
+      "cycles": 1.814465996282,
+      "instructions": 1.934495927611,
+      "page-faults": 0.999887731904
+    },
+    "comparison_limit": "Counters are from separate profiler workload invocations; bounded/materialized ratios are descriptive whole-process ratios, not operation-only attribution.",
+    "configuration": {
+      "cpu": 2,
+      "events": [
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-misses",
+        "page-faults"
+      ],
+      "same_normal_binary": true
+    },
+    "routes": {
+      "bounded": {
+        "artifact": {
+          "bytes": 300,
+          "path": "profiles/accepted/bounded/perf-stat.csv",
+          "sha256": "4b0b2c58eaca8314e182400507b3fef71138a8cfda0d22aedaf7232dfcd4db39"
+        },
+        "derived": {
+          "branch_miss_rate_percent": 0.175770433186,
+          "cache_misses_per_instruction_percent": 0.001122458431,
+          "instructions_per_cycle_ipc": 4.527038669341
+        },
+        "events": {
+          "branch-misses": {
+            "line": 6,
+            "unit": "",
+            "value": 123220522
+          },
+          "branches": {
+            "line": 5,
+            "unit": "",
+            "value": 70103099689
+          },
+          "cache-misses": {
+            "line": 7,
+            "unit": "",
+            "value": 4041293
+          },
+          "cycles": {
+            "line": 3,
+            "unit": "",
+            "value": 79530894675
+          },
+          "instructions": {
+            "line": 4,
+            "unit": "",
+            "value": 360039435601
+          },
+          "page-faults": {
+            "line": 8,
+            "unit": "",
+            "value": 35625
+          }
+        },
+        "unit": "raw event counts from one whole-process perf stat invocation"
+      },
+      "materialized": {
+        "artifact": {
+          "bytes": 293,
+          "path": "profiles/accepted/materialized/perf-stat.csv",
+          "sha256": "024886b3e35f8bc8647798390fb6b6cf5b3fed0a579ea0ffe604468fbfa82dfa"
+        },
+        "derived": {
+          "branch_miss_rate_percent": 0.218512313815,
+          "cache_misses_per_instruction_percent": 0.005050298496,
+          "instructions_per_cycle_ipc": 4.246148886712
+        },
+        "events": {
+          "branch-misses": {
+            "line": 6,
+            "unit": "",
+            "value": 78830955
+          },
+          "branches": {
+            "line": 5,
+            "unit": "",
+            "value": 36076207159
+          },
+          "cache-misses": {
+            "line": 7,
+            "unit": "",
+            "value": 9399382
+          },
+          "cycles": {
+            "line": 3,
+            "unit": "",
+            "value": 43831570742
+          },
+          "instructions": {
+            "line": 4,
+            "unit": "",
+            "value": 186115375309
+          },
+          "page-faults": {
+            "line": 8,
+            "unit": "",
+            "value": 35629
+          }
+        },
+        "unit": "raw event counts from one whole-process perf stat invocation"
+      }
+    }
+  },
+  "reviewed_utc": "2026-09-09T05:39:38.566942+00:00",
+  "schema": "docx-tail-append-process-profile-review-v1",
+  "scope": {
+    "count": 131072,
+    "cpu": 2,
+    "exclusion": "diagnostic profile and instrumented elapsed_ns values are excluded from formal evidence",
+    "formal_samples": false,
+    "included_work": [
+      "corpus construction",
+      "untimed independent output/member/semantic oracles",
+      "warmups",
+      "30 measured harness lifecycles",
+      "report JSON serialization",
+      "teardown"
+    ],
+    "profile_manifest_status": "pass",
+    "routes": [
+      "materialized",
+      "bounded"
+    ],
+    "samples": 30,
+    "warmups": 3,
+    "whole_process": true
+  },
+  "source_context": [
+    {
+      "line": 1563,
+      "source": "crates/litchi-docx/src/source_backed/paragraph_copy.rs",
+      "symbol": "paragraph_copy::scan_document"
+    },
+    {
+      "line": 2730,
+      "source": "crates/litchi-docx/src/source_backed/tail_append.rs",
+      "symbol": "tail_append::scan_main_part"
+    },
+    {
+      "line": 696,
+      "source": "crates/xml-minifier/src/audit.rs",
+      "symbol": "xml_minifier::audit::verify_authored"
+    },
+    {
+      "line": 731,
+      "source": "crates/xml-minifier/src/audit.rs",
+      "symbol": "xml_minifier::audit::verify_authored_reader / verify_reader_with_policy"
+    },
+    {
+      "lines": [
+        1118,
+        1287,
+        1322,
+        1362
+      ],
+      "source": "tools/perf-baseline/src/docx_bounded_tail_append_compare.rs",
+      "symbol": "benchmark lifecycle and route dispatch"
+    }
+  ],
+  "status": "pass",
+  "syscalls": {
+    "interpretation": "strace -c covers the complete process, including report JSON writing; its write row cannot be treated as an in-memory sink syscall or transaction-only attribution.",
+    "routes": {
+      "bounded": {
+        "artifact": {
+          "bytes": 1923,
+          "path": "profiles/accepted/bounded/strace.txt",
+          "sha256": "217a4db59281941bbda086c0b4cec11453fe3a1fceb7a8981498e748969c9352"
+        },
+        "error_rows": [
+          {
+            "calls": 1,
+            "errors": 1,
+            "line": 22,
+            "seconds": 0.0,
+            "share_percent": 0.0,
+            "syscall": "access",
+            "usecs_per_call": 0
+          }
+        ],
+        "parsed_call_sum": 26749,
+        "parsed_error_sum": 1,
+        "top_rows": [
+          {
+            "calls": 24752,
+            "errors": 0,
+            "line": 3,
+            "seconds": 0.027014,
+            "share_percent": 90.84,
+            "syscall": "write",
+            "usecs_per_call": 1
+          },
+          {
+            "calls": 84,
+            "errors": 0,
+            "line": 4,
+            "seconds": 0.001768,
+            "share_percent": 5.95,
+            "syscall": "brk",
+            "usecs_per_call": 21
+          },
+          {
+            "calls": 8,
+            "errors": 0,
+            "line": 5,
+            "seconds": 0.000657,
+            "share_percent": 2.21,
+            "syscall": "munmap",
+            "usecs_per_call": 82
+          },
+          {
+            "calls": 1193,
+            "errors": 0,
+            "line": 6,
+            "seconds": 0.00018,
+            "share_percent": 0.61,
+            "syscall": "read",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 203,
+            "errors": 0,
+            "line": 7,
+            "seconds": 5e-05,
+            "share_percent": 0.17,
+            "syscall": "openat",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 198,
+            "errors": 0,
+            "line": 8,
+            "seconds": 2.5e-05,
+            "share_percent": 0.08,
+            "syscall": "statx",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 203,
+            "errors": 0,
+            "line": 9,
+            "seconds": 2.4e-05,
+            "share_percent": 0.08,
+            "syscall": "close",
+            "usecs_per_call": 0
+          }
+        ],
+        "total": {
+          "calls": 26749,
+          "errors": 1,
+          "line": 32,
+          "seconds": 0.029738,
+          "share_percent": 100.0,
+          "usecs_per_call": 1
+        },
+        "totals_match_rows": true,
+        "unit": "whole-process strace -c syscall summary"
+      },
+      "materialized": {
+        "artifact": {
+          "bytes": 1923,
+          "path": "profiles/accepted/materialized/strace.txt",
+          "sha256": "b8e528b424bf412b5384db6f6e9a03695bfe93c99838e05c51db0ffb9eb66fdf"
+        },
+        "error_rows": [
+          {
+            "calls": 1,
+            "errors": 1,
+            "line": 21,
+            "seconds": 0.0,
+            "share_percent": 0.0,
+            "syscall": "access",
+            "usecs_per_call": 0
+          }
+        ],
+        "parsed_call_sum": 26473,
+        "parsed_error_sum": 1,
+        "top_rows": [
+          {
+            "calls": 24476,
+            "errors": 0,
+            "line": 3,
+            "seconds": 0.026357,
+            "share_percent": 91.07,
+            "syscall": "write",
+            "usecs_per_call": 1
+          },
+          {
+            "calls": 84,
+            "errors": 0,
+            "line": 4,
+            "seconds": 0.001078,
+            "share_percent": 3.72,
+            "syscall": "brk",
+            "usecs_per_call": 12
+          },
+          {
+            "calls": 8,
+            "errors": 0,
+            "line": 5,
+            "seconds": 0.000811,
+            "share_percent": 2.8,
+            "syscall": "munmap",
+            "usecs_per_call": 101
+          },
+          {
+            "calls": 1193,
+            "errors": 0,
+            "line": 6,
+            "seconds": 0.000462,
+            "share_percent": 1.6,
+            "syscall": "read",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 203,
+            "errors": 0,
+            "line": 7,
+            "seconds": 8.5e-05,
+            "share_percent": 0.29,
+            "syscall": "close",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 203,
+            "errors": 0,
+            "line": 8,
+            "seconds": 8.1e-05,
+            "share_percent": 0.28,
+            "syscall": "openat",
+            "usecs_per_call": 0
+          },
+          {
+            "calls": 198,
+            "errors": 0,
+            "line": 9,
+            "seconds": 6.4e-05,
+            "share_percent": 0.22,
+            "syscall": "statx",
+            "usecs_per_call": 0
+          }
+        ],
+        "total": {
+          "calls": 26473,
+          "errors": 1,
+          "line": 32,
+          "seconds": 0.028943,
+          "share_percent": 100.0,
+          "usecs_per_call": 1
+        },
+        "totals_match_rows": true,
+        "unit": "whole-process strace -c syscall summary"
+      }
+    }
+  },
+  "validation": {
+    "all_six_workload_reports_validated": true,
+    "all_ten_receipts_and_artifacts_verified": true,
+    "gate_receipts": [
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-stat",
+        "receipt": {
+          "bytes": 2236,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-materialized-perf-stat-accepted.json",
+          "sha256": "6638bad11b61e49c4cc3d175ff89f7fcb8cad19ed516b0c3da24d0a7671d8fc4"
+        },
+        "record_status": "pass",
+        "route": "materialized",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-stat-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-stat-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-record",
+        "receipt": {
+          "bytes": 2204,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-materialized-perf-record-accepted.json",
+          "sha256": "47a69050e3c9fdc4725892e1735a4d887799866ea70ac0cbfe0e187b1ffade84"
+        },
+        "record_status": "pass",
+        "route": "materialized",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 817,
+              "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+            },
+            "expected": {
+              "bytes": 817,
+              "sha256": "b1856d0f9f99cb50577068f3c7987d0e2202502da52a24460c57c9a7bcde51be"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-record-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-record-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "strace",
+        "receipt": {
+          "bytes": 2125,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-materialized-strace-accepted.json",
+          "sha256": "52a01efeebeeeac69cf15b6c1d132400742c915727a76d327e1c94a1bf573d01"
+        },
+        "record_status": "pass",
+        "route": "materialized",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-strace-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-strace-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-report",
+        "receipt": {
+          "bytes": 1804,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-materialized-perf-report-accepted.json",
+          "sha256": "86866ef2083f17bbb1357d24fac8f3643b7227ea598c4bad6ef751793fbee47d"
+        },
+        "record_status": "pass",
+        "route": "materialized",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 754,
+              "sha256": "df762ca318a6d3422b95c954b16a77fa2903ab7236281b45e5b74d891175447c"
+            },
+            "expected": {
+              "bytes": 754,
+              "sha256": "df762ca318a6d3422b95c954b16a77fa2903ab7236281b45e5b74d891175447c"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-report-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 1161908,
+              "sha256": "2c86d033a296360c05e708a8070dab476531341fde0e9d09704517daa6213907"
+            },
+            "expected": {
+              "bytes": 1161908,
+              "sha256": "2c86d033a296360c05e708a8070dab476531341fde0e9d09704517daa6213907"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-report-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-script",
+        "receipt": {
+          "bytes": 1736,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-materialized-perf-script-accepted.json",
+          "sha256": "bdf60473777c32510133f8cc53accf747c5c5942270304c77f4c0f282f5a896b"
+        },
+        "record_status": "pass",
+        "route": "materialized",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 476,
+              "sha256": "f1ee7583772b65edde9d136e28e0a7097f86e1b47d73147d056d014584d6e50c"
+            },
+            "expected": {
+              "bytes": 476,
+              "sha256": "f1ee7583772b65edde9d136e28e0a7097f86e1b47d73147d056d014584d6e50c"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-script-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 3105779,
+              "sha256": "67d2b0b6a7a047a0c47ae2bf627d9498fecb9ba4b8cf95f8f6a5fd09308951ea"
+            },
+            "expected": {
+              "bytes": 3105779,
+              "sha256": "67d2b0b6a7a047a0c47ae2bf627d9498fecb9ba4b8cf95f8f6a5fd09308951ea"
+            },
+            "matches": true,
+            "path": "validation/profile-materialized-perf-script-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-stat",
+        "receipt": {
+          "bytes": 2206,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-bounded-perf-stat-accepted.json",
+          "sha256": "64820c2b893aa3d47e2d6eddc595759f4610566da69ab17af4864cf28ff10867"
+        },
+        "record_status": "pass",
+        "route": "bounded",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-stat-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-stat-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-record",
+        "receipt": {
+          "bytes": 2174,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-bounded-perf-record-accepted.json",
+          "sha256": "676b3211fb981da78e364928c82df7715331737c73dd0198d069f75be144de6e"
+        },
+        "record_status": "pass",
+        "route": "bounded",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 813,
+              "sha256": "d6edd1094397a61f952983feb090198b677cc5492e906c4a7f2389e19b89d89a"
+            },
+            "expected": {
+              "bytes": 813,
+              "sha256": "d6edd1094397a61f952983feb090198b677cc5492e906c4a7f2389e19b89d89a"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-record-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-record-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "strace",
+        "receipt": {
+          "bytes": 2095,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-bounded-strace-accepted.json",
+          "sha256": "fa19f1ff3863fab8649bb9587fa868ff14fb9489115e4b657b6ac7e24c68c93b"
+        },
+        "record_status": "pass",
+        "route": "bounded",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-strace-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "expected": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-strace-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-report",
+        "receipt": {
+          "bytes": 1784,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-bounded-perf-report-accepted.json",
+          "sha256": "13e94cc19109a9088cd49c5f22c62d35cfc2e30531996dde6851b11ce6c1a8cf"
+        },
+        "record_status": "pass",
+        "route": "bounded",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 635,
+              "sha256": "15c19452b05d86abf7c0fcb20ad6a41f7a6a85ebc55d34b9acd5c063d62383e7"
+            },
+            "expected": {
+              "bytes": 635,
+              "sha256": "15c19452b05d86abf7c0fcb20ad6a41f7a6a85ebc55d34b9acd5c063d62383e7"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-report-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 4189545,
+              "sha256": "55e5c94f42918955af1ed68cab4ccd93c0bc9b600279cd46d44fe9731eb262e5"
+            },
+            "expected": {
+              "bytes": 4189545,
+              "sha256": "55e5c94f42918955af1ed68cab4ccd93c0bc9b600279cd46d44fe9731eb262e5"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-report-accepted.stdout"
+          }
+        ]
+      },
+      {
+        "argv_matches_profile": true,
+        "exit_code": 0,
+        "kind": "perf-script",
+        "receipt": {
+          "bytes": 1716,
+          "metadata_matches_profile": true,
+          "path": "validation/profile-bounded-perf-script-accepted.json",
+          "sha256": "fe6e7de956e3317b8367b590892b6617988d2e4d79b0134e430ec1f1733872cf"
+        },
+        "record_status": "pass",
+        "route": "bounded",
+        "source_after": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before": {
+          "actual_file_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf",
+          "digest_matches": true,
+          "file_bytes": 870501,
+          "files": 7142,
+          "matches_profile_source": true,
+          "path": "validation-sources/30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf.json",
+          "sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+        },
+        "source_before_equals_after": true,
+        "source_unchanged": true,
+        "status": "pass",
+        "stdout_stderr": [
+          {
+            "actual": {
+              "bytes": 357,
+              "sha256": "161a0c27f0d3f1b31c3ecd04ff6b2f001ea12c6497bdb0c99a91fbbb13fd8aa7"
+            },
+            "expected": {
+              "bytes": 357,
+              "sha256": "161a0c27f0d3f1b31c3ecd04ff6b2f001ea12c6497bdb0c99a91fbbb13fd8aa7"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-script-accepted.stderr"
+          },
+          {
+            "actual": {
+              "bytes": 9863945,
+              "sha256": "ca5b8f04ff6fbb6ebcf28496b841411629bbf12fb383d267154a2fa58711d9f6"
+            },
+            "expected": {
+              "bytes": 9863945,
+              "sha256": "ca5b8f04ff6fbb6ebcf28496b841411629bbf12fb383d267154a2fa58711d9f6"
+            },
+            "matches": true,
+            "path": "validation/profile-bounded-perf-script-accepted.stdout"
+          }
+        ]
+      }
+    ],
+    "profile_manifest_excluded_samples": {
+      "planned_workload_runs": 6,
+      "planned_workload_samples": 180,
+      "successful_workload_runs": 6,
+      "successful_workload_samples": 180,
+      "unit": "retained harness samples from successful profiler workload reports"
+    },
+    "receipt_sha256_by_route": {
+      "bounded": {
+        "perf-record": "676b3211fb981da78e364928c82df7715331737c73dd0198d069f75be144de6e",
+        "perf-report": "13e94cc19109a9088cd49c5f22c62d35cfc2e30531996dde6851b11ce6c1a8cf",
+        "perf-script": "fe6e7de956e3317b8367b590892b6617988d2e4d79b0134e430ec1f1733872cf",
+        "perf-stat": "64820c2b893aa3d47e2d6eddc595759f4610566da69ab17af4864cf28ff10867",
+        "strace": "fa19f1ff3863fab8649bb9587fa868ff14fb9489115e4b657b6ac7e24c68c93b"
+      },
+      "materialized": {
+        "perf-record": "47a69050e3c9fdc4725892e1735a4d887799866ea70ac0cbfe0e187b1ffade84",
+        "perf-report": "86866ef2083f17bbb1357d24fac8f3643b7227ea598c4bad6ef751793fbee47d",
+        "perf-script": "bdf60473777c32510133f8cc53accf747c5c5942270304c77f4c0f282f5a896b",
+        "perf-stat": "6638bad11b61e49c4cc3d175ff89f7fcb8cad19ed516b0c3da24d0a7671d8fc4",
+        "strace": "52a01efeebeeeac69cf15b6c1d132400742c915727a76d327e1c94a1bf573d01"
+      }
+    },
+    "workload_reports": [
+      {
+        "bytes": 70762,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/materialized/perf-stat.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "perf-stat",
+        "route": "materialized",
+        "route_name": "materialized_paragraph_copy",
+        "sha256": "803737a5145ce7ee5d1f2597a20943140013d45aed5fd715618461251571433b",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      },
+      {
+        "bytes": 70762,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/materialized/perf-record.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "perf-record",
+        "route": "materialized",
+        "route_name": "materialized_paragraph_copy",
+        "sha256": "1e2803e73b0c49b554026f117a12e4b43928c2aa39b67ca313720c83037cc9c1",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      },
+      {
+        "bytes": 70792,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/materialized/strace.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "strace",
+        "route": "materialized",
+        "route_name": "materialized_paragraph_copy",
+        "sha256": "c194fdeba44fb959554685888844d7a5802650f21fbb374cc5309f581d1407bb",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      },
+      {
+        "bytes": 71997,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/bounded/perf-stat.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "perf-stat",
+        "route": "bounded",
+        "route_name": "bounded_plain_text_tail_append",
+        "sha256": "e662ad47c72ef19ae1e28c3e49e66b8d086f6c2d9f0dabcee70272a5d1cdc061",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      },
+      {
+        "bytes": 71997,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/bounded/perf-record.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "perf-record",
+        "route": "bounded",
+        "route_name": "bounded_plain_text_tail_append",
+        "sha256": "e8b2f2c203cc370f296cd5374fe485336f9c6578e42ffb8c79a4ca3d6fb63200",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      },
+      {
+        "bytes": 72028,
+        "checked_sample_count": 30,
+        "expected": {
+          "count": 131072,
+          "instrumentation": "normal",
+          "samples": 30,
+          "warmups": 3
+        },
+        "metadata_matches_profile": true,
+        "path": "profiles/accepted/bounded/strace.report.json",
+        "profile_workload_sample_count": 30,
+        "profiler": "strace",
+        "route": "bounded",
+        "route_name": "bounded_plain_text_tail_append",
+        "sha256": "2c950ad6e1b9b394c6b98957fa496bed2dea82a26f8fe0edaeff773caf3be1a8",
+        "status": "pass",
+        "validator": "analyze.validate_report"
+      }
+    ]
+  }
+}

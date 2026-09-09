@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0483/seal.py",
+    "--verify"
+  ],
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T05:53:15.236228+00:00",
+  "schema": "docx-tail-append-final-seal-verification-v1",
+  "started_utc": "2026-09-09T05:53:03.574587+00:00",
+  "stderr": "",
+  "stdout": "{\"mode\": \"verify\", \"root\": \"/home/zhuhe/code/litchi/docs/performance/results/change-0483\", \"seal\": {\"bytes\": 203386, \"files\": 1652, \"manifest\": \"SHA256SUMS\", \"schema\": \"docx-tail-append-sha256sums-v1\", \"sha256\": \"4b32733067d570be50fea59d52dc68d4766a9d047fe784c7e9bf0c4f3573d327\", \"status\": \"pass\"}, \"structured\": {\"capture_count\": 24, \"fuzz\": {\"receipts\": 3, \"seeds\": 62}, \"protocol_sha256\": \"751b54edf4f53671a6e4e875e5d15f64b7a52849249ab1b4f1514501ca399e39\", \"sample_count\": 720, \"schema\": \"docx-tail-append-verification-v1\", \"status\": \"pass\", \"temporary_binaries_required\": false, \"validation\": {\"pilots\": 12, \"required\": 32, \"retained\": 129}}}\n"
+}

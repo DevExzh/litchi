@@ -1,0 +1,25 @@
+{
+  "attempt": "accepted",
+  "binaries": {
+    "allocator": {
+      "build_path": "builds/allocator-accepted.json",
+      "build_sha256": "b716050fe092e71f37653e9a3aec08a430ae9b8bcd3adbeebf8227662ad3d1bc",
+      "bytes": 420510936,
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/allocator/docx_bounded_tail_append_compare",
+      "sha256": "b62c5700ffdcdbfdcf970fad2dad406c4787b3dc38cbd466b72f7032e6ee4c90",
+      "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+    },
+    "normal": {
+      "build_path": "builds/normal-accepted.json",
+      "build_sha256": "5daf114c5bdb7c901a54e5276f1bcaa6914a685c270be6c905ff120da4c1067f",
+      "bytes": 420503104,
+      "path": "/home/zhuhe/.cache/litchi-goal-0483/accepted/normal/docx_bounded_tail_append_compare",
+      "sha256": "6f3a30ae7c826befb10c93787ece9d771e558848443ad0a866c5d9a12e0e629d",
+      "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+    }
+  },
+  "binary_name": "docx_bounded_tail_append_compare",
+  "git_revision": "59b1b27cef73394f1f1f4842314d8bbae5461425",
+  "schema": "docx-tail-append-binaries-v1",
+  "source_manifest_sha256": "30d3ad60b0ae90911992b9855c5328913de2741f27090ba6c31b760c2ebcaeaf"
+}

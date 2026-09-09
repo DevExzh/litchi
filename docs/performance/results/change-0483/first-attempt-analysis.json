@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0483/analyze.py"
+  ],
+  "started_utc": "2026-09-09T05:35:25.967217+00:00",
+  "finished_utc": "2026-09-09T05:35:28.113438+00:00",
+  "exit_code": 1,
+  "reason": "Zero-baseline process counter percentages become nonfinite; strict JSON serialization refuses infinity. All 24 capture processes succeeded."
+}

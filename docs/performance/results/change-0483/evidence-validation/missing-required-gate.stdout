@@ -1,0 +1,1 @@
+verification failed: binary build allocator.gate_path: cannot resolve: [Errno 2] No such file or directory: '/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/missing-required-gate/validation/build-allocator-accepted.json'

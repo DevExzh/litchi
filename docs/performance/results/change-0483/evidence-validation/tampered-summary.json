@@ -1,0 +1,28 @@
+{
+  "accepted": false,
+  "case": "tampered-summary",
+  "command": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/tampered-summary/verify.py",
+    "--root",
+    "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/tampered-summary"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0483/closure-check/run-it51gn7v/tampered-summary",
+  "exit_code": 1,
+  "expected_acceptance": false,
+  "finished_utc": "2026-09-09T05:47:49.804861+00:00",
+  "mutation": "summary.json.sample_count",
+  "schema": "docx-tail-append-closure-case-v1",
+  "started_utc": "2026-09-09T05:47:40.415221+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "evidence-validation/tampered-summary.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 43,
+    "path": "evidence-validation/tampered-summary.stdout",
+    "sha256": "ec8dd45857ba4743dc2ba4bd74f499411e03833a58fffc91976ce53e1810b34e"
+  }
+}

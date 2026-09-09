@@ -1,0 +1,12 @@
+{
+  "archive_sha256": "d6a7e5982779de6d3b6ee12875522e32798334e858f9af84dea2efdaa3445367",
+  "capture_count": 24,
+  "corrected_analyzer_sha256": "0a55f244071dd309ddc932af1da12fe1279c922ecf0452ed968348fee0735cd9",
+  "recorded_utc": "2026-09-09T05:39:26.841185+00:00",
+  "sample_count": 720,
+  "schema": "docx-tail-append-zero-baseline-regression-v1",
+  "scope": "Regression check of corrected pure analysis against all archived first-attempt raw reports; not accepted formal measurement evidence. Temporary extracted reports removed.",
+  "status": "pass",
+  "strict_json_serialization_succeeded": true,
+  "undefined_percentages_retained": 10
+}

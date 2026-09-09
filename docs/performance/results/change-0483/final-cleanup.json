@@ -1,0 +1,18 @@
+{
+  "copied_bundle_removed": true,
+  "owned_runtime_root": "/home/zhuhe/.cache/litchi-goal-0483",
+  "owned_runtime_root_absent": true,
+  "recorded_utc": "2026-09-09T05:49:21.751087+00:00",
+  "removed_remaining_empty_directories_and_locks": [
+    "profile-driver.lock",
+    "closure-check",
+    "cachetesttmp",
+    "test-tmp",
+    "cpu.lock"
+  ],
+  "retained_closure_cases": 12,
+  "retained_corruption_refusals": 8,
+  "schema": "docx-tail-append-final-cleanup-v1",
+  "shared_build_caches_removed": false,
+  "temporary_binaries_absent": true
+}

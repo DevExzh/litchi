@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0483: format-owned bounded DOCX tail proof
+
+[0483](changes/0483-docx-bounded-tail-append.md) keeps Word grammar, settings and
+opaque final-section validation in DOCX, decoded splice publication in OPC and
+raw physical preservation in ZIP. The package's execution context controls
+memory/work reservations; edit options can only add a cancellation token.
+Authored fragment storage is reserved before allocation and transferred under
+its existing lease. Exact no-op and immediate inverse remain source-bound.
+The [matrix](results/change-0483/adr-matrix.md) and
+[source checkpoint](results/change-0483/docx-source-checkpoint.md) define the
+admitted closure and explicit refusals. No ambient provider or executor is
+added. Durable replay and full authored-stream memory guarantees remain open.
+
 ## 0482: XML reader and source-backed OPC insertion
 
 [0482](changes/0482-bounded-xml-opc-splice.md) keeps lexical XML auditing in `xml-minifier`, physical package proof and
