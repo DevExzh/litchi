@@ -492,9 +492,27 @@ impl BoundedOutput {
         if len > self.max {
             return Err(limit("output bytes"));
         }
-        if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
+        let capacity = self.bytes.capacity();
+        if len > capacity {
+            // Namespace closure and escaping can expand beyond the source-size
+            // hint. Amortize subsequent small writes while keeping requested
+            // capacity within the same output budget and limiting spare space.
+            let grown = capacity.saturating_add((capacity / 2).max(1));
+            let requested_capacity = len.max(grown).min(self.max);
+            let requested_additional = requested_capacity
+                .checked_sub(self.bytes.len())
+                .ok_or_else(|| limit("output bytes"))?;
             self.bytes
-                .try_reserve_exact(additional)
+                .try_reserve_exact(requested_additional)
+                // Spare capacity is optional: under allocator pressure, retry
+                // the minimum allocation needed for this admitted write.
+                .or_else(|source| {
+                    if requested_capacity > len {
+                        self.bytes.try_reserve_exact(additional)
+                    } else {
+                        Err(source)
+                    }
+                })
                 .map_err(|source| Error::Allocation {
                     resource: "MCE output",
                     source,
