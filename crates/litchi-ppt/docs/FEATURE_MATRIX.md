@@ -35,6 +35,20 @@ external-object, other, and common types, plus its structure examples. Companion
 covered [MS-CFB], [MS-ODRAW], [MS-OLEDS], [MS-OGRAPH], [MS-OFFCRYPTO], and [MS-OVBA] for
 compound files, OfficeArt, OLE activation metadata, native charts, encryption, and VBA.
 
+## Additional native metadata coverage
+
+These rows make previously grouped [MS-PPT] features explicit. Record codecs
+and document-stream transactions do not imply an unrestricted opened-package
+editor, playback, or native application behavior.
+
+| Feature | Status | Read | Write | Notes |
+|---------|--------|------|-------|-------|
+| Photo album settings (`PhotoAlbumInfo10Atom`) | 🟡 | ✅ | ❌ | `DocumentProperties10::photo_album` contains typed layout/frame shape and photo-album flags via `PhotoAlbumSettings`. No dedicated semantic photo-album writer; source preservation is distinct from authoring an album. |
+| Presentation Advisor (`PP9DocBinaryTagExtension` preferences) | 🟡 | ✅ | 🟡 | `Presentation::presentation_advisor_settings()` exposes `PresentationAdvisorSettings`; its checked record parser and `to_record` retain the warning-rule settings. No advisor execution or ordinary package-level settings transaction. |
+| Document sound collection (`SoundCollection`, `Sound`, `SoundData`) | 🟡 | ✅ | ✅ | Typed bounded collection inspection validates IDs, interaction references, and embedded-WAV references. The writer can add/replace/remove embedded sounds and build the collection; writer-supported references are checked during serialization. This does not fetch linked sounds or play media. `tests/ppt_sound_collection.rs` and `ppt_interaction_sound_writer.rs`. |
+| WMF recoloring (`RecolorInfo`) | 🟡 | ✅ | 🟡 | `RecolorInfo::{parse_payload,to_payload,to_record}` models source colors, brushes, patterns, and bounded recolor entries. Codec support does not rasterize WMF or provide an ordinary selected-shape recolor transaction. |
+| Custom table-style record (`RoundTripCustomTableStyles12Atom`) | 🟡 | ✅ | 🟡 | `DocumentStructure` models presence/placement. `document_structure::Transaction` inserts/replaces/removes/moves the validated record envelope with source-checked patches. The replacement API takes a record and does not validate its embedded OPC/DrawingML table-style package or supply an effective style resolver. |
+
 ## Package, records, and presentation structure
 
 | Feature | Status | Read | Write | Notes |
