@@ -12,6 +12,7 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
+use litchi_ole_common::property_set::Guid;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -377,6 +378,177 @@ fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
     assert_eq!(preview.state_bits, 0xC1C2_C3C4);
     assert_eq!(preview.creation_time, 0x6162_6364_6566_6768);
     assert_eq!(preview.modified_time, 0x7172_7374_7576_7778);
+}
+
+#[test]
+fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults() {
+    let source = write_cfb(|writer| {
+        writer.create_storage(&["Pool", "Object"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Pool", "Object"],
+                0xA1A2_A3A4,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["Pool", "Object", "Payload"], b"payload")
+            .unwrap();
+    });
+    let mut ole = OleFile::open(Cursor::new(source.clone())).expect("source CFB should open");
+    let objects = discover(
+        &mut ole,
+        &targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("object discovery should pass");
+    let object = objects.get("object").expect("object should be present");
+    let source_storage = object.storage().directory();
+    assert_eq!(source_storage.kind(), EntryKind::Storage);
+    assert_eq!(source_storage.state_bits(), 0xA1A2_A3A4);
+    assert_eq!(source_storage.creation_time(), 0x0102_0304_0506_0708);
+    assert_eq!(source_storage.modified_time(), 0x1112_1314_1516_1718);
+
+    let promoted = OleFile::open(Cursor::new(object.compound().to_vec()))
+        .expect("promoted object CFB should open");
+    let root = promoted.root_entry().expect("promoted root should exist");
+    assert_eq!(root.entry_type, EntryKind::Root.raw());
+    assert_eq!(root.state_bits, 0);
+    assert_eq!(root.creation_time, 0);
+    assert_eq!(root.modified_time, 0);
+
+    let editor = Editor::open(
+        source,
+        targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let editor_object = editor.objects().get("object").expect("object should exist");
+    assert_eq!(
+        editor_object.storage().directory().creation_time(),
+        0x0102_0304_0506_0708
+    );
+    let editor_promoted = OleFile::open(Cursor::new(editor_object.compound().to_vec()))
+        .expect("editor-promoted object CFB should open");
+    let editor_root = editor_promoted
+        .root_entry()
+        .expect("editor-promoted root should exist");
+    assert_eq!(editor_root.state_bits, 0);
+    assert_eq!(editor_root.creation_time, 0);
+    assert_eq!(editor_root.modified_time, 0);
+}
+
+#[test]
+fn replacement_preserves_target_storage_metadata_while_mapping_clsid() {
+    const REPLACEMENT_CLSID: [u8; 16] = [
+        0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x46,
+    ];
+    let original = write_cfb(|writer| {
+        writer.create_storage(&["Pool", "Object"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Pool", "Object"],
+                0xA1A2_A3A4,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["Pool", "Object", "Payload"], b"old")
+            .unwrap();
+    });
+    let replacement = write_cfb(|writer| {
+        writer.set_root_clsid(REPLACEMENT_CLSID);
+        writer.set_root_state_bits(0xB1B2_B3B4);
+        writer.set_root_creation_time_from_source(0x2122_2324_2526_2728);
+        writer.set_root_modified_time(0x3132_3334_3536_3738);
+        writer.create_stream(&["Payload"], b"new").unwrap();
+    });
+    let mut editor = Editor::open(
+        original,
+        targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    editor
+        .replace("object", replacement)
+        .expect("replacement should commit");
+    let output = editor.finish().expect("edited package should finish");
+    let mut file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let target = file
+        .list_directory_entries(&["Pool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Object")
+        .unwrap();
+    assert_eq!(target.state_bits, 0xA1A2_A3A4);
+    assert_eq!(target.creation_time, 0x0102_0304_0506_0708);
+    assert_eq!(target.modified_time, 0x1112_1314_1516_1718);
+    assert_eq!(target.clsid, "00020906-0000-0000-C000-000000000046");
+    let objects = discover(
+        &mut file,
+        &targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("replaced object should rediscover");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("replaced object should exist")
+            .storage()
+            .class_id(),
+        Some(Guid::from_bytes(REPLACEMENT_CLSID))
+    );
+    assert_eq!(
+        file.open_stream(&["Pool", "Object", "Payload"]).unwrap(),
+        b"new"
+    );
+}
+
+#[test]
+fn added_storage_uses_zero_metadata_for_nonzero_source_root() {
+    let mut editor = Editor::open(
+        doc_with_object(&[0, 0, 0, 0]),
+        targets("first", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let replacement = write_cfb(|writer| {
+        writer.set_root_state_bits(0xA1A2_A3A4);
+        writer.set_root_creation_time_from_source(0x0102_0304_0506_0708);
+        writer.set_root_modified_time(0x1112_1314_1516_1718);
+        writer
+            .create_stream(&["CONTENTS"], b"new object")
+            .expect("nested payload should write");
+    });
+    editor
+        .add_storage(target("second", &["ObjectPool", "_43"]), replacement)
+        .expect("explicit storage should be added");
+
+    let added = editor
+        .objects()
+        .get("second")
+        .expect("storage should be present");
+    let metadata = added.storage().directory();
+    assert_eq!(metadata.kind(), EntryKind::Storage);
+    assert_eq!(metadata.state_bits(), 0);
+    assert_eq!(metadata.creation_time(), 0);
+    assert_eq!(metadata.modified_time(), 0);
+    assert_eq!(added.stream(&["CONTENTS"]), Some(&b"new object"[..]));
+
+    let output = editor.finish().expect("edited package should finish");
+    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let target = file
+        .list_directory_entries(&["ObjectPool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "_43")
+        .expect("added storage should be serialized");
+    assert_eq!(target.state_bits, 0);
+    assert_eq!(target.creation_time, 0);
+    assert_eq!(target.modified_time, 0);
 }
 
 #[test]

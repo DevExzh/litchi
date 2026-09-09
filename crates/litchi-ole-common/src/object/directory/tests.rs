@@ -79,6 +79,21 @@ fn projects_nonzero_stream_filetimes_without_conversion() {
 }
 
 #[test]
+fn preserves_a_nonzero_storage_start_sector_until_a_typed_edit() {
+    let mut source = entry(0x01);
+    source.size = 0;
+    source.is_minifat = false;
+    source.sid_child = 0xFFFF_FFFF;
+    source.start_sector = litchi_cfb::consts::ENDOFCHAIN;
+    let metadata = decode(&source).expect("source metadata should remain readable");
+    assert_eq!(metadata.start_sector(), litchi_cfb::consts::ENDOFCHAIN);
+
+    let mut typed = metadata;
+    typed.set_start_sector(litchi_cfb::consts::ENDOFCHAIN);
+    assert!(super::validation::validate(typed).is_err());
+}
+
+#[test]
 fn class_id_codec_preserves_cfb_byte_order() {
     let value = Guid::from_bytes([
         0x33, 0x22, 0x11, 0x00, 0x55, 0x44, 0x77, 0x66, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
@@ -267,6 +282,23 @@ fn metadata_and_containment_edits_are_typed_and_raw_preserving() {
 }
 
 #[test]
+fn sid_zero_root_name_and_kind_are_immutable() {
+    let source = catalog_snapshot();
+    let mut transaction = source.edit();
+    assert!(transaction.set_name(Sid::new(0).unwrap(), "Other").is_err());
+    assert!(
+        transaction
+            .set_kind(Sid::new(0).unwrap(), EntryKind::Storage)
+            .is_err()
+    );
+    assert_eq!(transaction.catalog().raw_entries()[0].name, "Root Entry");
+    assert_eq!(
+        transaction.catalog().raw_entries()[0].entry_type,
+        EntryKind::Root.raw()
+    );
+}
+
+#[test]
 fn typed_metadata_edit_preserves_filetime_lexical_values() {
     let source = catalog_snapshot();
     let storage = Sid::new(1).unwrap();
@@ -352,4 +384,8 @@ fn catalog_validation_is_bounded_and_failure_atomic() {
         transaction.catalog().raw_entries(),
         &before
     ));
+
+    let mut no_root = entries.clone();
+    no_root[0].sid = 9;
+    assert!(Catalog::parse(&no_root, Limits::default()).is_err());
 }

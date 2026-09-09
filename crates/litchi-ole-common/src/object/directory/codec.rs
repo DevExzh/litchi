@@ -33,7 +33,7 @@ pub(crate) fn decode(entry: &DirectoryEntry) -> Result<Metadata, OleError> {
         entry.is_minifat,
     )
     .with_directory_fields(entry.state_bits, entry.creation_time, entry.modified_time);
-    validation::validate(metadata)?;
+    validation::validate_source(metadata)?;
     Ok(metadata)
 }
 

@@ -4,10 +4,9 @@ use super::model::{EntryKind, Metadata};
 use super::{catalog::Projection, codec};
 use litchi_cfb::DirectoryEntry;
 use litchi_cfb::OleError;
-use litchi_cfb::consts::ENDOFCHAIN;
 use std::collections::HashSet;
 
-pub(super) fn validate(metadata: Metadata) -> Result<(), OleError> {
+fn validate_shape(metadata: Metadata) -> Result<(), OleError> {
     if metadata.sid().raw() > super::model::MAX_REGULAR_SID {
         return Err(OleError::InvalidFormat(
             "CFB directory metadata contains an invalid SID".into(),
@@ -31,10 +30,7 @@ pub(super) fn validate(metadata: Metadata) -> Result<(), OleError> {
 
     match metadata.kind() {
         EntryKind::Storage => {
-            if metadata.stream_size() != 0
-                || metadata.uses_mini_stream()
-                || !matches!(metadata.start_sector(), 0 | ENDOFCHAIN)
-            {
+            if metadata.stream_size() != 0 || metadata.uses_mini_stream() {
                 return Err(OleError::InvalidFormat(
                     "CFB storage metadata contains stream-only fields".into(),
                 ));
@@ -62,6 +58,51 @@ pub(super) fn validate(metadata: Metadata) -> Result<(), OleError> {
     Ok(())
 }
 
+/// Validates fields whose shape is needed to expose a source projection.
+///
+/// CFB producers in the wild leave stale values in fields that are
+/// meaningless for a particular directory kind.  A source-preserving
+/// catalog must be able to retain those values for a no-op edit, while typed
+/// edits use [`validate`] below before publishing a new value.
+pub(super) fn validate_source(metadata: Metadata) -> Result<(), OleError> {
+    validate_shape(metadata)
+}
+
+/// Validates a typed metadata value before a mutation is committed.
+pub(super) fn validate(metadata: Metadata) -> Result<(), OleError> {
+    validate_shape(metadata)?;
+    match metadata.kind() {
+        EntryKind::Storage => {
+            // [MS-CFB] 2.6.1 requires the storage starting-sector field to
+            // be zero.  ENDOFCHAIN is tolerated only while replaying a raw
+            // source value through `validate_source`.
+            if metadata.start_sector() != 0 {
+                return Err(OleError::InvalidFormat(
+                    "CFB storage metadata must use a zero starting sector".into(),
+                ));
+            }
+        },
+        EntryKind::Stream => {
+            // Stream timestamps are required to be zero on newly published
+            // typed values.  Existing nonconforming source words remain
+            // available to source-preserving no-op catalogs.
+            if metadata.creation_time() != 0 || metadata.modified_time() != 0 {
+                return Err(OleError::InvalidFormat(
+                    "CFB stream metadata must use zero timestamps".into(),
+                ));
+            }
+        },
+        EntryKind::Root => {
+            if metadata.creation_time() != 0 {
+                return Err(OleError::InvalidFormat(
+                    "CFB root metadata must use a zero creation time".into(),
+                ));
+            }
+        },
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_catalog(
     entries: &[DirectoryEntry],
     limits: super::model::Limits,
@@ -73,6 +114,14 @@ pub(crate) fn validate_catalog(
             entries.len(),
             limits.max_entries
         )));
+    }
+    let root = entries.first().ok_or_else(|| {
+        OleError::InvalidFormat("CFB directory catalog must begin with SID-zero Root Entry".into())
+    })?;
+    if root.sid != 0 || root.entry_type != EntryKind::Root.raw() || root.name != "Root Entry" {
+        return Err(OleError::InvalidFormat(
+            "CFB directory catalog must begin with SID-zero Root Entry".into(),
+        ));
     }
 
     let mut seen = HashSet::new();

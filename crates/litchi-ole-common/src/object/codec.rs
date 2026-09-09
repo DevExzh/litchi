@@ -53,7 +53,11 @@ impl Package {
         let mut package = Self {
             sector_size: ole.sector_size(),
             root_clsid: storage.class_id(),
-            root_directory: Some(*storage.directory()),
+            // A selected storage is promoted into a standalone compound
+            // file.  Its directory metadata remains attached to the
+            // selected Object, but it is not the standalone file's root
+            // directory metadata.
+            root_directory: None,
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -81,7 +85,10 @@ impl Package {
         let object_package = Self {
             sector_size: self.sector_size,
             root_clsid: storage.class_id(),
-            root_directory: Some(*storage.directory()),
+            // The selected storage is promoted to a fresh standalone root.
+            // Keep the source storage metadata on `Object::storage()` rather
+            // than projecting storage-only fields onto the new root.
+            root_directory: None,
             storages: self
                 .storages
                 .iter()
@@ -355,13 +362,11 @@ impl Package {
             .iter_mut()
             .find(|storage| storage.path() == path)
             .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-        let mut root_directory = root.directory().with_class_id(replacement.root_clsid);
-        if let Some(replacement_root) = replacement.root_directory {
-            root_directory
-                .set_state_bits(replacement_root.state_bits())
-                .set_creation_time(replacement_root.creation_time())
-                .set_modified_time(replacement_root.modified_time());
-        }
+        // Replacing an object changes its class identity intentionally, while
+        // the existing target storage remains the same directory object in
+        // the containing file.  Preserve its state and timestamps by default;
+        // replacement root metadata belongs to the standalone source file.
+        let root_directory = root.directory().with_class_id(replacement.root_clsid);
         *root = Storage::new(path.to_vec(), root_directory);
         self.storages.retain(|storage| {
             storage.path() == path
@@ -411,13 +416,10 @@ impl Package {
                 "new object storage parent is missing".into(),
             ));
         }
-        let mut root_directory = directory::Metadata::staged_storage(replacement.root_clsid);
-        if let Some(replacement_root) = replacement.root_directory {
-            root_directory
-                .set_state_bits(replacement_root.state_bits())
-                .set_creation_time(replacement_root.creation_time())
-                .set_modified_time(replacement_root.modified_time());
-        }
+        let root_directory = directory::Metadata::staged_storage(replacement.root_clsid);
+        // A newly added target is a fresh storage in the containing file.
+        // Use normative storage defaults; source root state/times are not
+        // meaningful storage metadata.
         self.storages
             .push(Storage::new(target.path().to_vec(), root_directory));
         for storage in &replacement.storages {
@@ -459,11 +461,13 @@ impl Package {
         if let Some(clsid) = self.root_clsid {
             writer.set_root_clsid(*clsid.as_bytes());
         }
-        if let Some(root) = self.root_directory {
-            // A selected storage is promoted to the standalone compound-file
-            // root during object extraction. Keep its raw directory words
-            // unchanged so source-preserving edits do not silently discard
-            // producer metadata; fresh OleWriter roots still default to zero.
+        if let Some(root) = self
+            .root_directory
+            .filter(|root| root.kind() == EntryKind::Root)
+        {
+            // Only a captured SID-zero root may project its raw directory
+            // fields onto the rendered root.  Promoted nested storages use
+            // the writer's normative fresh-root defaults.
             writer.set_root_state_bits(root.state_bits());
             writer.set_root_modified_time(root.modified_time());
             writer.set_root_creation_time_from_source(root.creation_time());
