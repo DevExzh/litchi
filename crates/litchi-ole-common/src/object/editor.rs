@@ -19,6 +19,22 @@ use std::sync::Arc;
 /// Maximum number of stream selectors accepted by one removal publication.
 pub const MAX_STREAM_REMOVALS: usize = 1_024;
 
+/// A bounded, source- and target-bound replacement prepared for publication.
+///
+/// The value is intentionally opaque: callers can admit a replacement before
+/// cloning an outer format editor, then hand it back to the same object owner
+/// for atomic publication. It cannot be constructed without the common
+/// owner's target, limits, and validated replacement package.
+#[derive(Debug)]
+pub struct PreparedReplacement {
+    key: String,
+    path: Vec<String>,
+    before: Arc<[u8]>,
+    replacement: Package,
+    source: Arc<Vec<u8>>,
+    limits: Limits,
+}
+
 /// Result class attached to a completed top-level in-memory CFB parse.
 #[cfg(feature = "performance-diagnostics")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,15 +96,21 @@ impl Editor {
     /// Returns an error when the CFB is malformed or protected, a target is
     /// missing/invalid, or a configured resource limit is exceeded.
     pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, OleError> {
-        Self::open_with_ole_file(bytes, targets, limits).map(|(editor, _ole)| editor)
+        Self::validate_open_inputs(&targets, limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes))?;
+        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let original = Arc::new(ole.into_inner().into_inner());
+        Ok(Self::from_admitted(original, limits, admitted))
     }
 
     /// Opens a package and returns the validated physical OLE context used by
     /// the object owner.
     ///
-    /// The returned `OleFile` is parsed from the same source bytes owned by
-    /// the returned editor.  Keeping source opening inside this bounded API
+    /// The returned `OleFile` is parsed from the same source content as the
+    /// returned editor. Keeping source opening inside this bounded API
     /// prevents callers from pairing an editor with an unrelated parsed CFB.
+    /// The editor retains one source copy because both values are returned;
+    /// that copy is made only after common CFB admission succeeds.
     ///
     /// # Errors
     ///
@@ -100,9 +122,10 @@ impl Editor {
         limits: Limits,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
         Self::validate_open_inputs(&targets, limits)?;
-        let original = Arc::new(bytes);
-        let mut ole = OleFile::open(Cursor::new(original.as_ref().clone()))?;
-        let editor = Self::open_from_parsed_ole(Arc::clone(&original), &mut ole, targets, limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes))?;
+        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let original = Arc::new(ole.get_ref().get_ref().clone());
+        let editor = Self::from_admitted(original, limits, admitted);
         Ok((editor, ole))
     }
 
@@ -131,11 +154,10 @@ impl Editor {
         mut observer: impl FnMut(CfbParseEvent),
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
         Self::validate_open_inputs(&targets, limits)?;
-        let original = Arc::new(bytes);
-        let mut ole = observe_cfb_parse(&mut observer, || {
-            OleFile::open(Cursor::new(original.as_ref().clone()))
-        })?;
-        let editor = Self::open_from_parsed_ole(Arc::clone(&original), &mut ole, targets, limits)?;
+        let mut ole = observe_cfb_parse(&mut observer, || OleFile::open(Cursor::new(bytes)))?;
+        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let original = Arc::new(ole.get_ref().get_ref().clone());
+        let editor = Self::from_admitted(original, limits, admitted);
         Ok((editor, ole))
     }
 
@@ -151,12 +173,11 @@ impl Editor {
         Ok(())
     }
 
-    fn open_from_parsed_ole<R: Read + Seek>(
-        original: Arc<Vec<u8>>,
+    fn admit_open<R: Read + Seek>(
         ole: &mut OleFile<R>,
         targets: Targets,
         limits: Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<(Targets, Package, Objects), OleError> {
         codec::open(ole)?;
         if targets
             .iter()
@@ -175,14 +196,22 @@ impl Editor {
         let package = Package::capture(&mut *ole, limits)?;
         package.check(limits)?;
         let objects = discovery::from_package(&package, &resolved_targets, limits)?;
-        Ok(Self {
-            targets: resolved_targets,
+        Ok((resolved_targets, package, objects))
+    }
+
+    fn from_admitted(
+        original: Arc<Vec<u8>>,
+        limits: Limits,
+        (targets, package, objects): (Targets, Package, Objects),
+    ) -> Self {
+        Self {
+            targets,
             limits,
             original,
             package,
             objects,
             changed: false,
-        })
+        }
     }
 
     /// Captures the current read state as an immutable, shareable snapshot.
@@ -242,6 +271,16 @@ impl Editor {
         self.package.stream_shared(path)
     }
 
+    /// Returns shared ownership of the exact source bytes admitted by this
+    /// editor's bounded open validation.
+    ///
+    /// Cloning the returned handle does not copy the source allocation. The
+    /// bytes remain immutable; edits publish through a separate candidate.
+    #[must_use]
+    pub fn source_shared(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.original)
+    }
+
     /// Applies a fallible replacement to one selected object's standalone CFB.
     ///
     /// # Errors
@@ -269,6 +308,27 @@ impl Editor {
     /// Returns an error when the target or replacement is invalid, protected,
     /// oversized, or cannot be committed atomically.
     pub fn replace(&mut self, key: &str, compound_file: Vec<u8>) -> Result<(), OleError> {
+        let Some(prepared) = self.prepare_replacement(key, compound_file)? else {
+            return Ok(());
+        };
+        self.replace_prepared(prepared)
+    }
+
+    /// Validates and captures a replacement without cloning the editor.
+    ///
+    /// `None` is an exact byte-for-byte no-op. A returned value is bound to
+    /// this editor's target, source object, and limits and must be consumed by
+    /// [`Self::replace_prepared`] before the editor is changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is missing, the replacement exceeds
+    /// the retained limits, or the replacement CFB is malformed/protected.
+    pub fn prepare_replacement(
+        &self,
+        key: &str,
+        compound_file: Vec<u8>,
+    ) -> Result<Option<PreparedReplacement>, OleError> {
         if compound_file.len() as u64 > self.limits.max_object_size {
             return Err(OleError::InvalidFormat(
                 "replacement object exceeds size limit".into(),
@@ -279,15 +339,55 @@ impl Editor {
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
         if object.compound() == compound_file.as_slice() {
-            return Ok(());
+            return Ok(None);
         }
         let mut replacement_ole = OleFile::open(Cursor::new(compound_file))?;
         codec::open(&replacement_ole)?;
         let replacement = Package::capture(&mut replacement_ole, self.limits)?;
+        replacement.check_object_limits(self.limits)?;
+        Ok(Some(PreparedReplacement {
+            key: key.to_owned(),
+            path: object.path().to_vec(),
+            before: object.compound_shared(),
+            replacement,
+            source: Arc::clone(&self.original),
+            limits: self.limits,
+        }))
+    }
+
+    /// Publishes a replacement previously admitted by this editor.
+    ///
+    /// The prepared value is source-, target-, and limit-bound. Reusing it
+    /// with another editor or after the selected object changed is rejected
+    /// before any candidate is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the prepared value does not match this editor or
+    /// the candidate package fails its normal bounded publication checks.
+    pub fn replace_prepared(&mut self, prepared: PreparedReplacement) -> Result<(), OleError> {
+        if self.limits != prepared.limits {
+            return Err(OleError::InvalidFormat(
+                "prepared replacement limits do not match editor".into(),
+            ));
+        }
+        if !Arc::ptr_eq(&self.original, &prepared.source) {
+            return Err(OleError::InvalidFormat(
+                "prepared replacement source does not match editor".into(),
+            ));
+        }
+        let object = self.objects.get(&prepared.key).ok_or_else(|| {
+            OleError::InvalidFormat(format!("object target {:?} not found", prepared.key))
+        })?;
+        if object.path() != prepared.path || object.compound() != prepared.before.as_ref() {
+            return Err(OleError::InvalidFormat(
+                "prepared replacement source does not match object editor".into(),
+            ));
+        }
         let mut candidate = self.clone();
         candidate
             .package
-            .replace_object(object.path(), &replacement, self.limits)?;
+            .replace_object(&prepared.path, &prepared.replacement, self.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }

@@ -566,6 +566,220 @@ fn failed_replacement_is_transactional() {
 }
 
 #[test]
+fn uniquely_owned_noop_editor_retains_the_consumed_vec_allocation() {
+    let mut source = doc_with_object(&[0, 0, 0, 0]);
+    source.reserve(4096);
+    let expected = source.clone();
+    let allocation = source.as_ptr();
+    let capacity = source.capacity();
+    let editor = Editor::open(
+        source,
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should admit the owned source");
+    let retained = editor.source_shared();
+    assert_eq!(retained.as_ptr(), allocation);
+    assert_eq!(retained.capacity(), capacity);
+    drop(retained);
+    let output = editor.finish().expect("unique no-op should finish");
+    assert_eq!(output.as_ptr(), allocation);
+    assert_eq!(output.capacity(), capacity);
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn prepared_replacement_admission_is_bounded_and_source_bound() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"prepared replacement")
+            .expect("replacement stream should write");
+    });
+
+    let editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    let original_object_size = editor
+        .objects()
+        .get("object")
+        .expect("object should exist")
+        .compound()
+        .len() as u64;
+    assert!(
+        editor
+            .prepare_replacement(
+                "object",
+                editor.objects().get("object").unwrap().compound().to_vec()
+            )
+            .expect("exact replacement should be admitted")
+            .is_none()
+    );
+    assert!(!editor.is_changed());
+    assert_eq!(
+        editor
+            .clone()
+            .finish()
+            .expect("no-op should finish exactly"),
+        original
+    );
+
+    let bounded_limits = Limits {
+        max_object_size: original_object_size,
+        ..Limits::default()
+    };
+    let bounded = Editor::open(original.clone(), selected.clone(), bounded_limits)
+        .expect("bounded source should open");
+    let oversized = write_cfb(|writer| {
+        writer
+            .create_stream(
+                &["Large"],
+                &vec![0u8; usize::try_from(original_object_size).unwrap()],
+            )
+            .expect("oversized replacement should write");
+    });
+    assert!(bounded.prepare_replacement("object", oversized).is_err());
+    assert!(!bounded.is_changed());
+    assert_eq!(
+        bounded.finish().expect("failed admission stays exact"),
+        original
+    );
+
+    let object_count_limits = Limits {
+        max_streams_per_object: 4,
+        max_storage_depth: 2,
+        ..Limits::default()
+    };
+    let object_count_editor = Editor::open(original.clone(), selected.clone(), object_count_limits)
+        .expect("source should fit per-object limits");
+    let too_many_streams = write_cfb(|writer| {
+        for name in ["A", "B", "C", "D", "E"] {
+            writer
+                .create_stream(&[name], b"replacement")
+                .expect("replacement stream should write");
+        }
+    });
+    assert!(
+        object_count_editor
+            .prepare_replacement("object", too_many_streams)
+            .is_err()
+    );
+
+    let too_many_storages = write_cfb(|writer| {
+        writer.create_storage(&["A"]).expect("storage should write");
+        writer.create_storage(&["B"]).expect("storage should write");
+        writer.create_storage(&["C"]).expect("storage should write");
+    });
+    assert!(
+        object_count_editor
+            .prepare_replacement("object", too_many_storages)
+            .is_err()
+    );
+    assert!(!object_count_editor.is_changed());
+    assert_eq!(
+        object_count_editor
+            .finish()
+            .expect("per-object rejection stays exact"),
+        original
+    );
+
+    let mut stale = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    let prepared = stale
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    stale
+        .put_stream(
+            &[
+                "ObjectPool".to_owned(),
+                "_42".to_owned(),
+                "\u{3}PRINT".to_owned(),
+            ],
+            b"changed selected stream".to_vec(),
+        )
+        .expect("host edit should commit");
+    let changed_source = stale.clone().finish().expect("host edit should finish");
+    assert!(stale.replace_prepared(prepared).is_err());
+    assert_eq!(
+        stale.clone().finish().expect("stale admission stays exact"),
+        changed_source
+    );
+
+    let mut different_limits = Limits::default();
+    different_limits.max_total_size -= 1;
+    let mut other = Editor::open(original.clone(), selected, different_limits)
+        .expect("different limits should still admit the fixture");
+    let prepared = editor
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    assert!(other.replace_prepared(prepared).is_err());
+    assert!(!other.is_changed());
+    assert_eq!(
+        other.finish().expect("limit mismatch stays exact"),
+        original
+    );
+
+    let mut same_limit_other = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("same-limit editor should open");
+    let prepared = editor
+        .prepare_replacement("object", replacement)
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    assert!(same_limit_other.replace_prepared(prepared).is_err());
+    assert!(!same_limit_other.is_changed());
+    assert_eq!(
+        same_limit_other
+            .finish()
+            .expect("cross-editor rejection stays exact"),
+        original
+    );
+}
+
+#[test]
+fn prepared_replacement_commit_supports_forward_and_inverse_patch() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"forward replacement")
+            .expect("replacement stream should write");
+    });
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let prepared = editor
+        .prepare_replacement("object", replacement)
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    editor
+        .replace_prepared(prepared)
+        .expect("prepared replacement should publish");
+
+    let committed = editor.commit().expect("replacement should commit");
+    let forward = committed
+        .patch()
+        .apply(&original)
+        .expect("forward replacement patch should apply");
+    assert_eq!(forward, committed.patch().after());
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(&forward)
+            .expect("inverse replacement patch should apply"),
+        original
+    );
+}
+
+#[test]
 fn shared_stream_replacement_reuses_validated_allocation() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(

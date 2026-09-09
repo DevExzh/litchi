@@ -23,7 +23,7 @@ pub use directory::{EntryKind, Links, Metadata, Sid};
 pub use discovery::discover;
 #[cfg(feature = "performance-diagnostics")]
 pub use editor::{CfbParseEvent, CfbParseOutcome};
-pub use editor::{Editor, MAX_STREAM_REMOVALS};
+pub use editor::{Editor, MAX_STREAM_REMOVALS, PreparedReplacement};
 pub use link::Link;
 pub use model::{Limits, Object, Objects, Storage, Stream};
 pub use patch::{Commit, Patch};

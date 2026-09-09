@@ -230,14 +230,19 @@ impl Editor {
     pub fn replace_storage(&mut self, storage_id: u32, compound_file: Vec<u8>) -> Result<()> {
         let reference = reference_for_storage_id(self, storage_id)?;
         let object = object_for_reference_checked(self, &reference)?;
-        if object.compound() == compound_file.as_slice() {
+        let key = object.key().to_owned();
+        let Some(prepared) = self
+            .package
+            .prepare_replacement(&key, compound_file)
+            .map_err(PackageError::from)?
+        else {
             return Ok(());
-        }
+        };
 
         let mut candidate = self.clone();
         candidate
             .package
-            .replace(object.key(), compound_file)
+            .replace_prepared(prepared)
             .map_err(PackageError::from)?;
         candidate.changed = true;
         *self = candidate;
