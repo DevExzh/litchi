@@ -106,6 +106,7 @@
 )]
 
 pub mod calc;
+pub mod calculation_chain;
 pub mod cell_values;
 pub mod cell_watches;
 pub mod chart;
