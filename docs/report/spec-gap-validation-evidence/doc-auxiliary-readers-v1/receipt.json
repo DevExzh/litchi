@@ -1,0 +1,56 @@
+{
+  "base_commit": "ed370d7060f695454f6d1183ceb3724447238756",
+  "sources": {
+    "crates/litchi-doc/docs/FEATURE_MATRIX.md": "1a74f9490d211b09b8467e367ee35dbaa5435394179c95c10150b5832e01bd3b",
+    "crates/litchi-doc/src/document/model/semantic/basics.rs": "b56f1223b6028d702400be8710b57ab426cb0f0fd0e7c907f0f11ad0b1893b44",
+    "crates/litchi-doc/src/document/model/semantic/prelude.rs": "d3cd36dfdf96abcb5da8742a36032a71efbf8f1dc5c0cf8ac229644783e38b22",
+    "crates/litchi-doc/src/document/model/state.rs": "ed87786d464824ef952a0e8c8bda4b81a2b346434654ab4881ff10e399e082ec",
+    "crates/litchi-doc/src/document/package.rs": "2ef34e03d83e35c9f41536a2a24704335f5ad423d2a97b53115e6b51cddb37c5",
+    "crates/litchi-doc/src/document/tests.rs": "fd8f8d65dab6fb979c3a55a6c6dcdf690d1a566ef101af395c7b50b33197a4f9",
+    "crates/litchi-doc/src/lib.rs": "e29753e488b7c83610504e7ccbb6fad6397914b4c5b96615df6a5ab401cc6420",
+    "crates/litchi-doc/src/parts/dofr.rs": "c7026e690be6a657e8226fe8934c87abd79d9d6b71da61de6707032c0625f38c",
+    "crates/litchi-doc/src/parts/mod.rs": "056bca8d36ae9f899be2ad278691a6b202a4b155cd0171839d6df80314b1795f",
+    "crates/litchi-doc/src/parts/paragraph_groups.rs": "ef7fee591d0b24c41900daf7eeb3119ccdc59cd95d1445a8f32f521b181043e5",
+    "crates/litchi-doc/src/parts/print_environment.rs": "c60412e9fff5f49c5881035c09729fa468cef4654195ce6f22c953884355a070",
+    "crates/litchi-doc/tests/auxiliary_tables.rs": "ddbfc7e8ad0aaba2f8445c970b0c34734e342b0ebcc28a7f4f3f0c08b65de50c"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-doc --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-doc --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <eleven Rust paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "tests": {
+    "passed": 1192,
+    "failed": 0,
+    "ignored": 2
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 12
+  },
+  "clippy": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "independent_review": "cfb_boundary_tests: final isolated reader review clear, including bounded deferred sources, cached errors and DOFR association delta",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "6e829816e5014f9185dd66087c9f91e0fbb1d9dafdf31ca18f5234373b548b24",
+      "raw_sha256": "92e7dd1a16b07a7a73c851070928964cf55c14412fd27d41cdc5976b6fb6ce99"
+    },
+    "clippy.log.gz": {
+      "sha256": "7be417ec3337d3f03c775dd8e8cd2fa52c1cda5ea729abe6ac69d322b68a9c56",
+      "raw_sha256": "3d9b28908cc2b1151a145b148383ced107e3b30552b95f75d6dfb68a2abc30ac"
+    }
+  },
+  "coverage": "Synthetic reader grammar/range/laziness/preservation and public accessor tests. No native producer changed-save or measured performance claim."
+}

@@ -232,6 +232,11 @@ pub use parts::document_properties_2007::{
 };
 pub use parts::document_properties_2010::{DocumentId, Dop2010};
 pub use parts::document_properties_2013::Dop2013;
+pub use parts::dofr::{
+    DofrArray, DofrChildMarker, DofrDivider, DofrDividerUnits, DofrFrame, DofrFrameKind,
+    DofrListStyle, DofrListStyles, DofrPayload, DofrRecord, DofrScrollType, DofrSplitter, DofrType,
+    DofrXstz,
+};
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
     Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,
@@ -317,6 +322,8 @@ pub use parts::mail_merge::{
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
 pub use parts::ole_controls;
 pub use parts::pap::ParagraphConditionalFormatting;
+pub use parts::paragraph_groups::{PgpArray, PgpInfo, PgpOptions, PgpType};
+pub use parts::print_environment::{DocumentPrintEnvironment, PrintDriver, PrintEnvironment};
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,

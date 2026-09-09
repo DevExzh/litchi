@@ -12,6 +12,7 @@ pub(super) use crate::parts::associated_strings::DocumentAssociatedStrings;
 pub(super) use crate::parts::auto_summary::DocumentAutoSummary;
 pub(super) use crate::parts::captions::CaptionTables;
 pub(super) use crate::parts::document_properties::DocumentProperties;
+pub(super) use crate::parts::dofr::DofrArray;
 pub(super) use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 pub(super) use crate::parts::fib::FileInformationBlock;
 pub(super) use crate::parts::fields::{
@@ -37,6 +38,10 @@ pub(super) use crate::parts::mail_merge::DocumentMailMerge;
 pub(super) use crate::parts::numbering::{ListTables, ParagraphListBinding};
 pub(super) use crate::parts::ole_controls::RgxOcxInfo;
 pub(super) use crate::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
+pub(super) use crate::parts::paragraph_groups::PgpArray;
+pub(super) use crate::parts::print_environment::{
+    DocumentPrintEnvironment, PrintDriver, PrintEnvironment,
+};
 pub(super) use crate::parts::proofing::ProofingTables;
 pub(super) use crate::parts::protection::Ranges;
 pub(super) use crate::parts::repair_bookmarks::DocumentRepairBookmarks;

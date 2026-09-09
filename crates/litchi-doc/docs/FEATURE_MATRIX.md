@@ -86,6 +86,24 @@ coverage of a genuine Word 97 floating-picture donor whose producer graph is
 outside the canonical slice. The suite does not claim a native Word or
 LibreOffice changed-save result.
 
+## Auxiliary structures: explicit public coverage
+
+These rows expand the aggregate auxiliary-table entries below. A public binary
+codec does not by itself provide package-level CRUD; the Notes column names
+that boundary. Record names refer to the checked-in [MS-DOC] structures.
+
+| Feature | Status | Read | Write | Notes |
+|---------|--------|------|-------|-------|
+| Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`) | 🟡 | ✅ | ❌ | `Document::paragraph_groups()` defers bounded typed PGP identifiers, table depth, presence bits, margins, HTML block type, raw `Brc` bytes, and future option bytes. No paragraph-layout application or PGP writer is provided. |
+| Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`) | 🟡 | ✅ | ❌ | `Document::print_environment()` defers bounded four-string driver metadata and exact ignored portrait/landscape printer blobs. No printer access, pagination, or print-settings writer is provided. |
+| Frame/list records (`RgDofr`, `Dofr`) | 🟡 | ✅ | ❌ | `Document::dofr_records()` exposes bounded `Dofrh` boundaries, typed frame/list payloads, and retained unknown payload bytes. Document publication, rendering, and editing remain outside this reader-only batch. |
+
+### Unmodeled FIB tables
+
+The bounded readers intentionally stop at passive metadata semantics; printer
+access, frame rendering, and list-style execution remain outside the DOC
+package API.
+
 ## Core Word binary document model
 
 | Feature | Status | Read | Write | Notes |

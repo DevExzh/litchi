@@ -6,6 +6,7 @@ use crate::parts::captions::CaptionTables;
 use crate::parts::chp_bin_table::ChpBinTable;
 use crate::parts::comments::CommentsTable;
 use crate::parts::document_properties::DocumentProperties;
+use crate::parts::dofr::DofrArray;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 use crate::parts::envelope::Envelope;
 use crate::parts::fib::FileInformationBlock;
@@ -22,6 +23,8 @@ use crate::parts::mail_merge::DocumentMailMerge;
 use crate::parts::numbering::ListTables;
 use crate::parts::ole_controls::RgxOcxInfo;
 use crate::parts::pap_bin_table::PapBinTable;
+use crate::parts::paragraph_groups::PgpArray;
+use crate::parts::print_environment::DocumentPrintEnvironment;
 use crate::parts::proofing::ProofingTables;
 use crate::parts::protection::Ranges;
 use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
@@ -40,7 +43,7 @@ use crate::parts::text::TextExtractor;
 use crate::parts::text_services::TextServicesTables;
 use crate::parts::textbox_breaks::TextBoxBreakTables;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// A Word document (.doc).
 ///
@@ -147,6 +150,30 @@ pub struct Document {
     pub(in crate::document) text_services: Result<TextServicesTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     pub(in crate::document) saved_by_table: Result<SavedByTable>,
+    /// Bounded raw source for deferred paragraph-group parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) paragraph_groups_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict paragraph-group properties (`PGPArray`), including the
+    /// first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) paragraph_groups:
+        OnceLock<std::result::Result<Option<PgpArray>, String>>,
+    /// Bounded raw source for deferred frame-set/list parsing, or its deferred
+    /// range/allocation diagnostic.
+    pub(in crate::document) dofr_records_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict frame-set/list records (`RgDofr`), including the first
+    /// parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) dofr_records: OnceLock<std::result::Result<Option<DofrArray>, String>>,
+    /// Bounded raw sources for deferred printer metadata parsing. Each
+    /// selected FIB range is retained independently.
+    pub(in crate::document) print_driver_source: std::result::Result<Option<Vec<u8>>, String>,
+    pub(in crate::document) print_environment_portrait_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    pub(in crate::document) print_environment_landscape_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred inert printer driver and environment metadata, including the
+    /// first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) print_environment:
+        OnceLock<std::result::Result<Option<DocumentPrintEnvironment>, String>>,
     /// Deferred strict caption label and `AutoCaption` metadata parse
     pub(in crate::document) caption_tables: Result<CaptionTables>,
     /// Deferred strict repair-bookmark metadata parse
