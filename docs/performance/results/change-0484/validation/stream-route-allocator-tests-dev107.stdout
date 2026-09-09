@@ -1,0 +1,42 @@
+
+running 37 tests
+test docx_replayable_tail_append::compression_profiles::tests::current_is_an_owned_identity_operation ... ok
+test docx_replayable_tail_append::compression_profiles::tests::profile_parse_and_missing_or_duplicate_main_are_typed ... ok
+test docx_replayable_tail_append::file_store::tests::append_refuses_before_crossing_cap ... ok
+test docx_replayable_tail_append::input_profiles::tests::invalid_range_bandwidth_and_mode_settings_fail_before_open ... ok
+test docx_replayable_tail_append::input_profiles::tests::owned_source_is_zero_copy_and_each_open_has_fresh_identity ... ok
+test docx_replayable_tail_append::input_profiles::tests::short_read_reconstructs_exact_bytes_with_bounded_requests ... ok
+test docx_replayable_tail_append::file_store::tests::finish_rejects_wrong_hash ... ok
+test docx_replayable_tail_append::file_store::tests::changed_file_is_refused_before_first_byte ... ok
+test docx_replayable_tail_append::file_store::tests::cleanup_waits_for_reader_and_removes_only_owned_file ... ok
+test docx_replayable_tail_append::file_store::tests::finish_rejects_wrong_length_and_hash ... ok
+test docx_replayable_tail_append::file_store::tests::preexisting_path_is_rejected_exclusively ... ok
+test docx_replayable_tail_append::file_store::tests::pathname_replacement_does_not_redirect_retained_handle ... ok
+test docx_replayable_tail_append::file_store::tests::mutation_after_prefix_preserves_typed_partial_failure ... ok
+test docx_replayable_tail_append::file_store::tests::readers_have_independent_positional_offsets ... ok
+test docx_replayable_tail_append::input_profiles::tests::latency_profile_preserves_fingerprint_and_returned_bytes ... ok
+test docx_replayable_tail_append::tests::authored_counter_oracle_rejects_partial_and_extra_empty_events ... ok
+test docx_replayable_tail_append::tests::replay_counter_oracle_rejects_partial_and_extra_empty_store_passes ... ok
+test docx_replayable_tail_append::tests::source_adapter_records_returned_bytes_and_request_histogram ... ok
+test docx_replayable_tail_append::tests::near_limit_text_is_fixed_across_authored_counts ... ok
+test docx_replayable_tail_append::compression_profiles::tests::explicit_profiles_preserve_untouched_source_records_with_only_offset_relocation ... ok
+test docx_replayable_tail_append::compression_profiles::tests::explicit_profiles_select_only_main_compression_and_keep_source_xml ... ok
+test docx_replayable_tail_append::tests::candidate_xml_oracle_rejects_a_wrong_byte ... ok
+test docx_replayable_tail_append::tests::sink_records_all_fixed_write_histogram_bins ... ok
+test docx_replayable_tail_append::tests::raw_untouched_oracle_rejects_central_metadata_mutation_with_same_payload ... ok
+test docx_replayable_tail_append::input_profiles::tests::file_capability_pins_identity_across_path_replacement ... ok
+test docx_replayable_tail_append::input_profiles::tests::in_place_file_mutation_is_rejected_by_the_prepared_version_fence ... ok
+test docx_replayable_tail_append::tests::untouched_member_oracle_rejects_changed_opaque_bytes ... ok
+test docx_replayable_tail_append::tests::explicit_store_and_deflate_profiles_preserve_archive_semantics ... ok
+test docx_replayable_tail_append::tests::build_fixture_smoke_exercises_stream_and_full_oracles ... ok
+test docx_replayable_tail_append::route_failure_tests::file_replay_mutation_after_publication_prefix_is_incomplete_and_typed ... ok
+test docx_replayable_tail_append::route_smoke_tests::file_store_run_case_short_route ... ok
+test docx_replayable_tail_append::route_smoke_tests::memory_store_run_case_short_and_empty_routes ... ok
+test docx_replayable_tail_append::tests::cursor_event_framing_matches_the_independent_authored_proof ... ok
+test docx_replayable_tail_append::tests::near_limit_fixture_uses_dynamic_parser_workspace ... ok
+test docx_replayable_tail_append::route_smoke_tests::memory_store_run_case_near_limit_route ... ok
+test docx_replayable_tail_append::route_smoke_tests::file_store_run_case_near_limit_route ... ok
+test docx_replayable_tail_append::tests::generated_text_and_proof_accounting_are_independent_of_chunking ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 394 filtered out; finished in 0.79s
+

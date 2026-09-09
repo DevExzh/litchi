@@ -1,0 +1,66 @@
+{
+  "attempt": "dev103",
+  "binary": {
+    "bytes": 423341400,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev101-allocator/docx_replayable_tail_append",
+    "sha256": "e06480e110822ed0bfefde4d424cb3a8da1aae522522da490fd8693f65ffeb48"
+  },
+  "binary_unchanged": true,
+  "diagnostic_only": true,
+  "driver": {
+    "bytes": 4990,
+    "sha256": "a3ace3b6634ca34cc83386b5e2aa430f133fa91fb85644c6b0003e7bb2e59c6f"
+  },
+  "failures": [],
+  "finished_utc": "2026-09-09T10:08:45.556707+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "passed": true,
+  "receipts": [
+    {
+      "bytes": 2512,
+      "label": "deterministic-s64-a64-short-c64",
+      "sha256": "1980a6a177b7580255c818e4b64a955fe806ac4d0dde44216cc1f58d33b06fb0"
+    },
+    {
+      "bytes": 2514,
+      "label": "memory_store-s64-a64-short-c64",
+      "sha256": "97eb07d318d5bb6d98253749c59a2ab84654c8213030ffbb9f1fbdb6b622acec"
+    },
+    {
+      "bytes": 2621,
+      "label": "file_store-s64-a64-short-c64",
+      "sha256": "2b74fa8def2d8cbf8d299f7c3d0edc3e71e9d1bff089c92c4eb53caaa2ea1cfb"
+    },
+    {
+      "bytes": 2507,
+      "label": "deterministic-s64-a64-near-c64",
+      "sha256": "9ad92b9f89dc7d3502f3cd93046cf7c14631514b586f1508dcdf4a4a9fa07d29"
+    },
+    {
+      "bytes": 2508,
+      "label": "memory_store-s64-a64-near-c64",
+      "sha256": "bc07e1c6d7b4c6851b66925c47550b8d5ed410eb5fdefe6c1d71f8a71404eed9"
+    },
+    {
+      "bytes": 2614,
+      "label": "file_store-s64-a64-near-c64",
+      "sha256": "eff46f9054333303be7f375728b78aa6bc7b4aedda782417c67a9d506fc4b390"
+    }
+  ],
+  "role": "allocator",
+  "samples": 1,
+  "scratch_removed": true,
+  "validators": {
+    "common.py": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+    "corpus_oracle.py": "40d3fc1bcdc95bada7f4d5eb1722df9406cddda480ea650b0a74bf5f57971779",
+    "gate.py": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+    "measure.py": "622e6eb6675ee4304e9283de04c050ef1fde1fb115ee9ee24328b0a590245d44",
+    "measure_routes.py": "51af21d89a910165511ddee2ab938a215ac37f31ea310255eb20a5ac5100e4c0",
+    "record_environment.py": "4436acf24304f3494dcf7d01f6dc9b023421215aa4e20090d68ffb2dd5b05736"
+  },
+  "warmups": 1
+}

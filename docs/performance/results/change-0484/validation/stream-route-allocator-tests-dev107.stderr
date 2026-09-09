@@ -1,0 +1,3 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.97s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-6550fa09609c68c1)

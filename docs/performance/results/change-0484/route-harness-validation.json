@@ -1,0 +1,82 @@
+{
+  "accepted_allocator_samples": 15,
+  "accepted_diagnostic_processes": 30,
+  "allocator_net_live_delta_bytes": 0,
+  "diagnostics": {
+    "route-axis-diagnostics/dev108": {
+      "bytes": 4660,
+      "sha256": "c56ab2294453a8425cb4dcfd890603af6055d24809c0c196a8ad5151a6997c01"
+    },
+    "route-axis-diagnostics/dev109": {
+      "bytes": 4667,
+      "sha256": "036dde1fcede979b115d33bb15abfa3c70df5b502fcd49b00fcb5554770ce857"
+    },
+    "route-diagnostics/dev100": {
+      "bytes": 2318,
+      "sha256": "c7d08f95e04f7c1334f07c8e548b6318db720c87ddb31b13140553bbfaf22793"
+    },
+    "route-diagnostics/dev103": {
+      "bytes": 2325,
+      "sha256": "e56beae18bf397f27c7838898a5e876c3d7aced249d87f3fd1b24a6d0fd7e57d"
+    }
+  },
+  "formal_protocol_frozen": false,
+  "gates": {
+    "stream-axis-allocator-smoke-dev109.json": {
+      "bytes": 1834,
+      "sha256": "4a81f2ed591631e39aa6dbbb98f36e97febc8ba698ca1b91a5bf541cccb4d98c"
+    },
+    "stream-axis-normal-smoke-dev108.json": {
+      "bytes": 1818,
+      "sha256": "afe56b2f47b6b1517a4bce744f44a2c8acb0ac1f9c73c7bb5919e92b3e1e2fa4"
+    },
+    "stream-route-allocator-build-dev101.json": {
+      "bytes": 1787,
+      "sha256": "3eaea4617a520a1a8d92d713e56714b9d032aa23411a7d3c8ddb2d30b77adf09"
+    },
+    "stream-route-allocator-smoke-dev103.json": {
+      "bytes": 1839,
+      "sha256": "0a0ffcac2ddf521c9c24d8c7ef69c4dab71e9aa54bdb6ffacb4622ab33984311"
+    },
+    "stream-route-allocator-tests-dev107.json": {
+      "bytes": 1756,
+      "sha256": "84946514368de6e071080a4b5007db3fe32fb1dd2dfe93dc00750a94b1e7cf21"
+    },
+    "stream-route-crate-boundaries-dev106.json": {
+      "bytes": 1643,
+      "sha256": "05fd1c5b000d9a947ea5e6e3f567ef8f8c455c793cbd1508907d6091aa352f12"
+    },
+    "stream-route-evidence-tests-dev102.json": {
+      "bytes": 1732,
+      "sha256": "60a4c63e7fa725cde962d10fe2539d832e774f6e80542d910f054e33dfbe2824"
+    },
+    "stream-route-harness-clippy-dev104.json": {
+      "bytes": 1816,
+      "sha256": "92a62e3f6e25e69c5cea7f1c47e2f63805fcd7b9f1887029c2b6c60f3e62e7a8"
+    },
+    "stream-route-harness-format-dev105.json": {
+      "bytes": 2180,
+      "sha256": "6b96e316cf9fc5d3ab75ee7f7a0ba1aa5774c2b85468b2eb576dc62e3adc671b"
+    },
+    "stream-route-harness-rustdoc-dev93.json": {
+      "bytes": 1772,
+      "sha256": "4e744b87b193122777eacff438853e7b3c901d9ef5f1bc90992b670cea384d4d"
+    },
+    "stream-route-harness-tests-dev99.json": {
+      "bytes": 1703,
+      "sha256": "0fad729bff8279da26e4103a44a8aefe57eaaf3fe2d7b390ccd775449bcf6abb"
+    },
+    "stream-route-normal-build-dev96.json": {
+      "bytes": 1731,
+      "sha256": "a81c931c96e7eab7898754807af5d8ce7ba4334f9e69225079cdebc7b7bb245e"
+    },
+    "stream-route-normal-smoke-dev100.json": {
+      "bytes": 1823,
+      "sha256": "8f3e0b0b7eb90947717894cc5de4bf45712fb1747a410163cbdf04bfae61bd73"
+    }
+  },
+  "schema": "docx-route-harness-checkpoint-validation-v1",
+  "source_scope": "Normal dev96 and allocator dev101 differ only by the later cfg(test) route smoke module; accepted gate receipts bind each scope independently.",
+  "statistical_performance_claim": false,
+  "verified_utc": "2026-09-09T10:14:31.524665+00:00"
+}

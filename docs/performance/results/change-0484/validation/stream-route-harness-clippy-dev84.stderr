@@ -1,0 +1,79 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: unused import: `Write`
+  --> src/docx_replayable_tail_append/compression_profiles.rs:15:16
+   |
+15 |     io::{self, Write},
+   |                ^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: method `observation` is never used
+   --> src/docx_replayable_tail_append.rs:510:8
+    |
+500 | impl MeasureSource {
+    | ------------------ method in this implementation
+...
+510 |     fn observation(&self) -> ReadObservation {
+    |        ^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: associated function `short_read` is never used
+   --> src/docx_replayable_tail_append/input_profiles.rs:298:12
+    |
+175 | impl InputProfile {
+    | ----------------- associated function in this implementation
+...
+298 |     pub fn short_read(max_range_bytes: usize) -> Result<Self, InputProfileError> {
+    |            ^^^^^^^^^^
+
+error: associated functions `from_bytes` and `from_file_capability` are never used
+   --> src/docx_replayable_tail_append/input_profiles.rs:526:12
+    |
+516 | impl InputSourceCapability {
+    | -------------------------- associated functions in this implementation
+...
+526 |     pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    |            ^^^^^^^^^^
+...
+537 |     pub fn from_file_capability(capability: SourceFileCapability) -> Self {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+error: unneeded `return` statement
+   --> src/docx_replayable_tail_append/file_store.rs:203:13
+    |
+203 | /             return Ok(Self {
+204 | |                 device: metadata.dev(),
+205 | |                 inode: metadata.ino(),
+206 | |             });
+    | |______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+203 ~             Ok(Self {
+204 +                 device: metadata.dev(),
+205 +                 inode: metadata.ino(),
+206 ~             })
+    |
+
+error: unneeded `return` statement
+   --> src/docx_replayable_tail_append/file_store.rs:915:9
+    |
+915 |         return metadata.blocks().checked_mul(512);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_return
+help: remove `return`
+    |
+915 -         return metadata.blocks().checked_mul(512);
+915 +         metadata.blocks().checked_mul(512)
+    |
+
+error: could not compile `litchi-perf-baseline` (lib) due to 6 previous errors

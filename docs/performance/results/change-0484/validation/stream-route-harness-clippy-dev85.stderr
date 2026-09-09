@@ -1,0 +1,26 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: items after a test module
+    --> src/docx_replayable_tail_append.rs:3535:1
+     |
+3535 | mod tests {
+     | ^^^^^^^^^
+...
+3900 | fn verify_candidate_xml_only(actual: &[u8], expected: &[u8]) -> BenchResult<()> {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#items_after_test_module
+     = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+     = help: move the items to before the test module was defined
+
+error: redundant closure
+   --> src/docx_replayable_tail_append/route_failure_tests.rs:158:22
+    |
+158 |         .is_some_and(|source| contains_authored_changed_in_source(source))
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `contains_authored_changed_in_source`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+error: could not compile `litchi-perf-baseline` (lib test) due to 2 previous errors

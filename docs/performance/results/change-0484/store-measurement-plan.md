@@ -1,6 +1,15 @@
 # Change 0484 one-shot replay-store measurement plan
 
-Status: **design proposal, unmeasured**. This note closes the measurement
+Status: **implemented harness, formal measurements outstanding**. The
+[route harness checkpoint](route-harness-checkpoint.md) records implementation,
+development failures, validation, and diagnostic scope. The executable driver
+now also lists 27 one-factor input/sink/compression arms (108 formal and 54
+pilot processes), separate from the 120/60 store-route inventory. The design
+below remains the original planning record; current source and the checkpoint
+supersede its future-tense implementation descriptions. No formal protocol has
+been frozen by this update.
+
+This note closes the measurement
 design gap identified in [`measurement-plan-review.md`](measurement-plan-review.md#scope-blockers-against-the-0484-design-claim).
 It does not turn the current deterministic correctness checkpoint into a
 performance result, and it does not revise the open full-document goal.

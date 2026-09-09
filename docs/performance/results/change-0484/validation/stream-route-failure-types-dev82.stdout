@@ -1,0 +1,11 @@
+
+running 1 test
+test docx_replayable_tail_append::route_failure_tests::file_replay_mutation_after_publication_prefix_is_incomplete_and_typed ... FAILED
+
+failures:
+
+failures:
+    docx_replayable_tail_append::route_failure_tests::file_replay_mutation_after_publication_prefix_is_incomplete_and_typed
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 426 filtered out; finished in 0.03s
+

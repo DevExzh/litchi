@@ -1,0 +1,104 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0433]: cannot find module or crate `io` in this scope
+  --> src/docx_replayable_tail_append/compression_profiles.rs:79:12
+   |
+79 |     Output(io::Error),
+   |            ^^ use of unresolved module or unlinked crate `io`
+   |
+   = help: if you wanted to use a crate named `io`, use `cargo add io` to add it to your `Cargo.toml`
+help: a builtin type with a similar name exists
+   |
+79 -     Output(io::Error),
+79 +     Output(i8::Error),
+   |
+help: consider importing one of these modules
+   |
+11 + use crate::io;
+   |
+11 + use std::io;
+   |
+
+error[E0433]: cannot find module or crate `io` in this scope
+   --> src/docx_replayable_tail_append/compression_profiles.rs:131:11
+    |
+131 | impl From<io::Error> for CompressionProfileError {
+    |           ^^ use of unresolved module or unlinked crate `io`
+    |
+    = help: if you wanted to use a crate named `io`, use `cargo add io` to add it to your `Cargo.toml`
+help: a builtin type with a similar name exists
+    |
+131 - impl From<io::Error> for CompressionProfileError {
+131 + impl From<i8::Error> for CompressionProfileError {
+    |
+help: consider importing one of these modules
+    |
+ 11 + use crate::io;
+    |
+ 11 + use std::io;
+    |
+
+error[E0433]: cannot find module or crate `io` in this scope
+   --> src/docx_replayable_tail_append/compression_profiles.rs:132:20
+    |
+132 |     fn from(error: io::Error) -> Self {
+    |                    ^^ use of unresolved module or unlinked crate `io`
+    |
+    = help: if you wanted to use a crate named `io`, use `cargo add io` to add it to your `Cargo.toml`
+help: a builtin type with a similar name exists
+    |
+132 -     fn from(error: io::Error) -> Self {
+132 +     fn from(error: i8::Error) -> Self {
+    |
+help: consider importing one of these modules
+    |
+ 11 + use crate::io;
+    |
+ 11 + use std::io;
+    |
+
+error[E0609]: no field `storage` on type `std::boxed::Box<FileReplayReader>`
+   --> src/docx_replayable_tail_append/file_store.rs:931:14
+    |
+931 |         self.storage
+    |              ^^^^^^^ unknown field
+    |
+help: a field with a similar name exists
+    |
+931 |         self._storage
+    |              +
+
+warning: unused import: `Read`
+    --> src/docx_replayable_tail_append/file_store.rs:1001:19
+     |
+1001 |     use std::io::{Read as _, Seek as _, SeekFrom};
+     |                   ^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0015]: cannot perform non-const deref coercion on `std::sync::Arc<FileReplayStorage>` in constant functions
+   --> src/docx_replayable_tail_append/file_store.rs:753:9
+    |
+753 |         self.storage.sync_policy
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: attempting to deref into `FileReplayStorage`
+note: impl defined here, but it is not `const`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/sync.rs:2443:0
+    = note: calls in constant functions are limited to constant functions, tuple structs and tuple variants
+
+warning: variable does not need to be mutable
+    --> src/docx_replayable_tail_append/file_store.rs:1093:13
+     |
+1093 |         let mut file = OpenOptions::new().write(true).open(&path).unwrap();
+     |             ----^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0015, E0433, E0609.
+For more information about an error, try `rustc --explain E0015`.
+warning: `litchi-perf-baseline` (lib test) generated 2 warnings
+error: could not compile `litchi-perf-baseline` (lib test) due to 5 previous errors; 2 warnings emitted

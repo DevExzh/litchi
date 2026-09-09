@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0484/smoke_routes.py",
+    "--binary",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev96-normal/docx_replayable_tail_append",
+    "--role",
+    "normal",
+    "--attempt",
+    "dev97"
+  ],
+  "attempt": "dev97",
+  "common_sha256": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "stream-route-normal-smoke-dev97",
+  "schema": "docx-stream-append-gate-v1",
+  "source_before": {
+    "files": 7156,
+    "path": "validation-sources/83c6ca750d50c55a389156672bd4f2cf81a4611cc2424801fe83e4f5bfb5d23f.json",
+    "sha256": "83c6ca750d50c55a389156672bd4f2cf81a4611cc2424801fe83e4f5bfb5d23f"
+  },
+  "started_utc": "2026-09-09T10:04:46.637902+00:00"
+}

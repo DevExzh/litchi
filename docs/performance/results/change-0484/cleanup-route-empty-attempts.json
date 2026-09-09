@@ -1,0 +1,16 @@
+{
+  "failed_receipts_retained": [
+    "route-diagnostics/dev95",
+    "route-diagnostics/dev97"
+  ],
+  "note": "Only already-empty owned scratch directories removed; raw failure artifacts remain.",
+  "removed_empty_directories": [
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev95/file_store-s64-a64-near-c64",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev95/file_store-s64-a64-short-c64",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev95",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev97/file_store-s64-a64-near-c64",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev97/file_store-s64-a64-short-c64",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-diagnostics/dev97"
+  ],
+  "removed_utc": "2026-09-09T10:10:55.189677+00:00"
+}

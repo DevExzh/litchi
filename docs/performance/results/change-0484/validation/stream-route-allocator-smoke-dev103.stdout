@@ -1,0 +1,6 @@
+deterministic-s64-a64-short-c64: PASS
+memory_store-s64-a64-short-c64: PASS
+file_store-s64-a64-short-c64: PASS
+deterministic-s64-a64-near-c64: PASS
+memory_store-s64-a64-near-c64: PASS
+file_store-s64-a64-near-c64: PASS

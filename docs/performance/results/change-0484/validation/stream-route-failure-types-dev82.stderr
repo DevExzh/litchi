@@ -1,0 +1,9 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.62s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-891237911b18d194)
+replay error types: authored=false boxed_authored=false io=false boxed_io=false
+
+thread 'docx_replayable_tail_append::route_failure_tests::file_replay_mutation_after_publication_prefix_is_incomplete_and_typed' (214198) panicked at src/docx_replayable_tail_append/route_failure_tests.rs:231:5:
+typed AuthoredReplayError::Changed must survive the publication error chain: Opc(IncompleteOutput { written: 619, source: IoError(Custom { kind: Other, error: Custom { kind: Other, error: Changed } }) })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--lib`

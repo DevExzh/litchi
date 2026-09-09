@@ -1,0 +1,96 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev103/memory_store-s64-a64-near-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev101-allocator/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "near",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev103/memory_store-s64-a64-near-c64/report.json"
+  ],
+  "artifacts": {
+    "report.json": {
+      "bytes": 11667,
+      "sha256": "07568d58d69dc8b31404896c2e6bd367a9a144f1e4a25c75b54ae32229a0b766"
+    },
+    "resource.txt": {
+      "bytes": 1194,
+      "sha256": "a25b39d4c8a2e23f3936b62a7943bb52d3ebb27f01b9aa09a6c72fb720356d09"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "case": {
+    "authored_count": 64,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "64",
+      "--authored-counts",
+      "64",
+      "--chunks",
+      "64",
+      "--text",
+      "near",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "label": "s64-a64-near-c64",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "text_bytes": 61440,
+    "text_mode": "near"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "error": null,
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T10:08:43.284618+00:00",
+  "label": "memory_store-s64-a64-near-c64",
+  "passed": true,
+  "route": "memory_store",
+  "started_utc": "2026-09-09T10:08:41.265795+00:00"
+}
