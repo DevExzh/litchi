@@ -1943,6 +1943,7 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
 /// Inspect an OOXML encryption DataSpaces graph with narrowly scoped native
 /// producer compatibility. Generic DataSpaces callers continue to use the
 /// strict [`inspect`] path.
+#[cfg(any(feature = "ooxml", test))]
 pub(crate) fn inspect_ooxml<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
     inspect_inner(ole, true)
 }
