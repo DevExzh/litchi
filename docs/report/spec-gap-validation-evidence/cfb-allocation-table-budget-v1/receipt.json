@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "1ffcebbf701675b160c706902bdb40c2fc3c8b1d",
+  "validation_worktree": "/var/tmp/litchi-cfb-metadata-validation-20260909",
+  "toolchain": "1.95.0",
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "source_files": {
+    "crates/litchi-cfb/README.md": "8578298713f07f01e8a11dea789d0af780679a2241720f72c36b1b5943537f3f",
+    "crates/litchi-cfb/src/file.rs": "7cb4d10d6fbbe54aaf9cbe9d2bfc154e134d211371fcd0abe3a0c262aa26581f",
+    "crates/litchi-cfb/src/shared.rs": "780eff123a6766e21bdc88f2da83b6061b2903b410ef6774ed133e5eb9bc6e06",
+    "crates/litchi-cfb/src/allocation_validation_tests.rs": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f",
+    "crates/litchi-cfb/src/validation.rs": "bff75ed93600b5681614764ca492f086eb666bb89aa2823e5db1d8a064eab05f",
+    "crates/litchi-cfb/src/validation_tests.rs": "46d4bcab183872acc12e7b75a708d5f5125eaac02fdf4f051927895e7bd63290",
+    "docs/performance/changes/0298-cfb-directory-byte-limit.md": "2caedb15a9aa4444f877874005110a6d839c665300d63c4fca2303867faa02bf"
+  },
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-cfb",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 314,
+      "doctests_passed": 14,
+      "doctests_ignored": 1
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-cfb --lib --tests -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "log_sha256": {
+    "tests.log.gz": "7b3b4462ca60ec86fba2ed6dc69c8fb5c6d502dd97d7ddf1d72365c2f2e9fcc1",
+    "clippy.log.gz": "02c08b8516670119c2d0381e55c9353579fbfd61cf5223ece3eba239bba5ed2e"
+  },
+  "uncompressed_log_sha256": {
+    "tests.log.gz": "48df0ad8abf6ee18d6ae030d5486cb1985a99d18731cde153d4910902751ab41",
+    "clippy.log.gz": "9574d58e46c7d59d41240eeb1bad17a378db240a7173019b5304507ae20f0a6a"
+  },
+  "scope": "Combined declared FAT/DIFAT/MiniFAT sector bytes and u32 location-vector admission; excludes total memory, directory bytes, role maps, chain scratch, source memory, and throughput. Final prose clarification only followed test run; final Clippy includes it."
+}

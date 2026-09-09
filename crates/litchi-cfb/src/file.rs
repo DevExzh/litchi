@@ -309,12 +309,15 @@ pub enum OleError {
 /// The input limit is checked immediately after obtaining the reader length and
 /// before the parser allocates its physical-sector map or traverses any CFB
 /// metadata. The directory limit is checked before the directory stream and
-/// derived directory-entry allocations. Both defaults are deliberately finite
-/// and the shared reader carries the same policy.
+/// derived directory-entry allocations. The allocation-table limit is checked
+/// from the header counts before the physical-sector map or FAT/DIFAT/MiniFAT
+/// tables are reserved. All defaults are deliberately finite and the shared
+/// reader carries the same policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OleFileLimits {
     max_input_bytes: u64,
     max_directory_bytes: u64,
+    max_allocation_table_bytes: u64,
 }
 
 impl OleFileLimits {
@@ -329,14 +332,19 @@ impl OleFileLimits {
     pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = 64 * 1024 * 1024;
     /// Largest directory stream ceiling accepted by the low-level CFB reader.
     pub const MAX_DIRECTORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default combined decoded FAT/DIFAT/MiniFAT table ceiling.
+    pub const DEFAULT_MAX_ALLOCATION_TABLE_BYTES: u64 = 64 * 1024 * 1024;
+    /// Largest combined decoded FAT/DIFAT/MiniFAT table ceiling accepted by
+    /// the low-level CFB reader.
+    pub const MAX_ALLOCATION_TABLE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
     /// Creates a finite input ceiling for one CFB source.
     ///
     /// # Errors
     ///
     /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
-    /// the low-level CFB hard ingress ceiling. Use
-    /// [`Self::with_max_directory_bytes`] to select a directory ceiling.
+    /// the low-level CFB hard ingress ceiling. Use the `with_max_*` methods to
+    /// select directory and allocation-table ceilings.
     pub const fn new(max_input_bytes: u64) -> Result<Self, OleError> {
         if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
             return Err(OleError::InvalidLimit {
@@ -348,6 +356,7 @@ impl OleFileLimits {
         Ok(Self {
             max_input_bytes,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
         })
     }
 
@@ -384,6 +393,42 @@ impl OleFileLimits {
     pub const fn max_directory_bytes(self) -> u64 {
         self.max_directory_bytes
     }
+
+    /// Selects the combined decoded FAT/DIFAT/MiniFAT table ceiling accepted
+    /// while parsing one CFB source.
+    ///
+    /// The observed value includes the declared FAT, DIFAT, and MiniFAT
+    /// sector bytes plus the `u32` location vectors used for those sectors.
+    /// It excludes the directory stream, physical-sector role map, chain
+    /// scratch, source bytes, and total process memory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// [`Self::MAX_ALLOCATION_TABLE_BYTES`].
+    pub const fn with_max_allocation_table_bytes(
+        mut self,
+        max_allocation_table_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_allocation_table_bytes == 0
+            || max_allocation_table_bytes > Self::MAX_ALLOCATION_TABLE_BYTES
+        {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB allocation table bytes",
+                value: max_allocation_table_bytes,
+                maximum: Self::MAX_ALLOCATION_TABLE_BYTES,
+            });
+        }
+        self.max_allocation_table_bytes = max_allocation_table_bytes;
+        Ok(self)
+    }
+
+    /// Maximum combined decoded FAT/DIFAT/MiniFAT table bytes accepted during
+    /// parsing.
+    #[must_use]
+    pub const fn max_allocation_table_bytes(self) -> u64 {
+        self.max_allocation_table_bytes
+    }
 }
 
 impl Default for OleFileLimits {
@@ -391,6 +436,7 @@ impl Default for OleFileLimits {
         Self {
             max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
         }
     }
 }
@@ -695,6 +741,19 @@ impl<R: Read + Seek> OleFile<R> {
             return Err(OleError::CorruptedFile(
                 "Declared directory sector count exceeds the physical file".to_string(),
             ));
+        }
+        let allocation_table_bytes = checked_allocation_table_bytes(
+            sector_size,
+            num_fat_sectors,
+            num_difat_sectors,
+            num_minifat_sectors,
+        )?;
+        if allocation_table_bytes > limits.max_allocation_table_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "allocation table bytes",
+                observed: allocation_table_bytes,
+                maximum: limits.max_allocation_table_bytes(),
+            });
         }
         let sector_roles = try_filled_vec(
             physical_sector_count,
@@ -2615,6 +2674,38 @@ fn checked_directory_data_len(sector_count: usize, sector_size: usize) -> Result
     sector_count
         .checked_mul(sector_size)
         .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))
+}
+
+/// Computes the combined bytes charged for the decoded FAT/DIFAT/MiniFAT
+/// sectors and the `u32` vectors that retain their sector locations.
+///
+/// DIFAT sectors are decoded through one reusable sector buffer rather than an
+/// aggregate byte allocation, but their declared sector bytes are charged as
+/// part of this conservative metadata budget. The charge is intentionally
+/// independent of total process memory.
+fn checked_allocation_table_bytes(
+    sector_size: usize,
+    num_fat_sectors: u32,
+    num_difat_sectors: u32,
+    num_minifat_sectors: u32,
+) -> Result<u64, OleError> {
+    let sector_size = u64::try_from(sector_size)
+        .map_err(|_err| OleError::CorruptedFile("sector size does not fit u64".to_string()))?;
+    let sector_count = u64::from(num_fat_sectors)
+        .checked_add(u64::from(num_difat_sectors))
+        .and_then(|value| value.checked_add(u64::from(num_minifat_sectors)))
+        .ok_or_else(|| {
+            OleError::CorruptedFile("allocation table sector count overflow".to_string())
+        })?;
+    let decoded_bytes = sector_count.checked_mul(sector_size).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table byte count overflow".to_string())
+    })?;
+    let location_bytes = sector_count.checked_mul(4).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table location count overflow".to_string())
+    })?;
+    decoded_bytes
+        .checked_add(location_bytes)
+        .ok_or_else(|| OleError::CorruptedFile("allocation table byte count overflow".to_string()))
 }
 
 fn enforce_directory_limit(data_len: usize, maximum: u64) -> Result<(), OleError> {

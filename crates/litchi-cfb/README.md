@@ -41,8 +41,11 @@ let word_doc = ole.open_stream(&["WordDocument"])?;
   output requires explicit writer limits that admit the requested size.
   Readers retain a 2 GiB default input limit; `OleFileLimits::new` and
   `SharedOleFileLimits::new` allow explicit v4 input ceilings up to 32 GiB.
-  This is a resource profile, below the format's theoretical maximum. Input
-  ceilings do not independently cap decoded FAT/MiniFAT allocation bytes.
+  This is a resource profile, below the format's theoretical maximum. Readers
+  also apply a combined 64 MiB default and 2 GiB hard ceiling to decoded
+  FAT/DIFAT/MiniFAT sector bytes plus their `u32` sector-location vectors.
+  This metadata budget excludes directory bytes, physical-sector roles, chain
+  scratch, source bytes, and total process memory.
 
 ## License
 
