@@ -1795,13 +1795,67 @@ impl OpcPackage {
         self.signature_api_authored = false;
     }
 
-    pub(crate) fn requires_signature_edit_policy(&self) -> bool {
+    /// Whether a changed source still requires explicit signature disposition.
+    ///
+    /// This state can remain true after low-level removal of all visible
+    /// signature parts or relationships. Format-owned publication must not
+    /// authorize that change merely because [`Self::is_signed`] is now false.
+    /// Use [`Self::unsign`] or the signing APIs to authorize the disposition.
+    /// Exact unchanged source publication does not require a new disposition.
+    #[must_use]
+    pub fn requires_signature_edit_policy(&self) -> bool {
         !self.exact_source_authorized
             && self.signature_graph_tracked
             && ((self.signature_policy_required && !self.signature_policy_authorized)
                 || (self.is_signed()
                     && (self.source_ingress || self.signature_api_authored)
                     && !self.signature_policy_authorized))
+    }
+
+    /// Validate signature disposition when publishing an edited candidate.
+    ///
+    /// A signed source with a retained archive may publish its unchanged clone
+    /// or a clone explicitly handled through [`Self::unsign`] or the signing
+    /// APIs. Replacing that candidate with a separately constructed package
+    /// cannot discard the source's signature policy. Call `unsign` on the
+    /// source before replacing its whole graph. Signed sources without a
+    /// retained archive also require disposition before constructing a candidate.
+    /// Changed candidates with opaque non-Part signature-directory entries are
+    /// refused: `unsign` cannot prove removal of those retained archive members.
+    ///
+    /// This checks publication policy only, not cryptographic validity or trust.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::SignedSourceRequiresExplicitPolicy`] when either the
+    /// candidate or its replacement of the source lacks explicit disposition.
+    /// Returns [`OpcError::PreservationUnavailable`] for changed candidates
+    /// retaining opaque signature-directory entries.
+    pub fn validate_signature_edit_from(&self, source: &Self) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !self.exact_source_authorized
+            && self
+                .non_part_members
+                .iter()
+                .any(|member| is_signature_member_path(member.name()))
+        {
+            return Err(OpcError::PreservationUnavailable {
+                reason: "opaque signature-directory entries cannot be removed by candidate signature disposition".to_owned(),
+            });
+        }
+        if source.is_signed() || source.requires_signature_edit_policy() {
+            let same_source = self
+                .source_archive
+                .as_ref()
+                .zip(source.source_archive.as_ref())
+                .is_some_and(|(candidate, original)| Arc::ptr_eq(candidate, original));
+            if !same_source {
+                return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn requires_owned_source_preservation(&self) -> bool {
@@ -2714,6 +2768,51 @@ mod tests {
 
         assert!(package.is_signed());
         assert!(package.requires_signature_edit_policy());
+    }
+
+    #[test]
+    fn candidate_signature_policy_checks_source_provenance_and_disposition() {
+        let mut authored = OpcPackage::new();
+        authored.add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+            crate::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            Vec::new(),
+        )));
+        let bytes = crate::PackageWriter::to_bytes(&authored).unwrap();
+        let original = OpcPackage::from_vec(bytes.clone()).unwrap();
+        assert!(
+            original
+                .clone()
+                .validate_signature_edit_from(&original)
+                .is_ok()
+        );
+        let mut candidate = original.clone();
+        candidate.remove_part(&PackURI::new("/_xmlsignatures/origin.sigs").unwrap());
+        assert!(!candidate.is_signed());
+        assert!(candidate.validate_signature_edit_from(&original).is_err());
+        candidate.unsign();
+        assert!(candidate.validate_signature_edit_from(&original).is_ok());
+
+        let mut replacement = OpcPackage::from_vec(bytes.clone()).unwrap();
+        replacement.unsign();
+        assert!(replacement.validate_signature_edit_from(&original).is_err());
+        assert!(
+            OpcPackage::new()
+                .validate_signature_edit_from(&original)
+                .is_err()
+        );
+
+        let mut borrowed = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut candidate = borrowed.clone();
+        candidate.unsign();
+        assert!(candidate.validate_signature_edit_from(&borrowed).is_err());
+        borrowed.unsign();
+        assert!(candidate.validate_signature_edit_from(&borrowed).is_ok());
+        assert!(
+            OpcPackage::new()
+                .validate_signature_edit_from(&borrowed)
+                .is_ok()
+        );
     }
 
     #[test]
