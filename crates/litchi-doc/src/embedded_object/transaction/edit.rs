@@ -3,6 +3,9 @@
 use super::super::model::{Editor, Info, Inventory, Reference, WriteOptions};
 use super::{Commit, Patch, Snapshot};
 use crate::package::Error as PackageError;
+use litchi_ole_common::ole_streams::{
+    self, NativePatch, NativeTransaction, PresentationPatch, PresentationTransaction,
+};
 use std::fmt;
 
 /// A staged, clone-first DOC embedded-object edit.
@@ -162,6 +165,178 @@ impl Transaction {
     {
         self.editor
             .update_link(storage_id, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits one managed OLEDS presentation stream.
+    ///
+    /// The callback is applied to a bounded shared-owner transaction. The DOC
+    /// candidate is replaced only after the stream and the resulting DOC
+    /// object references validate successfully.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the storage or presentation is missing or
+    /// malformed, the callback rejects the edit, the OLEDS limits are
+    /// exceeded, or the candidate DOC cannot be validated.
+    pub fn update_presentation<F>(
+        &mut self,
+        storage_id: u32,
+        index: usize,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_presentation(storage_id, index, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits a presentation selected by a DOC object reference.
+    pub fn update_presentation_for<F>(
+        &mut self,
+        reference: &Reference,
+        index: usize,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_presentation_for(reference, index, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits one presentation under explicit OLEDS limits.
+    pub fn update_presentation_with_limits<F>(
+        &mut self,
+        storage_id: u32,
+        index: usize,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_presentation_with_limits(storage_id, index, limits, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits a reference-selected presentation under explicit limits.
+    pub fn update_presentation_for_with_limits<F>(
+        &mut self,
+        reference: &Reference,
+        index: usize,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_presentation_for_with_limits(reference, index, limits, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Applies a source-checked presentation patch to one managed object.
+    pub fn apply_presentation_patch(
+        &mut self,
+        storage_id: u32,
+        index: usize,
+        patch: &PresentationPatch,
+    ) -> Result<(), TransactionError> {
+        self.editor
+            .apply_presentation_patch(storage_id, index, patch)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Applies a presentation patch selected by a DOC object reference.
+    pub fn apply_presentation_patch_for(
+        &mut self,
+        reference: &Reference,
+        index: usize,
+        patch: &PresentationPatch,
+    ) -> Result<(), TransactionError> {
+        self.editor
+            .apply_presentation_patch_for(reference, index, patch)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits one managed OLEDS native-data stream.
+    pub fn update_native<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_native(storage_id, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits native data selected by a DOC object reference.
+    pub fn update_native_for<F>(
+        &mut self,
+        reference: &Reference,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_native_for(reference, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits one native-data stream under explicit OLEDS limits.
+    pub fn update_native_with_limits<F>(
+        &mut self,
+        storage_id: u32,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_native_with_limits(storage_id, limits, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Clone-edits reference-selected native data under explicit limits.
+    pub fn update_native_for_with_limits<F>(
+        &mut self,
+        reference: &Reference,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), TransactionError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+    {
+        self.editor
+            .update_native_for_with_limits(reference, limits, edit)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Applies a source-checked native-data patch to one managed object.
+    pub fn apply_native_patch(
+        &mut self,
+        storage_id: u32,
+        patch: &NativePatch,
+    ) -> Result<(), TransactionError> {
+        self.editor
+            .apply_native_patch(storage_id, patch)
+            .map_err(TransactionError::Invalid)
+    }
+
+    /// Applies a native-data patch selected by a DOC object reference.
+    pub fn apply_native_patch_for(
+        &mut self,
+        reference: &Reference,
+        patch: &NativePatch,
+    ) -> Result<(), TransactionError> {
+        self.editor
+            .apply_native_patch_for(reference, patch)
             .map_err(TransactionError::Invalid)
     }
 
