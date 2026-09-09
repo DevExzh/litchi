@@ -1,4 +1,6 @@
-use super::{Binding, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID};
+use super::{
+    Binding, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID, PROPERTY_BAG_FMTID,
+};
 use crate::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Guid, SUMMARY_INFORMATION_FMTID,
     USER_DEFINED_PROPERTIES_FMTID,
@@ -76,6 +78,33 @@ fn generic_binding_names_round_trip_without_heap_storage() {
 }
 
 #[test]
+fn property_bag_binding_matches_the_ms_oleps_example() {
+    let binding = Binding::custom(PROPERTY_BAG_FMTID);
+    assert_eq!(
+        binding.name().as_str(),
+        "\u{0005}bagaaqy23kudbhchaaq5u2chnd"
+    );
+    assert_eq!(
+        parse("\u{0005}Bagaaqy23kudbhchAaq5u2chNd"),
+        binding,
+        "MS-OLEPS 3.2 uses a case-insensitive GUID-derived binding name"
+    );
+}
+
+#[test]
+fn generic_binding_codec_matches_an_independent_packet_guid_vector() {
+    let binding = Binding::custom(Guid::from_bytes([
+        0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD,
+        0xEF,
+    ]));
+    assert_eq!(
+        binding.name().as_str(),
+        "\u{0005}qqmif1bt0fx35amef0zsyvwzph"
+    );
+    assert_eq!(parse("\u{0005}QQMIF1BT0FX35AMEF0ZSYVWZPH"), binding);
+}
+
+#[test]
 fn generic_binding_names_reject_bad_alphabet_and_trailing_bits() {
     assert!(Binding::from_name("SummaryInformation").is_err());
     assert!(Binding::from_name("\u{0005}too-short").is_err());
@@ -85,7 +114,7 @@ fn generic_binding_names_reject_bad_alphabet_and_trailing_bits() {
         .name()
         .as_bytes()
         .to_vec();
-    bytes[26] = b'b';
+    bytes[26] = b'i';
     assert!(Binding::from_name(std::str::from_utf8(&bytes).unwrap()).is_err());
 }
 

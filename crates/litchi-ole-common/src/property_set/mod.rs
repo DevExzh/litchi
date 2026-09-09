@@ -30,6 +30,7 @@ mod tests;
 pub use binding::Binding as Standard;
 pub use binding::{
     Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID,
+    PROPERTY_BAG_FMTID,
 };
 #[allow(
     clippy::module_name_repetitions,
