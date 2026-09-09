@@ -1,0 +1,30 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "source": "body-table-name-visible-native.pages",
+  "source_sha256": "3b34070e8dfaa07d614efc69c3d15416540676e2c1f2a0f1075d711aacf4f738",
+  "files": [
+    {
+      "file": "body-table-name-focused.pages",
+      "size": 81275,
+      "sha256": "9007bd0ea5828f59cd4ddc2f74de5efeb6c1e43e8f6ed702d0ea18ec02e15512",
+      "role": "focused Rust rename candidate"
+    },
+    {
+      "file": "body-table-name-focused-native-saved.pages",
+      "size": 115608,
+      "sha256": "d1fb7234ae64e50c2d197487718047c3eec80025d1e47de87f92bd3da8879e62",
+      "role": "Pages-saved candidate"
+    }
+  ],
+  "lifecycle": [
+    "renamed Table 1 to Native renamed table through the focused Package transaction",
+    "opened an exact disposable copy of the candidate in Pages without repair",
+    "visually verified Native renamed table, the five-by-four grid, and the original body marker",
+    "saved with Command-S and closed the actual document window to the template chooser",
+    "reopened the exact saved path without repair and visually verified the same title and grid",
+    "closed to the template chooser"
+  ],
+  "scope": "Native file opening, displayed name, save, close, reopen, and semantic preservation for this fixture. The Rust transaction changes the selected model component and removes previews while preserving Metadata.iwa; Pages itself rewrites metadata during save. Changed renames with active volatile name dependencies or pivot owners remain unsupported."
+}
