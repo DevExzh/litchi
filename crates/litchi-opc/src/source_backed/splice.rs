@@ -212,6 +212,43 @@ impl SourcePartSpliceProof {
     }
 }
 
+/// Fixed-length authored storage reserved before allocation by its source
+/// package. The mutable slice cannot increase the retained capacity.
+///
+/// Pass this owner to
+/// [`SourceBackedPackage::prepare_source_part_splice_with_fragment`] to transfer
+/// its existing memory reservation into the plan without charging it twice.
+/// The reservation covers the requested byte-buffer capacity, not allocator
+/// bookkeeping or caller-owned encoder state. Storage with a larger reported
+/// capacity is refused before it can be authored or retained in a plan.
+pub struct SourcePartSpliceFragment<'package> {
+    package: &'package SourceBackedPackage,
+    bytes: Vec<u8>,
+    reservation: Option<Arc<Reservation>>,
+}
+
+impl fmt::Debug for SourcePartSpliceFragment<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourcePartSpliceFragment")
+            .field("bytes", &self.bytes.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl SourcePartSpliceFragment<'_> {
+    /// Borrow the fixed-length authored bytes for hashing or validation.
+    #[must_use]
+    pub fn as_slice(&self) -> &[u8] {
+        self.bytes.as_slice()
+    }
+
+    /// Fill the preallocated fragment without resizing its storage.
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.bytes.as_mut_slice()
+    }
+}
+
 /// A prepared source-backed decoded-member splice.
 ///
 /// The plan borrows the immutable source-backed package and retains only the
@@ -555,6 +592,107 @@ impl<'package> SourcePartSplicePlan<'package> {
 }
 
 impl SourceBackedPackage {
+    /// Reserve and allocate fixed-length fragment storage before authoring.
+    ///
+    /// The buffer starts filled with zeroes. Its length is checked against
+    /// both `maximum` and the package's part limit. Managed packages charge
+    /// memory before allocation and work while initializing bounded chunks.
+    /// Dropping the buffer releases its reservation. This method performs no
+    /// publication or XML admission; the prepared splice verifies its bytes.
+    pub fn allocate_source_part_splice_fragment(
+        &self,
+        length: u64,
+        maximum: u64,
+    ) -> Result<SourcePartSpliceFragment<'_>> {
+        if maximum == 0 || maximum == u64::MAX {
+            return Err(OpcError::InvalidReadLimit {
+                resource: ReadResource::PartBytes,
+                value: maximum,
+            });
+        }
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        limits_check(ReadResource::PartBytes, length, maximum)?;
+        limits_check(
+            ReadResource::PartBytes,
+            length,
+            self.limits.max_part_bytes(),
+        )?;
+        let capacity = usize::try_from(length)
+            .map_err(|_| overlay_unavailable("decoded splice fragment length exceeds usize"))?;
+        let reservation = self
+            .source
+            .context
+            .as_ref()
+            .filter(|_| length != 0)
+            .map(|context| {
+                context
+                    .reserve(Resource::Memory, length)
+                    .map(Arc::new)
+                    .map_err(map_execution_error)
+            })
+            .transpose()?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC authored fragment",
+                source,
+            })?;
+        if bytes.capacity() != capacity {
+            return Err(overlay_unavailable(
+                "authored fragment allocation reported capacity beyond its reservation",
+            ));
+        }
+        while bytes.len() < capacity {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            let count = (capacity - bytes.len()).min(super::SOURCE_PUBLICATION_CHUNK_BYTES);
+            if let Some(context) = self.source.context.as_ref() {
+                context
+                    .consume(Resource::Work, count as u64)
+                    .map_err(map_execution_error)?;
+            }
+            bytes.resize(bytes.len() + count, 0);
+        }
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(SourcePartSpliceFragment {
+            package: self,
+            bytes,
+            reservation,
+        })
+    }
+
+    /// Prepare an insertion while transferring the fragment's original
+    /// preallocation reservation into the returned plan.
+    ///
+    /// The fragment must have been allocated by this exact package instance;
+    /// another instance, even over identical source bytes, cannot substitute
+    /// a different execution budget. All ordinary splice proof, XML, source,
+    /// and publication checks remain in force.
+    pub fn prepare_source_part_splice_with_fragment(
+        &self,
+        partname: &PackURI,
+        proof: SourcePartSpliceProof,
+        fragment: SourcePartSpliceFragment<'_>,
+        limits: SourcePartSpliceLimits,
+    ) -> Result<SourcePartSplicePlan<'_>> {
+        if !std::ptr::eq(self, fragment.package) {
+            return Err(overlay_unavailable(
+                "decoded splice fragment belongs to a different source package",
+            ));
+        }
+        self.prepare_source_part_splice_inner(
+            partname,
+            proof,
+            Arc::new(fragment.bytes),
+            limits,
+            true,
+            fragment.reservation,
+        )
+    }
+
     /// Prepare one bounded decoded insertion into an existing Part.
     ///
     /// The format owner must have already validated its source and candidate
@@ -568,6 +706,18 @@ impl SourceBackedPackage {
         proof: SourcePartSpliceProof,
         fragment: Arc<Vec<u8>>,
         limits: SourcePartSpliceLimits,
+    ) -> Result<SourcePartSplicePlan<'_>> {
+        self.prepare_source_part_splice_inner(partname, proof, fragment, limits, false, None)
+    }
+
+    fn prepare_source_part_splice_inner(
+        &self,
+        partname: &PackURI,
+        proof: SourcePartSpliceProof,
+        fragment: Arc<Vec<u8>>,
+        limits: SourcePartSpliceLimits,
+        fragment_preallocated: bool,
+        reservation: Option<Arc<Reservation>>,
     ) -> Result<SourcePartSplicePlan<'_>> {
         limits.validate()?;
         self.source.ensure_current()?;
@@ -666,18 +816,21 @@ impl SourceBackedPackage {
                 ));
             }
         }
-        let fragment_memory_reservation = self
-            .source
-            .context
-            .as_ref()
-            .filter(|_| fragment_capacity != 0)
-            .map(|context| {
-                context
-                    .reserve(Resource::Memory, fragment_capacity)
-                    .map(Arc::new)
-                    .map_err(map_execution_error)
-            })
-            .transpose()?;
+        let fragment_memory_reservation = if fragment_preallocated {
+            reservation
+        } else {
+            self.source
+                .context
+                .as_ref()
+                .filter(|_| fragment_capacity != 0)
+                .map(|context| {
+                    context
+                        .reserve(Resource::Memory, fragment_capacity)
+                        .map(Arc::new)
+                        .map_err(map_execution_error)
+                })
+                .transpose()?
+        };
         let xml_workspace_reservation = if is_noop {
             None
         } else {

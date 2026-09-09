@@ -367,6 +367,14 @@ pub(crate) fn execution_io_error(error: litchi_core::ExecutionError) -> std::io:
 }
 
 pub(crate) fn map_io_error(error: std::io::Error) -> OpcError {
+    // Format-owned cooperative adapters can carry the public execution error
+    // directly through Write/Read without depending on OPC's private marker.
+    if let Some(execution) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<litchi_core::ExecutionError>())
+    {
+        return execution_to_opc_error(execution.clone());
+    }
     if let Some(execution) = error
         .get_ref()
         .and_then(|source| source.downcast_ref::<ExecutionIoError>())
@@ -532,6 +540,14 @@ mod tests {
         let error = soapberry_zip::Error::from(soapberry_zip::ErrorKind::IO(execution_io_error(
             litchi_core::ExecutionError::Cancelled,
         )));
+        assert!(matches!(OpcError::from(error), OpcError::Cancelled));
+    }
+
+    #[test]
+    fn public_execution_error_from_a_format_sink_remains_typed() {
+        let error = soapberry_zip::Error::from(soapberry_zip::ErrorKind::IO(
+            std::io::Error::other(litchi_core::ExecutionError::Cancelled),
+        ));
         assert!(matches!(OpcError::from(error), OpcError::Cancelled));
     }
 

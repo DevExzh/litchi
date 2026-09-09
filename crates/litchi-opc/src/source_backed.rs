@@ -44,7 +44,7 @@ use std::time::Duration;
 
 mod splice;
 pub use splice::{
-    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
     SourcePartSplicePublication,
 };
 
@@ -10950,8 +10950,8 @@ fn write_exact_snapshot_with_accounting<W: Write>(
     }
 }
 
-/// Reserve a bounded positional-read window, perform exactly one source read,
-/// and commit only the bytes actually accepted. The retry loop is important
+/// Reserve a bounded positional-read window, retry interrupted reads, and
+/// commit only the bytes actually accepted. The reservation retry loop is important
 /// for short-read adapters: a caller with one input byte remaining must still
 /// be allowed to read one byte even when the adapter initially receives a
 /// larger output buffer. A reservation is held only across the physical read,
@@ -11003,9 +11003,24 @@ fn read_source_at_with_context(
     } else {
         (output, None)
     };
-    let read = match snapshot.source.read_at(offset, read_output) {
-        Ok(read) => read,
-        Err(error) => return Err(OpcError::IoError(error)),
+    let read = loop {
+        match snapshot.source.read_at(offset, read_output) {
+            Ok(read) => break read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                // An interrupted read accepted no bytes. Keep the same input
+                // reservation, but bound managed retries by Work and observe
+                // cancellation and source changes before calling the provider
+                // again. This also serves BufRead consumers which do not
+                // themselves retry Interrupted from fill_buf.
+                if let Some(context) = context {
+                    context
+                        .consume(Resource::Work, 1)
+                        .map_err(map_execution_error)?;
+                }
+                snapshot.ensure_current_io_if_monitored()?;
+            },
+            Err(error) => return Err(OpcError::IoError(error)),
+        }
     };
     validate_source_read_count(read, read_output.len(), operation)?;
     if let Some(reservation) = reservation {
