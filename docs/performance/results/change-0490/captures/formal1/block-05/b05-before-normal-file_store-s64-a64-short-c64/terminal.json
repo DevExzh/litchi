@@ -1,0 +1,123 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "60",
+    "--warmups",
+    "5",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "data",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/report.json",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0490/replay/formal1/b05-before-normal-file_store-s64-a64-short-c64"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 240,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/replay-cleanup.json",
+      "sha256": "8684670801a83f71a2a48cd749c1da7252bbe9ff0c3284f53f208d46b23bc32d"
+    },
+    "report.json": {
+      "bytes": 233175,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/report.json",
+      "sha256": "480817b68f39f22f040639ad020fc13b843abfe2c4b5ec86b2f9da120ac4b557"
+    },
+    "resource.txt": {
+      "bytes": 1308,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/resource.txt",
+      "sha256": "cf25eb092805f5beda22c5382004718a0a657db3a78c0a86022aee4c77133616"
+    },
+    "started.json": {
+      "bytes": 2382,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/started.json",
+      "sha256": "8449d65a1c411db6e1ae94c12e00d4249b277e785fa1037ba559e48d3a3a2b27"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-05/b05-before-normal-file_store-s64-a64-short-c64/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423367880,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "sha256": "2486a9a84558b58815d8a4cc9a78a921c0e017650335d2d64f3a1d28053ff933"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "failure": null,
+  "finished_utc": "2026-09-09T16:27:31.181258+00:00",
+  "machine": {
+    "bytes": 16256,
+    "path": "machine.json",
+    "sha256": "09ed97660f8ec187ce1f0a27f0cc72bcef1b89136fb74e0312a0b90eec879352"
+  },
+  "protocol": {
+    "path": "variance-protocol.json",
+    "sha256": "609e0fab916ae9f3757abaaabc6074a8f01d2fdf011be9d1837cc4fa2bb5e36e"
+  },
+  "run": {
+    "block": 5,
+    "case": "s64-a64-short-c64",
+    "index": 51,
+    "label": "b05-before-normal-file_store-s64-a64-short-c64",
+    "phase": "before",
+    "role": "normal",
+    "route": "file_store"
+  },
+  "schema": "docx-opc-candidate-audit-variance-terminal-v1",
+  "source": {
+    "files": 7157,
+    "sha256": "cb69be7b5a1f443191a27000fdfab285b707ba28517cccc3ee764d833cde0ba2"
+  },
+  "started": {
+    "path": "started.json",
+    "sha256": "8449d65a1c411db6e1ae94c12e00d4249b277e785fa1037ba559e48d3a3a2b27"
+  },
+  "started_utc": "2026-09-09T16:27:30.863217+00:00",
+  "status": "pass",
+  "timed_out": false,
+  "version": 1
+}

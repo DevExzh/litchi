@@ -1,0 +1,53 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "docs/performance/results/change-0490",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "exit_code": 0,
+  "tests": 20,
+  "completed_utc": "2026-09-09T16:27:34.618408+00:00",
+  "helpers": {
+    "plot_sync.py": {
+      "bytes": 2875,
+      "sha256": "defe075bd0e68539b6b1d66593007fbfb18d9344590d2d1fd9a14e33164ab917"
+    },
+    "seal.py": {
+      "bytes": 4634,
+      "sha256": "7c0c628b56b2351b214f7c9544d1e9209fdca44a3a0c3998570e8583f41a6fdd"
+    },
+    "sync_profiles.py": {
+      "bytes": 14887,
+      "sha256": "26e23d9809ebba30dd9840e275e75d2c3ed41a21f7f0193f0ec52c92134f54d6"
+    },
+    "test_sync_profiles.py": {
+      "bytes": 3402,
+      "sha256": "743bd0ffe2cc0619a511f14f5348d8fba7dbccfa26d54be67040b7c300a8bddd"
+    },
+    "test_variance.py": {
+      "bytes": 10825,
+      "sha256": "8ff5c4b911979e5165c50c0a3d1dda483e61ccadd5bbb210db7b7ec377d26060"
+    },
+    "variance.py": {
+      "bytes": 59835,
+      "sha256": "f9d5f41dbab84307712b0cf15073d31f3bd4d3a59d6fa50bfda7d13b776fe251"
+    }
+  },
+  "artifacts": {
+    "helpers-final.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "helpers-final.stderr": {
+      "bytes": 3017,
+      "sha256": "439fb5fb2c8516d6948241a3f82b7b23c92c5ce00af280a96314ccb3416ffd9e"
+    }
+  }
+}

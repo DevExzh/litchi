@@ -1,0 +1,5177 @@
+{
+  "schema": "docx-replayable-tail-append-v1",
+  "version": 1,
+  "binary": {
+    "binary": "litchi-perf-baseline-alloc",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  },
+  "config": {
+    "source_counts": [
+      64
+    ],
+    "authored_counts": [
+      64
+    ],
+    "chunk_modes": [
+      "fixed64"
+    ],
+    "text_modes": [
+      "short"
+    ],
+    "samples": 60,
+    "warmups": 5,
+    "sink_write_bytes": 4096,
+    "lifecycle": [
+      "source_admission",
+      "prepare",
+      "publish",
+      "drop"
+    ],
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "source": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "authored_provider": "deterministic_replayable_bounded_cursor",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_dir": null,
+    "replay_sync": "none",
+    "compression": "current",
+    "input_mode": "owned",
+    "input_storage_kind": "owned",
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_delay_us": 0,
+    "input_overhead_us": 0,
+    "input_bytes_per_second": null,
+    "sink": "non_seek_hashing_sha256_short_write_no_archive_retention",
+    "fixture_dir": null
+  },
+  "cases": [
+    {
+      "source_count": 64,
+      "authored_count": 64,
+      "chunk_mode": "fixed64",
+      "text_mode": "short",
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "compression": "current",
+      "input_mode": "owned",
+      "input_storage_kind": "owned",
+      "input_identity_validation": "setup_fingerprint_outside_timing",
+      "sink_write_bytes": 4096,
+      "source": {
+        "archive_bytes": 2106,
+        "archive_sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+        "main_xml_bytes": 3223,
+        "main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+        "member_count": 4,
+        "semantic": {
+          "paragraph_count": 64,
+          "order_sha256": "4443ad3c2075effa0b9915bbcce9c6efde10a76cf4a01b8658a86c7a1ececc2c",
+          "text_sha256": "4cba4274650a9adfc3968218866ce3276e1d7a7b317e5fa0e92776f642935060",
+          "text_bytes": 960
+        },
+        "members": [
+          {
+            "path": "[Content_Types].xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 2913692623,
+            "decoded_bytes": 512,
+            "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+            "compressed_bytes": 267,
+            "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+          },
+          {
+            "path": "_rels/.rels",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 3929537947,
+            "decoded_bytes": 297,
+            "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+            "compressed_bytes": 183,
+            "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+          },
+          {
+            "path": "word/document.xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 1416465303,
+            "decoded_bytes": 3223,
+            "decoded_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+            "compressed_bytes": 321,
+            "compressed_sha256": "ce4c9abe647531fc5b8a2097ff58d3ddfb61de397b4f23827bcc25dfeac4ae5a"
+          },
+          {
+            "path": "word/perf-opaque.bin",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 528510375,
+            "decoded_bytes": 32768,
+            "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+            "compressed_bytes": 811,
+            "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+          }
+        ],
+        "unchanged_oracle": true,
+        "opaque_member_exact": true
+      },
+      "authored": {
+        "authored_count": 64,
+        "chunk_mode": "fixed64",
+        "text_mode": "short",
+        "max_chunk_bytes": 21,
+        "replay_window_bytes": 65536,
+        "max_encoded_paragraph_bytes": 156,
+        "xml_entity_reference_count": 192,
+        "text_bytes": 1344,
+        "encoded_xml_bytes": 9984,
+        "event_count": 192,
+        "text_chunk_count": 64,
+        "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+        "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75"
+      },
+      "limits": {
+        "parser_event_limit": 1664,
+        "parser_token_bytes": 65536,
+        "parser_workspace_bytes": 13649335,
+        "max_xml_depth": 16,
+        "max_authored_chunk_bytes": 21,
+        "replay_window_bytes": 65536
+      },
+      "oracle": {
+        "candidate_archive_bytes": 2336,
+        "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+        "candidate_main_xml_bytes": 13207,
+        "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+        "candidate_semantic": {
+          "paragraph_count": 128,
+          "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+          "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+          "text_bytes": 2304
+        },
+        "candidate_member_count": 4,
+        "candidate_xml_exact": true,
+        "candidate_semantic_exact": true,
+        "untouched_member_metadata_exact": true,
+        "untouched_raw_members_preserved": true,
+        "physical_order_exact": true,
+        "opaque_member_exact": true,
+        "source_unchanged": true,
+        "inverse_exact": true
+      },
+      "proof": {
+        "source_len": 3223,
+        "source_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+        "source_paragraph_count": 64,
+        "source_event_count": 454,
+        "insertion_offset": 3201,
+        "candidate_len": 13207,
+        "candidate_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+        "candidate_paragraph_count": 128,
+        "candidate_event_count": 1094,
+        "generated_offset": 3201,
+        "generated_once": true,
+        "authored": {
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "max_chunk_bytes": 21,
+          "replay_window_bytes": 65536,
+          "max_encoded_paragraph_bytes": 156,
+          "xml_entity_reference_count": 192,
+          "text_bytes": 1344,
+          "encoded_xml_bytes": 9984,
+          "event_count": 192,
+          "text_chunk_count": 64,
+          "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+          "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75"
+        }
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661102,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74301,
+            "live_bytes_after": 74301,
+            "peak_live_bytes_before": 866704,
+            "peak_live_bytes_after": 866704,
+            "region_peak_live_bytes": 866704
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 1,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 668853,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74365,
+            "live_bytes_after": 74365,
+            "peak_live_bytes_before": 866704,
+            "peak_live_bytes_after": 866768,
+            "region_peak_live_bytes": 866768
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 2,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 678582,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74429,
+            "live_bytes_after": 74429,
+            "peak_live_bytes_before": 866768,
+            "peak_live_bytes_after": 866832,
+            "region_peak_live_bytes": 866832
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 3,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661673,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74493,
+            "live_bytes_after": 74493,
+            "peak_live_bytes_before": 866832,
+            "peak_live_bytes_after": 866896,
+            "region_peak_live_bytes": 866896
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 4,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 672242,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74557,
+            "live_bytes_after": 74557,
+            "peak_live_bytes_before": 866896,
+            "peak_live_bytes_after": 866960,
+            "region_peak_live_bytes": 866960
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 5,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 668593,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74621,
+            "live_bytes_after": 74621,
+            "peak_live_bytes_before": 866960,
+            "peak_live_bytes_after": 867024,
+            "region_peak_live_bytes": 867024
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 6,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 659682,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74685,
+            "live_bytes_after": 74685,
+            "peak_live_bytes_before": 867024,
+            "peak_live_bytes_after": 867088,
+            "region_peak_live_bytes": 867088
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 7,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 677763,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74749,
+            "live_bytes_after": 74749,
+            "peak_live_bytes_before": 867088,
+            "peak_live_bytes_after": 867152,
+            "region_peak_live_bytes": 867152
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 8,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 677952,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74813,
+            "live_bytes_after": 74813,
+            "peak_live_bytes_before": 867152,
+            "peak_live_bytes_after": 867216,
+            "region_peak_live_bytes": 867216
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 9,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 673913,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74877,
+            "live_bytes_after": 74877,
+            "peak_live_bytes_before": 867216,
+            "peak_live_bytes_after": 867280,
+            "region_peak_live_bytes": 867280
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 10,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 658532,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 74941,
+            "live_bytes_after": 74941,
+            "peak_live_bytes_before": 867280,
+            "peak_live_bytes_after": 867344,
+            "region_peak_live_bytes": 867344
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 11,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 669783,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75005,
+            "live_bytes_after": 75005,
+            "peak_live_bytes_before": 867344,
+            "peak_live_bytes_after": 867408,
+            "region_peak_live_bytes": 867408
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 12,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 670032,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75069,
+            "live_bytes_after": 75069,
+            "peak_live_bytes_before": 867408,
+            "peak_live_bytes_after": 867472,
+            "region_peak_live_bytes": 867472
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 13,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661003,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75133,
+            "live_bytes_after": 75133,
+            "peak_live_bytes_before": 867472,
+            "peak_live_bytes_after": 867536,
+            "region_peak_live_bytes": 867536
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 14,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 671962,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75197,
+            "live_bytes_after": 75197,
+            "peak_live_bytes_before": 867536,
+            "peak_live_bytes_after": 867600,
+            "region_peak_live_bytes": 867600
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 15,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 669592,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75261,
+            "live_bytes_after": 75261,
+            "peak_live_bytes_before": 867600,
+            "peak_live_bytes_after": 867664,
+            "region_peak_live_bytes": 867664
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 16,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 659612,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75325,
+            "live_bytes_after": 75325,
+            "peak_live_bytes_before": 867664,
+            "peak_live_bytes_after": 867728,
+            "region_peak_live_bytes": 867728
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 17,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 664162,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75389,
+            "live_bytes_after": 75389,
+            "peak_live_bytes_before": 867728,
+            "peak_live_bytes_after": 867792,
+            "region_peak_live_bytes": 867792
+          },
+          "process": {
+            "rchar": 1967,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 18,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 665052,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75453,
+            "live_bytes_after": 75453,
+            "peak_live_bytes_before": 867792,
+            "peak_live_bytes_after": 867856,
+            "region_peak_live_bytes": 867856
+          },
+          "process": {
+            "rchar": 1968,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 19,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 673672,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75517,
+            "live_bytes_after": 75517,
+            "peak_live_bytes_before": 867856,
+            "peak_live_bytes_after": 867920,
+            "region_peak_live_bytes": 867920
+          },
+          "process": {
+            "rchar": 1968,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 20,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 659012,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75581,
+            "live_bytes_after": 75581,
+            "peak_live_bytes_before": 867920,
+            "peak_live_bytes_after": 867984,
+            "region_peak_live_bytes": 867984
+          },
+          "process": {
+            "rchar": 1968,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 21,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 669452,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75645,
+            "live_bytes_after": 75645,
+            "peak_live_bytes_before": 867984,
+            "peak_live_bytes_after": 868048,
+            "region_peak_live_bytes": 868048
+          },
+          "process": {
+            "rchar": 1968,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 22,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666023,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75709,
+            "live_bytes_after": 75709,
+            "peak_live_bytes_before": 868048,
+            "peak_live_bytes_after": 868112,
+            "region_peak_live_bytes": 868112
+          },
+          "process": {
+            "rchar": 1968,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 23,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 657832,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75773,
+            "live_bytes_after": 75773,
+            "peak_live_bytes_before": 868112,
+            "peak_live_bytes_after": 868176,
+            "region_peak_live_bytes": 868176
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 24,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 669453,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75837,
+            "live_bytes_after": 75837,
+            "peak_live_bytes_before": 868176,
+            "peak_live_bytes_after": 868240,
+            "region_peak_live_bytes": 868240
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 25,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 687662,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75901,
+            "live_bytes_after": 75901,
+            "peak_live_bytes_before": 868240,
+            "peak_live_bytes_after": 868304,
+            "region_peak_live_bytes": 868304
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 26,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 660773,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 75965,
+            "live_bytes_after": 75965,
+            "peak_live_bytes_before": 868304,
+            "peak_live_bytes_after": 868368,
+            "region_peak_live_bytes": 868368
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 27,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666352,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76029,
+            "live_bytes_after": 76029,
+            "peak_live_bytes_before": 868368,
+            "peak_live_bytes_after": 868432,
+            "region_peak_live_bytes": 868432
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 28,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 667533,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76093,
+            "live_bytes_after": 76093,
+            "peak_live_bytes_before": 868432,
+            "peak_live_bytes_after": 868496,
+            "region_peak_live_bytes": 868496
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 29,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 668052,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76157,
+            "live_bytes_after": 76157,
+            "peak_live_bytes_before": 868496,
+            "peak_live_bytes_after": 868560,
+            "region_peak_live_bytes": 868560
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 30,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 657843,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76221,
+            "live_bytes_after": 76221,
+            "peak_live_bytes_before": 868560,
+            "peak_live_bytes_after": 868624,
+            "region_peak_live_bytes": 868624
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 31,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 672782,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76285,
+            "live_bytes_after": 76285,
+            "peak_live_bytes_before": 868624,
+            "peak_live_bytes_after": 868688,
+            "region_peak_live_bytes": 868688
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 32,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 664023,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76349,
+            "live_bytes_after": 76349,
+            "peak_live_bytes_before": 868688,
+            "peak_live_bytes_after": 868752,
+            "region_peak_live_bytes": 868752
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 33,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 658182,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76413,
+            "live_bytes_after": 76413,
+            "peak_live_bytes_before": 868752,
+            "peak_live_bytes_after": 868816,
+            "region_peak_live_bytes": 868816
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 34,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666713,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76477,
+            "live_bytes_after": 76477,
+            "peak_live_bytes_before": 868816,
+            "peak_live_bytes_after": 868880,
+            "region_peak_live_bytes": 868880
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 35,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666572,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76541,
+            "live_bytes_after": 76541,
+            "peak_live_bytes_before": 868880,
+            "peak_live_bytes_after": 868944,
+            "region_peak_live_bytes": 868944
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 36,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666293,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76605,
+            "live_bytes_after": 76605,
+            "peak_live_bytes_before": 868944,
+            "peak_live_bytes_after": 869008,
+            "region_peak_live_bytes": 869008
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 37,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 680322,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76669,
+            "live_bytes_after": 76669,
+            "peak_live_bytes_before": 869008,
+            "peak_live_bytes_after": 869072,
+            "region_peak_live_bytes": 869072
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 38,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 674723,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76733,
+            "live_bytes_after": 76733,
+            "peak_live_bytes_before": 869072,
+            "peak_live_bytes_after": 869136,
+            "region_peak_live_bytes": 869136
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 39,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 657122,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76797,
+            "live_bytes_after": 76797,
+            "peak_live_bytes_before": 869136,
+            "peak_live_bytes_after": 869200,
+            "region_peak_live_bytes": 869200
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 40,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 658712,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76861,
+            "live_bytes_after": 76861,
+            "peak_live_bytes_before": 869200,
+            "peak_live_bytes_after": 869264,
+            "region_peak_live_bytes": 869264
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 41,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 671842,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76925,
+            "live_bytes_after": 76925,
+            "peak_live_bytes_before": 869264,
+            "peak_live_bytes_after": 869328,
+            "region_peak_live_bytes": 869328
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 42,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 670743,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 76989,
+            "live_bytes_after": 76989,
+            "peak_live_bytes_before": 869328,
+            "peak_live_bytes_after": 869392,
+            "region_peak_live_bytes": 869392
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 43,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 663672,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77053,
+            "live_bytes_after": 77053,
+            "peak_live_bytes_before": 869392,
+            "peak_live_bytes_after": 869456,
+            "region_peak_live_bytes": 869456
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 44,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 674212,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77117,
+            "live_bytes_after": 77117,
+            "peak_live_bytes_before": 869456,
+            "peak_live_bytes_after": 869520,
+            "region_peak_live_bytes": 869520
+          },
+          "process": {
+            "rchar": 1969,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 45,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 668982,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77181,
+            "live_bytes_after": 77181,
+            "peak_live_bytes_before": 869520,
+            "peak_live_bytes_after": 869584,
+            "region_peak_live_bytes": 869584
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 46,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661852,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77245,
+            "live_bytes_after": 77245,
+            "peak_live_bytes_before": 869584,
+            "peak_live_bytes_after": 869648,
+            "region_peak_live_bytes": 869648
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 47,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 667143,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77309,
+            "live_bytes_after": 77309,
+            "peak_live_bytes_before": 869648,
+            "peak_live_bytes_after": 869712,
+            "region_peak_live_bytes": 869712
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 48,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 674932,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77373,
+            "live_bytes_after": 77373,
+            "peak_live_bytes_before": 869712,
+            "peak_live_bytes_after": 869776,
+            "region_peak_live_bytes": 869776
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 49,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 660893,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77437,
+            "live_bytes_after": 77437,
+            "peak_live_bytes_before": 869776,
+            "peak_live_bytes_after": 869840,
+            "region_peak_live_bytes": 869840
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 50,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 663982,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77501,
+            "live_bytes_after": 77501,
+            "peak_live_bytes_before": 869840,
+            "peak_live_bytes_after": 869904,
+            "region_peak_live_bytes": 869904
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 51,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 668283,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77565,
+            "live_bytes_after": 77565,
+            "peak_live_bytes_before": 869904,
+            "peak_live_bytes_after": 869968,
+            "region_peak_live_bytes": 869968
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 52,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 666542,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77629,
+            "live_bytes_after": 77629,
+            "peak_live_bytes_before": 869968,
+            "peak_live_bytes_after": 870032,
+            "region_peak_live_bytes": 870032
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 53,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661173,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77693,
+            "live_bytes_after": 77693,
+            "peak_live_bytes_before": 870032,
+            "peak_live_bytes_after": 870096,
+            "region_peak_live_bytes": 870096
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 54,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 676442,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77757,
+            "live_bytes_after": 77757,
+            "peak_live_bytes_before": 870096,
+            "peak_live_bytes_after": 870160,
+            "region_peak_live_bytes": 870160
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 55,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 673123,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77821,
+            "live_bytes_after": 77821,
+            "peak_live_bytes_before": 870160,
+            "peak_live_bytes_after": 870224,
+            "region_peak_live_bytes": 870224
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 56,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 663872,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77885,
+            "live_bytes_after": 77885,
+            "peak_live_bytes_before": 870224,
+            "peak_live_bytes_after": 870288,
+            "region_peak_live_bytes": 870288
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 57,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 665233,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 77949,
+            "live_bytes_after": 77949,
+            "peak_live_bytes_before": 870288,
+            "peak_live_bytes_after": 870352,
+            "region_peak_live_bytes": 870352
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 58,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 672672,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 78013,
+            "live_bytes_after": 78013,
+            "peak_live_bytes_before": 870352,
+            "peak_live_bytes_after": 870416,
+            "region_peak_live_bytes": 870416
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        },
+        {
+          "sample": 59,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 661933,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": 2336,
+            "write_calls": 18,
+            "largest_write": 877,
+            "histogram": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 16,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 546,
+            "deallocation_calls": 511,
+            "reallocation_calls": 35,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3659745,
+            "deallocated_bytes": 3659745,
+            "live_bytes_before": 78077,
+            "live_bytes_after": 78077,
+            "peak_live_bytes_before": 870416,
+            "peak_live_bytes_after": 870480,
+            "region_peak_live_bytes": 870480
+          },
+          "process": {
+            "rchar": 1970,
+            "wchar": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 0,
+            "minor_faults": 188,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 0,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6213632
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "docs/performance/results/change-0490",
+    "-p",
+    "test_sync_profiles.py",
+    "-v"
+  ],
+  "exit_code": 0,
+  "tests": 8,
+  "helpers": {
+    "sync_profiles.py": {
+      "bytes": 14887,
+      "sha256": "26e23d9809ebba30dd9840e275e75d2c3ed41a21f7f0193f0ec52c92134f54d6"
+    },
+    "test_sync_profiles.py": {
+      "bytes": 3402,
+      "sha256": "743bd0ffe2cc0619a511f14f5348d8fba7dbccfa26d54be67040b7c300a8bddd"
+    }
+  },
+  "artifacts": {
+    "sync-tests.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "sync-tests.stderr": {
+      "bytes": 1228,
+      "sha256": "f3b22df8872e8d95be5c9de6ec722ba8d8ce9e2a64743eaa6a82ddfff9a68ca2"
+    }
+  }
+}

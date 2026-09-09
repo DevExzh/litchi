@@ -1,0 +1,121 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "60",
+    "--warmups",
+    "5",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 153,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/replay-cleanup.json",
+      "sha256": "d9b7840fa8ed99bb20182efcb918becfca5d7010362047bfd702fb7028a654f9"
+    },
+    "report.json": {
+      "bytes": 230920,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/report.json",
+      "sha256": "34bb43fbb526cefe57694e251a6bd47cb1e26559c4ab647dd3e7e12ce2a62b03"
+    },
+    "resource.txt": {
+      "bytes": 1198,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/resource.txt",
+      "sha256": "4c86a063839bcfc576754e412d89164311e45484020fadf6ea52dd30d6ec67a2"
+    },
+    "started.json": {
+      "bytes": 2267,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/started.json",
+      "sha256": "dd6776f96323117dc628e97cd9c869c0ce28dacbd2512f70f5789ed48d070efc"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-03/b03-before-normal-memory_store-s64-a64-short-c64/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423367880,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "sha256": "2486a9a84558b58815d8a4cc9a78a921c0e017650335d2d64f3a1d28053ff933"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "failure": null,
+  "finished_utc": "2026-09-09T16:27:21.673821+00:00",
+  "machine": {
+    "bytes": 16256,
+    "path": "machine.json",
+    "sha256": "09ed97660f8ec187ce1f0a27f0cc72bcef1b89136fb74e0312a0b90eec879352"
+  },
+  "protocol": {
+    "path": "variance-protocol.json",
+    "sha256": "609e0fab916ae9f3757abaaabc6074a8f01d2fdf011be9d1837cc4fa2bb5e36e"
+  },
+  "run": {
+    "block": 3,
+    "case": "s64-a64-short-c64",
+    "index": 26,
+    "label": "b03-before-normal-memory_store-s64-a64-short-c64",
+    "phase": "before",
+    "role": "normal",
+    "route": "memory_store"
+  },
+  "schema": "docx-opc-candidate-audit-variance-terminal-v1",
+  "source": {
+    "files": 7157,
+    "sha256": "cb69be7b5a1f443191a27000fdfab285b707ba28517cccc3ee764d833cde0ba2"
+  },
+  "started": {
+    "path": "started.json",
+    "sha256": "dd6776f96323117dc628e97cd9c869c0ce28dacbd2512f70f5789ed48d070efc"
+  },
+  "started_utc": "2026-09-09T16:27:21.606058+00:00",
+  "status": "pass",
+  "timed_out": false,
+  "version": 1
+}

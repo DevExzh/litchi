@@ -1,0 +1,61 @@
+{
+  "started_utc": "2026-09-09T14:57:04.050151+00:00",
+  "head": "94d84786d3676f5a1be5577f2ae0b640c6c52b76",
+  "prior_turn": "verified progress:0489 production optimization committed; evidence verified; scoped outputs removed",
+  "goal": {
+    "path": "docs/GOAL.md",
+    "bytes": 35839,
+    "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "taxonomy": {
+    "path": "docs/CRUD_Scenario_Checklist.md",
+    "bytes": 8897,
+    "sha256": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a"
+  },
+  "protected_files": {
+    "docs/GOAL.md": {
+      "path": "docs/GOAL.md",
+      "bytes": 35839,
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+      "mode": "0o664"
+    },
+    "docs/report/spec-gap-audit.md": {
+      "path": "docs/report/spec-gap-audit.md",
+      "bytes": 59518,
+      "sha256": "f71288dddc0827d5f5a16bf3936985606ec1b341d6e5c06fced4e612c7972ddf",
+      "mode": "0o664"
+    },
+    "crates/litchi-keynote/src/document.rs": {
+      "path": "crates/litchi-keynote/src/document.rs",
+      "bytes": 41274,
+      "sha256": "867f3a2800bbe9b94c7dab382b1229446bd4c44e852e6a27ff22de4f9d8ae136",
+      "mode": "0o664"
+    }
+  },
+  "excluded_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "scope": "Retained-binary controlled repeat and sync syscall diagnostics; no production change or rebuild planned",
+  "before_builds": [
+    {
+      "path": "docs/performance/results/change-0487/build-normal.json",
+      "bytes": 1827,
+      "sha256": "91f99a5d1a123c5b6e62c7b3179a5132ce7c6456ee7383c2da52cc1618bc7f86"
+    },
+    {
+      "path": "docs/performance/results/change-0487/build-allocator.json",
+      "bytes": 1879,
+      "sha256": "1e11448e203eed0c73078a3d70b50568c9da36edd6550626fe7495578600e860"
+    }
+  ],
+  "after_builds": [
+    {
+      "path": "docs/performance/results/change-0489/build-normal.json",
+      "bytes": 1877,
+      "sha256": "74e37fb9f4da3c0964ed7e0e80c10414324953de31754f6d70176238b55d8afd"
+    },
+    {
+      "path": "docs/performance/results/change-0489/build-allocator.json",
+      "bytes": 1929,
+      "sha256": "80ef5c1390c236fd31a0a3495a9dc85428624be8e6c59540bd48258ceebdfc84"
+    }
+  ]
+}

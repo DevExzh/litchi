@@ -1,0 +1,25 @@
+{
+  "cleanup": {
+    "bytes": 725,
+    "sha256": "402e888af42b5e4089053d52a94fc3b302feae9353f0b78c863200d850d5792a"
+  },
+  "content_identity": "all exact",
+  "diagnostic_children": 8,
+  "files": 593,
+  "formal_processes": 72,
+  "formal_protocol": {
+    "attempt": "formal1",
+    "path": "variance-protocol.json",
+    "sha256": "609e0fab916ae9f3757abaaabc6074a8f01d2fdf011be9d1837cc4fa2bb5e36e"
+  },
+  "formal_samples": 4320,
+  "helper_tests": 20,
+  "paired_blocks": 6,
+  "schema": "litchi-file-store-variance-seal-verification-v1",
+  "seal": {
+    "bytes": 119326,
+    "sha256": "b94b62810fa079e9b7be799d8077a400fd190c8cbeae84cd1a017543b1fbad64"
+  },
+  "status": "pass",
+  "verified_utc": "2026-09-09T16:36:16.181616+00:00"
+}
