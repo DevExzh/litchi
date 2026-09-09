@@ -1540,6 +1540,7 @@ fn metadata_profile_for_descriptor(descriptor: &[u8]) -> MetadataProfile {
 fuzz_target!(|data: &[u8]| {
     let descriptor = normalize_descriptor(data);
     exercise_native_existing_owner(&descriptor);
+    exercise_aggregate_owner_creation(&descriptor);
 
     // This is the primary path for every input, including malformed-mode
     // bytes.  The descriptor controls the selector, command, topology,
@@ -1570,6 +1571,216 @@ fuzz_target!(|data: &[u8]| {
     static CODEC_SWEEP: OnceLock<()> = OnceLock::new();
     CODEC_SWEEP.get_or_init(exercise_nested_codec_limits);
 });
+
+fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
+    let source = synthetic_package_with_metadata(
+        [TableOptions::default(); TABLE_COUNT],
+        ["Revenue", "Costs"],
+        MetadataProfile::None,
+    )?;
+    let mut archive = document_archive(&source)?;
+    for identifier in [table_drawable(0), table_model(0)] {
+        archive
+            .object_mut(identifier)
+            .ok_or("selected aggregate object missing")?
+            .archive_info
+            .message_infos[0]
+            .field_infos
+            .clear();
+    }
+    let owner_id = table_formula_owner(0);
+    let owner = archive
+        .object_mut(owner_id)
+        .ok_or("formula owner missing")?;
+    let mut payload =
+        tsce::FormulaOwnerDependenciesArchive::decode(owner.messages[0].data.as_slice())?;
+    payload.owner_kind = Some(1);
+    payload.cell_dependencies = Some(Default::default());
+    payload.range_dependencies = Some(Default::default());
+    payload.volatile_dependencies = Some(tsce::VolatileDependenciesExpandedArchive {
+        volatile_time_cells: Some(Default::default()),
+        volatile_random_cells: Some(Default::default()),
+        volatile_locale_cells: Some(Default::default()),
+        volatile_sheet_table_name_cells: Some(Default::default()),
+        volatile_remote_data_cells: Some(Default::default()),
+        volatile_geometry_cell_refs: Some(Default::default()),
+    });
+    payload.spanning_column_dependencies = Some(Default::default());
+    payload.spanning_row_dependencies = Some(Default::default());
+    payload.whole_owner_dependencies = Some(tsce::WholeOwnerDependenciesExpandedArchive {
+        dependent_cells: Some(Default::default()),
+    });
+    payload.cell_errors = Some(Default::default());
+    payload.tiled_cell_dependencies = Some(Default::default());
+    payload.uuid_references = Some(Default::default());
+    payload.tiled_range_dependencies = Some(Default::default());
+    payload.spill_range_sizes = Some(Default::default());
+    let formula_uid = uuid(
+        payload.formula_owner_uid.lower,
+        payload.formula_owner_uid.upper,
+    );
+    owner.replace_message(
+        0,
+        RawMessage {
+            type_: FORMULA_OWNER_MESSAGE_TYPE,
+            data: payload.encode_to_vec(),
+        },
+    )?;
+    owner.archive_info.message_infos[0].field_infos.clear();
+    let engine = object(
+        9_000,
+        4_000,
+        tsce::CalculationEngineArchive {
+            dependency_tracker: tsce::DependencyTrackerArchive {
+                owner_id_map: Some(tsce::OwnerIdMapArchive {
+                    map_entry: vec![tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
+                        internal_owner_id: 1,
+                        owner_id: tsp::CfuuidArchive {
+                            uuid_bytes: None,
+                            uuid_w0: Some(formula_uid.lower as u32),
+                            uuid_w1: Some((formula_uid.lower >> 32) as u32),
+                            uuid_w2: Some(formula_uid.upper as u32),
+                            uuid_w3: Some((formula_uid.upper >> 32) as u32),
+                        },
+                    }],
+                    ..Default::default()
+                }),
+                number_of_formulas: Some(0),
+                formula_owner_dependencies: vec![reference(owner_id)],
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        &[owner_id],
+    )?;
+    // Current TableStyle shares type 6003 with legacy TableInfo. The census
+    // must qualify the style role without treating it as a malformed table.
+    archive.objects.push(object(
+        9_001,
+        6_003,
+        tst::TableStyleArchive {
+            super_: litchi_iwa_protos::tss::StyleArchive {
+                name: Some("Table".to_owned()),
+                style_identifier: Some("litchi-table-default".to_owned()),
+                ..Default::default()
+            },
+            override_count: Some(0),
+            table_properties: Some(tst::TableStylePropertiesArchive {
+                behaves_like_spreadsheet: Some(true),
+                auto_resize: Some(false),
+                ..Default::default()
+            }),
+        }
+        .encode_to_vec(),
+        &[],
+    )?);
+    let calculation = if cross_component {
+        let owner = archive.remove_object(owner_id).ok_or("owner missing")?;
+        Some(SnappyStream::compress(
+            &Archive {
+                objects: vec![engine, owner],
+            }
+            .to_bytes()?,
+        )?)
+    } else {
+        archive.objects.push(engine);
+        None
+    };
+    let document = SnappyStream::compress(&archive.to_bytes()?)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let mut members = catalog
+        .iter()
+        .map(|entry| {
+            (
+                entry.name(),
+                if entry.name() == DOCUMENT_MEMBER {
+                    document.as_slice()
+                } else {
+                    entry.data()
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    if let Some(calculation) = &calculation {
+        members.push(("Index/CalculationEngine.iwa", calculation.as_slice()));
+    }
+    Ok(litchi_iwa_archive::package::to_bytes(
+        members,
+        Limits::default(),
+    )?)
+}
+
+fn exercise_aggregate_owner_creation(descriptor: &[u8]) {
+    static SAME_COMPONENT: OnceLock<Vec<u8>> = OnceLock::new();
+    static CROSS_COMPONENT: OnceLock<Vec<u8>> = OnceLock::new();
+    let cross = descriptor.first().copied().unwrap_or_default() & 1 != 0;
+    let source = if cross {
+        &CROSS_COMPONENT
+    } else {
+        &SAME_COMPONENT
+    }
+    .get_or_init(|| aggregate_ownerless_fixture(cross).expect("bounded aggregate fixture"));
+    let package = Package::from_bytes(source).expect("aggregate source ingress");
+    assert_eq!(
+        package
+            .body_table_hidden_axes(0usize)
+            .expect("aggregate read"),
+        HiddenAxes::empty()
+    );
+    let requested = HiddenAxes::new([
+        AxisIndex::row(usize::from(
+            descriptor.get(2).copied().unwrap_or_default() % 4,
+        )),
+        AxisIndex::column(usize::from(
+            descriptor.get(3).copied().unwrap_or_default() % 4,
+        )),
+    ])
+    .expect("bounded aggregate positions");
+    let result = package
+        .edit_body_table_hidden_axes(0usize)
+        .expect("aggregate edit")
+        .set(requested.clone())
+        .commit();
+    if !cross {
+        assert!(matches!(result, Err(Error::UnsupportedDependency)));
+        assert_eq!(package.exact_bytes(), source.as_slice());
+        return;
+    }
+    let commit = result.expect("aggregate owner creation");
+    let reopened = Package::from_bytes(&commit.package().exact_bytes()).expect("aggregate reopen");
+    assert_eq!(
+        reopened
+            .body_table_hidden_axes(0usize)
+            .expect("aggregate readback"),
+        requested
+    );
+    assert_eq!(
+        reopened
+            .body_table_hidden_axes(1usize)
+            .expect("unselected table"),
+        HiddenAxes::empty()
+    );
+    let cleared = reopened
+        .edit_body_table_hidden_axes(0usize)
+        .expect("aggregate clear")
+        .clear()
+        .commit()
+        .expect("aggregate clear commit");
+    assert_eq!(
+        cleared
+            .package()
+            .body_table_hidden_axes(0usize)
+            .expect("cleared read"),
+        HiddenAxes::empty()
+    );
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())
+        .expect("aggregate inverse");
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
+    assert_eq!(package.exact_bytes(), source.as_slice());
+}
 
 fn exercise_native_existing_owner(descriptor: &[u8]) {
     const VISIBLE: &[u8] =

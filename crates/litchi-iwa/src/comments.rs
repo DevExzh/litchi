@@ -23,9 +23,10 @@ use crate::archive::{
 };
 use crate::package_metadata::{
     PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, add_component_external_reference,
-    advance_package_save_token_for_components, component_identifier_for_entry,
-    inspect_package_metadata_source, next_object_identifier, package_metadata_read_options,
-    release_package_identifier_suffix, remove_component_external_references_to_object,
+    add_object_uuid_for_entry, advance_package_save_token_for_components,
+    component_identifier_for_entry, inspect_package_metadata_source, next_object_identifier,
+    package_metadata_read_options, release_package_identifier_suffix,
+    remove_component_external_references_to_object, remove_object_uuid_for_entry,
     set_package_last_object_identifier,
 };
 #[cfg(test)]
@@ -600,7 +601,8 @@ fn set_drawable_comment_in_package(
     let (author_id, author_component_entry, created_author) = ensure_annotation_author(package)?;
     let storage_id = next_object_identifier(package)?;
     let storage_uuid = fresh_comment_storage_uuid(package)?;
-    package.update_archive(&location.archive_name, |archive| {
+    let mut staged = package.clone();
+    staged.update_archive(&location.archive_name, |archive| {
         let mut object = ArchiveObject::new(
             storage_id,
             vec![RawMessage {
@@ -622,6 +624,8 @@ fn set_drawable_comment_in_package(
         }
         Ok(archive.insert_object(object)?)
     })?;
+    add_object_uuid_for_entry(&mut staged, &location.archive_name, storage_id)?;
+    *package = staged;
     replace_drawable_comment_reference(package, application, &location, None, Some(storage_id))?;
     set_package_last_object_identifier(package, storage_id)?;
     if let (Some(author_id), Some(author_component_entry)) =
@@ -1284,7 +1288,11 @@ fn clone_comment_storage(
     clone.archive_info.message_infos[0] = source.archive_info.message_infos[0].clone();
     clone.archive_info.message_infos[0].length = u32::try_from(clone.messages[0].data.len())
         .map_err(|_| Error::Archive("comment payload exceeds the u32 format limit".to_owned()))?;
-    package.update_archive(archive_name, |archive| Ok(archive.insert_object(clone)?))
+    let mut staged = package.clone();
+    staged.update_archive(archive_name, |archive| Ok(archive.insert_object(clone)?))?;
+    add_object_uuid_for_entry(&mut staged, archive_name, new_storage_id)?;
+    *package = staged;
+    Ok(())
 }
 
 pub(crate) fn clone_comment_storage_exact(
@@ -1313,7 +1321,10 @@ pub(crate) fn clone_comment_storage_exact(
     let mut clone = ArchiveObject::new(new_storage_id, source.messages.clone())?;
     clone.archive_info.should_merge = source.archive_info.should_merge;
     clone.archive_info.message_infos = source.archive_info.message_infos.clone();
-    package.update_archive(&archive_name, |archive| Ok(archive.insert_object(clone)?))?;
+    let mut staged = package.clone();
+    staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(clone)?))?;
+    add_object_uuid_for_entry(&mut staged, &archive_name, new_storage_id)?;
+    *package = staged;
     Ok(archive_name)
 }
 
@@ -1325,7 +1336,8 @@ pub(crate) fn insert_comment_storage(
     author_id: Option<u64>,
     storage_uuid: tsp::Uuid,
 ) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
+    let mut staged = package.clone();
+    staged.update_archive(archive_name, |archive| {
         let mut object = ArchiveObject::new(
             storage_id,
             vec![RawMessage {
@@ -1346,7 +1358,10 @@ pub(crate) fn insert_comment_storage(
                 .push(author_id);
         }
         Ok(archive.insert_object(object)?)
-    })
+    })?;
+    add_object_uuid_for_entry(&mut staged, archive_name, storage_id)?;
+    *package = staged;
+    Ok(())
 }
 
 pub(crate) fn update_comment_reply_reference(
@@ -2327,7 +2342,8 @@ fn ensure_generated_annotation_author(
         )
     })?;
     expected_authors.push(author_id);
-    package.update_archive(&location.archive_name, |archive| {
+    let mut staged = package.clone();
+    staged.update_archive(&location.archive_name, |archive| {
         {
             let storage_object = archive.object_mut(location.object_id).ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -2359,6 +2375,8 @@ fn ensure_generated_annotation_author(
         }
         Ok(archive.insert_object(generated_annotation_author_object(author_id, &generated)?)?)
     })?;
+    add_object_uuid_for_entry(&mut staged, &location.archive_name, author_id)?;
+    *package = staged;
     Ok((Some(author_id), Some(location.archive_name), true))
 }
 
@@ -2443,6 +2461,7 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
     {
         remove_component_external_references_to_object(package, component_identifier, author_id)?;
     }
+    remove_object_uuid_for_entry(package, &location.archive_name, author_id)?;
     package.update_archive(&location.archive_name, |archive| {
         let storage_object = archive.object_mut(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -2557,6 +2576,7 @@ fn remove_unreferenced_comment_graph_in_place(
             }
             replies.extend(reply_ids);
         }
+        remove_object_uuid_for_entry(package, &archive_name, identifier)?;
         let mut archive = package.archive(&archive_name)?;
         archive.remove_object(identifier).ok_or_else(|| {
             Error::InvalidFormat(format!("comment storage object {identifier} is missing"))
@@ -2585,6 +2605,16 @@ fn comment_object_is_referenced(
     let metadata_expected = package.contains_entry(PACKAGE_METADATA_ENTRY);
     let metadata_options = package_metadata_read_options(package);
     let archive_limits = package.limits().effective_archive_limits()?;
+    let owning_component_identifier = if metadata_expected {
+        let locations = object_locations(package)?;
+        locations
+            .get(&identifier)
+            .map(|archive_name| component_identifier_for_entry(package, archive_name))
+            .transpose()?
+            .flatten()
+    } else {
+        None
+    };
     let mut metadata_payloads = 0usize;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
@@ -2616,6 +2646,7 @@ fn comment_object_is_referenced(
                     }
                     let mut visitor = CommentMetadataReferenceVisitor {
                         identifier,
+                        owning_component_identifier,
                         referenced: false,
                         unknown_fields: false,
                     };
@@ -2665,6 +2696,7 @@ impl ArchiveReferenceVisitor for CommentArchiveReferenceVisitor {
 
 struct CommentMetadataReferenceVisitor {
     identifier: u64,
+    owning_component_identifier: Option<u64>,
     referenced: bool,
     unknown_fields: bool,
 }
@@ -2679,7 +2711,9 @@ impl PackageMetadataVisitor for CommentMetadataReferenceVisitor {
         &mut self,
         binding: ObjectUuidDescriptor<'_>,
     ) -> std::result::Result<(), RewriteError> {
-        self.referenced |= binding.object_identifier() == self.identifier;
+        let is_own_identity = binding.component().is_current()
+            && Some(binding.component().identifier()) == self.owning_component_identifier;
+        self.referenced |= binding.object_identifier() == self.identifier && !is_own_identity;
         Ok(())
     }
 

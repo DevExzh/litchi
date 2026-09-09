@@ -28,6 +28,8 @@ use litchi_pages::{
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
+const CALCULATION_ENGINE_MEMBER: &str = "Index/CalculationEngine.iwa";
+const CALCULATION_ENGINE_OBJECT_BASE: u64 = 900;
 const ROOT_IDENTIFIER: u64 = 1;
 const BODY_IDENTIFIER: u64 = 42;
 const TABLE_COUNT: usize = 2;
@@ -644,6 +646,22 @@ fn hidden_state_uuid(index: usize) -> tsp::Uuid {
     )
 }
 
+fn source_formula_owner_uuid(index: usize) -> tsp::Uuid {
+    let hidden = hidden_state_uuid(index);
+    uuid(hidden.lower - 4, hidden.upper)
+}
+
+fn source_formula_owner_cfuuid(index: usize) -> tsp::CfuuidArchive {
+    let owner = source_formula_owner_uuid(index);
+    tsp::CfuuidArchive {
+        uuid_bytes: None,
+        uuid_w0: Some(owner.lower as u32),
+        uuid_w1: Some((owner.lower >> 32) as u32),
+        uuid_w2: Some(owner.upper as u32),
+        uuid_w3: Some((owner.upper >> 32) as u32),
+    }
+}
+
 fn synthetic_package(
     options: [TableOptions; TABLE_COUNT],
     names: [&str; TABLE_COUNT],
@@ -1035,6 +1053,61 @@ fn document_archive(package: &[u8]) -> TestResult<Archive> {
     )?)
 }
 
+fn assert_aggregate_rewrite_preserves_unselected_source(
+    source: &[u8],
+    target: &[u8],
+    index: usize,
+) -> TestResult {
+    let source_archive = document_archive(source)?;
+    let target_archive = document_archive(target)?;
+    for source_object in source_archive.objects {
+        let identifier = source_object
+            .archive_info
+            .identifier
+            .ok_or("source object is missing its identifier")?;
+        if [
+            table_model(index),
+            table_drawable(index),
+            table_formula_owner(index),
+        ]
+        .contains(&identifier)
+        {
+            continue;
+        }
+        let target_object = target_archive
+            .object(identifier)
+            .ok_or_else(|| format!("unselected object {identifier} disappeared"))?;
+        assert!(
+            source_object.same_content_ignoring_offsets(target_object),
+            "unselected object {identifier} changed during aggregate rewrite"
+        );
+    }
+    assert_eq!(
+        member_bytes(source, CALCULATION_ENGINE_MEMBER)?,
+        member_bytes(target, CALCULATION_ENGINE_MEMBER)?,
+        "the physically separate formula-owner component was rewritten"
+    );
+    for (before, after, fields) in [
+        (
+            model_payload_from_package(source, index)?,
+            model_payload_from_package(target, index)?,
+            [UNKNOWN_MODEL_FIELD, UNKNOWN_LENGTH_FIELD],
+        ),
+        (
+            info_payload(source, index)?,
+            info_payload(target, index)?,
+            [UNKNOWN_INFO_FIELD, UNKNOWN_LENGTH_FIELD],
+        ),
+    ] {
+        assert_eq!(
+            raw_fields_at_path(&before, &[], &fields)?,
+            raw_fields_at_path(&after, &[], &fields)?,
+            "selected source-owned unknown fields changed"
+        );
+    }
+    Ok(())
+}
+
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(package)?;
     Ok(catalog
@@ -1159,6 +1232,15 @@ fn metadata_duplicate_uuid(package: &[u8]) -> TestResult<Vec<u8>> {
         // second binding's UUID is made equal to the first binding's UUID so
         // this case isolates duplicate UUID identity from dangling IDs.
         second.uuid = first_uuid;
+        Ok(())
+    })
+}
+
+fn metadata_missing_registry_binding(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        metadata_component_mut(metadata)?
+            .object_uuid_map_entries
+            .retain(|entry| entry.identifier != identifier);
         Ok(())
     })
 }
@@ -1432,6 +1514,338 @@ fn rewrite_native_archive(
         &[EntryEdit::new(&entry_name, &component)],
         Limits::default(),
     )?)
+}
+
+/// Reproduce the source-built Pages placement where the kind-1 formula owner
+/// lives in CalculationEngine while the selected table-info/model pair stays
+/// in Document.  This is deliberately a physical move, not a metadata-only
+/// alias, so the focused owner must prove the package-wide dependency route.
+fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    if catalog
+        .iter()
+        .any(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
+    {
+        return Err("calculation-engine fixture member already exists".into());
+    }
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or("missing document member")?;
+    let mut document = Archive::parse(SnappyStream::decompress(document_entry.data())?.as_bytes())?;
+    let owner_identifier = table_formula_owner(index);
+    let owner_position = document
+        .objects
+        .iter()
+        .position(|object| object.archive_info.identifier == Some(owner_identifier))
+        .ok_or("missing formula-owner object")?;
+    let owner = document.objects.remove(owner_position);
+    let owner_payload = owner
+        .messages
+        .iter()
+        .find(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+        .ok_or("missing formula-owner message")?
+        .data
+        .as_slice();
+    let owner_payload = tsce::FormulaOwnerDependenciesArchive::decode(owner_payload)?;
+    let owner_id = tsp::CfuuidArchive {
+        uuid_bytes: None,
+        uuid_w0: Some(owner_payload.formula_owner_uid.lower as u32),
+        uuid_w1: Some((owner_payload.formula_owner_uid.lower >> 32) as u32),
+        uuid_w2: Some(owner_payload.formula_owner_uid.upper as u32),
+        uuid_w3: Some((owner_payload.formula_owner_uid.upper >> 32) as u32),
+    };
+    let engine = object(
+        CALCULATION_ENGINE_OBJECT_BASE
+            .checked_add(u64::try_from(index).expect("fixture index fits"))
+            .ok_or("calculation-engine object identifier overflow")?,
+        4_000,
+        tsce::CalculationEngineArchive {
+            dependency_tracker: tsce::DependencyTrackerArchive {
+                owner_id_map: Some(tsce::OwnerIdMapArchive {
+                    map_entry: vec![tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
+                        internal_owner_id: owner_payload.internal_formula_owner_id,
+                        owner_id,
+                    }],
+                    ..tsce::OwnerIdMapArchive::default()
+                }),
+                number_of_formulas: Some(0),
+                formula_owner_dependencies: vec![reference(owner_identifier)],
+                ..tsce::DependencyTrackerArchive::default()
+            },
+            ..tsce::CalculationEngineArchive::default()
+        }
+        .encode_to_vec(),
+        &[owner_identifier],
+    )?;
+    let calculation = SnappyStream::compress(
+        &Archive {
+            objects: vec![engine, owner],
+        }
+        .to_bytes()?,
+    )?;
+    let document = SnappyStream::compress(&document.to_bytes()?)?;
+
+    let mut members = catalog
+        .iter()
+        .map(|entry| {
+            if entry.name() == DOCUMENT_MEMBER {
+                (entry.name().to_owned(), document.clone())
+            } else {
+                (entry.name().to_owned(), entry.data().to_vec())
+            }
+        })
+        .collect::<Vec<_>>();
+    members.push((CALCULATION_ENGINE_MEMBER.to_owned(), calculation));
+    let references = members
+        .iter()
+        .map(|(name, data)| (name.as_str(), data.as_slice()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        references,
+        Limits::default(),
+    )?)
+}
+
+fn clear_calculation_engine_formula_owner_metadata(
+    package: &[u8],
+    index: usize,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
+        .ok_or("missing calculation-engine member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let owner = archive
+        .object_mut(table_formula_owner(index))
+        .ok_or("missing calculation-engine formula-owner object")?;
+    let message_index = owner
+        .messages
+        .iter()
+        .position(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+        .ok_or("missing calculation-engine formula-owner message")?;
+    let metadata = owner
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or("missing calculation-engine formula-owner metadata")?;
+    metadata.object_references.clear();
+    metadata.data_references.clear();
+    metadata.field_infos.clear();
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
+        Limits::default(),
+    )?)
+}
+
+fn rewrite_calculation_engine_archive(
+    package: &[u8],
+    index: usize,
+    mutate: impl FnOnce(&mut ArchiveObject, &mut tsce::CalculationEngineArchive) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
+        .ok_or("missing calculation-engine member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let engine = archive
+        .object_mut(
+            CALCULATION_ENGINE_OBJECT_BASE
+                .checked_add(u64::try_from(index).expect("fixture index fits"))
+                .ok_or("calculation-engine object identifier overflow")?,
+        )
+        .ok_or("missing calculation-engine object")?;
+    let message_index = engine
+        .messages
+        .iter()
+        .position(|message| message.type_ == 4_000)
+        .ok_or("missing calculation-engine message")?;
+    let mut decoded =
+        tsce::CalculationEngineArchive::decode(engine.messages[message_index].data.as_slice())?;
+    mutate(engine, &mut decoded)?;
+    engine.messages[message_index].data = decoded.encode_to_vec();
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
+        Limits::default(),
+    )?)
+}
+
+fn forge_calculation_engine_formula_owner_reference(
+    package: &[u8],
+    index: usize,
+) -> TestResult<Vec<u8>> {
+    rewrite_calculation_engine_archive(package, index, |_, engine| {
+        let foreign_identifier = table_formula_owner(index + 1);
+        engine
+            .dependency_tracker
+            .formula_owner_dependencies
+            .first_mut()
+            .ok_or("missing calculation-engine formula-owner edge")?
+            .identifier = foreign_identifier;
+        Ok(())
+    })
+}
+
+#[allow(
+    deprecated,
+    reason = "The fixture intentionally exercises the legacy dirty-leaf tracker field."
+)]
+fn source_built_provenance_variants(
+    package: &[u8],
+    index: usize,
+) -> TestResult<Vec<(&'static str, Vec<u8>)>> {
+    let wrong_internal_owner_id =
+        rewrite_calculation_engine_archive(package, index, |_, engine| {
+            let map = engine
+                .dependency_tracker
+                .owner_id_map
+                .as_mut()
+                .ok_or("missing calculation-engine owner map")?;
+            map.map_entry
+                .first_mut()
+                .ok_or("missing calculation-engine owner-map entry")?
+                .internal_owner_id = 2;
+            Ok(())
+        })?;
+    let wrong_owner_uid = rewrite_calculation_engine_archive(package, index, |_, engine| {
+        let map = engine
+            .dependency_tracker
+            .owner_id_map
+            .as_mut()
+            .ok_or("missing calculation-engine owner map")?;
+        let entry = map
+            .map_entry
+            .first_mut()
+            .ok_or("missing calculation-engine owner-map entry")?;
+        let mut owner = source_formula_owner_cfuuid(index);
+        owner.uuid_w0 = Some(
+            owner
+                .uuid_w0
+                .ok_or("missing owner UUID word")?
+                .wrapping_add(1),
+        );
+        entry.owner_id = owner;
+        Ok(())
+    })?;
+    let second_owner_map_entry =
+        rewrite_calculation_engine_archive(package, index, |_, engine| {
+            let map = engine
+                .dependency_tracker
+                .owner_id_map
+                .as_mut()
+                .ok_or("missing calculation-engine owner map")?;
+            map.map_entry
+                .push(tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
+                    internal_owner_id: 77,
+                    owner_id: source_formula_owner_cfuuid(index),
+                });
+            Ok(())
+        })?;
+    let unregistered_owner_id = rewrite_calculation_engine_archive(package, index, |_, engine| {
+        let map = engine
+            .dependency_tracker
+            .owner_id_map
+            .as_mut()
+            .ok_or("missing calculation-engine owner map")?;
+        map.unregistered_internal_owner_id.push(77);
+        Ok(())
+    })?;
+    let cfuuid_bytes_form = rewrite_calculation_engine_archive(package, index, |_, engine| {
+        let map = engine
+            .dependency_tracker
+            .owner_id_map
+            .as_mut()
+            .ok_or("missing calculation-engine owner map")?;
+        let entry = map
+            .map_entry
+            .first_mut()
+            .ok_or("missing calculation-engine owner-map entry")?;
+        entry.owner_id = tsp::CfuuidArchive {
+            uuid_bytes: Some(vec![0; 16]),
+            ..tsp::CfuuidArchive::default()
+        };
+        Ok(())
+    })?;
+    let nonzero_number_of_formulas =
+        rewrite_calculation_engine_archive(package, index, |_, engine| {
+            engine.dependency_tracker.number_of_formulas = Some(1);
+            Ok(())
+        })?;
+    let opaque_formula_owner_info =
+        rewrite_calculation_engine_archive(package, index, |_, engine| {
+            engine
+                .dependency_tracker
+                .formula_owner_info
+                .push(tsce::FormulaOwnerInfoArchive {
+                    formula_owner_id: source_formula_owner_cfuuid(index),
+                    ..tsce::FormulaOwnerInfoArchive::default()
+                });
+            Ok(())
+        })?;
+    let dirty_leaf = rewrite_calculation_engine_archive(package, index, |_, engine| {
+        engine
+            .dependency_tracker
+            .dirty_leaf
+            .push(tsce::CellReferenceArchive {
+                column: 0,
+                row: 0,
+                table_id: source_formula_owner_cfuuid(index),
+            });
+        Ok(())
+    })?;
+    let duplicate_foreign_formula_owner =
+        rewrite_calculation_engine_archive(package, index, |_, engine| {
+            engine
+                .dependency_tracker
+                .formula_owner_dependencies
+                .push(reference(table_formula_owner(index + 1)));
+            Ok(())
+        })?;
+    let extra_engine_header_edge =
+        rewrite_calculation_engine_archive(package, index, |engine, _| {
+            let info = engine
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or("missing calculation-engine message metadata")?;
+            info.object_references.push(table_formula_owner(index + 1));
+            Ok(())
+        })?;
+    let extra_engine_field_info_edge =
+        rewrite_calculation_engine_archive(package, index, |engine, _| {
+            let info = engine
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or("missing calculation-engine message metadata")?;
+            let mut field = FieldInfo::new(FieldPath::new(vec![99]));
+            field.object_references.push(table_formula_owner(index + 1));
+            info.field_infos.push(field);
+            Ok(())
+        })?;
+    Ok(vec![
+        ("wrong internal owner ID", wrong_internal_owner_id),
+        ("wrong owner UUID", wrong_owner_uid),
+        ("second owner-map entry", second_owner_map_entry),
+        ("unregistered owner ID", unregistered_owner_id),
+        ("CFUUID bytes form", cfuuid_bytes_form),
+        ("nonzero number of formulas", nonzero_number_of_formulas),
+        ("opaque formula-owner info", opaque_formula_owner_info),
+        ("dirty leaf", dirty_leaf),
+        (
+            "duplicate foreign formula owner",
+            duplicate_foreign_formula_owner,
+        ),
+        ("extra type-4000 header edge", extra_engine_header_edge),
+        (
+            "extra type-4000 FieldInfo edge",
+            extra_engine_field_info_edge,
+        ),
+    ])
 }
 
 fn replace_first_raw_field(source: &[u8], number: u32, replacement: &[u8]) -> TestResult<Vec<u8>> {
@@ -3531,6 +3945,48 @@ fn remove_info_map_field(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     })
 }
 
+/// Pages source-built table graphs retain the selected payload references in
+/// the aggregate object list while omitting their field-local declarations.
+/// Keep this fixture mutation scoped to the selected model/info pair so the
+/// rooted body and every unrelated table continue to exercise the ordinary
+/// ownership census.
+fn source_built_aggregate_metadata(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
+    let package = rewrite_model_metadata(package, index, |model, message_index| {
+        model.archive_info.message_infos[message_index]
+            .field_infos
+            .retain(|field| matches!(field.path.as_slice(), [34] | [35]));
+        Ok(())
+    })?;
+    rewrite_info_metadata(&package, index, |info, message_index| {
+        info.archive_info.message_infos[message_index]
+            .field_infos
+            .clear();
+        Ok(())
+    })
+}
+
+/// Keep an aggregate-only route's source shape, then add one contradictory
+/// field-local declaration.  The focused reader must reject this rather than
+/// treating an incorrect path as equivalent to an omitted declaration.
+fn source_built_aggregate_metadata_conflict(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
+    let package = rewrite_model_metadata(package, index, |model, message_index| {
+        let metadata = &mut model.archive_info.message_infos[message_index];
+        metadata
+            .field_infos
+            .retain(|field| matches!(field.path.as_slice(), [34] | [35]));
+        let mut field = FieldInfo::new(FieldPath::new(vec![47]));
+        field.object_references.push(table_uid_map(index));
+        metadata.field_infos.push(field);
+        Ok(())
+    })?;
+    rewrite_info_metadata(&package, index, |info, message_index| {
+        info.archive_info.message_infos[message_index]
+            .field_infos
+            .clear();
+        Ok(())
+    })
+}
+
 fn wrong_info_map_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_info_metadata(package, index, |info, message_index| {
         let field = info.archive_info.message_infos[message_index]
@@ -3902,6 +4358,50 @@ fn formula_owner_base_uid(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 fn formula_owner_cell_dependencies(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_formula_owner_payload(package, index, |owner| {
         owner.cell_dependencies = Some(tsce::CellDependenciesExpandedArchive::default());
+    })
+}
+
+fn source_built_kind_one_formula_owner(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
+    rewrite_formula_owner_payload(package, index, |owner| {
+        owner.owner_kind = Some(1);
+        owner.cell_dependencies = Some(tsce::CellDependenciesExpandedArchive::default());
+        owner.range_dependencies = Some(tsce::RangeDependenciesArchive::default());
+        owner.volatile_dependencies = Some(tsce::VolatileDependenciesExpandedArchive {
+            volatile_time_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_random_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_locale_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_sheet_table_name_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_remote_data_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_geometry_cell_refs: Some(tsce::InternalCellRefSetArchive::default()),
+        });
+        owner.spanning_column_dependencies =
+            Some(tsce::SpanningDependenciesExpandedArchive::default());
+        owner.spanning_row_dependencies =
+            Some(tsce::SpanningDependenciesExpandedArchive::default());
+        owner.whole_owner_dependencies = Some(tsce::WholeOwnerDependenciesExpandedArchive {
+            dependent_cells: Some(tsce::InternalCellRefSetArchive::default()),
+        });
+        owner.cell_errors = Some(tsce::CellErrorsArchive::default());
+        owner.tiled_cell_dependencies = Some(tsce::CellDependenciesTiledArchive::default());
+        owner.uuid_references = Some(tsce::UuidReferencesArchive::default());
+        owner.tiled_range_dependencies = Some(tsce::RangeDependenciesTiledArchive::default());
+        owner.spill_range_sizes = Some(tsce::CellSpillSizesArchive::default());
+    })
+}
+
+fn source_built_kind_one_formula_owner_with_nonempty_dependency(
+    package: &[u8],
+    index: usize,
+) -> TestResult<Vec<u8>> {
+    rewrite_formula_owner_payload(package, index, |owner| {
+        owner.owner_kind = Some(1);
+        owner.cell_dependencies = Some(tsce::CellDependenciesExpandedArchive {
+            cell_record: vec![tsce::CellRecordExpandedArchive {
+                column: 0,
+                row: 0,
+                ..tsce::CellRecordExpandedArchive::default()
+            }],
+        });
     })
 }
 
@@ -4564,6 +5064,237 @@ fn ownerless_creation_rejects_unknown_or_missing_unselected_rooted_uid_map() -> 
 }
 
 #[test]
+fn source_built_aggregate_cross_component_owner_round_trips_and_is_local() -> TestResult {
+    let base = synthetic_package(
+        [
+            TableOptions {
+                user_hidden: true,
+                ..TableOptions::default()
+            },
+            TableOptions::default(),
+        ],
+        ["Revenue", "Costs"],
+    )?;
+    // The source-built route keeps the selected model/info references in the
+    // aggregate object lists and puts the kind-1 formula owner in the
+    // CalculationEngine component.  This exercises the source-built
+    // existing-owner shape while retaining the strict owner-creation gate.
+    let aggregate = source_built_aggregate_metadata(&base, 0)?;
+    let aggregate = source_built_kind_one_formula_owner(&aggregate, 0)?;
+    let source = move_formula_owner_to_calculation_engine(&aggregate, 0)?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.body_table_hidden_axes(BodyTableSelector::name("Revenue"))?,
+        HiddenAxes::new([AxisIndex::row(1), AxisIndex::column(2)])?
+    );
+
+    let source_second_model = model_payload_from_package(&source, 1)?;
+    let source_second_info = info_payload(&source, 1)?;
+    let source_sentinel = member_bytes(&source, "Data/sentinel.bin")?;
+    let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
+    let commit = package
+        .edit_body_table_hidden_axes(BodyTableSelector::name("Revenue"))?
+        .set(requested.clone())
+        .commit()?;
+    let target = commit.package().exact_bytes();
+    assert_aggregate_rewrite_preserves_unselected_source(&source, &target, 0)?;
+    assert_eq!(
+        Package::from_bytes(&target)?.body_table_hidden_axes(0usize)?,
+        requested
+    );
+    assert_eq!(model_payload_from_package(&target, 1)?, source_second_model);
+    assert_eq!(info_payload(&target, 1)?, source_second_info);
+    assert_eq!(member_bytes(&target, "Data/sentinel.bin")?, source_sentinel);
+
+    let reopened = Package::from_bytes(&target)?;
+    assert_eq!(reopened.body_table_hidden_axes(0usize)?, requested);
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
+    assert_eq!(
+        restored.package().body_table_hidden_axes(0usize)?,
+        HiddenAxes::new([AxisIndex::row(1), AxisIndex::column(2)])?
+    );
+    Ok(())
+}
+
+#[test]
+fn source_built_aggregate_ownerless_creation_round_trips_and_is_local() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let aggregate = source_built_aggregate_metadata(&base, 0)?;
+    let aggregate = source_built_kind_one_formula_owner(&aggregate, 0)?;
+    let source = move_formula_owner_to_calculation_engine(&aggregate, 0)?;
+    let source = clear_calculation_engine_formula_owner_metadata(&source, 0)?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.body_table_hidden_axes(BodyTableSelector::name("Revenue"))?,
+        HiddenAxes::empty()
+    );
+
+    let source_second_model = model_payload_from_package(&source, 1)?;
+    let source_second_info = info_payload(&source, 1)?;
+    let source_sentinel = member_bytes(&source, "Data/sentinel.bin")?;
+    let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
+    let commit = package
+        .edit_body_table_hidden_axes(BodyTableSelector::name("Revenue"))?
+        .set(requested.clone())
+        .commit()?;
+    let target = commit.package().exact_bytes();
+    assert_aggregate_rewrite_preserves_unselected_source(&source, &target, 0)?;
+    assert_eq!(
+        Package::from_bytes(&target)?.body_table_hidden_axes(0usize)?,
+        requested
+    );
+    assert_eq!(model_payload_from_package(&target, 1)?, source_second_model);
+    assert_eq!(info_payload(&target, 1)?, source_second_info);
+    assert_eq!(member_bytes(&target, "Data/sentinel.bin")?, source_sentinel);
+
+    let reopened = Package::from_bytes(&target)?;
+    assert_eq!(reopened.body_table_hidden_axes(0usize)?, requested);
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
+    assert_eq!(
+        restored.package().body_table_hidden_axes(0usize)?,
+        HiddenAxes::empty()
+    );
+    Ok(())
+}
+
+#[test]
+fn source_built_aggregate_nonempty_dependency_creation_is_refused() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let aggregate = source_built_aggregate_metadata(&base, 0)?;
+    let aggregate = source_built_kind_one_formula_owner_with_nonempty_dependency(&aggregate, 0)?;
+    let source = move_formula_owner_to_calculation_engine(&aggregate, 0)?;
+    let source = clear_calculation_engine_formula_owner_metadata(&source, 0)?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.exact_bytes();
+    assert_eq!(
+        package.body_table_hidden_axes(0usize)?,
+        HiddenAxes::empty(),
+        "read-only absence remains independent of the mutation owner proof"
+    );
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    let result = package
+        .edit_body_table_hidden_axes(0usize)
+        .and_then(|edit| edit.set(requested).commit());
+    assert!(
+        matches!(
+            &result,
+            Err(Error::UnsupportedDependency | Error::InvalidSource)
+        ),
+        "non-empty source-built dependency was admitted: {result:?}"
+    );
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn source_built_aggregate_foreign_engine_edge_is_refused() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let aggregate = source_built_aggregate_metadata(&base, 0)?;
+    let aggregate = source_built_kind_one_formula_owner(&aggregate, 0)?;
+    let source = move_formula_owner_to_calculation_engine(&aggregate, 0)?;
+    let source = clear_calculation_engine_formula_owner_metadata(&source, 0)?;
+    let source = forge_calculation_engine_formula_owner_reference(&source, 0)?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.exact_bytes();
+    assert_eq!(
+        package.body_table_hidden_axes(0usize)?,
+        HiddenAxes::empty(),
+        "read-only absence remains independent of the mutation owner proof"
+    );
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    let result = package
+        .edit_body_table_hidden_axes(0usize)
+        .and_then(|edit| edit.set(requested).commit());
+    assert!(matches!(
+        result,
+        Err(Error::UnsupportedDependency | Error::InvalidSource)
+    ));
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn source_built_provenance_variants_fail_closed() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let aggregate = source_built_aggregate_metadata(&base, 0)?;
+    let aggregate = source_built_kind_one_formula_owner(&aggregate, 0)?;
+    let source = move_formula_owner_to_calculation_engine(&aggregate, 0)?;
+    let source = clear_calculation_engine_formula_owner_metadata(&source, 0)?;
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    let mut accepted = Vec::new();
+
+    for (label, malformed) in source_built_provenance_variants(&source, 0)? {
+        let Ok(package) = Package::from_bytes(&malformed) else {
+            continue;
+        };
+        let before = package.exact_bytes();
+        let result = package
+            .edit_body_table_hidden_axes(0usize)
+            .and_then(|edit| edit.set(requested.clone()).commit());
+        if result.is_ok() {
+            accepted.push(label);
+        }
+        assert_eq!(
+            package.exact_bytes(),
+            before,
+            "malformed provenance mutated source: {label}"
+        );
+    }
+    assert!(
+        accepted.is_empty(),
+        "accepted malformed provenance: {accepted:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn source_built_aggregate_metadata_conflicts_fail_closed() -> TestResult {
+    let base = synthetic_package(
+        [
+            TableOptions {
+                user_hidden: true,
+                ..TableOptions::default()
+            },
+            TableOptions::default(),
+        ],
+        ["Revenue", "Costs"],
+    )?;
+    let malformed = source_built_aggregate_metadata_conflict(&base, 0)?;
+    let package = Package::from_bytes(&malformed)?;
+    let before = package.exact_bytes();
+    assert!(matches!(
+        package.body_table_hidden_axes(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
+        package
+            .edit_body_table_hidden_axes(0usize)
+            .and_then(|edit| edit.set(HiddenAxes::empty()).commit()),
+        Err(Error::InvalidSource)
+    ));
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
 fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> TestResult {
     let requests = [
         HiddenAxes::new([AxisIndex::row(1)])?,
@@ -4830,6 +5561,7 @@ fn hostile_metadata_identity_routes_and_watermarks_fail_closed_atomically() -> T
         metadata_dangling_registry(&source)?,
         metadata_duplicate_registry_identifier(&source)?,
         metadata_duplicate_uuid(&source)?,
+        metadata_missing_registry_binding(&source, table_model(0))?,
         metadata_physical_id_collision(&source)?,
         metadata_misrouted_member(&source)?,
         metadata_watermark_near_max(&source)?,

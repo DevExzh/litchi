@@ -61,6 +61,12 @@ and hidden-axis readback after reopening, applies the patch, and checks exact
 source restoration through its inverse. These fixed native sources complement
 the generated malformed graph matrix below.
 
+A second fixed-size source-built probe omits the selected field-local metadata
+and varies canonical CalculationEngine and unsupported same-component
+formula-owner placement. Canonical inputs create an owner, reopen it, clear the
+axes, and restore exact source bytes through the inverse; misplaced owners must
+fail atomically. The unselected table must retain empty visibility.
+
 `pages_body_table_hidden_axes` exercises the focused body-table hidden-axes
 owner using bounded descriptors that construct a strict two-table IWA graph.
 Every input first reaches a valid selector/read setup and stages an edit; the

@@ -3,7 +3,6 @@
 mod comments;
 mod conditional_highlight;
 mod formula;
-mod hidden_axes;
 mod semantic;
 mod sort;
 mod storage;

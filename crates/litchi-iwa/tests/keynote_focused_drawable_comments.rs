@@ -493,50 +493,89 @@ fn assert_cow_uuid_registration(
     Ok(())
 }
 
-/// The deprecated generic editor predates the focused UUID-map ownership
-/// contract.  Keep its observed regression explicit and narrowly scoped: on
-/// a registered reply edit it leaves the source object as an unreachable
-/// orphan and omits the clone's ObjectUUIDMap registration.  The focused
-/// backend continues to use `assert_cow_uuid_registration` above, so this
-/// helper cannot mask a focused UUID regression.
-fn assert_legacy_generic_reply_cow_uuid_registration(
+/// The generic migration editor now registers every newly allocated physical
+/// comment object.  Keep this oracle separate from the focused contract: the
+/// focused backend continues to use `assert_cow_uuid_registration` above,
+/// while this helper checks the generic backend's own registration policy.
+fn assert_generic_cow_uuid_registration(
     before: &[u8],
     after: &[u8],
     old_identifier: u64,
     new_identifier: u64,
+    preserve_payload_uuid: bool,
 ) -> TestResult<()> {
+    if old_identifier == new_identifier {
+        return assert_cow_uuid_registration(before, after, old_identifier, new_identifier);
+    }
     let before_registrations = uuid_registrations(before)?;
     let after_registrations = uuid_registrations(after)?;
-    let old_registrations = before_registrations.get(&old_identifier).ok_or_else(|| {
-        io::Error::other("legacy UUID regression fixture lost source registration")
+    let old_before = before_registrations.get(&old_identifier);
+    let old_survives = native_object_ids(after)?.contains(&old_identifier);
+    if old_survives {
+        assert_eq!(
+            after_registrations.get(&old_identifier),
+            old_before,
+            "generic COW changed the source ObjectUUIDMap entry while the source survived"
+        );
+    } else {
+        assert!(
+            !after_registrations.contains_key(&old_identifier),
+            "generic COW retained an ObjectUUIDMap entry for a removed source object"
+        );
+    }
+
+    let new_registrations = after_registrations.get(&new_identifier).ok_or_else(|| {
+        io::Error::other(format!(
+            "generic COW did not register newly allocated object {new_identifier}"
+        ))
     })?;
     assert_eq!(
-        old_registrations.len(),
+        new_registrations.len(),
         1,
-        "legacy UUID regression fixture has duplicate source registrations"
+        "generic COW clone has duplicate ObjectUUIDMap registrations"
     );
+    assert_ne!(
+        new_registrations[0].uuid,
+        (0, 0),
+        "generic COW clone has an all-zero ObjectUUIDMap UUID"
+    );
+    let new_component = component_for_object(after, new_identifier)?;
+    let expected_component =
+        metadata_component_id_for_archive(&metadata_snapshot(after)?, &new_component)?.ok_or_else(
+            || {
+                io::Error::other(format!(
+                    "generic COW clone {new_identifier} has no PackageMetadata component"
+                ))
+            },
+        )?;
     assert_eq!(
-        after_registrations.get(&old_identifier),
-        Some(old_registrations),
-        "generic legacy path changed the source ObjectUUIDMap entry"
+        new_registrations[0].component_identifier, expected_component,
+        "generic COW clone registered under the wrong component"
     );
-    assert!(
-        native_object_ids(after)?.contains(&old_identifier),
-        "generic legacy path no longer exhibits the retained source orphan"
-    );
-    assert!(
-        native_object_ids(after)?.contains(&new_identifier),
-        "generic legacy path did not create the replacement reply object"
-    );
-    assert!(
-        !after_registrations.contains_key(&new_identifier),
-        "generic legacy path unexpectedly registered its replacement reply"
-    );
+    let new_uuid = new_registrations[0].uuid;
+    let after_uuid_count = after_registrations
+        .values()
+        .flatten()
+        .filter(|registration| registration.uuid == new_uuid)
+        .count();
     assert_eq!(
-        comment_storage_uuid(after, old_identifier)?,
-        comment_storage_uuid(before, old_identifier)?,
-        "generic legacy orphan is not the original registered reply"
+        after_uuid_count, 1,
+        "generic COW clone reused its ObjectUUIDMap UUID"
     );
+    assert!(
+        before_registrations
+            .values()
+            .flatten()
+            .all(|registration| registration.uuid != new_uuid),
+        "generic COW clone reused a source ObjectUUIDMap UUID"
+    );
+    if preserve_payload_uuid {
+        assert_eq!(
+            comment_storage_uuid(after, new_identifier)?,
+            comment_storage_uuid(before, old_identifier)?,
+            "generic COW operation changed the payload UUID of an exact clone"
+        );
+    }
     Ok(())
 }
 
@@ -1692,7 +1731,13 @@ fn foreign_root_read_and_set_match_generic_backend() -> TestResult {
         fixtures::AUTHOR_STORAGE_COMPONENT,
     )?;
     assert_cow_uuid_registration(&fixture.bytes, &focused_bytes, root, focused_root)?;
-    assert_cow_uuid_registration(&fixture.bytes, &generic_bytes, root, generic_root)?;
+    assert_generic_cow_uuid_registration(
+        &fixture.bytes,
+        &generic_bytes,
+        root,
+        generic_root,
+        false,
+    )?;
     assert_foreign_component(&focused_bytes, root, fixtures::AUTHOR_STORAGE_COMPONENT)?;
     assert_foreign_component(&generic_bytes, root, fixtures::AUTHOR_STORAGE_COMPONENT)?;
     assert_save_tokens_advance_once(&fixture.bytes, &focused_bytes)?;
@@ -1779,19 +1824,26 @@ fn foreign_reply_set_and_remove_match_generic_backend() -> TestResult {
     )?;
     with_context(
         "generic set-reply root COW UUID",
-        assert_cow_uuid_registration(&fixture.bytes, &generic_bytes, source_root, generic_root),
+        assert_generic_cow_uuid_registration(
+            &fixture.bytes,
+            &generic_bytes,
+            source_root,
+            generic_root,
+            true,
+        ),
     )?;
     with_context(
         "focused set-reply registered-reply COW UUID",
         assert_cow_uuid_registration(&fixture.bytes, &focused_bytes, reply, focused_reply),
     )?;
     with_context(
-        "generic set-reply registered-reply legacy UUID behavior",
-        assert_legacy_generic_reply_cow_uuid_registration(
+        "generic set-reply registered-reply UUID",
+        assert_generic_cow_uuid_registration(
             &fixture.bytes,
             &generic_bytes,
             reply,
             generic_reply,
+            true,
         ),
     )?;
     assert_save_tokens_advance_once(&fixture.bytes, &focused_bytes)?;
@@ -1922,11 +1974,12 @@ fn shared_foreign_root_cow_and_clear_match_generic_backend() -> TestResult {
         root,
         focused_selected_root,
     )?;
-    assert_cow_uuid_registration(
+    assert_generic_cow_uuid_registration(
         &fixture.bytes,
         &generic_set_bytes,
         root,
         generic_selected_root,
+        false,
     )?;
     assert_save_tokens_advance_once(&fixture.bytes, &focused_set_bytes)?;
     assert_legacy_save_tokens_monotonic(&fixture.bytes, &generic_set_bytes)?;
