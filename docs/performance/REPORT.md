@@ -1,5 +1,41 @@
 # Performance program phase report
 
+## 0485: bounded OPC splice consumption and remaining DOCX metadata cost
+
+[0485](changes/0485-opc-splice-consumed-window-batching.md) batches bytes
+already consumed by the XML parser within the existing private OPC adapter
+window. The source XML audit, replay authentication, source freshness policy,
+per-fragment Work accounting, and bounded publication proofs remain in place.
+The matched comparison retains 144 formal processes and 4,320 samples across
+18 arms, two executable roles, and two reversed process repeats. Candidate
+archives, semantic output, untouched members, source identities, and reopen or
+patch oracles remain identical.
+
+The authored-heavy file route improves p50 from 443.916/440.383 ms to
+239.499/238.865 ms across the two repeats (45.76–46.05% lower). The
+source-heavy owned route improves from 482.325/476.215 ms to
+385.058/385.006 ms. Operation heap peaks are effectively unchanged. Three
+latency quantiles and nine whole-child RSS observations cross the five-percent
+review threshold; the [results review](results/change-0485/results-review.md)
+retains each adverse row instead of folding it into the median result.
+
+The 12-child diagnostics show remaining metadata work. Authored-heavy file
+`statx` falls from 3,735,939 to 1,475,055 with `pread64` unchanged at 114;
+source-heavy file `statx` rises from 15,415 to 25,219 with `pread64` unchanged
+at 264. These profiles use one sample and one warmup and include setup and
+oracle work, so they support caller-level attribution only. They do not justify
+relaxing `FileSource` freshness checks or removing the separate source proof.
+
+The validation bundle records 1,989 all-feature OPC/DOCX tests, 1,948
+no-default-feature tests, 32 ignored tests in each configuration, warning-
+denied formatting/lint/documentation gates, boundary validation, five replay
+benchmark tests, nine Python helper tests, and the sanitizer smoke lane. This
+is scoped route evidence: cold-cache, concurrency, atomic-save, all
+provider/input intersections, and broad native Office validation remain open.
+The representative CRUD index remains unchanged at 15 categories and 34 rows
+(11 measured, 22 correctness-only, and one unsupported dynamic-content row),
+because this private route has no registered default selector.
+
 ## 0483: measured DOCX tail append memory/latency tradeoff
 
 [0483](changes/0483-docx-bounded-tail-append.md) integrates bounded source and

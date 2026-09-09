@@ -1,5 +1,38 @@
 # Performance CRUD coverage
 
+## 0485: bounded OPC splice consumption in the DOCX append route
+
+[0485](changes/0485-opc-splice-consumed-window-batching.md) adds a matched
+before/after measurement for the existing replayable DOCX logical-append route.
+The private OPC adapter batches already-consumed parser bytes inside its
+bounded window while retaining the standalone source XML audit, replay
+authentication, source freshness checks, per-fragment Work charging, and
+source-bound preservation proofs. The 18-arm comparison retains 144 formal
+processes and 4,320 samples; all candidate archives, semantic projections,
+untouched members, and patch/readback oracles match.
+
+Authored-heavy file-input p50 falls from 443.916/440.383 ms to
+239.499/238.865 ms across the two repeats (45.76–46.05% lower). The source-
+heavy owned case falls from 482.325/476.215 ms to 385.058/385.006 ms. Operation
+heap peaks are effectively unchanged. Three latency quantiles and nine
+whole-child RSS observations cross the five-percent review threshold and remain
+open in the [results review](results/change-0485/results-review.md).
+
+The profile also leaves a caller-level metadata question: authored-heavy file
+`statx` falls from 3,735,939 to 1,475,055 while `pread64` remains 114, and
+source-heavy file `statx` rises from 15,415 to 25,219 while `pread64` remains
+264. These are one-sample/one-warmup whole-child diagnostics, so they justify
+further attribution rather than a freshness-policy change. The bundle does not
+close cold-cache, concurrent, atomic-save, all provider/input intersections, or
+broad native Office validation.
+
+This route is supplementary evidence and does not add a selector to the
+representative machine-readable index. That index currently contains 15
+categories and 34 rows: 11 measured, 22 correctness-only, and one explicitly
+unsupported dynamic-content row (33 selector-backed mappings). The narrow DOCX
+route therefore does not promote any broad CRUD category or alter the index's
+timing contract.
+
 ## 0483: one-paragraph source-backed DOCX logical append
 
 [0483](changes/0483-docx-bounded-tail-append.md) adds a public one-plain-paragraph

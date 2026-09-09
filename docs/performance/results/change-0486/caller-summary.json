@@ -1,0 +1,204 @@
+{
+  "capture": {
+    "bytes": 1366,
+    "sha256": "9f2ca94350bced77cdafc3a6597d3b245810350d294cbabb91ee84f7d641a4ba"
+  },
+  "driver_sha256": "e6d647b31183c4d4a1bd014b3195c2756e0ccfdfa10c53c6db1c68ca410f5ab8",
+  "profiles": [
+    {
+      "comm_samples": {
+        "docx_replayable": 1246,
+        "perf-exec": 6,
+        "taskset": 7,
+        "time": 8
+      },
+      "inclusive": {
+        "audit_splice": {
+          "percent": 7.039964889513352,
+          "period": 782090881,
+          "samples": 88
+        },
+        "ensure_current": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "fill_fragment_buffer": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "flush_pending_consumed": {
+          "percent": 0.7999101384316328,
+          "period": 88864424,
+          "samples": 10
+        },
+        "statx": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "write_consumed_range": {
+          "percent": 0.23993466647737494,
+          "period": 26655064,
+          "samples": 3
+        }
+      },
+      "label": "owned-s131072-a64-short-c64",
+      "period": 11109300874,
+      "receipt": {
+        "bytes": 7215,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/owned-s131072-a64-short-c64/receipt.json",
+        "sha256": "cba0def3458340e17f23ac1ae103431e08648d26ee048b796f420796d2f1cd9a"
+      },
+      "samples": 1267
+    },
+    {
+      "comm_samples": {
+        "docx_replayable": 1262,
+        "perf-exec": 6,
+        "taskset": 7,
+        "time": 8
+      },
+      "inclusive": {
+        "audit_splice": {
+          "percent": 4.4284350729490916,
+          "period": 498242453,
+          "samples": 56
+        },
+        "ensure_current": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "fill_fragment_buffer": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "flush_pending_consumed": {
+          "percent": 0.39549186202965986,
+          "period": 44496720,
+          "samples": 5
+        },
+        "statx": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "write_consumed_range": {
+          "percent": 0.07908096948127025,
+          "period": 8897386,
+          "samples": 1
+        }
+      },
+      "label": "file-s131072-a64-short-c64",
+      "period": 11250982453,
+      "receipt": {
+        "bytes": 7794,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/file-s131072-a64-short-c64/receipt.json",
+        "sha256": "0d1232cfaa90926ae095fee9f2e3f11bd66c0c40d27fdd7a5b4d5c4de5d33d01"
+      },
+      "samples": 1283
+    },
+    {
+      "comm_samples": {
+        "docx_replayable": 319,
+        "perf-exec": 6,
+        "taskset": 7,
+        "time": 8
+      },
+      "inclusive": {
+        "audit_splice": {
+          "percent": 38.774944177344096,
+          "period": 1111445098,
+          "samples": 125
+        },
+        "ensure_current": {
+          "percent": 1.5506327127023178,
+          "period": 44447340,
+          "samples": 5
+        },
+        "fill_fragment_buffer": {
+          "percent": 3.1011429023900523,
+          "period": 88891168,
+          "samples": 10
+        },
+        "flush_pending_consumed": {
+          "percent": 7.75386172141815,
+          "period": 222256712,
+          "samples": 25
+        },
+        "statx": {
+          "percent": 0.0,
+          "period": 0,
+          "samples": 0
+        },
+        "write_consumed_range": {
+          "percent": 3.4114702194034447,
+          "period": 97786391,
+          "samples": 11
+        }
+      },
+      "label": "owned-s64-a16384-short-c64",
+      "period": 2866400253,
+      "receipt": {
+        "bytes": 7203,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/owned-s64-a16384-short-c64/receipt.json",
+        "sha256": "ea74049c2de7dabba3963ca3cc6b8ecfbedb21bd351bafca84acc93d2bcb76e9"
+      },
+      "samples": 340
+    },
+    {
+      "comm_samples": {
+        "docx_replayable": 581,
+        "perf-exec": 6,
+        "taskset": 7,
+        "time": 15
+      },
+      "inclusive": {
+        "audit_splice": {
+          "percent": 49.62104054213277,
+          "period": 2576793446,
+          "samples": 290
+        },
+        "ensure_current": {
+          "percent": 46.53976212203461,
+          "period": 2416784346,
+          "samples": 272
+        },
+        "fill_fragment_buffer": {
+          "percent": 19.164430482534925,
+          "period": 995198374,
+          "samples": 112
+        },
+        "flush_pending_consumed": {
+          "percent": 32.50989661992594,
+          "period": 1688221118,
+          "samples": 190
+        },
+        "statx": {
+          "percent": 27.376557610455944,
+          "period": 1421649636,
+          "samples": 160
+        },
+        "write_consumed_range": {
+          "percent": 18.47815330096899,
+          "period": 959560376,
+          "samples": 108
+        }
+      },
+      "label": "file-s64-a16384-short-c64",
+      "period": 5192945206,
+      "receipt": {
+        "bytes": 7776,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/file-s64-a16384-short-c64/receipt.json",
+        "sha256": "522906deb167931d20652c9fcb0bc3edb6a2f0cb1316fbea26dbdd95ffd5ca1e"
+      },
+      "samples": 609
+    }
+  ],
+  "schema": "docx-caller-sample-summary-v1",
+  "scope": "Whole diagnostic child, including setup/oracles and launcher samples; inclusive symbols overlap. Period-weighted sampled shares are not syscall counts or paired speedups. Unknown kernel frames and addr2line warnings remain in raw artifacts.",
+  "status": "pass"
+}
