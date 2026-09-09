@@ -2881,20 +2881,6 @@ impl NumbersEditor {
         Ok(true)
     }
 
-    /// Read the comment attached to a writable BNC cell.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::table_cell_comment with SheetSelector and TableSelector for the focused semantic root-comment read; unsupported graph creation and replies remain migration-host scope"
-    )]
-    pub fn cell_comment(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<TableCellComment>> {
-        cell_comment_in_package(&self.package, table_id, row, column)
-    }
-
     /// Create or replace a cell comment without changing the cell value or style.
     #[deprecated(
         since = "0.0.1",

@@ -93,6 +93,115 @@ def write_cargo_manifest_fixture(root: Path, relative: str, source: str) -> Path
     return path
 
 
+def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
+    """Create the complete evidence set needed by the root-reader ratchet."""
+
+    compat_module = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE
+    compat_module.parent.mkdir(parents=True, exist_ok=True)
+    compat_module.write_text(
+        "#[cfg(feature = \"internal-iwork-source\")]\n"
+        "#[doc(hidden)]\n"
+        "#[path = \"comments_compat.rs\"]\n"
+        "mod comments_compat;\n",
+        encoding="utf-8",
+    )
+
+    compat = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE
+    compat.parent.mkdir(parents=True, exist_ok=True)
+    compat.write_text(
+        "impl Package {\n"
+        "#[doc(hidden)]\n"
+        "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Option<Comment>> {\n"
+        "    let _ = (bytes, sheet, table, position);\n"
+        "    compatibility_package(bytes, ReadOptions::default(), WireLimits::default())\n"
+        "}\n"
+        "#[doc(hidden)]\n"
+        "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    options: ReadOptions,\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Option<Comment>> {\n"
+        "    let _ = (bytes, options, sheet, table, position);\n"
+        "    compatibility_package(bytes, options, WireLimits::default())\n"
+        "}\n"
+        "#[doc(hidden)]\n"
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Box<[CommentReply]>> {\n"
+        "    let _ = (bytes, sheet, table, position);\n"
+        "    compatibility_package(bytes, ReadOptions::default(), WireLimits::default())\n"
+        "}\n"
+        "#[doc(hidden)]\n"
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<\n"
+        "    'sheet,\n"
+        "    'table,\n"
+        ">(\n"
+        "    bytes: &[u8],\n"
+        "    options: ReadOptions,\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Box<[CommentReply]>> {\n"
+        "    let _ = (bytes, options, sheet, table, position);\n"
+        "    compatibility_package(bytes, options, WireLimits::default())\n"
+        "}\n"
+        "}\n"
+        "fn compatibility_package(bytes: &[u8], options: ReadOptions, limits: WireLimits) {\n"
+        "    let _ = (bytes, options, limits, DecodeOptions::default());\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    compatibility_test = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE
+    compatibility_test.parent.mkdir(parents=True, exist_ok=True)
+    compatibility_test.write_text(
+        "#[test]\n"
+        "fn source_built_comment_compatibility_reads() {\n"
+        "    let package = Package::from_bytes(source);\n"
+        "    __table_cell_comment_from_bytes_for_compatibility(source);\n"
+        "    __table_cell_comment_replies_from_bytes_for_compatibility(source);\n"
+        "    assert_source_unchanged(package);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    parity = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_PARITY_SOURCE
+    parity.parent.mkdir(parents=True, exist_ok=True)
+    parity.write_text(
+        "fn focused_numbers_comment_reads_match_wire_oracle_by_selector_and_a1() {\n"
+        "    wire_comment(source); table_cell_comment(package);\n"
+        "    assert_source_unchanged(package, source);\n"
+        "}\n"
+        "fn focused_numbers_read_accepts_native_style_missing_field_info_headers() {}\n",
+        encoding="utf-8",
+    )
+
+    native = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_SOURCE
+    native.parent.mkdir(parents=True, exist_ok=True)
+    native.write_text(
+        "const SOURCE: &[u8] = include_bytes!(\"fixture.numbers\");\n"
+        "fn native_saved_root_preserves_semantic_metadata() {\n"
+        "    package.table_cell_comment(); package.write_to(output);\n"
+        "    let reopened = Package::from_bytes(bytes); let _ = reopened;\n"
+        "}\n"
+        "fn native_created_root_read_preserves_metadata_and_empty_replies() {\n"
+        "    package.table_cell_comment(); package.write_to(output);\n"
+        "    let reopened = Package::from_bytes(bytes); let _ = reopened;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_iwa_numbers_model_storage_scaffold(
     root: Path,
     *,
@@ -1109,6 +1218,65 @@ def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
         directory = root / corpus
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "seed.hex").write_text("00\n", encoding="utf-8")
+
+
+def add_numbers_cell_comment_reader_compat_mutation_scaffold(
+    root: Path,
+    *,
+    module_declaration: str,
+    method_attributes: str = "#[doc(hidden)]\n",
+    extra_methods: str = "",
+) -> Path:
+    """Add the four source-byte readers to an active mutation-owner fixture."""
+
+    add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+    owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+    owner.write_text(
+        owner.read_text(encoding="utf-8") + module_declaration,
+        encoding="utf-8",
+    )
+    compat = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE
+    compat.parent.mkdir(parents=True, exist_ok=True)
+    compat.write_text(
+        "impl Package {\n"
+        f"{method_attributes}"
+        "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Option<Comment>> { todo!() }\n"
+        f"{method_attributes}"
+        "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    options: ReadOptions,\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Option<Comment>> { todo!() }\n"
+        f"{method_attributes}"
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, 'table>(\n"
+        "    bytes: &[u8],\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Box<[CommentReply]>> { todo!() }\n"
+        f"{method_attributes}"
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<\n"
+        "    'sheet,\n"
+        "    'table,\n"
+        ">(\n"
+        "    bytes: &[u8],\n"
+        "    options: ReadOptions,\n"
+        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
+        "    table: impl Into<TableSelector<'table>>,\n"
+        "    position: CellPosition,\n"
+        ") -> Result<Box<[CommentReply]>> { todo!() }\n"
+        f"{extra_methods}"
+        "}\n",
+        encoding="utf-8",
+    )
+    return compat
 
 
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
@@ -9231,8 +9399,15 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertIn("cell_comment_replies", violations[0])
             self.assertIn("debt 015 is open", violations[0])
 
+            readers.write_text("pub fn cell_comment_replies() {}\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_comment_reader_retention_source_topology(
+                    root
+                ),
+                [],
+            )
+
             readers.write_text(
-                "pub fn cell_comment() {}\n"
                 "#[cfg(test)]\n"
                 "pub fn cell_comment_replies() {}\n",
                 encoding="utf-8",
@@ -9242,6 +9417,110 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             self.assertEqual(len(violations), 1)
             self.assertIn("cell_comment_replies", violations[0])
+
+    def test_iwa_numbers_cell_comment_reader_retirement_waits_for_all_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                "    pub fn cell_comment(&self, table_id: u64, row: usize, column: usize) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(
+                boundaries._iwa_numbers_cell_comment_reader_retirement_evidence_ready(
+                    root
+                )
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            add_iwa_numbers_cell_comment_reader_retirement_evidence(root)
+            self.assertTrue(
+                boundaries._iwa_numbers_cell_comment_reader_retirement_evidence_ready(
+                    root
+                )
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("NumbersEditor::cell_comment method returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw identifier parameter" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_cell_comment_reader_retirement_rejects_calls_and_reexports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_cell_comment_reader_retirement_evidence(root)
+            host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn private_model_witness() { cell_comment_in_package(); }\n"
+                "fn unrelated() { cell_comment_replies(); }\n",
+                encoding="utf-8",
+            )
+            caller = root / "crates/litchi-iwa/tests/retired_root_reader.rs"
+            caller.parent.mkdir(parents=True, exist_ok=True)
+            caller.write_text(
+                "fn bypass() { editor.cell_comment(table_id, row, column); }\n"
+                "pub use crate::comments::cell_comment;\n",
+                encoding="utf-8",
+            )
+            outside = root / "crates/litchi-iwa/src/pages/editor/comments.rs"
+            outside.parent.mkdir(parents=True, exist_ok=True)
+            outside.write_text(
+                "fn private_pages_helper() { editor.cell_comment(table_id, row, column); }\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(
+                sum("raw-ID call returned" in item for item in violations),
+                1,
+                violations,
+            )
+            self.assertEqual(
+                sum("re-export returned" in item for item in violations),
+                1,
+                violations,
+            )
+            self.assertFalse(
+                any("cell_comment_replies" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(
+                any("private_pages_helper" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_cell_comment_reader_retirement_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_cell_comment_reader_retirement_source_topology()",
+            main_source,
+        )
 
     def test_iwa_numbers_comment_reader_retention_can_close_with_policy_debt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -39716,6 +39995,130 @@ fn rewrite_movie_title_operation(
                 ),
                 [],
             )
+
+    def test_numbers_comment_compatibility_bytes_are_allowed_only_for_exact_hidden_readers(
+        self,
+    ) -> None:
+        module = (
+            '#[cfg(feature = "internal-iwork-source")]\n'
+            "#[doc(hidden)]\n"
+            '#[path = "comments_compat.rs"]\n'
+            "mod comments_compat;\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            compat = add_numbers_cell_comment_reader_compat_mutation_scaffold(
+                root,
+                module_declaration=module,
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            compat.write_text(
+                compat.read_text(encoding="utf-8").replace(
+                    "position: CellPosition,\n",
+                    "position: CellPosition, raw: &[u8],\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "raw byte slice &[u8]" in item
+                    and "comments_compat.rs" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_numbers_comment_compatibility_ordinary_bytes_remain_forbidden(self) -> None:
+        module = (
+            '#[cfg(feature = "internal-iwork-source")]\n'
+            "#[doc(hidden)]\n"
+            '#[path = "comments_compat.rs"]\n'
+            "mod comments_compat;\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_cell_comment_reader_compat_mutation_scaffold(
+                root,
+                module_declaration=module,
+                extra_methods="pub fn ordinary_bytes(&self, bytes: &[u8]) {}\n",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "raw byte slice &[u8]" in item
+                    and "comments_compat.rs" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_numbers_comment_compatibility_exception_requires_private_hidden_module_and_methods(
+        self,
+    ) -> None:
+        module_variants = (
+            (
+                "wrong module path",
+                '#[cfg(feature = "internal-iwork-source")]\n'
+                "#[doc(hidden)]\n"
+                '#[path = "other_comments.rs"]\n'
+                "mod comments_compat;\n",
+                "#[doc(hidden)]\n",
+            ),
+            (
+                "missing internal cfg",
+                "#[doc(hidden)]\n"
+                '#[path = "comments_compat.rs"]\n'
+                "mod comments_compat;\n",
+                "#[doc(hidden)]\n",
+            ),
+            (
+                "public module",
+                '#[cfg(feature = "internal-iwork-source")]\n'
+                "#[doc(hidden)]\n"
+                '#[path = "comments_compat.rs"]\n'
+                "pub mod comments_compat;\n",
+                "#[doc(hidden)]\n",
+            ),
+            (
+                "missing method doc",
+                '#[cfg(feature = "internal-iwork-source")]\n'
+                "#[doc(hidden)]\n"
+                '#[path = "comments_compat.rs"]\n'
+                "mod comments_compat;\n",
+                "",
+            ),
+        )
+        for label, module, method_attributes in module_variants:
+            with self.subTest(variant=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                add_numbers_cell_comment_reader_compat_mutation_scaffold(
+                    root,
+                    module_declaration=module,
+                    method_attributes=method_attributes,
+                )
+                violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                )
+                self.assertTrue(
+                    any(
+                        "raw byte slice &[u8]" in item
+                        and "comments_compat.rs" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
 
     def test_numbers_table_cell_comment_reply_mutation_requires_each_api_and_index_accessor(
         self,

@@ -23,7 +23,9 @@ use std::{
 use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::wire::{WireView, patch_length_delimited_field};
+use litchi_iwa_common::wire::{
+    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+};
 use litchi_iwa_core::{
     Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor, RawMessage, SnappyStream,
@@ -42,6 +44,10 @@ use crate::{SheetSelector, TableSelector, table::CellPosition};
 
 use super::Package;
 
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+#[path = "comments_compat.rs"]
+mod comments_compat;
 #[path = "comments_create.rs"]
 mod comments_create;
 #[path = "comments_read.rs"]
@@ -953,6 +959,33 @@ impl Package {
         position: CellPosition,
     ) -> Result<Box<[CommentReply]>, Error> {
         let located = resolve_comment(self, sheet, table, position)?;
+        self.read_comment_replies(located)
+    }
+
+    /// Read source-ordered semantic replies from a resolved comment target.
+    ///
+    /// The physical compatibility reader uses the same bounded projection
+    /// after selector admission, while the normal package reader reaches it
+    /// through the fully projected semantic document above.
+    fn read_comment_replies(&self, located: Located) -> Result<Box<[CommentReply]>, Error> {
+        self.read_comment_replies_with_mode(located, false)
+    }
+
+    /// Read replies through the compatibility model envelope without
+    /// changing the strict public package or mutation paths.
+    #[cfg(feature = "internal-iwork-source")]
+    fn read_comment_replies_compatibility(
+        &self,
+        located: Located,
+    ) -> Result<Box<[CommentReply]>, Error> {
+        self.read_comment_replies_with_mode(located, true)
+    }
+
+    fn read_comment_replies_with_mode(
+        &self,
+        located: Located,
+        compatibility_defaults: bool,
+    ) -> Result<Box<[CommentReply]>, Error> {
         let path = located.target.path;
         if located.comment.is_none() {
             return Err(Error::CommentNotFound { path });
@@ -964,9 +997,13 @@ impl Package {
         // readable comment list.  Likewise, a reply may live in another
         // current component or be shared by more than one root.  Keep those
         // facts out of the mutation census below.
-        let census = census_comment_read(self, path)?;
+        let census = if compatibility_defaults {
+            census_comment_read_with_model_mode(self, path, true)?
+        } else {
+            census_comment_read(self, path)?
+        };
         validate_comment_authors(self, &census, path)?;
-        validate_reply_package_metadata(self, path)?;
+        validate_reply_package_metadata_with_mode(self, path, compatibility_defaults)?;
         let entry = located
             .entry
             .as_ref()
@@ -1268,10 +1305,26 @@ impl Package {
     }
 }
 
-fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), Error> {
-    let metadata = super::comments_metadata::strict_source(source)
-        .map_err(|_| Error::InvalidSource { path })?;
+fn validate_reply_package_metadata_with_mode(
+    source: &Package,
+    path: Path,
+    compatibility_defaults: bool,
+) -> Result<(), Error> {
+    // Legacy editor fixtures (and some older native documents) have no
+    // PackageMetadata sidecar at all.  A semantic compatibility read can
+    // still prove the selected comment graph from its source-owned archives,
+    // but must validate a sidecar whenever one is present. In particular,
+    // do not turn a malformed or misplaced metadata message into an absent
+    // sidecar by checking only the canonical member name.
+    let metadata = match super::comments_metadata::strict_source(source) {
+        Ok(metadata) => metadata,
+        Err(_) if compatibility_defaults && !package_metadata_is_present(source) => return Ok(()),
+        Err(_) => return Err(Error::InvalidSource { path }),
+    };
     let payload_len = metadata.payload().len();
+    if payload_len == 0 {
+        return Err(Error::InvalidSource { path });
+    }
     let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
         source
             .state
@@ -1280,7 +1333,7 @@ fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), E
             .archive_limits()
             .max_archive_bytes(),
     );
-    if payload_len == 0 || payload_len > maximum_wire {
+    if payload_len > maximum_wire {
         return Err(Error::LimitExceeded {
             kind: LimitKind::WireBytes,
             observed: payload_len,
@@ -1306,6 +1359,22 @@ fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), E
     super::comments_metadata::inspect_cross_component_read(source, options)
         .map_err(|_| Error::InvalidSource { path })?;
     Ok(())
+}
+
+fn package_metadata_is_present(source: &Package) -> bool {
+    source
+        .state
+        .components
+        .iter_archives()
+        .any(|(name, archive)| {
+            name == super::metadata::ENTRY_NAME
+                || archive.objects.iter().any(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == super::metadata::MESSAGE_TYPE)
+                })
+        })
 }
 
 fn validate_comment_authors(
@@ -1454,9 +1523,146 @@ struct DecodedTableStorage<'source> {
     tile_storage: numbers_table_cell_storage_codec::TileStorageSnapshot,
 }
 
+#[derive(Clone, Copy)]
+enum CommentTableModelMode {
+    Strict,
+    DenseNative,
+    Compatibility,
+}
+
+fn decode_comment_table_model<'source>(
+    payload: &'source [u8],
+    message_type: u32,
+    options: numbers_table_cell_storage_codec::DecodeOptions,
+    compatibility_defaults: bool,
+    path: Path,
+) -> Result<
+    Option<(
+        numbers_table_cell_storage_codec::TableModelSnapshot<'source>,
+        CommentTableModelMode,
+    )>,
+    Error,
+> {
+    let strict = numbers_table_cell_storage_codec::decode_table_model_with_report(payload, options);
+    let (model, mode) = match strict {
+        Ok((model, _report)) => {
+            return Ok(Some((model, CommentTableModelMode::Strict)));
+        },
+        Err(error) if error.resource_limit().is_some() => {
+            return Err(map_table_codec_error(error, path));
+        },
+        Err(_strict_error) => {
+            match numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(
+                payload, options,
+            ) {
+                Ok((model, _report)) => (model, CommentTableModelMode::DenseNative),
+                Err(error) if error.resource_limit().is_some() => {
+                    return Err(map_table_codec_error(error, path));
+                },
+                Err(dense_error) => {
+                    // A 6000 message can be either the historical table
+                    // model or the modern TableInfo envelope.  Probe the
+                    // typed TableInfo shape only after both model routes have
+                    // failed, so a legacy 6000 model remains admissible.
+                    if message_type == 6_000
+                        && !has_comment_legacy_table_model_shape(payload, path)?
+                    {
+                        match table_info_codec::decode_table_model_reference(
+                            payload,
+                            super::table_info_decode_options(payload),
+                        ) {
+                            Ok(_) => return Ok(None),
+                            Err(error) if table_info_error_is_resource(&error) => {
+                                return Err(map_comment_table_info_error(error, path));
+                            },
+                            Err(_) => {},
+                        }
+                    }
+                    if !compatibility_defaults {
+                        return Err(map_table_codec_error(dense_error, path));
+                    }
+                    let (model, _report) =
+                        numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
+                            payload, options,
+                        )
+                        .map_err(|error| map_table_codec_error(error, path))?;
+                    (model, CommentTableModelMode::Compatibility)
+                },
+            }
+        },
+    };
+    Ok(Some((model, mode)))
+}
+
+fn has_comment_legacy_table_model_shape(source: &[u8], path: Path) -> Result<bool, Error> {
+    const DATA_STORE: u8 = 1 << 0;
+    const ROW_COUNT: u8 = 1 << 1;
+    const COLUMN_COUNT: u8 = 1 << 2;
+    const TABLE_NAME: u8 = 1 << 3;
+    const REQUIRED: u8 = DATA_STORE | ROW_COUNT | COLUMN_COUNT | TABLE_NAME;
+
+    let mut present = 0_u8;
+    let mut ambiguous = false;
+    let limits = wire_limits_for(source.len(), 0, path)?;
+    preflight_wire_tree_with_limits(source, limits, |visit| {
+        if !visit.path().is_empty() {
+            return Ok(WireDescent::Skip);
+        }
+        let field = visit.field();
+        let Some((bit, expected_wire_type)) = (match field.number() {
+            4 => Some((DATA_STORE, 2)),
+            6 => Some((ROW_COUNT, 0)),
+            7 => Some((COLUMN_COUNT, 0)),
+            8 => Some((TABLE_NAME, 2)),
+            _ => None,
+        }) else {
+            return Ok(WireDescent::Skip);
+        };
+        if field.wire_type() != expected_wire_type
+            || present & bit != 0
+            || field.validate_canonical_framing().is_err()
+        {
+            ambiguous = true;
+            return Ok(WireDescent::Skip);
+        }
+        if matches!(field.number(), 6 | 7) {
+            let payload = field.payload();
+            let canonical =
+                litchi_iwa_common::decode_varint_from_bytes(payload).is_ok_and(|(value, width)| {
+                    width == payload.len()
+                        && width == litchi_iwa_common::varint::encoded_len(value)
+                        && u32::try_from(value).is_ok()
+                });
+            if !canonical {
+                ambiguous = true;
+                return Ok(WireDescent::Skip);
+            }
+        }
+        present |= bit;
+        Ok(WireDescent::Skip)
+    })
+    .map_err(|error| map_wire_error(error, path))?;
+    Ok(!ambiguous && present == REQUIRED)
+}
+
 fn decode_table_storage<'source>(
     source: &'source Package,
     target: &Target,
+) -> Result<DecodedTableStorage<'source>, Error> {
+    decode_table_storage_with_mode(source, target, false)
+}
+
+fn decode_table_storage_compatibility<'source>(
+    source: &'source Package,
+    target: &Target,
+) -> Result<DecodedTableStorage<'source>, Error> {
+    decode_table_storage_with_mode(source, target, true)
+}
+
+fn decode_table_storage_with_mode<'source>(
+    source: &'source Package,
+    target: &Target,
+    compatibility_defaults: bool,
 ) -> Result<DecodedTableStorage<'source>, Error> {
     let model_route = MessageRoute {
         component_index: target.native.component_index,
@@ -1470,39 +1676,29 @@ fn decode_table_storage<'source>(
         model_message.data.len(),
         source.state.options.semantic().max_references(),
     );
-    let (model, compatibility_data_store) =
-        match numbers_table_cell_storage_codec::decode_table_model_with_report(
-            model_message.data.as_slice(),
-            model_options,
-        ) {
-            Ok((model, _report)) => (model, false),
-            Err(error) if error.resource_limit().is_none() => {
-                let (model, _report) = numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(
-                    model_message.data.as_slice(),
-                    model_options,
-                )
-                .map_err(|fallback| map_table_codec_error(fallback, target.path))?;
-                (model, true)
-            },
-            Err(error) => return Err(map_table_codec_error(error, target.path)),
-        };
+    let Some((model, model_mode)) = decode_comment_table_model(
+        model_message.data.as_slice(),
+        model_message.type_,
+        model_options,
+        compatibility_defaults,
+        target.path,
+    )?
+    else {
+        return Err(Error::InvalidSource { path: target.path });
+    };
     let data_store_options = table_cell_decode_options(
         source,
         model.base_data_store().len(),
         source.state.options.semantic().max_references(),
     );
-    let (data_store, _report) = if compatibility_data_store {
-        numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
-            model.base_data_store(),
-            data_store_options,
-        )
-    } else {
-        numbers_table_cell_storage_codec::decode_data_store_with_report(
-            model.base_data_store(),
-            data_store_options,
-        )
-    }
-    .map_err(|error| map_table_codec_error(error, target.path))?;
+    let data_store = decode_comment_data_store(
+        model.base_data_store(),
+        data_store_options,
+        model_mode,
+        compatibility_defaults,
+        compatibility_defaults,
+        target.path,
+    )?;
     let (tile_storage, _report) =
         numbers_table_cell_storage_codec::decode_tile_storage_with_report(
             data_store.tiles(),
@@ -1515,8 +1711,162 @@ fn decode_table_storage<'source>(
     })
 }
 
-fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Located, Error> {
-    let decoded = decode_table_storage(source, &target)?;
+fn decode_comment_data_store<'source>(
+    payload: &'source [u8],
+    options: numbers_table_cell_storage_codec::DecodeOptions,
+    model_mode: CommentTableModelMode,
+    compatibility_defaults: bool,
+    allow_strict_fallback: bool,
+    path: Path,
+) -> Result<numbers_table_cell_storage_codec::DataStoreSnapshot<'source>, Error> {
+    let strict =
+        match numbers_table_cell_storage_codec::decode_data_store_with_report(payload, options) {
+            Err(error) if error.resource_limit().is_some() => {
+                return Err(map_table_codec_error(error, path));
+            },
+            result => result,
+        };
+    match model_mode {
+        CommentTableModelMode::Strict => match strict {
+            Ok((store, _report)) => Ok(store),
+            Err(strict_error) if !compatibility_defaults && !allow_strict_fallback => {
+                Err(map_table_codec_error(strict_error, path))
+            },
+            Err(_strict_error) if !compatibility_defaults => {
+                numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                    payload, options,
+                )
+                .map(|(store, _report)| store)
+                .map_err(|fallback| map_table_codec_error(fallback, path))
+            },
+            Err(_strict_error) => {
+                decode_dense_then_legacy_data_store(payload, options, compatibility_defaults, path)
+            },
+        },
+        CommentTableModelMode::DenseNative => {
+            if compatibility_defaults {
+                decode_dense_then_legacy_data_store(payload, options, compatibility_defaults, path)
+            } else {
+                numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                    payload, options,
+                )
+                .map(|(store, _report)| store)
+                .map_err(|error| map_table_codec_error(error, path))
+            }
+        },
+        CommentTableModelMode::Compatibility => {
+            numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                payload, options,
+            )
+            .map(|(store, _report)| store)
+            .map_err(|error| map_table_codec_error(error, path))
+        },
+    }
+}
+
+fn table_info_error_is_resource(error: &table_info_codec::DecodeError) -> bool {
+    error.field_limit_values().is_some()
+        || error.work_limit_values().is_some()
+        || error.wire_resource_limit().is_some()
+        || error.allocation_amount().is_some()
+}
+
+fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path) -> Error {
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some(amount) = error.allocation_amount() {
+        return Error::Allocation { amount, path };
+    }
+    match error.wire_resource_limit() {
+        Some(table_info_codec::WireResourceLimit::Bytes { observed, maximum }) => {
+            Error::LimitExceeded {
+                kind: LimitKind::WireBytes,
+                observed: observed.unwrap_or(usize::MAX),
+                maximum: maximum.unwrap_or(usize::MAX),
+                path,
+            }
+        },
+        Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => {
+            Error::LimitExceeded {
+                kind: LimitKind::WireWork,
+                observed: observed
+                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                    .unwrap_or(usize::MAX),
+                maximum: maximum
+                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                    .unwrap_or(usize::MAX),
+                path,
+            }
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+fn decode_dense_then_legacy_data_store<'source>(
+    payload: &'source [u8],
+    options: numbers_table_cell_storage_codec::DecodeOptions,
+    compatibility_defaults: bool,
+    path: Path,
+) -> Result<numbers_table_cell_storage_codec::DataStoreSnapshot<'source>, Error> {
+    let dense = numbers_table_cell_storage_codec::decode_data_store_dense_native_with_report(
+        payload, options,
+    );
+    match dense {
+        Ok((store, _report)) => Ok(store),
+        Err(error) if error.resource_limit().is_some() => Err(map_table_codec_error(error, path)),
+        Err(dense_error) if compatibility_defaults => {
+            numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                payload, options,
+            )
+            .map(|(store, _report)| store)
+            .map_err(|fallback| {
+                if fallback.resource_limit().is_some() {
+                    map_table_codec_error(fallback, path)
+                } else {
+                    map_table_codec_error(dense_error, path)
+                }
+            })
+        },
+        Err(error) => Err(map_table_codec_error(error, path)),
+    }
+}
+
+fn resolve_comment_native(source: &Package, target: Target) -> Result<Located, Error> {
+    resolve_comment_native_with_mode(source, target, false)
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn resolve_comment_native_compatibility(
+    source: &Package,
+    target: Target,
+) -> Result<Located, Error> {
+    resolve_comment_native_with_mode(source, target, true)
+}
+
+fn resolve_comment_native_with_mode(
+    source: &Package,
+    mut target: Target,
+    compatibility_defaults: bool,
+) -> Result<Located, Error> {
+    let decoded = if compatibility_defaults {
+        decode_table_storage_compatibility(source, &target)?
+    } else {
+        decode_table_storage(source, &target)?
+    };
     let data_store = decoded.data_store;
     let tile_storage = decoded.tile_storage;
     let tile_size = usize::try_from(
@@ -3844,17 +4194,31 @@ fn prove_archive_reference_ownership(
 }
 
 fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
-    census_comment_ownership_with_mode(source, path, CommentCensusMode::Mutation)
+    census_comment_ownership_with_model_mode(source, path, CommentCensusMode::Mutation, false)
 }
 
 fn census_comment_read(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
-    census_comment_ownership_with_mode(source, path, CommentCensusMode::Read)
+    census_comment_read_with_model_mode(source, path, false)
 }
 
-fn census_comment_ownership_with_mode(
+fn census_comment_read_with_model_mode(
+    source: &Package,
+    path: Path,
+    compatibility_defaults: bool,
+) -> Result<CommentOwnershipCensus, Error> {
+    census_comment_ownership_with_model_mode(
+        source,
+        path,
+        CommentCensusMode::Read,
+        compatibility_defaults,
+    )
+}
+
+fn census_comment_ownership_with_model_mode(
     source: &Package,
     path: Path,
     mode: CommentCensusMode,
+    compatibility_defaults: bool,
 ) -> Result<CommentOwnershipCensus, Error> {
     let mut census = CommentOwnershipCensus::default();
     let mut budget = CensusBudget::new(source.state.options.semantic().max_references());
@@ -4153,6 +4517,7 @@ fn census_comment_ownership_with_mode(
         &mut census,
         &mut budget,
         mode.requires_field_infos(),
+        compatibility_defaults,
         path,
     )?;
     census_alias_checks(
@@ -4599,9 +4964,12 @@ fn census_models_and_cells(
     census: &mut CommentOwnershipCensus,
     budget: &mut CensusBudget,
     require_field_infos: bool,
+    compatibility_defaults: bool,
     path: Path,
 ) -> Result<(), Error> {
     let mut scan_work = 0;
+    let mut model_count = 0usize;
+    let maximum_models = source.state.options.semantic().max_tables();
     for component in source.state.components.catalog().iter() {
         for object in component.archive().objects.iter() {
             for (message_index, message) in object.messages.iter().enumerate() {
@@ -4626,60 +4994,43 @@ fn census_models_and_cells(
                     message.data.len(),
                     source.state.options.semantic().max_references(),
                 );
-                let model = match numbers_table_cell_storage_codec::decode_table_model_with_report(
+                let Some((model, model_mode)) = decode_comment_table_model(
                     message.data.as_slice(),
+                    message.type_,
                     options,
-                ) {
-                    Ok((model, _report)) => model,
-                    Err(error) if error.resource_limit().is_none() => {
-                        match numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(
-                            message.data.as_slice(),
-                            options,
-                        ) {
-                            Ok((model, _report)) => model,
-                            Err(_fallback) if message.type_ == 6_000 => {
-                                table_info_codec::decode_table_model_reference(
-                                    message.data.as_slice(),
-                                    super::table_info_decode_options(message.data.as_slice()),
-                                )
-                                .map_err(|_| Error::InvalidSource { path })?;
-                                continue;
-                            },
-                            Err(fallback) => {
-                                return Err(map_table_codec_error(fallback, path));
-                            },
-                        }
-                    },
-                    Err(_error) if message.type_ == 6_000 => {
-                        table_info_codec::decode_table_model_reference(
-                            message.data.as_slice(),
-                            super::table_info_decode_options(message.data.as_slice()),
-                        )
-                        .map_err(|_| Error::InvalidSource { path })?;
-                        continue;
-                    },
-                    Err(error) => return Err(map_table_codec_error(error, path)),
+                    compatibility_defaults,
+                    path,
+                )?
+                else {
+                    continue;
                 };
+                model_count = model_count.checked_add(1).ok_or(Error::LimitExceeded {
+                    kind: LimitKind::References,
+                    observed: usize::MAX,
+                    maximum: maximum_models,
+                    path,
+                })?;
+                if model_count > maximum_models {
+                    return Err(Error::LimitExceeded {
+                        kind: LimitKind::References,
+                        observed: model_count,
+                        maximum: maximum_models,
+                        path,
+                    });
+                }
                 let data_options = table_cell_decode_options(
                     source,
                     model.base_data_store().len(),
                     source.state.options.semantic().max_references(),
                 );
-                let store = match numbers_table_cell_storage_codec::decode_data_store_with_report(
+                let store = decode_comment_data_store(
                     model.base_data_store(),
                     data_options,
-                ) {
-                    Ok((store, _report)) => store,
-                    Err(error) if error.resource_limit().is_none() => {
-                        numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
-                            model.base_data_store(),
-                            data_options,
-                        )
-                        .map(|(store, _report)| store)
-                        .map_err(|error| map_table_codec_error(error, path))?
-                    },
-                    Err(error) => return Err(map_table_codec_error(error, path)),
-                };
+                    model_mode,
+                    compatibility_defaults,
+                    true,
+                    path,
+                )?;
                 let comment_table = store.comment_storage_table();
                 if let Some(reference) = comment_table {
                     push_nonzero(

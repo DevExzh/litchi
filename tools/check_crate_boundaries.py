@@ -14324,8 +14324,145 @@ IWA_NUMBERS_CELL_COMMENT_HOST_METHOD = "set_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_FOCUSED_METHOD = "set_table_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER = "set_cell_comment_in_package"
 RETAINED_IWA_NUMBERS_COMMENT_READER_METHODS = (
-    "cell_comment",
     "cell_comment_replies",
+)
+# The focused root-comment reader is retired independently from the reply
+# reader.  Reply identity and source-built reply graphs still need the legacy
+# host route, so keep that method in the retention ratchet above while this
+# smaller root-only ratchet protects the public surface from returning.
+RETIRED_IWA_NUMBERS_CELL_COMMENT_READER_METHOD = "cell_comment"
+RETIRED_IWA_NUMBERS_CELL_COMMENT_READER_METHOD_SET = frozenset(
+    {RETIRED_IWA_NUMBERS_CELL_COMMENT_READER_METHOD}
+)
+IWA_NUMBERS_CELL_COMMENT_READER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?cell_comment\b"
+    r"[ \t\r\n]*\("
+)
+IWA_NUMBERS_CELL_COMMENT_READER_REEXPORT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+use(?:(?!;)[\s\S])*?"
+    r"(?<![A-Za-z0-9_])(?:r#)?cell_comment(?![A-Za-z0-9_])"
+    r"(?:(?!;)[\s\S])*;"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:table_id|row|column)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32)\b"
+)
+
+# A compatibility reader is only useful once it is wired and exercised.  Tie
+# activation to the private seam, its source-built test corpus, and the
+# already checked-in wire/native parity suites.  This prevents a half-created
+# module from making the still-live host reader fail while migration is in
+# progress, and makes the eventual deletion gate evidence based.
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE = Path(
+    "crates/litchi-numbers/src/package/comments_compat.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE = Path(
+    "crates/litchi-numbers/src/package/comments.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t\r\n]+"
+    r"(?:r#)?comments_compat\b[ \t\r\n]*;"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_METHODS = (
+    "__table_cell_comment_from_bytes_for_compatibility",
+    "__table_cell_comment_replies_from_bytes_for_compatibility",
+)
+# These four hidden methods are the only compatibility exception to the
+# mutation facade's raw-byte vocabulary rule.  Keep the overloads explicit:
+# a new public method in the same file must still be rejected until it has a
+# semantic API of its own.
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHODS = (
+    "__table_cell_comment_from_bytes_for_compatibility",
+    "__table_cell_comment_from_bytes_for_compatibility_with_options",
+    "__table_cell_comment_replies_from_bytes_for_compatibility",
+    "__table_cell_comment_replies_from_bytes_for_compatibility_with_options",
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHOD_SET = frozenset(
+    IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHODS
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
+    "__table_cell_comment_from_bytes_for_compatibility": (
+        "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>("
+        " bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "-> Result<Option<Comment>>"
+    ),
+    "__table_cell_comment_from_bytes_for_compatibility_with_options": (
+        "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<"
+        "'sheet, 'table>( bytes: &[u8], options: ReadOptions, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "-> Result<Option<Comment>>"
+    ),
+    "__table_cell_comment_replies_from_bytes_for_compatibility": (
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, "
+        "'table>( bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "-> Result<Box<[CommentReply]>>"
+    ),
+    "__table_cell_comment_replies_from_bytes_for_compatibility_with_options": (
+        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<"
+        " 'sheet, 'table, >( bytes: &[u8], options: ReadOptions, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "-> Result<Box<[CommentReply]>>"
+    ),
+}
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PATH_ATTRIBUTE = re.compile(
+    r"#\s*\[\s*path\s*=\s*[\"']comments_compat\.rs[\"']\s*\]"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE = Path(
+    "crates/litchi-iwa/tests/numbers_comment_compatibility_reads.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SEAM_MARKERS = (
+    re.compile(r"\bSheetSelector\b"),
+    re.compile(r"\bTableSelector\b"),
+    re.compile(r"\bCellPosition\b"),
+    re.compile(
+        r"\b(?:physical_package|compatibility_package|PhysicalPackage|"
+        r"PackageContext)\b"
+    ),
+    re.compile(
+        r"\b(?:DecodeOptions|ReadOptions|WireLimits|WireBudget|"
+        r"DecodeBudget)\b"
+    ),
+    re.compile(r"\b(?:source|source_bytes|bytes)\b"),
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_MARKERS = (
+    "__table_cell_comment_from_bytes_for_compatibility",
+    "__table_cell_comment_replies_from_bytes_for_compatibility",
+    "Package::from_bytes",
+    "#[test]",
+)
+IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE_PRESERVATION = re.compile(
+    r"\bassert_source_unchanged\b|"
+    r"\bassert_eq!\s*\(\s*&?\s*source\b"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_PARITY_SOURCE = Path(
+    "crates/litchi-iwa/tests/numbers_focused_comment_reads.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_PARITY_TEST = (
+    "focused_numbers_comment_reads_match_wire_oracle_by_selector_and_a1"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_PARITY_MARKERS = (
+    "wire_comment",
+    "table_cell_comment",
+    "assert_source_unchanged",
+    "focused_numbers_read_accepts_native_style_missing_field_info_headers",
+)
+IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_SOURCE = Path(
+    "crates/litchi-numbers/tests/table_cell_comment_metadata_native.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_TESTS = (
+    "native_saved_root_preserves_semantic_metadata",
+    "native_created_root_read_preserves_metadata_and_empty_replies",
+)
+IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_MARKERS = (
+    "include_bytes!",
+    "write_to",
+    "reopened",
+    "table_cell_comment",
 )
 IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS = frozenset(
     {"UnsupportedDependency", "CommentNotFound"}
@@ -22852,14 +22989,14 @@ def audit_iwa_numbers_comment_reader_retention_source_topology(
     *,
     require_retained: bool = True,
 ) -> list[str]:
-    """Keep Numbers comment readers while the Numbers migration debt is open.
+    """Keep the legacy Numbers reply reader while migration debt is open.
 
     The focused package now projects a narrow semantic comment snapshot, but
-    it does not yet cover shared, cross-component, or segmented comment
-    graphs.  The migration host therefore needs both raw-ID readers until the
-    parity gate is closed.  ``require_retained`` is supplied by ``main`` from
-    the checked-in migration policy so a future debt exit can remove these
-    compatibility methods without leaving a permanent source tombstone.
+    the compatibility host still handles reply identity and source-built
+    reply graphs.  The root reader is retired by the separate evidence-gated
+    ratchet below; ``require_retained`` is supplied by ``main`` from the
+    checked-in migration policy so a future debt exit can remove this
+    compatibility method without leaving a permanent source tombstone.
     """
 
     if not require_retained:
@@ -22886,6 +23023,250 @@ def audit_iwa_numbers_comment_reader_retention_source_topology(
         if name not in public_methods
     ]
     return sorted(violations)
+
+
+def _iwa_numbers_cell_comment_reader_compat_module_is_private_hidden(
+    root: Path,
+) -> bool:
+    """Recognize the one private module allowed to expose source bytes.
+
+    The compatibility implementation is included from ``comments.rs`` under
+    the internal source feature.  Require the complete hidden/path-gated
+    declaration here so a similarly named module, a public module, or a
+    copied file cannot widen the mutation-facade exception.
+    """
+
+    module_path = root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE
+    if not module_path.is_file():
+        return False
+    raw_source = _mask_rust_cfg_test_items(
+        module_path.read_text(encoding="utf-8")
+    )
+    source = _mask_rust_non_code(raw_source)
+    for match in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE.finditer(source):
+        statement = match.group(0)
+        if re.search(r"\bpub\b", statement) is not None:
+            continue
+        attributes = _rust_attribute_block_before(raw_source, match.start())
+        if (
+            IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None
+            or IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None
+            or IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PATH_ATTRIBUTE.search(
+                attributes
+            )
+            is None
+        ):
+            continue
+        return True
+    return False
+
+
+def _iwa_numbers_cell_comment_reader_compat_public_method_allowed(
+    root: Path,
+    path: Path,
+    source: str,
+    name: str,
+    declaration: str,
+    line_number: int,
+) -> bool:
+    """Allow only the four hidden methods in the private compatibility seam."""
+
+    if path != root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE:
+        return False
+    if name not in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHOD_SET:
+        return False
+    expected = IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES.get(name)
+    if expected is None or re.sub(r"\s+", " ", declaration).strip() != expected:
+        return False
+    if not _iwa_numbers_cell_comment_reader_compat_module_is_private_hidden(root):
+        return False
+
+    source_code = _mask_rust_non_code(source)
+    method_pattern = re.compile(
+        rf"(?<![A-Za-z0-9_#])pub(?![ \t\r\n]*\()[ \t\r\n]+"
+        rf"(?:(?:unsafe|async|const)[ \t\r\n]+)*fn[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(name)}\b"
+    )
+    method_match = next(
+        (
+            match
+            for match in method_pattern.finditer(source_code)
+            if source_code.count("\n", 0, match.start()) + 1 == line_number
+        ),
+        None,
+    )
+    if method_match is None:
+        return False
+    attributes = _rust_attribute_block_before(source, method_match.start())
+    return IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is not None
+
+
+def _iwa_numbers_cell_comment_reader_retirement_evidence_ready(
+    root: Path,
+) -> bool:
+    """Return whether root-reader retirement has source and test evidence.
+
+    The compatibility reader deliberately lives behind a private module, but
+    a file appearing on disk is not enough to close the migration gate.  Keep
+    the ratchet dormant until both selector-first compatibility methods are
+    present, their source-built tests prove source preservation, and the
+    existing wire-oracle/native suites still cover focused ingress.  This
+    lets the source migration land atomically while preventing an untested
+    half-seam from deleting the only reader for old packages.
+    """
+
+    compat_path = root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE
+    compat_module_path = root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE
+    compat_test_path = root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE
+    parity_path = root / IWA_NUMBERS_CELL_COMMENT_READER_PARITY_SOURCE
+    native_path = root / IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_SOURCE
+    if not all(
+        path.is_file()
+        for path in (
+            compat_path,
+            compat_module_path,
+            compat_test_path,
+            parity_path,
+            native_path,
+        )
+    ):
+        return False
+
+    if not _iwa_numbers_cell_comment_reader_compat_module_is_private_hidden(root):
+        return False
+
+    compat_raw = _mask_rust_cfg_test_items(compat_path.read_text(encoding="utf-8"))
+    compat_methods = _rust_public_methods_in_impl(compat_raw, "Package")
+    for method in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHODS:
+        records = [
+            (declaration, line_number)
+            for name, declaration, line_number in compat_methods
+            if name == method
+        ]
+        if len(records) != 1:
+            return False
+        declaration, line_number = records[0]
+        if not _iwa_numbers_cell_comment_reader_compat_public_method_allowed(
+            root,
+            compat_path,
+            compat_raw,
+            method,
+            declaration,
+            line_number,
+        ):
+            return False
+    compat_code = _mask_rust_non_code(compat_raw)
+    if any(marker.search(compat_code) is None for marker in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SEAM_MARKERS):
+        return False
+
+    compat_test = _mask_rust_non_code(
+        compat_test_path.read_text(encoding="utf-8")
+    )
+    if any(
+        marker not in compat_test
+        for marker in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_MARKERS
+    ):
+        return False
+    if (
+        IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE_PRESERVATION.search(
+            compat_test
+        )
+        is None
+    ):
+        return False
+
+    parity = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(parity_path.read_text(encoding="utf-8"))
+    )
+    if re.search(
+        rf"(?<![A-Za-z0-9_])(?:fn|async[ \t\r\n]+fn)[ \t\r\n]+"
+        rf"{re.escape(IWA_NUMBERS_CELL_COMMENT_READER_PARITY_TEST)}\b",
+        parity,
+    ) is None:
+        return False
+    if any(marker not in parity for marker in IWA_NUMBERS_CELL_COMMENT_READER_PARITY_MARKERS):
+        return False
+
+    native = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(native_path.read_text(encoding="utf-8"))
+    )
+    for test_name in IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_TESTS:
+        if re.search(
+            rf"(?<![A-Za-z0-9_])(?:fn|async[ \t\r\n]+fn)[ \t\r\n]+"
+            rf"{re.escape(test_name)}\b",
+            native,
+        ) is None:
+            return False
+    return all(marker in native for marker in IWA_NUMBERS_CELL_COMMENT_READER_NATIVE_MARKERS)
+
+
+def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only ``NumbersEditor::cell_comment`` after parity evidence.
+
+    ``cell_comment_replies`` intentionally remains in the retention audit
+    above.  This scan is limited to the Numbers host and its callers, so
+    private Pages/Keynote helpers and private Numbers model witnesses remain
+    valid compatibility implementation details.  It rejects the public root
+    method, re-exports, and raw-ID calls once the compatibility seam and all
+    required parity evidence are present.
+    """
+
+    if not _iwa_numbers_cell_comment_reader_retirement_evidence_ready(root):
+        return []
+
+    caller_roots = (
+        root / IWA_NUMBERS_SOURCE_ROOT,
+        root / Path("crates/litchi-iwa/tests"),
+        root / Path("crates/litchi-iwa/examples"),
+    )
+    paths: set[Path] = set()
+    for caller_root in caller_roots:
+        if caller_root.is_dir():
+            paths.update(caller_root.rglob("*.rs"))
+
+    violations: list[str] = []
+    for path in sorted(paths):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_cfg_test_items(raw_source)
+        code = _mask_rust_non_code(source)
+        relative = path.relative_to(root)
+
+        for declaration, line_number in _rust_public_declarations(source):
+            function = RUST_FUNCTION_DECLARATION.search(declaration)
+            if function is None or function.group(1) not in RETIRED_IWA_NUMBERS_CELL_COMMENT_READER_METHOD_SET:
+                continue
+            name = function.group(1)
+            violations.append(
+                "retired litchi-iwa NumbersEditor::cell_comment method returned: "
+                f"{relative}:{line_number}"
+            )
+            for match in IWA_NUMBERS_CELL_COMMENT_READER_RAW_ID_PARAMETER.finditer(
+                declaration
+            ):
+                parameter = re.sub(r"\s+", " ", match.group(0)).strip()
+                parameter_line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    "retired litchi-iwa Numbers cell_comment public method exposes "
+                    f"raw identifier parameter {parameter}: {relative}:{parameter_line}"
+                )
+
+        for match in IWA_NUMBERS_CELL_COMMENT_READER_REEXPORT.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers cell_comment re-export returned: "
+                f"{relative}:{line_number}"
+            )
+
+        for match in IWA_NUMBERS_CELL_COMMENT_READER_CALL.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers cell_comment raw-ID call returned: "
+                f"{relative}:{line_number}"
+            )
+
+    return sorted(set(violations))
 
 
 def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
@@ -47964,6 +48345,10 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
 
     for path, source in owner_sources.items():
         for name, declaration, line_number in _rust_public_methods_in_impl(source, "Package"):
+            if _iwa_numbers_cell_comment_reader_compat_public_method_allowed(
+                root, path, source, name, declaration, line_number
+            ):
+                continue
             scan_surface(declaration, path, declaration, line_number)
         for name, declaration, line_number in _rust_public_methods_in_impl(
             source, "CommentReplyIndex"
@@ -67710,6 +68095,7 @@ def main(argv: list[str] | None = None) -> int:
             require_retained=Edge("litchi-iwa", "litchi-numbers")
             in policy.migration_edges
         )
+        + audit_iwa_numbers_cell_comment_reader_retirement_source_topology()
         + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_slide_text_info_source_topology()
         + audit_iwa_keynote_document_source_topology()

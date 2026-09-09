@@ -1438,10 +1438,11 @@ comments and ordered direct replies with optional checked timestamps and
 author display metadata. Native object identifiers stay inside the adapter.
 Focused reads support shared replies, cross-component storage, segmented lists,
 and native empty threads while retaining strict mutation ownership checks.
-The deprecated `NumbersEditor::cell_comment` and
-`NumbersEditor::cell_comment_replies` readers remain for legacy compatibility
-sources outside the strict native package profile. Their retirement also needs
-a semantic compatibility path and native reply save/reopen evidence.
+The legacy `NumbersEditor::cell_comment` reader has been retired; root-comment
+reads use the selector-first package owner. Deprecated
+`NumbersEditor::cell_comment_replies` remains pending native direct-reply
+save/reopen evidence; focused compatibility reads preserve the historical
+source-built reply graphs without rewriting their source.
 
 ```rust
 #![allow(deprecated)]

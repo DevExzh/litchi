@@ -158,3 +158,66 @@ fn native_created_root_read_preserves_metadata_and_empty_replies()
     );
     Ok(())
 }
+
+#[test]
+fn native_multiroot_comments_preserve_independent_metadata_and_values()
+-> Result<(), Box<dyn std::error::Error>> {
+    const BYTES: &[u8] =
+        include_bytes!("../../../test-data/iwork/numbers/comment-compat-native-multiroot.numbers");
+    let package = Package::from_bytes(BYTES)?;
+    let original = Package::from_bytes(NATIVE_CREATED)?;
+    assert_eq!(
+        package.table_cell_comment_a1("Sheet 1", "Table 1", "B2")?,
+        original.table_cell_comment_a1("Sheet 1", "Table 1", "B2")?,
+    );
+    for (row, address, text, sentinel) in [
+        (1, "B2", "Native root comment", "Native comment parity"),
+        (
+            2,
+            "B3",
+            "Native second root",
+            "Native compatibility sentinel",
+        ),
+    ] {
+        let position = CellPosition::new(row, 1);
+        let root = package
+            .table_cell_comment("Sheet 1", "Table 1", position)?
+            .ok_or("native root missing")?;
+        assert_eq!(root.text(), text);
+        assert!(root.timestamp().is_some());
+        assert_eq!(
+            root.author().and_then(|author| author.display_name()),
+            Some("Ryker Zhu")
+        );
+        assert!(
+            package
+                .table_cell_comment_replies("Sheet 1", "Table 1", position)?
+                .is_empty()
+        );
+        match package
+            .table_cell_a1("Sheet 1", "Table 1", address)?
+            .storage()
+        {
+            Storage::Stored(Value::Text(value)) => assert_eq!(value, sentinel),
+            other => panic!("native sentinel mismatch: {other:?}"),
+        }
+        #[cfg(feature = "internal-iwork-source")]
+        {
+            let compatible = Package::__table_cell_comment_from_bytes_for_compatibility(
+                BYTES, "Sheet 1", "Table 1", position,
+            )?
+            .ok_or("compatibility root missing")?;
+            assert_eq!(compatible, root);
+            assert!(
+                Package::__table_cell_comment_replies_from_bytes_for_compatibility(
+                    BYTES, "Sheet 1", "Table 1", position,
+                )?
+                .is_empty()
+            );
+        }
+    }
+    let mut unchanged = Vec::new();
+    package.write_to(&mut unchanged)?;
+    assert_eq!(unchanged, BYTES);
+    Ok(())
+}
