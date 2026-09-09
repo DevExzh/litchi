@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "67a68078dd53a33d331c7a38560b8117eddea260",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-crypto/Cargo.toml": "83abb577e5ce787e2fdaa00f9adb6aca7df84fbaad9f55c44f94dd2390a1ca0c",
+    "crates/litchi-crypto/src/ooxml/agile.rs": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0",
+    "crates/litchi-crypto/src/ooxml/container.rs": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db",
+    "crates/litchi-crypto/src/ooxml/mod.rs": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece",
+    "crates/litchi-crypto/src/ooxml/standard.rs": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964",
+    "crates/litchi-crypto/tests/agile_allocations.rs": "b19d3726df25805ea852831253c880f2d463a9ffd34dcf331339685d6bbc789a",
+    "crates/litchi-crypto/tests/ooxml_interoperability.rs": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf",
+    "crates/litchi-crypto/tests/data/ooxml/README.md": "b951b6c9b2127f2fa28ba7e33680c933a9cab25a454890a0e45669ce99538a9f",
+    "crates/litchi-crypto/tests/data/ooxml/agile-mixed-manifest.json": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9",
+    "crates/litchi-crypto/tests/data/ooxml/clear.docx": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+    "crates/litchi-crypto/tests/data/ooxml/component-agile-aes128-wrap-aes256-data-sha512.docx": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+    "crates/litchi-crypto/tests/data/ooxml/component-standard-aes192-sha1.docx": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+    "crates/litchi-crypto/tests/data/ooxml/component-standard-aes256-sha1.docx": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+    "crates/litchi-crypto/tests/data/ooxml/generate_agile_mixed.py": "6dea6d4eef4fa92b5675b66e2fbeb6aa04c9797a4576fdc6cec64022dbb35ab9",
+    "crates/litchi-crypto/tests/data/ooxml/generate_standard.py": "7b3a7168bd9cb8d155fd0c38867d317e1cf1bdc9ef4663d0ff0493dc18488a15",
+    "crates/litchi-crypto/tests/data/ooxml/manifest.json": "23408df5dd5a2029e88ff04a238551d7e5e2e0f8a665f7deeb3e56700706fb22",
+    "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512-valid-graph.docx": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+    "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512.docx": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+    "crates/litchi-crypto/tests/data/ooxml/native-agile-manifest.json": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520",
+    "crates/litchi-crypto/tests/data/ooxml/rust-agile-aes256-sha512.docx": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+    "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a",
+    "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes192.docx": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+    "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes256.docx": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+    "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5",
+    "crates/litchi-crypto/src/spaces.rs": "5fb0e83ae28e963ce90bb1bc0aa54a7047eca01c1037c3ed1fc704ed4977b125",
+    "crates/litchi-crypto/tests/native_ooxml_encryption.rs": "fb05d5a844408a8a07e02158a2fe4d35be5ca428e3f932ae09d1b8ca75b1a919"
+  },
+  "scope": "Standard AES128/192/256 and Agile AES128/192/256 with SHA1/SHA256/SHA512; distinct wrapper/data key sizes, narrow native mixed-hash read compatibility, explicit Agile integrity policy, bounded CFB/DataSpaces admission, inline segment workspace. Native evidence covers only the named fixtures. No universal producer support, PKI trust, IRM, latency or total-memory claim.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline -p litchi-crypto --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 74,
+      "tests_ignored": 3,
+      "doctests_passed": 3
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-crypto --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-crypto --all-features --test native_ooxml_encryption -- --ignored",
+      "exit_code": 0,
+      "log": "native.log.gz",
+      "tests_passed": 3,
+      "fixture_count": 5
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check (batch paths)",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "ac7dec598faece97dc0e681b91a36d373f17404f471623d627458b034cce99d4",
+      "uncompressed_sha256": "4553b2d0d5660ca777bcfdbf086bf7f8f9042eccfe21e66a4697356a5cc4bf6d"
+    },
+    "clippy.log.gz": {
+      "sha256": "5d4dfb514572eb8113e2f0c7db326d3de6f4ba565f09b9f3d75afb31ea525f78",
+      "uncompressed_sha256": "a462c9f8bead318aee056cb591ade3060b561a263150c48fe7f42075b5f6a447"
+    },
+    "native.log.gz": {
+      "sha256": "ecbacb53fb83a7e00c6b008671cef8de0bf0f6542f57e1f21d62975a70be9aba",
+      "uncompressed_sha256": "e7c6041a1fb771c1b9a5f66a43945e25f91f96d58c18c34ee212d6beb323d784"
+    }
+  },
+  "native_inputs": {
+    "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2007_abc.docx": {
+      "sha256": "ea105a1eb01653c904320ef9ab426686cc468b09503f617725c41cee2f6f549f",
+      "bytes": 18432,
+      "profile": "Standard AES128/SHA1",
+      "integrity": "Unauthenticated",
+      "policy": "default",
+      "password": "abc"
+    },
+    "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2010_abc.docx": {
+      "sha256": "7a51bb14cafbc1904779fa176701702251b55c2f9a5b064ba237a92eb3ce73ed",
+      "bytes": 19456,
+      "profile": "Agile AES128/SHA1",
+      "integrity": "Authenticated",
+      "policy": "default",
+      "password": "abc"
+    },
+    "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2013_abc.docx": {
+      "sha256": "2db365c48e5f3b0302b2f6c0f56b298b15f819e95c6448073566baad910023d3",
+      "bytes": 17920,
+      "profile": "Agile AES256/SHA512",
+      "integrity": "Authenticated",
+      "policy": "default",
+      "password": "abc"
+    },
+    "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_LO_Standard_abc.docx": {
+      "sha256": "d6b55065e5c8e6debd4a72a957275c22e1f5373a1806e40a1a2bd34334cce073",
+      "bytes": 7680,
+      "profile": "Standard AES128/SHA1",
+      "integrity": "Unauthenticated",
+      "policy": "allow_missing_data_spaces=true; default refusal verified",
+      "password": "abc"
+    },
+    "3rdparty/poi/test-data/poifs/60320-protected.xlsx": {
+      "sha256": "deed30663d59c44ea36728f81c8428ed5ff85373b30f4e4c92974d0f8b3e5329",
+      "bytes": 15872,
+      "profile": "Agile AES128/SHA1 data; AES256/SHA512 password wrapper",
+      "integrity": "Authenticated",
+      "policy": "default",
+      "password": "Test001!!",
+      "producer": "Not asserted; sourced from Apache POI test corpus"
+    }
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

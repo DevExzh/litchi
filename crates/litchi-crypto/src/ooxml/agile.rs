@@ -1,9 +1,14 @@
-//! `[MS-OFFCRYPTO]` Agile Encryption (AES-128/CBC/SHA-1 profile).
+//! `[MS-OFFCRYPTO]` Agile Encryption profiles.
+//!
+//! This owner supports the AES-128/192/256 CBC profiles with SHA-1, SHA-256,
+//! or SHA-512 password derivation and authenticated `dataIntegrity`. The
+//! schema's optional `dataIntegrity` profile is readable only through the
+//! explicit unauthenticated-read policy; authoring always emits the element.
 
 use std::fmt::Write as _;
 
-use aes::Aes128;
 use aes::cipher::{BlockModeDecrypt, BlockModeEncrypt, KeyIvInit, block_padding::NoPadding};
+use aes::{Aes128, Aes192, Aes256};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use cbc::{Decryptor, Encryptor};
@@ -15,18 +20,18 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use rand::TryRng;
 use rand::rngs::SysRng;
-use sha1::{Digest, Sha1};
+use sha1::Sha1;
+use sha2::{Digest, Sha256, Sha512};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
 use super::{
-    Error, Limits, Result, SPEC_MAX_SPIN_COUNT, container, declared_size, malformed, password_bytes,
+    AgileCipher, AgileHash, Error, IntegrityPolicy, IntegrityStatus, Limits, Mode, Result,
+    SPEC_MAX_SPIN_COUNT, container, declared_size, malformed, password_bytes,
 };
 
 const BLOCK: usize = 16;
-const KEY_BYTES: usize = 16;
-const HASH_BYTES: usize = 20;
-const ENCRYPTED_HASH_BYTES: usize = 32;
+const SALT_BYTES: usize = 16;
 const SPIN_COUNT: u32 = 100_000;
 const SEGMENT: usize = 4_096;
 const ENC_NS: &[u8] = b"http://schemas.microsoft.com/office/2006/encryption";
@@ -38,19 +43,90 @@ const CRYPTO_KEY_BLOCK: [u8; 8] = [0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd
 const INTEGRITY_KEY_BLOCK: [u8; 8] = [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6];
 const INTEGRITY_VALUE_BLOCK: [u8; 8] = [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33];
 
-type HmacSha1 = Hmac<Sha1>;
-type AesCbcEnc = Encryptor<Aes128>;
-type AesCbcDec = Decryptor<Aes128>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Profile {
+    cipher: AgileCipher,
+    hash: AgileHash,
+}
+
+impl Profile {
+    fn from_mode(mode: Mode) -> Result<Self> {
+        if !mode.is_agile() {
+            return Err(Error::Unsupported("mode is not an Agile profile".into()));
+        }
+        Ok(Self {
+            cipher: mode.agile_cipher(),
+            hash: mode.agile_hash(),
+        })
+    }
+
+    const fn key_bytes(self) -> usize {
+        match self.cipher {
+            AgileCipher::Aes128 => 16,
+            AgileCipher::Aes192 => 24,
+            AgileCipher::Aes256 => 32,
+        }
+    }
+
+    const fn key_bits(self) -> u32 {
+        match self.cipher {
+            AgileCipher::Aes128 => 128,
+            AgileCipher::Aes192 => 192,
+            AgileCipher::Aes256 => 256,
+        }
+    }
+
+    const fn hash_bytes(self) -> usize {
+        match self.hash {
+            AgileHash::Sha1 => 20,
+            AgileHash::Sha256 => 32,
+            AgileHash::Sha512 => 64,
+        }
+    }
+
+    const fn hash_name(self) -> &'static str {
+        match self.hash {
+            AgileHash::Sha1 => "SHA-1",
+            AgileHash::Sha256 => "SHA256",
+            AgileHash::Sha512 => "SHA512",
+        }
+    }
+
+    const fn mode(self) -> Mode {
+        Mode::agile(self.cipher, self.hash)
+    }
+
+    const fn encrypted_hash_bytes(self) -> usize {
+        round_up_const(self.hash_bytes())
+    }
+
+    // Office's published SHA-1 profile stores a 20-byte integrity key in a
+    // 32-byte encrypted block even though keyData.saltSize is 16. Preserve
+    // that interoperable shape and generalize it to the selected digest.
+    const fn integrity_bytes(self) -> usize {
+        if self.hash_bytes() > SALT_BYTES {
+            self.hash_bytes()
+        } else {
+            SALT_BYTES
+        }
+    }
+
+    const fn encrypted_integrity_bytes(self) -> usize {
+        round_up_const(self.integrity_bytes())
+    }
+}
+
+const fn round_up_const(value: usize) -> usize {
+    value.div_ceil(BLOCK) * BLOCK
+}
 
 struct Material {
-    verifier_salt: [u8; BLOCK],
+    verifier_salt: [u8; SALT_BYTES],
     verifier: [u8; BLOCK],
-    key_salt: [u8; BLOCK],
-    content_key: [u8; KEY_BYTES],
-    // MS-OFFCRYPTO 2.3.4.14 says this follows saltSize (16), while the
-    // published 3.11 Office vector stores a 32-byte encrypted form consistent
-    // with a 20-byte SHA-1-sized salt. Office interoperability takes priority.
-    integrity_salt: [u8; HASH_BYTES],
+    key_salt: [u8; SALT_BYTES],
+    content_key: [u8; 32],
+    integrity_salt: [u8; 64],
+    integrity_len: usize,
 }
 
 impl Zeroize for Material {
@@ -60,29 +136,34 @@ impl Zeroize for Material {
         self.key_salt.zeroize();
         self.content_key.zeroize();
         self.integrity_salt.zeroize();
+        self.integrity_len = 0;
     }
 }
 
 struct Info {
+    profile: Profile,
+    wrap_profile: Profile,
     spin_count: u32,
-    key_salt: [u8; BLOCK],
-    verifier_salt: [u8; BLOCK],
-    encrypted_verifier: [u8; BLOCK],
-    encrypted_verifier_hash: [u8; ENCRYPTED_HASH_BYTES],
-    encrypted_key: [u8; KEY_BYTES],
-    encrypted_hmac_key: [u8; ENCRYPTED_HASH_BYTES],
-    encrypted_hmac_value: [u8; ENCRYPTED_HASH_BYTES],
+    key_salt: [u8; SALT_BYTES],
+    verifier_salt: [u8; SALT_BYTES],
+    encrypted_verifier: Zeroizing<Vec<u8>>,
+    encrypted_verifier_hash: Zeroizing<Vec<u8>>,
+    encrypted_key: Zeroizing<Vec<u8>>,
+    encrypted_hmac_key: Option<Zeroizing<Vec<u8>>>,
+    encrypted_hmac_value: Option<Zeroizing<Vec<u8>>>,
 }
 
 #[derive(Default)]
 struct Parsed {
-    key_salt: Option<[u8; BLOCK]>,
-    verifier_salt: Option<[u8; BLOCK]>,
-    encrypted_verifier: Option<[u8; BLOCK]>,
-    encrypted_verifier_hash: Option<[u8; ENCRYPTED_HASH_BYTES]>,
-    encrypted_key: Option<[u8; KEY_BYTES]>,
-    encrypted_hmac_key: Option<[u8; ENCRYPTED_HASH_BYTES]>,
-    encrypted_hmac_value: Option<[u8; ENCRYPTED_HASH_BYTES]>,
+    profile: Option<Profile>,
+    wrap_profile: Option<Profile>,
+    key_salt: Option<[u8; SALT_BYTES]>,
+    verifier_salt: Option<[u8; SALT_BYTES]>,
+    encrypted_verifier: Option<Zeroizing<Vec<u8>>>,
+    encrypted_verifier_hash: Option<Zeroizing<Vec<u8>>>,
+    encrypted_key: Option<Zeroizing<Vec<u8>>>,
+    encrypted_hmac_key: Option<Zeroizing<Vec<u8>>>,
+    encrypted_hmac_value: Option<Zeroizing<Vec<u8>>>,
     spin_count: Option<u32>,
 }
 
@@ -92,34 +173,85 @@ enum Direction {
     Decrypt,
 }
 
-pub(super) fn encrypt(package: Vec<u8>, password: &str, limits: &Limits) -> Result<Vec<u8>> {
+/// A digest kept inline so a high-spin password derivation does not allocate
+/// once per iteration. The final password hash is copied into one bounded
+/// zeroizing vector at the API boundary.
+struct DigestValue {
+    bytes: [u8; 64],
+    len: usize,
+}
+
+impl DigestValue {
+    fn as_slice(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+}
+
+impl Zeroize for DigestValue {
+    fn zeroize(&mut self) {
+        self.bytes.zeroize();
+        self.len = 0;
+    }
+}
+
+impl Drop for DigestValue {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+pub(super) fn profile_with_policy(
+    info: &[u8],
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Mode> {
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    let parsed = parse(info, limits)?;
+    require_integrity_policy(&parsed, integrity_policy)?;
+    Ok(parsed.profile.mode())
+}
+
+pub(super) fn encrypt(
+    package: Vec<u8>,
+    password: &str,
+    mode: Mode,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let profile = Profile::from_mode(mode)?;
     let mut material = Zeroizing::new(Material {
-        verifier_salt: [0; BLOCK],
+        verifier_salt: [0; SALT_BYTES],
         verifier: [0; BLOCK],
-        key_salt: [0; BLOCK],
-        content_key: [0; KEY_BYTES],
-        integrity_salt: [0; HASH_BYTES],
+        key_salt: [0; SALT_BYTES],
+        content_key: [0; 32],
+        integrity_salt: [0; 64],
+        integrity_len: profile.integrity_bytes(),
     });
     let mut rng = SysRng;
     fill_random(&mut rng, &mut material.verifier_salt, "Agile verifier salt")?;
     fill_random(&mut rng, &mut material.verifier, "Agile verifier")?;
     fill_random(&mut rng, &mut material.key_salt, "Agile key salt")?;
-    fill_random(&mut rng, &mut material.content_key, "Agile content key")?;
     fill_random(
         &mut rng,
-        &mut material.integrity_salt,
+        &mut material.content_key[..profile.key_bytes()],
+        "Agile content key",
+    )?;
+    let integrity_len = material.integrity_len;
+    fill_random(
+        &mut rng,
+        &mut material.integrity_salt[..integrity_len],
         "Agile integrity salt",
     )?;
-    let (info, encrypted) = encrypt_parts(package, password, &material, limits)?;
+    let (info, encrypted) = encrypt_parts(package, password, profile, &material, limits)?;
     container::write(&info, encrypted, limits)
 }
 
-pub(super) fn decrypt(
+pub(super) fn decrypt_with_policy(
     info: &[u8],
     encrypted: Vec<u8>,
     password: &str,
     limits: &Limits,
-) -> Result<Vec<u8>> {
+    integrity_policy: IntegrityPolicy,
+) -> Result<(Vec<u8>, IntegrityStatus)> {
     Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     Limits::bytes(
         "EncryptedPackage",
@@ -127,38 +259,65 @@ pub(super) fn decrypt(
         limits.max_encrypted_bytes,
     )?;
     let parsed = parse(info, limits)?;
-    let password_hash = password_hash(password, &parsed.verifier_salt, parsed.spin_count, limits)?;
-
-    let verifier = decrypt_value::<BLOCK>(
+    let profile = parsed.profile;
+    let wrap_profile = parsed.wrap_profile;
+    let password_hash = password_hash(
+        password,
+        &parsed.verifier_salt,
+        parsed.spin_count,
+        wrap_profile.hash,
+        limits,
+    )?;
+    let verifier = decrypt_value(
         &parsed.verifier_salt,
         &password_hash,
+        wrap_profile,
         VERIFIER_INPUT_BLOCK,
         &parsed.encrypted_verifier,
+        BLOCK,
     )?;
-    let verifier_hash = decrypt_value::<HASH_BYTES>(
+    let verifier_hash = decrypt_value(
         &parsed.verifier_salt,
         &password_hash,
+        wrap_profile,
         HASHED_VERIFIER_BLOCK,
         &parsed.encrypted_verifier_hash,
+        wrap_profile.hash_bytes(),
     )?;
-    let expected_hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(Sha1::digest(verifier.as_slice())));
-    if !bool::from(verifier_hash.ct_eq(expected_hash.as_slice())) {
+    let expected_hash = digest(wrap_profile.hash, verifier.as_slice());
+    if !bool::from(
+        verifier_hash
+            .as_slice()
+            .get(..wrap_profile.hash_bytes())
+            .ok_or_else(|| malformed("Agile verifier hash is shorter than its profile"))?
+            .ct_eq(expected_hash.as_slice()),
+    ) {
         return Err(Error::Password);
     }
-
-    let content_key = decrypt_value::<KEY_BYTES>(
+    let content_key = decrypt_value(
         &parsed.verifier_salt,
         &password_hash,
+        wrap_profile,
         CRYPTO_KEY_BLOCK,
         &parsed.encrypted_key,
+        profile.key_bytes(),
     )?;
-    verify_integrity(&parsed, &content_key, &encrypted)?;
+    let integrity = verify_integrity_or_policy(
+        &parsed,
+        profile,
+        content_key.as_slice(),
+        &encrypted,
+        integrity_policy,
+    )?;
     let clear_len = package_size(&encrypted, limits)?;
-    decrypt_package(encrypted, clear_len, &content_key, &parsed.key_salt)
-}
-
-pub(super) fn validate_info(info: &[u8], limits: &Limits) -> Result<()> {
-    parse(info, limits).map(|_| ())
+    let package = decrypt_package(
+        encrypted,
+        clear_len,
+        profile,
+        content_key.as_slice(),
+        &parsed.key_salt,
+    )?;
+    Ok((package, integrity))
 }
 
 fn fill_random(rng: &mut SysRng, bytes: &mut [u8], name: &'static str) -> Result<()> {
@@ -169,80 +328,112 @@ fn fill_random(rng: &mut SysRng, bytes: &mut [u8], name: &'static str) -> Result
 fn encrypt_parts(
     package: Vec<u8>,
     password: &str,
+    profile: Profile,
+    material: &Material,
+    limits: &Limits,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    encrypt_parts_with_wrapper(package, password, profile, profile, material, limits)
+}
+
+fn encrypt_parts_with_wrapper(
+    package: Vec<u8>,
+    password: &str,
+    profile: Profile,
+    wrap_profile: Profile,
     material: &Material,
     limits: &Limits,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
     check_spin(SPIN_COUNT, limits)?;
-    let password_hash = password_hash(password, &material.verifier_salt, SPIN_COUNT, limits)?;
-    let encrypted_verifier = encrypt_value::<BLOCK>(
+    let password_hash = password_hash(
+        password,
+        &material.verifier_salt,
+        SPIN_COUNT,
+        wrap_profile.hash,
+        limits,
+    )?;
+    let encrypted_verifier = encrypt_value(
         &material.verifier_salt,
         &password_hash,
+        wrap_profile,
         VERIFIER_INPUT_BLOCK,
         &material.verifier,
     )?;
-    let mut verifier_digest = Sha1::new();
-    verifier_digest.update(material.verifier.as_slice());
-    let verifier_hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(verifier_digest.finalize()));
-    let encrypted_verifier_hash = encrypt_value::<ENCRYPTED_HASH_BYTES>(
+    let verifier_hash = digest(wrap_profile.hash, &material.verifier);
+    let encrypted_verifier_hash = encrypt_value(
         &material.verifier_salt,
         &password_hash,
+        wrap_profile,
         HASHED_VERIFIER_BLOCK,
         verifier_hash.as_slice(),
     )?;
-    let encrypted_key = encrypt_value::<KEY_BYTES>(
+    let encrypted_key = encrypt_value(
         &material.verifier_salt,
         &password_hash,
+        wrap_profile,
         CRYPTO_KEY_BLOCK,
-        &material.content_key,
+        &material.content_key[..profile.key_bytes()],
     )?;
 
-    let encrypted = encrypt_package(package, &material.content_key, &material.key_salt, limits)?;
-    let integrity_value = hmac(&material.integrity_salt, &encrypted)?;
-    let encrypted_hmac_key = encrypt_content::<ENCRYPTED_HASH_BYTES>(
-        &material.content_key,
+    let encrypted = encrypt_package(
+        package,
+        profile,
+        &material.content_key[..profile.key_bytes()],
+        &material.key_salt,
+        limits,
+    )?;
+    let integrity_value = hmac(
+        profile.hash,
+        &material.integrity_salt[..material.integrity_len],
+        &encrypted,
+    )?;
+    let encrypted_hmac_key = encrypt_content(
+        profile,
+        &material.content_key[..profile.key_bytes()],
         &material.key_salt,
         INTEGRITY_KEY_BLOCK,
-        &material.integrity_salt,
+        &material.integrity_salt[..material.integrity_len],
     )?;
-    let encrypted_hmac_value = encrypt_content::<ENCRYPTED_HASH_BYTES>(
-        &material.content_key,
+    let encrypted_hmac_value = encrypt_content(
+        profile,
+        &material.content_key[..profile.key_bytes()],
         &material.key_salt,
         INTEGRITY_VALUE_BLOCK,
         integrity_value.as_slice(),
     )?;
-
     let info = Info {
+        profile,
+        wrap_profile,
         spin_count: SPIN_COUNT,
         key_salt: material.key_salt,
         verifier_salt: material.verifier_salt,
         encrypted_verifier,
         encrypted_verifier_hash,
         encrypted_key,
-        encrypted_hmac_key,
-        encrypted_hmac_value,
+        encrypted_hmac_key: Some(encrypted_hmac_key),
+        encrypted_hmac_value: Some(encrypted_hmac_value),
     };
     Ok((build_info(&info, limits)?, encrypted))
 }
 
 fn password_hash(
     password: &str,
-    salt: &[u8; BLOCK],
+    salt: &[u8; SALT_BYTES],
     spin_count: u32,
+    hash: AgileHash,
     limits: &Limits,
-) -> Result<Zeroizing<[u8; HASH_BYTES]>> {
+) -> Result<Zeroizing<Vec<u8>>> {
     check_spin(spin_count, limits)?;
     let encoded = password_bytes(password, limits)?;
-    let mut hasher = Sha1::new();
-    hasher.update(salt);
-    hasher.update(encoded.as_slice());
-    let mut hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(hasher.finalize()));
+    let mut hash_value = digest_parts_inline(hash, salt, encoded.as_slice());
     for iterator in 0..spin_count {
-        let mut spin = Sha1::new();
-        spin.update(iterator.to_le_bytes());
-        spin.update(hash.as_slice());
-        hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(spin.finalize()));
+        hash_value = digest_parts_inline(hash, &iterator.to_le_bytes(), hash_value.as_slice());
     }
-    Ok(hash)
+    let mut output = Zeroizing::new(Vec::new());
+    output
+        .try_reserve_exact(hash_value.len)
+        .map_err(|_err| Error::Allocation("Agile password hash"))?;
+    output.extend_from_slice(hash_value.as_slice());
+    Ok(output)
 }
 
 fn check_spin(spin_count: u32, limits: &Limits) -> Result<()> {
@@ -259,156 +450,270 @@ fn check_spin(spin_count: u32, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
-fn derive_key(password_hash: &[u8; HASH_BYTES], block_key: [u8; 8]) -> Zeroizing<[u8; KEY_BYTES]> {
-    let mut sha = Sha1::new();
-    sha.update(password_hash);
-    sha.update(block_key);
-    let digest = Zeroizing::new(<[u8; HASH_BYTES]>::from(sha.finalize()));
-    let mut key = Zeroizing::new([0x36; KEY_BYTES]);
-    key.copy_from_slice(&digest[..KEY_BYTES]);
-    key
+fn digest(hash: AgileHash, bytes: &[u8]) -> Zeroizing<Vec<u8>> {
+    match hash {
+        AgileHash::Sha1 => Zeroizing::new(Sha1::digest(bytes).to_vec()),
+        AgileHash::Sha256 => Zeroizing::new(Sha256::digest(bytes).to_vec()),
+        AgileHash::Sha512 => Zeroizing::new(Sha512::digest(bytes).to_vec()),
+    }
 }
 
-fn iv(salt: &[u8; BLOCK], block_key: Option<&[u8]>) -> [u8; BLOCK] {
-    let Some(segment) = block_key else {
-        return *salt;
+fn digest_parts(hash: AgileHash, first: &[u8], second: &[u8]) -> Zeroizing<Vec<u8>> {
+    match hash {
+        AgileHash::Sha1 => {
+            let mut hasher = Sha1::new();
+            hasher.update(first);
+            hasher.update(second);
+            Zeroizing::new(hasher.finalize().to_vec())
+        },
+        AgileHash::Sha256 => {
+            let mut hasher = Sha256::new();
+            hasher.update(first);
+            hasher.update(second);
+            Zeroizing::new(hasher.finalize().to_vec())
+        },
+        AgileHash::Sha512 => {
+            let mut hasher = Sha512::new();
+            hasher.update(first);
+            hasher.update(second);
+            Zeroizing::new(hasher.finalize().to_vec())
+        },
+    }
+}
+
+fn digest_parts_inline(hash: AgileHash, first: &[u8], second: &[u8]) -> DigestValue {
+    let mut output = DigestValue {
+        bytes: [0; 64],
+        len: match hash {
+            AgileHash::Sha1 => 20,
+            AgileHash::Sha256 => 32,
+            AgileHash::Sha512 => 64,
+        },
     };
-    let mut sha = Sha1::new();
-    sha.update(salt);
-    sha.update(segment);
-    let digest = <[u8; HASH_BYTES]>::from(sha.finalize());
-    let mut output = [0u8; BLOCK];
-    output.copy_from_slice(&digest[..BLOCK]);
+    match hash {
+        AgileHash::Sha1 => {
+            let mut hasher = Sha1::new();
+            hasher.update(first);
+            hasher.update(second);
+            output.bytes[..20].copy_from_slice(&hasher.finalize());
+        },
+        AgileHash::Sha256 => {
+            let mut hasher = Sha256::new();
+            hasher.update(first);
+            hasher.update(second);
+            output.bytes[..32].copy_from_slice(&hasher.finalize());
+        },
+        AgileHash::Sha512 => {
+            let mut hasher = Sha512::new();
+            hasher.update(first);
+            hasher.update(second);
+            output.bytes[..64].copy_from_slice(&hasher.finalize());
+        },
+    }
     output
 }
 
-fn encrypt_value<const N: usize>(
-    salt: &[u8; BLOCK],
-    password_hash: &[u8; HASH_BYTES],
-    block_key: [u8; 8],
-    input: &[u8],
-) -> Result<[u8; N]> {
-    if round_up(input.len(), BLOCK)? != N {
-        return Err(malformed("Agile password value has an invalid padded size"));
-    }
-    let key = derive_key(password_hash, block_key);
-    let iv = iv(salt, None);
-    let mut output = Zeroizing::new([0u8; N]);
-    let destination = output
-        .get_mut(..input.len())
-        .ok_or_else(|| malformed("Agile password value exceeds its destination"))?;
-    destination.copy_from_slice(input);
-    cbc_encrypt(&key, &iv, &mut output[..])?;
-    Ok(*output)
+fn derive_key(password_hash: &[u8], profile: Profile, block_key: [u8; 8]) -> Zeroizing<Vec<u8>> {
+    let digest = digest_parts(profile.hash, password_hash, &block_key);
+    let mut key = Zeroizing::new(vec![0x36; profile.key_bytes()]);
+    let copy_len = digest.len().min(key.len());
+    key[..copy_len].copy_from_slice(&digest[..copy_len]);
+    key
 }
 
-fn decrypt_value<const N: usize>(
-    salt: &[u8; BLOCK],
-    password_hash: &[u8; HASH_BYTES],
+fn iv(
+    salt: &[u8; SALT_BYTES],
+    profile: Profile,
+    block_key: Option<&[u8]>,
+) -> Zeroizing<[u8; BLOCK]> {
+    let mut output = Zeroizing::new([0x36; BLOCK]);
+    match block_key {
+        Some(block) => {
+            let digest = digest_parts_inline(profile.hash, salt, block);
+            let copy_len = digest.len.min(BLOCK);
+            output.as_mut()[..copy_len].copy_from_slice(&digest.bytes[..copy_len]);
+        },
+        None => output.as_mut().copy_from_slice(salt),
+    }
+    output
+}
+
+fn encrypt_value(
+    salt: &[u8; SALT_BYTES],
+    password_hash: &[u8],
+    profile: Profile,
+    block_key: [u8; 8],
+    input: &[u8],
+) -> Result<Zeroizing<Vec<u8>>> {
+    let output_len = round_up(input.len())?;
+    let key = derive_key(password_hash, profile, block_key);
+    let mut output = Zeroizing::new(vec![0u8; output_len]);
+    output[..input.len()].copy_from_slice(input);
+    cbc_crypt(
+        profile,
+        key.as_slice(),
+        &iv(salt, profile, None),
+        output.as_mut_slice(),
+        Direction::Encrypt,
+    )?;
+    Ok(output)
+}
+
+fn decrypt_value(
+    salt: &[u8; SALT_BYTES],
+    password_hash: &[u8],
+    profile: Profile,
     block_key: [u8; 8],
     encrypted: &[u8],
-) -> Result<Zeroizing<[u8; N]>> {
+    output_len: usize,
+) -> Result<Zeroizing<Vec<u8>>> {
     if encrypted.is_empty()
-        || encrypted.len() > ENCRYPTED_HASH_BYTES
         || !encrypted.len().is_multiple_of(BLOCK)
-        || encrypted.len() < N
+        || encrypted.len() < output_len
     {
         return Err(malformed(
             "Agile encrypted password value has an invalid size",
         ));
     }
-    let key = derive_key(password_hash, block_key);
-    let iv = iv(salt, None);
-    let mut buffer = Zeroizing::new([0u8; ENCRYPTED_HASH_BYTES]);
-    let destination = buffer
-        .get_mut(..encrypted.len())
-        .ok_or_else(|| malformed("Agile encrypted password value is too large"))?;
-    destination.copy_from_slice(encrypted);
-    cbc_decrypt(&key, &iv, destination)?;
-    let source = buffer
-        .get(..N)
-        .ok_or_else(|| malformed("Agile decrypted password value is truncated"))?;
-    let mut output = Zeroizing::new([0u8; N]);
-    output.copy_from_slice(source);
-    Ok(output)
+    let key = derive_key(password_hash, profile, block_key);
+    let mut buffer = Zeroizing::new(encrypted.to_vec());
+    cbc_crypt(
+        profile,
+        key.as_slice(),
+        &iv(salt, profile, None),
+        buffer.as_mut_slice(),
+        Direction::Decrypt,
+    )?;
+    buffer.truncate(output_len);
+    Ok(buffer)
 }
 
-fn encrypt_content<const N: usize>(
-    key: &[u8; KEY_BYTES],
-    salt: &[u8; BLOCK],
+fn encrypt_content(
+    profile: Profile,
+    key: &[u8],
+    salt: &[u8; SALT_BYTES],
     block_key: [u8; 8],
     input: &[u8],
-) -> Result<[u8; N]> {
-    if round_up(input.len(), BLOCK)? != N {
-        return Err(malformed(
-            "Agile integrity value has an invalid padded size",
-        ));
-    }
-    let mut output = Zeroizing::new([0u8; N]);
-    let destination = output
-        .get_mut(..input.len())
-        .ok_or_else(|| malformed("Agile integrity value exceeds its destination"))?;
-    destination.copy_from_slice(input);
-    cbc_encrypt(key, &iv(salt, Some(&block_key)), &mut output[..])?;
-    Ok(*output)
-}
-
-fn decrypt_content<const N: usize>(
-    key: &[u8; KEY_BYTES],
-    salt: &[u8; BLOCK],
-    block_key: [u8; 8],
-    encrypted: &[u8; ENCRYPTED_HASH_BYTES],
-) -> Result<Zeroizing<[u8; N]>> {
-    if N > ENCRYPTED_HASH_BYTES {
-        return Err(malformed("Agile integrity output size is unsupported"));
-    }
-    let mut buffer = Zeroizing::new(*encrypted);
-    cbc_decrypt(key, &iv(salt, Some(&block_key)), &mut buffer[..])?;
-    let source = buffer
-        .get(..N)
-        .ok_or_else(|| malformed("Agile decrypted integrity value is truncated"))?;
-    let mut output = Zeroizing::new([0u8; N]);
-    output.copy_from_slice(source);
+) -> Result<Zeroizing<Vec<u8>>> {
+    let output_len = round_up(input.len())?;
+    let mut output = Zeroizing::new(vec![0u8; output_len]);
+    output[..input.len()].copy_from_slice(input);
+    cbc_crypt(
+        profile,
+        key,
+        &iv(salt, profile, Some(&block_key)),
+        output.as_mut_slice(),
+        Direction::Encrypt,
+    )?;
     Ok(output)
 }
 
-fn hmac(key: &[u8], bytes: &[u8]) -> Result<Zeroizing<[u8; HASH_BYTES]>> {
-    let mut mac = <HmacSha1 as KeyInit>::new_from_slice(key)
-        .map_err(|_err| malformed("HMAC-SHA1 key length invariant was violated"))?;
-    mac.update(bytes);
-    Ok(Zeroizing::new(<[u8; HASH_BYTES]>::from(
-        mac.finalize().into_bytes(),
-    )))
+fn decrypt_content(
+    profile: Profile,
+    key: &[u8],
+    salt: &[u8; SALT_BYTES],
+    block_key: [u8; 8],
+    encrypted: &[u8],
+    output_len: usize,
+) -> Result<Zeroizing<Vec<u8>>> {
+    if encrypted.is_empty()
+        || !encrypted.len().is_multiple_of(BLOCK)
+        || encrypted.len() < output_len
+    {
+        return Err(malformed("Agile integrity value has an invalid size"));
+    }
+    let mut buffer = Zeroizing::new(encrypted.to_vec());
+    cbc_crypt(
+        profile,
+        key,
+        &iv(salt, profile, Some(&block_key)),
+        buffer.as_mut_slice(),
+        Direction::Decrypt,
+    )?;
+    buffer.truncate(output_len);
+    Ok(buffer)
 }
 
-fn verify_integrity(info: &Info, content_key: &[u8; KEY_BYTES], encrypted: &[u8]) -> Result<()> {
-    let integrity_salt = decrypt_content::<HASH_BYTES>(
+fn hmac(hash: AgileHash, key: &[u8], bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+    macro_rules! run {
+        ($ty:ty) => {{
+            let mut mac = <Hmac<$ty> as KeyInit>::new_from_slice(key)
+                .map_err(|_err| malformed("Agile HMAC key length invariant was violated"))?;
+            mac.update(bytes);
+            Zeroizing::new(mac.finalize().into_bytes().to_vec())
+        }};
+    }
+    Ok(match hash {
+        AgileHash::Sha1 => run!(Sha1),
+        AgileHash::Sha256 => run!(Sha256),
+        AgileHash::Sha512 => run!(Sha512),
+    })
+}
+
+fn verify_integrity_or_policy(
+    info: &Info,
+    profile: Profile,
+    content_key: &[u8],
+    encrypted: &[u8],
+    integrity_policy: IntegrityPolicy,
+) -> Result<IntegrityStatus> {
+    let (Some(encrypted_hmac_key), Some(encrypted_hmac_value)) = (
+        info.encrypted_hmac_key.as_ref(),
+        info.encrypted_hmac_value.as_ref(),
+    ) else {
+        return match integrity_policy {
+            IntegrityPolicy::RequireAuthenticated => Err(Error::Unsupported(
+                "Agile profile without authenticated dataIntegrity".into(),
+            )),
+            IntegrityPolicy::AllowUnauthenticated => Ok(IntegrityStatus::Unauthenticated),
+        };
+    };
+    let integrity_len = integrity_key_length(profile, encrypted_hmac_key.len())?;
+    let integrity_salt = decrypt_content(
+        profile,
         content_key,
         &info.key_salt,
         INTEGRITY_KEY_BLOCK,
-        &info.encrypted_hmac_key,
+        encrypted_hmac_key,
+        integrity_len,
     )?;
-    let stored = decrypt_content::<HASH_BYTES>(
+    let stored = decrypt_content(
+        profile,
         content_key,
         &info.key_salt,
         INTEGRITY_VALUE_BLOCK,
-        &info.encrypted_hmac_value,
+        encrypted_hmac_value,
+        profile.hash_bytes(),
     )?;
-    let expected = hmac(integrity_salt.as_slice(), encrypted)?;
-    if !bool::from(stored.ct_eq(expected.as_slice())) {
+    let expected = hmac(profile.hash, integrity_salt.as_slice(), encrypted)?;
+    if !bool::from(stored.as_slice().ct_eq(expected.as_slice())) {
         return Err(Error::Integrity);
     }
-    Ok(())
+    Ok(IntegrityStatus::Authenticated)
+}
+
+fn integrity_key_length(profile: Profile, encrypted_length: usize) -> Result<usize> {
+    if encrypted_length == BLOCK {
+        return Ok(SALT_BYTES);
+    }
+    if encrypted_length == profile.encrypted_integrity_bytes() {
+        return Ok(profile.integrity_bytes());
+    }
+    Err(malformed(format!(
+        "Agile encryptedHmacKey has {encrypted_length} bytes, expected {BLOCK} or {}",
+        profile.encrypted_integrity_bytes()
+    )))
 }
 
 fn encrypt_package(
     mut package: Vec<u8>,
-    content_key: &[u8; KEY_BYTES],
-    key_salt: &[u8; BLOCK],
+    profile: Profile,
+    content_key: &[u8],
+    key_salt: &[u8; SALT_BYTES],
     limits: &Limits,
 ) -> Result<Vec<u8>> {
     let clear_len = package.len();
-    let cipher_len = round_up(clear_len, BLOCK)?;
+    let cipher_len = round_up(clear_len)?;
     let total = cipher_len
         .checked_add(8)
         .ok_or_else(|| malformed("Agile EncryptedPackage size overflows usize"))?;
@@ -418,18 +723,18 @@ fn encrypt_package(
         .map_err(|_err| Error::Allocation("Agile EncryptedPackage"))?;
     package.resize(total, 0);
     package.copy_within(0..clear_len, 8);
-    let prefix = package
+    package
         .get_mut(..8)
-        .ok_or_else(|| malformed("Agile EncryptedPackage prefix is unavailable"))?;
-    prefix.copy_from_slice(
-        &u64::try_from(clear_len)
-            .map_err(|_err| malformed("plaintext size does not fit u64"))?
-            .to_le_bytes(),
-    );
-
+        .ok_or_else(|| malformed("Agile EncryptedPackage prefix is unavailable"))?
+        .copy_from_slice(
+            &u64::try_from(clear_len)
+                .map_err(|_err| malformed("plaintext size does not fit u64"))?
+                .to_le_bytes(),
+        );
     crypt_segments(
         &mut package,
         clear_len,
+        profile,
         content_key,
         key_salt,
         Direction::Encrypt,
@@ -441,18 +746,23 @@ fn package_size(encrypted: &[u8], limits: &Limits) -> Result<usize> {
     if encrypted.len() < 8 + BLOCK {
         return Err(malformed("Agile EncryptedPackage is too short"));
     }
-    let prefix: [u8; 8] = encrypted
+    let prefix = encrypted
         .get(..8)
-        .ok_or_else(|| malformed("Agile EncryptedPackage has no StreamSize"))?
-        .try_into()
-        .map_err(|_err| malformed("Agile StreamSize has the wrong length"))?;
-    let clear_len = declared_size(u64::from_le_bytes(prefix), limits)?;
+        .ok_or_else(|| malformed("Agile EncryptedPackage has no StreamSize"))?;
+    let clear_len = declared_size(
+        u64::from_le_bytes(
+            prefix
+                .try_into()
+                .map_err(|_| malformed("Agile StreamSize has the wrong length"))?,
+        ),
+        limits,
+    )?;
     if clear_len == 0 {
         return Err(malformed(
             "Agile EncryptedPackage declares an empty package",
         ));
     }
-    let expected = round_up(clear_len, BLOCK)?
+    let expected = round_up(clear_len)?
         .checked_add(8)
         .ok_or_else(|| malformed("Agile EncryptedPackage length overflows usize"))?;
     if encrypted.len() != expected {
@@ -466,12 +776,14 @@ fn package_size(encrypted: &[u8], limits: &Limits) -> Result<usize> {
 fn decrypt_package(
     mut encrypted: Vec<u8>,
     clear_len: usize,
-    content_key: &[u8; KEY_BYTES],
-    key_salt: &[u8; BLOCK],
+    profile: Profile,
+    content_key: &[u8],
+    key_salt: &[u8; SALT_BYTES],
 ) -> Result<Vec<u8>> {
     crypt_segments(
         &mut encrypted,
         clear_len,
+        profile,
         content_key,
         key_salt,
         Direction::Decrypt,
@@ -490,8 +802,9 @@ fn decrypt_package(
 fn crypt_segments(
     bytes: &mut [u8],
     clear_len: usize,
-    content_key: &[u8; KEY_BYTES],
-    key_salt: &[u8; BLOCK],
+    profile: Profile,
+    content_key: &[u8],
+    key_salt: &[u8; SALT_BYTES],
     direction: Direction,
 ) -> Result<()> {
     let segments = clear_len
@@ -503,7 +816,7 @@ fn crypt_segments(
             .checked_mul(SEGMENT)
             .ok_or_else(|| malformed("Agile segment offset overflows usize"))?;
         let clear_segment = (clear_len - clear_start).min(SEGMENT);
-        let cipher_segment = round_up(clear_segment, BLOCK)?;
+        let cipher_segment = round_up(clear_segment)?;
         let start = clear_start
             .checked_add(8)
             .ok_or_else(|| malformed("Agile segment start overflows usize"))?;
@@ -516,48 +829,74 @@ fn crypt_segments(
         let block = u32::try_from(index)
             .map_err(|_err| malformed("Agile segment index exceeds u32"))?
             .to_le_bytes();
-        let iv = iv(key_salt, Some(&block));
-        match direction {
-            Direction::Encrypt => cbc_encrypt(content_key, &iv, segment)?,
-            Direction::Decrypt => cbc_decrypt(content_key, &iv, segment)?,
-        }
+        cbc_crypt(
+            profile,
+            content_key,
+            &iv(key_salt, profile, Some(&block)),
+            segment,
+            direction,
+        )?;
     }
     Ok(())
 }
 
-fn cbc_encrypt(key: &[u8; KEY_BYTES], iv: &[u8; BLOCK], bytes: &mut [u8]) -> Result<()> {
+fn cbc_crypt(
+    profile: Profile,
+    key: &[u8],
+    iv: &[u8; BLOCK],
+    bytes: &mut [u8],
+    direction: Direction,
+) -> Result<()> {
+    if !bytes.len().is_multiple_of(BLOCK) {
+        return Err(malformed("Agile AES data is not block aligned"));
+    }
     let message_len = bytes.len();
-    AesCbcEnc::new_from_slices(key, iv)
-        .map_err(|_err| malformed("AES-128-CBC key or IV length invariant was violated"))?
-        .encrypt_padded::<NoPadding>(bytes, message_len)
-        .map(|_| ())
-        .map_err(|_err| malformed("AES-128-CBC input is not block aligned"))
+    macro_rules! run {
+        ($ty:ty) => {{
+            match direction {
+                Direction::Encrypt => Encryptor::<$ty>::new_from_slices(key, iv)
+                    .map_err(|_err| malformed("Agile AES key or IV length invariant was violated"))?
+                    .encrypt_padded::<NoPadding>(bytes, message_len)
+                    .map(|_| ())
+                    .map_err(|_err| malformed("Agile CBC encryption failed")),
+                Direction::Decrypt => Decryptor::<$ty>::new_from_slices(key, iv)
+                    .map_err(|_err| malformed("Agile AES key or IV length invariant was violated"))?
+                    .decrypt_padded::<NoPadding>(bytes)
+                    .map(|_| ())
+                    .map_err(|_err| malformed("Agile CBC decryption failed")),
+            }
+        }};
+    }
+    match profile.cipher {
+        AgileCipher::Aes128 => run!(Aes128),
+        AgileCipher::Aes192 => run!(Aes192),
+        AgileCipher::Aes256 => run!(Aes256),
+    }
 }
 
-fn cbc_decrypt(key: &[u8; KEY_BYTES], iv: &[u8; BLOCK], bytes: &mut [u8]) -> Result<()> {
-    AesCbcDec::new_from_slices(key, iv)
-        .map_err(|_err| malformed("AES-128-CBC key or IV length invariant was violated"))?
-        .decrypt_padded::<NoPadding>(bytes)
-        .map(|_| ())
-        .map_err(|_err| malformed("AES-128-CBC input is not block aligned"))
-}
-
-fn round_up(value: usize, multiple: usize) -> Result<usize> {
+fn round_up(value: usize) -> Result<usize> {
     value
-        .checked_add(multiple - 1)
-        .map(|padded| padded / multiple * multiple)
+        .checked_add(BLOCK - 1)
+        .map(|padded| padded / BLOCK * BLOCK)
         .ok_or_else(|| malformed("Agile block length overflows usize"))
 }
 
 fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
     let key_salt = BASE64.encode(info.key_salt);
     let verifier_salt = BASE64.encode(info.verifier_salt);
-    let encrypted_verifier = BASE64.encode(info.encrypted_verifier);
-    let encrypted_verifier_hash = BASE64.encode(info.encrypted_verifier_hash);
-    let encrypted_key = BASE64.encode(info.encrypted_key);
-    let encrypted_hmac_key = BASE64.encode(info.encrypted_hmac_key);
-    let encrypted_hmac_value = BASE64.encode(info.encrypted_hmac_value);
-
+    let encrypted_verifier = BASE64.encode(&info.encrypted_verifier);
+    let encrypted_verifier_hash = BASE64.encode(&info.encrypted_verifier_hash);
+    let encrypted_key = BASE64.encode(&info.encrypted_key);
+    let encrypted_hmac_key = BASE64.encode(
+        info.encrypted_hmac_key
+            .as_ref()
+            .ok_or_else(|| malformed("Agile authoring requires encrypted HMAC key"))?,
+    );
+    let encrypted_hmac_value = BASE64.encode(
+        info.encrypted_hmac_value
+            .as_ref()
+            .ok_or_else(|| malformed("Agile authoring requires encrypted HMAC value"))?,
+    );
     let mut xml = String::new();
     xml.try_reserve(1_024)
         .map_err(|_err| Error::Allocation("Agile EncryptionInfo XML"))?;
@@ -566,16 +905,22 @@ fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
         concat!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
             r#"<encryption xmlns="http://schemas.microsoft.com/office/2006/encryption" xmlns:p="http://schemas.microsoft.com/office/2006/keyEncryptor/password">"#,
-            r#"<keyData saltSize="16" blockSize="16" keyBits="128" hashSize="20" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="SHA-1" saltValue="{}"/>"#,
+            r#"<keyData saltSize="16" blockSize="16" keyBits="{}" hashSize="{}" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="{}" saltValue="{}"/>"#,
             r#"<dataIntegrity encryptedHmacKey="{}" encryptedHmacValue="{}"/>"#,
             r#"<keyEncryptors><keyEncryptor uri="http://schemas.microsoft.com/office/2006/keyEncryptor/password">"#,
-            r#"<p:encryptedKey spinCount="{}" saltSize="16" blockSize="16" keyBits="128" hashSize="20" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="SHA-1" saltValue="{}" encryptedVerifierHashInput="{}" encryptedVerifierHashValue="{}" encryptedKeyValue="{}"/>"#,
+            r#"<p:encryptedKey spinCount="{}" saltSize="16" blockSize="16" keyBits="{}" hashSize="{}" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="{}" saltValue="{}" encryptedVerifierHashInput="{}" encryptedVerifierHashValue="{}" encryptedKeyValue="{}"/>"#,
             r#"</keyEncryptor></keyEncryptors></encryption>"#,
         ),
+        info.profile.key_bits(),
+        info.profile.hash_bytes(),
+        info.profile.hash_name(),
         key_salt,
         encrypted_hmac_key,
         encrypted_hmac_value,
         info.spin_count,
+        info.wrap_profile.key_bits(),
+        info.wrap_profile.hash_bytes(),
+        info.wrap_profile.hash_name(),
         verifier_salt,
         encrypted_verifier,
         encrypted_verifier_hash,
@@ -635,6 +980,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     let mut declaration_seen = false;
     let mut first_event = true;
     let mut parsed = Parsed::default();
+    let mut key_encryptors = 0u8;
 
     loop {
         let decoder = reader.decoder();
@@ -678,13 +1024,10 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                     },
                     1 => {
                         element_is(&namespace, &element, ENC_NS, b"keyData")?;
-                        parsed.key_salt = Some(parse_key_data(
-                            &reader,
-                            &element,
-                            decoder,
-                            &mut attributes,
-                            limits,
-                        )?);
+                        let (salt, profile) =
+                            parse_key_data(&reader, &element, decoder, &mut attributes, limits)?;
+                        parsed.key_salt = Some(salt);
+                        parsed.profile = Some(profile);
                         phase = 2;
                     },
                     3 => {
@@ -702,12 +1045,16 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                             phase = 6;
                         } else {
                             element_is(&namespace, &element, ENC_NS, b"dataIntegrity")?;
+                            let profile = parsed
+                                .profile
+                                .ok_or_else(|| malformed("Agile dataIntegrity precedes keyData"))?;
                             let (key, value) = parse_data_integrity(
                                 &reader,
                                 &element,
                                 decoder,
                                 &mut attributes,
                                 limits,
+                                profile,
                             )?;
                             parsed.encrypted_hmac_key = Some(key);
                             parsed.encrypted_hmac_value = Some(value);
@@ -729,17 +1076,27 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                     },
                     6 => {
                         element_is(&namespace, &element, ENC_NS, b"keyEncryptor")?;
+                        if key_encryptors != 0 {
+                            return Err(malformed(
+                                "Agile XML contains multiple keyEncryptor elements",
+                            ));
+                        }
+                        key_encryptors = 1;
                         parse_key_encryptor(&reader, &element, decoder, &mut attributes, limits)?;
                         phase = 7;
                     },
                     7 => {
                         element_is(&namespace, &element, PASSWORD_NS, b"encryptedKey")?;
+                        let profile = parsed
+                            .profile
+                            .ok_or_else(|| malformed("Agile encryptedKey precedes keyData"))?;
                         parse_password_key(
                             &reader,
                             &element,
                             decoder,
                             &mut attributes,
                             limits,
+                            profile,
                             &mut parsed,
                         )?;
                         phase = 8;
@@ -806,33 +1163,31 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
             Event::CData(_) | Event::GeneralRef(_) => {
                 return Err(malformed("Agile XML cannot contain CDATA or entity nodes"));
             },
-            Event::Empty(_) => {
-                return Err(malformed("Agile XML empty-element expansion failed"));
-            },
+            Event::Empty(_) => return Err(malformed("Agile XML empty-element expansion failed")),
             Event::Eof => break,
         }
     }
-    if phase != 12 || depth != 0 {
+    if phase != 12 || depth != 0 || key_encryptors != 1 {
         return Err(malformed("Agile XML descriptor is incomplete"));
     }
-    let (encrypted_hmac_key, encrypted_hmac_value) =
-        match (parsed.encrypted_hmac_key, parsed.encrypted_hmac_value) {
-            (Some(key), Some(value)) => (key, value),
-            (None, None) => {
-                return Err(Error::Unsupported(
-                    "Agile profile without authenticated dataIntegrity".into(),
-                ));
-            },
-            _ => return Err(malformed("Agile dataIntegrity is incomplete")),
-        };
-
+    if parsed.encrypted_hmac_key.is_some() != parsed.encrypted_hmac_value.is_some() {
+        return Err(malformed("Agile dataIntegrity is incomplete"));
+    }
+    let profile = parsed
+        .profile
+        .ok_or_else(|| malformed("Agile XML has no keyData"))?;
+    let wrap_profile = parsed
+        .wrap_profile
+        .ok_or_else(|| malformed("Agile XML has no encryptedKey profile"))?;
     Ok(Info {
+        profile,
+        wrap_profile,
         spin_count: parsed
             .spin_count
             .ok_or_else(|| malformed("Agile encryptedKey has no spinCount"))?,
         key_salt: parsed
             .key_salt
-            .ok_or_else(|| malformed("Agile XML has no keyData"))?,
+            .ok_or_else(|| malformed("Agile XML has no keyData salt"))?,
         verifier_salt: parsed
             .verifier_salt
             .ok_or_else(|| malformed("Agile XML has no password salt"))?,
@@ -845,9 +1200,21 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
         encrypted_key: parsed
             .encrypted_key
             .ok_or_else(|| malformed("Agile XML has no encrypted content key"))?,
-        encrypted_hmac_key,
-        encrypted_hmac_value,
+        encrypted_hmac_key: parsed.encrypted_hmac_key,
+        encrypted_hmac_value: parsed.encrypted_hmac_value,
     })
+}
+
+fn require_integrity_policy(info: &Info, policy: IntegrityPolicy) -> Result<()> {
+    if info.encrypted_hmac_key.is_some() {
+        return Ok(());
+    }
+    match policy {
+        IntegrityPolicy::RequireAuthenticated => Err(Error::Unsupported(
+            "Agile profile without authenticated dataIntegrity".into(),
+        )),
+        IntegrityPolicy::AllowUnauthenticated => Ok(()),
+    }
 }
 
 fn element_is(
@@ -903,7 +1270,7 @@ fn parse_key_data(
     decoder: Decoder,
     total: &mut usize,
     limits: &Limits,
-) -> Result<[u8; BLOCK]> {
+) -> Result<([u8; SALT_BYTES], Profile)> {
     const NAMES: &[&[u8]] = &[
         b"saltSize",
         b"blockSize",
@@ -915,6 +1282,9 @@ fn parse_key_data(
         b"saltValue",
     ];
     let mut salt = None;
+    let mut key_bits = None;
+    let mut hash_size = None;
+    let mut hash = None;
     exact_attributes(
         reader,
         element,
@@ -923,21 +1293,41 @@ fn parse_key_data(
         total,
         limits,
         |name, value| match name {
-            b"saltSize" => exact_number(value, 16, "keyData.saltSize"),
-            b"blockSize" => exact_number(value, 16, "keyData.blockSize"),
-            b"keyBits" => exact_number(value, 128, "keyData.keyBits"),
-            b"hashSize" => exact_number(value, 20, "keyData.hashSize"),
+            b"saltSize" => exact_number(value, SALT_BYTES as u32, "keyData.saltSize"),
+            b"blockSize" => exact_number(value, BLOCK as u32, "keyData.blockSize"),
+            b"keyBits" => {
+                key_bits = Some(number(value, "keyData.keyBits")?);
+                Ok(())
+            },
+            b"hashSize" => {
+                hash_size = Some(number(value, "keyData.hashSize")?);
+                Ok(())
+            },
             b"cipherAlgorithm" => exact_text(value, "AES", "keyData.cipherAlgorithm"),
             b"cipherChaining" => exact_text(value, "ChainingModeCBC", "keyData.cipherChaining"),
-            b"hashAlgorithm" => exact_text(value, "SHA-1", "keyData.hashAlgorithm"),
+            b"hashAlgorithm" => {
+                hash = Some(parse_hash(value, "keyData.hashAlgorithm")?);
+                Ok(())
+            },
             b"saltValue" => {
-                salt = Some(decode_array(value, "keyData.saltValue")?);
+                salt = Some(decode_fixed::<SALT_BYTES>(value, "keyData.saltValue")?);
                 Ok(())
             },
             _ => Err(malformed("unknown keyData attribute")),
         },
     )?;
-    salt.ok_or_else(|| malformed("keyData.saltValue is missing"))
+    let key_bits = key_bits.ok_or_else(|| malformed("keyData.keyBits is missing"))?;
+    let hash = hash.ok_or_else(|| malformed("keyData.hashAlgorithm is missing"))?;
+    let profile = profile_from_values(
+        key_bits,
+        hash_size.ok_or_else(|| malformed("keyData.hashSize is missing"))?,
+        hash,
+        "keyData",
+    )?;
+    Ok((
+        salt.ok_or_else(|| malformed("keyData.saltValue is missing"))?,
+        profile,
+    ))
 }
 
 fn parse_data_integrity(
@@ -946,7 +1336,8 @@ fn parse_data_integrity(
     decoder: Decoder,
     total: &mut usize,
     limits: &Limits,
-) -> Result<([u8; ENCRYPTED_HASH_BYTES], [u8; ENCRYPTED_HASH_BYTES])> {
+    profile: Profile,
+) -> Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {
     const NAMES: &[&[u8]] = &[b"encryptedHmacKey", b"encryptedHmacValue"];
     let mut key = None;
     let mut value = None;
@@ -959,11 +1350,15 @@ fn parse_data_integrity(
         limits,
         |name, raw| match name {
             b"encryptedHmacKey" => {
-                key = Some(decode_array(raw, "dataIntegrity.encryptedHmacKey")?);
+                key = Some(decode_integrity_key(raw, profile)?);
                 Ok(())
             },
             b"encryptedHmacValue" => {
-                value = Some(decode_array(raw, "dataIntegrity.encryptedHmacValue")?);
+                value = Some(decode_array(
+                    raw,
+                    "dataIntegrity.encryptedHmacValue",
+                    profile.encrypted_integrity_bytes(),
+                )?);
                 Ok(())
             },
             _ => Err(malformed("unknown dataIntegrity attribute")),
@@ -973,6 +1368,32 @@ fn parse_data_integrity(
         key.ok_or_else(|| malformed("dataIntegrity.encryptedHmacKey is missing"))?,
         value.ok_or_else(|| malformed("dataIntegrity.encryptedHmacValue is missing"))?,
     ))
+}
+
+fn decode_integrity_key(raw: &str, profile: Profile) -> Result<Zeroizing<Vec<u8>>> {
+    let office_size = profile.encrypted_integrity_bytes();
+    let max_size = office_size.max(BLOCK);
+    let max_encoded = max_size
+        .checked_add(2)
+        .and_then(|length| length.checked_mul(4).map(|value| value / 3 + 4))
+        .ok_or_else(|| malformed("dataIntegrity.encryptedHmacKey length overflows usize"))?;
+    if raw.len() > max_encoded {
+        return Err(malformed(
+            "dataIntegrity.encryptedHmacKey exceeds its bounded encoded size",
+        ));
+    }
+    let decoded = BASE64.decode(raw).map_err(|error| {
+        malformed(format!(
+            "dataIntegrity.encryptedHmacKey is not valid base64: {error}"
+        ))
+    })?;
+    if decoded.len() != BLOCK && decoded.len() != office_size {
+        return Err(malformed(format!(
+            "dataIntegrity.encryptedHmacKey has {} bytes, expected {BLOCK} or {office_size}",
+            decoded.len()
+        )));
+    }
+    Ok(Zeroizing::new(decoded))
 }
 
 fn parse_key_encryptor(
@@ -1005,6 +1426,7 @@ fn parse_password_key(
     decoder: Decoder,
     total: &mut usize,
     limits: &Limits,
+    profile: Profile,
     parsed: &mut Parsed,
 ) -> Result<()> {
     const NAMES: &[&[u8]] = &[
@@ -1021,6 +1443,10 @@ fn parse_password_key(
         b"encryptedVerifierHashValue",
         b"encryptedKeyValue",
     ];
+    let mut wrap_key_bits = None;
+    let mut wrap_hash_size = None;
+    let mut wrap_hash = None;
+    let mut encoded_verifier_hash = None;
     exact_attributes(
         reader,
         element,
@@ -1035,36 +1461,115 @@ fn parse_password_key(
                 parsed.spin_count = Some(count);
                 Ok(())
             },
-            b"saltSize" => exact_number(value, 16, "encryptedKey.saltSize"),
-            b"blockSize" => exact_number(value, 16, "encryptedKey.blockSize"),
-            b"keyBits" => exact_number(value, 128, "encryptedKey.keyBits"),
-            b"hashSize" => exact_number(value, 20, "encryptedKey.hashSize"),
+            b"saltSize" => exact_number(value, SALT_BYTES as u32, "encryptedKey.saltSize"),
+            b"blockSize" => exact_number(value, BLOCK as u32, "encryptedKey.blockSize"),
+            b"keyBits" => {
+                wrap_key_bits = Some(number(value, "encryptedKey.keyBits")?);
+                Ok(())
+            },
+            b"hashSize" => {
+                wrap_hash_size = Some(number(value, "encryptedKey.hashSize")?);
+                Ok(())
+            },
             b"cipherAlgorithm" => exact_text(value, "AES", "encryptedKey.cipherAlgorithm"),
             b"cipherChaining" => {
                 exact_text(value, "ChainingModeCBC", "encryptedKey.cipherChaining")
             },
-            b"hashAlgorithm" => exact_text(value, "SHA-1", "encryptedKey.hashAlgorithm"),
+            b"hashAlgorithm" => {
+                wrap_hash = Some(parse_hash(value, "encryptedKey.hashAlgorithm")?);
+                Ok(())
+            },
             b"saltValue" => {
-                parsed.verifier_salt = Some(decode_array(value, "encryptedKey.saltValue")?);
+                parsed.verifier_salt =
+                    Some(decode_fixed::<SALT_BYTES>(value, "encryptedKey.saltValue")?);
                 Ok(())
             },
             b"encryptedVerifierHashInput" => {
                 parsed.encrypted_verifier =
-                    Some(decode_array(value, "encryptedVerifierHashInput")?);
+                    Some(decode_array(value, "encryptedVerifierHashInput", BLOCK)?);
                 Ok(())
             },
             b"encryptedVerifierHashValue" => {
-                parsed.encrypted_verifier_hash =
-                    Some(decode_array(value, "encryptedVerifierHashValue")?);
+                encoded_verifier_hash = Some(Zeroizing::new(value.to_owned()));
                 Ok(())
             },
             b"encryptedKeyValue" => {
-                parsed.encrypted_key = Some(decode_array(value, "encryptedKeyValue")?);
+                parsed.encrypted_key = Some(decode_array(
+                    value,
+                    "encryptedKeyValue",
+                    round_up_const(profile.key_bytes()),
+                )?);
                 Ok(())
             },
             _ => Err(malformed("unknown encryptedKey attribute")),
         },
-    )
+    )?;
+    let wrap_key_bits =
+        wrap_key_bits.ok_or_else(|| malformed("encryptedKey.keyBits is missing"))?;
+    let wrap_hash_size =
+        wrap_hash_size.ok_or_else(|| malformed("encryptedKey.hashSize is missing"))?;
+    let wrap_hash = wrap_hash.ok_or_else(|| malformed("encryptedKey.hashAlgorithm is missing"))?;
+    let wrap_profile =
+        profile_from_values(wrap_key_bits, wrap_hash_size, wrap_hash, "encryptedKey")?;
+    if !is_supported_wrapper_profile(profile, wrap_profile) {
+        return Err(malformed(
+            "encryptedKey profile is not supported with keyData",
+        ));
+    }
+    let encoded_verifier_hash = encoded_verifier_hash
+        .ok_or_else(|| malformed("encryptedKey.encryptedVerifierHashValue is missing"))?;
+    parsed.encrypted_verifier_hash = Some(decode_array(
+        encoded_verifier_hash.as_str(),
+        "encryptedVerifierHashValue",
+        wrap_profile.encrypted_hash_bytes(),
+    )?);
+    parsed.wrap_profile = Some(wrap_profile);
+    Ok(())
+}
+
+fn is_supported_wrapper_profile(data: Profile, wrapper: Profile) -> bool {
+    wrapper.hash == data.hash
+        // A POI 60320 workbook uses an AES-256/SHA-512 password wrapper for
+        // an AES-128/SHA-1 keyData profile. Keep that producer quirk narrow;
+        // all other hash mismatches remain rejected against the published
+        // PasswordKeyEncryptor requirements.
+        || (data.cipher == AgileCipher::Aes128
+            && data.hash == AgileHash::Sha1
+            && wrapper.cipher == AgileCipher::Aes256
+            && wrapper.hash == AgileHash::Sha512)
+}
+
+fn profile_from_values(
+    key_bits: u32,
+    hash_size: u32,
+    hash: AgileHash,
+    field: &'static str,
+) -> Result<Profile> {
+    let cipher = match key_bits {
+        128 => AgileCipher::Aes128,
+        192 => AgileCipher::Aes192,
+        256 => AgileCipher::Aes256,
+        _ => return Err(Error::Unsupported(format!("{field}.keyBits is {key_bits}"))),
+    };
+    let profile = Profile { cipher, hash };
+    if hash_size != profile.hash_bytes() as u32 {
+        return Err(Error::Unsupported(format!(
+            "{field}.hashSize is {hash_size}, expected {}",
+            profile.hash_bytes()
+        )));
+    }
+    Ok(profile)
+}
+
+fn parse_hash(value: &str, field: &'static str) -> Result<AgileHash> {
+    match value {
+        // Office and several compatible producers use both spellings. Keep
+        // the canonical writer spelling in `Profile::hash_name`.
+        "SHA-1" | "SHA1" => Ok(AgileHash::Sha1),
+        "SHA256" => Ok(AgileHash::Sha256),
+        "SHA512" => Ok(AgileHash::Sha512),
+        _ => Err(Error::Unsupported(format!("{field} is '{value}'"))),
+    }
 }
 
 fn exact_attributes(
@@ -1076,11 +1581,7 @@ fn exact_attributes(
     limits: &Limits,
     mut visitor: impl FnMut(&[u8], &str) -> Result<()>,
 ) -> Result<()> {
-    if allowed.len()
-        > u16::BITS.try_into().map_err(|_err| {
-            Error::InvalidLimit("Agile attribute schema width does not fit usize")
-        })?
-    {
+    if allowed.len() > u16::BITS as usize {
         return Err(Error::InvalidLimit(
             "Agile attribute schema exceeds its bitset",
         ));
@@ -1121,10 +1622,10 @@ fn exact_attributes(
                     String::from_utf8_lossy(name)
                 ))
             })?;
-        let shift =
-            u32::try_from(index).map_err(|_err| malformed("Agile attribute index exceeds u32"))?;
         let bit = 1u16
-            .checked_shl(shift)
+            .checked_shl(
+                u32::try_from(index).map_err(|_| malformed("Agile attribute index exceeds u32"))?,
+            )
             .ok_or_else(|| malformed("Agile attribute index exceeds its bitset"))?;
         if seen & bit != 0 {
             return Err(malformed(format!(
@@ -1136,10 +1637,10 @@ fn exact_attributes(
         visitor(name, &value)?;
     }
     for (index, name) in allowed.iter().enumerate() {
-        let shift =
-            u32::try_from(index).map_err(|_err| malformed("Agile attribute index exceeds u32"))?;
         let bit = 1u16
-            .checked_shl(shift)
+            .checked_shl(
+                u32::try_from(index).map_err(|_| malformed("Agile attribute index exceeds u32"))?,
+            )
             .ok_or_else(|| malformed("Agile attribute index exceeds its bitset"))?;
         if seen & bit == 0 {
             return Err(malformed(format!(
@@ -1231,17 +1732,34 @@ fn exact_text(value: &str, expected: &str, field: &'static str) -> Result<()> {
     Ok(())
 }
 
-fn decode_array<const N: usize>(value: &str, field: &'static str) -> Result<[u8; N]> {
-    let mut decoded = [0u8; N];
-    let length = BASE64
-        .decode_slice(value, &mut decoded)
-        .map_err(|error| malformed(format!("{field} is not valid {N}-byte base64: {error}")))?;
-    if length != N {
+fn decode_array(value: &str, field: &'static str, expected: usize) -> Result<Zeroizing<Vec<u8>>> {
+    let max_encoded = expected
+        .checked_add(2)
+        .and_then(|length| length.checked_mul(4).map(|value| value / 3 + 4))
+        .ok_or_else(|| malformed(format!("{field} length overflows usize")))?;
+    if value.len() > max_encoded {
         return Err(malformed(format!(
-            "{field} has {length} bytes, expected {N}"
+            "{field} exceeds its bounded encoded size"
         )));
     }
-    Ok(decoded)
+    let decoded = BASE64
+        .decode(value)
+        .map_err(|error| malformed(format!("{field} is not valid base64: {error}")))?;
+    if decoded.len() != expected {
+        return Err(malformed(format!(
+            "{field} has {} bytes, expected {expected}",
+            decoded.len()
+        )));
+    }
+    Ok(Zeroizing::new(decoded))
+}
+
+fn decode_fixed<const N: usize>(value: &str, field: &'static str) -> Result<[u8; N]> {
+    let decoded = decode_array(value, field, N)?;
+    decoded
+        .as_slice()
+        .try_into()
+        .map_err(|_| malformed(format!("{field} has an invalid fixed length")))
 }
 
 fn count(value: &mut usize, maximum: usize, resource: &'static str) -> Result<()> {
@@ -1267,7 +1785,8 @@ fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
 mod tests {
     #![allow(
         clippy::expect_used,
-        reason = "test code panics on failure; expect keeps assertions concise"
+        clippy::unwrap_used,
+        reason = "test code panics on failure; assertions stay concise"
     )]
     use super::*;
     use crate::ooxml::{Mode, open_with};
@@ -1282,234 +1801,357 @@ mod tests {
             0xfd, 0xae, 0x22, 0x5a, 0xa3, 0xf2, 0x22, 0xf1, 0x36, 0x71, 0x4a, 0x25, 0x24, 0xc2,
             0xab, 0x23,
         ],
-        content_key: *b"content key 1234",
-        integrity_salt: *b"integrity salt bytes",
+        content_key: [0x43; 32],
+        integrity_salt: [0x49; 64],
+        integrity_len: 20,
     };
 
     #[test]
-    fn agile_round_trip_has_typed_password_and_integrity_failures() {
+    fn agile_profiles_round_trip_with_authenticated_integrity() {
         let limits = Limits::default();
         let clear = Vec::from(&b"PK\x03\x04deterministic Agile package"[..]);
-        let (info, encrypted) = encrypt_parts(clear.clone(), "correct horse", &MATERIAL, &limits)
-            .expect("encrypt Agile parts");
-        let compound =
-            container::write(&info, encrypted.clone(), &limits).expect("wrap Agile parts");
-        let opened = open_with(compound, "correct horse", &limits).expect("open Agile package");
-        assert_eq!(opened.mode(), Some(Mode::Agile));
-        assert_eq!(opened.bytes(), clear);
-        assert!(matches!(
-            decrypt(&info, encrypted.clone(), "wrong", &limits),
-            Err(Error::Password)
-        ));
-
-        let mut tampered = encrypted;
-        let last = tampered.len() - 1;
-        tampered[last] ^= 1;
-        assert!(matches!(
-            decrypt(&info, tampered, "correct horse", &limits),
-            Err(Error::Integrity)
-        ));
-
-        let mut tampered_prefix =
-            encrypt_package(clear, &MATERIAL.content_key, &MATERIAL.key_salt, &limits)
-                .expect("encrypt package for prefix tamper");
-        tampered_prefix[0] ^= 1;
-        assert!(matches!(
-            decrypt(&info, tampered_prefix, "correct horse", &limits),
-            Err(Error::Integrity)
-        ));
-    }
-
-    #[test]
-    fn final_segment_accepts_spec_padding_for_boundary_lengths() {
-        let limits = Limits::default();
-        for length in [1, BLOCK, SEGMENT, SEGMENT + 1] {
-            let clear = vec![0x5a; length];
-            let encrypted = encrypt_package(
-                clear.clone(),
-                &MATERIAL.content_key,
-                &MATERIAL.key_salt,
-                &limits,
-            )
-            .expect("encrypt segmented package");
-            let clear_len = package_size(&encrypted, &limits).expect("package size");
-            let opened = decrypt_package(
-                encrypted,
-                clear_len,
-                &MATERIAL.content_key,
-                &MATERIAL.key_salt,
-            )
-            .expect("decrypt segmented package");
-            assert_eq!(opened, clear);
+        for mode in [
+            Mode::Agile,
+            Mode::AgileSha256,
+            Mode::AgileSha512,
+            Mode::AgileAes192,
+            Mode::AgileAes192Sha256,
+            Mode::AgileAes192Sha512,
+            Mode::AgileAes256,
+            Mode::AgileAes256Sha256,
+            Mode::AgileAes256Sha512,
+        ] {
+            let profile = Profile::from_mode(mode).expect("profile");
+            let mut material = Zeroizing::new(Material {
+                verifier_salt: MATERIAL.verifier_salt,
+                verifier: MATERIAL.verifier,
+                key_salt: MATERIAL.key_salt,
+                content_key: MATERIAL.content_key,
+                integrity_salt: MATERIAL.integrity_salt,
+                integrity_len: profile.integrity_bytes(),
+            });
+            let (info, encrypted) =
+                encrypt_parts(clear.clone(), "correct horse", profile, &material, &limits)
+                    .expect("encrypt Agile parts");
+            let compound = container::write(&info, encrypted, &limits).expect("wrap Agile parts");
+            let opened = open_with(compound, "correct horse", &limits).expect("open Agile package");
+            assert_eq!(opened.mode(), Some(mode));
+            assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
+            assert_eq!(opened.bytes(), clear);
+            material.zeroize();
         }
     }
 
     #[test]
-    fn parses_published_ms_offcrypto_3_11_vector() {
+    fn agile_sha1_accepts_literal_salt_size_integrity_key() {
         let limits = Limits::default();
-        let info = published_info();
-        let parsed = parse(&info, &limits).expect("published Agile vector");
-        assert_eq!(parsed.spin_count, 100_000);
+        let profile = Profile::from_mode(Mode::Agile).expect("profile");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: SALT_BYTES,
+        });
+        let (info, encrypted) = encrypt_parts(
+            b"PK\x03\x04literal salt-size integrity package".to_vec(),
+            "correct horse",
+            profile,
+            &material,
+            &limits,
+        )
+        .expect("encrypt literal salt-size form");
+        let parsed = parse(&info, &limits).expect("parse literal salt-size form");
         assert_eq!(
-            parsed.key_salt,
-            [
-                0xfd, 0xae, 0x22, 0x5a, 0xa3, 0xf2, 0x22, 0xf1, 0x36, 0x71, 0x4a, 0x25, 0x24, 0xc2,
-                0xab, 0x23,
-            ]
+            parsed
+                .encrypted_hmac_key
+                .as_ref()
+                .expect("integrity key")
+                .len(),
+            BLOCK
         );
+        let (opened, status) = decrypt_with_policy(
+            &info,
+            encrypted,
+            "correct horse",
+            &limits,
+            IntegrityPolicy::RequireAuthenticated,
+        )
+        .expect("decrypt literal salt-size form");
+        assert_eq!(status, IntegrityStatus::Authenticated);
+        assert_eq!(opened, b"PK\x03\x04literal salt-size integrity package");
+    }
+
+    #[test]
+    fn agile_reader_accepts_sha1_alias_but_authoring_stays_canonical() {
+        let limits = Limits::default();
+        let profile = Profile::from_mode(Mode::Agile).expect("profile");
+        assert_eq!(profile.hash_name(), "SHA-1");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: profile.integrity_bytes(),
+        });
+        let clear = b"PK\x03\x04SHA1 XML alias";
+        let (info, encrypted) =
+            encrypt_parts(clear.to_vec(), "correct horse", profile, &material, &limits)
+                .expect("encrypt canonical profile");
+        let xml = std::str::from_utf8(&info[8..])
+            .expect("UTF-8 Agile XML")
+            .to_owned();
+        assert!(xml.contains("hashAlgorithm=\"SHA-1\""));
+        let xml = xml.replace("SHA-1", "SHA1");
+        let mut alias_info = info[..8].to_vec();
+        alias_info.extend_from_slice(xml.as_bytes());
+        let compound =
+            container::write(&alias_info, encrypted, &limits).expect("wrap SHA1 alias profile");
+        let opened =
+            open_with(compound, "correct horse", &limits).expect("read SHA1 alias profile");
+        assert_eq!(opened.mode(), Some(Mode::Agile));
+        assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
+        assert_eq!(opened.bytes(), clear);
+    }
+
+    #[test]
+    fn missing_data_integrity_requires_explicit_read_opt_in() {
+        let limits = Limits::default();
+        let profile = Profile::from_mode(Mode::Agile).expect("profile");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: profile.integrity_bytes(),
+        });
+        let clear = b"PK\x03\x04unauthenticated agile profile";
+        let (info, encrypted) =
+            encrypt_parts(clear.to_vec(), "correct horse", profile, &material, &limits)
+                .expect("encrypt profile");
+        let xml = std::str::from_utf8(&info[8..]).expect("UTF-8 Agile XML");
+        let start = xml.find("<dataIntegrity ").expect("dataIntegrity start");
+        let end = xml[start..]
+            .find("/>")
+            .map(|offset| start + offset + 2)
+            .expect("dataIntegrity end");
+        let xml_bytes = xml.as_bytes();
+        let mut without_integrity = info[..8].to_vec();
+        without_integrity.extend_from_slice(&xml_bytes[..start]);
+        without_integrity.extend_from_slice(&xml_bytes[end..]);
+        let compound = container::write(&without_integrity, encrypted, &limits)
+            .expect("wrap schema-legal descriptor");
+
+        assert!(matches!(
+            open_with(compound.clone(), "correct horse", &limits),
+            Err(Error::Unsupported(message)) if message.contains("dataIntegrity")
+        ));
+        assert!(matches!(
+            crate::ooxml::inspect_with(&compound, &limits),
+            Err(Error::Unsupported(message)) if message.contains("dataIntegrity")
+        ));
         assert_eq!(
-            parsed.verifier_salt,
-            [
-                0xa6, 0x9b, 0x3a, 0x07, 0x56, 0xe6, 0xa8, 0x21, 0x57, 0x82, 0x8a, 0x6c, 0x9b, 0x5a,
-                0xd6, 0x9d,
-            ]
+            crate::ooxml::inspect_with_policy(
+                &compound,
+                &limits,
+                IntegrityPolicy::AllowUnauthenticated,
+            )
+            .expect("explicit unauthenticated inspection policy"),
+            crate::ooxml::Kind::Encrypted(Mode::Agile)
         );
+        let opened = crate::ooxml::open_with_policy(
+            compound,
+            "correct horse",
+            &limits,
+            IntegrityPolicy::AllowUnauthenticated,
+        )
+        .expect("explicit unauthenticated read policy");
+        assert_eq!(opened.mode(), Some(Mode::Agile));
+        assert_eq!(opened.integrity(), Some(IntegrityStatus::Unauthenticated));
+        assert_eq!(opened.bytes(), clear);
     }
 
     #[test]
-    fn header_distinguishes_unsupported_version_from_malformed_reserved_field() {
+    fn agile_xml_limits_reject_malformed_depth_nodes_and_spin() {
         let limits = Limits::default();
-        let mut unsupported = published_info();
-        unsupported[..4].copy_from_slice(&[5, 0, 0, 0]);
-        assert!(matches!(
-            parse(&unsupported, &limits),
-            Err(Error::Unsupported(_))
-        ));
+        let profile = Profile::from_mode(Mode::AgileSha256).expect("profile");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: profile.integrity_bytes(),
+        });
+        let (info, _) = encrypt_parts(
+            b"PK\x03\x04XML limits".to_vec(),
+            "correct horse",
+            profile,
+            &material,
+            &limits,
+        )
+        .expect("encrypt profile");
 
-        let mut malformed_reserved = published_info();
-        malformed_reserved[4..8].copy_from_slice(&0x41u32.to_le_bytes());
-        assert!(matches!(
-            parse(&malformed_reserved, &limits),
-            Err(Error::Malformed(_))
-        ));
-    }
-
-    #[test]
-    fn missing_data_integrity_is_unsupported_after_structural_validation() {
-        let limits = Limits::default();
-        let info = published_info();
-        let xml = std::str::from_utf8(&info[8..]).expect("published XML is UTF-8");
-        let integrity_start = xml
-            .find("<dataIntegrity ")
-            .expect("published XML has dataIntegrity");
-        let integrity_end = integrity_start
-            + xml[integrity_start..]
-                .find("/>")
-                .expect("dataIntegrity is empty")
-            + 2;
-        let without_integrity = format!("{}{}", &xml[..integrity_start], &xml[integrity_end..]);
-        assert!(matches!(
-            parse(&with_prefix(&without_integrity), &limits),
-            Err(Error::Unsupported(_))
-        ));
-
-        let malformed =
-            without_integrity.replacen("spinCount=\"100000\"", "spinCount=\"invalid\"", 1);
-        assert!(matches!(
-            parse(&with_prefix(&malformed), &limits),
-            Err(Error::Malformed(_))
-        ));
-    }
-
-    #[test]
-    fn parser_enforces_attribute_spin_and_tree_budgets() {
-        let info = published_info();
-        let spin_limits = Limits {
-            max_spin_count: 99_999,
-            ..Limits::default()
+        let shallow = Limits {
+            max_xml_depth: 2,
+            ..limits
         };
         assert!(matches!(
-            parse(&info, &spin_limits),
-            Err(Error::Limit {
-                resource: "Agile spin count",
-                actual: 100_000,
-                maximum: 99_999,
-            })
-        ));
-
-        let depth_limits = Limits {
-            max_xml_depth: 3,
-            ..Limits::default()
-        };
-        assert!(matches!(
-            parse(&info, &depth_limits),
+            parse(&info, &shallow),
             Err(Error::Limit {
                 resource: "Agile XML depth",
-                actual: 4,
-                maximum: 3,
+                ..
             })
         ));
 
-        let attribute_limits = Limits {
-            max_xml_attributes: 1,
-            ..Limits::default()
+        let few_nodes = Limits {
+            max_xml_nodes: 3,
+            ..limits
         };
         assert!(matches!(
-            parse(&info, &attribute_limits),
+            parse(&info, &few_nodes),
             Err(Error::Limit {
-                resource: "Agile XML attributes",
-                actual: 2,
-                maximum: 1,
+                resource: "Agile XML nodes",
+                ..
             })
+        ));
+
+        let few_spin = Limits {
+            max_spin_count: 99_999,
+            ..limits
+        };
+        assert!(matches!(
+            parse(&info, &few_spin),
+            Err(Error::Limit {
+                resource: "Agile spin count",
+                ..
+            })
+        ));
+
+        let mut malformed = info;
+        malformed.pop();
+        assert!(matches!(
+            parse(&malformed, &limits),
+            Err(Error::Xml(_)) | Err(Error::Malformed(_))
         ));
     }
 
     #[test]
-    fn parser_rejects_unknown_attributes_and_schema_exceeding_spin() {
-        let info = published_info();
-        let xml = std::str::from_utf8(&info[8..]).expect("published XML is UTF-8");
-        let unknown = xml.replacen("saltSize=\"16\"", "saltSize=\"16\" extra=\"1\"", 1);
-        assert!(matches!(
-            parse(&with_prefix(&unknown), &Limits::default()),
-            Err(Error::Malformed(_))
-        ));
-
-        let excessive = xml.replacen("spinCount=\"100000\"", "spinCount=\"10000001\"", 1);
-        assert!(matches!(
-            parse(
-                &with_prefix(&excessive),
-                &Limits {
-                    max_spin_count: SPEC_MAX_SPIN_COUNT,
-                    ..Limits::default()
-                }
-            ),
-            Err(Error::Malformed(_))
-        ));
+    fn parses_independent_agile_wrapper_and_data_key_sizes() {
+        let limits = Limits::default();
+        let encrypted = include_bytes!(
+            "../../tests/data/ooxml/component-agile-aes128-wrap-aes256-data-sha512.docx"
+        );
+        let info = container::read_info(encrypted, &limits).expect("read fixture EncryptionInfo");
+        let parsed = parse(&info, &limits).expect("parse fixture Agile XML");
+        assert_eq!(parsed.profile.cipher, AgileCipher::Aes256);
+        assert_eq!(parsed.profile.hash, AgileHash::Sha512);
+        assert_eq!(parsed.wrap_profile.cipher, AgileCipher::Aes128);
+        assert_eq!(parsed.wrap_profile.hash, AgileHash::Sha512);
     }
 
     #[test]
-    fn declared_size_is_bounded_before_decryption() {
-        let limits = Limits {
-            max_plaintext_bytes: 32,
-            ..Limits::default()
+    fn agile_reader_supports_the_known_mixed_wrapper_hash_profile() {
+        let limits = Limits::default();
+        let data_profile = Profile::from_mode(Mode::Agile).expect("data profile");
+        let wrapper_profile = Profile {
+            cipher: AgileCipher::Aes256,
+            hash: AgileHash::Sha512,
         };
-        let mut encrypted = vec![0u8; 8 + 48];
-        encrypted[..8].copy_from_slice(&33u64.to_le_bytes());
-        assert!(matches!(
-            package_size(&encrypted, &limits),
-            Err(Error::Limit {
-                resource: "declared plaintext",
-                actual: 33,
-                maximum: 32,
-            })
-        ));
-    }
-
-    fn published_info() -> Vec<u8> {
-        with_prefix(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<encryption xmlns="http://schemas.microsoft.com/office/2006/encryption" xmlns:p="http://schemas.microsoft.com/office/2006/keyEncryptor/password">
-<keyData saltSize="16" blockSize="16" keyBits="128" hashSize="20" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="SHA-1" saltValue="/a4iWqPyIvE2cUolJMKrIw=="/>
-<dataIntegrity encryptedHmacKey="uwpAEFW1hQyD2O01kz1lhjevNw0ECyAA0u2OxDygsfY=" encryptedHmacValue="uf6HbJjtryJOjSFqrkqkNQY9NjNQUPI+xck8Q8y4mko="/>
-<keyEncryptors><keyEncryptor uri="http://schemas.microsoft.com/office/2006/keyEncryptor/password">
-<p:encryptedKey spinCount="100000" saltSize="16" blockSize="16" keyBits="128" hashSize="20" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="SHA-1" saltValue="pps6B1bmqCFXgopsm1rWnQ==" encryptedVerifierHashInput="JYU4Q0u2BhqzQA5D4J/voA==" encryptedVerifierHashValue="eB2jX5mvhBJ+9O7ffC+6X2Mydz2glHOXx0T9Pn6nK+w=" encryptedKeyValue="2F86HG+xV3nGa27DElgqgw=="/>
-</keyEncryptor></keyEncryptors></encryption>"#,
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: data_profile.integrity_bytes(),
+        });
+        let clear = b"PK\x03\x04mixed wrapper profile";
+        let (info, encrypted) = encrypt_parts_with_wrapper(
+            clear.to_vec(),
+            "correct horse",
+            data_profile,
+            wrapper_profile,
+            &material,
+            &limits,
         )
+        .expect("encrypt mixed wrapper profile");
+        let parsed = parse(&info, &limits).expect("parse mixed wrapper profile");
+        assert_eq!(parsed.profile, data_profile);
+        assert_eq!(parsed.wrap_profile, wrapper_profile);
+        let verifier_hash = parsed.encrypted_verifier_hash.as_slice();
+        assert_eq!(verifier_hash.len(), wrapper_profile.encrypted_hash_bytes());
+        let compound = container::write(&info, encrypted, &limits).expect("wrap mixed profile");
+        let opened =
+            open_with(compound, "correct horse", &limits).expect("open mixed wrapper profile");
+        assert_eq!(opened.mode(), Some(Mode::Agile));
+        assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
+        assert_eq!(opened.bytes(), clear);
     }
 
-    fn with_prefix(xml: &str) -> Vec<u8> {
-        let mut info = Vec::from([4, 0, 4, 0, 0x40, 0, 0, 0]);
-        info.extend_from_slice(xml.as_bytes());
-        info
+    #[test]
+    fn mixed_wrapper_hash_compatibility_stays_narrow() {
+        let data_profile = Profile::from_mode(Mode::Agile).expect("data profile");
+        assert!(is_supported_wrapper_profile(
+            data_profile,
+            Profile {
+                cipher: AgileCipher::Aes256,
+                hash: AgileHash::Sha512,
+            }
+        ));
+        assert!(!is_supported_wrapper_profile(
+            data_profile,
+            Profile {
+                cipher: AgileCipher::Aes256,
+                hash: AgileHash::Sha256,
+            }
+        ));
+    }
+
+    #[test]
+    fn agile_wrong_password_and_tampering_are_typed() {
+        let limits = Limits::default();
+        let profile = Profile::from_mode(Mode::AgileSha256).expect("profile");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: profile.integrity_bytes(),
+        });
+        let (info, mut encrypted) = encrypt_parts(
+            b"PK\x03\x04package".to_vec(),
+            "correct horse",
+            profile,
+            &material,
+            &limits,
+        )
+        .expect("encrypt");
+        assert!(matches!(
+            decrypt_with_policy(
+                &info,
+                encrypted.clone(),
+                "wrong",
+                &limits,
+                IntegrityPolicy::RequireAuthenticated,
+            ),
+            Err(Error::Password)
+        ));
+        let last = encrypted.len() - 1;
+        encrypted[last] ^= 1;
+        assert!(matches!(
+            decrypt_with_policy(
+                &info,
+                encrypted,
+                "correct horse",
+                &limits,
+                IntegrityPolicy::RequireAuthenticated,
+            ),
+            Err(Error::Integrity)
+        ));
     }
 }

@@ -1,0 +1,32 @@
+{
+  "generator": "litchi-crypto::ooxml::encrypt_with",
+  "password": "Litchi rust interop output 2026",
+  "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+  "external_verifier": "msoffcrypto-tool==6.0.0; load_key(verify_password=True), decrypt(verify_integrity=True)",
+  "vectors": [
+    {
+      "file": "rust-standard-aes192.docx",
+      "profile": "Standard AES-192/SHA-1",
+      "sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+      "bytes": 30208,
+      "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+      "external_byte_match": true
+    },
+    {
+      "file": "rust-standard-aes256.docx",
+      "profile": "Standard AES-256/SHA-1",
+      "sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+      "bytes": 30208,
+      "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+      "external_byte_match": true
+    },
+    {
+      "file": "rust-agile-aes256-sha512.docx",
+      "profile": "Agile AES-256/SHA-512",
+      "sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+      "bytes": 31232,
+      "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+      "external_byte_match": true
+    }
+  ]
+}

@@ -110,6 +110,11 @@ pub struct Limits {
     pub max_encrypted_bytes: usize,
     /// Maximum bytes emitted for the complete compound container.
     pub max_output_bytes: usize,
+    /// Maximum padded directory stream accepted from the CFB container.
+    pub max_cfb_directory_bytes: usize,
+    /// Maximum decoded FAT/DIFAT/MiniFAT table bytes accepted from the CFB
+    /// container.
+    pub max_cfb_allocation_table_bytes: usize,
     /// Accept `LibreOffice`'s nonconforming encrypted container without `DataSpaces`.
     pub allow_missing_data_spaces: bool,
 }
@@ -130,6 +135,10 @@ impl Default for Limits {
             max_plaintext_bytes: 512 * 1024 * 1024,
             max_encrypted_bytes: 520 * 1024 * 1024,
             max_output_bytes: 528 * 1024 * 1024,
+            max_cfb_directory_bytes: litchi_cfb::OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
+                as usize,
+            max_cfb_allocation_table_bytes:
+                litchi_cfb::OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES as usize,
             allow_missing_data_spaces: false,
         }
     }
@@ -175,6 +184,29 @@ impl Limits {
         }
         if self.max_output_bytes < 512 {
             return Err(Error::InvalidLimit("max_output_bytes must be at least 512"));
+        }
+        let max_cfb_input = u64::try_from(self.max_input_bytes).unwrap_or(u64::MAX);
+        if max_cfb_input > litchi_cfb::OleFileLimits::MAX_INPUT_BYTES {
+            return Err(Error::InvalidLimit(
+                "max_input_bytes exceeds the supported CFB input ceiling",
+            ));
+        }
+        let max_cfb_directory = u64::try_from(self.max_cfb_directory_bytes).unwrap_or(u64::MAX);
+        if max_cfb_directory == 0
+            || max_cfb_directory > litchi_cfb::OleFileLimits::MAX_DIRECTORY_BYTES
+        {
+            return Err(Error::InvalidLimit(
+                "max_cfb_directory_bytes exceeds the supported CFB directory ceiling",
+            ));
+        }
+        let max_cfb_allocation =
+            u64::try_from(self.max_cfb_allocation_table_bytes).unwrap_or(u64::MAX);
+        if max_cfb_allocation == 0
+            || max_cfb_allocation > litchi_cfb::OleFileLimits::MAX_ALLOCATION_TABLE_BYTES
+        {
+            return Err(Error::InvalidLimit(
+                "max_cfb_allocation_table_bytes exceeds the supported CFB allocation-table ceiling",
+            ));
         }
         Ok(self)
     }
@@ -228,12 +260,124 @@ impl fmt::Debug for Password {
 }
 
 /// Supported encryption profile.
+///
+/// `Standard` and `Agile` retain their historical meaning: AES-128/SHA-1.
+/// The additional variants identify the non-default profiles on input and on
+/// explicit authoring calls. Keeping the profile in this value is important
+/// for re-encryption: a caller that opens an AES-256 or SHA-512 package must
+/// not accidentally write it back as the publishing default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Mode {
     /// Binary Standard Encryption using AES-128 ECB and SHA-1.
     Standard,
+    /// Binary Standard Encryption using AES-192 ECB and SHA-1.
+    StandardAes192,
+    /// Binary Standard Encryption using AES-256 ECB and SHA-1.
+    StandardAes256,
     /// XML-described Agile Encryption using AES-128 CBC, SHA-1, and integrity data.
     Agile,
+    /// XML-described Agile Encryption using AES-128 CBC, SHA-256, and integrity data.
+    AgileSha256,
+    /// XML-described Agile Encryption using AES-128 CBC, SHA-512, and integrity data.
+    AgileSha512,
+    /// XML-described Agile Encryption using AES-192 CBC, SHA-1, and integrity data.
+    AgileAes192,
+    /// XML-described Agile Encryption using AES-256 CBC, SHA-1, and integrity data.
+    AgileAes256,
+    /// XML-described Agile Encryption using AES-192 CBC, SHA-256, and integrity data.
+    AgileAes192Sha256,
+    /// XML-described Agile Encryption using AES-192 CBC, SHA-512, and integrity data.
+    AgileAes192Sha512,
+    /// XML-described Agile Encryption using AES-256 CBC, SHA-256, and integrity data.
+    AgileAes256Sha256,
+    /// XML-described Agile Encryption using AES-256 CBC, SHA-512, and integrity data.
+    AgileAes256Sha512,
+}
+
+impl Mode {
+    /// Return whether this is a Standard (binary) profile.
+    #[must_use]
+    pub const fn is_standard(self) -> bool {
+        matches!(
+            self,
+            Self::Standard | Self::StandardAes192 | Self::StandardAes256
+        )
+    }
+
+    /// Return whether this is an Agile (XML-described) profile.
+    #[must_use]
+    pub const fn is_agile(self) -> bool {
+        !self.is_standard()
+    }
+
+    /// Construct an Agile profile from its cipher and hash names.
+    ///
+    /// The compact variants cover every AES-128/192/256 and SHA-1/256/512
+    /// combination currently admitted by the owner.  Unknown combinations
+    /// are not representable and therefore cannot accidentally reach an
+    /// authoring or decryption path.
+    #[must_use]
+    pub const fn agile(cipher: AgileCipher, hash: AgileHash) -> Self {
+        match (cipher, hash) {
+            (AgileCipher::Aes128, AgileHash::Sha1) => Self::Agile,
+            (AgileCipher::Aes128, AgileHash::Sha256) => Self::AgileSha256,
+            (AgileCipher::Aes128, AgileHash::Sha512) => Self::AgileSha512,
+            (AgileCipher::Aes192, AgileHash::Sha1) => Self::AgileAes192,
+            (AgileCipher::Aes192, AgileHash::Sha256) => Self::AgileAes192Sha256,
+            (AgileCipher::Aes192, AgileHash::Sha512) => Self::AgileAes192Sha512,
+            (AgileCipher::Aes256, AgileHash::Sha1) => Self::AgileAes256,
+            (AgileCipher::Aes256, AgileHash::Sha256) => Self::AgileAes256Sha256,
+            (AgileCipher::Aes256, AgileHash::Sha512) => Self::AgileAes256Sha512,
+        }
+    }
+
+    pub(crate) const fn agile_cipher(self) -> AgileCipher {
+        match self {
+            Self::Agile | Self::AgileSha256 | Self::AgileSha512 => AgileCipher::Aes128,
+            Self::AgileAes192 | Self::AgileAes192Sha256 | Self::AgileAes192Sha512 => {
+                AgileCipher::Aes192
+            },
+            Self::AgileAes256 | Self::AgileAes256Sha256 | Self::AgileAes256Sha512 => {
+                AgileCipher::Aes256
+            },
+            _ => AgileCipher::Aes128,
+        }
+    }
+
+    pub(crate) const fn agile_hash(self) -> AgileHash {
+        match self {
+            Self::Agile | Self::AgileAes192 | Self::AgileAes256 => AgileHash::Sha1,
+            Self::AgileSha256 | Self::AgileAes192Sha256 | Self::AgileAes256Sha256 => {
+                AgileHash::Sha256
+            },
+            Self::AgileSha512 | Self::AgileAes192Sha512 | Self::AgileAes256Sha512 => {
+                AgileHash::Sha512
+            },
+            _ => AgileHash::Sha1,
+        }
+    }
+}
+
+/// AES key sizes admitted by Agile Encryption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AgileCipher {
+    /// AES with a 128-bit key.
+    Aes128,
+    /// AES with a 192-bit key.
+    Aes192,
+    /// AES with a 256-bit key.
+    Aes256,
+}
+
+/// Hash functions admitted by Agile Encryption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AgileHash {
+    /// SHA-1, the historical Office publishing default.
+    Sha1,
+    /// SHA-256.
+    Sha256,
+    /// SHA-512.
+    Sha512,
 }
 
 /// Password-free outer-package classification.
@@ -245,11 +389,53 @@ pub enum Kind {
     Encrypted(Mode),
 }
 
+/// Policy controlling whether an Agile package may omit its optional
+/// `dataIntegrity` element while being opened.
+///
+/// The default reader policy is [`Self::RequireAuthenticated`].
+/// [`Self::AllowUnauthenticated`] is an explicit compatibility escape hatch
+/// for the legal schema profile used by some non-Office producers. It affects
+/// reading only; every Agile authoring API in this module always emits
+/// authenticated `dataIntegrity`. Standard Encryption has no Agile
+/// `dataIntegrity` element and reports [`IntegrityStatus::Unauthenticated`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum IntegrityPolicy {
+    /// Require authenticated Agile `dataIntegrity` before returning clear
+    /// package bytes. Standard Encryption remains unauthenticated because it
+    /// has no Agile `dataIntegrity` element.
+    #[default]
+    RequireAuthenticated,
+    /// Permit an Agile package with no `dataIntegrity` element to be read.
+    AllowUnauthenticated,
+}
+
+/// Integrity result recorded for an encrypted package that was opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntegrityStatus {
+    /// Agile `dataIntegrity` was present and verified against the encrypted
+    /// package stream.
+    Authenticated,
+    /// No integrity check was available. This includes Standard Encryption,
+    /// which has no package-integrity field, and an Agile package opened under
+    /// [`IntegrityPolicy::AllowUnauthenticated`].
+    Unauthenticated,
+}
+
 impl fmt::Display for Mode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::Standard => "Standard",
+            Self::StandardAes192 => "Standard AES-192",
+            Self::StandardAes256 => "Standard AES-256",
             Self::Agile => "Agile",
+            Self::AgileSha256 => "Agile SHA-256",
+            Self::AgileSha512 => "Agile SHA-512",
+            Self::AgileAes192 => "Agile AES-192",
+            Self::AgileAes256 => "Agile AES-256",
+            Self::AgileAes192Sha256 => "Agile AES-192/SHA-256",
+            Self::AgileAes192Sha512 => "Agile AES-192/SHA-512",
+            Self::AgileAes256Sha256 => "Agile AES-256/SHA-256",
+            Self::AgileAes256Sha512 => "Agile AES-256/SHA-512",
         })
     }
 }
@@ -257,6 +443,7 @@ impl fmt::Display for Mode {
 /// A moved clear package and its optional source encryption profile.
 pub struct Opened {
     mode: Option<Mode>,
+    integrity: Option<IntegrityStatus>,
     bytes: Vec<u8>,
 }
 
@@ -265,6 +452,7 @@ impl fmt::Debug for Opened {
         formatter
             .debug_struct("Opened")
             .field("mode", &self.mode)
+            .field("integrity", &self.integrity)
             .field("byte_len", &self.bytes.len())
             .finish_non_exhaustive()
     }
@@ -275,6 +463,12 @@ impl Opened {
     #[must_use]
     pub const fn mode(&self) -> Option<Mode> {
         self.mode
+    }
+
+    /// Integrity result for encrypted input, or `None` for an ordinary package.
+    #[must_use]
+    pub const fn integrity(&self) -> Option<IntegrityStatus> {
+        self.integrity
     }
 
     /// Borrow the clear package bytes.
@@ -312,6 +506,26 @@ pub fn inspect(bytes: &[u8]) -> Result<Kind> {
     inspect_with(bytes, &Limits::default())
 }
 
+/// Classify a package under an explicit resource and Agile-integrity policy.
+///
+/// The ordinary [`inspect`] and [`inspect_with`] entry points require
+/// authenticated Agile metadata. Use this method when an application has
+/// deliberately opted into the schema's unauthenticated Agile profile.
+pub fn inspect_with_policy(
+    bytes: &[u8],
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Kind> {
+    let validated = limits.validate()?;
+    Limits::bytes("input", bytes.len(), validated.max_input_bytes)?;
+    if !is_ole_file(bytes) {
+        return Ok(Kind::Plain);
+    }
+    let info = container::read_info(bytes, &validated)?;
+    let mode = profile_with_policy(&info, &validated, integrity_policy)?;
+    Ok(Kind::Encrypted(mode))
+}
+
 /// Classify a package under an explicit resource policy.
 ///
 /// This parses the CFB header and `EncryptionInfo` only; it does not allocate
@@ -322,18 +536,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Kind> {
 /// Returns an [`enum@Error`] when the limits are invalid, the input exceeds them,
 /// or the encryption metadata is malformed or unsupported.
 pub fn inspect_with(bytes: &[u8], limits: &Limits) -> Result<Kind> {
-    let validated = limits.validate()?;
-    Limits::bytes("input", bytes.len(), validated.max_input_bytes)?;
-    if !is_ole_file(bytes) {
-        return Ok(Kind::Plain);
-    }
-    let info = container::read_info(bytes, &validated)?;
-    let mode = mode(&info)?;
-    match mode {
-        Mode::Standard => standard::validate_info(&info, &validated)?,
-        Mode::Agile => agile::validate_info(&info, &validated)?,
-    }
-    Ok(Kind::Encrypted(mode))
+    inspect_with_policy(bytes, limits, IntegrityPolicy::RequireAuthenticated)
 }
 
 /// Read and open an ordinary or encrypted package with safe default limits.
@@ -349,13 +552,38 @@ pub fn load<R: Read>(reader: R, password: &str) -> Result<Opened> {
     load_with(reader, password, &Limits::default())
 }
 
+/// Read and open a package under an explicit resource and Agile-integrity
+/// policy.
+pub fn load_with_policy<R: Read>(
+    reader: R,
+    password: &str,
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Opened> {
+    load_with_policy_inner(reader, password, limits, integrity_policy)
+}
+
 /// Read and open an ordinary or encrypted package under an explicit policy.
 ///
 /// # Errors
 ///
 /// Returns an [`enum@Error`] when reading fails, the limits are invalid or
 /// exceeded, or the encrypted package cannot be opened.
-pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Result<Opened> {
+pub fn load_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Opened> {
+    load_with_policy_inner(
+        reader,
+        password,
+        limits,
+        IntegrityPolicy::RequireAuthenticated,
+    )
+}
+
+fn load_with_policy_inner<R: Read>(
+    mut reader: R,
+    password: &str,
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Opened> {
     let validated = limits.validate()?;
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 8 * 1024];
@@ -363,7 +591,7 @@ pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Res
         let remaining = validated.max_input_bytes - bytes.len();
         let read_len = remaining.min(buffer.len());
         let count = match reader.read(&mut buffer[..read_len]) {
-            Ok(0) => return open_with(bytes, password, &validated),
+            Ok(0) => return open_with_policy(bytes, password, &validated, integrity_policy),
             Ok(count) => count,
             Err(error) if error.kind() == ErrorKind::Interrupted => continue,
             Err(error) => return Err(Error::Io(error)),
@@ -377,7 +605,7 @@ pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Res
     let mut probe = [0u8; 1];
     loop {
         match reader.read(&mut probe) {
-            Ok(0) => return open_with(bytes, password, &validated),
+            Ok(0) => return open_with_policy(bytes, password, &validated, integrity_policy),
             Ok(_) => {
                 return Err(Error::Limit {
                     resource: "input",
@@ -400,23 +628,53 @@ pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Res
 /// Returns an [`enum@Error`] when the limits are invalid or exceeded, the password
 /// violates policy or is incorrect, or the package is malformed.
 pub fn open_with(bytes: Vec<u8>, password: &str, limits: &Limits) -> Result<Opened> {
+    open_with_policy(
+        bytes,
+        password,
+        limits,
+        IntegrityPolicy::RequireAuthenticated,
+    )
+}
+
+/// Open an ordinary or encrypted package under an explicit resource and
+/// Agile-integrity policy.
+///
+/// `AllowUnauthenticated` applies only to an Agile descriptor that omits the
+/// optional `dataIntegrity` element. It never disables verification when the
+/// element is present, and it never changes authoring behavior.
+pub fn open_with_policy(
+    bytes: Vec<u8>,
+    password: &str,
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Opened> {
     let validated = limits.validate()?;
     Limits::bytes("input", bytes.len(), validated.max_input_bytes)?;
 
     if !is_ole_file(&bytes) {
         Limits::bytes("plaintext", bytes.len(), validated.max_plaintext_bytes)?;
-        return Ok(Opened { mode: None, bytes });
+        return Ok(Opened {
+            mode: None,
+            integrity: None,
+            bytes,
+        });
     }
 
     validate_password(password, &validated)?;
     let (info, encrypted) = container::read(bytes, &validated)?;
-    let mode = mode(&info)?;
-    let package = match mode {
-        Mode::Standard => standard::decrypt(&info, encrypted, password, &validated)?,
-        Mode::Agile => agile::decrypt(&info, encrypted, password, &validated)?,
+    let mode = profile_with_policy(&info, &validated, integrity_policy)?;
+    let (package, integrity) = match mode.is_standard() {
+        true => (
+            standard::decrypt(&info, encrypted, password, &validated)?,
+            IntegrityStatus::Unauthenticated,
+        ),
+        false => {
+            agile::decrypt_with_policy(&info, encrypted, password, &validated, integrity_policy)?
+        },
     };
     Ok(Opened {
         mode: Some(mode),
+        integrity: Some(integrity),
         bytes: package,
     })
 }
@@ -454,8 +712,10 @@ pub fn encrypt_with(
     validate_password(password, &validated)?;
 
     match mode {
-        Mode::Standard => standard::encrypt(bytes, password, &validated),
-        Mode::Agile => agile::encrypt(bytes, password, &validated),
+        Mode::Standard | Mode::StandardAes192 | Mode::StandardAes256 => {
+            standard::encrypt(bytes, password, mode, &validated)
+        },
+        _ => agile::encrypt(bytes, password, mode, &validated),
     }
 }
 
@@ -483,12 +743,33 @@ pub fn rekey_with(
     new_password: &str,
     limits: &Limits,
 ) -> Result<Vec<u8>> {
-    let opened = open_with(bytes, old_password, limits)?;
+    rekey_with_policy(
+        bytes,
+        old_password,
+        new_password,
+        limits,
+        IntegrityPolicy::RequireAuthenticated,
+    )
+}
+
+/// Change a password under an explicit resource and Agile-integrity policy.
+///
+/// Regardless of the input policy, the returned package is authored with the
+/// authenticated Agile `dataIntegrity` element; Standard Encryption output has
+/// no Agile integrity element.
+pub fn rekey_with_policy(
+    bytes: Vec<u8>,
+    old_password: &str,
+    new_password: &str,
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Vec<u8>> {
+    let opened = open_with_policy(bytes, old_password, limits, integrity_policy)?;
     let mode = opened.mode().ok_or(Error::NotEncrypted)?;
     encrypt_with(opened.into_bytes(), new_password, mode, limits)
 }
 
-fn mode(info: &[u8]) -> Result<Mode> {
+fn family_mode(info: &[u8]) -> Result<Mode> {
     if info.len() < 8 {
         return Err(malformed(
             "EncryptionInfo is shorter than its version header",
@@ -502,6 +783,18 @@ fn mode(info: &[u8]) -> Result<Mode> {
         _ => Err(Error::Unsupported(format!(
             "EncryptionInfo version {major}.{minor}"
         ))),
+    }
+}
+
+fn profile_with_policy(
+    info: &[u8],
+    limits: &Limits,
+    integrity_policy: IntegrityPolicy,
+) -> Result<Mode> {
+    match family_mode(info)? {
+        Mode::Standard => standard::profile(info, limits),
+        Mode::Agile => agile::profile_with_policy(info, limits, integrity_policy),
+        _ => Err(malformed("encryption profile family is not representable")),
     }
 }
 
@@ -556,6 +849,7 @@ mod tests {
         let pointer = bytes.as_ptr();
         let opened = open(bytes, "unused").expect("ordinary input");
         assert_eq!(opened.mode(), None);
+        assert_eq!(opened.integrity(), None);
         let moved = opened.into_bytes();
         assert_eq!(moved.as_ptr(), pointer);
     }
