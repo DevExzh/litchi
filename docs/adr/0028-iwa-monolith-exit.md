@@ -11332,3 +11332,45 @@ while output still fits. Strict Clippy for those tests passes. The ownership
 audit and all 1,024 Python boundary tests pass, including acceptance of future
 host reader deletion. The new `formula_render_arena` fuzz target completes
 1,000 AddressSanitizer runs without crashes.
+
+## 2026-09-09 Shared native formula event adapter
+
+The next layer above the common expression arena belongs in
+`litchi-numbers-wire::formula_render`: it interprets native formula events,
+scalar nodes, references, categories, functions, arrays, and compatibility
+placeholders. Both the migration host and focused Numbers use this shared
+implementation. It consumes the existing `numbers_formula_codec` vocabulary
+from `litchi-iwa-protos`; the sanctioned wire-to-protos dependency is acyclic
+and introduces no format-peer dependency. The common arena retains no native
+schema knowledge.
+
+Reference resolution is borrowed and caller-owned. The shared renderer asks
+for semantic sheet/table prefixes, category labels, and function names;
+package object indexes and UUID censuses remain outside it. A budget trait
+extends the common arena's output/structure contract with semantic depth and
+format-specific error construction. Strict retained-wire preflight, decoder
+invocation, scalar eligibility, and aggregate decode report charging remain
+in their existing adapters. The focused generated-AST renderer remains a
+test-only compatibility oracle.
+
+The shared argument extraction preserves the host's fallible reservation and
+drain behavior, replacing the focused reader's infallible `split_off` path.
+The native `formula-events-native.numbers` control was edited in Numbers
+14.4, saved, closed, and reopened at its exact path. Range `SUM(B2:C2)`
+displayed 48.5 and Unicode concatenation displayed Café北京, with the
+preceding arithmetic and conditional formula results preserved.
+
+The 345 native function ID/name entries now have one canonical owner in
+`litchi-numbers-wire::function_map`. Both readers retain their previous
+visibility through thin reexports; numeric lookup uses the sorted static
+slice and reverse lookup remains ASCII case-insensitive. Unknown IDs and
+names retain their existing `None` behavior.
+
+Validation passes seven independent event-renderer contract tests, two
+function-registry tests, 100 focused and 42 host table-extractor tests, all three native
+Numbers formula controls, and the native Pages table-values roundtrip. The
+full boundary audit and all 1,030 Python boundary tests pass. The semantic
+review confirms native operator/reference/thunk compatibility and preserves
+typed semantic failures across the codec visitor bridge.
+The new `formula_render_events` fuzz target also passes 1,000
+AddressSanitizer runs without crashes.

@@ -180,6 +180,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "formula_render_events"
+path = "fuzz_targets/formula_render_events.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_cell_api"
 path = "fuzz_targets/numbers_table_cell_api.rs"
 test = false

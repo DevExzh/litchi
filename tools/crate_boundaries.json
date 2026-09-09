@@ -151,7 +151,8 @@
       "litchi-numbers-wire"
     ],
     "litchi-numbers-wire": [
-      "litchi-iwa-common"
+      "litchi-iwa-common",
+      "litchi-iwa-protos"
     ],
     "litchi-odb": [
       "litchi-core",

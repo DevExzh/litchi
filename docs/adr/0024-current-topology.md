@@ -4445,3 +4445,17 @@ Table/Builder wrappers. The host PagesTable stores the shared core directly.
 Format selectors, native graph resolution, sidecars, and transactions retain
 their concrete owners. This establishes shared semantic storage for future
 focused Pages reads without introducing a Pages-to-Numbers dependency.
+
+## 2026-09-09 Shared native formula event rendering
+
+`litchi-numbers-wire` is extended from binary cell storage to the shared
+native formula event-to-text adapter. Its new dependency on
+`litchi-iwa-protos` consumes the existing bounded, generated-free formula
+events; it does not introduce a dependency on a concrete Numbers, Pages, or
+Keynote facade. The common expression arena remains archive/schema-free.
+
+The migration host and focused Numbers supply their own reference resolvers,
+typed errors, and operation budgets. Native object discovery, retained-wire
+admission, decoding, and aggregate report charging remain concrete adapter
+responsibilities. Sharing the event renderer is a prerequisite for focused
+Pages/Keynote table reads; it does not by itself retire their host readers.
