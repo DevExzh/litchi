@@ -1,0 +1,24 @@
+{
+  "finished_utc": "2026-09-09T14:04:37.756177+00:00",
+  "cache_allocated_bytes_removed": 503605403648,
+  "worktree_allocated_bytes_removed": 13148950528,
+  "total_allocated_bytes_removed": 516754354176,
+  "worktrees_removed": 11,
+  "remaining_registered_worktrees": 34,
+  "branches_deleted": 0,
+  "force_removals": 0,
+  "protected_file_hashes_unchanged": true,
+  "disk_after": {
+    "/": {
+      "total": 2081881157632,
+      "used": 1142046384128,
+      "free": 939817996288
+    },
+    "/tmp": {
+      "total": 66276900864,
+      "used": 49253281792,
+      "free": 17023619072
+    }
+  },
+  "explicit_exclusion": "/home/zhuhe/code/litchi-spec-gaps and associated build/validation directories"
+}
