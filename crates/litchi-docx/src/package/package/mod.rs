@@ -12,5 +12,6 @@ mod merge;
 mod parts;
 mod settings;
 mod story_edit;
+mod task_panes;
 mod transfer;
 mod validation;

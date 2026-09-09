@@ -31,6 +31,39 @@ fn saves_and_reopens_inline_and_display_office_math() {
 }
 
 #[test]
+fn opened_package_round_trips_inert_owexml_custom_function_metadata() {
+    let file = NamedTempFile::with_suffix(".docx").unwrap();
+    let reference = web::Reference::new("addin", "1.0", web::Store::Omex).unwrap();
+    let add_in = web::AddIn::new("addin-instance", reference)
+        .unwrap()
+        .bind(web::Binding::new("binding", "matrix", "app-ref").unwrap())
+        .unwrap();
+    let mut metadata = web::CustomFunctions::new();
+    metadata.set_contains_custom_functions(Some(web::ContainsCustomFunctions::new(Some(true))));
+    metadata.set_background_app_data(Some(web::BackgroundAppData::new(3, "runtime-3").unwrap()));
+    let mut ids = web::CustomFunctionList::new();
+    ids.push_id("CONTOSO.ADDIN.FUNCTION").unwrap();
+    metadata.set_custom_function_list(Some(ids));
+    let mut add_in = add_in;
+    add_in.set_custom_functions(Some(metadata.clone())).unwrap();
+    let mut panes = web::Panes::new();
+    panes.push(web::Pane::new(add_in)).unwrap();
+
+    let mut package = Package::new().unwrap();
+    package
+        .put_task_panes(panes, web::Conformance::Transitional)
+        .unwrap();
+    package.save(file.path()).unwrap();
+
+    let reopened = Package::open(file.path()).unwrap();
+    let loaded = reopened.task_panes().unwrap().unwrap();
+    assert_eq!(
+        loaded.get(0usize).unwrap().add_in().custom_functions(),
+        Some(&metadata)
+    );
+}
+
+#[test]
 fn writes_and_rediscovers_distinct_watermarks() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
     let mut package = Package::new().unwrap();
