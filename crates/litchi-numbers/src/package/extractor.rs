@@ -277,9 +277,13 @@ fn preflight_formula_archive_envelope(
                     .ok()
                     .and_then(|(value, width)| (width == field.payload().len()).then_some(value))
                     .and_then(|value| u32::try_from(value).ok());
-                if node_type
-                    .is_none_or(|value| !numbers_formula_codec::is_scalar_visitor_node_type(value))
-                {
+                if node_type.is_none_or(|value| {
+                    // The standalone LocalCellReferenceNode (27) is a
+                    // compatibility-only node: unlike the nested local
+                    // reference in CellReferenceNode, the scalar codec does
+                    // not preserve its sticky flags.
+                    value == 27 || !numbers_formula_codec::is_scalar_visitor_node_type(value)
+                }) {
                     scalar_visitor_eligible = false;
                 }
             } else if field.number() == 2 {
@@ -1471,6 +1475,33 @@ impl ProjectionBudget {
             MAX_PAYLOAD_WORK,
             SemanticLimitKind::FormulaWork,
         )?;
+        *self = next;
+        Ok(())
+    }
+
+    /// Admit one successful FormulaArchive codec pass as an aggregate
+    /// transaction.  The codec performs a bounded preflight before invoking
+    /// the visitor, so all of its fields, work, and staged text belong to the
+    /// same candidate and must be charged together before any rendered value
+    /// is published or a compatibility fallback is attempted.
+    fn charge_formula_decode_report(
+        &mut self,
+        report: numbers_formula_codec::DecodeReport,
+    ) -> Result<()> {
+        let mut next = *self;
+        next.payload_fields = projection_charge(
+            next.payload_fields,
+            report.fields(),
+            crate::MAX_REFERENCES,
+            SemanticLimitKind::Objects,
+        )?;
+        next.payload_work = projection_charge(
+            next.payload_work,
+            report.work(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
+        )?;
+        next.charge_staging_text(report.text_bytes())?;
         *self = next;
         Ok(())
     }
@@ -6433,13 +6464,21 @@ fn render_scalar_formula(
     // cannot allocate a node vector beyond the package render-work budget.
     budget.charge_formula_render_work(formula.scalar_visitor_node_count)?;
 
+    let max_fields = budget.remaining_payload_fields();
+    let max_work = budget.remaining_payload_work();
+    let max_text_bytes = budget.remaining_staging_text_bytes();
+    // The neutral scalar evaluator has a deliberately smaller wire-depth
+    // ceiling than the compatibility renderer's recursive thunk surface.
+    let scalar_depth = u32::try_from(budget.max_formula_render_depth)
+        .unwrap_or(u32::MAX)
+        .min(32);
     let options = numbers_formula_codec::DecodeOptions::new(
         formula.bytes.len(),
-        crate::MAX_REFERENCES,
-        MAX_PAYLOAD_WORK,
-        32,
+        max_fields,
+        max_work,
+        scalar_depth,
         formula.scalar_visitor_node_count,
-        DEFAULT_MAX_TEXT_BYTES,
+        max_text_bytes,
     );
     let context =
         numbers_formula_codec::FormulaContext::new(owner, host_row, host_column, rows, columns);
@@ -6457,9 +6496,14 @@ fn render_scalar_formula(
             {
                 return Err(allocation_error("Numbers scalar formula nodes", requested));
             }
-            return Ok(None);
+            // The strict envelope admitted every scalar-eligible wire field.
+            // A codec error is therefore a semantic/resource refusal, not a
+            // compatibility probe. Ending the operation avoids replaying a
+            // failed, unreported traversal under the same residual budget.
+            return Err(map_formula_render_decode_error(error));
         },
     };
+    budget.charge_formula_decode_report(report)?;
     if visitor.unsupported {
         return Ok(None);
     }
@@ -6612,13 +6656,16 @@ fn render_formula_compatibility(
     // codec validates the former while the visitor enforces the latter.
     let raw_depth = u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX);
     let render_depth = u32::try_from(budget.max_formula_render_depth).unwrap_or(u32::MAX);
+    let max_fields = budget.remaining_payload_fields();
+    let max_work = budget.remaining_payload_work();
+    let max_text_bytes = budget.remaining_staging_text_bytes();
     let options = numbers_formula_codec::DecodeOptions::new(
         formula.bytes.len(),
-        crate::MAX_REFERENCES.saturating_mul(2),
-        MAX_PAYLOAD_WORK.saturating_mul(2),
+        max_fields,
+        max_work,
         raw_depth,
         formula.scalar_visitor_node_count,
-        DEFAULT_MAX_TEXT_BYTES.saturating_mul(2),
+        max_text_bytes,
     )
     .with_opaque_unknown_fields(true)
     .with_render_recursion_limit(render_depth);
@@ -6641,6 +6688,7 @@ fn render_formula_compatibility(
                 .unwrap_or_else(|| map_formula_render_decode_error(error)));
         },
     };
+    visitor.budget.charge_formula_decode_report(report)?;
     if let Some(error) = visitor.error.take() {
         return Err(error);
     }
@@ -10846,7 +10894,7 @@ mod tests {
     }
 
     #[test]
-    fn scalar_formula_visitor_preserves_local_sticky_coordinates() -> super::Result<()> {
+    fn compatibility_renderer_keeps_standalone_local_reference_parity() -> super::Result<()> {
         let local = AstNodeArchive {
             ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
             ast_local_cell_reference_node_reference: Some(AstLocalCellReferenceNodeArchive {
@@ -10861,7 +10909,10 @@ mod tests {
         let source = input.encode_to_vec();
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
-        assert!(raw.scalar_visitor_eligible);
+        assert!(
+            !raw.scalar_visitor_eligible,
+            "native type 27 must use its established compatibility rendering"
+        );
         let actual = TableDataExtractor::extract_formula_string(
             &raw,
             0,
@@ -10871,7 +10922,16 @@ mod tests {
             &FormulaReferenceMaps::default(),
             &mut budget,
         )?;
-        assert_eq!(actual, "=$D$3");
+        let mut reference_budget = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render_formula(
+            &input,
+            0,
+            0,
+            &FormulaReferenceMaps::default(),
+            &mut reference_budget,
+        )?;
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=D3");
         Ok(())
     }
 
@@ -11317,7 +11377,28 @@ mod tests {
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
+        let pre_render_fields = exact_budget.payload_fields;
         let pre_render_work = exact_budget.payload_work;
+        let render_depth = u32::try_from(litchi_iwa_common::WireLimits::MAX_NESTING)
+            .map_err(|_| Error::InvalidFormat("test render depth exceeds u32".to_owned()))?;
+        let report = litchi_iwa_protos::numbers_formula_codec::decode_formula_archive_for_render(
+            &source,
+            litchi_iwa_protos::numbers_formula_codec::FormulaContext::new(1, 0, 0, 10, 10),
+            litchi_iwa_protos::numbers_formula_codec::DecodeOptions::new(
+                source.len(),
+                crate::MAX_REFERENCES,
+                MAX_PAYLOAD_WORK,
+                render_depth,
+                exact_raw.scalar_visitor_node_count,
+                DEFAULT_MAX_TEXT_BYTES,
+            )
+            .with_opaque_unknown_fields(true)
+            .with_render_recursion_limit(render_depth),
+            &mut (),
+        )
+        .map_err(|error| Error::InvalidFormat(format!("test formula report failed: {error:?}")))?;
+        assert!(report.fields() > 0);
+        assert!(report.work() > 0);
         let actual = TableDataExtractor::extract_formula_string(
             &exact_raw,
             0,
@@ -11331,12 +11412,16 @@ mod tests {
         assert_eq!(exact_budget.formula_render_work, 1);
         assert_eq!(
             exact_budget.payload_work,
-            pre_render_work + exact_raw.lazy_traversal_entry_count
+            pre_render_work + exact_raw.lazy_traversal_entry_count + report.work()
+        );
+        assert_eq!(
+            exact_budget.payload_fields,
+            pre_render_fields + report.fields()
         );
 
         let mut tight_budget = ProjectionBudget::new(SemanticLimits::default());
         let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
-        tight_budget.payload_work = MAX_PAYLOAD_WORK - 2;
+        tight_budget.payload_work = MAX_PAYLOAD_WORK - tight_raw.lazy_traversal_entry_count + 1;
         let error = TableDataExtractor::extract_formula_string(
             &tight_raw,
             0,
@@ -12675,6 +12760,158 @@ mod tests {
                 path: SemanticPath::StructuredTables,
             }) if observed == MAX_FORMULA_WIRE_BYTES + 1
         ));
+    }
+
+    #[test]
+    fn scalar_formula_decode_report_is_merged_across_repeated_renders() -> super::Result<()> {
+        let source = formula(vec![number_node(7.5)]).encode_to_vec();
+        let source_before = source.clone();
+        let mut admission_budget = ProjectionBudget::new(SemanticLimits::default());
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget)?;
+        assert_eq!(source, source_before);
+
+        let render = |budget: &mut ProjectionBudget| {
+            TableDataExtractor::extract_formula_string(
+                &retained,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                budget,
+            )
+        };
+
+        let mut probe = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render(&mut probe)?;
+        let fields = probe.payload_fields;
+        let work = probe.payload_work;
+        assert!(fields > 0, "successful scalar decode must report fields");
+        assert!(work > 0, "successful scalar decode must report work");
+        assert!(probe.formula_render_work > 0);
+
+        let mut fields_budget = ProjectionBudget::new(SemanticLimits::default());
+        fields_budget.payload_fields = crate::MAX_REFERENCES - fields;
+        assert_eq!(render(&mut fields_budget)?, expected);
+        assert_eq!(fields_budget.payload_fields, crate::MAX_REFERENCES);
+        let fields_before_refusal = fields_budget;
+        let fields_error = render(&mut fields_budget).expect_err("field residual must fail");
+        assert!(matches!(
+            fields_error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                ..
+            }
+        ));
+        assert_eq!(
+            fields_budget.payload_fields,
+            fields_before_refusal.payload_fields
+        );
+
+        let mut work_budget = ProjectionBudget::new(SemanticLimits::default());
+        work_budget.payload_work = MAX_PAYLOAD_WORK - work;
+        assert_eq!(render(&mut work_budget)?, expected);
+        assert_eq!(work_budget.payload_work, MAX_PAYLOAD_WORK);
+        let work_before_refusal = work_budget;
+        let work_error = render(&mut work_budget).expect_err("work residual must fail");
+        assert!(matches!(
+            work_error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                ..
+            }
+        ));
+        assert_eq!(work_budget.payload_work, work_before_refusal.payload_work);
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_formula_decode_report_text_is_merged_across_repeated_renders()
+    -> super::Result<()> {
+        let mut string = formula_node(AstNodeType::StringNode);
+        string.ast_string_node_string = Some("aggregate".to_owned());
+        let source = formula(vec![string]).encode_to_vec();
+        let source_before = source.clone();
+        let mut admission_budget = ProjectionBudget::new(SemanticLimits::default());
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget)?;
+        assert_eq!(source, source_before);
+        assert!(!retained.scalar_visitor_eligible);
+
+        let render = |budget: &mut ProjectionBudget| {
+            TableDataExtractor::extract_formula_string(
+                &retained,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                budget,
+            )
+        };
+
+        let mut probe = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render(&mut probe)?;
+        let fields = probe.payload_fields;
+        let work = probe.payload_work;
+        let text = probe.staging_text_bytes;
+        assert!(
+            fields > 0,
+            "successful compatibility decode must report fields"
+        );
+        assert!(work > 0, "successful compatibility decode must report work");
+        assert!(text > 0, "successful compatibility decode must report text");
+        assert!(!expected.is_empty());
+
+        let mut text_budget = ProjectionBudget::new(SemanticLimits::default());
+        text_budget.staging_text_bytes = DEFAULT_MAX_TEXT_BYTES - text;
+        assert_eq!(render(&mut text_budget)?, expected);
+        assert_eq!(text_budget.staging_text_bytes, DEFAULT_MAX_TEXT_BYTES);
+        let text_before_refusal = text_budget;
+        let text_error = render(&mut text_budget).expect_err("text residual must fail");
+        assert!(matches!(
+            text_error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::TextBytes,
+                ..
+            }
+        ));
+        assert_eq!(
+            text_budget.staging_text_bytes,
+            text_before_refusal.staging_text_bytes
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_codec_limit_is_not_replayed_as_compatibility_render() -> super::Result<()> {
+        let source = formula(vec![number_node(7.5)]).encode_to_vec();
+        let mut admission_budget = ProjectionBudget::new(SemanticLimits::default());
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget)?;
+        assert!(retained.scalar_visitor_eligible);
+
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        budget.payload_fields = crate::MAX_REFERENCES;
+        let error = TableDataExtractor::extract_formula_string(
+            &retained,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )
+        .expect_err("a scalar codec field refusal must not replay compatibility traversal");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                ..
+            }
+        ));
+        assert_eq!(budget.payload_fields, crate::MAX_REFERENCES);
+        assert_eq!(budget.output_text_bytes, 0);
+        assert_eq!(budget.staging_text_bytes, 0);
+        Ok(())
     }
 
     include!("extractor_rich_text_tests.rs");

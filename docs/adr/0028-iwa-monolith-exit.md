@@ -11236,3 +11236,49 @@ readback proves text/number/boolean coverage for this control; the complete
 value-variant contract is established by the separate semantic tests. No
 protobuf message is added or changed by this move; package decoding continues
 through the existing bounded Buffa views and storage codecs.
+
+## 2026-09-09 Formula traversal budget parity
+
+Comparing the remaining host and focused formula renderers found that focused
+Numbers still supplied fresh codec limits for each retained formula and did
+not merge successful traversal reports. Before extracting a shared renderer,
+the focused adapter now follows the host's aggregate admission contract:
+scalar and compatibility decoding receive the remaining field, work, and
+staged-text budgets, and successful reports are merged atomically before
+returning a value or attempting a supported compatibility fallback. Scalar
+codec refusals terminate the operation instead of replaying an unreported
+traversal through compatibility decoding. The scalar recursion ceiling is
+the smaller of the caller's render depth and 32.
+
+Standalone local-reference node 27 is admitted directly to the compatibility
+renderer, matching the host. Its sticky reference flags are outside the
+scalar codec contract, so an extra scalar traversal would waste the newly
+enforced aggregate budget without producing a usable value.
+
+The generated-free lazy archive retention, arena renderer, owner/category
+resolution, and output text budgets remain intact. Failed codec passes end
+the operation without a successful report; this change does not claim to
+recover work counters from a codec error. No format-peer dependency or new
+public raw-object API is introduced, and no host reader debt edge is retired.
+
+The next shared seam is the arena/event formula renderer over the existing
+`numbers_formula_codec` borrowed events, with caller-owned reference
+resolution and aggregate admission. Package root discovery and owner/category
+graph lookup must stay in concrete adapters. Focused Pages must retain its
+rooted body-table selection and object index for the whole cell read, using
+one cumulative budget rather than calling the catalog and repeating discovery.
+Its host reader remains required until values, formulas, comments, and merges
+all have focused parity.
+
+The native `formula-budget-native.numbers` control was created in Numbers
+14.4 from a disposable copy of the shared-model fixture. Scalar `SUM(1,2)`
+and reference `SUM(B2,C2)` formulas displayed 3 and 45.5 after save, close,
+and reopen of the exact file. Its receipt records the native lifecycle;
+resource-limit refusal is established separately by synthetic regressions.
+
+Validation passes all 100 focused extractor tests, the native formula readback
+regression, strict Clippy for that integration test, and the crate-boundary
+audit. The local-reference regression compares against the retained legacy
+renderer: its established standalone-reference output is `=D3`, even when the
+source carries sticky bits. This turn preserves that behavior; it does not
+claim a new absolute-reference rendering feature.

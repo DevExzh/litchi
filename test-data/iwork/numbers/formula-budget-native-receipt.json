@@ -1,0 +1,29 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "file": "formula-budget-native.numbers",
+  "size": 101345,
+  "sha256": "6726414adc52762fab5ce3c52d6244d8d55958cf9fc4ee8bb26c00234f048fd3",
+  "source": "shared-model-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "formulas": {
+    "C2": {
+      "input": "=SUM(1,2)",
+      "native_display": "3"
+    },
+    "C3": {
+      "input": "=SUM(B2,C2)",
+      "native_display": "45.5"
+    }
+  },
+  "lifecycle": [
+    "Copied the existing shared-model native control into a disposable directory.",
+    "Entered scalar and cell-reference formulas through the Numbers UI.",
+    "Saved and closed the actual document window.",
+    "Reopened the exact saved path using the file dialog Open Finder item action; accessibility confirmed formula results 3 and 45.5.",
+    "Closed to the template chooser."
+  ],
+  "scope": "Native formula creation and save/close/reopen control. Aggregate resource refusal is tested separately with bounded synthetic archives."
+}
