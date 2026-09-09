@@ -204,6 +204,38 @@ impl Document {
             .map_err(|error| PackageError::Corrupted(format!("invalid saved-by metadata: {error}")))
     }
 
+    /// Strictly access the inert main-document saved selection (`Selsf`).
+    ///
+    /// Selection state is a historical Word UI cache. The returned record is
+    /// never applied to document navigation or host selection state, and its
+    /// optional malformed bytes are reported only when this accessor is used.
+    pub fn saved_selection(&self) -> Result<Option<&SavedSelection>> {
+        match self.saved_selection.get_or_init(|| {
+            let ccp_text = self.fib.get_main_doc_range().1;
+            parse_deferred_source(&self.saved_selection_source, |source| {
+                let selection = SavedSelection::parse_bytes(source)?;
+                if selection.cp_first() > ccp_text {
+                    return Err(PackageError::Corrupted(format!(
+                        "Selsf cpFirst {} exceeds ccpText {ccp_text}",
+                        selection.cp_first()
+                    )));
+                }
+                if selection.cp_lim() > ccp_text {
+                    return Err(PackageError::Corrupted(format!(
+                        "Selsf cpLim {} exceeds ccpText {ccp_text}",
+                        selection.cp_lim()
+                    )));
+                }
+                Ok(selection)
+            })
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid saved selection metadata: {error}"
+            ))),
+        }
+    }
+
     /// Strictly access the inert paragraph-group property array (`PGPArray`).
     ///
     /// PGP entries describe paragraph margins, borders, and HTML-oriented

@@ -58,6 +58,7 @@ pub mod rmd_threading;
 pub mod route_slip;
 pub mod rsids;
 pub mod saved_by;
+pub mod saved_selection;
 pub mod sections;
 pub mod smart_tags;
 pub mod spa;

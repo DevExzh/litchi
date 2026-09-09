@@ -276,6 +276,13 @@ impl Document {
         // accessors are called. Retain only their bounded FIB-selected ranges
         // so an ordinary document does not keep the complete table stream
         // alive solely for optional metadata.
+        let saved_selection_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::saved_selection::FIB_INDEX_WSS,
+            crate::parts::saved_selection::SELSF_SIZE,
+            "Selsf",
+        );
         let paragraph_groups_source = capture_optional_table_range(
             &fib,
             &table_stream,
@@ -351,6 +358,8 @@ impl Document {
             textbox_breaks,
             text_services,
             saved_by_table,
+            saved_selection_source,
+            saved_selection: std::sync::OnceLock::new(),
             paragraph_groups_source,
             paragraph_groups: std::sync::OnceLock::new(),
             dofr_records_source,
