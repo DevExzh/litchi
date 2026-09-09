@@ -11045,3 +11045,49 @@ bounded borrowed raw-field scan and charges cumulative fields, work, and depth.
 The legacy host regression now asserts successful focused rename, an exact
 repeated no-op, and preserved name/cell content through resize and reopen; its
 former source-builder rejection expectation is obsolete for this qualified slice.
+
+## 2026-09-09 Focused Pages body-table catalog
+
+`litchi_pages::Package::body_tables()` introduces a read-only semantic catalog
+in rooted body order. Entries expose checked positions, validated names,
+declared row and column counts, and semantic selectors. Native model,
+drawable, attachment, component, and storage identities remain private.
+Each entry's default selector uses its position in that immutable snapshot;
+positions are not durable identities across structural edits. Duplicate names
+remain separate entries and exact-name lookup reports ambiguity.
+
+The owner reuses the existing bounded body-table discovery walk and extracts
+name and dimensions from one borrowed Buffa table-model snapshot. The entire
+catalog shares one cumulative package/wire budget. A valid body-less or
+table-less document returns an empty catalog; existing selector operations
+retain their table-not-found behavior. Discovery does not certify every
+mutation owner's dependency or metadata requirements and does not expose
+cells, formulas, structural CRUD, or calculated results.
+
+Pages 14.4 created the retained body-table-catalog-native.pages fixture from
+the previous title-visible control. A second plain body table was inserted,
+resized to three rows and two columns, and given a visible title. Native
+save, actual window close, exact-path reopen, and visual/accessibility
+readback confirmed Table 1 (five by four), then Table 2 (three by two), and
+the original body marker. The receipt records the saved artifact's hash.
+
+This supplies the focused semantic catalog prerequisite identified by the
+previous turn. The source-built stylesheet regression now obtains semantic
+name/dimension/reopen facts through the focused catalog, retaining private
+raw-ID witnesses only for physical stylesheet closure. PagesEditor::tables
+still serves physical cell and graph consumers; deleting it requires focused
+physical table/cell ownership. No crate or dependency edge is retired here.
+
+When the payload declares no body, field-local [4] object/data references
+are contradictory and rejected. Aggregate root references alone cannot prove
+a body role: legitimate unrelated root fields also contribute to that list.
+They retain the existing opaque-preservation policy rather than being inferred
+as body edges from IDs or message types.
+
+Validation passes 11 catalog integration tests, 61 existing table-lock/name
+integration tests, 149 Pages library tests, three Pages doc tests, and two
+source-built stylesheet integration tests. Strict Pages library Clippy and
+workspace formatting pass. The final AddressSanitizer smoke run completes
+20 inputs with required native/source catalog seeds and 504 MiB reported RSS.
+Catalog-time cumulative object limits are exercised after successful package
+ingress, with typed refusal and exact source preservation.

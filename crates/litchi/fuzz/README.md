@@ -636,6 +636,13 @@ regressions fail the fuzz run. The command recipes already cover ASCII,
 UTF-8, no-op, inverse/conflict, malformed, selector, and limit cases, so no
 native package copies are added to the corpus.
 
+The same target also requires the native two-table catalog seed
+`test-data/iwork/pages/body-table-catalog-native.pages`. It checks rooted
+source order, names, row and column snapshots, positional and exact-name
+selector parity, bounded catalog iteration, and exact source preservation;
+catalog admission or selector regressions in any required seed fail the fuzz
+run rather than being skipped.
+
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same
 input as bounded `SlideSelector`/`MovieSelector` commands. When the source
