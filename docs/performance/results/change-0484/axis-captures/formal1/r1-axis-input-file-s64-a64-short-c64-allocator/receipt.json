@@ -1,0 +1,202 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-captures/formal1/r1-axis-input-file-s64-a64-short-c64-allocator/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/allocator/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "file",
+    "--input-file",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a64-short-c64-source.docx",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-captures/formal1/r1-axis-input-file-s64-a64-short-c64-allocator/report.json"
+  ],
+  "artifacts": {
+    "report.json": {
+      "bytes": 88253,
+      "sha256": "d8c708fcbec4d903dd4e42f613e037cd59d8202b4cfd367032264ab52d3e6f5c"
+    },
+    "resource.txt": {
+      "bytes": 1317,
+      "sha256": "37150be68884b286df1725b3d1bc69c2fe611af3f5212dd04d7db24c583de1c6"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "axis": {
+    "axis": "input",
+    "cli_provider": "deterministic",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "input_backing": "file",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": "axis-input/s64-a64-short-c64-source.docx",
+    "input_identity_validation": "setup_and_post_sample_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "file",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "file",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": "axis-input/s64-a64-short-c64-source.docx",
+      "max_range_bytes": null,
+      "mode": "file",
+      "overhead_us": 0
+    },
+    "label": "axis-input-file-s64-a64-short-c64",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "report_provider": "deterministic_replayable_bounded_cursor",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_file_source_positional_read_at_requested_returned_fixed_histograms",
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "value": "file",
+    "workload": "s64-a64-short-c64"
+  },
+  "binary": {
+    "bytes": 423341400,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/allocator/docx_replayable_tail_append",
+    "sha256": "e06480e110822ed0bfefde4d424cb3a8da1aae522522da490fd8693f65ffeb48"
+  },
+  "build": {
+    "path": "route-attempts/formal1/build-allocator.json",
+    "sha256": "6fad06ac7ea99b5a547594391975b0a2d36096d556bebd0d4cd52ea6c1296bf5"
+  },
+  "compression_profile": {
+    "name": "current",
+    "source_raw_members_preserved": true
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T10:48:54.311878+00:00",
+  "input_file": {
+    "absolute_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a64-short-c64-source.docx",
+    "bytes": 2106,
+    "identity": "prepared_file_capability_fingerprint_must_match_report_source_archive",
+    "path": "axis-input/s64-a64-short-c64-source.docx",
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+  },
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "run": {
+    "axis": "input",
+    "case": "s64-a64-short-c64",
+    "cli_provider": "deterministic",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "input_backing": "file",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": "axis-input/s64-a64-short-c64-source.docx",
+    "input_identity_validation": "setup_and_post_sample_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "file",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "file",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": "axis-input/s64-a64-short-c64-source.docx",
+      "max_range_bytes": null,
+      "mode": "file",
+      "overhead_us": 0
+    },
+    "kind": "formal",
+    "label": "r1-axis-input-file-s64-a64-short-c64-allocator",
+    "provider": "deterministic",
+    "repeat": 1,
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "report_provider": "deterministic_replayable_bounded_cursor",
+    "role": "allocator",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_file_source_positional_read_at_requested_returned_fixed_histograms",
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "value": "file",
+    "workload": "s64-a64-short-c64"
+  },
+  "schema": "docx-replayable-tail-append-axis-capture-v1",
+  "started_utc": "2026-09-09T10:48:54.229403+00:00",
+  "status": "pass",
+  "storage_profile": {
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_store": "none",
+    "replay_sync": "none"
+  },
+  "version": 1
+}

@@ -1,0 +1,137 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r1-deterministic-allocator-s64-a64-near-cone/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/allocator/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "one",
+    "--text",
+    "near",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r1-deterministic-allocator-s64-a64-near-cone/report.json"
+  ],
+  "artifacts": {
+    "report.json": {
+      "bytes": 88679,
+      "sha256": "1c24f153b2b8d4464934a8de1272a0eb88b42ea9e78c12ca29dd7580ef315484"
+    },
+    "resource.txt": {
+      "bytes": 1207,
+      "sha256": "af5d2dfcfe2b8dc06141630857aee98528664510b301eea62733146ef4202aec"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423341400,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/allocator/docx_replayable_tail_append",
+    "sha256": "e06480e110822ed0bfefde4d424cb3a8da1aae522522da490fd8693f65ffeb48"
+  },
+  "build": {
+    "path": "route-attempts/formal1/build-allocator.json",
+    "sha256": "6fad06ac7ea99b5a547594391975b0a2d36096d556bebd0d4cd52ea6c1296bf5"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T10:33:30.970406+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "run": {
+    "authored_count": 64,
+    "case": "s64-a64-near-cone",
+    "chunk_mode": "one",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "owned",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": null,
+      "max_range_bytes": null,
+      "mode": "owned",
+      "overhead_us": 0
+    },
+    "kind": "formal",
+    "label": "r1-deterministic-allocator-s64-a64-near-cone",
+    "repeat": 1,
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "role": "allocator",
+    "route": "deterministic",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "text_mode": "near"
+  },
+  "schema": "docx-replayable-tail-append-route-capture-v1",
+  "started_utc": "2026-09-09T10:33:15.644626+00:00",
+  "status": "pass",
+  "version": 1
+}

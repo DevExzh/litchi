@@ -1,0 +1,286 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "131072",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/report.json"
+  ],
+  "artifacts": {
+    "heaptrack-histogram.tsv": {
+      "bytes": 1471,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-histogram.tsv",
+      "present": true,
+      "sha256": "48f3018f0edf2a64f99333d4cf086e75400cada43bdb093b3106d84df56581dc"
+    },
+    "heaptrack-print-stderr.txt": {
+      "bytes": 0,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-print-stderr.txt",
+      "present": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "heaptrack-print.txt": {
+      "bytes": 232398,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-print.txt",
+      "present": true,
+      "sha256": "9804a5499fb22f43fba8a019b21be8fd009a9087da4fa216502ff6185c1d04a6"
+    },
+    "heaptrack-profile.zst": {
+      "bytes": 1559652,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-profile.zst",
+      "present": true,
+      "sha256": "62e9e9dbfb1922e860f8e235229dfa13eeac03747f8fd17c2303be376d44d3e6"
+    },
+    "report.json": {
+      "bytes": 11008,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/report.json",
+      "present": true,
+      "sha256": "ec3e63640da08c5996ad5360efa9328f334aab4ef2cf7d3190d5a2a1d48b0df7"
+    },
+    "resource.txt": {
+      "bytes": 1409,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/resource.txt",
+      "present": true,
+      "sha256": "2225a2bf6269df25858ebbec443faa24dc5ffb1c8136b20220d027643f1e4d77"
+    },
+    "stderr.txt": {
+      "bytes": 299,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/stderr.txt",
+      "present": true,
+      "sha256": "f6a74f2be55b4d64558a5b71e6d480ea6604642ddd86dbddd8c047e5426ce1ad"
+    },
+    "stdout.txt": {
+      "bytes": 487,
+      "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/stdout.txt",
+      "present": true,
+      "sha256": "b918413ac9ef39d4e0e2a814e66ab90a969c736b2beb014af1ed562012596c72"
+    }
+  },
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "case": {
+    "authored_count": 64,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "131072",
+      "--authored-counts",
+      "64",
+      "--chunks",
+      "64",
+      "--text",
+      "short",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "label": "s131072-a64-short-c64",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 131072,
+    "text_bytes": null,
+    "text_mode": "short"
+  },
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-profile",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "131072",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T11:02:31.818281+00:00",
+  "label": "heaptrack-memory_store-s131072-a64-short-c64",
+  "passed": true,
+  "performance_claim": "none",
+  "process": {
+    "returncode": 0,
+    "route_started": true,
+    "timed_out": false
+  },
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "profiler": {
+    "captures": [
+      {
+        "bytes": 1559652,
+        "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-profile.zst",
+        "present": true,
+        "sha256": "62e9e9dbfb1922e860f8e235229dfa13eeac03747f8fd17c2303be376d44d3e6"
+      }
+    ],
+    "counter_status": "observed",
+    "heaptrack_print": {
+      "name": "heaptrack_print",
+      "path": "/usr/bin/heaptrack_print",
+      "status": "available"
+    },
+    "heaptrack_print_run": {
+      "command": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-profile.zst",
+        "--merge-backtraces=0",
+        "-H",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/heaptrack-histogram.tsv"
+      ],
+      "error": null,
+      "returncode": 0,
+      "route_started": true,
+      "timed_out": false
+    },
+    "name": "heaptrack",
+    "scope": "whole child process; profiler overhead included",
+    "summary_status": "observed"
+  },
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "replay": {
+    "cleanup": "successful_empty_directory_only",
+    "directory": null,
+    "max_bytes": 8388608,
+    "route": "memory_store",
+    "sync": "none"
+  },
+  "route": {
+    "cli_provider": "memory-store",
+    "name": "memory_store",
+    "replay_max_bytes": 8388608,
+    "replay_sync": "none",
+    "report_provider": "memory_explicit_replay_store"
+  },
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-route-profile-run-v1",
+  "scratch_cleaned": false,
+  "started_utc": "2026-09-09T11:02:16.414573+00:00",
+  "status": "ok",
+  "timed_out": false,
+  "tool": {
+    "executable": "heaptrack",
+    "name": "heaptrack",
+    "path": "/usr/bin/heaptrack",
+    "status": "available"
+  },
+  "validation_status": "ok",
+  "version": 1,
+  "warmups": 1
+}

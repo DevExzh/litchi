@@ -1,0 +1,116 @@
+{
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "build_attempt": "formal1",
+  "cases": [
+    "s131072-a64-short-c64",
+    "s64-a16384-short-c64"
+  ],
+  "driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "output": "route-profiles/profiles1",
+  "performance_claim": "none",
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "routes": [
+    "deterministic",
+    "memory_store",
+    "file_store"
+  ],
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-route-profile-v1",
+  "scratch": "/home/zhuhe/.cache/litchi-goal-0484/route-profiles/profiles1",
+  "started_utc": "2026-09-09T11:01:36.129390+00:00",
+  "timeout_seconds": 900.0,
+  "tool_info": {
+    "heaptrack": {
+      "executable": "heaptrack",
+      "name": "heaptrack",
+      "path": "/usr/bin/heaptrack",
+      "status": "available"
+    },
+    "heaptrack_print": {
+      "name": "heaptrack_print",
+      "path": "/usr/bin/heaptrack_print",
+      "status": "available"
+    },
+    "perf-record": {
+      "executable": "perf",
+      "name": "perf-record",
+      "path": "/usr/bin/perf",
+      "status": "available"
+    },
+    "perf-stat": {
+      "executable": "perf",
+      "name": "perf-stat",
+      "path": "/usr/bin/perf",
+      "status": "available"
+    },
+    "strace": {
+      "executable": "strace",
+      "name": "strace",
+      "path": "/usr/bin/strace",
+      "status": "available"
+    }
+  },
+  "tools": [
+    "perf-stat",
+    "perf-record",
+    "strace",
+    "heaptrack"
+  ],
+  "version": 1,
+  "warmups": 1
+}

@@ -1,0 +1,6 @@
+perf-record-deterministic-s131072-a64-short-c64 {'bytes': 222593, 'sha256': 'b855a968d0786d2caf9e9e670060e85e961b34c72cb3e7260ea7e20548c934e2'}
+perf-record-deterministic-s64-a16384-short-c64 {'bytes': 62825, 'sha256': '695b5bcaf8c188fb6e17ec1d31eb3aea27712f9eb1a07aace2f22158795385eb'}
+perf-record-memory_store-s131072-a64-short-c64 {'bytes': 286529, 'sha256': '8f3ffd7fb0a9f9ecbd61e499e37eb58837e21a3fee60799b6a58ba2a6950d28b'}
+perf-record-memory_store-s64-a16384-short-c64 {'bytes': 74643, 'sha256': '937b7cf1d2238246f8e256e41abb335f8ba587ca33680b4ca72c8716850795f9'}
+perf-record-file_store-s131072-a64-short-c64 {'bytes': 264848, 'sha256': 'aa521f2be28497498c1c3a7f1453870bb9c1a5a195e877974c3cadfa8c19187c'}
+perf-record-file_store-s64-a16384-short-c64 {'bytes': 68137, 'sha256': 'aa653ab7b6dd610c394406d79f723680bd3d36d3c5343e8aafb2620d556a1d5c'}

@@ -1,0 +1,116 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r2-memory_store-normal-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r2-memory_store-normal-s64-a16384-short-c64/report.json"
+  ],
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "path": "route-attempts/formal1/build-normal.json",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "run": {
+    "authored_count": 16384,
+    "case": "s64-a16384-short-c64",
+    "chunk_mode": "64",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "owned",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": null,
+      "max_range_bytes": null,
+      "mode": "owned",
+      "overhead_us": 0
+    },
+    "kind": "formal",
+    "label": "r2-memory_store-normal-s64-a16384-short-c64",
+    "repeat": 2,
+    "replay_max_bytes": 8388608,
+    "replay_sync": "none",
+    "role": "normal",
+    "route": "memory_store",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "memory_store",
+      "replay_max_bytes": 8388608,
+      "replay_store": "memory_store",
+      "replay_sync": "none"
+    },
+    "text_mode": "short"
+  },
+  "schema": "docx-replayable-tail-append-route-capture-v1",
+  "started_utc": "2026-09-09T10:42:36.559020+00:00",
+  "status": "running",
+  "version": 1
+}

@@ -1,0 +1,306 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "data",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/report.json",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/replay"
+  ],
+  "artifacts": {
+    "perf-stat.txt": {
+      "bytes": 476,
+      "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/perf-stat.txt",
+      "present": true,
+      "sha256": "9608daf4374497433bda4d9d1f8a1157b7ba7566b4df60a7fb0ac35fe4c424f2"
+    },
+    "report.json": {
+      "bytes": 11151,
+      "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/report.json",
+      "present": true,
+      "sha256": "26103eca2d3dfdc7ab1e2d106846da303fb6258b829d1539fe7aa963605245fb"
+    },
+    "resource.txt": {
+      "bytes": 1329,
+      "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/resource.txt",
+      "present": true,
+      "sha256": "675f11898ca4d71f92f114551f0bdf127d82b68523aeb4768427098555ea18b3"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/stderr.txt",
+      "present": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/stdout.txt",
+      "present": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "case": {
+    "authored_count": 16384,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "64",
+      "--authored-counts",
+      "16384",
+      "--chunks",
+      "64",
+      "--text",
+      "short",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "label": "s64-a16384-short-c64",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "text_bytes": null,
+    "text_mode": "short"
+  },
+  "command": [
+    "/usr/bin/perf",
+    "stat",
+    "-x,",
+    "--no-big-num",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/perf-stat.txt",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,page-faults",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "data",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/report.json",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/replay"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T11:01:46.265353+00:00",
+  "label": "perf-stat-file_store-s64-a16384-short-c64",
+  "passed": true,
+  "performance_claim": "none",
+  "process": {
+    "returncode": 0,
+    "route_started": true,
+    "timed_out": false
+  },
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "profiler": {
+    "counter_status": "observed",
+    "counters": {
+      "L1-dcache-load-misses": {
+        "available": true,
+        "raw": "0,,L1-dcache-load-misses,360479679,62.00,,",
+        "value": 0
+      },
+      "L1-dcache-loads": {
+        "available": true,
+        "raw": "0,,L1-dcache-loads,360356771,62.00,,",
+        "value": 0
+      },
+      "LLC-load-misses": {
+        "available": false,
+        "raw": "<not supported>,,LLC-load-misses,0,100.00,,",
+        "value": null
+      },
+      "LLC-loads": {
+        "available": false,
+        "raw": "<not supported>,,LLC-loads,0,100.00,,",
+        "value": null
+      },
+      "branch-misses": {
+        "available": true,
+        "raw": "3306424,,branch-misses,360961163,62.00,,",
+        "value": 3306424
+      },
+      "branches": {
+        "available": true,
+        "raw": "1617643418,,branches,361926798,62.00,,",
+        "value": 1617643418
+      },
+      "cache-misses": {
+        "available": true,
+        "raw": "1016500,,cache-misses,359479852,62.00,,",
+        "value": 1016500
+      },
+      "cache-references": {
+        "available": true,
+        "raw": "0,,cache-references,360888631,62.00,,",
+        "value": 0
+      },
+      "cycles": {
+        "available": true,
+        "raw": "2501963401,,cycles,361465580,62.00,,",
+        "value": 2501963401
+      },
+      "instructions": {
+        "available": true,
+        "raw": "8486506889,,instructions,361516311,62.00,,",
+        "value": 8486506889
+      },
+      "page-faults": {
+        "available": true,
+        "raw": "6802,,page-faults,577414957,100.00,,",
+        "value": 6802
+      }
+    },
+    "name": "perf-stat",
+    "scope": "whole child process; profiler overhead included"
+  },
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "replay": {
+    "cleanup": "successful_empty_directory_only",
+    "directory": "/home/zhuhe/.cache/litchi-goal-0484/route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/replay",
+    "max_bytes": 8388608,
+    "route": "file_store",
+    "sync": "data"
+  },
+  "route": {
+    "cli_provider": "file-store",
+    "name": "file_store",
+    "replay_max_bytes": 8388608,
+    "replay_sync": "data",
+    "report_provider": "file_explicit_replay_store"
+  },
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-route-profile-run-v1",
+  "scratch_cleaned": true,
+  "started_utc": "2026-09-09T11:01:45.650067+00:00",
+  "status": "ok",
+  "timed_out": false,
+  "tool": {
+    "executable": "perf",
+    "name": "perf-stat",
+    "path": "/usr/bin/perf",
+    "status": "available"
+  },
+  "validation_status": "ok",
+  "version": 1,
+  "warmups": 1
+}

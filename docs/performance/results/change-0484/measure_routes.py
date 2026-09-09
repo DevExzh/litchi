@@ -1233,7 +1233,7 @@ def capture_one(
             check_route_report(report, role, case, spec, samples=samples, warmups=warmups, binary=binary, argv=argv, replay_dir=replay_dir)
             if replay_dir is not None:
                 require(not any(replay_dir.iterdir()), f"{report}: replay directory was not cleaned")
-        except (RouteMeasureError, OSError, ValueError) as error:
+        except (base.MeasureError, OSError, ValueError) as error:
             validation_error = str(error)
     passed = exit_code == 0 and validation_error is None and not missing
     finished = dict(started, status="pass" if passed else "failed", exit_code=exit_code, finished_utc=now(), artifacts=artifacts, missing_artifacts=missing)
@@ -1360,7 +1360,7 @@ def capture_axis_one(
                 argv=argv,
                 input_metadata=input_metadata,
             )
-        except (RouteMeasureError, OSError, ValueError) as error:
+        except (base.MeasureError, OSError, ValueError) as error:
             validation_error = str(error)
     passed = exit_code == 0 and validation_error is None and not missing
     finished = dict(
@@ -1498,7 +1498,7 @@ def main(argv: list[str] | None = None) -> int:
                 capture_axis_one(base._attempt(args.attempt), args.arm, args.role, pilot=True, repeat=None)
         else:
             fail(f"unknown command {args.command!r}")
-    except (RouteMeasureError, OSError, ValueError, subprocess.SubprocessError) as error:
+    except (base.MeasureError, OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"measure_routes.py: FAIL: {error}", file=sys.stderr)
         return 1
     return 0

@@ -1,0 +1,101 @@
+{
+  "attempt": "metadata2",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "build_attempt": "formal1",
+  "cases": [
+    "s131072-a64-short-c64",
+    "s64-a16384-short-c64"
+  ],
+  "driver": {
+    "bytes": 21634,
+    "path": "profile_input_metadata.py",
+    "sha256": "d73fffb35262f0a250c85f554e0d8230431ea1fa18437b37639fc4f4d0599aa7"
+  },
+  "execution": {
+    "cpu": 2,
+    "cpu_lock_required": true,
+    "cwd": "/home/zhuhe/code/litchi",
+    "environment": {
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "DEBUGINFOD_URLS": "",
+      "LC_ALL": "C",
+      "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    },
+    "gate_required": true
+  },
+  "input_modes": [
+    "owned",
+    "file"
+  ],
+  "output": "input-metadata-profiles/metadata2",
+  "performance_claim": "none",
+  "profile_driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "raw_authored": true,
+  "role": "normal",
+  "route": "deterministic",
+  "route_driver_sha256": "a4abd79b072621e251eae56557bda85759fca2babe2537029c0d283ab33be557",
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-input-metadata-profile-v1",
+  "started_utc": "2026-09-09T11:22:21.633803+00:00",
+  "timeout_seconds": 300.0,
+  "tool": {
+    "executable": "strace",
+    "name": "strace",
+    "path": "/usr/bin/strace",
+    "status": "available"
+  },
+  "validators": {
+    "common.py": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+    "corpus_oracle.py": "40d3fc1bcdc95bada7f4d5eb1722df9406cddda480ea650b0a74bf5f57971779",
+    "gate.py": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+    "measure.py": "622e6eb6675ee4304e9283de04c050ef1fde1fb115ee9ee24328b0a590245d44",
+    "measure_routes.py": "a4abd79b072621e251eae56557bda85759fca2babe2537029c0d283ab33be557",
+    "record_environment.py": "4436acf24304f3494dcf7d01f6dc9b023421215aa4e20090d68ffb2dd5b05736"
+  },
+  "version": 1,
+  "warmups": 1
+}

@@ -1,0 +1,137 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r2-memory_store-normal-s64-a64-near-cwindow/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "window",
+    "--text",
+    "near",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-captures/formal1/r2-memory_store-normal-s64-a64-near-cwindow/report.json"
+  ],
+  "artifacts": {
+    "report.json": {
+      "bytes": 120401,
+      "sha256": "f7cf1c665624d67ca45c153ea0e05b57a21c59ee27f9ef022c123e146a07ce16"
+    },
+    "resource.txt": {
+      "bytes": 1211,
+      "sha256": "57a2d6a3c4edfc8e8884564c009934fd35bcfe150aca99fbd855eed21e69ebed"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "path": "route-attempts/formal1/build-normal.json",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T10:42:10.658431+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "run": {
+    "authored_count": 64,
+    "case": "s64-a64-near-cwindow",
+    "chunk_mode": "window",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "owned",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": null,
+      "max_range_bytes": null,
+      "mode": "owned",
+      "overhead_us": 0
+    },
+    "kind": "formal",
+    "label": "r2-memory_store-normal-s64-a64-near-cwindow",
+    "repeat": 2,
+    "replay_max_bytes": 8388608,
+    "replay_sync": "none",
+    "role": "normal",
+    "route": "memory_store",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "memory_store",
+      "replay_max_bytes": 8388608,
+      "replay_store": "memory_store",
+      "replay_sync": "none"
+    },
+    "text_mode": "near"
+  },
+  "schema": "docx-replayable-tail-append-route-capture-v1",
+  "started_utc": "2026-09-09T10:41:58.370708+00:00",
+  "status": "pass",
+  "version": 1
+}

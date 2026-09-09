@@ -1,0 +1,8 @@
+{
+  "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+  "perf_data_sha256": "b9e56587a17b61e08ece71b23b66b7151b38708b74707ef2ff5088bf9ad86626",
+  "profile_label": "perf-record-file_store-s131072-a64-short-c64",
+  "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+  "schema": "docx-replayable-tail-append-perf-script-v1",
+  "script_sha256": "aa521f2be28497498c1c3a7f1453870bb9c1a5a195e877974c3cadfa8c19187c"
+}

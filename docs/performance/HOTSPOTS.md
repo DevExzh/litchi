@@ -1,23 +1,28 @@
 # Performance hotspot inventory
 
-## 0484: authored stream lifecycle ready for measurement
+## 0484: authored replay cost and file-input metadata investigation
 
 [0484](changes/0484-docx-replayable-tail-stream.md) implements a replayable
 multi-paragraph append route and explicit one-shot storage. The deterministic
 route opens five cursors across sealing, validation and publication; chunk
 count does not multiply the number of opens. The existing XML audit and replay
-costs remain present. This correctness checkpoint makes no CPU or memory
-improvement claim over 0483.
+costs remain present. The [formal measurements](results/change-0484/README.md)
+characterize these routes without claiming a historical improvement over 0483.
 
-The next measurements must vary source size and authored size independently,
-then compare deterministic replay with the production memory store and a
-caller-supplied bounded file store. The [store measurement plan](results/change-0484/store-measurement-plan.md)
-retains source-adapter, sink-window and Store/Deflate cases as required work.
-The [harness checkpoint](results/change-0484/route-harness-checkpoint.md)
-implements those profiles and separate process inventories; formal captures
-remain outstanding. One-shot routes emit one authored pass with zero cursor
+The 228-process matrix varies source and authored size independently and adds
+input, sink-window and Store/Deflate profiles. At 16,384 authored paragraphs,
+memory-store p50 is about 90 ms versus deterministic 117–119 ms, with a larger
+operation heap reservation. At 131,072 source paragraphs all three routes
+remain near 475–479 ms. One-shot routes emit one authored pass with zero cursor
 opens, then authenticate four replay-reader passes.
-Only measured phase attribution can justify removing repeated validation work.
+
+File input on the authored-heavy case takes about 444 ms in repeat one despite
+the same 60 logical reads and 7,651 returned bytes as owned input. Metadata
+syscalls need explicit attribution before choosing an I/O optimization. The
+[audit investigation](results/change-0484/repeated-audit-investigation.md)
+also rules out deleting the standalone source XML audit: candidate validity
+does not prove source validity in the generic splice API. Profiling must
+justify a replacement that retains both proofs and error ordering.
 
 ## 0483: bounded DOCX heap with repeated audit/replay CPU cost
 
@@ -5176,3 +5181,11 @@ gate; these are resource-capped/OOM-mitigating controls, not proof of OOM
 prevention.
 
 `performance_claim: none`; `claim_authorized: false`.
+
+The change-0484 focused metadata2 diagnostics now confirm syscall
+amplification: authored-heavy file input makes 3,735,939 `statx` calls
+versus 12 for owned input, with 3,735,927 attributed to the exact source
+descriptor in the separate raw trace. Counts include setup, one warmup and
+one measured sample. `FileSource::len` and `version` query metadata on each
+call; next work must locate redundant callers and preserve freshness policy.
+No production optimization or before/after speedup is claimed by this batch.

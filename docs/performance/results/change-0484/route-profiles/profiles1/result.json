@@ -1,0 +1,394 @@
+{
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "binary_unchanged": true,
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "build_attempt": "formal1",
+  "cases": [
+    "s131072-a64-short-c64",
+    "s64-a16384-short-c64"
+  ],
+  "driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "failures": [],
+  "finished_utc": "2026-09-09T11:02:51.207749+00:00",
+  "limitations": [
+    "External profiler observations cover the whole child process and include profiler overhead.",
+    "No elapsed-time, throughput, speedup, cold-cache, or allocation claim is made by this helper.",
+    "Missing profiler counters remain unavailable/null; they are never replaced with zero.",
+    "Timeout cleanup covers the profiler's private process group; daemonized or escaped-session descendants are outside this helper's custody."
+  ],
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "output": "route-profiles/profiles1",
+  "passed": true,
+  "performance_claim": "none",
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "receipts": [
+    {
+      "label": "perf-stat-deterministic-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9206,
+        "path": "route-profiles/profiles1/perf-stat-deterministic-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "19a13d1963a7a7ea55d80be86bbef9e7cdb39d020497150dea628f9815aec2e8"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-stat-deterministic-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9173,
+        "path": "route-profiles/profiles1/perf-stat-deterministic-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "1f3dfee2f9efadcbd1c86b4beaca7b8f53f11fe20748a5c7427b10001d2a19f8"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-stat-memory_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9208,
+        "path": "route-profiles/profiles1/perf-stat-memory_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "f635505485841bd3e7262a5a23915921b47e7562a4823f3f29ff83c879c68b6c"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-stat-memory_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9171,
+        "path": "route-profiles/profiles1/perf-stat-memory_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "ef0c58ea9b58563e6808bb5c2448ecbadc3bbcfe5ef901af8558f059c59038b4"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-stat-file_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9557,
+        "path": "route-profiles/profiles1/perf-stat-file_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "110a3056e3dee1275915d14ff4276c5d27c43afd7cd0a22b042e4eee0506ea80"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-stat-file_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9519,
+        "path": "route-profiles/profiles1/perf-stat-file_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "2eff2ceeb0fb319fba0fbec36991379c51f85de069c6f6de3d652f60020259cc"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-deterministic-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7778,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "5ed95ed7d1bb28b11d612059295feabd3b0e1924d91fb8a8867d95aa6044b280"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-deterministic-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7759,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "476ef44f1c14a3aa9fcf87d5355f91f3820779d3e821d3c0de1cbcbaa7fe03e9"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-memory_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7775,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "a72850f203a58c3369178cd132418c6553d4b03f4b078e8531306e74cfaa07b7"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-memory_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7756,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "de5606a05072a33e4179d0dcaafe789e741552a7cf4c5a490863526ec0a3d818"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-file_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 8128,
+        "path": "route-profiles/profiles1/perf-record-file_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "61973c3c62643bf8219224f9f0d5c9faeed2c0096917f55e33f7cecb6bb6a735"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "perf-record-file_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 8106,
+        "path": "route-profiles/profiles1/perf-record-file_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "30ee8e41fc5b4bbc3123437f12670a9e590b9c7cec8b2f2942348024f16db6f0"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-deterministic-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7787,
+        "path": "route-profiles/profiles1/strace-deterministic-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "8c19c9201222a28cd98ff83e9283c16f01a3a45d1fd7b8723e6a2580734f37d5"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-deterministic-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7770,
+        "path": "route-profiles/profiles1/strace-deterministic-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "8b875b5d95253c2c992db96ec4cdf61a9d0e85ea7f6fb4a62b94aad7c0355d1c"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-memory_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7784,
+        "path": "route-profiles/profiles1/strace-memory_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "ef05354a9107a50be9e7cbb1c47ec52407222d48e78511bda6b338e1223edca5"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-memory_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 7767,
+        "path": "route-profiles/profiles1/strace-memory_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "a4986e35702c6ae9fdee7ed4297189b63a55ef0001d42cbbbc01565d02ae0ebe"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-file_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 8122,
+        "path": "route-profiles/profiles1/strace-file_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "c6749b062688751e57d1ac9ed0411cc48618c7f2ba8e15e6a507c1edacaef274"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "strace-file_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 8102,
+        "path": "route-profiles/profiles1/strace-file_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "4c750d98120f55849c02ef7aef1262e1f09e9166d7c3147acaaae2abc845e434"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-deterministic-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9331,
+        "path": "route-profiles/profiles1/heaptrack-deterministic-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "742ed24386dbb5be1e7a51de2af3ae37bde4cfaa3a9831696354507c0d7cc3ed"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-deterministic-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9307,
+        "path": "route-profiles/profiles1/heaptrack-deterministic-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "7092ea84e368d87eb3cbdeae7b8cf9cded24f218619843179b724615211cf712"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-memory_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9325,
+        "path": "route-profiles/profiles1/heaptrack-memory_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "8e58d074dc5f553cd4f6e661a6be5de95f7299b437627aadc05643ba924b3846"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-memory_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9301,
+        "path": "route-profiles/profiles1/heaptrack-memory_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "ec5500395d13a20d3a7b092b786452fe2a9b9da29faa328174febe2729bc2325"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-file_store-s131072-a64-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9662,
+        "path": "route-profiles/profiles1/heaptrack-file_store-s131072-a64-short-c64/receipt.json",
+        "present": true,
+        "sha256": "2d2c5df885781fc92d999e31b8c8304b21a0ae946a1d4b305e29a590d6d95420"
+      },
+      "status": "ok"
+    },
+    {
+      "label": "heaptrack-file_store-s64-a16384-short-c64",
+      "passed": true,
+      "receipt": {
+        "bytes": 9635,
+        "path": "route-profiles/profiles1/heaptrack-file_store-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "9a9b076fa1dbe3bd34f5a38d7b73533787fb3d2196a7599d943a33ede3c8d342"
+      },
+      "status": "ok"
+    }
+  ],
+  "routes": [
+    "deterministic",
+    "memory_store",
+    "file_store"
+  ],
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-route-profile-v1",
+  "scratch": "/home/zhuhe/.cache/litchi-goal-0484/route-profiles/profiles1",
+  "scratch_removed": true,
+  "started_utc": "2026-09-09T11:01:36.129390+00:00",
+  "status": "ok",
+  "timeout_seconds": 900.0,
+  "tool_info": {
+    "heaptrack": {
+      "executable": "heaptrack",
+      "name": "heaptrack",
+      "path": "/usr/bin/heaptrack",
+      "status": "available"
+    },
+    "heaptrack_print": {
+      "name": "heaptrack_print",
+      "path": "/usr/bin/heaptrack_print",
+      "status": "available"
+    },
+    "perf-record": {
+      "executable": "perf",
+      "name": "perf-record",
+      "path": "/usr/bin/perf",
+      "status": "available"
+    },
+    "perf-stat": {
+      "executable": "perf",
+      "name": "perf-stat",
+      "path": "/usr/bin/perf",
+      "status": "available"
+    },
+    "strace": {
+      "executable": "strace",
+      "name": "strace",
+      "path": "/usr/bin/strace",
+      "status": "available"
+    }
+  },
+  "tools": [
+    "perf-stat",
+    "perf-record",
+    "strace",
+    "heaptrack"
+  ],
+  "version": 1,
+  "warmups": 1
+}

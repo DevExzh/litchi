@@ -1,0 +1,6 @@
+strace-summary-deterministic-owned-s131072-a64-short-c64: ok
+strace-summary-deterministic-file-s131072-a64-short-c64: ok
+strace-summary-deterministic-owned-s64-a16384-short-c64: ok
+strace-raw-metadata-deterministic-owned-s64-a16384-short-c64: ok
+strace-summary-deterministic-file-s64-a16384-short-c64: ok
+strace-raw-metadata-deterministic-file-s64-a16384-short-c64: ok

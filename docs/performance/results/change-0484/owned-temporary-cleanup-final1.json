@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {
+      "bytes": 607935,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/render-cache-formal1/fontlist-v390.json",
+      "removed": true,
+      "sha256": "92fa1a4b359baa9045c07e9013866d014116a87ed0ac21555fb82bca30700691"
+    }
+  ],
+  "finished_utc": "2026-09-09T11:25:35.866239+00:00",
+  "scope": "Owned bytecode and matplotlib font cache; empty test temporary directory verified",
+  "status": "pass"
+}
