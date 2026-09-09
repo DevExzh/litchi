@@ -1694,3 +1694,11 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
   -timeout=10 -rss_limit_mb=2048
 ```
+
+## Borrowed row cell spans
+
+`numbers_tile_storage` also drives `CellSpans` directly from bounded arbitrary
+offset bytes and narrow/wide sparse recipes. Successful views must preserve
+column order, contiguous payload ranges, exact iterator lengths, borrowed
+storage pointers, and complete-range bounds. This path does not require
+protobuf Tile admission, so malformed later offsets and padding remain reachable.

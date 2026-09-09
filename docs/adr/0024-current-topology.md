@@ -4410,3 +4410,17 @@ The legacy stylesheet-closure test uses this focused catalog for semantic
 facts. Physical cell/graph witnesses remain host-owned, as do the raw-ID
 consumers preventing removal of PagesEditor::tables. This adds the catalog
 prerequisite without claiming table-cell support or a retired dependency edge.
+
+## 2026-09-09 Borrowed table-row storage follow-up
+
+The monolith and focused Numbers extractors now share the bounded `CellSpans`
+view in numbers_table_cell_storage_codec. Their duplicate allocating offset
+parsers are removed; decoded Buffa row snapshots select the active storage
+pair and validated iterators borrow cell ranges. Cumulative projection budgets
+include validation and traversal work before payload interpretation.
+
+The populated native Pages fixture records save/close/reopen evidence for
+nonempty table cells and formulas while preserving the existing host reader.
+This shared storage primitive supports the next Pages/Keynote cell migration;
+it is not a focused Pages cell API, full table-reader retirement, or a removed
+crate dependency. ADR0028's matching amendment records the boundaries.

@@ -4070,37 +4070,50 @@ impl<'a> TableDataExtractor<'a> {
             .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
         validate_table_row(row_index, row_count)?;
 
-        // The cell_storage_buffer contains serialized Cell messages
-        // The cell_offsets buffer contains the byte offsets for each cell
-
-        let (cell_storage, cell_offsets) =
-            match (row_info.cell_storage_buffer(), row_info.cell_offsets()) {
-                (Some(storage), Some(offsets)) => (storage, offsets),
-                _ => (
-                    row_info.cell_storage_buffer_pre_bnc(),
-                    row_info.cell_offsets_pre_bnc(),
-                ),
-            };
+        // The active buffers contain serialized Cell messages and the byte
+        // offsets for each present cell. The shared row view selects the
+        // modern pair only when both fields are present, preserving the
+        // package readers' compatibility fallback to the pre-BNC pair.
+        let (cell_storage, cell_offsets) = row_info.cell_storage_and_offsets();
 
         let expected_cells = usize::try_from(row_info.cell_count()).map_err(|_| {
             Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
         })?;
         budget.check(expected_cells)?;
         // The strict borrowed-row projection charged the aggregate declared
-        // cell count before row-level cell decoding.
-        let cells = Self::parse_cell_offsets(
+        // cell count before row-level cell decoding. Offset validation is a
+        // separate bounded borrowed pass: charge both its validation and
+        // subsequent iterator traversal before inspecting a span.
+        let offset_options = table_cell_decode_options(
             cell_offsets,
-            cell_storage.len(),
-            row_info.has_wide_offsets().unwrap_or(false),
-            expected_cells,
-            column_count,
-        )?;
+            projection_budget.remaining_references(),
+            projection_budget.remaining_output_text_bytes(),
+            projection_budget.remaining_payload_fields(),
+            projection_budget.remaining_payload_work(),
+        );
+        let (cells, offset_report) =
+            row_info
+                .cell_spans(column_count, offset_options)
+                .map_err(|error| {
+                    map_table_cell_codec_error_with_offsets(
+                        error,
+                        projection_budget.references,
+                        projection_budget.payload_fields,
+                        projection_budget.payload_work,
+                        projection_budget.output_text_bytes,
+                    )
+                })?;
+        projection_budget.charge_decode_work(offset_report)?;
         budget.consume(cells.len())?;
 
-        for (column_index, range) in cells {
+        for span in cells.iter() {
+            let column_index = span.column();
             validate_table_column(column_index, column_count)?;
+            let cell_data = span.bytes(cell_storage).ok_or_else(|| {
+                Error::InvalidFormat("Numbers cell span exceeds its storage buffer".to_owned())
+            })?;
             let parsed = Self::parse_cell_storage(
-                &cell_storage[range],
+                cell_data,
                 cell_tables,
                 projection_budget,
                 row_index,
@@ -4132,102 +4145,6 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         Ok(())
-    }
-
-    /// Parse cell offsets from the offsets buffer
-    ///
-    /// The offset table is an array of little-endian `u16` values. `0xffff`
-    /// marks a missing column; wide rows store offsets in four-byte units.
-    /// Native producers may pad the table past the semantic table width, but
-    /// every padded slot must retain the missing-column sentinel.
-    fn parse_cell_offsets(
-        offsets_buffer: &[u8],
-        storage_length: usize,
-        wide_offsets: bool,
-        expected_cells: usize,
-        column_count: usize,
-    ) -> Result<Vec<(usize, std::ops::Range<usize>)>> {
-        if !offsets_buffer.len().is_multiple_of(2) {
-            return Err(Error::ParseError(
-                "Numbers cell offset table has an odd byte length".to_string(),
-            ));
-        }
-
-        let slot_count = offsets_buffer.len() / 2;
-        if expected_cells > slot_count {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has only {slot_count} offset slots"
-            )));
-        }
-        if expected_cells > column_count {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers row declares {expected_cells} cells but table width is {column_count}"
-            )));
-        }
-        if let Some((column, _bytes)) = offsets_buffer
-            .chunks_exact(2)
-            .enumerate()
-            .skip(column_count)
-            .find(|(_column, bytes)| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers cell offset at column {column} is outside the declared table width {column_count}"
-            )));
-        }
-
-        let present_cells = offsets_buffer
-            .chunks_exact(2)
-            .take(column_count)
-            .filter(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
-            .count();
-        if present_cells != expected_cells {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has {present_cells} offsets"
-            )));
-        }
-
-        let width = if wide_offsets { 4usize } else { 1usize };
-        let mut cells = Vec::new();
-        cells
-            .try_reserve_exact(expected_cells)
-            .map_err(|_| allocation_error("Numbers cell ranges", expected_cells))?;
-        let mut previous = None;
-        for (column, bytes) in offsets_buffer
-            .chunks_exact(2)
-            .take(column_count)
-            .enumerate()
-        {
-            let raw_offset = u16::from_le_bytes([bytes[0], bytes[1]]);
-            if raw_offset == u16::MAX {
-                continue;
-            }
-            let offset = usize::from(raw_offset)
-                .checked_mul(width)
-                .ok_or_else(|| Error::ParseError("Numbers cell offset overflow".to_string()))?;
-            if offset >= storage_length {
-                return Err(Error::ParseError(format!(
-                    "Numbers cell offset {offset} exceeds storage length {storage_length}"
-                )));
-            }
-            if let Some((previous_column, previous_offset)) = previous {
-                if offset <= previous_offset {
-                    return Err(Error::ParseError(format!(
-                        "Numbers cell offsets are not strictly increasing: {previous_offset} then {offset}"
-                    )));
-                }
-                cells.push((previous_column, previous_offset..offset));
-            }
-            previous = Some((column, offset));
-        }
-        if let Some((column, start)) = previous {
-            if storage_length <= start {
-                return Err(Error::ParseError(format!(
-                    "Numbers cell offset range ends at {storage_length} after {start}"
-                )));
-            }
-            cells.push((column, start..storage_length));
-        }
-        Ok(cells)
     }
 
     fn parse_cell_storage(
@@ -8664,8 +8581,37 @@ mod tests {
     use prost::Message as _;
     use std::collections::HashMap;
     use std::path::PathBuf;
+    use std::result::Result as StdResult;
 
     const TEST_DECIMAL_FLAG: u32 = 0x0000_0001;
+
+    fn test_cell_spans<'source>(
+        offsets: &'source [u8],
+        storage_length: usize,
+        wide_offsets: bool,
+        expected_cells: usize,
+        column_count: usize,
+    ) -> StdResult<
+        numbers_table_cell_storage_codec::CellSpans<'source>,
+        numbers_table_cell_storage_codec::DecodeError,
+    > {
+        numbers_table_cell_storage_codec::CellSpans::parse(
+            offsets,
+            storage_length,
+            wide_offsets,
+            expected_cells,
+            column_count,
+            numbers_table_cell_storage_codec::DecodeOptions::new(
+                offsets.len().max(1),
+                usize::MAX,
+                usize::MAX,
+                16,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .map(|(spans, _report)| spans)
+    }
 
     fn formula_node(kind: AstNodeType) -> AstNodeArchive {
         AstNodeArchive {
@@ -9604,9 +9550,15 @@ mod tests {
             0xff, 0xff, // native tile-width padding
             0xff, 0xff,
         ];
-        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1)
+        let cells = test_cell_spans(&offsets, 1, false, 1, 1)
             .unwrap_or_else(|error| panic!("missing padded slots were rejected: {error}"));
-        assert_eq!(cells, vec![(0, 0..1)]);
+        assert_eq!(
+            cells
+                .iter()
+                .map(|span| (span.column(), span.range()))
+                .collect::<Vec<_>>(),
+            vec![(0, 0..1)]
+        );
     }
 
     #[test]
@@ -9649,20 +9601,17 @@ mod tests {
         );
         let error = parse_projected_rows(&source, 2)
             .expect_err("a missing slot cannot satisfy the declared occupied-cell count");
-        assert!(matches!(error, Error::ParseError(message) if message.contains("has 1 offsets")));
+        assert!(matches!(error, Error::InvalidFormat(_)));
     }
 
     #[test]
     fn populated_cell_offset_slots_outside_table_width_are_rejected() {
         let offsets = [0, 0, 0, 0];
-        let error = match TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1) {
+        let error = match test_cell_spans(&offsets, 1, false, 1, 1) {
             Ok(cells) => panic!("populated padded slot produced cells: {cells:?}"),
             Err(error) => error,
         };
-        assert!(matches!(
-            error,
-            Error::InvalidFormat(message) if message.contains("outside the declared table width")
-        ));
+        assert!(error.resource_limit().is_none());
     }
 
     #[test]

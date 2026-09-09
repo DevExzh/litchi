@@ -1,0 +1,70 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "file": "body-table-cells-native.pages",
+  "size": 138984,
+  "sha256": "2363b431c13acc68c56c6ddee3bab1a0ee4f47414f7ddf4e6d455ea74b522ab3",
+  "source": "body-table-catalog-native.pages",
+  "lifecycle": [
+    "Opened a disposable copy of the two-table source in Pages.",
+    "Entered text, numbers and TRUE/FALSE values in Table 1; added SUM(B2:B3) in B4.",
+    "Entered 2026-09-09 and 1h 30m in Table 2 A1/B1; added 1/0 in A2.",
+    "Saved, closed the actual document window, reopened the exact saved path without repair, and verified both tables visually and through accessibility.",
+    "Closed to the template chooser."
+  ],
+  "table_1_display_rows": [
+    [
+      "Label",
+      "Value",
+      "Flag",
+      "Note"
+    ],
+    [
+      "Alpha",
+      "12.5",
+      "TRUE",
+      "北京"
+    ],
+    [
+      "Beta",
+      "-7",
+      "FALSE",
+      "Café"
+    ],
+    [
+      "Total",
+      "5.5",
+      "",
+      ""
+    ],
+    [
+      "Tail",
+      "0",
+      "",
+      ""
+    ]
+  ],
+  "table_2_display_rows": [
+    [
+      "2026-09-09",
+      "1h 30m"
+    ],
+    [
+      "Formula error: Numbers can’t be divided by zero.",
+      ""
+    ],
+    [
+      "",
+      ""
+    ]
+  ],
+  "body_marker": "Pages hidden-axis native oracle — 2026-09-05",
+  "scope": "Native entry, save, close and reopen with displayed values and formula result/error. Physical cell types and sparse/empty storage are qualified separately by decoder readback; blank display alone does not establish stored-empty versus missing.",
+  "decoder_projection": {
+    "Table 2 A1": "Text(\"2026-09-09\")",
+    "Table 2 B1": "Text(\"1h 30m\")",
+    "Table 2 A2": "Formula(\"=(1/0)\")",
+    "qualification": "This fixture does not establish Date, Duration, or Error scalar coverage."
+  }
+}
