@@ -57,7 +57,10 @@
 /// writer.save("output.ole")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-use super::super::consts::{DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, STGTY_ROOT};
+use super::super::consts::{
+    DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
+    STGTY_ROOT,
+};
 use super::super::directory_name::{MAX_DIRECTORY_NAME_CODE_UNITS, directory_name_data};
 use super::super::file::OleError;
 use super::difat::DifatBuilder;
@@ -1474,6 +1477,7 @@ impl OleWriter {
         } else {
             ENDOFCHAIN
         };
+        fat.finalize_range_lock()?;
         validate_output_size(self.sector_size, fat.total_sectors())?;
 
         // Prepare FAT sector data now that reservations are included
@@ -1497,7 +1501,7 @@ impl OleWriter {
         header_builder.set_minifat(minifat_start_sector, num_minifat_sectors);
 
         // Handle DIFAT if needed (> 109 FAT sectors)
-        let fat_sector_ids = sector_ids(fat_start_sector, num_fat_sectors, "FAT sector IDs")?;
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
 
         let (num_difat_sectors, difat_sectors) = if num_fat_sectors > 109 {
             let mut difat = DifatBuilder::new(self.sector_size)?;
@@ -1535,13 +1539,24 @@ impl OleWriter {
         writer.seek(SeekFrom::Start(0))?;
         writer.write_all(&header)?;
 
+        // Clear the reserved hole even when the caller reuses a nonzero sink.
+        if let Some(lock) = fat.range_lock_sector()
+            && lock < fat.total_sectors()
+        {
+            writer.seek(SeekFrom::Start(sector_offset(lock, self.sector_size)?))?;
+            writer.write_all(&[0; SECTOR_SIZE_V4])?;
+        }
+
         // Write ministream data (if any)
         if !minifat.is_empty() && ministream_start != ENDOFCHAIN {
-            let position = sector_offset(ministream_start, self.sector_size)?;
-            writer.seek(SeekFrom::Start(position))?;
-
             let ministream_data = minifat.ministream_data();
-            write_sector_aligned(writer, ministream_data, self.sector_size)?;
+            write_chain_aligned(
+                writer,
+                ministream_data,
+                ministream_start,
+                fat.fat(),
+                self.sector_size,
+            )?;
         }
 
         // Write large stream data sectors
@@ -1551,24 +1566,25 @@ impl OleWriter {
             }
             let data = &self.streams[plan.index].1;
 
-            // Calculate file position for this sector
-            let position = sector_offset(plan.start_sector, self.sector_size)?;
-            writer.seek(SeekFrom::Start(position))?;
-
-            // Write the retained payload allocation, then at most one sector of
-            // zero padding from a fixed stack buffer.
-            write_sector_aligned(writer, data, self.sector_size)?;
+            write_chain_aligned(writer, data, plan.start_sector, fat.fat(), self.sector_size)?;
         }
 
         // Write directory stream
-        let dir_position = sector_offset(dir_start_sector, self.sector_size)?;
-        writer.seek(SeekFrom::Start(dir_position))?;
-        write_sector_aligned(writer, &dir_stream, self.sector_size)?;
+        write_chain_aligned(
+            writer,
+            &dir_stream,
+            dir_start_sector,
+            fat.fat(),
+            self.sector_size,
+        )?;
 
         // Write MiniFAT sectors (if any)
         if minifat_start_sector != ENDOFCHAIN {
-            for (index, minifat_sector_data) in minifat_sectors.iter().enumerate() {
-                let current_sector = sector_at(minifat_start_sector, index)?;
+            let minifat_ids =
+                fat.allocation_sector_ids(minifat_start_sector, num_minifat_sectors)?;
+            for (current_sector, minifat_sector_data) in
+                minifat_ids.into_iter().zip(minifat_sectors.iter())
+            {
                 let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(minifat_sector_data)?;
@@ -1576,8 +1592,9 @@ impl OleWriter {
         }
 
         // Write FAT sectors
-        for (i, fat_sector_data) in fat_sectors_data.iter().enumerate() {
-            let sector_id = sector_at(fat_start_sector, i)?;
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
+        for (sector_id, fat_sector_data) in fat_sector_ids.into_iter().zip(fat_sectors_data.iter())
+        {
             let position = sector_offset(sector_id, self.sector_size)?;
             writer.seek(SeekFrom::Start(position))?;
             writer.write_all(fat_sector_data)?;
@@ -1585,8 +1602,10 @@ impl OleWriter {
 
         // Write DIFAT sectors (if any)
         if !difat_sectors.is_empty() {
-            for (index, difat_sector_data) in difat_sectors.iter().enumerate() {
-                let current_sector = sector_at(difat_start_sector, index)?;
+            let difat_ids = fat.allocation_sector_ids(difat_start_sector, num_difat_sectors)?;
+            for (current_sector, difat_sector_data) in
+                difat_ids.into_iter().zip(difat_sectors.iter())
+            {
                 let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(difat_sector_data)?;
@@ -1992,10 +2011,20 @@ fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32,
     let mut fat = 0u32;
     let mut difat = 0u32;
     for _ in 0..32 {
-        let total = used
+        let mut total = used
             .checked_add(fat)
             .and_then(|value| value.checked_add(difat))
             .ok_or_else(|| OleError::InvalidData("CFB sector count overflows u32".to_string()))?;
+        // `used` already includes any hole crossed by payload allocations.
+        // Metadata can be the first allocation to cross it, adding one FAT entry.
+        if sector_size == SECTOR_SIZE_V4
+            && used <= RANGE_LOCK_SECTOR_V4
+            && total > RANGE_LOCK_SECTOR_V4
+        {
+            total = total.checked_add(1).ok_or_else(|| {
+                OleError::InvalidData("CFB range-lock sector overflows u32".to_string())
+            })?;
+        }
         if total > MAXREGSECT {
             return Err(OleError::InvalidData(
                 "CFB sector count exceeds MAXREGSECT".to_string(),
@@ -2012,41 +2041,6 @@ fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32,
     Err(OleError::InvalidData(
         "CFB FAT/DIFAT planning did not converge".to_string(),
     ))
-}
-
-fn sector_ids(start: u32, count: u32, resource: &'static str) -> Result<Vec<u32>, OleError> {
-    if count == 0 {
-        return Ok(Vec::new());
-    }
-    let end = start
-        .checked_add(count)
-        .ok_or_else(|| OleError::InvalidData(format!("CFB {resource} range overflows u32")))?;
-    if start >= MAXREGSECT || end > MAXREGSECT {
-        return Err(OleError::InvalidData(format!(
-            "CFB {resource} range exceeds MAXREGSECT"
-        )));
-    }
-    let count_usize = usize::try_from(count)
-        .map_err(|_err| OleError::InvalidData(format!("CFB {resource} count exceeds usize")))?;
-    let mut ids = Vec::new();
-    ids.try_reserve_exact(count_usize)
-        .map_err(|source| OleError::allocation(resource, source))?;
-    ids.extend(start..end);
-    Ok(ids)
-}
-
-fn sector_at(start: u32, index: usize) -> Result<u32, OleError> {
-    let index_u32 = u32::try_from(index)
-        .map_err(|_err| OleError::InvalidData("CFB sector offset exceeds u32".to_string()))?;
-    let sector = start
-        .checked_add(index_u32)
-        .ok_or_else(|| OleError::InvalidData("CFB sector index overflows u32".to_string()))?;
-    if sector >= MAXREGSECT {
-        return Err(OleError::InvalidData(
-            "CFB sector index exceeds MAXREGSECT".to_string(),
-        ));
-    }
-    Ok(sector)
 }
 
 fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OleError> {
@@ -2069,6 +2063,68 @@ fn checked_sector_size(sector_size: usize) -> Result<u64, OleError> {
     }
     u64::try_from(sector_size)
         .map_err(|_err| OleError::InvalidData("CFB sector size does not fit u64".to_string()))
+}
+
+/// Write a payload through the exact FAT chain assigned by the allocator.
+///
+/// Version 4 files reserve one physical sector for the range lock.  A chain
+/// that crosses that fixed hole is therefore not physically contiguous even
+/// though its logical allocation was requested as one stream.
+fn write_chain_aligned<W: Write + Seek>(
+    writer: &mut W,
+    data: &[u8],
+    start_sector: u32,
+    fat: &[u32],
+    sector_size: usize,
+) -> Result<(), OleError> {
+    if data.is_empty() {
+        return Ok(());
+    }
+    checked_sector_size(sector_size)?;
+    let mut current = start_sector;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let run_start = current;
+        let mut run_end = offset;
+        loop {
+            if current == RANGE_LOCK_SECTOR_V4 && sector_size == 4096 {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain points to the range-lock sector".to_string(),
+                ));
+            }
+            let current_index = usize::try_from(current).map_err(|_err| {
+                OleError::InvalidData("CFB FAT sector index does not fit usize".to_string())
+            })?;
+            let next = *fat.get(current_index).ok_or_else(|| {
+                OleError::InvalidData("CFB stream chain exceeds the FAT".to_string())
+            })?;
+            run_end += (data.len() - run_end).min(sector_size);
+            if run_end == data.len() {
+                if next != ENDOFCHAIN {
+                    return Err(OleError::InvalidData(
+                        "CFB stream chain continues beyond its payload".to_string(),
+                    ));
+                }
+                break;
+            }
+            if next >= MAXREGSECT {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain ends before its payload".to_string(),
+                ));
+            }
+            let contiguous = current.checked_add(1) == Some(next);
+            current = next;
+            if !contiguous {
+                break;
+            }
+        }
+        // Keep ordinary payloads in one write. Only an actual physical hole
+        // splits the contiguous run; FAT traversal does not fragment sink I/O.
+        writer.seek(SeekFrom::Start(sector_offset(run_start, sector_size)?))?;
+        write_sector_aligned(writer, &data[offset..run_end], sector_size)?;
+        offset = run_end;
+    }
+    Ok(())
 }
 
 fn write_sector_aligned<W: Write>(
@@ -2147,6 +2203,25 @@ mod tests {
     use crate::file::OleFile;
     use std::error::Error as _;
     use std::io::Cursor;
+
+    #[test]
+    fn metadata_crossing_range_lock_expands_fat_capacity() {
+        // Without the reserved hole, 512 FAT sectors appear to fit exactly.
+        // The metadata allocations cross the hole and need a 513th FAT sector.
+        let used = 512 * 1024 - 512 - 1;
+        assert_eq!(
+            allocation_table_sector_counts(used - 1, 4096).unwrap(),
+            (512, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used, 4096).unwrap(),
+            (513, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used + 1, 4096).unwrap(),
+            (513, 1)
+        );
+    }
 
     #[test]
     fn test_create_writer() {
@@ -2268,6 +2343,62 @@ mod tests {
         let mut writer = OleWriter::new();
         writer.create_storage(&["Storage"]).unwrap();
         assert_eq!(writer.storages.len(), 1);
+    }
+
+    #[test]
+    fn chain_publication_coalesces_contiguous_sectors_and_splits_at_the_lock() {
+        #[derive(Default)]
+        struct Sink {
+            position: u64,
+            writes: Vec<(u64, Vec<u8>)>,
+            seeks: usize,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes.push((self.position, bytes.to_vec()));
+                self.position += bytes.len() as u64;
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        impl Seek for Sink {
+            fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+                let SeekFrom::Start(position) = from else {
+                    panic!("absolute seeks only")
+                };
+                self.position = position;
+                self.seeks += 1;
+                Ok(position)
+            }
+        }
+        for sector_size in [512, 4096] {
+            let mut allocator = FatBuilder::new_with_size(sector_size).unwrap();
+            let data = vec![0xA5; 64 * 1024];
+            let start = allocator.allocate_chain(data.len()).unwrap();
+            let mut sink = Sink::default();
+            write_chain_aligned(&mut sink, &data, start, allocator.fat(), sector_size).unwrap();
+            assert_eq!(sink.seeks, 1);
+            assert_eq!(sink.writes, vec![(sector_size as u64, data)]);
+        }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let mut fat = vec![crate::consts::FREESECT; lock as usize + 2];
+        fat[lock as usize - 1] = lock + 1;
+        fat[lock as usize + 1] = ENDOFCHAIN;
+        let data = vec![0x5A; 2 * 4096];
+        let mut sink = Sink::default();
+        write_chain_aligned(&mut sink, &data, lock - 1, &fat, 4096).unwrap();
+        assert_eq!(sink.seeks, 2);
+        assert_eq!(sink.writes.len(), 2);
+        assert_eq!(
+            sink.writes[0],
+            (u64::from(lock) * 4096, data[..4096].to_vec())
+        );
+        assert_eq!(
+            sink.writes[1],
+            (u64::from(lock + 2) * 4096, data[4096..].to_vec())
+        );
     }
 
     #[test]
@@ -2597,15 +2728,6 @@ mod tests {
         assert_eq!(allocation_table_sector_counts(128, 512).unwrap(), (2, 0));
         assert!(allocation_table_sector_counts(MAXREGSECT, 512).is_err());
         assert!(allocation_table_sector_counts(1, 0).is_err());
-    }
-
-    #[test]
-    fn sector_id_ranges_use_maxregsect_as_an_exclusive_end() {
-        assert_eq!(
-            sector_ids(MAXREGSECT - 1, 1, "test IDs").unwrap(),
-            [MAXREGSECT - 1]
-        );
-        assert!(sector_ids(MAXREGSECT, 1, "test IDs").is_err());
     }
 
     #[test]

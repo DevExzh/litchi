@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "29ad6a094dc3dbab2f80bdd2dd46d5a80ecc14e3",
+  "validation_worktree": "/var/tmp/litchi-feature-batch-validation-20260909",
+  "toolchain": "1.95.0",
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "source_files": {
+    "crates/litchi-cfb/README.md": "61dbae5161a45a1447d51550f31fc6c97847c21a00eac6aa08ca98b198f8ae2c",
+    "crates/litchi-cfb/src/allocation_validation_tests.rs": "bd41267875c72d9003f3d4d6d113d00902f7d13da507aa24dc8fc3fed8621d5f",
+    "crates/litchi-cfb/src/consts.rs": "63f5a57d7ead3bd99658575fffa8ae6c76a44d36fceccda1165af98c2d503b81",
+    "crates/litchi-cfb/src/file.rs": "5e438d2571684db2858e32bfeecdca6c1e25453aca94bd4e50fefbb9fe0842db",
+    "crates/litchi-cfb/src/shared.rs": "a68976cf9a77adbbd3586fcd7db95891c14e4b0c1cb7209d7153d45c2700bc3a",
+    "crates/litchi-cfb/src/writer/core.rs": "18638158dd39e6671c5716c8a3f0a7f6c9009a5658d474eb840713f73362596e",
+    "crates/litchi-cfb/src/writer/difat.rs": "a873183ff69fd8edea5a4d34164b31f14c96c76fef815af5a5100b96515090c9",
+    "crates/litchi-cfb/src/writer/fat.rs": "86e421c1daba1b1610592ee6d0fe813d923a4eb11317c3918ae1c4716a5f2b61",
+    "crates/litchi-cfb/src/writer/sequential.rs": "9f9e377d2e9ab6fb5aaa775d7432a206c20224ebad96dbc3ff3da5da8c5a78bc",
+    "crates/litchi-cfb/tests/range_lock.rs": "d7a7557a9dfd6ef87e4d15232d8bd7fa882a4746e25a16e92dc97948c8c7d6c3",
+    "docs/performance/changes/0298-cfb-directory-byte-limit.md": "2f8c113521a8edc1737e193db6245e49bd455feacea03fee2e3a18192e5eee56"
+  },
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-cfb",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "passed": 306,
+      "doctests_passed": 14,
+      "doctests_ignored": 1,
+      "note": "Before addition of the independent integration test file; unchanged production sources."
+    },
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-cfb --test range_lock",
+      "exit_code": 0,
+      "log": "range-lock.log.gz",
+      "passed": 2
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-cfb --lib --tests -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (all changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "scope": "Synthetic v4 boundary writer/readback and malformed chain coverage; no native >2-GiB producer interoperability or timing benchmark claim.",
+  "documentation_note": "Final documentation clarifies source admission versus metadata allocation and updates the historical directory-limit report; compiled Rust sources are unchanged from validation.",
+  "uncompressed_log_sha256": {
+    "tests.log": "98f21431a89c9c51ae35e5a5c316899437fe977071cb411d3d7e92be0d5d8663",
+    "range-lock.log": "667cd3c4f9f04aaa499a1873a06f76b63a9b2bf11b003f0912fd40270c92a2d8",
+    "clippy.log": "9db290e0afb4b31358fa80f728062f19d918459ed16ff2fbcd1e35ec285f0501"
+  },
+  "log_sha256": {
+    "tests.log.gz": "2a61051abe4fc4079a504c0f736ab77eb8bc59b4d29d30f5ea891ff14127d272",
+    "range-lock.log.gz": "29d4c5328be8f3a0344caa80bd6c8265b3b460bdadd54231507c576bf6b43132",
+    "clippy.log.gz": "639afc79db29e78990cb5ec055cb79fbfbfdf017fc0d09368f0bf7deed8660ed"
+  }
+}

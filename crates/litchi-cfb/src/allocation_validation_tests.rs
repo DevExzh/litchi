@@ -223,6 +223,42 @@ fn hostile_reported_length_is_rejected_before_header_read() {
 }
 
 #[test]
+fn larger_explicit_ingress_preserves_defaults_and_version_three_size_limit() {
+    let default_bytes = 2 * 1024 * 1024 * 1024;
+    assert_eq!(OleFileLimits::default().max_input_bytes(), default_bytes);
+    assert_eq!(
+        crate::SharedOleFileLimits::default().max_input_bytes(),
+        default_bytes
+    );
+    for ceiling in [default_bytes + 1, OleFileLimits::MAX_INPUT_BYTES] {
+        assert_eq!(
+            OleFileLimits::new(ceiling).unwrap().max_input_bytes(),
+            ceiling
+        );
+        assert_eq!(
+            crate::SharedOleFileLimits::new(ceiling)
+                .unwrap()
+                .max_input_bytes(),
+            ceiling
+        );
+    }
+    let reads = Arc::new(AtomicUsize::new(0));
+    let reader = ReportedLengthReader {
+        bytes: sample_file(),
+        reported_length: default_bytes + 1,
+        position: 0,
+        reads: reads.clone(),
+    };
+    let limits = OleFileLimits::new(reader.reported_length).unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(reader, limits),
+        Err(OleError::InvalidFormat(message)) if message.contains("Version 3 CFB input cannot exceed")
+    ));
+    // Only the fixed header was read; no FAT/directory traversal occurred.
+    assert_eq!(reads.load(Ordering::Relaxed), 1);
+}
+
+#[test]
 fn hostile_count_metadata_is_rejected_before_index_allocation() {
     let mut bytes = sample_file();
     write_u32(&mut bytes, NUM_FAT_SECTORS_OFFSET, u32::MAX);

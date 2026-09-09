@@ -24,7 +24,9 @@ pub struct SharedOleFileLimits {
 }
 
 impl SharedOleFileLimits {
-    /// Largest CFB input accepted by the default shared reader.
+    /// Default source ceiling; larger version-4 files require explicit limits.
+    pub const DEFAULT_MAX_INPUT_BYTES: u64 = OleFileLimits::DEFAULT_MAX_INPUT_BYTES;
+    /// Largest CFB input accepted under explicit shared-reader limits.
     pub const MAX_INPUT_BYTES: u64 = OleFileLimits::MAX_INPUT_BYTES;
     /// Default directory stream ceiling used by the default shared reader.
     pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES;
@@ -70,7 +72,7 @@ impl SharedOleFileLimits {
 impl Default for SharedOleFileLimits {
     fn default() -> Self {
         Self {
-            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
         }
     }
