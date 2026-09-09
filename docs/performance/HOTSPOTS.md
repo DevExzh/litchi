@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0487: fewer replay sink fences; candidate audit cost remains
+
+[0487](changes/0487-opc-replay-consumed-prefix-retention.md) retains consumed
+replay bytes across short reads within the existing adapter window. Both
+authored-heavy file repeats improve p50 about 36%; statx diagnostics fall
+59.90%. Source-heavy medians stay within 1%, and operation heap is effectively
+unchanged. The [review](results/change-0487/results-review.md) retains small-input
+latency regressions and three RSS increases above 5%.
+
+The 0486 caller attribution and this reduction support sink-fence overhead as
+one cost. Repeated candidate XML audits remain a possible next experiment;
+source-only proof reuse is insufficient. Any retained candidate-audit capability
+must preserve frozen limits, complete byte authentication, freshness, Work,
+cancellation, accepted-output accounting and final reopen. This batch retains
+all XML audits and does not close the broader non-iWork goal.
+
 ## 0485: lower splice overhead with remaining metadata and audit cost
 
 [0485](changes/0485-opc-splice-consumed-window-batching.md) coalesces hashing

@@ -1,0 +1,197 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0487/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "owned",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0487/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/report.json"
+  ],
+  "arm": {
+    "axis": "input",
+    "cli_provider": "deterministic",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "owned",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": null,
+      "max_range_bytes": null,
+      "mode": "owned",
+      "overhead_us": 0
+    },
+    "label": "input-owned-s64-a16384-short-c64",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "report_provider": "deterministic_replayable_bounded_cursor",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "value": "owned",
+    "workload": "s64-a16384-short-c64"
+  },
+  "artifacts": {
+    "profile.txt": {
+      "bytes": 240,
+      "sha256": "5b93e9cf0b1f4c990c7cea0605d448086e25d2b87e354cddb3fe42216069f3a7"
+    },
+    "report.json": {
+      "bytes": 9403,
+      "sha256": "183c5e49dceb5548dc25023c4701cc01ba4b0720224522365af6d39f4cc57423"
+    },
+    "resource.txt": {
+      "bytes": 1177,
+      "sha256": "bb68d2348c8900e06da831df48a474823ac207d3413bafbb9ef04e5028847ec2"
+    },
+    "started.json": {
+      "bytes": 4987,
+      "sha256": "66e3fe1ca2793b2f0ca01a47ebb65c2106f089d346ccc76206d1c6e81be2b6bc"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 423367880,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "sha256": "2486a9a84558b58815d8a4cc9a78a921c0e017650335d2d64f3a1d28053ff933"
+  },
+  "build": {
+    "bytes": 1827,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0487/build-normal.json",
+    "sha256": "91f99a5d1a123c5b6e62c7b3179a5132ce7c6456ee7383c2da52cc1618bc7f86"
+  },
+  "command": [
+    "perf",
+    "stat",
+    "-x,",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0487/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/profile.txt",
+    "-e",
+    "cycles,instructions,branches,branch-misses,page-faults",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0487/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "owned",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0487/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/report.json"
+  ],
+  "driver": {
+    "bytes": 5008,
+    "sha256": "cf1fd0cf7ec45a38234869fa48eb0c71455bc7a05fe1c6913ff1e26a1343fbf6"
+  },
+  "error": null,
+  "finished_utc": "2026-09-09T13:33:04.984651+00:00",
+  "label": "after-perf-owned-s64-a16384-short-c64",
+  "process": {
+    "returncode": 0,
+    "route_started": true,
+    "timed_out": false
+  },
+  "samples": 1,
+  "scope": "Whole diagnostic child including setup and oracle work; profiler overhead included.",
+  "source": {
+    "absolute_path": null,
+    "backing": "owned",
+    "bytes": null,
+    "identity": "owned_input_is_created_and_fingerprinted_by_the_route_binary",
+    "mode": "owned",
+    "path": null,
+    "sha256": null,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms"
+  },
+  "started_utc": "2026-09-09T13:33:04.360450+00:00",
+  "status": "pass",
+  "validators": {
+    "common.py": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+    "corpus_oracle.py": "40d3fc1bcdc95bada7f4d5eb1722df9406cddda480ea650b0a74bf5f57971779",
+    "gate.py": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+    "measure.py": "622e6eb6675ee4304e9283de04c050ef1fde1fb115ee9ee24328b0a590245d44",
+    "measure_routes.py": "a4abd79b072621e251eae56557bda85759fca2babe2537029c0d283ab33be557",
+    "record_environment.py": "4436acf24304f3494dcf7d01f6dc9b023421215aa4e20090d68ffb2dd5b05736"
+  },
+  "warmups": 1
+}

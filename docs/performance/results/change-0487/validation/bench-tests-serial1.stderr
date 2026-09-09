@@ -1,0 +1,2 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/bin/docx_replayable_tail_append.rs (tools/perf-baseline/target/debug/deps/docx_replayable_tail_append-25061c29e8c9dbf9)

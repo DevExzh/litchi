@@ -2175,8 +2175,8 @@ fn audit_splice(
         let audit_result = xml_minifier::audit::verify_authored_reader(&mut splice_reader, limits);
         // A parser may return an error while the current adapter window still
         // contains a consumed prefix.  Flush that prefix before observing the
-        // callback result so accepted output remains exactly the bytes the
-        // parser consumed, even on a partial publication.
+        // callback result. Any accepted output is an exact prefix of the
+        // consumed bytes; the sink's accepted count remains authoritative.
         splice_reader.flush_pending_consumed();
         if let Some(error) = splice_reader.take_failure() {
             return Err(error);
@@ -2274,12 +2274,12 @@ enum SplicePayload<'payload> {
 
 /// A bounded logical candidate view used by XML auditing or binary draining.
 ///
-/// `quick_xml` consumes a `BufRead` view, so this adapter copies at most one
-/// fixed-size chunk from the verified source into its own buffer. Bytes are
-/// written to the replay sink only after the auditor has consumed their
-/// complete bounded window. That keeps candidate validation and publication
-/// on the same byte stream without retaining the complete source or candidate,
-/// while avoiding one source/sink boundary call per XML token.
+/// `quick_xml` consumes a `BufRead` view, so this adapter copies source bytes
+/// and replay bytes into one fixed-size buffer. A short replay callback may be
+/// appended into the unused tail after its prior bytes are consumed; the sink
+/// sees a retained contiguous prefix at window or phase boundaries or when
+/// auditing returns. Work and error paths retain their existing flush and
+/// failure guards, and every replay callback keeps its freshness fences.
 #[derive(Clone, Copy)]
 struct SpliceAuditBounds {
     source_length: u64,
@@ -2583,12 +2583,27 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
             return Ok(&[]);
         }
 
+        // A replay reader can return a short chunk even when the adapter
+        // still has capacity. Keep the consumed prefix in place and append
+        // the next callback into the unused tail; the parser only receives
+        // the newly appended range through `buffer_start`.
+        debug_assert_eq!(self.buffer_start, self.buffer_len);
+        let buffer_start = self.buffer_len;
+        let available = self.buffer.len().saturating_sub(buffer_start);
         let count = usize::try_from(encoded_len - position)
             .unwrap_or(usize::MAX)
-            .min(self.buffer.len());
+            .min(available);
+        if count == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "decoded splice replay window has no append capacity",
+            ));
+        }
         self.check_external_state()?;
         let read_result = match &mut self.payload {
-            SplicePayload::Replay { reader, .. } => reader.read(&mut self.buffer[..count]),
+            SplicePayload::Replay { reader, .. } => {
+                reader.read(&mut self.buffer[buffer_start..buffer_start + count])
+            },
             SplicePayload::Fixed { .. } => unreachable!("fixed replay branch returned above"),
         };
         if let Some(error) = self.check_source_after_external_error() {
@@ -2614,10 +2629,9 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
                 "decoded splice replay ended before its declared length",
             ));
         }
-        self.buffer_start = 0;
-        self.buffer_len = read;
+        self.buffer_len = buffer_start + read;
         self.buffer_source_bytes = 0;
-        Ok(&self.buffer[..read])
+        Ok(&self.buffer[self.buffer_start..self.buffer_len])
     }
 
     fn add_candidate_length(&mut self, amount: usize) {
@@ -2679,6 +2693,19 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
                 },
             }
         }
+    }
+
+    fn can_retain_replay_window(&self) -> bool {
+        self.phase == SplicePhase::Fragment
+            && self.buffer_len < self.buffer.len()
+            && matches!(
+                &self.payload,
+                SplicePayload::Replay {
+                    proof,
+                    position,
+                    ..
+                } if *position < proof.encoded_len
+            )
     }
 
     /// Flush bytes that the parser has consumed from the current bounded
@@ -2919,6 +2946,9 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
         self.pending_source_bytes = self.pending_source_bytes.saturating_add(source_amount);
         self.buffer_start += amount;
         if self.buffer_start == self.buffer_len {
+            if self.can_retain_replay_window() {
+                return;
+            }
             self.flush_pending_consumed();
             self.buffer_start = 0;
             self.buffer_len = 0;
@@ -3224,6 +3254,544 @@ mod tests {
             self.reads += 1;
             Ok(1)
         }
+    }
+
+    struct OneByteReplayProvider {
+        bytes: Vec<u8>,
+        reads: Arc<AtomicUsize>,
+    }
+
+    impl OneByteReplayProvider {
+        fn new(bytes: Vec<u8>) -> (Self, Arc<AtomicUsize>) {
+            let reads = Arc::new(AtomicUsize::new(0));
+            (
+                Self {
+                    bytes,
+                    reads: Arc::clone(&reads),
+                },
+                reads,
+            )
+        }
+    }
+
+    impl SourcePartSpliceReplay for OneByteReplayProvider {
+        fn proof(&self) -> SourcePartSpliceReplayProof {
+            SourcePartSpliceReplayProof {
+                encoded_len: self.bytes.len() as u64,
+                encoded_sha256: digest_bytes(&self.bytes),
+            }
+        }
+
+        fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+            Ok(Box::new(OneByteReplayReader {
+                bytes: self.bytes.clone(),
+                position: 0,
+                reads: Arc::clone(&self.reads),
+            }))
+        }
+    }
+
+    struct OneByteReplayReader {
+        bytes: Vec<u8>,
+        position: usize,
+        reads: Arc<AtomicUsize>,
+    }
+
+    impl Read for OneByteReplayReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            if output.is_empty() || self.position == self.bytes.len() {
+                return Ok(0);
+            }
+            output[0] = self.bytes[self.position];
+            self.position += 1;
+            Ok(1)
+        }
+    }
+
+    struct ErrorAfterOneReplayProvider;
+
+    impl SourcePartSpliceReplay for ErrorAfterOneReplayProvider {
+        fn proof(&self) -> SourcePartSpliceReplayProof {
+            SourcePartSpliceReplayProof {
+                encoded_len: 2,
+                encoded_sha256: digest_bytes(b"AB"),
+            }
+        }
+
+        fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+            Ok(Box::new(ErrorAfterOneReplayReader { reads: 0 }))
+        }
+    }
+
+    struct ErrorAfterOneReplayReader {
+        reads: usize,
+    }
+
+    impl Read for ErrorAfterOneReplayReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.reads == 0 {
+                self.reads += 1;
+                output[0] = b'A';
+                return Ok(1);
+            }
+            Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "test replay callback failed",
+            ))
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct FaultReplayAction {
+        bump_source: bool,
+        cancel: bool,
+        error: bool,
+    }
+
+    struct FaultOnSecondReadProvider {
+        action: FaultReplayAction,
+        source: Option<Arc<VersionCounter>>,
+        cancellation: Option<CancellationSource>,
+    }
+
+    impl SourcePartSpliceReplay for FaultOnSecondReadProvider {
+        fn proof(&self) -> SourcePartSpliceReplayProof {
+            SourcePartSpliceReplayProof {
+                encoded_len: 2,
+                encoded_sha256: digest_bytes(b"AB"),
+            }
+        }
+
+        fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+            Ok(Box::new(FaultOnSecondReadReader {
+                reads: 0,
+                action: self.action,
+                source: self.source.clone(),
+                cancellation: self.cancellation.clone(),
+            }))
+        }
+    }
+
+    struct FaultOnSecondReadReader {
+        reads: usize,
+        action: FaultReplayAction,
+        source: Option<Arc<VersionCounter>>,
+        cancellation: Option<CancellationSource>,
+    }
+
+    impl Read for FaultOnSecondReadReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if output.is_empty() {
+                return Ok(0);
+            }
+            match self.reads {
+                0 => {
+                    self.reads += 1;
+                    output[0] = b'A';
+                    Ok(1)
+                },
+                1 => {
+                    self.reads += 1;
+                    if self.action.bump_source {
+                        if let Some(source) = &self.source {
+                            source.bump();
+                        }
+                    }
+                    if self.action.cancel {
+                        if let Some(cancellation) = &self.cancellation {
+                            cancellation.cancel();
+                        }
+                    }
+                    if self.action.error {
+                        Err(io::Error::new(
+                            io::ErrorKind::BrokenPipe,
+                            "test replay callback failed after action",
+                        ))
+                    } else {
+                        output[0] = b'B';
+                        Ok(1)
+                    }
+                },
+                _ => Ok(0),
+            }
+        }
+    }
+
+    fn drain_one_byte_replay(
+        payload: Vec<u8>,
+        window: usize,
+    ) -> (Vec<u8>, usize, usize, usize, [u8; 32], [u8; 32]) {
+        let (provider, reads) = OneByteReplayProvider::new(payload.clone());
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 0);
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let writes = Arc::clone(&sink.writes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: window,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            Some(&snapshot),
+            None,
+        )
+        .expect("bounded replay reader must initialize");
+
+        loop {
+            let available = {
+                let available = reader.fill_buf().expect("replay bytes must fill");
+                if available.is_empty() {
+                    break;
+                }
+                available.len()
+            };
+            // Simulate an XML parser consuming one token-sized byte at a
+            // time. The provider must not be called again until this byte
+            // has been consumed, while the adapter retains the prefix.
+            assert_eq!(available, 1);
+            reader.consume(1);
+        }
+        let (_source_length, source_hash, _candidate_length, candidate_hash) =
+            reader.finish().expect("complete replay must finish");
+        (
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
+            *writes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            reads.load(Ordering::SeqCst),
+            source_state.versions.load(Ordering::SeqCst),
+            source_hash,
+            candidate_hash,
+        )
+    }
+
+    #[test]
+    fn short_replay_reads_fill_one_window_before_sink_output() {
+        for (length, window, expected_writes) in [
+            (3_usize, 4_usize, 1_usize),
+            (4, 4, 1),
+            (7, 4, 2),
+            (128, 16, 8),
+        ] {
+            let payload: Vec<u8> = (0..length).map(|byte| b'a' + byte as u8).collect();
+            let (output, writes, reads, versions, source_hash, candidate_hash) =
+                drain_one_byte_replay(payload.clone(), window);
+            assert_eq!(output, payload);
+            assert_eq!(writes, expected_writes);
+            assert_eq!(reads, length + 1, "one EOF probe follows the data reads");
+            let windows = expected_writes;
+            assert_eq!(versions, 4 + 2 * length + 3 * windows);
+            assert_eq!(source_hash, digest_bytes(&[]));
+            assert_eq!(candidate_hash, digest_bytes(&payload));
+        }
+    }
+
+    #[test]
+    fn short_replay_does_not_read_ahead_of_parser_consumption() {
+        let payload = b"AB".to_vec();
+        let (provider, reads) = OneByteReplayProvider::new(payload.clone());
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            None,
+        )
+        .expect("bounded replay reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        assert_eq!(reads.load(Ordering::SeqCst), 1);
+        assert_eq!(reader.fill_buf().expect("same byte must remain"), b"A");
+        assert_eq!(reads.load(Ordering::SeqCst), 1);
+        reader.consume(1);
+        assert_eq!(reads.load(Ordering::SeqCst), 1);
+        assert_eq!(reader.fill_buf().expect("second byte must fill"), b"B");
+        assert_eq!(reads.load(Ordering::SeqCst), 2);
+        reader.consume(1);
+        assert!(
+            reader
+                .fill_buf()
+                .expect("authenticated EOF must be checked")
+                .is_empty()
+        );
+        reader.finish().expect("replay must finish");
+    }
+
+    #[test]
+    fn replay_short_read_error_flushes_retained_prefix() {
+        let provider = ErrorAfterOneReplayProvider;
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            None,
+        )
+        .expect("bounded replay reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        reader.consume(1);
+        let error = reader
+            .fill_buf()
+            .expect_err("second replay callback must fail");
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        reader.flush_pending_consumed();
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"A"
+        );
+    }
+
+    #[test]
+    fn replay_retained_prefix_short_sink_is_not_flushed_twice() {
+        let payload: Vec<u8> = (0..8).map(|byte| b'a' + byte as u8).collect();
+        let (provider, reads) = OneByteReplayProvider::new(payload.clone());
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = PrefixFailSink::new(3);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            None,
+        )
+        .expect("bounded replay reader must initialize");
+
+        for _ in 0..4 {
+            assert_eq!(reader.fill_buf().expect("replay byte must fill").len(), 1);
+            reader.consume(1);
+        }
+        assert_eq!(reads.load(Ordering::SeqCst), 4);
+        let error = reader
+            .fill_buf()
+            .expect_err("the short sink must surface its broken pipe");
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        reader.flush_pending_consumed();
+        drop(reader);
+        assert_eq!(sink.bytes.as_slice(), &payload[..3]);
+    }
+
+    #[test]
+    fn replay_faults_inside_second_callback_discard_retained_prefix() {
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 0);
+        let (_budget, cancellation, context) = managed_context(u64::MAX);
+        let provider = FaultOnSecondReadProvider {
+            action: FaultReplayAction {
+                bump_source: true,
+                cancel: true,
+                error: true,
+            },
+            source: Some(Arc::clone(&source_state)),
+            cancellation: Some(cancellation),
+        };
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            Some(&snapshot),
+            Some(&context),
+        )
+        .expect("bounded replay reader must initialize");
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        reader.consume(1);
+        let _ = reader
+            .fill_buf()
+            .expect_err("the second callback must return its ordinary error");
+        reader.flush_pending_consumed();
+        assert!(matches!(
+            reader.take_failure(),
+            Some(OpcError::SourceChanged { .. })
+        ));
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+
+        let (_budget, cancellation, context) = managed_context(u64::MAX);
+        let provider = FaultOnSecondReadProvider {
+            action: FaultReplayAction {
+                bump_source: false,
+                cancel: true,
+                error: false,
+            },
+            source: None,
+            cancellation: Some(cancellation),
+        };
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            Some(&context),
+        )
+        .expect("bounded replay reader must initialize");
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        reader.consume(1);
+        let _ = reader
+            .fill_buf()
+            .expect_err("cancellation after the callback must stop the pass");
+        reader.flush_pending_consumed();
+        assert!(matches!(reader.take_failure(), Some(OpcError::Cancelled)));
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+
+        let (_budget, cancellation, context) = managed_context(u64::MAX);
+        let provider = FaultOnSecondReadProvider {
+            action: FaultReplayAction {
+                bump_source: false,
+                cancel: true,
+                error: true,
+            },
+            source: None,
+            cancellation: Some(cancellation),
+        };
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            Some(&context),
+        )
+        .expect("bounded replay reader must initialize");
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        reader.consume(1);
+        let error = reader
+            .fill_buf()
+            .expect_err("ordinary callback error must still be returned");
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        reader.flush_pending_consumed();
+        assert!(matches!(reader.take_failure(), Some(OpcError::Cancelled)));
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn replay_work_failure_flushes_retained_prefix_before_typed_error() {
+        let (_budget, _cancellation, context) = managed_context(1);
+        let provider = OneByteReplayProvider::new(b"AB".to_vec()).0;
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            Some(&context),
+        )
+        .expect("bounded replay reader must initialize");
+        assert_eq!(reader.fill_buf().expect("first byte must fill"), b"A");
+        reader.consume(1);
+        assert_eq!(reader.fill_buf().expect("second byte must fill"), b"B");
+        reader.consume(1);
+        assert!(matches!(
+            reader.take_failure(),
+            Some(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::Work && limit.limit == 1
+        ));
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"A"
+        );
     }
 
     #[test]

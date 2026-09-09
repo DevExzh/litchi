@@ -1,0 +1,18 @@
+test_all_retained_0485_report_validators_and_resource_parsers (test_compare.CompareHelperTests.test_all_retained_0485_report_validators_and_resource_parsers)
+Exercise every selected arm with both retained baseline roles. ... ok
+test_artifact_hash_tamper_is_rejected (test_compare.CompareHelperTests.test_artifact_hash_tamper_is_rejected) ... ok
+test_before_after_flags_include_rss_and_zero_baseline_is_safe (test_compare.CompareHelperTests.test_before_after_flags_include_rss_and_zero_baseline_is_safe) ... ok
+test_capture_all_loads_only_the_selected_phase_builds (test_compare.CompareHelperTests.test_capture_all_loads_only_the_selected_phase_builds) ... ok
+test_content_identity_tamper_is_rejected (test_compare.CompareHelperTests.test_content_identity_tamper_is_rejected) ... ok
+test_frozen_matrix_cardinality_and_order (test_compare.CompareHelperTests.test_frozen_matrix_cardinality_and_order) ... ok
+test_metric_extraction_retains_samples_heap_and_rss_scope (test_compare.CompareHelperTests.test_metric_extraction_retains_samples_heap_and_rss_scope) ... ok
+test_protocol_loader_returns_protocol_hash_after_fixture_checks (test_compare.CompareHelperTests.test_protocol_loader_returns_protocol_hash_after_fixture_checks) ... ok
+test_perf_keeps_unsupported_and_missing_counters_unavailable (test_summarize_profiles.ProfileSummaryParserTests.test_perf_keeps_unsupported_and_missing_counters_unavailable) ... ok
+test_strace_accepts_implicit_zero_errors_column (test_summarize_profiles.ProfileSummaryParserTests.test_strace_accepts_implicit_zero_errors_column) ... ok
+test_syscall_baseline_is_retained_0485_after_diagnostic (test_summarize_profiles.ProfileSummaryParserTests.test_syscall_baseline_is_retained_0485_after_diagnostic) ... ok
+test_zero_baseline_percentage_is_explicitly_undefined (test_summarize_profiles.ProfileSummaryParserTests.test_zero_baseline_percentage_is_explicitly_undefined) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.554s
+
+OK
