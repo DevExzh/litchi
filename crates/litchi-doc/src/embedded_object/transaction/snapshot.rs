@@ -4,6 +4,7 @@ use super::super::Limits;
 use super::super::model::{Editor, Inventory, Reference, WriteOptions};
 use super::Transaction;
 use crate::package::Result;
+use litchi_ole_common::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
 use std::sync::Arc;
 
 /// An immutable, source-preserving snapshot of one bounded Word binary file.
@@ -81,6 +82,114 @@ impl Snapshot {
     /// `ObjectPool` storage.
     pub fn objects(&self) -> Result<Vec<Reference>> {
         self.editor.objects()
+    }
+
+    /// Returns one managed object's inert OLEDS presentation stream.
+    ///
+    /// The DOC field and `ObjectPool` storage remain owned by this DOC layer;
+    /// the stream payload is parsed by the shared bounded OLEDS owner and is
+    /// never rendered or activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the storage is not referenced, the stream index
+    /// or payload is malformed, or the selected OLEDS limits are exceeded.
+    pub fn presentation(
+        &self,
+        storage_id: u32,
+        index: usize,
+    ) -> Result<Option<PresentationSnapshot>> {
+        self.editor.presentation(storage_id, index)
+    }
+
+    /// Returns one managed presentation under explicit OLEDS limits.
+    pub fn presentation_with_limits(
+        &self,
+        storage_id: u32,
+        index: usize,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<PresentationSnapshot>> {
+        self.editor
+            .presentation_with_limits(storage_id, index, limits)
+    }
+
+    /// Returns one presentation selected by a DOC object reference.
+    pub fn presentation_for(
+        &self,
+        reference: &Reference,
+        index: usize,
+    ) -> Result<Option<PresentationSnapshot>> {
+        self.editor.presentation_for(reference, index)
+    }
+
+    /// Returns one reference-selected presentation under explicit limits.
+    pub fn presentation_for_with_limits(
+        &self,
+        reference: &Reference,
+        index: usize,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<PresentationSnapshot>> {
+        self.editor
+            .presentation_for_with_limits(reference, index, limits)
+    }
+
+    /// Returns all managed OLEDS presentations in numeric order.
+    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, PresentationSnapshot)>> {
+        self.editor.presentations(storage_id)
+    }
+
+    /// Returns all managed presentations under explicit OLEDS limits.
+    pub fn presentations_with_limits(
+        &self,
+        storage_id: u32,
+        limits: ole_streams::Limits,
+    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+        self.editor.presentations_with_limits(storage_id, limits)
+    }
+
+    /// Returns all presentations selected by a DOC object reference.
+    pub fn presentations_for(
+        &self,
+        reference: &Reference,
+    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+        self.editor.presentations_for(reference)
+    }
+
+    /// Returns all reference-selected presentations under explicit limits.
+    pub fn presentations_for_with_limits(
+        &self,
+        reference: &Reference,
+        limits: ole_streams::Limits,
+    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+        self.editor.presentations_for_with_limits(reference, limits)
+    }
+
+    /// Returns one managed object's inert OLEDS native-data stream.
+    pub fn native(&self, storage_id: u32) -> Result<Option<NativeSnapshot>> {
+        self.editor.native(storage_id)
+    }
+
+    /// Returns one managed native-data stream under explicit OLEDS limits.
+    pub fn native_with_limits(
+        &self,
+        storage_id: u32,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<NativeSnapshot>> {
+        self.editor.native_with_limits(storage_id, limits)
+    }
+
+    /// Returns native data selected by a DOC object reference.
+    pub fn native_for(&self, reference: &Reference) -> Result<Option<NativeSnapshot>> {
+        self.editor.native_for(reference)
+    }
+
+    /// Returns reference-selected native data under explicit OLEDS limits.
+    pub fn native_for_with_limits(
+        &self,
+        reference: &Reference,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<NativeSnapshot>> {
+        self.editor.native_for_with_limits(reference, limits)
     }
 
     /// Exports one managed object as a bounded inert transfer closure.
