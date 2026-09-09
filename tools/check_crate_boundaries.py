@@ -17681,6 +17681,134 @@ PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA = (
     Path("crates/litchi-pages/fuzz/corpus/pages_body_table_hidden_axes"),
 )
 
+# Pages raw-ID hidden-axis readers remain compatibility debt until the focused
+# owner has a native changed-edit receipt of its own.  The existing-owner
+# legacy candidate receipt is deliberately a different artifact and must not
+# satisfy this gate.  Keep this evidence contract narrow and source/test
+# based: a future host deletion is accepted only after the focused package
+# test pins the focused native fixture and proves save/reopen semantics.
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-pages/tests/native_hidden_axes.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE = Path(
+    "test-data/iwork/pages/body-table-hidden-axes-focused-native.pages"
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT = Path(
+    "test-data/iwork/pages/body-table-hidden-axes-focused-native-receipt.json"
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_REQUIRED_RECEIPT_FIELDS = (
+    "application",
+    "version",
+    "native_file",
+    "sha256",
+    "size",
+    "body_marker",
+    "lifecycle",
+    "hidden_row_indices",
+    "hidden_column_indices",
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_LIFECYCLE_MARKERS = {
+    "opened without repair": re.compile(
+        r"\bopened\b.*\bwithout\s+(?:a\s+)?repair\b", re.IGNORECASE
+    ),
+    "saved": re.compile(r"\bsaved\b", re.IGNORECASE),
+    "actual document close": re.compile(
+        r"\b(?:actual\s+)?(?:document\s+)?(?:window\s+)?closed\b|"
+        r"\bactual\s+document\s+(?:close|closed)\b|"
+        r"\btemplate\s+chooser\b",
+        re.IGNORECASE,
+    ),
+    "exact reopen": re.compile(
+        r"\b(?:exact\s+)?reopened\b|\breopen(?:ed)?\b.*\bexact\b",
+        re.IGNORECASE,
+    ),
+    "visual verification": re.compile(
+        r"\bvisually\s+verified\b|\bverified\b.*\b(?:hidden|row|column|table)\b",
+        re.IGNORECASE,
+    ),
+}
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_MARKERS = {
+    "strict package ingress": re.compile(
+        r"\bPackage\s*::\s*(?:from_bytes|open)\s*\("
+    ),
+    "semantic read": re.compile(r"\bbody_table_hidden_axes\s*\("),
+    "semantic edit": re.compile(r"\bedit_body_table_hidden_axes\s*\("),
+    "semantic apply": re.compile(r"\bapply_body_table_hidden_axes\s*\("),
+    "hidden row and column selectors": re.compile(
+        r"\bAxisIndex\s*::\s*(?:row|column)\s*\("
+    ),
+    "source-preserving write": re.compile(
+        r"\bwrite_to\s*\(|\bexact_bytes\s*\(|\bassert_eq!\s*\("
+    ),
+    # Permit snake_case test names such as ``focused_reopen_and_inverse``
+    # while still requiring a token boundary against ordinary identifiers.
+    "candidate reopen": re.compile(
+        r"(?<![A-Za-z0-9])(?:reopened|reopen|readback)(?![A-Za-z0-9])",
+        re.IGNORECASE,
+    ),
+    "inverse transaction": re.compile(r"\binverse\s*\("),
+}
+# Native proof is insufficient while the source-built Pages compatibility
+# harness has not exercised the focused transaction.  Keep this second gate
+# tied to the concrete migration host and example so a native fixture alone
+# cannot retire the legacy route after a partial source-built migration.
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE = (
+    IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE = (
+    IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_NAME = (
+    "focused_source_built_table_roundtrips_hidden_axes_transactionally"
+)
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
+    "focused transaction test": re.compile(
+        rf"(?m)^[ \t]*fn[ \t]+"
+        rf"{re.escape(PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_NAME)}\b"
+    ),
+    "source-built Pages builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "source-built table": re.compile(r"\bbody_table\s*\("),
+    "focused hidden-axis write": re.compile(r"\bset_pages_table_hidden_axes\s*\("),
+    "focused hidden-axis read": re.compile(r"\bpages_table_hidden_axes\s*\("),
+    "source-built reopen": re.compile(r"\bPagesEditor\s*::\s*from_bytes\s*\("),
+    "source-built exact bytes": re.compile(r"\bto_bytes\s*\("),
+    "source-built invalid transaction": re.compile(r"\bis_err\s*\("),
+    "source-built clear transaction": re.compile(r"\bHiddenAxes\s*::\s*empty\s*\("),
+}
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
+    "Pages migration branch": re.compile(
+        r"(?m)^[ \t]*fn[ \t]+create_pages\b"
+    ),
+    "Pages source-built builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "Pages source-built table": re.compile(r"\bbody_table\s*\("),
+    "Pages focused package ingress": re.compile(
+        r"\bPagesPackage\s*::\s*from_bytes\s*\("
+    ),
+    "Pages focused transaction": re.compile(
+        r"\bedit_body_table_hidden_axes\s*\("
+    ),
+    "Pages focused package write": re.compile(r"\bwrite_to\s*\("),
+    "Pages source-built reopen": re.compile(
+        r"\bPagesEditor\s*::\s*from_bytes\s*\("
+    ),
+    "Pages focused native reopen": re.compile(
+        r"\bPagesPackage\s*::\s*open\s*\("
+    ),
+    "Pages focused semantic read": re.compile(
+        r"\bbody_table_hidden_axes\s*\("
+    ),
+}
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_FOCUSED_TEST_MARKERS = {
+    "semantic read": re.compile(r"\bbody_table_hidden_axes\s*\("),
+    "semantic edit": re.compile(r"\bedit_body_table_hidden_axes\s*\("),
+    "semantic apply": re.compile(r"\bapply_body_table_hidden_axes\s*\("),
+}
+PAGES_TABLE_HIDDEN_AXES_RETIREMENT_REEXPORT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+use(?:(?!;)[\s\S])*?"
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:table_hidden_axes|set_table_hidden_axes)"
+    r"(?![A-Za-z0-9_])(?:(?!;)[\s\S])*;"
+)
+
 # Longer body terminology aliases keep callers and boundary tests consistent
 # with the public owner names without maintaining duplicate inventories.
 PAGES_BODY_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE = PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE
@@ -22217,6 +22345,229 @@ def _pages_table_hidden_axes_owner_present(root: Path) -> bool:
     return owner_path.is_file() and (
         PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE.search(package_source) is not None
     )
+
+
+def _audit_pages_table_hidden_axes_retirement_native_evidence(
+    root: Path,
+) -> list[str]:
+    """Require the focused Pages fixture, receipt, and semantic test seam."""
+
+    test_path = root / PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE
+    fixture_path = root / PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE
+    receipt_path = root / PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT
+    violations: list[str] = []
+
+    if not test_path.is_file():
+        violations.append(
+            "focused Pages hidden-axes retirement is missing its native integration test: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE}"
+        )
+    if not fixture_path.is_file():
+        violations.append(
+            "focused Pages hidden-axes retirement is missing its native fixture: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE}"
+        )
+    elif fixture_path.stat().st_size == 0:
+        violations.append(
+            "focused Pages hidden-axes retirement native fixture is empty: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE}"
+        )
+    if not receipt_path.is_file():
+        violations.append(
+            "focused Pages hidden-axes retirement is missing its native receipt: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+        )
+
+    receipt: dict[str, Any] | None = None
+    if receipt_path.is_file():
+        try:
+            loaded = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt is invalid JSON: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}: {error}"
+            )
+        else:
+            if not isinstance(loaded, dict):
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt must be an object: "
+                    f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+            else:
+                receipt = loaded
+
+    if receipt is not None:
+        for field in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_REQUIRED_RECEIPT_FIELDS:
+            if field not in receipt:
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt is missing "
+                    f"{field}: {PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+
+        if receipt.get("application") != "Pages":
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt must identify Pages: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+            )
+        if receipt.get("version") != "14.4":
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt must identify version 14.4: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+            )
+        if receipt.get("native_file") != fixture_path.name:
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt must pin its focused fixture: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+            )
+        if not isinstance(receipt.get("body_marker"), str) or not receipt["body_marker"].strip():
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt must include a body marker: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+            )
+
+        lifecycle = receipt.get("lifecycle")
+        if not isinstance(lifecycle, list) or not all(
+            isinstance(item, str) and item.strip() for item in lifecycle
+        ):
+            violations.append(
+                "focused Pages hidden-axes retirement native receipt must include a lifecycle list: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+            )
+            lifecycle_items: list[str] = []
+        else:
+            lifecycle_items = lifecycle
+        for label, marker in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_LIFECYCLE_MARKERS.items():
+            if not any(marker.search(item) for item in lifecycle_items):
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt is missing "
+                    f"{label} lifecycle evidence: "
+                    f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+
+        for field in ("hidden_row_indices", "hidden_column_indices"):
+            values = receipt.get(field)
+            if not isinstance(values, list) or not values or not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in values
+            ):
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt must record "
+                    f"nonempty {field}: {PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+
+        if fixture_path.is_file():
+            fixture_bytes = fixture_path.read_bytes()
+            expected_size = len(fixture_bytes)
+            if receipt.get("size") != expected_size:
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt size does not match "
+                    f"fixture ({receipt.get('size')!r} != {expected_size}): "
+                    f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+            expected_hash = hashlib.sha256(fixture_bytes).hexdigest()
+            if receipt.get("sha256") != expected_hash:
+                violations.append(
+                    "focused Pages hidden-axes retirement native receipt SHA-256 does not match "
+                    f"fixture: {PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT}"
+                )
+
+    if test_path.is_file():
+        raw_test = test_path.read_text(encoding="utf-8")
+        include_test = _mask_rust_comments(raw_test)
+        code_test = _mask_rust_non_code(raw_test)
+        if re.search(
+            rf"\binclude_bytes!\s*\([^;]*?"
+            rf"{re.escape(PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE.as_posix())}",
+            include_test,
+        ) is None:
+            violations.append(
+                "focused Pages hidden-axes retirement native test must include its focused fixture: "
+                f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE}"
+            )
+        for label, marker in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_MARKERS.items():
+            if marker.search(code_test) is None:
+                violations.append(
+                    "focused Pages hidden-axes retirement native test is missing "
+                    f"{label} evidence: {PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE}"
+                )
+
+    return sorted(set(violations))
+
+
+def _audit_pages_table_hidden_axes_retirement_source_built_evidence(
+    root: Path,
+) -> list[str]:
+    """Require the source-built focused transaction before host retirement."""
+
+    violations: list[str] = []
+    test_path = root / PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE
+    example_path = root / PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE
+
+    if not test_path.is_file():
+        violations.append(
+            "Pages hidden-axes retirement is missing its source-built focused host test: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE}"
+        )
+    else:
+        test_code = _mask_rust_non_code(test_path.read_text(encoding="utf-8"))
+        for label, marker in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS.items():
+            if marker.search(test_code) is None:
+                violations.append(
+                    "Pages hidden-axes retirement source-built host test is missing "
+                    f"{label} evidence: "
+                    f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE}"
+                )
+
+    if not example_path.is_file():
+        violations.append(
+            "Pages hidden-axes retirement is missing its source-built migration example: "
+            f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE}"
+        )
+    else:
+        example_code = _mask_rust_non_code(example_path.read_text(encoding="utf-8"))
+        for label, marker in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS.items():
+            if marker.search(example_code) is None:
+                violations.append(
+                    "Pages hidden-axes retirement source-built migration example is missing "
+                    f"{label} evidence: "
+                    f"{PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE}"
+                )
+
+    return sorted(set(violations))
+
+
+def _pages_table_hidden_axes_retirement_evidence_ready(root: Path) -> bool:
+    """Return whether focused source, tests, and native parity permit retirement."""
+
+    if not _pages_table_hidden_axes_owner_present(root):
+        return False
+    owner_path = root / PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    if not set(PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS) <= owner_methods:
+        return False
+
+    focused_test_code: list[str] = []
+    for relative_path in PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES:
+        path = root / relative_path
+        if not path.is_file():
+            return False
+        focused_test_code.append(
+            _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+        )
+    focused_tests = "\n".join(focused_test_code)
+    if any(marker.search(focused_tests) is None for marker in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_FOCUSED_TEST_MARKERS.values()):
+        return False
+    if _audit_pages_table_hidden_axes_retirement_source_built_evidence(root):
+        return False
+    return not _audit_pages_table_hidden_axes_retirement_native_evidence(root)
 
 
 def _pages_footnote_lifecycle_public_leak(identifier: str) -> str | None:
@@ -39841,6 +40192,13 @@ def audit_iwa_pages_table_hidden_axes_source_topology(
     # partially assembled package from a concurrent source migration.
     if not _pages_table_hidden_axes_owner_present(root):
         return []
+    # Once the focused native receipt and semantic parity tests are present,
+    # the old retention requirements (host module, host tests, and example)
+    # must stop blocking the retirement ratchet below.  That ratchet performs
+    # the stricter residue scan and keeps the shared Numbers/Keynote helper
+    # checks alive.
+    if _pages_table_hidden_axes_retirement_evidence_ready(root):
+        return []
 
     violations: list[str] = []
 
@@ -40098,6 +40456,148 @@ def audit_iwa_pages_table_hidden_axes_source_topology(
 audit_iwa_pages_body_table_hidden_axes_source_topology = (
     audit_iwa_pages_table_hidden_axes_source_topology
 )
+
+
+def audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only the Pages raw-ID hidden-axis compatibility route.
+
+    This audit activates after the focused Pages owner, semantic tests, and
+    focused native save/reopen receipt all exist.  It scans the Pages host
+    and Pages branches of shared examples for the two retired methods while
+    deliberately leaving the common helper and the Numbers/Keynote adapters
+    outside its source roots.
+    """
+
+    if not _pages_table_hidden_axes_retirement_evidence_ready(root):
+        return []
+
+    violations: list[str] = []
+    shared_helper = root / PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE
+    if not shared_helper.is_file():
+        violations.append(
+            "shared Numbers/Keynote table-hidden-axes helper is missing after Pages retirement: "
+            f"{PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE}"
+        )
+    else:
+        shared_code = _mask_rust_non_code(
+            shared_helper.read_text(encoding="utf-8")
+        )
+        for marker in PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_REQUIRED_MARKERS:
+            if re.search(
+                rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(marker)}\b",
+                shared_code,
+            ) is None:
+                violations.append(
+                    "shared Numbers/Keynote table-hidden-axes helper is missing "
+                    f"{marker} after Pages retirement: "
+                    f"{PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE}"
+                )
+    for host, host_path in (
+        ("Numbers", PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE),
+        ("Keynote", PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE),
+    ):
+        absolute_host = root / host_path
+        if not absolute_host.is_file():
+            violations.append(
+                f"{host} table-hidden-axes host route is missing its shared-helper adapter "
+                f"after Pages retirement: {host_path}"
+            )
+            continue
+        host_code = _mask_rust_non_code(
+            absolute_host.read_text(encoding="utf-8")
+        )
+        if PAGES_TABLE_HIDDEN_AXES_SHARED_IMPORT.search(host_code) is None:
+            violations.append(
+                f"{host} table-hidden-axes host must retain the shared helper import "
+                f"after Pages retirement: {host_path}"
+            )
+
+    def scan_pages_source(path: Path) -> None:
+        raw = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw)
+        relative = path.relative_to(root)
+        for name, line_number in _rust_function_declarations(source):
+            if name in RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHOD_SET:
+                violations.append(
+                    "retired litchi-iwa Pages table-hidden-axes migration-host method "
+                    f"{name}: {relative}:{line_number}"
+                )
+        for match in IWA_PAGES_TABLE_HIDDEN_AXES_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages table-hidden-axes migration-host module "
+                f"returned: {relative}:{line_number}"
+            )
+        for pattern in IWA_PAGES_TABLE_HIDDEN_AXES_IMPORTS:
+            # The retained host test file may keep semantic ``AxisIndex`` and
+            # ``HiddenAxes`` imports for the source-built focused transaction.
+            # Legacy method calls in that file are still scanned below, but a
+            # generic axis import alone is not a migration-host dependency.
+            if path == root / IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE:
+                continue
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-hidden-axes migration-host import "
+                    f"returned: {relative}:{line_number}"
+                )
+        for match in PAGES_TABLE_HIDDEN_AXES_RETIREMENT_REEXPORT.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages table-hidden-axes migration-host re-export "
+                f"returned: {relative}:{line_number}"
+            )
+        for match in IWA_PAGES_TABLE_HIDDEN_AXES_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            line_end = len(source) if line_end < 0 else line_end
+            line = source[line_start:line_end]
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+            ):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Pages table-hidden-axes migration-host call "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            scan_pages_source(path)
+
+    example_root = root / IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            raw = path.read_text(encoding="utf-8")
+            source = _mask_rust_non_code(raw)
+            relative = path.relative_to(root)
+            for match in IWA_PAGES_TABLE_HIDDEN_AXES_CALL.finditer(source):
+                if not _pages_table_hidden_axes_example_is_pages(
+                    path, source, match.start()
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-hidden-axes migration-host example "
+                    f"call {match.group('method')}: {relative}:{line_number}"
+                )
+            for pattern in IWA_PAGES_TABLE_HIDDEN_AXES_IMPORTS:
+                for match in pattern.finditer(source):
+                    if not _pages_table_hidden_axes_example_is_pages(
+                        path, source, match.start()
+                    ):
+                        continue
+                    line_number = source.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-hidden-axes migration-host "
+                        f"example import: {relative}:{line_number}"
+                    )
+
+    return sorted(set(violations))
 
 
 def _pages_table_sort_owner_present(root: Path) -> bool:
@@ -68325,6 +68825,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_table_dimension_source_topology()
         + audit_pages_table_dimension_facade_source_topology()
         + audit_iwa_pages_table_hidden_axes_source_topology()
+        + audit_iwa_pages_table_hidden_axes_retirement_source_topology()
         + audit_pages_table_hidden_axes_facade_source_topology()
         + audit_iwa_pages_table_sort_source_topology()
         + audit_pages_table_sort_facade_source_topology()

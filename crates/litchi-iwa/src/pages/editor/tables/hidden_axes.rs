@@ -1,10 +1,10 @@
 //! Typed hidden-row and hidden-column CRUD for Pages body tables.
 //!
-//! This route remains a migration-host compatibility seam until the focused
-//! `litchi-pages` owner has passed the native changed-edit gate.  In
-//! particular, the focused owner currently refuses creation for a table that
-//! has no native hidden-state owner, so removing this route would regress
-//! source-built Pages documents.
+//! This route remains a migration-host compatibility seam while the focused
+//! `litchi-pages` owner completes source-built parity.  The native changed-edit
+//! gate passes; remaining source-built gaps cover aggregate FieldInfo and
+//! reference metadata, cross-component formula-owner cases, and comment
+//! registry updates.
 
 use super::*;
 use litchi_iwa_common::table::axis::HiddenAxes;
@@ -14,7 +14,7 @@ impl PagesEditor {
     ///
     /// This raw-ID API is retained for migration-host compatibility.  New
     /// callers should use `litchi_pages::Package` and
-    /// `BodyTableSelector` once the focused owner has native parity.
+    /// `BodyTableSelector` once the focused owner has source-built parity.
     pub fn table_hidden_axes(&self, model_object_id: u64) -> Result<HiddenAxes> {
         self.require_body_table(model_object_id)?;
         crate::table_hidden_axes::table_hidden_axes(self.package(), model_object_id)
@@ -23,8 +23,8 @@ impl PagesEditor {
     /// Replace all user-hidden rows and columns transactionally.
     ///
     /// This raw-ID API is retained for migration-host compatibility.  The
-    /// focused Pages owner does not yet replace an absent native hidden-state
-    /// owner, so this route remains required for source-built documents.
+    /// focused Pages owner still has source-built aggregate and cross-component
+    /// owner gaps, so this route remains required for those documents.
     pub fn set_table_hidden_axes(
         &mut self,
         model_object_id: u64,

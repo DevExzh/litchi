@@ -10757,3 +10757,80 @@ all-feature workspace library/integration tests, and documentation tests.
 No Cargo manifest changed. The remaining validation logs and Python cache
 were removed after recording the results; the unrelated preexisting `.codex`
 worktree content was preserved.
+
+## 2026-09-09 Pages native hidden-axis writer qualification
+
+Computer Use opened a disposable copy of the native visible 5-by-4 Pages
+body-table fixture. The row menu again exposed no Hide command. A bounded
+legacy existing-owner probe then set zero-based row 2 and column 1 without
+creating hidden-state helper objects. Pages 14.4 opened that candidate without
+repair UI and visibly showed row tabs 1, 2, 4, 5 and column tabs A, C, D while
+retaining the logical 5-by-4 dimensions and original body marker.
+
+After save, actual document-window close to the template chooser, and exact
+file reopen, the same hidden axes and body marker remained visible. The
+application-saved result is retained as
+`test-data/iwork/pages/body-table-hidden-axes-native.pages`, with the adjacent
+receipt recording its hash, size, and lifecycle. This fixture qualifies the
+observed native existing-owner storage shape.
+
+The focused writer then independently produced a hidden candidate from the
+original visible fixture. Pages saved it, closed its actual document window,
+and reopened the exact saved file without repair UI; the body marker and
+hidden row/column tabs remained intact. The retained
+`body-table-hidden-axes-focused-native.pages` and adjacent receipt record this
+focused producer lifecycle. Focused clear and reset produced identical candidate
+bytes from the native hidden fixture. Their app-saved result,
+`body-table-hidden-axes-cleared-native.pages`, survived the same lifecycle and
+showed all five row tabs and four column tabs.
+
+Native mutation remains restricted to an existing, validated one-state owner.
+Native helper-owner creation stays unsupported. Focused tests exercise strict
+reads of all native goldens, no-op identity, set/clear/reset, reopen, patch
+application and exact inverse, conflicts, and atomic limit failures. They compare
+every unselected object inside the selected CalculationEngine component,
+including payload and retained archive metadata, and every unselected package
+member. Existing 4008/6204/6220 dependencies remain byte-identical.
+
+The legacy source-built Cities regression exposed a separate metadata
+admission gap: its selected payloads decode successfully, but its archive
+references omit per-field declarations. Retirement therefore also requires
+source-built read, creation, later edits, and reopen parity; positive native
+evidence alone does not establish that compatibility.
+
+The source-built probe also found two creation-specific gaps: pristine tables
+place their kind-1 formula owner in CalculationEngine rather than the selected
+Document component, and legacy comment/reply edits add physical objects without
+adding their UUID registry bindings. The strict creation registry census rejects
+the latter shape. These are separate qualification requirements, not reasons to
+relax the native existing-owner proof. Temporary compatibility experiments were
+removed. `PagesEditor::{table_hidden_axes, set_table_hidden_axes}` and their
+existing callers remain intact; the retirement gate requires source-built
+focused transaction evidence in addition to the native receipt. Eleven ordered
+migration debts remain.
+
+Final scoped validation passes 34 synthetic hidden-axis tests, three native
+fixture tests, seven native hidden-axis tests, and strict all-target Pages
+Clippy. Existing legacy callers and their feature coverage are preserved.
+
+The registry follow-up belongs at the legacy comment producer: its shared
+Numbers host `insert_comment_storage`/`clone_comment_storage_exact` paths
+advance the object watermark without adding component UUID bindings. Focused
+comment creation/reply transactions already publish those bindings atomically.
+Preserve the strict present-registry contract; repair and test the producer
+rather than synthesizing missing comment ownership during a visibility edit.
+
+The final nightly AddressSanitizer build and bounded replay pass: 87 checked-in
+corpus inputs, 89 executions including initialization, and 476 MiB reported
+resident memory, with no sanitizer failure. This is bounded regression
+evidence, not exhaustive fuzzing. The boundary suite passes 1,020 tests; the
+scanner accepts 64 packages and 238 dependency declarations with eleven
+explicit migration debts. Native evidence alone cannot activate retirement.
+
+Normal commit hooks pass formatting, strict all-feature workspace Clippy,
+all-feature workspace library/integration tests, and documentation tests.
+No Cargo manifest changed. Scoped `cargo clean` removed 2,093 sanitizer build
+files (1.5 GiB). Disposable native copies, compatibility probes, replay and
+build logs, generated fuzz lockfile, and Python cache were removed. Permanent
+native fixtures and receipts remain; unrelated preexisting `.codex` content
+was preserved.

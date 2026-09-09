@@ -2145,6 +2145,11 @@ fn rewrite(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let creation = graph.model.owner.is_none();
+    if graph.profile.is_native() && creation {
+        // Native owner creation has no qualified producer envelope. Keep
+        // this restriction at the private rewrite boundary as well.
+        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+    }
     let creation_plan = if creation {
         Some(prepare_owner_creation(source, graph, axes, budget)?)
     } else {

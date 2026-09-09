@@ -1,0 +1,41 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "source_file": "body-table-visible.pages",
+  "candidate_producer": "legacy PagesEditor existing hidden-state owner route",
+  "native_file": "body-table-hidden-axes-native.pages",
+  "sha256": "96e5c3b4815581bb3c0a65cb4b46b4bc68e35c15f3fb944af27e31360007830d",
+  "size": 108938,
+  "table": "Table 1",
+  "logical_rows": 5,
+  "logical_columns": 4,
+  "hidden_row_indices": [
+    2
+  ],
+  "hidden_column_indices": [
+    1
+  ],
+  "visible_row_tabs": [
+    1,
+    2,
+    4,
+    5
+  ],
+  "visible_column_tabs": [
+    "A",
+    "C",
+    "D"
+  ],
+  "body_marker": "Pages hidden-axis native oracle — 2026-09-05",
+  "lifecycle": [
+    "opened exact legacy candidate without repair warning",
+    "visually verified hidden row 3 and column B",
+    "saved in Pages",
+    "closed actual document window to template chooser",
+    "reopened exact saved file without repair warning",
+    "verified body marker and visible row/column tabs again",
+    "closed actual document window to template chooser"
+  ],
+  "scope": "Native existing-owner producer acceptance; focused writer candidate verification is separate."
+}

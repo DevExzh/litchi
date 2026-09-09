@@ -105,13 +105,34 @@ fn native_visible_body_table_reads_empty_and_preserves_exact_noop()
         .set(litchi_pages::table::hidden_axes::HiddenAxes::new([
             litchi_pages::table::hidden_axes::AxisIndex::row(0),
         ])?)
-        .commit();
-    assert!(matches!(
-        changed,
-        Err(litchi_pages::BodyTableHiddenAxesError::UnsupportedDependency)
-    ));
-    let mut after_refusal = Vec::new();
-    package.write_to(&mut after_refusal)?;
-    assert_eq!(after_refusal, bytes);
+        .commit()?;
+    assert_eq!(
+        changed.package().body_table_hidden_axes(0usize)?,
+        litchi_pages::table::hidden_axes::HiddenAxes::new([
+            litchi_pages::table::hidden_axes::AxisIndex::row(0),
+        ])?
+    );
+    let mut changed_bytes = Vec::new();
+    changed.package().write_to(&mut changed_bytes)?;
+    let reopened = Package::from_bytes(&changed_bytes)?;
+    assert_eq!(
+        reopened.body_table_hidden_axes(0usize)?,
+        litchi_pages::table::hidden_axes::HiddenAxes::new([
+            litchi_pages::table::hidden_axes::AxisIndex::row(0),
+        ])?
+    );
+    let restored = changed
+        .package()
+        .apply_body_table_hidden_axes(&changed.patch().inverse())?;
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    assert_eq!(restored_bytes, bytes);
+    assert_eq!(
+        restored.package().body_table_hidden_axes(0usize)?,
+        litchi_pages::table::hidden_axes::HiddenAxes::empty()
+    );
+    let mut source_after_edit = Vec::new();
+    package.write_to(&mut source_after_edit)?;
+    assert_eq!(source_after_edit, bytes);
     Ok(())
 }

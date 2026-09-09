@@ -54,6 +54,13 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 
 ## `pages_body_table_hidden_axes`
 
+Every descriptor also selects a checked-in native visible or native
+hidden-axis fixture with finite package/archive limits. It varies set,
+clear, reset, and no-op operations through semantic positions, verifies text
+and hidden-axis readback after reopening, applies the patch, and checks exact
+source restoration through its inverse. These fixed native sources complement
+the generated malformed graph matrix below.
+
 `pages_body_table_hidden_axes` exercises the focused body-table hidden-axes
 owner using bounded descriptors that construct a strict two-table IWA graph.
 Every input first reaches a valid selector/read setup and stages an edit; the

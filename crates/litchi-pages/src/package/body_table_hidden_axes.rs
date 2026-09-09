@@ -55,18 +55,18 @@ const MODEL_ROW_REFERENCE_PATH: &[u32] = &[35];
 
 /// The selected Pages producer profile determines which archive-header
 /// version tuples and dependency metadata are authoritative.  The qualified
-/// current profile remains the default; the native visible profile is
+/// current profile remains the default; the native existing-owner profile is
 /// admitted only for the exact 6000/6001 role pair observed in the checked-in
 /// Pages document.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GraphProfile {
     Indexed,
-    NativeVisible,
+    NativeExistingOwner,
 }
 
 impl GraphProfile {
     const fn is_native(self) -> bool {
-        matches!(self, Self::NativeVisible)
+        matches!(self, Self::NativeExistingOwner)
     }
 
     const fn info_versions(self) -> &'static [u32] {
@@ -78,14 +78,14 @@ impl GraphProfile {
     const fn model_versions(self) -> &'static [u32] {
         match self {
             Self::Indexed => CURRENT_MESSAGE_VERSIONS,
-            Self::NativeVisible => NATIVE_TABLE_MODEL_MESSAGE_VERSIONS,
+            Self::NativeExistingOwner => NATIVE_TABLE_MODEL_MESSAGE_VERSIONS,
         }
     }
 
     const fn formula_owner_versions(self) -> &'static [u32] {
         match self {
             Self::Indexed => CURRENT_MESSAGE_VERSIONS,
-            Self::NativeVisible => NATIVE_FORMULA_OWNER_MESSAGE_VERSIONS,
+            Self::NativeExistingOwner => NATIVE_FORMULA_OWNER_MESSAGE_VERSIONS,
         }
     }
 }
@@ -659,14 +659,11 @@ impl Package {
                 diagnostics: BodyTableHiddenAxesDiagnostics::unchanged(),
             });
         }
-        if graph.profile.is_native() {
-            // The native visible profile is read/no-op only until a Pages
-            // producer round-trip proves that its kind-1 dependency envelope
-            // can be rewritten without changing unrelated native state.
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
-        }
         if graph.target.explicit_locked == Some(true) {
             return Err(BodyTableHiddenAxesError::TableLocked);
+        }
+        if graph.profile.is_native() && graph.model.owner.is_none() {
+            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
         }
         if !self.state.source.source_is_exact()
             || page_layout::fingerprint(patch.target.as_ref()) != patch.target_fingerprint
@@ -756,9 +753,9 @@ fn commit_edit(
     if graph.before != edit.before {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
-    if graph.profile.is_native() {
-        // Native kind-1 formula ownership is qualified for reads and exact
-        // no-ops only.  Refuse before any candidate allocation or publication.
+    if graph.profile.is_native() && graph.model.owner.is_none() {
+        // Native kind-1 formula ownership is qualified for existing-owner
+        // edits only. Native helper-owner creation remains unsupported.
         return Err(BodyTableHiddenAxesError::UnsupportedDependency);
     }
     if graph.model.pivot || graph.info.pivot {
@@ -911,7 +908,7 @@ fn resolve_graph(
                 budget,
             )?;
         } else if profile.is_native() {
-            // The native visible profile carries both dependency roots.  An
+            // The native existing-owner profile carries both dependency roots.  An
             // absent root cannot be interpreted as an ownerless empty table.
             return Err(BodyTableHiddenAxesError::InvalidSource);
         } else {
@@ -1042,7 +1039,7 @@ fn resolve_graph(
         }
     }
     if profile.is_native() {
-        validate_native_visible_owner(&model, &info)?;
+        validate_native_existing_owner(&model, &info)?;
     }
     validate_dependencies(
         package,
@@ -1134,7 +1131,7 @@ fn classify_graph_profile(
         && model.type_ == 6_001
         && model.versions.as_slice() == NATIVE_TABLE_MODEL_MESSAGE_VERSIONS
     {
-        return Ok(GraphProfile::NativeVisible);
+        return Ok(GraphProfile::NativeExistingOwner);
     }
 
     if info.versions.as_slice() == CURRENT_MESSAGE_VERSIONS
@@ -3078,7 +3075,7 @@ fn validate_extent_filters(
         )?)
         .map_err(map_lock_error)?;
     if profile.is_native() {
-        // The visible profile has one state and at most two filter edges.
+        // The native profile has one state and at most two filter edges.
         // Admit its aggregate, field-path, and per-filter consistency scans
         // separately from constructing the sorted reference inventory.
         charge_metadata_scan(model_info, 8, budget)?;
@@ -3302,7 +3299,7 @@ fn read_extent(
     Ok(())
 }
 
-fn validate_native_visible_owner(
+fn validate_native_existing_owner(
     model: &ModelValues,
     info: &InfoValues,
 ) -> Result<(), BodyTableHiddenAxesError> {
@@ -3323,18 +3320,13 @@ fn validate_native_visible_owner(
         .hidden_states()
         .first()
         .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if state
-        .row_hidden_state_extent()
-        .base_hidden_states()
-        .is_empty()
-        && state
-            .column_hidden_state_extent()
-            .base_hidden_states()
-            .is_empty()
-    {
-        Ok(())
-    } else {
+    if state.hidden_states_uid() != owner.owner_uid() {
         Err(BodyTableHiddenAxesError::InvalidSource)
+    } else {
+        // The qualified native envelope has exactly one state. The shared
+        // dependency proof validates its extents, UUIDs, directions, filters,
+        // and unsupported flags before any edit can be published.
+        Ok(())
     }
 }
 

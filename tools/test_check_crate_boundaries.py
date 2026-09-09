@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
 import io
 import json
@@ -6865,6 +6866,183 @@ def add_pages_table_hidden_axes_shared_helper_scaffold(root: Path) -> None:
             "use crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes};\n",
             encoding="utf-8",
         )
+
+
+def add_pages_table_hidden_axes_retirement_evidence(
+    root: Path,
+    *,
+    keep_host: bool = True,
+    include_source_built: bool = True,
+) -> None:
+    """Create focused native and optional source-built evidence for ratchet tests."""
+
+    add_pages_table_hidden_axes_canonical_scaffold(root)
+    add_pages_table_hidden_axes_shared_helper_scaffold(root)
+
+    fixture = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture_bytes = b"focused Pages hidden-axis native fixture\n"
+    fixture.write_bytes(fixture_bytes)
+    receipt = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT
+    receipt.write_text(
+        json.dumps(
+            {
+                "application": "Pages",
+                "version": "14.4",
+                "native_file": fixture.name,
+                "sha256": hashlib.sha256(fixture_bytes).hexdigest(),
+                "size": len(fixture_bytes),
+                "body_marker": "Focused Pages hidden-axis native parity",
+                "hidden_row_indices": [2],
+                "hidden_column_indices": [1],
+                "lifecycle": [
+                    "opened exact focused candidate without repair warning",
+                    "saved in Pages",
+                    "closed actual document window to template chooser",
+                    "reopened exact saved file without repair warning",
+                    "visually verified hidden row 3 and column B",
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    native_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE
+    native_test.parent.mkdir(parents=True, exist_ok=True)
+    native_test.write_text(
+        "use litchi_pages::{BodyTableSelector, Package};\n"
+        "use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};\n"
+        "const SOURCE: &[u8] = include_bytes!(\"../../../test-data/iwork/pages/"
+        "body-table-hidden-axes-focused-native.pages\");\n"
+        "#[test]\n"
+        "fn focused_native_hidden_axes_roundtrip() {\n"
+        "    let package = Package::from_bytes(SOURCE).unwrap();\n"
+        "    let selector = BodyTableSelector::index(0);\n"
+        "    let baseline = package.body_table_hidden_axes(selector).unwrap();\n"
+        "    let requested = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();\n"
+        "    let commit = package.edit_body_table_hidden_axes(selector).unwrap().set(requested.clone()).commit().unwrap();\n"
+        "    let mut candidate = Vec::new();\n"
+        "    commit.package().write_to(&mut candidate).unwrap();\n"
+        "    let reopened = Package::from_bytes(&candidate).unwrap();\n"
+        "    assert_eq!(reopened.body_table_hidden_axes(selector).unwrap(), requested);\n"
+        "    let restored = reopened.apply_body_table_hidden_axes(&commit.patch().inverse()).unwrap();\n"
+        "    assert_eq!(restored.package().body_table_hidden_axes(selector).unwrap(), baseline);\n"
+        "    let mut exact = Vec::new();\n"
+        "    restored.package().write_to(&mut exact).unwrap();\n"
+        "    assert_eq!(exact, SOURCE);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    if include_source_built:
+        host_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE
+        host_test.parent.mkdir(parents=True, exist_ok=True)
+        host_test.write_text(
+            host_test.read_text(encoding="utf-8")
+            + "\n#[test]\n"
+            "fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {\n"
+            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "        .body_table(\"Hidden\", 4, 3)\n"
+            "        .build()\n"
+            "        .unwrap();\n"
+            "    let selector = BodyTableSelector::name(\"Hidden\");\n"
+            "    let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();\n"
+            "    set_pages_table_hidden_axes(&mut editor, selector, hidden.clone()).unwrap();\n"
+            "    assert_eq!(pages_table_hidden_axes(&editor, selector).unwrap(), hidden);\n"
+            "    let before = editor.to_bytes().unwrap();\n"
+            "    let reopened = PagesEditor::from_bytes(&before).unwrap();\n"
+            "    assert_eq!(pages_table_hidden_axes(&reopened, selector).unwrap(), hidden);\n"
+            "    let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();\n"
+            "    assert!(set_pages_table_hidden_axes(&mut editor, selector, invalid).is_err());\n"
+            "    assert_eq!(editor.to_bytes().unwrap(), before);\n"
+            "    set_pages_table_hidden_axes(&mut editor, selector, HiddenAxes::empty()).unwrap();\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        example = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE
+        example.parent.mkdir(parents=True, exist_ok=True)
+        example.write_text(
+            example.read_text(encoding="utf-8")
+            + "\nfn focused_source_built_pages_hidden_axes_example() {\n"
+            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "        .body_table(\"Hidden\", 4, 3)\n"
+            "        .build()\n"
+            "        .unwrap();\n"
+            "    let selector = BodyTableSelector::name(\"Hidden\");\n"
+            "    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();\n"
+            "    let commit = package.edit_body_table_hidden_axes(selector).unwrap()\n"
+            "        .set(HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap())\n"
+            "        .commit().unwrap();\n"
+            "    let mut bytes = Vec::new();\n"
+            "    commit.package().write_to(&mut bytes).unwrap();\n"
+            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    let _ = PagesPackage::open(output).unwrap()\n"
+            "        .body_table_hidden_axes(selector).unwrap();\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    if keep_host:
+        return
+    for relative_path in (
+        boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE,
+        boundaries.IWA_PAGES_TABLES_MODULE_SOURCE,
+    ):
+        path = root / relative_path
+        if path.is_file():
+            path.unlink()
+    if include_source_built:
+        host_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE
+        host_test.write_text(
+            "use litchi_pages::{BodyTableSelector, Package as PagesPackage};\n"
+            "use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};\n"
+            "use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};\n"
+            "#[test]\n"
+            "fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {\n"
+            "    let mut editor = PagesDocumentBuilder::new().body_table(\"Hidden\", 4, 3).build().unwrap();\n"
+            "    let selector = BodyTableSelector::name(\"Hidden\");\n"
+            "    let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();\n"
+            "    set_pages_table_hidden_axes(&mut editor, selector, hidden.clone()).unwrap();\n"
+            "    assert_eq!(pages_table_hidden_axes(&editor, selector).unwrap(), hidden);\n"
+            "    let before = editor.to_bytes().unwrap();\n"
+            "    let package = PagesPackage::from_bytes(&before).unwrap();\n"
+            "    let commit = package.edit_body_table_hidden_axes(selector).unwrap().set(hidden.clone()).commit().unwrap();\n"
+            "    let mut bytes = Vec::new();\n"
+            "    commit.package().write_to(&mut bytes).unwrap();\n"
+            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    assert_eq!(pages_table_hidden_axes(&editor, selector).unwrap(), hidden);\n"
+            "    let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();\n"
+            "    assert!(set_pages_table_hidden_axes(&mut editor, selector, invalid).is_err());\n"
+            "    assert_eq!(editor.to_bytes().unwrap(), bytes);\n"
+            "    set_pages_table_hidden_axes(&mut editor, selector, HiddenAxes::empty()).unwrap();\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        example = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE
+        example.write_text(
+            "fn create_pages(output: &Path) {\n"
+            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "        .body_table(\"Hidden\", 4, 3).build().unwrap();\n"
+            "    let selector = BodyTableSelector::name(\"Hidden\");\n"
+            "    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();\n"
+            "    let commit = package.edit_body_table_hidden_axes(selector).unwrap()\n"
+            "        .set(HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap())\n"
+            "        .commit().unwrap();\n"
+            "    let mut bytes = Vec::new();\n"
+            "    commit.package().write_to(&mut bytes).unwrap();\n"
+            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    let _ = PagesPackage::open(output).unwrap().body_table_hidden_axes(selector).unwrap();\n"
+            "}\n",
+            encoding="utf-8",
+        )
+    else:
+        for relative_path in (
+            boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE,
+            boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE,
+        ):
+            path = root / relative_path
+            if path.is_file():
+                path.unlink()
 
 
 def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
@@ -31823,6 +32001,33 @@ fn rewrite_movie_title_operation(
             boundaries.PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE,
             Path("crates/litchi-iwa/src/keynote/editor/slide_tables/hidden_axes.rs"),
         )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE,
+            Path("crates/litchi-pages/tests/native_hidden_axes.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_FIXTURE,
+            Path("test-data/iwork/pages/body-table-hidden-axes-focused-native.pages"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT,
+            Path(
+                "test-data/iwork/pages/body-table-hidden-axes-focused-native-"
+                "receipt.json"
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/tests.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE,
+            Path("crates/litchi-iwa/examples/create_iwork_hidden_tables.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_NAME,
+            "focused_source_built_table_roundtrips_hidden_axes_transactionally",
+        )
 
     def test_pages_table_hidden_axes_boundary_is_dormant_until_private_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -31841,6 +32046,177 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_pages_table_hidden_axes_facade_source_topology(root),
                 [],
+            )
+
+    def test_pages_table_hidden_axes_retirement_gate_is_dormant_without_focused_native_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            self.assertFalse(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root),
+                [],
+            )
+
+    def test_pages_table_hidden_axes_retirement_requires_receipt_integrity_and_lifecycle(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_retirement_evidence(root)
+            self.assertEqual(
+                boundaries._audit_pages_table_hidden_axes_retirement_native_evidence(
+                    root
+                ),
+                [],
+            )
+            self.assertTrue(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+
+            receipt = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_RECEIPT
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["sha256"] = "0" * 64
+            payload["lifecycle"] = ["saved"]
+            receipt.write_text(json.dumps(payload), encoding="utf-8")
+            violations = boundaries._audit_pages_table_hidden_axes_retirement_native_evidence(
+                root
+            )
+            self.assertTrue(any("SHA-256" in item for item in violations), violations)
+            self.assertTrue(
+                any("without repair" in item for item in violations), violations
+            )
+            self.assertTrue(any("exact reopen" in item for item in violations), violations)
+            self.assertFalse(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+
+    def test_pages_table_hidden_axes_native_evidence_alone_cannot_open_retirement_gate(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_retirement_evidence(
+                root,
+                include_source_built=False,
+            )
+            self.assertEqual(
+                boundaries._audit_pages_table_hidden_axes_retirement_native_evidence(
+                    root
+                ),
+                [],
+            )
+            source_built = boundaries._audit_pages_table_hidden_axes_retirement_source_built_evidence(
+                root
+            )
+            self.assertTrue(
+                any("source-built host test" in item for item in source_built),
+                source_built,
+            )
+            self.assertFalse(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_pages_table_hidden_axes_retirement_accepts_nested_include_and_snake_case_reopen(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_retirement_evidence(root, keep_host=False)
+            native_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_NATIVE_TEST_SOURCE
+            source = native_test.read_text(encoding="utf-8")
+            source = source.replace(
+                'include_bytes!("../../../test-data/iwork/pages/'
+                'body-table-hidden-axes-focused-native.pages")',
+                'include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), '
+                '"/../../test-data/iwork/pages/body-table-hidden-axes-focused-native.pages"))',
+            ).replace(
+                "fn focused_native_hidden_axes_roundtrip()",
+                "fn focused_native_hidden_axes_reopen_and_inverse()",
+            ).replace(
+                "let reopened = Package::from_bytes(&candidate).unwrap();",
+                "let candidate_package = Package::from_bytes(&candidate).unwrap();",
+            ).replace(
+                "reopened.body_table_hidden_axes(selector)",
+                "candidate_package.body_table_hidden_axes(selector)",
+            ).replace(
+                "let restored = reopened.apply_body_table_hidden_axes(",
+                "let restored = candidate_package.apply_body_table_hidden_axes(",
+            )
+            native_test.write_text(source, encoding="utf-8")
+            self.assertEqual(
+                boundaries._audit_pages_table_hidden_axes_retirement_native_evidence(root),
+                [],
+            )
+
+    def test_pages_table_hidden_axes_retirement_rejects_retained_host_after_focused_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_retirement_evidence(root)
+            self.assertTrue(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+                root
+            )
+            for fragment in (
+                "migration-host method table_hidden_axes",
+                "migration-host method set_table_hidden_axes",
+                "migration-host module returned",
+                "migration-host call table_hidden_axes",
+                "migration-host call set_table_hidden_axes",
+                "migration-host example call table_hidden_axes",
+                "migration-host example call set_table_hidden_axes",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), violations)
+
+    def test_pages_table_hidden_axes_retirement_preserves_shared_numbers_keynote_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_retirement_evidence(root, keep_host=False)
+            self.assertTrue(
+                boundaries._pages_table_hidden_axes_retirement_evidence_ready(root)
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root),
+                [],
+            )
+
+            shared = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE
+            shared.unlink()
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_retirement_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("shared Numbers/Keynote table-hidden-axes helper is missing" in item for item in violations),
+                violations,
             )
 
     def test_focused_pages_table_hidden_axes_requires_canonical_types_and_methods(self) -> None:
