@@ -48,6 +48,7 @@ pub(super) use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
 pub(super) use crate::parts::rmd_threading::DocumentRmdThreading;
 pub(super) use crate::parts::rsids::DocumentRsids;
 pub(super) use crate::parts::saved_by::SavedByTable;
+pub(super) use crate::parts::saved_selection::SavedSelection;
 pub(super) use crate::parts::smart_tags::DocumentSmartTags;
 pub(super) use crate::parts::structured_tags::DocumentStructuredTags;
 pub(super) use crate::parts::styles::StyleSheet;

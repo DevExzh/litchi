@@ -150,6 +150,13 @@ pub struct Document {
     pub(in crate::document) text_services: Result<TextServicesTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     pub(in crate::document) saved_by_table: Result<SavedByTable>,
+    /// Bounded raw source for deferred saved-selection parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) saved_selection_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict saved-selection (`Selsf`) metadata parse.
+    pub(in crate::document) saved_selection: OnceLock<
+        std::result::Result<Option<crate::parts::saved_selection::SavedSelection>, String>,
+    >,
     /// Bounded raw source for deferred paragraph-group parsing, or its
     /// deferred range/allocation diagnostic.
     pub(in crate::document) paragraph_groups_source: std::result::Result<Option<Vec<u8>>, String>,

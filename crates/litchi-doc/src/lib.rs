@@ -333,6 +333,7 @@ pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
+pub use parts::saved_selection::{SavedSelection, SelectionGeometry, SelectionStyle};
 pub use parts::smart_tags::{
     DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
     SmartTagRecognizerRange, SmartTagRecognizerState,
