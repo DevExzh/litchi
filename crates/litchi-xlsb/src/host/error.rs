@@ -54,6 +54,15 @@ pub enum Error {
         /// Found length
         found: usize,
     },
+    /// A format-owned resource exceeded its explicit finite caller limit.
+    LimitExceeded {
+        /// Resource whose caller ceiling was crossed.
+        resource: &'static str,
+        /// Observed or requested amount.
+        actual: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// End of stream reached unexpectedly
     UnexpectedEndOfStream(String),
     /// Invalid formula
@@ -153,6 +162,14 @@ impl fmt::Display for Error {
             Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
+            Error::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => write!(
+                f,
+                "{resource} limit exceeded: actual {actual}, maximum {maximum}"
+            ),
             Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
@@ -239,6 +256,7 @@ impl std::error::Error for Error {
             Error::InvalidRecordType(_)
             | Error::UnexpectedRecord { .. }
             | Error::InvalidLength { .. }
+            | Error::LimitExceeded { .. }
             | Error::UnexpectedEndOfStream(_)
             | Error::InvalidFormula(_)
             | Error::InvalidCellReference(_)

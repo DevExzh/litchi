@@ -130,6 +130,23 @@ pub const BOOK_VIEW: Kind = Kind(0x009E);
 pub const BEGIN_SST: Kind = Kind(0x009F);
 pub const END_SST: Kind = Kind(0x00A0);
 
+// Volatile Dependencies part (MS-XLSB 2.4.299-302, 2.4.651-654,
+// and 2.4.859-864).
+pub const BEGIN_VOL_DEPS: Kind = Kind(514);
+pub const BEGIN_VOL_MAIN: Kind = Kind(518);
+pub const BEGIN_VOL_TOPIC: Kind = Kind(520);
+pub const BEGIN_VOL_TYPE: Kind = Kind(516);
+pub const VOL_SUBTOPIC: Kind = Kind(522);
+pub const VOL_REF: Kind = Kind(523);
+pub const VOL_NUM: Kind = Kind(524);
+pub const VOL_ERR: Kind = Kind(525);
+pub const VOL_STR: Kind = Kind(526);
+pub const VOL_BOOL: Kind = Kind(527);
+pub const END_VOL_DEPS: Kind = Kind(515);
+pub const END_VOL_MAIN: Kind = Kind(519);
+pub const END_VOL_TOPIC: Kind = Kind(521);
+pub const END_VOL_TYPE: Kind = Kind(517);
+
 // Filter records
 pub const BEGIN_A_FILTER: Kind = Kind(0x00A1);
 pub const END_A_FILTER: Kind = Kind(0x00A2);
