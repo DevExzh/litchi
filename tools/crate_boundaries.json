@@ -325,7 +325,8 @@
       "litchi-sheet",
       "litchi-sign",
       "litchi-spreadsheet-drawing",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "litchi-xlsx": [
       "litchi-core",
@@ -383,6 +384,10 @@
     },
     {
       "dependent": "litchi-sign",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-xlsb",
       "dependency": "soapberry-zip"
     },
     {
