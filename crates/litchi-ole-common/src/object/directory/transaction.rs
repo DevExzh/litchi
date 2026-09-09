@@ -80,6 +80,11 @@ impl Transaction {
         let replacement_name = name.into();
         validation::validate_name_for_edit(&replacement_name, self.source.limits())?;
         let index = self.index(sid)?;
+        if sid.raw() == 0 {
+            return Err(OleError::InvalidFormat(
+                "CFB SID-zero Root Entry name is immutable".into(),
+            ));
+        }
         self.update_raw(move |entries| {
             entries[index].name = replacement_name;
             Ok(())
