@@ -546,6 +546,16 @@ impl Relationships {
         const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
         const FOOTER: &[u8] = b"</Relationships>";
 
+        // Reserve once from the checked escaped size. Reserving each emitted
+        // fragment exactly otherwise requests progressively larger reallocations
+        // for every relationship in a large owner.
+        let xml_len = crate::source_backed::canonical_relationship_xml_len(self)?;
+        let mut xml = Vec::new();
+        xml.try_reserve_exact(xml_len)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship XML",
+                source,
+            })?;
         let mut rels = Vec::new();
         rels.try_reserve_exact(self.rels.len())
             .map_err(|source| OpcError::Allocation {
@@ -555,7 +565,6 @@ impl Relationships {
         rels.extend(self.rels.values());
         rels.sort_unstable_by_key(|rel| rel.r_id());
 
-        let mut xml = Vec::new();
         append_relationship_xml_bytes(&mut xml, HEADER)?;
         for rel in rels {
             append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
@@ -804,6 +813,31 @@ mod tests {
         assert_eq!(
             relationships.try_to_xml_bytes().unwrap(),
             relationships.to_xml().as_bytes()
+        );
+    }
+
+    #[test]
+    fn sized_relationship_xml_matches_large_mixed_escaped_owner() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for index in (0..1024).rev() {
+            relationships
+                .try_add_relationship(
+                    format!("urn:example:类型<&>\"':{index}"),
+                    format!("target-é-{index}<&>\"'.xml"),
+                    format!("rId{index}"),
+                    if index % 2 == 0 {
+                        TargetMode::External
+                    } else {
+                        TargetMode::Internal
+                    },
+                )
+                .unwrap();
+        }
+        let bytes = relationships.try_to_xml_bytes().unwrap();
+        assert_eq!(bytes, relationships.to_xml().as_bytes());
+        assert_eq!(
+            bytes.len(),
+            crate::source_backed::canonical_relationship_xml_len(&relationships).unwrap()
         );
     }
 }
