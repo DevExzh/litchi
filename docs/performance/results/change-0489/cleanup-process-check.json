@@ -1,0 +1,12 @@
+{
+  "checked_utc": "2026-09-09T14:51:06.427793+00:00",
+  "roots": [
+    "/home/zhuhe/.cache/litchi-build-0489",
+    "/home/zhuhe/.cache/litchi-goal-0489"
+  ],
+  "processes_observed": 496,
+  "inaccessible_fd_directories": 427,
+  "references": [],
+  "all_known_batch_jobs_terminal": true,
+  "scope": "cwd, executable, open-file and mapping checks for the two owned batch roots; protected worktree and other sessions excluded"
+}

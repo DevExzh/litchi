@@ -1,0 +1,9 @@
+{
+  "files": {
+    "crates/litchi-opc/src/source_backed/splice.rs": "24ac1590ae2f4504db151b62cfbac7a47af1e646d32d026aae2596db8082b081",
+    "crates/litchi-opc/tests/source_part_splice_replay.rs": "5d052c1c55581bfd9ed90c0a87d3684d7232bdaa4fac243b8d91c6c5899a7ab6"
+  },
+  "patch_sha256": "38d538cd74d32b6c24f192cd826519ac527b3a08f8bfe1f9a09eda6132d2ad48",
+  "review": "Independent review found no semantic blocker. Root clarified payload/source Work accounting and corrected an atomic Work-charge test expectation; Clippy hex grouping fixed without changing the numeric value.",
+  "scope": "Private OPC candidate XML audit authorization and focused tests; no public API/dependency/unsafe changes; existing XML admission retained."
+}

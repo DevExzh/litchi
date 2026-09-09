@@ -1,0 +1,22 @@
+{
+  "artifacts": {
+    "latency-comparison.png": {
+      "bytes": 118435,
+      "sha256": "07cd87b9a8bad8aba52712671225fd16ee3456149521d73401eb61f7b283f1ae"
+    },
+    "latency-comparison.svg": {
+      "bytes": 108216,
+      "sha256": "23b6f1883d05579fb9e2cbe47a32702d87efd7dbd7cbf5c22b2d2aed98e8b0fa"
+    }
+  },
+  "driver": {
+    "bytes": 3882,
+    "sha256": "b547138b498b2bef4215c5a626bcdb2ec2fbb8c2208f6dbf6bac70c57848a10b"
+  },
+  "matplotlib_version": "3.10.7+dfsg1",
+  "scope": "Normal-process p50, both repeats shown independently; tails and memory remain in full tables.",
+  "summary": {
+    "bytes": 1075646,
+    "sha256": "f048e0388147f2c10db68d1d46c3ee5bd98bad779466c630499de9f8baa29a2d"
+  }
+}

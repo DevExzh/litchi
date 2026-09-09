@@ -1,0 +1,10 @@
+{
+  "git_head_before_source_changes": "eaec734f55228f7580c26528fec61d9f7dfd97db",
+  "baseline_implementation_commit": "4ddec78a56a09d69002c961998eefda8329a68d2",
+  "source_identity_policy": "Build-gate source manifests and reviewed source diff bind dirty source state exactly; documentation-only revisions are not substituted for source identity.",
+  "scope": "Non-iWork OPC candidate XML audit reuse; unrelated local edits excluded from ownership.",
+  "requirements": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/CRUD_Scenario_Checklist.md": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a"
+  }
+}

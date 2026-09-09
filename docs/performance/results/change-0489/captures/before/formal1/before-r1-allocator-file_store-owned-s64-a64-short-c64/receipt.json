@@ -1,0 +1,152 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r1-allocator-file_store-owned-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/allocator/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "data",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r1-allocator-file_store-owned-s64-a64-short-c64/report.json",
+    "--replay-dir",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r1-allocator-file_store-owned-s64-a64-short-c64/replay"
+  ],
+  "arm": {
+    "authored_count": 64,
+    "chunk_mode": "64",
+    "cli_provider": "file-store",
+    "compression": "current",
+    "expected_authored_opens": 0,
+    "expected_replay_opens": 4,
+    "family": "route",
+    "id": "file_store-owned-s64-a64-short-c64",
+    "input_backing": "owned",
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_mode": "owned",
+    "old_axis_arm": null,
+    "old_route_case": "s64-a64-short-c64",
+    "provider": "file_store",
+    "replay_max_bytes": 8388608,
+    "replay_sync": "data",
+    "report_provider": "file_explicit_replay_store",
+    "route": "file_store",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "file_store",
+      "replay_max_bytes": 8388608,
+      "replay_store": "file_store",
+      "replay_sync": "data"
+    },
+    "text_mode": "short",
+    "workload": "s64-a64-short-c64"
+  },
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 419,
+      "sha256": "8fb3d4c8a4b0a4843a572c1c48d3aa6d16dfed5be84e2ef7dfe58cd8736e40ed"
+    },
+    "report.json": {
+      "bytes": 136998,
+      "sha256": "0bfecb882881aa420f26d3f9c268f9c61b3612333d7aa7891584da3e07ef57e2"
+    },
+    "resource.txt": {
+      "bytes": 1364,
+      "sha256": "d56b4006508ed92ffbe4d9d14fd7090b6b9b447e0f53f5577fb412ff8434a623"
+    },
+    "started.json": {
+      "bytes": 3956,
+      "sha256": "31d4f2a5042e01b691803bc9ec098f54f67b5d775a112feef0340d85d762503f"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423376496,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0487/after1/allocator/docx_replayable_tail_append",
+    "sha256": "93a0d74a9924676f998a74252b8c87003972e959cd1113de33de60cf0ac54e27"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0487/build-allocator.json",
+    "role": "allocator",
+    "sha256": "1e11448e203eed0c73078a3d70b50568c9da36edd6550626fe7495578600e860"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0489",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T14:17:36.502756+00:00",
+  "input_file": null,
+  "machine": {
+    "path": "machine.json",
+    "sha256": "069d82b229a105ac9a4f58b89b5fd63eaaf2783af00c25cc94d731d690a9b7bf",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "phase": "before",
+  "protocol": {
+    "path": "comparison-protocol.json",
+    "sha256": "27fa75f85d8ea839410ab9cecc85a59acec69e00665636052e54e77022f406f8"
+  },
+  "replay_dir": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r1-allocator-file_store-owned-s64-a64-short-c64/replay",
+  "run": {
+    "arm": "file_store-owned-s64-a64-short-c64",
+    "input_mode": "owned",
+    "kind": "formal",
+    "label": "before-r1-allocator-file_store-owned-s64-a64-short-c64",
+    "phase": "before",
+    "repeat": 1,
+    "role": "allocator",
+    "route": "file_store",
+    "workload": "s64-a64-short-c64"
+  },
+  "schema": "docx-opc-candidate-audit-reuse-capture-v1",
+  "started_utc": "2026-09-09T14:17:36.336877+00:00",
+  "status": "pass",
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "version": 1
+}

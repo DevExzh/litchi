@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0489: candidate audit reuse; file-store tails and metadata remain
+
+[0489](changes/0489-opc-candidate-xml-audit-reuse.md) reuses a successful initial
+candidate XML audit inside one private immutable prepared OPC splice plan.
+Source-heavy owned/file medians improve about 20–21%, authored-heavy file
+medians improve 14–15%, and deterministic operation heap falls about 19.89%.
+Source/replay/candidate byte authentication, initial source and candidate audits,
+frozen limits, conservative workspace admission and final reopen remain required.
+
+[The review](results/change-0489/results-review.md) retains a small file-store
+repeat with normal p95/p99 increases of 79.00/82.60%, allocator tail increases,
+and four RSS observations above +5%. Their cause remains open. All candidate
+archive bytes match. Whole-child instructions decrease, but file statx and
+pread64 counts are unchanged, leaving freshness metadata as a measured cost.
+Broader CRUD/provider intersections, cold-cache, concurrency and native Office
+validation remain open. Batch-local Cargo output is removed after validation.
+
 ## 0487: fewer replay sink fences; candidate audit cost remains
 
 [0487](changes/0487-opc-replay-consumed-prefix-retention.md) retains consumed
