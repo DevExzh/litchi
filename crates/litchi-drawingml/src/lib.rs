@@ -45,6 +45,7 @@ pub mod ext;
 pub mod fill;
 pub mod geom;
 pub mod geometry;
+pub mod ink;
 pub mod model3d;
 pub mod text;
 pub mod theme;
