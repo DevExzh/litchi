@@ -1967,7 +1967,9 @@ fn validate_stream_size(
 
 fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
     let sector_size_u64 = checked_sector_size(sector_size)?;
-    if sector_count > MAXREGSECT {
+    // MS-CFB 2.9 caps the complete file at MAXREGSECT sectors, including
+    // its header. The count here covers only sectors following the header.
+    if sector_count >= MAXREGSECT {
         return Err(OleError::InvalidData(
             "CFB output exceeds MAXREGSECT".to_string(),
         ));
@@ -2720,6 +2722,13 @@ mod tests {
         assert!(validate_output_size(512, maximum_v3_sectors - 1).is_ok());
         assert!(validate_output_size(512, maximum_v3_sectors).is_err());
         assert!(validate_output_size(4096, maximum_v3_sectors).is_ok());
+    }
+
+    #[test]
+    fn version_four_size_limit_includes_the_header_sector() {
+        assert!(validate_output_size(4096, MAXREGSECT - 1).is_ok());
+        assert!(validate_output_size(4096, MAXREGSECT).is_err());
+        assert!(validate_output_size(4096, MAXREGSECT + 1).is_err());
     }
 
     #[test]

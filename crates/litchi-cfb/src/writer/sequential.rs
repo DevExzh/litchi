@@ -2324,8 +2324,8 @@ fn validate_output_size(
     sector_count: u32,
     maximum: u64,
 ) -> Result<(), SequentialWriteError> {
-    // MAXREGSECT is the first reserved sector marker, not a usable sector ID.
-    // Require the complete regular-sector count to remain strictly below it.
+    // MS-CFB 2.9 caps the complete file at MAXREGSECT sectors, including
+    // its header. The count here covers only sectors following the header.
     if sector_count >= MAXREGSECT {
         return Err(planning(
             "CFB output requires a sector count below MAXREGSECT",
