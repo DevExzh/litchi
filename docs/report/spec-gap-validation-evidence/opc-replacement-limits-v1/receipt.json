@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "9aa761f071b37edfbb898664338e2819c81e728d",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-opc/src/package.rs": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1",
+    "crates/litchi-opc/src/package/relationships.rs": "65f7533695766c114ce65de1e1ae3f676eda4c3a7bbe0ea9d61ba760b5f0835b"
+  },
+  "scope": "Explicit caller limits for source-checked content-type and relationship token replacement, preserving existing default API, signed-source policy, no-op semantics, exact binding and mutation ordering.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline -p litchi-opc --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 544,
+      "tests_ignored": 1,
+      "doctests_passed": 5
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-opc --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "01e6512606780842d2db560525d37831196af879a9938f8897d7eef687a27611",
+      "uncompressed_sha256": "7f65c2607a7c7987a3c9349bfccd8ad73735d598ba3fd1fa30a0624be5daaee6"
+    },
+    "clippy.log.gz": {
+      "sha256": "9066df5702734b790050f05881aa0e40112c266c2a4af695338dd507c01de2f5",
+      "uncompressed_sha256": "d5c2058236393ee501550c520eea5dec875c7ca4f9575d190c210c1e75cb680e"
+    }
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}
