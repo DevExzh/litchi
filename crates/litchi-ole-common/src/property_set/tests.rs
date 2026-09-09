@@ -152,7 +152,34 @@ fn versioned_stream_name_must_match_its_property_identifier() {
         .position(|window| window == b"prop42")
         .expect("serialized indirect property name");
     bytes[name + 4] = b'3';
-    assert!(Stream::parse(&bytes).is_err());
+    assert!(codec::parse_non_simple_stream(&bytes).is_err());
+}
+
+#[test]
+fn generic_versioned_stream_values_remain_opaque_and_byte_exact() {
+    let value = VersionedStream::new(Guid::from_bytes([0x11; 16]), 42).unwrap();
+    let mut section = Section::new(SUMMARY_INFORMATION_FMTID);
+    section.add(42, Value::VersionedStream(value)).unwrap();
+    let mut bytes = Stream::new(section).to_bytes().unwrap();
+    let name = bytes
+        .windows(b"prop42".len())
+        .position(|window| window == b"prop42")
+        .expect("serialized indirect property name");
+    bytes[name + 4] = b'3';
+    let parsed = Stream::parse(&bytes).expect("generic versioned stream should be opaque");
+    let Value::Unknown { variant_type, data } = parsed.sections[0]
+        .property(42)
+        .expect("versioned stream property")
+    else {
+        panic!("expected an opaque versioned stream value");
+    };
+    assert_eq!(*variant_type, model::VT_VERSIONED_STREAM);
+    assert_eq!(data, &bytes[name.saturating_sub(20)..]);
+    assert_eq!(parsed.to_bytes().unwrap(), bytes);
+    assert_eq!(
+        parsed.to_bytes_with_limit(bytes.len() as u64).unwrap(),
+        bytes
+    );
 }
 
 #[test]

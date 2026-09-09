@@ -1,14 +1,15 @@
 //! Typed VARIANT semantic codec for Property Set values.
 
 use super::super::super::model::{
-    Array, Dimension, Guid, PID_DOC_PARTS, PID_HEADING_PAIRS, Scalar, TextEncoding,
-    UNICODE_CODEPAGE, VT_ARRAY, VT_VERSIONED_STREAM, Value, Vector, VersionedStream, checked_add,
+    Array, Dimension, Guid, IndirectPropertyName, PID_DOC_PARTS, PID_HEADING_PAIRS, Scalar,
+    TextEncoding, UNICODE_CODEPAGE, VT_ARRAY, VT_STORAGE, VT_STORED_OBJECT, VT_STREAM,
+    VT_STREAMED_OBJECT, VT_VERSIONED_STREAM, Value, Vector, VersionedStream, checked_add,
     checked_mul, checked_u32, invalid, try_copy_bytes, try_vec_with_capacity,
 };
 use super::composite;
 use super::wire::{
-    ValueReader, append_bytes, append_u16, append_u32, append_u64, encode_ansi, pad4,
-    read_codepage_string, read_u16, read_unicode_string, reserve_bytes,
+    ByteSink, ValueReader, append_ansi, append_bytes, append_u16, append_u32, append_u64,
+    encoded_ansi_len, pad4, read_codepage_string, read_u16, read_unicode_string, reserve_bytes,
 };
 use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::OleError;
@@ -20,29 +21,49 @@ use litchi_cfb::consts::{
 
 const MAX_VECTOR_ELEMENTS: usize = 1_000_000;
 
-pub(super) fn serialize_typed(value: &Value, codepage: u16) -> Result<Vec<u8>, OleError> {
-    let mut out = try_vec_with_capacity(4, "serialized property value")?;
-    append_typed(&mut out, value, codepage)?;
-    Ok(out)
-}
-
 pub(super) fn serialize_typed_for_property(
     property_identifier: u32,
     value: &Value,
     codepage: u16,
 ) -> Result<Vec<u8>, OleError> {
+    let mut out = super::wire::ByteWriter::new(4, None, "serialized property value")?;
+    append_typed_for_property(&mut out, property_identifier, value, codepage)?;
+    Ok(out.into_bytes())
+}
+
+pub(super) fn serialize_typed_for_property_with_limit(
+    property_identifier: u32,
+    value: &Value,
+    codepage: u16,
+    maximum: u64,
+) -> Result<Vec<u8>, OleError> {
+    let mut out = super::wire::ByteWriter::new(4, Some(maximum), "serialized property value")?;
+    append_typed_for_property(&mut out, property_identifier, value, codepage)?;
+    Ok(out.into_bytes())
+}
+
+pub(super) fn append_typed_for_property<S: ByteSink + ?Sized>(
+    out: &mut S,
+    property_identifier: u32,
+    value: &Value,
+    codepage: u16,
+) -> Result<(), OleError> {
     match (property_identifier, value) {
         (PID_HEADING_PAIRS, Value::HeadingPairs(_)) | (PID_DOC_PARTS, Value::DocParts(_)) => {
-            serialize_typed(value, codepage)
+            append_typed(out, value, codepage)
         },
         (_, Value::HeadingPairs(_)) => {
             Err(invalid("HeadingPairs is only valid for PID_HEADING_PAIRS"))
         },
         (_, Value::DocParts(_)) => Err(invalid("DocParts is only valid for PID_DOC_PARTS")),
-        _ => serialize_typed(value, codepage),
+        _ => append_typed(out, value, codepage),
     }
 }
-fn append_typed(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), OleError> {
+pub(super) fn append_typed<S: ByteSink + ?Sized>(
+    out: &mut S,
+    value: &Value,
+    codepage: u16,
+) -> Result<(), OleError> {
     let vt = variant_type(value);
     append_u16(out, vt, "serialized property value")?;
     append_u16(out, 0, "serialized property value")?;
@@ -77,6 +98,10 @@ fn variant_type(property: &Value) -> u16 {
         Value::Blob(_) => VT_BLOB,
         Value::Clipboard { .. } => VT_CF,
         Value::Clsid(_) => VT_CLSID,
+        Value::Stream(_) => VT_STREAM,
+        Value::Storage(_) => VT_STORAGE,
+        Value::StreamedObject(_) => VT_STREAMED_OBJECT,
+        Value::StoredObject(_) => VT_STORED_OBJECT,
         Value::VersionedStream(_) => VT_VERSIONED_STREAM,
         Value::HeadingPairs(_) => composite::HEADING_PAIRS_TYPE,
         Value::DocParts(parts) => match parts.encoding() {
@@ -88,7 +113,11 @@ fn variant_type(property: &Value) -> u16 {
         Value::Unknown { variant_type, .. } => *variant_type,
     }
 }
-fn append_body(out: &mut Vec<u8>, property: &Value, codepage: u16) -> Result<(), OleError> {
+fn append_body<S: ByteSink + ?Sized>(
+    out: &mut S,
+    property: &Value,
+    codepage: u16,
+) -> Result<(), OleError> {
     match property {
         Value::Empty | Value::Null => {},
         Value::I1(v) => append_bytes(out, &v.to_ne_bytes(), "serialized property value")?,
@@ -124,9 +153,9 @@ fn append_body(out: &mut Vec<u8>, property: &Value, codepage: u16) -> Result<(),
             )?;
             reserve_bytes(out, byte_len, "serialized property value")?;
             for unit in v.encode_utf16() {
-                out.extend_from_slice(&unit.to_le_bytes());
+                append_bytes(out, &unit.to_le_bytes(), "serialized property value")?;
             }
-            out.extend_from_slice(&0u16.to_le_bytes());
+            append_bytes(out, &0u16.to_le_bytes(), "serialized property value")?;
         },
         Value::Blob(v) => {
             append_u32(
@@ -149,6 +178,10 @@ fn append_body(out: &mut Vec<u8>, property: &Value, codepage: u16) -> Result<(),
             pad4(out)?;
         },
         Value::Clsid(v) => append_bytes(out, v.as_bytes(), "serialized property value")?,
+        Value::Stream(name)
+        | Value::Storage(name)
+        | Value::StreamedObject(name)
+        | Value::StoredObject(name) => append_codepage_string(out, name.as_str(), codepage)?,
         Value::VersionedStream(stream) => {
             append_bytes(
                 out,
@@ -210,7 +243,11 @@ fn append_body(out: &mut Vec<u8>, property: &Value, codepage: u16) -> Result<(),
     }
     Ok(())
 }
-fn append_codepage_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Result<(), OleError> {
+fn append_codepage_string<S: ByteSink + ?Sized>(
+    out: &mut S,
+    value: &str,
+    codepage: u16,
+) -> Result<(), OleError> {
     if codepage == UNICODE_CODEPAGE {
         let units = checked_add(value.encode_utf16().count(), 1, "CodePageString length")?;
         let byte_len = checked_mul(units, 2, "CodePageString length")?;
@@ -221,20 +258,23 @@ fn append_codepage_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Resu
         )?;
         reserve_bytes(out, byte_len, "serialized CodePageString")?;
         for unit in value.encode_utf16() {
-            out.extend_from_slice(&unit.to_le_bytes());
+            append_bytes(out, &unit.to_le_bytes(), "serialized CodePageString")?;
         }
-        out.extend_from_slice(&[0, 0]);
+        append_bytes(out, &[0, 0], "serialized CodePageString")?;
     } else {
-        let bytes = encode_ansi(value, codepage)?;
-        let byte_len = checked_add(bytes.len(), 1, "CodePageString length")?;
+        let byte_len = checked_add(
+            encoded_ansi_len(value, codepage)?,
+            1,
+            "CodePageString length",
+        )?;
         append_u32(
             out,
             checked_u32(byte_len, "CodePageString length")?,
             "serialized CodePageString",
         )?;
         reserve_bytes(out, byte_len, "serialized CodePageString")?;
-        out.extend_from_slice(&bytes);
-        out.push(0);
+        append_ansi(out, value, codepage, "serialized CodePageString")?;
+        out.push_zero("serialized CodePageString")?;
     }
     pad4(out)?;
     Ok(())
@@ -244,7 +284,7 @@ pub(crate) fn parse_typed_property(
     codepage: u16,
     property_offset: usize,
 ) -> Result<Value, OleError> {
-    parse_typed_property_context(data, codepage, property_offset, None)
+    parse_typed_property_context(data, codepage, property_offset, None, false)
 }
 
 pub(crate) fn parse_typed_property_for_property(
@@ -253,7 +293,28 @@ pub(crate) fn parse_typed_property_for_property(
     property_offset: usize,
     property_identifier: u32,
 ) -> Result<Value, OleError> {
-    parse_typed_property_context(data, codepage, property_offset, Some(property_identifier))
+    parse_typed_property_context(
+        data,
+        codepage,
+        property_offset,
+        Some(property_identifier),
+        false,
+    )
+}
+
+pub(crate) fn parse_typed_property_for_non_simple_property(
+    data: &[u8],
+    codepage: u16,
+    property_offset: usize,
+    property_identifier: u32,
+) -> Result<Value, OleError> {
+    parse_typed_property_context(
+        data,
+        codepage,
+        property_offset,
+        Some(property_identifier),
+        true,
+    )
 }
 
 fn parse_typed_property_context(
@@ -261,6 +322,7 @@ fn parse_typed_property_context(
     codepage: u16,
     property_offset: usize,
     property_identifier: Option<u32>,
+    allow_indirect: bool,
 ) -> Result<Value, OleError> {
     if data.len() < 4 {
         return Err(invalid("Typed property value is truncated"));
@@ -274,7 +336,14 @@ fn parse_typed_property_context(
         .checked_add(4)
         .ok_or_else(|| invalid("Property value offset overflow"))?;
     let mut reader = ValueReader::new(&data[4..], value_offset);
-    let value = parse_value_body(&mut reader, variant_type, codepage, 0, property_identifier)?;
+    let value = parse_value_body(
+        &mut reader,
+        variant_type,
+        codepage,
+        0,
+        property_identifier,
+        allow_indirect,
+    )?;
     let allows_opaque_tail = matches!(
         variant_type,
         VT_EMPTY | VT_NULL | VT_BSTR | VT_LPSTR | VT_LPWSTR
@@ -303,6 +372,7 @@ fn parse_value_body(
     codepage: u16,
     depth: usize,
     property_identifier: Option<u32>,
+    allow_indirect: bool,
 ) -> Result<Value, OleError> {
     if depth > 8 {
         return Err(invalid("Property value nesting exceeds the safety limit"));
@@ -345,7 +415,7 @@ fn parse_value_body(
                 data: try_copy_bytes(reader.take_remaining(), "unknown vector property")?,
             });
         }
-        return parse_vector(reader, scalar, codepage, depth + 1);
+        return parse_vector(reader, scalar, codepage, depth + 1, allow_indirect);
     }
     if variant_type & VT_ARRAY != 0 {
         let base_type = variant_type & !VT_ARRAY;
@@ -371,7 +441,7 @@ fn parse_value_body(
                 data: try_copy_bytes(reader.take_remaining(), "unknown array property")?,
             });
         }
-        return parse_array(reader, scalar, codepage, depth + 1);
+        return parse_array(reader, scalar, codepage, depth + 1, allow_indirect);
     }
     match variant_type {
         VT_EMPTY => Ok(Value::Empty),
@@ -446,7 +516,24 @@ fn parse_value_body(
             value.copy_from_slice(raw);
             Ok(Value::Clsid(Guid::from_bytes(value)))
         },
-        VT_VERSIONED_STREAM => {
+        VT_STREAM if allow_indirect && depth == 0 => {
+            let name = read_codepage_string(reader, codepage, "stream property name", true)?;
+            IndirectPropertyName::from_wire(name, property_identifier).map(Value::Stream)
+        },
+        VT_STORAGE if allow_indirect && depth == 0 => {
+            let name = read_codepage_string(reader, codepage, "storage property name", true)?;
+            IndirectPropertyName::from_wire(name, property_identifier).map(Value::Storage)
+        },
+        VT_STREAMED_OBJECT if allow_indirect && depth == 0 => {
+            let name =
+                read_codepage_string(reader, codepage, "streamed object property name", true)?;
+            IndirectPropertyName::from_wire(name, property_identifier).map(Value::StreamedObject)
+        },
+        VT_STORED_OBJECT if allow_indirect && depth == 0 => {
+            let name = read_codepage_string(reader, codepage, "stored object property name", true)?;
+            IndirectPropertyName::from_wire(name, property_identifier).map(Value::StoredObject)
+        },
+        VT_VERSIONED_STREAM if allow_indirect && depth == 0 => {
             let raw = reader.take(16, "versioned stream GUID")?;
             let mut version_guid = [0u8; 16];
             version_guid.copy_from_slice(raw);
@@ -470,6 +557,7 @@ fn parse_vector(
     scalar: Scalar,
     codepage: u16,
     depth: usize,
+    allow_indirect: bool,
 ) -> Result<Value, OleError> {
     let count = usize::try_from(reader.read_u32("vector element count")?)
         .map_err(|_conversion_error| invalid("Vector element count is too large"))?;
@@ -496,11 +584,25 @@ fn parse_vector(
             if reader.read_u16("variant vector reserved field")? != 0 {
                 return Err(invalid("Variant vector reserved field must be zero"));
             }
-            let value = parse_value_body(reader, nested_type, codepage, depth + 1, None)?;
+            let value = parse_value_body(
+                reader,
+                nested_type,
+                codepage,
+                depth + 1,
+                None,
+                allow_indirect,
+            )?;
             reader.align4(false, "variant vector element padding")?;
             value
         } else {
-            parse_value_body(reader, scalar.raw(), codepage, depth + 1, None)?
+            parse_value_body(
+                reader,
+                scalar.raw(),
+                codepage,
+                depth + 1,
+                None,
+                allow_indirect,
+            )?
         };
         values.push(value);
     }
@@ -515,6 +617,7 @@ fn parse_array(
     scalar: Scalar,
     codepage: u16,
     depth: usize,
+    allow_indirect: bool,
 ) -> Result<Value, OleError> {
     let declared_type = reader.read_u32("array scalar type")?;
     if declared_type != u32::from(scalar.raw()) {
@@ -550,11 +653,25 @@ fn parse_array(
             if reader.read_u16("array variant reserved field")? != 0 {
                 return Err(invalid("Array variant reserved field must be zero"));
             }
-            let value = parse_value_body(reader, nested_type, codepage, depth + 1, None)?;
+            let value = parse_value_body(
+                reader,
+                nested_type,
+                codepage,
+                depth + 1,
+                None,
+                allow_indirect,
+            )?;
             reader.align4(false, "array variant element padding")?;
             value
         } else {
-            parse_value_body(reader, scalar.raw(), codepage, depth + 1, None)?
+            parse_value_body(
+                reader,
+                scalar.raw(),
+                codepage,
+                depth + 1,
+                None,
+                allow_indirect,
+            )?
         };
         values.push(value);
     }

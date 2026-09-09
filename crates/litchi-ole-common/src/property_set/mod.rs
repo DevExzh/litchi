@@ -15,6 +15,7 @@ mod binding;
 mod codec;
 pub mod document_summary;
 mod model;
+pub mod non_simple;
 pub mod summary_information;
 pub mod user_defined;
 
@@ -43,8 +44,14 @@ pub use binding::{
 pub use codec::{Editor, PropertySetReader, SharedPropertySetReader};
 pub use model::{
     Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, DocParts, Guid, HeadingPair,
-    HeadingPairs, Metadata, PID_DOC_PARTS, PID_HEADING_PAIRS, SUMMARY_INFORMATION_FMTID, Scalar,
-    Section, Stream, TextEncoding, USER_DEFINED_PROPERTIES_FMTID, Value, Vector, VersionedStream,
+    HeadingPairs, IndirectPropertyName, Metadata, PID_DOC_PARTS, PID_HEADING_PAIRS,
+    SUMMARY_INFORMATION_FMTID, Scalar, Section, Stream, TextEncoding,
+    USER_DEFINED_PROPERTIES_FMTID, Value, Vector, VersionedStream,
 };
 #[cfg(test)]
 pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};
+pub use non_simple::{
+    Commit as NonSimpleCommit, Editor as NonSimpleEditor, Element as NonSimpleElement,
+    ElementKind as NonSimpleElementKind, Limits as NonSimpleLimits, Patch as NonSimplePatch,
+    Revision as NonSimpleRevision, Snapshot as NonSimpleSnapshot,
+};

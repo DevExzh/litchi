@@ -21,6 +21,33 @@ impl DirectoryNameData {
     }
 }
 
+/// Opaque identity for a validated CFB storage or stream name.
+///
+/// The identity stores the original UTF-16 length and the UTF-16 simple-
+/// uppercase comparison units defined by [MS-CFB] 2.6.4. It therefore has
+/// the same equality, hashing, and ordering relationship as a CFB directory
+/// tree while retaining no copy of the caller's spelling.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DirectoryNameKey {
+    utf16_len: usize,
+    comparison: SmallVec<[u16; 32]>,
+}
+
+impl DirectoryNameKey {
+    /// Parse a directory name and construct its CFB comparison identity.
+    ///
+    /// Names are subject to the directory-entry length and character rules;
+    /// invalid names return [`OleError::InvalidData`].
+    pub fn new(name: &str) -> Result<Self, OleError> {
+        let data =
+            directory_name_data(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
+        Ok(Self {
+            utf16_len: data.utf16.len(),
+            comparison: data.comparison,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DirectoryNameError {
     Empty,
@@ -135,8 +162,8 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
 /// Compare two CFB storage or stream names using the format's sorting
 /// relationship. Invalid names never compare equal.
 pub fn directory_names_equal(left: &str, right: &str) -> bool {
-    match (directory_name_data(left), directory_name_data(right)) {
-        (Ok(left), Ok(right)) => left.compare(&right) == Ordering::Equal,
+    match (DirectoryNameKey::new(left), DirectoryNameKey::new(right)) {
+        (Ok(left), Ok(right)) => left == right,
         _ => false,
     }
 }
@@ -147,14 +174,15 @@ pub fn directory_names_equal(left: &str, right: &str) -> bool {
 /// fit within the 31 UTF-16 code-unit payload allowed by a 64-byte directory
 /// name field after its terminating NUL is written.
 pub fn validate_directory_name(name: &str) -> Result<(), OleError> {
-    directory_name_data(name)
-        .map(|_| ())
-        .map_err(|error| OleError::InvalidData(error.to_string()))
+    DirectoryNameKey::new(name).map(|_| ())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     const TOO_LONG_CODE_UNITS: usize = MAX_DIRECTORY_NAME_CODE_UNITS + 1;
 
@@ -212,5 +240,53 @@ mod tests {
             directory_name_data(&giant),
             Err(DirectoryNameError::TooLong(TOO_LONG_CODE_UNITS))
         ));
+    }
+
+    #[test]
+    fn keys_hash_and_compare_with_cfb_name_identity() {
+        let greek_lower = DirectoryNameKey::new("\u{1F80}").unwrap();
+        let greek_upper = DirectoryNameKey::new("\u{1F88}").unwrap();
+        assert_eq!(greek_lower, greek_upper);
+
+        let mut lower_hasher = DefaultHasher::new();
+        greek_lower.hash(&mut lower_hasher);
+        let mut upper_hasher = DefaultHasher::new();
+        greek_upper.hash(&mut upper_hasher);
+        assert_eq!(lower_hasher.finish(), upper_hasher.finish());
+
+        let mut keys = HashSet::new();
+        assert!(keys.insert(greek_lower));
+        assert!(!keys.insert(greek_upper));
+        assert_eq!(keys.len(), 1);
+
+        let shorter = DirectoryNameKey::new("z").unwrap();
+        let longer = DirectoryNameKey::new("aa").unwrap();
+        assert!(shorter < longer);
+    }
+
+    #[test]
+    fn keys_keep_supplementary_scalars_distinct_and_ordered() {
+        let deseret_upper = DirectoryNameKey::new("𐐀").unwrap();
+        let deseret_lower = DirectoryNameKey::new("𐐨").unwrap();
+        assert_ne!(deseret_upper, deseret_lower);
+        assert!(deseret_upper < deseret_lower);
+    }
+
+    #[test]
+    fn keys_reject_invalid_directory_names() {
+        for name in [
+            "",
+            "nul\0name",
+            "bad/name",
+            "bad\\name",
+            "bad:name",
+            "bad!name",
+            &"😀".repeat(MAX_DIRECTORY_NAME_CODE_UNITS / 2 + 1),
+        ] {
+            assert!(matches!(
+                DirectoryNameKey::new(name),
+                Err(OleError::InvalidData(_))
+            ));
+        }
     }
 }

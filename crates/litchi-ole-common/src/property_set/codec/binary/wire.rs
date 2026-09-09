@@ -8,6 +8,149 @@ use litchi_cfb::OleError;
 use litchi_codepage::Mbcs;
 use std::borrow::Cow;
 
+/// A fallible byte sink shared by the canonical and bounded encoders.
+///
+/// Keeping the append operations behind one sink makes the bounded path run
+/// the same value encoder as the ordinary path.  The bounded sink checks the
+/// caller's ceiling before reserving or copying bytes; the counting sink is
+/// used for the bounded preflight and never allocates payload storage.
+pub(super) trait ByteSink {
+    fn len(&self) -> usize;
+
+    fn reserve(&mut self, additional: usize, resource: &'static str) -> Result<(), OleError>;
+
+    fn append_reserved(&mut self, bytes: &[u8]);
+
+    fn push_zero(&mut self, resource: &'static str) -> Result<(), OleError> {
+        self.reserve(1, resource)?;
+        self.append_reserved(&[0]);
+        Ok(())
+    }
+
+    fn append_zeroes(&mut self, length: usize, resource: &'static str) -> Result<(), OleError> {
+        self.reserve(length, resource)?;
+        // The default implementation is intentionally small and is used only
+        // for padding.  Larger payloads go through append_bytes below.
+        for _ in 0..length {
+            self.append_reserved(&[0]);
+        }
+        Ok(())
+    }
+}
+
+/// A serialized byte vector with an optional exact retained-byte ceiling.
+pub(super) struct ByteWriter {
+    bytes: Vec<u8>,
+    maximum: Option<u64>,
+}
+
+impl ByteWriter {
+    pub(super) fn new(
+        initial_capacity: usize,
+        maximum: Option<u64>,
+        resource: &'static str,
+    ) -> Result<Self, OleError> {
+        let capacity = maximum
+            .and_then(|maximum| usize::try_from(maximum).ok())
+            .map_or(initial_capacity, |maximum| initial_capacity.min(maximum));
+        Ok(Self {
+            bytes: try_vec_with_capacity(capacity, resource)?,
+            maximum,
+        })
+    }
+
+    pub(super) fn zeroed(
+        length: usize,
+        maximum: Option<u64>,
+        resource: &'static str,
+    ) -> Result<Self, OleError> {
+        if let Some(maximum) = maximum {
+            let observed = u64::try_from(length).unwrap_or(u64::MAX);
+            if observed > maximum {
+                return Err(OleError::LimitExceeded {
+                    resource,
+                    observed,
+                    maximum,
+                });
+            }
+        }
+        let mut output = Self::new(length, maximum, resource)?;
+        output.bytes.resize(length, 0);
+        Ok(output)
+    }
+
+    pub(super) fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    pub(super) fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.bytes
+    }
+}
+
+impl ByteSink for ByteWriter {
+    fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    fn reserve(&mut self, additional: usize, resource: &'static str) -> Result<(), OleError> {
+        let required = self
+            .bytes
+            .len()
+            .checked_add(additional)
+            .ok_or_else(|| invalid("serialized property size overflow"))?;
+        if let Some(maximum) = self.maximum {
+            let observed = u64::try_from(required).unwrap_or(u64::MAX);
+            if observed > maximum {
+                return Err(OleError::LimitExceeded {
+                    resource,
+                    observed,
+                    maximum,
+                });
+            }
+        }
+        self.bytes
+            .try_reserve_exact(additional)
+            .map_err(|source| allocation(resource, source))?;
+        Ok(())
+    }
+
+    fn append_reserved(&mut self, bytes: &[u8]) {
+        self.bytes.extend_from_slice(bytes);
+    }
+}
+
+/// Allocation-free sink used to determine the exact canonical output length.
+pub(super) struct CountingWriter {
+    length: usize,
+}
+
+impl CountingWriter {
+    pub(super) const fn new() -> Self {
+        Self { length: 0 }
+    }
+}
+
+impl ByteSink for CountingWriter {
+    fn len(&self) -> usize {
+        self.length
+    }
+
+    fn reserve(&mut self, additional: usize, _resource: &'static str) -> Result<(), OleError> {
+        self.length
+            .checked_add(additional)
+            .ok_or_else(|| invalid("serialized property size overflow"))?;
+        Ok(())
+    }
+
+    fn append_reserved(&mut self, bytes: &[u8]) {
+        // `reserve` is called by every shared append helper before this
+        // method.  This second checked addition keeps the sink correct if a
+        // future caller appends directly.
+        self.length = self.length.saturating_add(bytes.len());
+    }
+}
+
 pub(super) struct ValueReader<'a> {
     data: &'a [u8],
     position: usize,
@@ -120,75 +263,95 @@ impl<'a> ValueReader<'a> {
     }
 }
 
-pub(super) fn try_zeroed_vec(len: usize, resource: &'static str) -> Result<Vec<u8>, OleError> {
-    let mut values = try_vec_with_capacity(len, resource)?;
-    values.resize(len, 0);
-    Ok(values)
-}
-
-pub(super) fn reserve_bytes(
-    output: &mut Vec<u8>,
+pub(super) fn reserve_bytes<S: ByteSink + ?Sized>(
+    output: &mut S,
     additional: usize,
     resource: &'static str,
 ) -> Result<(), OleError> {
-    output
-        .len()
-        .checked_add(additional)
-        .ok_or_else(|| invalid("serialized property size overflow"))?;
-    output
-        .try_reserve(additional)
-        .map_err(|source| allocation(resource, source))?;
-    Ok(())
+    output.reserve(additional, resource)
 }
 
-pub(super) fn append_bytes(
-    output: &mut Vec<u8>,
+pub(super) fn append_bytes<S: ByteSink + ?Sized>(
+    output: &mut S,
     bytes: &[u8],
     resource: &'static str,
 ) -> Result<(), OleError> {
     reserve_bytes(output, bytes.len(), resource)?;
-    output.extend_from_slice(bytes);
+    output.append_reserved(bytes);
     Ok(())
 }
 
-pub(super) fn append_u16(
-    output: &mut Vec<u8>,
+pub(super) fn append_u16<S: ByteSink + ?Sized>(
+    output: &mut S,
     value: u16,
     resource: &'static str,
 ) -> Result<(), OleError> {
     append_bytes(output, &value.to_le_bytes(), resource)
 }
 
-pub(super) fn append_u32(
-    output: &mut Vec<u8>,
+pub(super) fn append_u32<S: ByteSink + ?Sized>(
+    output: &mut S,
     value: u32,
     resource: &'static str,
 ) -> Result<(), OleError> {
     append_bytes(output, &value.to_le_bytes(), resource)
 }
 
-pub(super) fn append_u64(
-    output: &mut Vec<u8>,
+pub(super) fn append_u64<S: ByteSink + ?Sized>(
+    output: &mut S,
     value: u64,
     resource: &'static str,
 ) -> Result<(), OleError> {
     append_bytes(output, &value.to_le_bytes(), resource)
 }
 
-pub(super) fn pad4(out: &mut Vec<u8>) -> Result<(), OleError> {
+pub(super) fn pad4<S: ByteSink + ?Sized>(out: &mut S) -> Result<(), OleError> {
     let padding = (4 - (out.len() & 3)) & 3;
-    reserve_bytes(out, padding, "serialized property padding")?;
-    for _ in 0..padding {
-        out.push(0);
-    }
-    Ok(())
+    out.append_zeroes(padding, "serialized property padding")
 }
 
-pub(super) fn encode_ansi(value: &str, codepage: u16) -> Result<Vec<u8>, OleError> {
+/// Return the exact encoded byte count without retaining the complete result.
+///
+/// `litchi-codepage` exposes a strict whole-string conversion.  Encoding one
+/// Unicode scalar at a time keeps the bounded preflight's scratch storage
+/// constant while preserving the same strict conversion errors for all of the
+/// supported state-free MBCS pages.
+pub(super) fn encoded_ansi_len(value: &str, codepage: u16) -> Result<usize, OleError> {
     let page = Mbcs::require(u32::from(codepage)).map_err(|error| invalid(error.to_string()))?;
-    page.encode(value)
-        .map(Cow::into_owned)
-        .map_err(|error| invalid(error.to_string()))
+    let mut length = 0usize;
+    for character in value.chars() {
+        let mut utf8 = [0u8; 4];
+        let fragment = character.encode_utf8(&mut utf8);
+        let bytes = page
+            .encode(fragment)
+            .map_err(|error| invalid(error.to_string()))?;
+        length = length
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("encoded ANSI string length overflow"))?;
+    }
+    Ok(length)
+}
+
+/// Append a strictly encoded MBCS string without creating a whole-string
+/// temporary buffer.
+pub(super) fn append_ansi<S: ByteSink + ?Sized>(
+    output: &mut S,
+    value: &str,
+    codepage: u16,
+    resource: &'static str,
+) -> Result<(), OleError> {
+    let page = Mbcs::require(u32::from(codepage)).map_err(|error| invalid(error.to_string()))?;
+    let encoded_length = encoded_ansi_len(value, codepage)?;
+    output.reserve(encoded_length, resource)?;
+    for character in value.chars() {
+        let mut utf8 = [0u8; 4];
+        let fragment = character.encode_utf8(&mut utf8);
+        let bytes = page
+            .encode(fragment)
+            .map_err(|error| invalid(error.to_string()))?;
+        append_bytes(output, &bytes, resource)?;
+    }
+    Ok(())
 }
 
 pub(super) fn read_codepage_string(
