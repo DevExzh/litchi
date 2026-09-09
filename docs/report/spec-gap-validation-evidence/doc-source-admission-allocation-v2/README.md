@@ -35,3 +35,8 @@ python3 reproduce.py --control-source /path/to/control \
 ```
 
 The output directory must not exist. Rust 1.95.0 must be installed; use `RUSTUP_HOME` if it is outside the default installation. The driver verifies all recorded source and fixture hashes, rewrites only local dependency paths, uses the archived Cargo lockfile, clears Rust flag overrides, and records each command. Dependency downloads may be needed on a new machine. Allocation results are scoped to the recorded build and architecture.
+
+The separate [release latency evidence](../doc-source-admission-latency-v2/README.md)
+includes a portable rebuild and root reproduction. Its large open-plus-no-op-finish
+case regresses despite lower allocation totals; allocation measurements alone do
+not establish a latency improvement.
