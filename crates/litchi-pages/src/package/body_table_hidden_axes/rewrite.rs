@@ -29,11 +29,14 @@ use super::{
     METADATA_ENTRY_NAME, METADATA_MESSAGE_TYPE, MODEL_COLUMN_REFERENCE_PATH,
     MODEL_ROW_REFERENCE_PATH, MetadataRoute, OWNER_CREATION_FIELD_INFOS, OWNER_CREATION_MESSAGES,
     OWNER_CREATION_OBJECTS, ObjectLocation, Package, UID_MAP_MESSAGE_TYPE, UidIndex, charge_codec,
-    codec, codec_options, formula_owner_for, formula_owner_messages, global_objects,
-    map_archive_error, map_codec_error, map_core_error, map_lock_error, map_package_error,
-    map_page_layout_error, map_uid_codec_error, metadata_route, metadata_scan_work,
-    object_location, page_layout, table_lock, uid_codec, validate_message_metadata,
-    validate_no_reference_metadata, validate_uuid,
+    charge_style_codec, codec, codec_options, formula_owner_for, formula_owner_messages,
+    global_objects, map_archive_error, map_codec_error, map_core_error, map_lock_error,
+    map_package_error, map_page_layout_error, map_style_codec_error, map_uid_codec_error,
+    metadata_route, metadata_scan_work, object_location, page_layout, style_codec,
+    style_codec_options, table_lock, uid_codec, validate_aggregate_formula_owner_component,
+    validate_aggregate_formula_owner_metadata, validate_aggregate_formula_owner_provenance,
+    validate_empty_formula_owner_dependencies, validate_message_metadata,
+    validate_no_reference_metadata, validate_reference_shape, validate_uuid,
 };
 
 /// Execute the verified hidden-axis rewrite and return its reopened package.
@@ -986,6 +989,17 @@ fn validate_creation_uuid_namespace(
     if active_uuid == column_extent_uuid {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
+    let expected_formula_owner_uid = if graph.profile.is_aggregate_only() {
+        Some(codec::UuidSnapshot::new(
+            active_uuid
+                .lower()
+                .checked_sub(4)
+                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+            active_uuid.upper(),
+        ))
+    } else {
+        None
+    };
 
     let mut logical_uuids = Vec::new();
     let initial_capacity = graph
@@ -1078,7 +1092,47 @@ fn validate_creation_uuid_namespace(
                 .map_err(map_codec_error)?;
                 charge_codec(budget, report)?;
                 if owner.has_dependencies() {
-                    return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    let Some(expected_formula_owner_uid) = expected_formula_owner_uid else {
+                        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    };
+                    let Some(reference) = owner.formula_owner() else {
+                        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    };
+                    validate_reference_shape(reference)?;
+                    if owner.internal_formula_owner_id() == 0
+                        || owner.owner_kind() != Some(1)
+                        || owner.base_owner_uid().is_some()
+                        || owner.formula_owner_uid() != expected_formula_owner_uid
+                        || reference.identifier().get() != graph.target.drawable_identifier.get()
+                    {
+                        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    }
+                    let drawable = object_location(objects, graph.target.drawable_identifier)?;
+                    if location.component_index == drawable.component_index
+                        || location.identifier == graph.target.model_identifier.get()
+                    {
+                        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    }
+                    validate_aggregate_formula_owner_component(
+                        package,
+                        location.component_index,
+                        budget,
+                    )?;
+                    validate_empty_formula_owner_dependencies(message.data.as_slice(), budget)?;
+                    validate_aggregate_formula_owner_metadata(
+                        object,
+                        message_index,
+                        drawable.identifier,
+                        budget,
+                    )?;
+                    validate_aggregate_formula_owner_provenance(
+                        package,
+                        location.identifier,
+                        &owner,
+                        budget,
+                    )?;
+                    push_logical_uuid(&mut logical_uuids, owner.formula_owner_uid(), budget)?;
+                    continue;
                 }
                 push_logical_uuid(&mut logical_uuids, owner.formula_owner_uid(), budget)?;
                 if let Some(base_owner_uid) = owner.base_owner_uid() {
@@ -1117,14 +1171,34 @@ fn validate_creation_uuid_namespace(
                 budget
                     .charge_payload_work(message.data.len())
                     .map_err(map_lock_error)?;
-                let (info, report) = codec::decode_table_info_with_report(
+                let info_result = codec::decode_table_info_with_report(
                     message.data.as_slice(),
                     codec_options(budget, message.data.len(), message.data.len())?,
-                )
-                .map_err(map_codec_error)?;
-                charge_codec(budget, report)?;
-                if let Some(uuid) = info.hidden_states_uuid() {
-                    push_logical_uuid(&mut logical_uuids, uuid, budget)?;
+                );
+                match info_result {
+                    Ok((info, report)) => {
+                        charge_codec(budget, report)?;
+                        if let Some(uuid) = info.hidden_states_uuid() {
+                            push_logical_uuid(&mut logical_uuids, uuid, budget)?;
+                        }
+                    },
+                    Err(error)
+                        if error.resource_limit().is_none()
+                            && error.allocation_amount().is_none() =>
+                    {
+                        // Message type 6003 is also the current
+                        // TST.TableStyleArchive role. Qualify that known
+                        // collision with the strict appearance codec before
+                        // ignoring it in the UUID census; an unknown or
+                        // malformed payload remains a hard source error.
+                        let (_, report) = style_codec::decode_table_style_with_report(
+                            message.data.as_slice(),
+                            style_codec_options(budget, message.data.len())?,
+                        )
+                        .map_err(map_style_codec_error)?;
+                        charge_style_codec(budget, report)?;
+                    },
+                    Err(error) => return Err(map_codec_error(error)),
                 }
             } else if message.type_ == 6_000 {
                 // Type 6000 is shared by the indexed table-info/model pair.

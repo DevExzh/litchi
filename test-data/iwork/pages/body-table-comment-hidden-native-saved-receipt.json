@@ -1,0 +1,43 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "native_file": "body-table-comment-hidden-native-saved.pages",
+  "size": 109330,
+  "sha256": "335d9d13a86e8b62b8e10835fe37be31c672529e6ccc6348c6499eddd4f02c7d",
+  "body_marker": "Pages hidden-axis native oracle — 2026-09-05",
+  "hidden_row_indices": [
+    2
+  ],
+  "hidden_column_indices": [
+    1
+  ],
+  "lifecycle": [
+    "Opened native-derived comment and focused hidden-axis candidate without repair",
+    "Saved in Pages",
+    "Closed actual document window and observed template chooser",
+    "Reopened exact saved file",
+    "Verified visible row tabs 1, 2, 4, 5 and column tabs A, C, D, logical table size 5 by 4, and body marker",
+    "Closed verified document"
+  ],
+  "readback": {
+    "root": "Native hidden-axis control root",
+    "replies": [
+      "Native hidden-axis control reply"
+    ],
+    "cell": {
+      "row_index": 1,
+      "column_index": 1
+    },
+    "focused_axes": [
+      {
+        "row": 2
+      },
+      {
+        "column": 1
+      }
+    ],
+    "legacy_exact_reencode": true
+  },
+  "scope": "Native existing-owner hidden-axis edit with legacy-produced comment and reply. Both comments survive native save and semantic readback. Comments pane was empty with column B hidden; no visual comment rendering claim. Source-built native creation remains unqualified."
+}

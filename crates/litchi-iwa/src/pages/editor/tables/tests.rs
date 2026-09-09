@@ -214,6 +214,43 @@ fn clear_pages_table_sort_order(
     Ok(())
 }
 
+fn focused_pages_package(editor: &PagesEditor) -> Result<PagesPackage> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(format!("Pages hidden-axis package: {error}")))?;
+    Ok(package)
+}
+
+fn pages_table_hidden_axes(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+) -> Result<HiddenAxes> {
+    let package = focused_pages_package(editor)?;
+    package
+        .body_table_hidden_axes(selector)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table hidden axes: {error}")))
+}
+
+fn set_pages_table_hidden_axes(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    hidden: HiddenAxes,
+) -> Result<()> {
+    let package = focused_pages_package(editor)?;
+    let commit = package
+        .edit_body_table_hidden_axes(selector)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table hidden axes: {error}")))?
+        .set(hidden)
+        .commit()
+        .map_err(|error| Error::InvalidFormat(format!("Pages table hidden axes: {error}")))?;
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
 fn pages_table_row_height(
     editor: &PagesEditor,
     selector: BodyTableSelector<'_>,
@@ -1203,6 +1240,127 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
 }
 
 #[test]
+fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {
+    let mut editor = PagesDocumentBuilder::new()
+        .body_text("Pages hidden-axis source-built oracle — 2026-09-09\n")
+        .body_table("Hidden", 5, 4)
+        .build()
+        .unwrap();
+    let model_id = editor.tables().unwrap()[0].model_object_id;
+    editor
+        .set_table_cell_comment(model_id, 1, 1, "Focused source root")
+        .unwrap();
+    let reply_id = editor
+        .add_table_cell_comment_reply(model_id, 1, 1, "Focused source reply")
+        .unwrap();
+    let comment_id = editor
+        .table_cell_comment(model_id, 1, 1)
+        .unwrap()
+        .unwrap()
+        .storage_id;
+    let source = editor.to_bytes().unwrap();
+    let package = PagesPackage::from_bytes(&source).unwrap();
+    let by_name = BodyTableSelector::name("Hidden");
+    let by_index = BodyTableSelector::index(0);
+    let empty = HiddenAxes::empty();
+
+    assert_eq!(package.body_table_hidden_axes(by_name).unwrap(), empty);
+    assert_eq!(package.body_table_hidden_axes(by_index).unwrap(), empty);
+    let package_bytes = |package: &PagesPackage| {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).unwrap();
+        bytes
+    };
+    assert_eq!(package_bytes(&package), source);
+
+    let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();
+    let set = package
+        .edit_body_table_hidden_axes(by_name)
+        .unwrap()
+        .set(hidden.clone())
+        .commit()
+        .unwrap();
+    assert_eq!(set.patch().before(), &empty);
+    assert_eq!(set.patch().after(), &hidden);
+    assert!(!set.patch().is_noop());
+    assert!(set.diagnostics().changed());
+    assert_eq!(
+        set.package().body_table_hidden_axes(by_index).unwrap(),
+        hidden
+    );
+
+    let set_bytes = package_bytes(set.package());
+    let reopened = PagesPackage::from_bytes(&set_bytes).unwrap();
+    assert_eq!(reopened.body_table_hidden_axes(by_name).unwrap(), hidden);
+    assert_eq!(reopened.body_table_hidden_axes(by_index).unwrap(), hidden);
+    let reopened_editor = PagesEditor::from_bytes(&set_bytes).unwrap();
+    assert!(
+        reopened_editor
+            .body_text()
+            .unwrap()
+            .contains("Pages hidden-axis source-built oracle")
+    );
+    assert_eq!(
+        reopened_editor
+            .table_cell_comment(model_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .storage_id,
+        comment_id
+    );
+    assert_eq!(
+        reopened_editor
+            .table_cell_comment_replies(model_id, 1, 1)
+            .unwrap()[0]
+            .storage_id
+            .get(),
+        reply_id
+    );
+
+    let clear = reopened
+        .edit_body_table_hidden_axes(by_name)
+        .unwrap()
+        .clear()
+        .commit()
+        .unwrap();
+    assert_eq!(
+        clear.package().body_table_hidden_axes(by_index).unwrap(),
+        empty
+    );
+    let clear_bytes = package_bytes(clear.package());
+    assert_eq!(
+        PagesPackage::from_bytes(&clear_bytes)
+            .unwrap()
+            .body_table_hidden_axes(by_name)
+            .unwrap(),
+        empty
+    );
+
+    let before_invalid = package_bytes(&reopened);
+    let invalid = HiddenAxes::new([AxisIndex::row(5)]).unwrap();
+    assert!(
+        reopened
+            .edit_body_table_hidden_axes(by_name)
+            .unwrap()
+            .set(invalid)
+            .commit()
+            .is_err()
+    );
+    assert_eq!(package_bytes(&reopened), before_invalid);
+
+    let inverse = set.patch().inverse();
+    let restored = set
+        .package()
+        .apply_body_table_hidden_axes(&inverse)
+        .unwrap();
+    assert_eq!(
+        restored.package().body_table_hidden_axes(by_index).unwrap(),
+        empty
+    );
+    assert_eq!(package_bytes(restored.package()), source);
+}
+
+#[test]
 fn source_built_table_roundtrips_full_table_sort_crud() {
     let mut editor = PagesDocumentBuilder::new()
         .body_table("Cities", 5, 2)
@@ -1247,7 +1405,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .unwrap()
         .storage_id;
     let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
-    editor.set_table_hidden_axes(model_id, &hidden).unwrap();
+    set_pages_table_hidden_axes(&mut editor, BodyTableSelector::index(0), hidden.clone()).unwrap();
     let order = Order::new([SortRule::new(
         ColumnIndex::new(0).unwrap(),
         Direction::Ascending,
@@ -1305,7 +1463,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .get(),
         reply_id
     );
-    assert_eq!(editor.table_hidden_axes(model_id).unwrap(), hidden);
+    assert_eq!(
+        pages_table_hidden_axes(&editor, BodyTableSelector::index(0)).unwrap(),
+        hidden
+    );
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -1326,7 +1487,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .get(),
         reply_id
     );
-    assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
+    assert_eq!(
+        pages_table_hidden_axes(&reopened, BodyTableSelector::index(0)).unwrap(),
+        hidden
+    );
     let unchanged = reopened.to_bytes().unwrap();
     set_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0), order).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
@@ -1402,7 +1566,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .get(),
         reply_id
     );
-    assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
+    assert_eq!(
+        pages_table_hidden_axes(&reopened, BodyTableSelector::index(0)).unwrap(),
+        hidden
+    );
 
     clear_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0)).unwrap();
     assert_eq!(

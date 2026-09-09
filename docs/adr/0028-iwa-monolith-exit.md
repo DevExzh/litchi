@@ -10834,3 +10834,97 @@ files (1.5 GiB). Disposable native copies, compatibility probes, replay and
 build logs, generated fuzz lockfile, and Python cache were removed. Permanent
 native fixtures and receipts remain; unrelated preexisting `.codex` content
 was preserved.
+
+## 2026-09-09 Pages source-built hidden-axis parity follow-up
+
+Legacy comment producers now stage each physical allocation together with its
+component UUID binding: root storage, copied root/reply storage, generated
+authors, and comment table objects. Cleanup removes the corresponding owned
+bindings. A current component's identity binding does not pin an otherwise
+unreferenced comment graph; foreign component bindings remain ownership edges.
+Missing metadata keeps legacy behavior, while a present sidecar must resolve
+the current component and preserve unique registrations. Removal tolerates a
+missing legacy binding without inventing one.
+
+Producer regressions cover Pages table and drawable comment workflows, root and
+reply copy-on-write, author registration, expected component ownership, stale
+binding cleanup, unrelated metadata/member preservation, monotonic save tokens,
+reopen, and malformed-metadata atomicity. Four producer tests and 31 comment
+unit tests pass in the scoped run.
+
+Computer Use also tested the legacy source-built control and its pre-edit
+baseline in Pages 14.4. Both were rejected as damaged before a document window
+opened. Their exact bytes and negative receipt are retained under
+`test-data/iwork/pages/source-built-hidden-axes-*`. This exposes a pre-existing
+builder acceptance gap; no native creation success is inferred from source-built
+library parity. The independent native visible fixture remains the positive
+native existing-owner baseline.
+
+A native-derived candidate also combines the repaired legacy comment producer
+with a focused hidden-axis edit. Pages 14.4 opened, saved, closed, and reopened
+the exact candidate without repair. Row 3 and column B remained hidden and the
+body marker survived. Semantic readback confirms the B2 root and its reply,
+author and storage UUID metadata, and byte-exact legacy re-encoding of the
+app-saved package. The retained fixture and receipt are
+`body-table-comment-hidden-native-saved.pages` and its matching JSON receipt.
+The comments pane was empty with B hidden; this establishes stored comment
+preservation, not visual comment rendering.
+
+A read-only comparison narrows the next builder investigation: the rejected
+source places TableInfo and TableModel in Document with aggregate references
+and no FieldInfo declarations, while the accepted native fixture places them
+in a dedicated CalculationEngine component with declared reference paths and
+ViewState, tile, header-storage, and data-list sidecars. These topology and
+declaration differences are repair candidates, not proof of a single cause.
+Qualify a pristine builder document in Pages before attributing native
+acceptance to any subsequent table edit.
+
+The focused AggregateOnly route qualifies the source-built type-4008 owner
+through its canonical CalculationEngine component, a single type-4000 incoming
+edge, an exact internal-owner-to-CFUUID map, zero formula count, and complete
+empty dependency envelopes. Extra tracker data, owner edges, metadata edges,
+duplicate or mismatched IDs, and noncanonical UUID representations are refused.
+Raw proof scans precharge their byte work and contribute their fields and depth
+to the transaction budget; source payloads remain borrowed.
+
+The source-built creation census also distinguishes current type-6003
+TableStyle records from legacy TableInfo records using the bounded appearance
+codec. This fixes the concrete style-role collision without ignoring malformed
+records or weakening the present-registry requirement. The sanitizer harness
+now exercises aggregate owner creation, that style collision, reopen/inverse
+locality, and misplaced CalculationEngine refusal.
+
+The actual source-built transactional test now passes read-by-name/index,
+owner creation, changed edits, clear, reopen, invalid-command atomicity, exact
+inverse, body marker, and comment/reply preservation. The existing full
+table-sort CRUD test also passes through the focused route. With both runtime
+obligations and the earlier positive native changed-edit receipt satisfied,
+`PagesEditor::table_hidden_axes` and `set_table_hidden_axes` and their private
+module are removed. The Pages example and compatibility tests use semantic
+selectors and focused package transactions. All 46 Pages table unit tests pass
+after removal; shared Numbers and Keynote functionality remains covered by
+their existing routes. The boundary ratchet matches the actual semantic
+test/example and requires exact-byte/inverse evidence.
+
+Scoped validation passes 40 focused hidden-axis tests, five producer/native
+comment-registry integration tests, and 31 comment unit tests. Strict Pages
+library Clippy and workspace formatting pass. The final nightly
+AddressSanitizer replay passes 87 checked-in descriptors (89 executions
+including initialization), reporting 479 MiB resident memory. This is bounded
+regression evidence, not exhaustive fuzzing. The boundary test suite passes
+1,020 tests.
+
+The shared producer repair also updates the Keynote generic-backend parity
+oracle: new physical copies must have fresh, unique component-local UUID
+registrations, while surviving source bindings remain exact and removed
+objects leave no stale binding. The focused backend's existing assertions
+are unchanged. All six Keynote drawable-comment parity tests pass.
+
+Final boundary scanning accepts 64 workspace packages and 238 internal
+dependency declarations with eleven explicit migration debts. Normal commit
+hooks pass workspace formatting, strict all-feature workspace library Clippy,
+all-feature library/integration tests, and documentation tests. No Cargo
+manifest changed. Scoped `cargo clean` removed 2,102 sanitizer build files
+(1.5 GiB). Disposable Pages copies, probes, build/replay logs, generated fuzz
+lockfile, and Python cache were removed. The three new permanent fixtures and
+their receipts remain; unrelated pre-existing `.codex` content was preserved.

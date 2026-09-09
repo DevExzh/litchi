@@ -211,6 +211,59 @@ pub(crate) fn component_identifier_for_entry(
     .map(|value| value.flatten())
 }
 
+/// Register one object in the UUID map owned by an archive component.
+///
+/// Packages without the legacy metadata sidecar retain their historical
+/// compatibility behavior. A present sidecar is strict: the archive must
+/// resolve to exactly one current component, and the existing UUID-map helper
+/// validates component cardinality, UUID uniqueness, and the inserted binding
+/// before replacing metadata.
+pub(crate) fn add_object_uuid_for_entry(
+    package: &mut IWorkPackage,
+    entry_name: &str,
+    object_identifier: u64,
+) -> Result<()> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(());
+    }
+    let component_identifier =
+        component_identifier_for_entry(package, entry_name)?.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "PackageMetadata has no current component for archive {entry_name}"
+            ))
+        })?;
+    add_component_object_uuids(package, component_identifier, &[object_identifier])
+}
+
+/// Remove one object from its archive component UUID map before deleting it.
+///
+/// A missing metadata sidecar remains admissible for legacy compatibility.
+/// Present metadata must still identify the owning current component, while a
+/// missing binding is harmless because removal is idempotent for stale legacy
+/// registries.
+pub(crate) fn remove_object_uuid_for_entry(
+    package: &mut IWorkPackage,
+    entry_name: &str,
+    object_identifier: u64,
+) -> Result<()> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(());
+    }
+    let component_identifier =
+        component_identifier_for_entry(package, entry_name)?.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "PackageMetadata has no current component for archive {entry_name}"
+            ))
+        })?;
+    let Some(registered) = component_uuid_identifiers(package, component_identifier)? else {
+        return Ok(());
+    };
+    if !registered.contains(&object_identifier) {
+        return Ok(());
+    }
+    remove_component_object_uuids(package, component_identifier, &[object_identifier])
+}
+
 pub(crate) fn component_identifier_for_object_uuid(
     package: &IWorkPackage,
     object_identifier: u64,

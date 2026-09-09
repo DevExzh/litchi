@@ -11,6 +11,7 @@ use litchi_numbers::{
     TableSelector,
     cell::{Update as TableCellUpdate, Value as CellValue},
 };
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 3;
@@ -53,9 +54,17 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cells(table_id, table_cells())?;
-    editor.set_table_hidden_axes(table_id, &hidden)?;
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_body_table_hidden_axes(BodyTableSelector::name("Hidden Axes"))?
+        .set(hidden.clone())
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = PagesEditor::from_bytes(&bytes)?;
     editor.save(output)?;
-    if PagesEditor::open(output)?.table_hidden_axes(table_id)? != hidden {
+    let reopened = PagesPackage::from_bytes(&std::fs::read(output)?)?;
+    if reopened.body_table_hidden_axes(BodyTableSelector::index(0))? != hidden {
         return Err("Pages hidden axes failed reopen validation".into());
     }
     Ok(())

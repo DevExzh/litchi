@@ -6,7 +6,10 @@ use super::table_model_projection::{
 use super::*;
 use crate::application::Application;
 use crate::application_detection::detect;
-use crate::package_metadata::PACKAGE_METADATA_ENTRY;
+use crate::package_metadata::{
+    PACKAGE_METADATA_ENTRY, add_object_uuid_for_entry, component_identifier_for_entry,
+    remove_component_external_references_to_object, remove_object_uuid_for_entry,
+};
 use litchi_iwa_protos::comment_storage_codec;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
@@ -4584,7 +4587,8 @@ pub(super) fn ensure_comment_table(
             ))
         })?
         .clone();
-    package.update_archive(&model_archive, |archive| {
+    let mut staged = package.clone();
+    staged.update_archive(&model_archive, |archive| {
         archive.insert_object(ArchiveObject::new(
             table_id,
             vec![RawMessage {
@@ -4645,6 +4649,8 @@ pub(super) fn ensure_comment_table(
         }
         Ok(())
     })?;
+    add_object_uuid_for_entry(&mut staged, &model_archive, table_id)?;
+    *package = staged;
     Ok((table_id, model_archive))
 }
 
@@ -5453,6 +5459,7 @@ pub(super) fn remove_unreferenced_comment_graph(
                 identifier,
             )?;
         }
+        remove_object_uuid_for_entry(package, archive_name, identifier)?;
         remove_object_or_empty_entry(package, locations, identifier)?;
         removed.object_ids.push(identifier);
         pending.extend(replies);

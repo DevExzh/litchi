@@ -625,6 +625,12 @@ fn comment_cull_streams_every_metadata_ownership_namespace() {
     }];
 
     let mut uuid = comment_metadata_component();
+    // The UUID namespace must be foreign to the component that physically
+    // owns the comment.  A current binding in the owning component is the
+    // object's identity witness, not an external reference that keeps the
+    // unreachable graph alive.
+    uuid.identifier = 2;
+    uuid.preferred_locator = "Other".to_owned();
     uuid.object_uuid_map_entries = vec![tsp::ObjectUuidMapEntry {
         identifier: 20,
         uuid: fixture_comment_storage_uuid(20),
@@ -690,6 +696,58 @@ fn comment_cull_streams_every_metadata_ownership_namespace() {
     let document = package.archive("Index/Document.iwa").unwrap();
     assert!(document.object(20).is_none());
     assert!(document.object(21).is_none());
+}
+
+#[test]
+fn comment_cull_removes_owned_uuid_binding_with_the_comment_graph() {
+    let mut component = comment_metadata_component();
+    component.object_uuid_map_entries = vec![tsp::ObjectUuidMapEntry {
+        identifier: 20,
+        uuid: fixture_comment_storage_uuid(20),
+    }];
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![component],
+        ..Default::default()
+    });
+
+    let mut removed =
+        remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).unwrap();
+    removed.object_ids.sort_unstable();
+    assert_eq!(removed.object_ids, [20, 21]);
+    let metadata = package_metadata(&package);
+    assert!(metadata.components.iter().all(|component| {
+        component
+            .object_uuid_map_entries
+            .iter()
+            .all(|entry| entry.identifier != 20)
+    }));
+}
+
+#[test]
+fn malformed_present_metadata_rejects_comment_creation_atomically() {
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    });
+    package
+        .update_archive("Index/Metadata.iwa", |archive| {
+            let object = archive.object_mut(100).unwrap();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
+                    data: vec![0x80],
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    assert!(editor.set_comment(drawable(5), "must fail").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

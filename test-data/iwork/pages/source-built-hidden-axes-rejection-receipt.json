@@ -1,0 +1,27 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "files": [
+    {
+      "file": "source-built-hidden-axes-before.pages",
+      "size": 8368,
+      "sha256": "09f54a479577b912c0b20790d10427ba0000b258eb7db74d8ca952f3873c644c",
+      "result": "Pages reports damaged and cannot be opened"
+    },
+    {
+      "file": "source-built-hidden-axes-legacy.pages",
+      "size": 8549,
+      "sha256": "528b586e996c34aa53a9067f4c73808c2494da5fd101b0490bc2f22766c43812",
+      "result": "Pages reports damaged and cannot be opened"
+    }
+  ],
+  "lifecycle": [
+    "opened disposable exact copy of legacy hidden-axis candidate",
+    "observed damaged/cannot-open alert and dismissed it",
+    "opened disposable exact copy of pre-edit source-built baseline",
+    "observed same damaged/cannot-open alert and dismissed it",
+    "returned to template chooser"
+  ],
+  "scope": "Negative native acceptance evidence for the pre-existing source-built baseline. No save or reopen lifecycle succeeded. Does not invalidate qualified edits of the independent native visible fixture."
+}

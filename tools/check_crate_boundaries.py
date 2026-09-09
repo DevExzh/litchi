@@ -17768,12 +17768,26 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
     ),
     "source-built Pages builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
     "source-built table": re.compile(r"\bbody_table\s*\("),
-    "focused hidden-axis write": re.compile(r"\bset_pages_table_hidden_axes\s*\("),
-    "focused hidden-axis read": re.compile(r"\bpages_table_hidden_axes\s*\("),
-    "source-built reopen": re.compile(r"\bPagesEditor\s*::\s*from_bytes\s*\("),
-    "source-built exact bytes": re.compile(r"\bto_bytes\s*\("),
+    # The focused test deliberately uses the semantic Package transaction
+    # directly.  Do not require the old litchi-iwa adapter helper names here:
+    # those helpers are the surface this gate eventually retires.
+    "focused hidden-axis write": re.compile(
+        r"\bedit_body_table_hidden_axes\s*\("
+    ),
+    "focused hidden-axis read": re.compile(r"\bbody_table_hidden_axes\s*\("),
+    "source-built reopen": re.compile(
+        r"\b(?:PagesEditor|PagesPackage|Package)\s*::\s*from_bytes\s*\("
+    ),
+    "source-built exact bytes": re.compile(
+        r"\b(?:to_bytes|write_to)\s*\("
+    ),
+    "source-built exact byte equality": re.compile(
+        r"\bassert_eq!\s*\([^;\n]*"
+        r"\b(?:source|before|bytes|exact)\b[^;\n]*\)"
+    ),
     "source-built invalid transaction": re.compile(r"\bis_err\s*\("),
     "source-built clear transaction": re.compile(r"\bHiddenAxes\s*::\s*empty\s*\("),
+    "source-built inverse transaction": re.compile(r"\binverse\s*\("),
 }
 PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
     "Pages migration branch": re.compile(
@@ -17792,7 +17806,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
         r"\bPagesEditor\s*::\s*from_bytes\s*\("
     ),
     "Pages focused native reopen": re.compile(
-        r"\bPagesPackage\s*::\s*open\s*\("
+        r"\bPagesPackage\s*::\s*(?:open|from_bytes)\s*\("
     ),
     "Pages focused semantic read": re.compile(
         r"\bbody_table_hidden_axes\s*\("
