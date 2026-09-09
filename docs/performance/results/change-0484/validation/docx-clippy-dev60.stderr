@@ -1,0 +1,18 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:275:5
+    |
+275 |     source.max_source_xml_bytes = source_xml_bytes as u64 + 256 * 1024;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `litchi_docx::source_backed::TailAppendLimits { max_source_xml_bytes: source_xml_bytes as u64 + 256 * 1024, max_text_bytes: 64 * 1024 * 1024, max_fragment_bytes: 16 * 1024 * 1024, max_candidate_xml_bytes: source_xml_bytes as u64 + 16 * 1024 * 1024, max_events: 65_536, max_depth: 32, max_paragraphs: 65_536, max_settings_xml_bytes: 64 * 1024, max_workspace_bytes: 16 * 1024 * 1024, max_output_bytes: 32 * 1024 * 1024, max_token_bytes: 4 * 1024 }` and removing relevant reassignments
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:274:5
+    |
+274 |     let mut source = TailAppendLimits::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+    = note: `-D clippy::field-reassign-with-default` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `litchi-docx` (test "source_backed_tail_append_stream") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

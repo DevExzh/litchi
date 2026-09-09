@@ -1,0 +1,2 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `tools/perf-baseline/target/debug/docx_replayable_tail_append --source-counts 64 --authored-counts 64 --chunks 64 --text short,near --samples 1 --warmups 1 --json /home/zhuhe/.cache/litchi-goal-0484/cli-dev50.json --fixture-dir /home/zhuhe/.cache/litchi-goal-0484/native-dev50`

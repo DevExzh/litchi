@@ -1,0 +1,52 @@
+{
+  "authored_text_bytes": 1344,
+  "candidate_docx": {
+    "bytes": 2336,
+    "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+  },
+  "candidate_expected": {
+    "contains_entity_text": true,
+    "non_ascii_codepoints": 0,
+    "paragraph_count": 128,
+    "text_bytes": 2432,
+    "text_sha256": "19d0f485431760de719c49dbd3ae3143b36651bfeefab49390488e96ed505cf0",
+    "xml_bytes": 13207,
+    "xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124"
+  },
+  "candidate_output": {
+    "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+    "suffix": "ored-00000058 <&>\nauthored-00000059 <&>\nauthored-00000060 <&>\nauthored-00000061 <&>\nauthored-00000062 <&>\nauthored-00000063 <&>\n",
+    "text_bytes": 2432,
+    "text_sha256": "19d0f485431760de719c49dbd3ae3143b36651bfeefab49390488e96ed505cf0"
+  },
+  "candidate_txt": {
+    "bytes": 2435,
+    "sha256": "2efc405b519df254e679934aa07ba31b973a886671c53b762e1f2420ee6368bc"
+  },
+  "contains_entity_text": true,
+  "source_docx": {
+    "bytes": 2106,
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+  },
+  "source_expected": {
+    "contains_entity_text": false,
+    "non_ascii_codepoints": 0,
+    "paragraph_count": 64,
+    "text_bytes": 1024,
+    "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7",
+    "xml_bytes": 3223,
+    "xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+  },
+  "source_output": {
+    "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+    "suffix": "source-00000056\nsource-00000057\nsource-00000058\nsource-00000059\nsource-00000060\nsource-00000061\nsource-00000062\nsource-00000063\n",
+    "text_bytes": 1024,
+    "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7"
+  },
+  "source_txt": {
+    "bytes": 1027,
+    "sha256": "5bfbb1bcc7267b5cb0179fb07b2231901090d15856bf2d1ce0c6eaccdf49756e"
+  },
+  "text_mode": "short",
+  "verified": true
+}

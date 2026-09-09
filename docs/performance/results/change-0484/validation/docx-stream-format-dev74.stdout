@@ -1,0 +1,219 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:1144:
+ /// The stream owner uses the same source/candidate/output and XML-audit
+ /// ceilings as the fixed one-paragraph operation.  The replay adapter adds
+ /// its own bounded reader window at the caller boundary.
+[31m-pub(super) fn make_splice_limits_for_stream(
+[m[31m-    limits: Limits,
+[m[31m-) -> Result<SourcePartSpliceLimits> {
+[m[32m+pub(super) fn make_splice_limits_for_stream(limits: Limits) -> Result<SourcePartSpliceLimits> {
+[m     make_splice_limits(limits)
+ }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:2782:
+         })
+     } else {
+         part.with_verified_decoded_reader(|mut reader| {
+[31m-            scan_reader(&mut reader, expected_len, limits, context, cancellation, None)
+[m[32m+            scan_reader(
+[m[32m+                &mut reader,
+[m[32m+                expected_len,
+[m[32m+                limits,
+[m[32m+                context,
+[m[32m+                cancellation,
+[m[32m+                None,
+[m[32m+            )
+[m         })
+     };
+     match scanned {
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3163:
+                                 && event_end <= generated_end
+                             {
+                                 generated_offset.get_or_insert(event_start);
+[31m-                                generated_count = generated_count.checked_add(1).ok_or(
+[m[31m-                                    ScanError::Limit {
+[m[32m+                                generated_count =
+[m[32m+                                    generated_count.checked_add(1).ok_or(ScanError::Limit {
+[m                                         resource: "generated paragraphs",
+                                         actual: u64::MAX,
+                                         maximum: expected_count,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3171:
+[31m-                                    },
+[m[31m-                                )?;
+[m[32m+                                    })?;
+[m                                 if generated_count > expected_count {
+                                     return Err(ScanError::Semantic(
+                                         "generated paragraph count exceeds the authored proof",
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3207:
+                     if let Some((expected, fragment_len, expected_count)) = generated {
+                         let generated_end = expected.saturating_add(fragment_len);
+                         if event_end <= generated_end {
+[31m-                            generated_count = generated_count.checked_add(1).ok_or(
+[m[31m-                                ScanError::Limit {
+[m[32m+                            generated_count =
+[m[32m+                                generated_count.checked_add(1).ok_or(ScanError::Limit {
+[m                                     resource: "generated paragraphs",
+                                     actual: u64::MAX,
+                                     maximum: expected_count,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3215:
+[31m-                                },
+[m[31m-                            )?;
+[m[32m+                                })?;
+[m                             if generated_count > expected_count {
+                                 return Err(ScanError::Semantic(
+                                     "generated paragraph count exceeds the authored proof",
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3312:
+     cancellation: Option<&CancellationToken>,
+     generated: Option<(u64, u64, u64)>,
+ ) -> Result<ScanFacts> {
+[31m-    scan_reader(reader, expected_len, limits, context, cancellation, generated)
+[m[31m-        .map_err(map_scan_error)
+[m[32m+    scan_reader(
+[m[32m+        reader,
+[m[32m+        expected_len,
+[m[32m+        limits,
+[m[32m+        context,
+[m[32m+        cancellation,
+[m[32m+        generated,
+[m[32m+    )
+[m[32m+    .map_err(map_scan_error)
+[m }
+ 
+ fn validate_event_name(event: &Event<'_>) -> std::result::Result<(), ScanError> {
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed.rs:36:
+     AuthoredReplayReader as TailAppendStreamReplayReader,
+     AuthoredReplayReference as TailAppendStreamReplayReference,
+     AuthoredReplayStore as TailAppendStreamReplayStore,
+[31m-    AuthoredStreamProof as TailAppendStreamProof,
+[m[31m-    Error as TailAppendStreamError,
+[m[32m+    AuthoredStreamProof as TailAppendStreamProof, Error as TailAppendStreamError,
+[m     MemoryReplayStore as TailAppendStreamMemoryReplayStore,
+     OneShotParagraphProducer as TailAppendStreamOneShotProducer,
+[31m-    ParagraphCursor as TailAppendStreamCursor,
+[m[31m-    ParagraphEventSink as TailAppendStreamEventSink,
+[m[31m-    ParagraphStreamCommit as TailAppendStreamCommit,
+[m[31m-    ParagraphStreamEdit as TailAppendStreamEdit,
+[m[31m-    ParagraphStreamLimits as TailAppendStreamLimits,
+[m[31m-    ParagraphStreamPlan as TailAppendStreamPlan,
+[m[32m+    ParagraphCursor as TailAppendStreamCursor, ParagraphEventSink as TailAppendStreamEventSink,
+[m[32m+    ParagraphStreamCommit as TailAppendStreamCommit, ParagraphStreamEdit as TailAppendStreamEdit,
+[m[32m+    ParagraphStreamLimits as TailAppendStreamLimits, ParagraphStreamPlan as TailAppendStreamPlan,
+[m     ParagraphStreamPublication as TailAppendStreamPublication,
+     PlainParagraphEvent as TailAppendStreamEvent,
+     ReplayableParagraphSource as TailAppendStreamSource,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed.rs:52:
+ };
+ 
+ pub use tail_append_stream::patch::{
+[31m-    apply_exact_inverse as apply_tail_append_exact_inverse,
+[m     ArtifactProof as TailAppendStreamArtifactProof,
+     AuthoredReplayResolver as TailAppendStreamReplayResolver,
+     ExactInverseAuthorization as TailAppendStreamExactInverseAuthorization,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed.rs:59:
+     OriginalArtifactError as TailAppendStreamOriginalArtifactError,
+     OriginalArtifactProvider as TailAppendStreamOriginalArtifactProvider,
+     OriginalArtifactReference as TailAppendStreamOriginalArtifactReference,
+[31m-    ParagraphStreamPatch as TailAppendStreamPatch,
+[m[31m-    Patch as TailAppendStreamDurablePatch,
+[m[31m-    PatchError as TailAppendStreamPatchError,
+[m[31m-    PatchLimits as TailAppendStreamPatchLimits,
+[m[32m+    ParagraphStreamPatch as TailAppendStreamPatch, Patch as TailAppendStreamDurablePatch,
+[m[32m+    PatchError as TailAppendStreamPatchError, PatchLimits as TailAppendStreamPatchLimits,
+[m     ReplayResolverError as TailAppendStreamReplayResolverError,
+     StreamCandidateProof as TailAppendStreamPatchCandidateProof,
+     StreamSourceProof as TailAppendStreamPatchSourceProof,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed.rs:69:
+[32m+    apply_exact_inverse as apply_tail_append_exact_inverse,
+[m };
+ 
+ use crate::alt::Data;
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:1144:
+ /// The stream owner uses the same source/candidate/output and XML-audit
+ /// ceilings as the fixed one-paragraph operation.  The replay adapter adds
+ /// its own bounded reader window at the caller boundary.
+[31m-pub(super) fn make_splice_limits_for_stream(
+[m[31m-    limits: Limits,
+[m[31m-) -> Result<SourcePartSpliceLimits> {
+[m[32m+pub(super) fn make_splice_limits_for_stream(limits: Limits) -> Result<SourcePartSpliceLimits> {
+[m     make_splice_limits(limits)
+ }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:2782:
+         })
+     } else {
+         part.with_verified_decoded_reader(|mut reader| {
+[31m-            scan_reader(&mut reader, expected_len, limits, context, cancellation, None)
+[m[32m+            scan_reader(
+[m[32m+                &mut reader,
+[m[32m+                expected_len,
+[m[32m+                limits,
+[m[32m+                context,
+[m[32m+                cancellation,
+[m[32m+                None,
+[m[32m+            )
+[m         })
+     };
+     match scanned {
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3163:
+                                 && event_end <= generated_end
+                             {
+                                 generated_offset.get_or_insert(event_start);
+[31m-                                generated_count = generated_count.checked_add(1).ok_or(
+[m[31m-                                    ScanError::Limit {
+[m[32m+                                generated_count =
+[m[32m+                                    generated_count.checked_add(1).ok_or(ScanError::Limit {
+[m                                         resource: "generated paragraphs",
+                                         actual: u64::MAX,
+                                         maximum: expected_count,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3171:
+[31m-                                    },
+[m[31m-                                )?;
+[m[32m+                                    })?;
+[m                                 if generated_count > expected_count {
+                                     return Err(ScanError::Semantic(
+                                         "generated paragraph count exceeds the authored proof",
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3207:
+                     if let Some((expected, fragment_len, expected_count)) = generated {
+                         let generated_end = expected.saturating_add(fragment_len);
+                         if event_end <= generated_end {
+[31m-                            generated_count = generated_count.checked_add(1).ok_or(
+[m[31m-                                ScanError::Limit {
+[m[32m+                            generated_count =
+[m[32m+                                generated_count.checked_add(1).ok_or(ScanError::Limit {
+[m                                     resource: "generated paragraphs",
+                                     actual: u64::MAX,
+                                     maximum: expected_count,
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3215:
+[31m-                                },
+[m[31m-                            )?;
+[m[32m+                                })?;
+[m                             if generated_count > expected_count {
+                                 return Err(ScanError::Semantic(
+                                     "generated paragraph count exceeds the authored proof",
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:3312:
+     cancellation: Option<&CancellationToken>,
+     generated: Option<(u64, u64, u64)>,
+ ) -> Result<ScanFacts> {
+[31m-    scan_reader(reader, expected_len, limits, context, cancellation, generated)
+[m[31m-        .map_err(map_scan_error)
+[m[32m+    scan_reader(
+[m[32m+        reader,
+[m[32m+        expected_len,
+[m[32m+        limits,
+[m[32m+        context,
+[m[32m+        cancellation,
+[m[32m+        generated,
+[m[32m+    )
+[m[32m+    .map_err(map_scan_error)
+[m }
+ 
+ fn validate_event_name(event: &Event<'_>) -> std::result::Result<(), ScanError> {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:10:
+ mod cold_verified;
+ mod corpus_manifest;
+ pub mod docx_bounded_tail_append_compare;
+[31m-pub mod docx_replayable_tail_append;
+[m pub mod docx_plain_paragraph_tail_append;
+[32m+pub mod docx_replayable_tail_append;
+[m mod docx_story_hyperlink_publication;
+ mod docx_story_hyperlinks;
+ mod docx_streaming_create;

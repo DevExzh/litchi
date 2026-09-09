@@ -238,6 +238,10 @@ impl Limits {
         }
         Ok(())
     }
+
+    pub(super) fn validate_for_stream(self) -> Result<()> {
+        self.validate()
+    }
 }
 
 impl Default for Limits {
@@ -1135,6 +1139,15 @@ fn make_splice_limits(limits: Limits) -> Result<SourcePartSpliceLimits> {
     Ok(splice)
 }
 
+/// Build the OPC splice policy for the multi-paragraph stream route.
+///
+/// The stream owner uses the same source/candidate/output and XML-audit
+/// ceilings as the fixed one-paragraph operation.  The replay adapter adds
+/// its own bounded reader window at the caller boundary.
+pub(super) fn make_splice_limits_for_stream(limits: Limits) -> Result<SourcePartSpliceLimits> {
+    make_splice_limits(limits)
+}
+
 fn checked_declared_size(
     part: &litchi_opc::PartView<'_>,
     maximum: u64,
@@ -1234,7 +1247,7 @@ fn digest_bytes(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
 
-fn validate_topology(
+pub(super) fn validate_topology(
     package: &Package,
     limits: Limits,
     context: Option<&ExecutionContext>,
@@ -2682,22 +2695,23 @@ impl FrameKind {
 }
 
 #[derive(Clone, Copy)]
-struct ScanFacts {
-    len: u64,
-    sha256: [u8; 32],
-    insertion_offset: u64,
-    paragraph_count: u64,
-    event_count: u64,
-    max_depth: u64,
-    strict_namespace: bool,
-    sect_pr_len: u64,
-    sect_pr_sha256: [u8; 32],
-    generated_offset: u64,
-    generated_once: bool,
+pub(super) struct ScanFacts {
+    pub(super) len: u64,
+    pub(super) sha256: [u8; 32],
+    pub(super) insertion_offset: u64,
+    pub(super) paragraph_count: u64,
+    pub(super) event_count: u64,
+    pub(super) max_depth: u64,
+    pub(super) strict_namespace: bool,
+    pub(super) sect_pr_len: u64,
+    pub(super) sect_pr_sha256: [u8; 32],
+    pub(super) generated_offset: u64,
+    pub(super) generated_once: bool,
+    pub(super) generated_count: u64,
 }
 
 impl ScanFacts {
-    fn source_proof(self, source_version: SourceVersion) -> SourceProof {
+    pub(super) fn source_proof(self, source_version: SourceVersion) -> SourceProof {
         SourceProof {
             source_version,
             source_len: self.len,
@@ -2712,7 +2726,7 @@ impl ScanFacts {
         }
     }
 
-    fn candidate_proof(self) -> CandidateProof {
+    pub(super) fn candidate_proof(self) -> CandidateProof {
         CandidateProof {
             candidate_len: self.len,
             candidate_sha256: self.sha256,
@@ -2727,7 +2741,7 @@ impl ScanFacts {
     }
 }
 
-fn scan_main_part(
+pub(super) fn scan_main_part(
     part: &litchi_opc::PartView<'_>,
     source_len: u64,
     limits: Limits,
@@ -2761,12 +2775,19 @@ fn scan_main_part(
                 limits,
                 context,
                 cancellation,
-                Some((source.insertion_offset, fragment.len() as u64)),
+                Some((source.insertion_offset, fragment.len() as u64, 1)),
             )
         })
     } else {
-        part.with_verified_decoded_reader(|reader| {
-            scan_reader(reader, expected_len, limits, context, cancellation, None)
+        part.with_verified_decoded_reader(|mut reader| {
+            scan_reader(
+                &mut reader,
+                expected_len,
+                limits,
+                context,
+                cancellation,
+                None,
+            )
         })
     };
     match scanned {
@@ -2783,12 +2804,12 @@ fn scan_main_part(
 }
 
 fn scan_reader<R: BufRead>(
-    reader: R,
+    reader: &mut R,
     expected_len: u64,
     limits: Limits,
     context: Option<&ExecutionContext>,
     cancellation: Option<&CancellationToken>,
-    generated: Option<(u64, u64)>,
+    generated: Option<(u64, u64, u64)>,
 ) -> std::result::Result<ScanFacts, ScanError> {
     let max_token = usize::try_from(limits.max_token_bytes).map_err(|_| ScanError::Limit {
         resource: "XML token bytes",
@@ -2866,6 +2887,8 @@ fn scan_reader<R: BufRead>(
     let mut generated_offset = None;
     let mut generated_once = false;
     let mut generated_open = false;
+    let mut generated_count = 0_u64;
+    let mut generated_last_end = None;
 
     loop {
         parser.get_mut().begin_token();
@@ -3047,9 +3070,9 @@ fn scan_reader<R: BufRead>(
                                     actual: u64::MAX,
                                     maximum: limits.max_paragraphs,
                                 })?;
-                            let paragraph_limit = limits
-                                .max_paragraphs
-                                .saturating_add(if generated.is_some() { 1 } else { 0 });
+                            let paragraph_limit = limits.max_paragraphs.saturating_add(
+                                generated.map_or(0, |(_, _, paragraph_count)| paragraph_count),
+                            );
                             if paragraph_count > paragraph_limit {
                                 return Err(ScanError::Limit {
                                     resource: "paragraphs",
@@ -3057,9 +3080,12 @@ fn scan_reader<R: BufRead>(
                                     maximum: paragraph_limit,
                                 });
                             }
-                            if let Some((expected, _)) = generated {
-                                if event_start == expected {
-                                    generated_offset = Some(event_start);
+                            if let Some((expected, fragment_len, _)) = generated {
+                                let generated_end = expected.saturating_add(fragment_len);
+                                if event_start >= expected && event_start < generated_end {
+                                    if generated_offset.is_none() {
+                                        generated_offset = Some(event_start);
+                                    }
                                     generated_open = true;
                                 }
                             }
@@ -3125,9 +3151,9 @@ fn scan_reader<R: BufRead>(
                                 actual: u64::MAX,
                                 maximum: limits.max_paragraphs,
                             })?;
-                        let paragraph_limit = limits
-                            .max_paragraphs
-                            .saturating_add(if generated.is_some() { 1 } else { 0 });
+                        let paragraph_limit = limits.max_paragraphs.saturating_add(
+                            generated.map_or(0, |(_, _, paragraph_count)| paragraph_count),
+                        );
                         if paragraph_count > paragraph_limit {
                             return Err(ScanError::Limit {
                                 resource: "paragraphs",
@@ -3135,12 +3161,29 @@ fn scan_reader<R: BufRead>(
                                 maximum: paragraph_limit,
                             });
                         }
-                        if let Some((expected, fragment_len)) = generated
-                            && event_start == expected
-                            && event_end == expected.saturating_add(fragment_len)
-                        {
-                            generated_offset = Some(event_start);
-                            generated_once = true;
+                        if let Some((expected, fragment_len, expected_count)) = generated {
+                            let generated_end = expected.saturating_add(fragment_len);
+                            if event_start >= expected
+                                && event_start < generated_end
+                                && event_end <= generated_end
+                            {
+                                generated_offset.get_or_insert(event_start);
+                                generated_count =
+                                    generated_count.checked_add(1).ok_or(ScanError::Limit {
+                                        resource: "generated paragraphs",
+                                        actual: u64::MAX,
+                                        maximum: expected_count,
+                                    })?;
+                                if generated_count > expected_count {
+                                    return Err(ScanError::Semantic(
+                                        "generated paragraph count exceeds the authored proof",
+                                    ));
+                                }
+                                generated_last_end = Some(event_end);
+                                if event_end == generated_end {
+                                    generated_once = true;
+                                }
+                            }
                         }
                     }
                 }
@@ -3165,10 +3208,25 @@ fn scan_reader<R: BufRead>(
                 } else if matches!(frame, FrameKind::Document) {
                     finished_document = true;
                 } else if matches!(frame, FrameKind::Paragraph) && generated_open {
-                    if let Some((expected, fragment_len)) = generated
-                        && event_end == expected.saturating_add(fragment_len)
-                    {
-                        generated_once = true;
+                    if let Some((expected, fragment_len, expected_count)) = generated {
+                        let generated_end = expected.saturating_add(fragment_len);
+                        if event_end <= generated_end {
+                            generated_count =
+                                generated_count.checked_add(1).ok_or(ScanError::Limit {
+                                    resource: "generated paragraphs",
+                                    actual: u64::MAX,
+                                    maximum: expected_count,
+                                })?;
+                            if generated_count > expected_count {
+                                return Err(ScanError::Semantic(
+                                    "generated paragraph count exceeds the authored proof",
+                                ));
+                            }
+                            generated_last_end = Some(event_end);
+                        }
+                        if event_end == generated_end {
+                            generated_once = true;
+                        }
                     }
                     generated_open = false;
                 }
@@ -3222,8 +3280,12 @@ fn scan_reader<R: BufRead>(
     let insertion_offset = insertion_offset.ok_or(ScanError::Semantic(
         "plain story has no direct body insertion point",
     ))?;
-    if let Some((_, _)) = generated {
-        if !generated_once {
+    if let Some((expected, fragment_len, expected_count)) = generated {
+        if !generated_once
+            || generated_offset != Some(expected)
+            || generated_last_end != Some(expected.saturating_add(fragment_len))
+            || generated_count != expected_count
+        {
             return Err(ScanError::Semantic(
                 "generated paragraph was not closed at its fragment boundary",
             ));
@@ -3241,7 +3303,27 @@ fn scan_reader<R: BufRead>(
         sect_pr_sha256: section_hasher.finalize().into(),
         generated_offset: generated_offset.unwrap_or(0),
         generated_once,
+        generated_count,
     })
+}
+
+pub(super) fn scan_reader_checked<R: BufRead>(
+    reader: &mut R,
+    expected_len: u64,
+    limits: Limits,
+    context: Option<&ExecutionContext>,
+    cancellation: Option<&CancellationToken>,
+    generated: Option<(u64, u64, u64)>,
+) -> Result<ScanFacts> {
+    scan_reader(
+        reader,
+        expected_len,
+        limits,
+        context,
+        cancellation,
+        generated,
+    )
+    .map_err(map_scan_error)
 }
 
 fn validate_event_name(event: &Event<'_>) -> std::result::Result<(), ScanError> {

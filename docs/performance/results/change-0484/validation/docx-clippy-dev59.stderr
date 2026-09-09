@@ -1,0 +1,59 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: this can be `std::io::Error::other(_)`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream/patch.rs:1448:30
+     |
+1448 |             .map_err(|error| io::Error::new(io::ErrorKind::Other, error.to_string()))?;
+     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+     = note: `-D clippy::io-other-error` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+     |
+1448 -             .map_err(|error| io::Error::new(io::ErrorKind::Other, error.to_string()))?;
+1448 +             .map_err(|error| io::Error::other(error.to_string()))?;
+     |
+
+error: using `chunks_exact` with a constant chunk size
+    --> crates/litchi-docx/src/source_backed/tail_append_stream/patch.rs:1481:34
+     |
+1481 |     for pair in value.as_bytes().chunks_exact(2) {
+     |                                  ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+     = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: methods called `new` usually return `Self`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1094:5
+     |
+1094 | /     fn new(
+1095 | |         inner: Arc<dyn AuthoredReplayHandle>,
+1096 | |         proof: AuthoredStreamProof,
+1097 | |         durable_reference: Option<AuthoredReplayReference>,
+...    |
+1112 | |         }))
+1113 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_ret_no_self
+     = note: `-D clippy::new-ret-no-self` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::new_ret_no_self)]`
+
+error: could not compile `litchi-docx` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-docx` (lib test) due to 3 previous errors

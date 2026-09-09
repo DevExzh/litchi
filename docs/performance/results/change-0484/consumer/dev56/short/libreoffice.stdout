@@ -1,0 +1,2 @@
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/source.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/text/source.txt using filter : Text (encoded):UTF8
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/candidate.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/text/candidate.txt using filter : Text (encoded):UTF8

@@ -1,0 +1,2 @@
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/source.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/text/source.txt using filter : Text (encoded):UTF8
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/candidate.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/text/candidate.txt using filter : Text (encoded):UTF8

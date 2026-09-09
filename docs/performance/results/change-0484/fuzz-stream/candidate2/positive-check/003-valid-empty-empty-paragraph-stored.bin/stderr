@@ -1,0 +1,11 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4843
+INFO: Loaded 1 modules   (109152 inline 8-bit counters): 109152 [0x5bc8facf3343, 0x5bc8fad0dda3), 
+INFO: Loaded 1 PC tables (109152 PCs): 109152 [0x5bc8fad0dda8,0x5bc8faeb83a8), 
+/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate2/source_backed_tail_append_stream: Running 1 inputs 1 time(s) each.
+Running: /home/zhuhe/code/litchi/docs/performance/results/change-0484/fuzz-stream/candidate2/seeds/valid-empty-empty-paragraph-stored.bin
+Executed /home/zhuhe/code/litchi/docs/performance/results/change-0484/fuzz-stream/candidate2/seeds/valid-empty-empty-paragraph-stored.bin in 5 ms
+***
+*** NOTE: fuzzing was not performed, you have only
+***       executed the target code on a fixed set of inputs.
+***

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "/usr/bin/libreoffice",
+    "--headless",
+    "-env:UserInstallation=file:///home/zhuhe/.cache/litchi-goal-0484/consumer-0484-dev56/profile-near_limit",
+    "--convert-to",
+    "txt:Text (encoded):UTF8",
+    "--outdir",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/text",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/source.docx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/candidate.docx"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T07:47:50.249404+00:00",
+  "started_utc": "2026-09-09T07:47:47.181609+00:00",
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 544,
+    "sha256": "bebdb0c338edfc29a1581902d162f382524246cb38a822c3663aebe4eb26f4ca"
+  },
+  "timed_out": false
+}

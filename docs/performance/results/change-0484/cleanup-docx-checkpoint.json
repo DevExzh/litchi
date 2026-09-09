@@ -1,0 +1,48 @@
+{
+  "verified_duplicate_artifacts_removed": [
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/cli-dev50.json",
+      "sha256": "eb81e7a039943176e6fcdd453d28295f8ae52d63cc74083a30a30aaf2c7c190b",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/cli-report.json"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-near-candidate.docx",
+      "sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/near_limit/candidate.docx"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-near-hashes.json",
+      "sha256": "7d87c2679ae9e3fd1c693fc533eba97b92d0cb4cd61f9d0768c73b9ca01e7210",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/near_limit/fixture-hashes.json"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-near-source.docx",
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/short/source.docx"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-short-candidate.docx",
+      "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/short/candidate.docx"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-short-hashes.json",
+      "sha256": "da2b4f730c63e17770ddc0515ddbec1079f1c0d03d1003b76b33c4105f8bddb3",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/short/fixture-hashes.json"
+    },
+    {
+      "removed": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-short-source.docx",
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+      "retained": "docs/performance/results/change-0484/consumer/dev56/short/source.docx"
+    }
+  ],
+  "retained_caches": [
+    "target/",
+    "tools/perf-baseline/target/",
+    "target/fuzz-asan/"
+  ],
+  "fuzz_attempts_retained_for_reproduction_and_diagnosis": [
+    "candidate1",
+    "candidate2"
+  ]
+}

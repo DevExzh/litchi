@@ -1,0 +1,45 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4841
+INFO: Loaded 1 modules   (1554 inline 8-bit counters): 1554 [0x58c2a58d1fe3, 0x58c2a58d25f5), 
+INFO: Loaded 1 PC tables (1554 PCs): 1554 [0x58c2a58d25f8,0x58c2a58d8718), 
+/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream: Running 1 inputs 1 time(s) each.
+Running: /home/zhuhe/code/litchi/docs/performance/results/change-0484/fuzz-stream/candidate1/seeds/valid-empty-default-namespace-deflate.bin
+
+thread '<unnamed>' (4091526) panicked at /home/zhuhe/code/litchi/crates/litchi-docx/fuzz/fuzz_targets/source_backed_tail_append_stream.rs:176:10:
+called `Result::unwrap()` on an `Err` value: InvalidReadLimit { resource: Parts, value: 64 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+==4091526== ERROR: libFuzzer: deadly signal
+    #0 0x58c2a57f10d1  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1040d1) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #1 0x58c2a589e3cb  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1b13cb) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #2 0x58c2a586d479  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x180479) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #3 0x7d6dfe047e0f  (/usr/lib/x86_64-linux-gnu/libc.so.6+0x47e0f) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #4 0x7d6dfe0ae14b  (/usr/lib/x86_64-linux-gnu/libc.so.6+0xae14b) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #5 0x7d6dfe047cdd  (/usr/lib/x86_64-linux-gnu/libc.so.6+0x47cdd) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #6 0x7d6dfe0288eb  (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #7 0x58c2a5860919  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x173919) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #8 0x58c2a585f408  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x172408) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #9 0x58c2a5821a16  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x134a16) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #10 0x58c2a585f6c1  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1726c1) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #11 0x58c2a584fc01  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x162c01) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #12 0x58c2a58454d8  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1584d8) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #13 0x58c2a585039c  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x16339c) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #14 0x58c2a581b7fb  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x12e7fb) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #15 0x58c2a581b5d1  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x12e5d1) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #16 0x58c2a582e6ec  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1416ec) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #17 0x58c2a582ff5e  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x142f5e) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #18 0x58c2a583ae0a  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x14de0a) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #19 0x58c2a58215b7  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1345b7) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #20 0x58c2a582200b  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x13500b) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #21 0x58c2a582104b  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x13404b) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #22 0x58c2a586da2d  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x180a2d) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #23 0x58c2a587b975  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x18e975) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #24 0x58c2a5889912  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x19c912) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #25 0x58c2a58c48b6  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x1d78b6) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+    #26 0x7d6dfe02a8c0  (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a8c0) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #27 0x7d6dfe02a9d7  (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a9d7) (BuildId: 4ec69afdf3da96ce7388640dcd27c6d0c1b256ef)
+    #28 0x58c2a575c264  (/home/zhuhe/.cache/litchi-goal-0484/fuzz-docx-stream-candidate1/source_backed_tail_append_stream+0x6f264) (BuildId: 43984c58f20cc94cdacc197d6620c01ae59de305)
+
+NOTE: libFuzzer has rudimentary signal handlers.
+      Combine libFuzzer with AddressSanitizer or similar for better crash reports.
+SUMMARY: libFuzzer: deadly signal
+MS: 0 ; base unit: 0000000000000000000000000000000000000000

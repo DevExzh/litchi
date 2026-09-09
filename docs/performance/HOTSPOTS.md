@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0484: authored stream lifecycle ready for measurement
+
+[0484](changes/0484-docx-replayable-tail-stream.md) implements a replayable
+multi-paragraph append route and explicit one-shot storage. The deterministic
+route opens five cursors across sealing, validation and publication; chunk
+count does not multiply the number of opens. The existing XML audit and replay
+costs remain present. This correctness checkpoint makes no CPU or memory
+improvement claim over 0483.
+
+The next measurements must vary source size and authored size independently,
+then compare deterministic replay with the production memory store and a
+caller-supplied bounded file store. The [store measurement plan](results/change-0484/store-measurement-plan.md)
+retains source-adapter, sink-window and Store/Deflate cases as required work.
+Only measured phase attribution can justify removing repeated validation work.
+
 ## 0483: bounded DOCX heap with repeated audit/replay CPU cost
 
 [0483](changes/0483-docx-bounded-tail-append.md) removes full source/candidate

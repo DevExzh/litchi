@@ -1,0 +1,71 @@
+
+running 40 tests
+test append_and_source_limits_are_checked_before_output ... ok
+test managed_work_limit_exhaustion_refuses_before_archive_output ... ok
+test encrypted_metadata_refusal_precedes_main_payload_reads_and_output ... ok
+test managed_memory_limit_refuses_before_archive_output ... ok
+test one_large_token_is_rejected_by_the_token_ceiling_before_output ... ok
+test cancellation_is_checked_before_preparation_and_before_publication_output ... ok
+test managed_prepare_charges_semantic_memory_and_releases_plan_workspace ... ok
+test settings_xml_declaration_inside_root_refuses_before_publication ... ok
+test settings_mce_must_understand_unknown_namespace_refuses_before_publication ... ok
+test bounded_prepare_and_publication_keep_main_xml_out_of_the_payload_cache ... ok
+test options_cancellation_during_short_publication_is_typed_after_a_prefix ... ok
+test managed_cancellation_during_short_publication_is_typed_after_a_prefix ... ok
+test append_without_a_section_properties_element_targets_the_body_close ... ok
+test empty_text_is_a_real_empty_paragraph_and_is_not_the_exact_noop_branch ... ok
+test explicit_noop_is_exact_and_reversible_without_a_generated_paragraph ... ok
+test protected_external_unsupported_and_signed_topologies_refuse_before_output ... ok
+test insertion_survives_distinct_body_prefix_and_word_prefix_shadowing_in_section ... ok
+test opaque_section_preserves_unicode_qnames ... ok
+test source_change_after_preparation_is_rejected_without_output ... ok
+test opaque_section_allows_an_explicit_empty_default_namespace_and_preserves_it ... ok
+test sink_failure_reports_partial_output_after_preflight ... ok
+test default_word_namespace_and_shadowed_local_prefix_are_bound_at_insertion ... ok
+test topology_refusals_keep_their_public_reason_and_emit_no_prefix ... ok
+test empty_settings_root_is_admitted_in_both_word_dialects ... ok
+test authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules ... ok
+test strict_tail_append_preserves_opaque_section_with_vendor_word_like_descendants ... ok
+test opaque_section_namespace_attribute_and_event_policy_refuses_before_output ... ok
+test source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once ... ok
+test grammar_refusals_happen_before_publication ... ok
+test repeated_protection_and_tracking_elements_refuse_before_output ... ok
+test malformed_mail_merge_schema_refuses_before_output ... ok
+test xml_declaration_and_encoding_grammar_refuse_before_publication ... ok
+test inherited_settings_namespace_copies_hit_the_workspace_ceiling ... ok
+test supported_settings_mce_fallback_is_admitted_and_output_limited ... ok
+test settings_scalar_duplicates_and_malformed_on_off_values_refuse_before_output ... ok
+test appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members ... ok
+test settings_relationship_closure_is_checked_without_staging_relationships ... ok
+test settings_protection_flags_honor_explicit_on_and_off_values ... ok
+test nested_long_mce_directives_account_for_decoded_expanded_names ... ok
+test many_xml_space_paragraphs_use_the_aggregate_attribute_budget ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 21 tests
+test managed_memory_store_zero_object_budget_refuses_before_append ... ok
+test explicit_store_capacity_must_fit_selected_replay_limit_before_producer ... ok
+test one_shot_store_must_return_the_encoder_proof_before_candidate_or_output ... ok
+test changed_text_event_boundaries_are_rejected_even_when_encoded_xml_matches ... ok
+test managed_replay_readers_each_hold_object_lease_until_final_handle_drop ... ok
+test managed_store_memory_budget_refuses_before_one_shot_producer ... ok
+test default_stream_limits_accept_a_tiny_valid_append ... ok
+test deterministic_replay_change_and_truncated_event_eof_are_typed_refusals ... ok
+test durable_resolver_cancellation_refuses_before_replay_reader_or_output ... ok
+test default_and_shadowed_namespaces_cannot_capture_generated_prefix ... ok
+test source_change_after_preparation_refuses_without_archive_output ... ok
+test managed_store_lease_survives_plan_and_handle_then_releases ... ok
+test finite_limits_cancellation_and_partial_sink_errors_remain_at_public_boundary ... ok
+test one_shot_producer_requires_and_uses_explicit_replay_store ... ok
+test durable_forward_and_inverse_authorizations_are_compact_canonical_wire ... ok
+test managed_external_output_is_charged_once_for_one_publication ... ok
+test malformed_order_empty_stream_invalid_xml_and_provider_errors_refuse_before_output ... ok
+test durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provider ... ok
+test replayable_stream_escapes_borrowed_chunks_and_preserves_section_and_inverse ... ok
+test each_replay_pass_opens_one_cursor_independent_of_encoded_window_count ... ok
+test source_size_and_authored_count_are_independent ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+
