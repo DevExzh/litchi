@@ -36,7 +36,7 @@ pub(in crate::web) fn existing_web_extension_graph(
     let mut extensions_by_relationship = HashMap::with_capacity(loaded.panes.len());
     let mut owned = HashSet::new();
     owned.insert(task_panes_name.clone());
-    for pane in loaded.panes {
+    for pane in loaded.panes.iter() {
         let child_relationship = task_panes_part
             .rels()
             .get(&pane.relationship_id)
@@ -61,9 +61,9 @@ pub(in crate::web) fn existing_web_extension_graph(
             ));
         }
         owned.insert(extension_name);
-        for resource in pane.snapshot_resources {
-            if let SnapshotTarget::Internal { part_name, .. } = resource.target {
-                owned.insert(part_name);
+        for resource in &pane.snapshot_resources {
+            if let SnapshotTarget::Internal { part_name, .. } = &resource.target {
+                owned.insert(part_name.clone());
             }
         }
     }
@@ -72,6 +72,7 @@ pub(in crate::web) fn existing_web_extension_graph(
     Ok(Some(ExistingAddInGraph {
         root_relationship_id: relationship.r_id().to_owned(),
         task_panes_name,
+        panes: loaded,
         extensions_by_relationship,
         owned_parts,
     }))

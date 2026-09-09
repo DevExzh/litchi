@@ -13,6 +13,12 @@ pub(in crate::web) fn escape_attr(out: &mut String, value: &str) {
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
             '\'' => out.push_str("&apos;"),
+            // XML 1.0 normalizes literal attribute line endings and tabs.
+            // Numeric references retain the typed value when a model is
+            // serialized and reopened.
+            '\t' => out.push_str("&#x9;"),
+            '\n' => out.push_str("&#xA;"),
+            '\r' => out.push_str("&#xD;"),
             _ => out.push(character),
         }
     }

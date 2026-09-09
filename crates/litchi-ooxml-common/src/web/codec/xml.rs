@@ -220,7 +220,16 @@ impl XmlDocument {
             .ok_or_else(|| Error::Invalid("missing XML root".into()))
     }
 
+    #[cfg(test)]
     pub(in crate::web) fn self_contained_fragment(&self, node: &Node) -> Result<String> {
+        self.self_contained_fragment_with_limits(node, &Limits::standard())
+    }
+
+    pub(in crate::web) fn self_contained_fragment_with_limits(
+        &self,
+        node: &Node,
+        limits: &Limits,
+    ) -> Result<String> {
         let fragment = node
             .raw_fragment
             .as_ref()
@@ -247,7 +256,14 @@ impl XmlDocument {
 
         let raw = std::str::from_utf8(raw)
             .map_err(|error| Error::Xml(format!("non-UTF-8 extension fragment: {error}")))?;
-        let mut namespaces = effective_namespaces(&fragment.namespaces)?;
+        let used_prefixes = used_namespace_prefixes(raw.as_bytes())?;
+        let mut namespaces = effective_namespaces(&fragment.namespaces)?
+            .into_iter()
+            .filter(|(prefix, _)| {
+                fragment.declared_prefixes.contains(prefix.as_str())
+                    || used_prefixes.contains(prefix.as_str())
+            })
+            .collect::<Vec<_>>();
         namespaces.sort_unstable_by(|left, right| left.0.cmp(right.0));
         let extra = retained_namespace_bytes(&namespaces, &fragment.declared_prefixes)?;
         let capacity = raw.len().checked_add(extra).ok_or(Error::Limit {
@@ -255,6 +271,13 @@ impl XmlDocument {
             max: usize::MAX,
             actual: usize::MAX,
         })?;
+        if capacity > limits.xml_bytes {
+            return limit(
+                "retained web extension fragment bytes",
+                limits.xml_bytes,
+                capacity,
+            );
+        }
         let mut out = String::new();
         out.try_reserve(capacity).map_err(|_error| Error::Limit {
             resource: "retained web extension fragment bytes",
@@ -279,6 +302,49 @@ impl XmlDocument {
         out.push_str(&raw[insert_at..]);
         Ok(out)
     }
+}
+
+fn used_namespace_prefixes(raw: &[u8]) -> Result<HashSet<String>> {
+    let mut reader = Reader::from_reader(raw);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut prefixes = HashSet::new();
+    loop {
+        match reader.read_event_into(&mut buffer)? {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_name = element.name();
+                let name = std::str::from_utf8(element_name.as_ref())
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                let (prefix, _) = split_qname(name);
+                prefixes.insert(prefix.to_owned());
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let name = std::str::from_utf8(attribute.key.as_ref())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if name == "xmlns" || name.starts_with("xmlns:") {
+                        continue;
+                    }
+                    let (prefix, _) = split_qname(name);
+                    if !prefix.is_empty() && prefix != "xml" {
+                        prefixes.insert(prefix.to_owned());
+                    }
+                }
+            },
+            Event::Eof => break,
+            Event::DocType(_) => {
+                return invalid("DTD is forbidden in retained XML fragments".into());
+            },
+            Event::GeneralRef(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
+            Event::End(_) => {},
+        }
+        buffer.clear();
+    }
+    Ok(prefixes)
 }
 
 pub(in crate::web) fn parse_mce_xml(
@@ -381,11 +447,15 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
             {
                 return invalid("CDATA is not permitted in web extension structures".into());
             },
-            Event::GeneralRef(_) => {
+            Event::GeneralRef(_) if !extension_text_is_allowed(&state.stack) => {
+                return invalid("text is not permitted in web extension structures".into());
+            },
+            Event::GeneralRef(reference) if !is_predefined_xml_reference(&reference) => {
                 return invalid(
-                    "general entity references are forbidden in web extension XML".into(),
+                    "non-predefined entity references are forbidden in web extension XML".into(),
                 );
             },
+            Event::GeneralRef(_) => {},
             Event::End(_) if state.stack.is_empty() => {
                 return invalid("unexpected XML end tag".into());
             },
@@ -421,6 +491,36 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
         root: state.root,
         xml,
         string_bytes: state.string_bytes,
+    })
+}
+
+fn is_predefined_xml_reference(reference: &quick_xml::events::BytesRef<'_>) -> bool {
+    let Ok(name) = reference.decode() else {
+        return false;
+    };
+    let name = name.as_ref();
+    if quick_xml::escape::resolve_xml_entity(name).is_some() {
+        return true;
+    }
+    let digits = if let Some(value) = name.strip_prefix("#x") {
+        u32::from_str_radix(value, 16).ok()
+    } else if let Some(value) = name.strip_prefix('#') {
+        value.parse::<u32>().ok()
+    } else {
+        None
+    };
+    digits.is_some_and(|value| {
+        matches!(
+            char::from_u32(value),
+            Some(
+                '\u{9}'
+                | '\u{A}'
+                | '\u{D}'
+                | '\u{20}'..='\u{D7FF}'
+                | '\u{E000}'..='\u{FFFD}'
+                | '\u{10000}'..='\u{10FFFF}',
+            )
+        )
     })
 }
 

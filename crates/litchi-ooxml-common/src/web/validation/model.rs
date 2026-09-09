@@ -1,7 +1,7 @@
 use super::super::codec::{enforce_count_with, invalid, limit, require_nonempty};
 use super::super::model::{
     AddIn, Binding, Effect, ExtKind, ExtList, Limits, OperationBudget, Pane, Panes, Reference,
-    SnapshotTarget, Store,
+    SnapshotTarget, Store, validate_custom_functions,
 };
 use super::super::package::fold_part_name;
 use super::super::{ADD_IN_RELATIONSHIP, IMAGE_RELATIONSHIP_TYPE};
@@ -13,7 +13,7 @@ pub(in crate::web) fn validate_model(extension: &AddIn) -> Result<()> {
 
 pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) -> Result<()> {
     require_nonempty("web extension id", &extension.id)?;
-    validate_store_reference(&extension.reference)?;
+    validate_store_reference_with(&extension.reference, limits)?;
     enforce_count_with(
         "alternate reference",
         extension.alternate_references.len(),
@@ -24,7 +24,7 @@ pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) ->
     let mut reference_ids = HashSet::new();
     reference_ids.insert(extension.reference.id.as_str());
     for reference in &extension.alternate_references {
-        validate_store_reference(reference)?;
+        validate_store_reference_with(reference, limits)?;
         if !reference_ids.insert(reference.id.as_str()) {
             return invalid(format!("duplicate reference id '{}'", reference.id));
         }
@@ -39,7 +39,7 @@ pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) ->
     let mut binding_ids = HashSet::new();
     let mut binding_app_refs = HashSet::new();
     for binding in &extension.bindings {
-        validate_binding(binding)?;
+        validate_binding_with(binding, limits)?;
         if !binding_ids.insert(binding.id.as_str()) {
             return invalid(format!("duplicate binding id '{}'", binding.id));
         }
@@ -55,23 +55,35 @@ pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) ->
                 return invalid("snapshot effect kind does not match its XML root".into());
             }
         }
-        validate_extension_list(
+        validate_extension_list_with(
             snapshot.extension_list.as_ref(),
             &[ExtKind::DrawingMl, ExtKind::StrictDrawingMl],
+            limits,
         )?;
     }
-    validate_extension_list(extension.extension_list.as_ref(), &[ExtKind::AddIn])?;
+    validate_extension_list_with(extension.extension_list.as_ref(), &[ExtKind::AddIn], limits)?;
     Ok(())
 }
 
 pub(in crate::web) fn validate_binding(binding: &Binding) -> Result<()> {
+    validate_binding_with(binding, &Limits::standard())
+}
+
+pub(in crate::web) fn validate_binding_with(binding: &Binding, limits: &Limits) -> Result<()> {
     require_nonempty("binding id", &binding.id)?;
     require_nonempty("binding type", binding.kind.as_str())?;
     require_nonempty("binding appref", &binding.app_ref)?;
-    validate_extension_list(binding.extension_list.as_ref(), &[ExtKind::AddIn])
+    validate_extension_list_with(binding.extension_list.as_ref(), &[ExtKind::AddIn], limits)
 }
 
 pub(in crate::web) fn validate_store_reference(reference: &Reference) -> Result<()> {
+    validate_store_reference_with(reference, &Limits::standard())
+}
+
+pub(in crate::web) fn validate_store_reference_with(
+    reference: &Reference,
+    limits: &Limits,
+) -> Result<()> {
     require_nonempty("reference id", &reference.id)?;
     require_nonempty("reference version", &reference.version)?;
     if let Some(location) = &reference.location {
@@ -79,7 +91,7 @@ pub(in crate::web) fn validate_store_reference(reference: &Reference) -> Result<
     } else if reference.store == Store::FileSystem {
         return invalid("FileSystem reference requires a non-empty location".into());
     }
-    validate_extension_list(reference.extension_list.as_ref(), &[ExtKind::AddIn])
+    validate_extension_list_with(reference.extension_list.as_ref(), &[ExtKind::AddIn], limits)
 }
 
 pub(in crate::web) fn validate_task_pane(pane: &Pane) -> Result<()> {
@@ -92,7 +104,7 @@ pub(in crate::web) fn validate_task_pane_with(pane: &Pane, limits: &Limits) -> R
     if !pane.width.is_finite() || pane.width <= 0.0 {
         return invalid("task-pane width must be finite and positive".into());
     }
-    validate_extension_list(pane.extension_list.as_ref(), &[ExtKind::TaskPane])?;
+    validate_extension_list_with(pane.extension_list.as_ref(), &[ExtKind::TaskPane], limits)?;
     validate_model_with(&pane.add_in, limits)?;
     validate_snapshot_resources_with(pane, limits)
 }
@@ -300,6 +312,14 @@ pub(in crate::web) fn validate_extension_list(
     extension_list: Option<&ExtList>,
     allowed: &[ExtKind],
 ) -> Result<()> {
+    validate_extension_list_with(extension_list, allowed, &Limits::standard())
+}
+
+pub(in crate::web) fn validate_extension_list_with(
+    extension_list: Option<&ExtList>,
+    allowed: &[ExtKind],
+    limits: &Limits,
+) -> Result<()> {
     let Some(extension_list) = extension_list else {
         return Ok(());
     };
@@ -308,6 +328,9 @@ pub(in crate::web) fn validate_extension_list(
             "extLst namespace '{}' is not valid at this location",
             extension_list.kind.namespace()
         ));
+    }
+    if let Some(custom_functions) = extension_list.custom_functions() {
+        validate_custom_functions(custom_functions, limits)?;
     }
     let reparsed = ExtList::from_xml(extension_list.as_xml())?;
     if reparsed != *extension_list {
