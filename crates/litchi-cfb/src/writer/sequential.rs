@@ -2367,13 +2367,16 @@ mod tests {
         let destination = test_destination("hostile-temp");
         fs::write(&destination, b"old destination").unwrap();
         let writer = writer_with_payload("Saved", b"saved");
+        let displaced_path = test_destination("displaced-temp");
         let mut attacker_path = None;
         let error = writer
             .save_with_hooks(
                 &destination,
                 |staged, _target| {
                     attacker_path = Some(staged.to_path_buf());
-                    fs::remove_file(staged).unwrap();
+                    // Keep the original inode alive so immediate inode reuse
+                    // cannot make the replacement appear to be the same file.
+                    fs::rename(staged, &displaced_path).unwrap();
                     fs::write(staged, b"attacker replacement").unwrap();
                     Err(io::Error::other("injected replacement failure"))
                 },
@@ -2385,6 +2388,7 @@ mod tests {
         assert_eq!(fs::read(&attacker_path).unwrap(), b"attacker replacement");
         assert_eq!(fs::read(&destination).unwrap(), b"old destination");
         fs::remove_file(attacker_path).unwrap();
+        fs::remove_file(displaced_path).unwrap();
         fs::remove_file(destination).unwrap();
     }
 
