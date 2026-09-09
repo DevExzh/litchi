@@ -1487,6 +1487,13 @@ fn install_initial_table_graph(
             .identifier
             .is_some_and(|identifier| TABLE_STYLE_OBJECT_IDS.contains(&identifier))
     });
+    let imported_stylesheet = style_objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(TABLE_STYLESHEET_OBJECT_ID))
+        .ok_or_else(|| {
+            crate::Error::InvalidFormat("source-built table stylesheet is missing".to_owned())
+        })?;
+    prune_uncopied_stylesheet_edges(imported_stylesheet)?;
     package.update_archive(STYLESHEET_ARCHIVE_ENTRY, |archive| {
         for object in style_objects {
             archive.insert_object(object)?;
@@ -1502,6 +1509,41 @@ fn install_initial_table_graph(
         )
     });
     package.replace_archive("Index/CalculationEngine.iwa", &calculation)?;
+    Ok(())
+}
+
+fn prune_uncopied_stylesheet_edges(object: &mut ArchiveObject) -> Result<()> {
+    // Numbers may add presets that the Pages table graph does not import. Keep
+    // the root's edges within the imported style set: source preset ID 41, for
+    // example, belongs to the body table attachment in the Pages package.
+    let stylesheet = object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == PagesMessageType::Stylesheet.value())
+        .ok_or_else(|| {
+            crate::Error::InvalidFormat(
+                "source-built table stylesheet payload is missing".to_owned(),
+            )
+        })?;
+    let mut archive = tss::StylesheetArchive::decode(stylesheet.data.as_slice())?;
+    archive
+        .styles
+        .retain(|reference| TABLE_STYLE_OBJECT_IDS.contains(&reference.identifier));
+    archive
+        .identifier_to_style_map
+        .retain(|entry| TABLE_STYLE_OBJECT_IDS.contains(&entry.style.identifier));
+    stylesheet.data = archive.encode_to_vec();
+
+    for message_info in &mut object.archive_info.message_infos {
+        message_info
+            .object_references
+            .retain(|identifier| TABLE_STYLE_OBJECT_IDS.contains(identifier));
+        for field_info in &mut message_info.field_infos {
+            field_info
+                .object_references
+                .retain(|identifier| TABLE_STYLE_OBJECT_IDS.contains(identifier));
+        }
+    }
     Ok(())
 }
 

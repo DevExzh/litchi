@@ -1,0 +1,29 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "files": [
+    {
+      "file": "source-built-table-stylesheet-before.pages",
+      "size": 7704,
+      "sha256": "2d529276f72a5a05fe8933c1f20f44cfc991500defe8ab1b6e8acede6668e941"
+    },
+    {
+      "file": "source-built-table-stylesheet-native-saved.pages",
+      "size": 37712,
+      "sha256": "b6519600b50bb4a621d4bd06cb7a35569110b5624e55d123fe804758605b9957"
+    }
+  ],
+  "lifecycle": [
+    "opened an exact disposable copy of the pruned-stylesheet source-built package without a repair alert",
+    "observed body Cities and accessibility table Cities with 5 rows and 4 columns",
+    "saved with Command-S and closed the actual document window to the template chooser",
+    "reopened the exact saved path without a repair alert",
+    "observed the same body and accessibility table dimensions",
+    "closed the document to the template chooser"
+  ],
+  "limitations": [
+    "The table grid was not visible in screenshots before or after save/reopen. This receipt qualifies opening and structural preservation, not visible table rendering or interactive table editing.",
+    "The source package is a diagnostic repair of the builder output. Regression tests separately cover the production builder."
+  ]
+}
