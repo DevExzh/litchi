@@ -63,7 +63,7 @@ fn mixed_minifat_fat_nested_storage_clsids_reopen() {
 fn sequential_directory_metadata_is_exact_and_defaults_are_zeroed() {
     let mut writer = SequentialOleWriter::new();
     writer.set_root_state_bits(0x1020_3040);
-    writer.set_root_creation_time(0x0102_0304_0506_0708);
+    writer.set_root_creation_time(0).unwrap();
     writer.set_root_modified_time(0x1112_1314_1516_1718);
     writer.create_storage(&["Storage"]).unwrap();
     writer
@@ -93,7 +93,7 @@ fn sequential_directory_metadata_is_exact_and_defaults_are_zeroed() {
     let file = OleFile::open(Cursor::new(bytes)).unwrap();
     let root = file.root_entry().unwrap();
     assert_eq!(root.state_bits, 0x1020_3040);
-    assert_eq!(root.creation_time, 0x0102_0304_0506_0708);
+    assert_eq!(root.creation_time, 0);
     assert_eq!(root.modified_time, 0x1112_1314_1516_1718);
     let storage = file
         .list_directory_entries(&[])
@@ -122,6 +122,16 @@ fn sequential_directory_metadata_is_exact_and_defaults_are_zeroed() {
     assert_eq!(stream.state_bits, 0xCAFEBABE);
     assert_eq!(stream.creation_time, 0x8877_6655_4433_2211);
     assert_eq!(stream.modified_time, 0x1100_FFEE_DDCC_BBAA);
+}
+
+#[test]
+fn sequential_fresh_root_creation_time_rejects_nonzero_without_mutation() {
+    let mut writer = SequentialOleWriter::new();
+    assert!(writer.set_root_creation_time(1).is_err());
+
+    let bytes = publish(writer);
+    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    assert_eq!(file.root_entry().unwrap().creation_time, 0);
 }
 
 #[test]

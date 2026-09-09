@@ -466,7 +466,7 @@ impl Package {
             // producer metadata; fresh OleWriter roots still default to zero.
             writer.set_root_state_bits(root.state_bits());
             writer.set_root_modified_time(root.modified_time());
-            writer.set_root_creation_time(root.creation_time());
+            writer.set_root_creation_time_from_source(root.creation_time());
         }
         let mut storages = self.storages.clone();
         storages.sort_by(|left, right| {

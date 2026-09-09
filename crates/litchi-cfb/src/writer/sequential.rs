@@ -687,9 +687,25 @@ impl<'a> SequentialOleWriter<'a> {
         self.root_modified_time = modified_time;
     }
 
-    /// Sets the root storage's raw creation FILETIME exactly.
-    pub fn set_root_creation_time(&mut self, creation_time: u64) {
-        self.root_creation_time = creation_time;
+    /// Sets the root storage's creation FILETIME for a fresh artifact.
+    ///
+    /// The CFB root directory entry has no creation timestamp. This
+    /// forward-only writer has no source-replay mode, so only zero is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a planning error when `creation_time` is nonzero.
+    pub fn set_root_creation_time(
+        &mut self,
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        if creation_time != 0 {
+            return Err(planning(
+                "CFB fresh root creation time must be zero; sequential writer has no source replay mode",
+            ));
+        }
+        self.root_creation_time = 0;
+        Ok(())
     }
 
     /// Declares a storage path.  Missing parent storages are created during planning.
@@ -1412,7 +1428,9 @@ impl<'a> SequentialOleWriter<'a> {
             directory.set_root_clsid(clsid);
         }
         directory.set_root_state_bits(self.root_state_bits);
-        directory.set_root_creation_time(self.root_creation_time);
+        directory
+            .set_root_creation_time(self.root_creation_time)
+            .map_err(SequentialWriteError::Planning)?;
         directory.set_root_modified_time(self.root_modified_time);
         for storage in &self.storages {
             directory

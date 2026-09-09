@@ -393,12 +393,34 @@ impl OleWriter {
         }
     }
 
-    /// Sets the root storage's raw creation FILETIME.
+    /// Sets the root storage's creation FILETIME for a fresh artifact.
     ///
-    /// The value is retained exactly for source-preserving edits.  New
-    /// writers still default it to zero, as required by the normal CFB
-    /// production contract.
-    pub fn set_root_creation_time(&mut self, creation_time: u64) {
+    /// The CFB root directory entry has no creation timestamp. Existing
+    /// source values, including nonconforming ones, can be replayed through
+    /// [`Self::set_root_creation_time_from_source`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] when `creation_time` is nonzero.
+    pub fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero; use set_root_creation_time_from_source for source replay".to_string(),
+            ));
+        }
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = 0;
+        }
+        Ok(())
+    }
+
+    /// Replays the exact root creation FILETIME captured from an existing
+    /// source package.
+    ///
+    /// This explicit source-preservation operation may retain a malformed
+    /// nonzero value. Fresh authoring should use
+    /// [`Self::set_root_creation_time`], which accepts only zero.
+    pub fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
         if let Some(root) = self.entries.first_mut() {
             root.creation_time = creation_time;
         }
@@ -1375,7 +1397,10 @@ impl OleWriter {
         }
         if let Some(root) = self.entries.first() {
             directory.set_root_state_bits(root.state_bits);
-            directory.set_root_creation_time(root.creation_time);
+            // `OleWriter` can replay a captured source root explicitly. The
+            // ordinary public setter only admits zero, while this publication
+            // path preserves the value selected by that source operation.
+            directory.set_root_creation_time_from_source(root.creation_time);
             directory.set_root_modified_time(root.modified_time);
         }
 

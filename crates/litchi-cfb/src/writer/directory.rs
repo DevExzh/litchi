@@ -375,8 +375,19 @@ impl DirectoryBuilder {
         }
     }
 
+    /// Set the fresh root storage creation time, which must be zero.
+    pub(crate) fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero".to_string(),
+            ));
+        }
+        self.set_root_creation_time_from_source(0);
+        Ok(())
+    }
+
     /// Set the root storage creation time exactly as supplied by a source.
-    pub(crate) fn set_root_creation_time(&mut self, creation_time: u64) {
+    pub(crate) fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
         if let Some(root) = self.entries.first_mut() {
             root.creation_time = creation_time;
         }
