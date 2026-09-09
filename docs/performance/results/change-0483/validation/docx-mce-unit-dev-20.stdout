@@ -1,0 +1,8 @@
+
+running 3 tests
+test source_backed::tail_append::mce_workspace::tests::checked_arithmetic_rejects_unrepresentable_profiles ... ok
+test source_backed::tail_append::mce_workspace::tests::small_profile_has_a_checked_owner_envelope ... ok
+test source_backed::tail_append::mce_workspace::tests::expanded_directive_payload_increases_the_envelope ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 926 filtered out; finished in 0.00s
+

@@ -1,0 +1,32 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0499]: cannot borrow `parser` as mutable more than once at a time
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2100:25
+     |
+2096 |         let (namespace, event) = parser
+     |                                  ------ first mutable borrow occurs here
+...
+2100 |         let event_end = parser.get_mut().position();
+     |                         ^^^^^^ second mutable borrow occurs here
+...
+2141 |                     require_opaque_namespace(&namespace)?;
+     |                                              ---------- first borrow later used here
+
+error[E0499]: cannot borrow `parser` as mutable more than once at a time
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2124:23
+     |
+2096 |         let (namespace, event) = parser
+     |                                  ------ first mutable borrow occurs here
+...
+2124 |             let raw = parser.get_mut().captured();
+     |                       ^^^^^^ second mutable borrow occurs here
+...
+2141 |                     require_opaque_namespace(&namespace)?;
+     |                                              ---------- first borrow later used here
+
+For more information about this error, try `rustc --explain E0499`.
+error: could not compile `litchi-docx` (lib) due to 2 previous errors

@@ -1,0 +1,11 @@
+{
+  "recorded_utc": "2026-09-09T03:25:02.913486+00:00",
+  "reason": "/tmp is tmpfs mounted with usrquota; final-32 had 53 Disk quota exceeded file-output test failures after successful compilation",
+  "failed_gate": "docx-full-all-features-final-32",
+  "old_temp": "/tmp/litchi-goal-0483",
+  "new_temp": "/home/zhuhe/.cache/litchi-goal-0483",
+  "test_tmpdir": "/home/zhuhe/.cache/litchi-goal-0483/test-tmp",
+  "previous_common_sha256": "cfee534b23ba63c9486d82987f18fb5370ae6789a31db79b8c12365544e05b98",
+  "new_common_sha256": "dff2c29d15f62bf529bd546ac100fc88c077de29550662894645ac668262b699",
+  "policy": "No unrelated files or shared build caches removed. Future test commands explicitly select TMPDIR in retained argv. Task-owned binary/fuzz/consumer scratch uses the new TEMP."
+}

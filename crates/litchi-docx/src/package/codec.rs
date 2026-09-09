@@ -10,9 +10,12 @@
     clippy::shadow_unrelated,
     reason = "local parser names mirror the OOXML role currently being decoded"
 )]
-#![expect(
-    clippy::used_underscore_binding,
-    reason = "the named ignored error records intentional source collapse"
+#![cfg_attr(
+    feature = "encryption",
+    expect(
+        clippy::used_underscore_binding,
+        reason = "the named ignored error records intentional source collapse"
+    )
 )]
 //! OPC construction, validation, and publication codecs for DOCX packages.
 

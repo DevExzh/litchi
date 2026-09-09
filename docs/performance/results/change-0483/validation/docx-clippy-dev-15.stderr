@@ -1,0 +1,105 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: useless conversion to the same type: `error::Error`
+   --> crates/litchi-docx/src/source_backed/tail_append.rs:621:42
+    |
+621 |         .map_err(|error| Error::Document(DocumentError::from(error)))?;
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider removing `DocumentError::from()`: `error`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+    = note: `-D clippy::useless-conversion` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::useless_conversion)]`
+
+error: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1012:5
+     |
+1012 |     profile.max_input_bytes = source_bytes;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `litchi_ooxml_common::mce::Limits { max_input_bytes: source_bytes, max_output_bytes: source_bytes, max_depth: max_depth, max_namespace_bindings: max_namespace_bindings, max_directive_tokens: max_directive_tokens, max_choices_per_alternate: max_choices_per_alternate }` and removing relevant reassignments
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1007:5
+     |
+1007 |     let mut profile = MceLimits::default();
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+     = note: `-D clippy::field-reassign-with-default` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: useless conversion to the same type: `error::Error`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1487:46
+     |
+1487 |             .map_err(|error| Error::Document(DocumentError::from(error)))?;
+     |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider removing `DocumentError::from()`: `error`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+
+error: clamp-like pattern without using clamp function
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1731:38
+     |
+1731 |     let max_namespace_declarations = bytes.len().min(256).max(1);
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `bytes.len().clamp(1, 256)`
+     |
+     = note: clamp will panic if max < min
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+     = note: `-D clippy::manual-clamp` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::manual_clamp)]`
+
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/package/codec.rs:14:5
+   |
+14 |     clippy::used_underscore_binding,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: the named ignored error records intentional source collapse
+   = note: requested on the command line with `-D unfulfilled-lint-expectations`
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/package/model.rs:6:5
+  |
+6 |     clippy::shadow_reuse,
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: parser bindings are intentionally refined after validation
+
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/package/model.rs:10:5
+   |
+10 |     clippy::shadow_unrelated,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: local parser names mirror the OOXML role currently being decoded
+
+error: this lint expectation is unfulfilled
+  --> crates/litchi-docx/src/settings/document/codec.rs:14:5
+   |
+14 |     clippy::shadow_unrelated,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: local parser names mirror the OOXML role currently being decoded
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/writer/hyperlink.rs:2:5
+  |
+2 |     clippy::arbitrary_source_item_ordering,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: items remain grouped by OOXML schema family and package lifecycle
+
+error: this lint expectation is unfulfilled
+ --> crates/litchi-docx/src/writer/run.rs:2:5
+  |
+2 |     clippy::arbitrary_source_item_ordering,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: items remain grouped by OOXML schema family and package lifecycle
+
+error: could not compile `litchi-docx` (lib) due to 10 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-docx` (lib) due to 10 previous errors
+error: could not compile `litchi-docx` (lib test) due to 9 previous errors

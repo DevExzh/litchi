@@ -1,0 +1,86 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0425]: cannot find value `token_window` in this scope
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2039:28
+     |
+2039 |         .try_reserve_exact(token_window)
+     |                            ^^^^^^^^^^^^ not found in this scope
+
+error: unused import: `validate_mail_merge_relationship_refs`
+  --> crates/litchi-docx/src/mail_merge/mod.rs:18:5
+   |
+18 |     validate_mail_merge_relationship_refs, validate_mail_merge_relationships,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: unused import: `MailMergeRelationshipRefs`
+  --> crates/litchi-docx/src/settings/document/codec.rs:28:5
+   |
+28 |     MailMergeRelationshipRefs, Settings as MailMergeSettings,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unused imports: `Capabilities` and `process_markup_compatibility`
+  --> crates/litchi-docx/src/settings/document/codec.rs:41:5
+   |
+41 |     Capabilities, Limits as MceLimits, process_markup_compatibility,
+   |     ^^^^^^^^^^^^                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `as_ref` found for struct `litchi_ooxml_common::mce::Output<'a>` in the current scope
+   --> crates/litchi-docx/src/mail_merge/codec.rs:179:51
+    |
+179 |     parse_settings_mail_merge_processed(processed.as_ref())
+    |                                                   ^^^^^^ method not found in `litchi_ooxml_common::mce::Output<'_>`
+
+error[E0277]: can't compare `&[u8]` with `[u8]`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2418:57
+     |
+2418 |         ResolveResult::Bound(Namespace(value)) if value == STRICT_WORDPROCESSINGML_NAMESPACE => {
+     |                                                         ^^ no implementation for `&[u8] == [u8]`
+     |
+     = help: the trait `PartialEq<[u8]>` is not implemented for `&[u8]`
+     = note: required for `&&[u8]` to implement `PartialEq<&[u8]>`
+help: consider dereferencing here
+     |
+2418 |         ResolveResult::Bound(Namespace(value)) if *value == STRICT_WORDPROCESSINGML_NAMESPACE => {
+     |                                                   +
+
+error[E0277]: can't compare `&[u8]` with `[u8]`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2421:57
+     |
+2421 |         ResolveResult::Bound(Namespace(value)) if value == WORDPROCESSINGML_NAMESPACE => Some(false),
+     |                                                         ^^ no implementation for `&[u8] == [u8]`
+     |
+     = help: the trait `PartialEq<[u8]>` is not implemented for `&[u8]`
+     = note: required for `&&[u8]` to implement `PartialEq<&[u8]>`
+help: consider dereferencing here
+     |
+2421 |         ResolveResult::Bound(Namespace(value)) if *value == WORDPROCESSINGML_NAMESPACE => Some(false),
+     |                                                   +
+
+error[E0599]: no method named `resolve_attribute` found for reference `&NsReader<R>` in the current scope
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2508:38
+     |
+2508 |         let namespace = match parser.resolve_attribute(attribute.key).0 {
+     |                                      ^^^^^^^^^^^^^^^^^
+     |
+help: there is a method `resolver_mut` with a similar name, but with different arguments
+    --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:131:5
+     |
+ 131 |     pub fn resolver_mut(&mut self) -> &mut NamespaceResolver {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: variable does not need to be mutable
+   --> crates/litchi-docx/src/source_backed/tail_append.rs:658:10
+    |
+658 |     let (mut fragment, fragment_context_reservation) = encode_fragment(
+    |          ----^^^^^^^^
+    |          |
+    |          help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+Some errors have detailed explanations: E0277, E0425, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (lib) due to 9 previous errors

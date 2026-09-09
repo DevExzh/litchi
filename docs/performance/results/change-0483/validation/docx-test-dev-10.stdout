@@ -1,0 +1,82 @@
+
+running 27 tests
+test append_and_source_limits_are_checked_before_output ... ok
+test encrypted_metadata_refusal_precedes_main_payload_reads_and_output ... ok
+test cancellation_is_checked_before_preparation_and_before_publication_output ... ok
+test explicit_noop_is_exact_and_reversible_without_a_generated_paragraph ... ok
+test managed_work_limit_exhaustion_refuses_before_archive_output ... ok
+test appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members ... FAILED
+test default_word_namespace_and_shadowed_local_prefix_are_bound_at_insertion ... ok
+test authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules ... ok
+test settings_protection_flags_honor_explicit_on_and_off_values ... FAILED
+test managed_memory_limit_refuses_before_archive_output ... ok
+test bounded_prepare_and_publication_keep_main_xml_out_of_the_payload_cache ... ok
+test managed_prepare_charges_semantic_memory_and_releases_plan_workspace ... ok
+test grammar_refusals_happen_before_publication ... ok
+test protected_external_unsupported_and_signed_topologies_refuse_before_output ... ok
+test one_large_token_is_rejected_by_the_token_ceiling_before_output ... ok
+test managed_cancellation_during_short_publication_is_typed_after_a_prefix ... FAILED
+test settings_relationship_closure_is_checked_without_staging_relationships ... FAILED
+test insertion_survives_distinct_body_prefix_and_word_prefix_shadowing_in_section ... ok
+test topology_refusals_keep_their_public_reason_and_emit_no_prefix ... FAILED
+test sink_failure_reports_partial_output_after_preflight ... ok
+test append_without_a_section_properties_element_targets_the_body_close ... ok
+test empty_text_is_a_real_empty_paragraph_and_is_not_the_exact_noop_branch ... ok
+test unsupported_settings_mce_fails_closed_before_publication ... ok
+test source_change_after_preparation_is_rejected_without_output ... ok
+test strict_tail_append_preserves_opaque_section_with_vendor_word_like_descendants ... ok
+test opaque_section_namespace_attribute_and_event_policy_refuses_before_output ... FAILED
+test source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once ... FAILED
+
+failures:
+
+---- appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members stdout ----
+
+thread 'appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members' (3289261) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:871:13:
+assertion `left == right` failed: the source prefix through the insertion anchor must remain lexical
+  left: [60, 63, 120, 109, 108, 32, 118, 101, 114, 115, 105, 111, 110, 61, 34, 49, 46, 48, 34, 32, 101, 110, 99, 111, 100, 105, 110, 103, 61, 34, 85, 84, 70, 45, 56, 34, 63, 62, 60, 119, 58, 100, 111, 99, 117, 109, 101, 110, 116, 32, 120, 109, 108, 110, 115, 58, 119, 61, 34, 104, 116, 116, 112, 58, 47, 47, 115, 99, 104, 101, 109, 97, 115, 46, 111, 112, 101, 110, 120, 109, 108, 102, 111, 114, 109, 97, 116, 115, 46, 111, 114, 103, 47, 119, 111, 114, 100, 112, 114, 111, 99, 101, 115, 115, 105, 110, 103, 109, 108, 47, 50, 48, 48, 54, 47, 109, 97, 105, 110, 34, 62, 60, 119, 58, 98, 111, 100, 121, 62, 60, 119, 58, 112, 62, 60, 119, 58, 114, 62, 60, 119, 58, 116, 62, 115, 101, 101, 100, 60, 47, 119, 58, 116, 62, 60, 47, 119, 58, 114, 62, 60, 47, 119, 58, 112, 62]
+ right: [60, 63, 120, 109, 108, 32, 118, 101, 114, 115, 105, 111, 110, 61, 34, 49, 46, 48, 34, 32, 101, 110, 99, 111, 100, 105, 110, 103, 61, 34, 85, 84, 70, 45, 56, 34, 63, 62, 60, 119, 58, 100, 111, 99, 117, 109, 101, 110, 116, 32, 120, 109, 108, 110, 115, 58, 119, 61, 34, 104, 116, 116, 112, 58, 47, 47, 115, 99, 104, 101, 109, 97, 115, 46, 111, 112, 101, 110, 120, 109, 108, 102, 111, 114, 109, 97, 116, 115, 46, 111, 114, 103, 47, 119, 111, 114, 100, 112, 114, 111, 99, 101, 115, 115, 105, 110, 103, 109, 108, 47, 50, 48, 48, 54, 47, 109, 97, 105, 110, 34, 62, 60, 119, 58, 98, 111, 100, 121, 62, 60, 119, 58, 112, 62, 60, 119, 58, 114, 62, 60, 119, 58, 116, 62, 115, 101, 101, 100, 60, 47, 119, 58, 116, 62, 60, 47, 119, 58, 114, 62, 60, 47, 119, 58, 112, 62, 60, 119, 58, 112, 32, 120, 109, 108, 110, 115, 58, 119, 61, 34, 104, 116, 116, 112, 58, 47, 47, 115, 99, 104, 101, 109, 97, 115, 46, 111, 112, 101, 110, 120, 109, 108, 102, 111, 114, 109, 97, 116, 115, 46, 111, 114, 103, 47, 119, 111, 114, 100, 112, 114, 111, 99, 101, 115, 115, 105, 110, 103, 109, 108, 47, 50, 48, 48, 54, 47, 109, 97, 105, 110, 34, 62, 60, 119, 58, 114, 62, 60, 119, 58, 116, 32, 120, 109, 108, 58, 115, 112, 97, 99, 101, 61, 34, 112, 114, 101, 115, 101, 114, 118, 101, 34, 62, 116, 97, 105, 108, 32, 38, 97, 109, 112, 59, 32, 38, 108, 116, 59, 32, 38, 103, 116, 59, 32, 34, 32, 39, 60, 47, 119, 58, 116, 62, 60, 47, 119, 58, 114, 62, 60, 47, 119, 58, 112, 62]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- settings_protection_flags_honor_explicit_on_and_off_values stdout ----
+
+thread 'settings_protection_flags_honor_explicit_on_and_off_values' (3289278) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:1326:35:
+documentProtection enabled returned the wrong refusal: plain paragraph tail append settings XML workspace limit exceeded: 2238276 > 2097152
+
+---- managed_cancellation_during_short_publication_is_typed_after_a_prefix stdout ----
+
+thread 'managed_cancellation_during_short_publication_is_typed_after_a_prefix' (3289271) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:1742:14:
+short-write cancellation must be typed
+
+---- settings_relationship_closure_is_checked_without_staging_relationships stdout ----
+
+thread 'settings_relationship_closure_is_checked_without_staging_relationships' (3289279) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:1412:14:
+valid mail-merge relationship closure must be admitted: Limit { resource: "settings XML workspace", actual: 2238276, maximum: 2097152 }
+
+---- topology_refusals_keep_their_public_reason_and_emit_no_prefix stdout ----
+
+thread 'topology_refusals_keep_their_public_reason_and_emit_no_prefix' (3289284) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:1263:27:
+unexpected topology error: plain paragraph tail append settings XML workspace limit exceeded: 2238276 > 2097152
+
+---- opaque_section_namespace_attribute_and_event_policy_refuses_before_output stdout ----
+
+thread 'opaque_section_namespace_attribute_and_event_policy_refuses_before_output' (3289276) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:1187:9:
+opaque unbound default element must be refused
+
+---- source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once stdout ----
+
+thread 'source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once' (3289281) panicked at crates/litchi-docx/tests/source_backed_tail_append.rs:785:10:
+tail append plan must prepare: Document(Opc(IoError(Kind(Interrupted))))
+
+
+failures:
+    appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members
+    managed_cancellation_during_short_publication_is_typed_after_a_prefix
+    opaque_section_namespace_attribute_and_event_policy_refuses_before_output
+    settings_protection_flags_honor_explicit_on_and_off_values
+    settings_relationship_closure_is_checked_without_staging_relationships
+    source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once
+    topology_refusals_keep_their_public_reason_and_emit_no_prefix
+
+test result: FAILED. 20 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

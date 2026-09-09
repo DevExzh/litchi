@@ -1,0 +1,2 @@
+["/home/zhuhe/.cache/litchi-goal-0483/fuzz-parse-accepted/parse_docx", "/home/zhuhe/.cache/litchi-goal-0483/fuzz-parse-accepted/corpus", "-runs=10000", "-seed=483", "-max_len=65536", "-timeout=10", "-artifact_prefix=/home/zhuhe/.cache/litchi-goal-0483/fuzz-parse-accepted/artifacts/"]
+{"smoke": "/home/zhuhe/code/litchi/docs/performance/results/change-0483/fuzz/accepted/parse-smoke.json", "exit_code": 0}

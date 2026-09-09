@@ -1,0 +1,58 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0277]: `TailAppendPublication` doesn't implement `Debug`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1451:78
+     |
+1451 |                 "{label} must fail through settings relationship validation: {result:?}"
+     |                                                                              ^^^^^^^^^^ `TailAppendPublication` cannot be formatted using `{:?}` because it doesn't implement `Debug`
+     |
+     = help: the trait `Debug` is not implemented for `TailAppendPublication`
+help: the trait `Debug` is conditionally implemented for `Result<T, E>`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:552:15
+    ::: /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:557:16
+     |
+     = note: unsatisfied requirement introduced here: `TailAppendPublication: Debug`
+     = note: required for `Result<TailAppendPublication, TailAppendError>` to implement `Debug`
+
+error: trivial cast: `Arc<VersionedSource>` as `Arc<dyn ReadAt>`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1533:56
+     |
+1533 |     let package = source_backed::Package::from_read_at(source.clone() as Arc<dyn ReadAt>)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: cast can be replaced by coercion; this might require a temporary variable
+     = note: requested on the command line with `-D trivial-casts`
+
+error: trivial cast: `Arc<ReadCountingSource>` as `Arc<dyn ReadAt>`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1550:56
+     |
+1550 |     let package = source_backed::Package::from_read_at(source.clone() as Arc<dyn ReadAt>)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: cast can be replaced by coercion; this might require a temporary variable
+
+error: trivial cast: `Arc<MemoryObservingSource>` as `Arc<dyn ReadAt>`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1588:9
+     |
+1588 |         source.clone() as Arc<dyn ReadAt>,
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: cast can be replaced by coercion; this might require a temporary variable
+
+error: trivial cast: `Arc<OneByteSource>` as `Arc<dyn ReadAt>`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1710:56
+     |
+1710 |     let package = source_backed::Package::from_read_at(one_byte as Arc<dyn ReadAt>)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: cast can be replaced by coercion; this might require a temporary variable
+
+error: trivial cast: `Arc<InterruptedOnceSource>` as `Arc<dyn ReadAt>`
+    --> crates/litchi-docx/tests/source_backed_tail_append.rs:1719:56
+     |
+1719 |     let package = source_backed::Package::from_read_at(interrupted.clone() as Arc<dyn ReadAt>)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: cast can be replaced by coercion; this might require a temporary variable
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (test "source_backed_tail_append") due to 6 previous errors

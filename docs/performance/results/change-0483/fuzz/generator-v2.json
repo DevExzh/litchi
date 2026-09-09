@@ -1,0 +1,35 @@
+{
+  "compression_methods": [
+    "stored",
+    "deflate"
+  ],
+  "generator_sha256": "2b62cfae3f9b108db4f4c2f0a61347078728f2a74e7f25c5d82b1f78bc1bc555",
+  "legacy_generator_sha256": "2ffff36a2bbf9c6bda0cf3a3a497fb8261036b6dd4573d5a7d670a183abeb488",
+  "legacy_manifest_sha256": "230dd7724c209eb92544ef573f1dfa4fef339225a483a8b02d9e0322512ec78a",
+  "legacy_seed_count": 30,
+  "python": "3.14.4 (main, Jun 18 2026, 14:25:02) [GCC 15.2.0]",
+  "schema": "litchi-docx-fuzz-generator-v2",
+  "seed_count": 62,
+  "seed_manifest_sha256": "af718d53b76a05c6d979c03bed16458291dddbc5868c4ba834119d168057f253",
+  "seeds": 62,
+  "settings_cases": [
+    "empty-settings",
+    "protection-disabled",
+    "protection-enabled",
+    "duplicate-flags",
+    "mce-fallback",
+    "must-understand",
+    "inherited-namespace",
+    "directive-amplification"
+  ],
+  "settings_member_verified": true,
+  "settings_seed_count": 32,
+  "version": 2,
+  "word_dialects": [
+    "word",
+    "strict"
+  ],
+  "zip_crc_and_main_hashes_verified": true,
+  "zlib_build": "1.3.1",
+  "zlib_runtime": "1.3.1"
+}

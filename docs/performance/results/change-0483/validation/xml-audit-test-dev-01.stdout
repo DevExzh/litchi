@@ -1,0 +1,16 @@
+
+running 11 tests
+test audit::stream_tests::aggregate_attribute_budget_remains_independent_of_token_scratch ... ok
+test audit::stream_tests::authored_reader_preserves_authored_whitespace_policy ... ok
+test audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks ... ok
+test audit::stream_tests::reader_matches_slice_bom_rejection ... ok
+test audit::stream_tests::source_failures_are_distinguished_from_audit_failures ... ok
+test audit::stream_tests::streaming_memory_bound_caps_per_event_attribute_scratch_at_token_window ... ok
+test audit::stream_tests::streamed_encoding_offsets_include_markup_prefixes ... ok
+test audit::stream_tests::streaming_memory_bound_accounts_for_depth_and_token_windows ... ok
+test audit::stream_tests::streaming_memory_bound_reports_checked_arithmetic_overflow ... ok
+test audit::stream_tests::token_window_fails_before_unbounded_parser_growth ... ok
+test audit::stream_tests::total_window_fails_with_audit_limit ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

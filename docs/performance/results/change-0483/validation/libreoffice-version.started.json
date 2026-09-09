@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "libreoffice",
+    "--version"
+  ],
+  "attempt": null,
+  "common_sha256": "3898e9dd98855abd7ec9659194cbede3550a40fe28d785f9e9ceb80ce56e4e7d",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "fddd6638753d867bdf4d0c4c4f5b722031b88ef021472ee3759d81e3a601c39e",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "libreoffice-version",
+  "schema": "docx-tail-append-gate-v1",
+  "source_before": {
+    "files": 7139,
+    "path": "validation-sources/07fc16fdc3c4a380b84460dc15421f2628f24f512414bca1c6c3e0dc6127393c.json",
+    "sha256": "07fc16fdc3c4a380b84460dc15421f2628f24f512414bca1c6c3e0dc6127393c"
+  },
+  "started_utc": "2026-09-09T01:04:02.796777+00:00"
+}

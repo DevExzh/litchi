@@ -1,0 +1,44 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: method `delta` is never used
+   --> src/docx_bounded_tail_append_compare.rs:297:8
+    |
+296 | impl ReadObservation {
+    | -------------------- method in this implementation
+297 |     fn delta(self, before: Self) -> Self {
+    |        ^^^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: returning the result of a `let` binding from a block
+   --> src/docx_bounded_tail_append_compare.rs:864:13
+    |
+857 | /             let length = if entry.is_zip64() {
+858 | |                 if with_signature { 24 } else { 20 }
+859 | |             } else if with_signature {
+860 | |                 16
+861 | |             } else {
+862 | |                 12
+863 | |             };
+    | |______________- unnecessary `let` binding
+864 |               length
+    |               ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+857 ~             
+858 ~             if entry.is_zip64() {
+859 +                 if with_signature { 24 } else { 20 }
+860 +             } else if with_signature {
+861 +                 16
+862 +             } else {
+863 +                 12
+864 +             }
+    |
+
+error: could not compile `litchi-perf-baseline` (lib) due to 2 previous errors

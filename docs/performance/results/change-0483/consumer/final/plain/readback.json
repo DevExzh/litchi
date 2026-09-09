@@ -1,0 +1,24 @@
+{
+  "candidate": {
+    "bytes": 1234,
+    "sha256": "4140940ece4c52b184d27a548447e4c3633e2244543aea68a74212e381aadc91"
+  },
+  "candidate_text": {
+    "bytes": 55,
+    "sha256": "59ede4faffb8861d48000f584f09c9216755b2d4dccbfa5f1e70239e111b6bb7"
+  },
+  "case": "plain",
+  "decoded_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+  "decoded_source_text": " seed & text \n",
+  "expected_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+  "expected_source_text": " seed & text \n",
+  "source": {
+    "bytes": 1188,
+    "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+  },
+  "source_text": {
+    "bytes": 17,
+    "sha256": "72402f8efe5fa37f89c414138f64fa019b8f0e580189bfddf0ae5def8786e52d"
+  },
+  "verified": true
+}

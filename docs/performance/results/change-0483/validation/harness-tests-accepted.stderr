@@ -1,0 +1,2 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-340f1611ab1688b3)

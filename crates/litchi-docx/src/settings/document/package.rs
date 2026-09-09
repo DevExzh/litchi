@@ -4,10 +4,14 @@
 )]
 //! OPC/package integration for document settings.
 
+use std::borrow::Cow;
+
 use super::model::DocumentSettings;
 use crate::Variables;
 use crate::error::{Error, Result};
-use crate::mail_merge::validate_mail_merge_relationships;
+use crate::mail_merge::{validate_mail_merge_relationships, validate_mail_merge_relationships_in};
+use litchi_ooxml_common::mce::Limits as MceLimits;
+use litchi_opc::Relationships;
 use litchi_opc::part::Part;
 
 /// Relationship type required by Word for an attached document template.
@@ -55,7 +59,29 @@ impl DocumentSettings {
         let xml = super::super::extensions::process_part(part)?;
         let mut settings = Self::extract_from_xml(xml.as_ref())?;
         validate_mail_merge_relationships(part, settings.mail_merge.as_ref())?;
-        validate_attached_template_relationship(part, &mut settings)?;
+        validate_attached_template_relationship(part.rels(), &mut settings)?;
+        Ok(settings)
+    }
+
+    /// Apply the DOCX MCE capability profile once and return its borrowed or
+    /// owned XML result.  The caller keeps that result alive while it performs
+    /// the complete settings and mail-merge validation pass.
+    pub(crate) fn process_bytes_with_mce_limits<'a>(
+        bytes: &'a [u8],
+        mce_limits: &MceLimits,
+    ) -> Result<Cow<'a, [u8]>> {
+        super::super::extensions::process_bytes_with_limits(bytes, mce_limits)
+    }
+
+    /// Validate a settings model which has already passed the package MCE
+    /// capability profile, against the original relationship map.
+    pub(crate) fn extract_from_processed_xml_with_relationships(
+        xml: &[u8],
+        relationships: &Relationships,
+    ) -> Result<Self> {
+        let mut settings = Self::extract_from_processed_xml(xml)?;
+        validate_mail_merge_relationships_in(relationships, settings.mail_merge.as_ref())?;
+        validate_attached_template_relationship(relationships, &mut settings)?;
         Ok(settings)
     }
 }
@@ -78,22 +104,23 @@ pub(crate) fn validate_attached_template_target(target: &str) -> Result<()> {
 }
 
 fn validate_attached_template_relationship(
-    part: &dyn Part,
+    relationships: &Relationships,
     settings: &mut DocumentSettings,
 ) -> Result<()> {
-    let matching = part
-        .rels()
+    let mut matching = None;
+    for relationship in relationships
         .iter()
         .filter(|relationship| is_attached_template_relationship(relationship.reltype()))
-        .collect::<Vec<_>>();
-    if matching.len() > 1 {
-        return Err(Error::InvalidFormat(
-            "settings part has multiple attached-template relationships".into(),
-        ));
+    {
+        if matching.replace(relationship).is_some() {
+            return Err(Error::InvalidFormat(
+                "settings part has multiple attached-template relationships".into(),
+            ));
+        }
     }
 
     let Some(attached_template) = settings.attached_template.as_mut() else {
-        if matching.is_empty() {
+        if matching.is_none() {
             return Ok(());
         }
         return Err(Error::InvalidFormat(
@@ -101,8 +128,7 @@ fn validate_attached_template_relationship(
                 .into(),
         ));
     };
-    let relationship = part
-        .rels()
+    let relationship = relationships
         .get(&attached_template.relationship_id)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(

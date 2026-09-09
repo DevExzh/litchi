@@ -1,0 +1,3 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.00s
+     Running unittests src/lib.rs (target/release/deps/xml_minifier-8c9cf7528f840540)

@@ -1,0 +1,11 @@
+
+running 6 tests
+test error::tests::accounting_overflow_is_not_misclassified_as_unsupported ... ok
+test error::tests::public_execution_error_from_a_format_sink_remains_typed ... ok
+test error::tests::execution_io_errors_survive_zip_error_conversion ... ok
+test error::tests::allocation_zip_errors_remain_typed ... ok
+test error::tests::publication_capability_errors_retain_typed_core_classification ... ok
+test error::tests::spool_error_display_is_content_free_and_retains_the_provider_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 338 filtered out; finished in 0.00s
+

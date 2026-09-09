@@ -10,9 +10,12 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-#![expect(
-    clippy::shadow_unrelated,
-    reason = "local parser names mirror the OOXML role currently being decoded"
+#![cfg_attr(
+    any(feature = "automatic-fonts", test),
+    expect(
+        clippy::shadow_unrelated,
+        reason = "local parser names mirror the OOXML role currently being decoded"
+    )
 )]
 #![expect(
     clippy::wildcard_enum_match_arm,
@@ -24,11 +27,15 @@ use super::super::notes::{NoteNumberingProperties, NoteNumberingRestart, NotePos
 use super::model::{AttachedTemplate, DocumentSettings};
 use crate::Variables;
 use crate::error::{Error, Result};
-use crate::mail_merge::{Settings as MailMergeSettings, parse_settings_mail_merge};
+use crate::mail_merge::{
+    Settings as MailMergeSettings, parse_settings_mail_merge_processed,
+    parse_settings_mail_merge_with_mce_limits,
+};
 use crate::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
 };
 use crate::numbering::Format;
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -52,13 +59,38 @@ use crate::settings::{
 
 impl DocumentSettings {
     pub(super) fn extract_from_xml(xml_bytes: &[u8]) -> Result<Self> {
+        Self::extract_from_xml_with_mce_limits(xml_bytes, &MceLimits::default())
+    }
+
+    pub(super) fn extract_from_xml_with_mce_limits(
+        xml_bytes: &[u8],
+        mce_limits: &MceLimits,
+    ) -> Result<Self> {
+        let mail_merge = parse_settings_mail_merge_with_mce_limits(xml_bytes, mce_limits)?;
+        Self::extract_from_processed_xml_with_mail_merge(xml_bytes, mail_merge)
+    }
+
+    /// Extract a settings model from XML after the package boundary has
+    /// already applied the authoritative DOCX MCE capability profile.
+    ///
+    /// This avoids a second MCE pass while retaining the complete settings
+    /// and mail-merge grammar used by the ordinary codec.
+    pub(super) fn extract_from_processed_xml(xml_bytes: &[u8]) -> Result<Self> {
+        let mail_merge = parse_settings_mail_merge_processed(xml_bytes)?;
+        Self::extract_from_processed_xml_with_mail_merge(xml_bytes, mail_merge)
+    }
+
+    fn extract_from_processed_xml_with_mail_merge(
+        xml_bytes: &[u8],
+        mail_merge: Option<MailMergeSettings>,
+    ) -> Result<Self> {
         let mut reader = NsReader::from_reader(xml_bytes);
 
         let mut settings = Self::new();
         settings
             .values
             .set_extensions(Extensions::parse(xml_bytes)?);
-        settings.mail_merge = parse_settings_mail_merge(xml_bytes)?;
+        settings.mail_merge = mail_merge;
         let mut depth = 0usize;
         let mut saw_root = false;
         let mut strict_wordprocessingml = false;
@@ -418,6 +450,8 @@ fn parse_note_property_child(
 struct SeenSettings {
     do_not_embed_smart_tags: bool,
     attached_template: bool,
+    document_protection: bool,
+    track_revisions: bool,
     write_protection: bool,
 }
 
@@ -430,6 +464,12 @@ fn parse_setting(
 ) -> Result<()> {
     match element.local_name().as_ref() {
         b"documentProtection" => {
+            if seen.document_protection {
+                return Err(Error::InvalidFormat(
+                    "duplicate documentProtection setting".into(),
+                ));
+            }
+            seen.document_protection = true;
             settings.values.set_protected(true);
             if let Some(value) = word_attribute_value(element, b"edit", decoder, resolver)? {
                 settings
@@ -441,6 +481,12 @@ fn parse_setting(
             }
         },
         b"trackRevisions" => {
+            if seen.track_revisions {
+                return Err(Error::InvalidFormat(
+                    "duplicate trackRevisions setting".into(),
+                ));
+            }
+            seen.track_revisions = true;
             settings
                 .values
                 .set_track_revisions(parse_on_off(element, decoder, resolver)?);

@@ -1,0 +1,92 @@
+   Compiling hybrid-array v0.4.14
+   Compiling libc v0.2.189
+   Compiling num-traits v0.2.19
+   Compiling either v1.18.0
+   Compiling rayon v1.12.0
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling chrono v0.4.45
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling digest v0.11.3
+   Compiling getrandom v0.4.3
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling ff v0.13.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling encoding_rs v0.8.35
+   Compiling rand_chacha v0.3.1
+   Compiling elliptic-curve v0.13.8
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling libz-sys v1.1.29
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling flate2 v1.1.10
+   Compiling tinyvec v1.12.0
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling num-bigint-dig v0.8.6
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling p256 v0.13.2
+   Compiling pathfinder_simd v0.5.6
+   Compiling rsa v0.9.10
+   Compiling cipher v0.5.2
+   Compiling getrandom v0.3.4
+   Compiling libloading v0.8.8
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling option-ext v0.2.0
+   Compiling byteorder v1.5.0
+   Compiling dirs-sys v0.5.0
+   Compiling pathfinder_geometry v0.5.1
+   Compiling alloc-stdlib v0.2.4
+   Compiling tempfile v3.27.0
+   Compiling dlib v0.5.3
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling unicode-normalization v0.1.25
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling static_assertions v1.1.0
+   Compiling aliasable v0.1.3
+   Compiling same-file v1.0.6
+   Compiling walkdir v2.5.0
+   Compiling ouroboros v0.18.5
+   Compiling enumflags2 v0.7.12
+   Compiling caseless v0.2.2
+   Compiling yeslogic-fontconfig-sys v6.0.1
+   Compiling unicode-general-category v1.1.0
+   Compiling brotli-decompressor v5.0.3
+   Compiling unicode-joining-type v1.0.0
+   Compiling dirs v6.0.0
+   Compiling unicode-canonical-combining-class v1.0.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling freetype-sys v0.20.1
+   Compiling itertools v0.14.0
+   Compiling bitreader v0.3.11
+   Compiling rustc-hash v2.1.3
+   Compiling float-ord v0.3.2
+   Compiling ucd-trie v0.1.7
+   Compiling bytemuck v1.25.2
+   Compiling glyph-names v0.2.0
+   Compiling aes v0.9.3
+   Compiling allsorts v0.17.0
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling roaring v0.11.1
+   Compiling font-kit v0.14.3
+   Compiling rc4 v0.2.0
+   Compiling cbc v0.2.1
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling hmac v0.13.0
+   Compiling sha1 v0.11.0
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 56s
+     Running unittests src/lib.rs (target/release/deps/litchi_docx-3277e99e8da2ed85)

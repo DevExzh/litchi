@@ -1032,6 +1032,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "unicode-normalization",
+ "xml-minifier",
 ]
 
 [[package]]

@@ -1,6 +1,9 @@
-#![expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items remain grouped by OOXML schema family and package lifecycle"
+#![cfg_attr(
+    feature = "fonts",
+    expect(
+        clippy::arbitrary_source_item_ordering,
+        reason = "items remain grouped by OOXML schema family and package lifecycle"
+    )
 )]
 #![expect(
     clippy::module_name_repetitions,

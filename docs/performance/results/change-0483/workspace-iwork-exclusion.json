@@ -1,0 +1,25 @@
+{
+  "excluded_packages": [
+    "litchi-iwa",
+    "litchi-iwa-archive",
+    "litchi-iwa-cache",
+    "litchi-iwa-common",
+    "litchi-iwa-core",
+    "litchi-iwa-detect",
+    "litchi-iwa-graph",
+    "litchi-iwa-index",
+    "litchi-iwa-package",
+    "litchi-iwa-protos",
+    "litchi-iwa-structured",
+    "litchi-iwa-text",
+    "litchi-iwa-text-wire",
+    "litchi-keynote",
+    "litchi-numbers",
+    "litchi-numbers-wire",
+    "litchi-pages"
+  ],
+  "full_workspace_failed_gate": "workspace-check-final-42",
+  "failure": "E0277 in crates/litchi-iwa/examples/create_keynote_audio.rs:52: missing playback settings conversion",
+  "reason": "User explicitly excludes iWork implementation from this goal. iWork production sources remain unchanged by this batch.",
+  "replacement_gate": "non-iwork-workspace-check-final-48"
+}

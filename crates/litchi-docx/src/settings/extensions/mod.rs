@@ -15,4 +15,4 @@ pub use model::{
 };
 pub use transaction::{Commit, Patch, Snapshot, Transaction};
 
-pub(crate) use package::process_part;
+pub(crate) use package::{process_bytes_with_limits, process_part};

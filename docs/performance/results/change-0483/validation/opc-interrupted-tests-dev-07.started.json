@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--test",
+    "source_part_splice",
+    "interrupted_splice_source"
+  ],
+  "attempt": null,
+  "common_sha256": "6d6030ffb9ab1d45db18059f2df5b8bcb613600b09b65274504c33da47ef4049",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "opc-interrupted-tests-dev-07",
+  "schema": "docx-tail-append-gate-v1",
+  "source_before": {
+    "files": 7139,
+    "path": "validation-sources/0b9456b73071fc607388b9b2b61263936e55af1ddaee368d49843ff15b08ef30.json",
+    "sha256": "0b9456b73071fc607388b9b2b61263936e55af1ddaee368d49843ff15b08ef30"
+  },
+  "started_utc": "2026-09-09T02:01:57.011800+00:00"
+}

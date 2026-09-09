@@ -1,0 +1,8 @@
+{
+  "observed_utc": "2026-09-09T04:19:04.019146+00:00",
+  "path": "workspace-Cargo.lock.txt",
+  "bytes": 138626,
+  "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292",
+  "scope": "Root workspace lock observed after accepted locked validation commands. The standalone performance harness uses its tracked tools/perf-baseline/Cargo.lock; fuzz builds retain their own lock separately.",
+  "repository_policy": "The root Cargo.lock is ignored by the repository *.lock rule; the copy is retained as a reproducible validation input, not a before-run observation."
+}

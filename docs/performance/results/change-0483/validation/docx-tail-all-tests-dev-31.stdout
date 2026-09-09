@@ -1,0 +1,45 @@
+
+running 40 tests
+test append_and_source_limits_are_checked_before_output ... ok
+test cancellation_is_checked_before_preparation_and_before_publication_output ... ok
+test grammar_refusals_happen_before_publication ... ok
+test one_large_token_is_rejected_by_the_token_ceiling_before_output ... ok
+test managed_work_limit_exhaustion_refuses_before_archive_output ... ok
+test managed_cancellation_during_short_publication_is_typed_after_a_prefix ... ok
+test authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules ... ok
+test default_word_namespace_and_shadowed_local_prefix_are_bound_at_insertion ... ok
+test managed_memory_limit_refuses_before_archive_output ... ok
+test empty_settings_root_is_admitted_in_both_word_dialects ... ok
+test opaque_section_allows_an_explicit_empty_default_namespace_and_preserves_it ... ok
+test encrypted_metadata_refusal_precedes_main_payload_reads_and_output ... ok
+test bounded_prepare_and_publication_keep_main_xml_out_of_the_payload_cache ... ok
+test opaque_section_namespace_attribute_and_event_policy_refuses_before_output ... ok
+test explicit_noop_is_exact_and_reversible_without_a_generated_paragraph ... ok
+test empty_text_is_a_real_empty_paragraph_and_is_not_the_exact_noop_branch ... ok
+test settings_xml_declaration_inside_root_refuses_before_publication ... ok
+test inherited_settings_namespace_copies_hit_the_workspace_ceiling ... ok
+test managed_prepare_charges_semantic_memory_and_releases_plan_workspace ... ok
+test options_cancellation_during_short_publication_is_typed_after_a_prefix ... ok
+test appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate_members ... ok
+test repeated_protection_and_tracking_elements_refuse_before_output ... ok
+test strict_tail_append_preserves_opaque_section_with_vendor_word_like_descendants ... ok
+test source_change_after_preparation_is_rejected_without_output ... ok
+test source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once ... ok
+test topology_refusals_keep_their_public_reason_and_emit_no_prefix ... ok
+test malformed_mail_merge_schema_refuses_before_output ... ok
+test settings_mce_must_understand_unknown_namespace_refuses_before_publication ... ok
+test insertion_survives_distinct_body_prefix_and_word_prefix_shadowing_in_section ... ok
+test append_without_a_section_properties_element_targets_the_body_close ... ok
+test protected_external_unsupported_and_signed_topologies_refuse_before_output ... ok
+test opaque_section_preserves_unicode_qnames ... ok
+test supported_settings_mce_fallback_is_admitted_and_output_limited ... ok
+test xml_declaration_and_encoding_grammar_refuse_before_publication ... ok
+test sink_failure_reports_partial_output_after_preflight ... ok
+test settings_protection_flags_honor_explicit_on_and_off_values ... ok
+test settings_scalar_duplicates_and_malformed_on_off_values_refuse_before_output ... ok
+test settings_relationship_closure_is_checked_without_staging_relationships ... ok
+test nested_long_mce_directives_account_for_decoded_expanded_names ... ok
+test many_xml_space_paragraphs_use_the_aggregate_attribute_budget ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

@@ -1508,14 +1508,14 @@ fn encoded_text_size(text: &str) -> Result<(u64, u64), String> {
     Ok((encoded, characters))
 }
 
-fn is_plain_text_character(character: char) -> bool {
+pub(crate) fn is_plain_text_character(character: char) -> bool {
     matches!(
         character,
         '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
     )
 }
 
-fn escaped_character_len(character: char) -> usize {
+pub(crate) fn escaped_character_len(character: char) -> usize {
     match character {
         '&' => 5,
         '<' | '>' => 4,
@@ -1523,7 +1523,7 @@ fn escaped_character_len(character: char) -> usize {
     }
 }
 
-fn append_character(character: char, destination: &mut [u8]) -> usize {
+pub(crate) fn append_character(character: char, destination: &mut [u8]) -> usize {
     match character {
         '&' => copy_bytes(destination, b"&amp;"),
         '<' => copy_bytes(destination, b"&lt;"),

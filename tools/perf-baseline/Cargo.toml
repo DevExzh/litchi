@@ -19,6 +19,10 @@ name = "docx_plain_paragraph_tail_append"
 path = "src/bin/docx_plain_paragraph_tail_append.rs"
 
 [[bin]]
+name = "docx_bounded_tail_append_compare"
+path = "src/bin/docx_bounded_tail_append_compare.rs"
+
+[[bin]]
 name = "xlsb_crud"
 path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]

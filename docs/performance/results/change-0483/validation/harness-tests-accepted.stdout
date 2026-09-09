@@ -1,0 +1,10 @@
+
+running 5 tests
+test docx_bounded_tail_append_compare::tests::independent_candidate_adds_one_exact_fragment ... ok
+test docx_bounded_tail_append_compare::tests::bounded_candidate_oracle_tracks_local_namespace_and_space_policy ... ok
+test docx_bounded_tail_append_compare::tests::source_adapter_counts_logical_reads ... ok
+test docx_bounded_tail_append_compare::tests::cli_accepts_frozen_counts_and_routes ... ok
+test docx_bounded_tail_append_compare::tests::source_text_is_explicit_and_escaped ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 389 filtered out; finished in 0.00s
+

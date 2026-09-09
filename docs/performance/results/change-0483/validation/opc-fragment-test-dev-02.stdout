@@ -1,0 +1,8 @@
+
+running 3 tests
+test authored_fragment_refusals_release_memory_and_preserve_typed_limits ... ok
+test authored_fragment_cannot_transfer_a_foreign_package_budget ... ok
+test authored_fragment_transfers_one_reservation_and_publishes_reversibly ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+

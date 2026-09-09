@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--test",
+    "source_backed_tail_append"
+  ],
+  "attempt": null,
+  "common_sha256": "6d6030ffb9ab1d45db18059f2df5b8bcb613600b09b65274504c33da47ef4049",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "docx-tail-all-tests-dev-18",
+  "schema": "docx-tail-append-gate-v1",
+  "source_before": {
+    "files": 7141,
+    "path": "validation-sources/976257caf5678d7448a1e6fe85769c93dbc33baff62a90c23fd75a0f6041d94e.json",
+    "sha256": "976257caf5678d7448a1e6fe85769c93dbc33baff62a90c23fd75a0f6041d94e"
+  },
+  "started_utc": "2026-09-09T02:48:52.547570+00:00"
+}

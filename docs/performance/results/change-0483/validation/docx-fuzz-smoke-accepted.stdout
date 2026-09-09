@@ -1,0 +1,1 @@
+["/home/zhuhe/.cache/litchi-goal-0483/fuzz-docx-accepted/tail_append", "/home/zhuhe/.cache/litchi-goal-0483/fuzz-docx-accepted/corpus", "-runs=10000", "-seed=483", "-max_len=65536", "-timeout=10", "-artifact_prefix=/home/zhuhe/.cache/litchi-goal-0483/fuzz-docx-accepted/artifacts/"]

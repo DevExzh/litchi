@@ -21,6 +21,7 @@ use super::model::{
 use crate::{Error, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -163,7 +164,23 @@ impl Recipients {
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn parse_settings_mail_merge(xml: &[u8]) -> Result<Option<Settings>> {
-    let root = parse_tree(xml)?;
+    parse_settings_mail_merge_with_mce_limits(xml, &MceLimits::default())
+}
+
+/// Parse settings mail-merge metadata with a caller-owned MCE resource
+/// profile.  The schema and relationship identifiers remain the same as the
+/// public parser; only the baseline preprocessing ceiling is explicit.
+pub(crate) fn parse_settings_mail_merge_with_mce_limits(
+    xml: &[u8],
+    limits: &MceLimits,
+) -> Result<Option<Settings>> {
+    let processed = process_markup_compatibility(xml, &Capabilities::default(), limits)
+        .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
+    parse_settings_mail_merge_processed(processed.xml.as_ref())
+}
+
+pub(crate) fn parse_settings_mail_merge_processed(xml: &[u8]) -> Result<Option<Settings>> {
+    let root = parse_tree_processed(xml)?;
     require_word_element(&root, "settings")?;
     let mut found = None;
     let mut mail_index = None;
@@ -671,7 +688,11 @@ impl Node {
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
-    let mut reader = NsReader::from_reader(processed.as_ref());
+    parse_tree_processed(processed.as_ref())
+}
+
+fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
+    let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut stack: Vec<Node> = Vec::new();
