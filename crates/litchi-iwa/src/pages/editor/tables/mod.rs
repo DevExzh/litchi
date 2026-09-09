@@ -33,9 +33,9 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
-pub type PagesCellValue = litchi_numbers::cell::Value;
+pub type PagesCellValue = litchi_iwa_common::table::cell::value::Value;
 /// One mutation in a transactional Pages table-cell batch.
-pub type PagesTableCellUpdate = litchi_numbers::cell::Update;
+pub type PagesTableCellUpdate = litchi_iwa_common::table::cell::value::Update;
 pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::text::Background as PagesTableCellTextBackground;
 pub use crate::text::Outline as PagesTableCellTextOutline;

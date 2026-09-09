@@ -5,6 +5,7 @@ use crate::shape::stroke::Stroke;
 pub mod conditional_highlight;
 pub mod layout;
 pub mod number_format;
+pub mod value;
 
 /// One edge of a native table cell.
 #[repr(u8)]
