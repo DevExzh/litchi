@@ -1,0 +1,57 @@
+{
+  "base_commit": "c85997bc0d93ea523731d6e7622b2300e1747255",
+  "sources": {
+    "crates/litchi-cfb/src/file.rs": "334b3f9a0a6a59d1d4f511eaa5ee292eb614b219861e004caf03f5674fab38f9",
+    "crates/litchi-doc/src/embedded_object/tests.rs": "6daf7118c1ddc5e934ab000843c76efead64727ea55ea2a6933c3ad6079bbe61",
+    "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs": "542a22ccbbd787c49fde5232c7609d324b034175c447e52776cabd85bf9af720",
+    "crates/litchi-doc/src/embedded_object/transaction/storage.rs": "d77197add231009349a72f6435929a6c583584b343d9ba1340fc5b5a58fc54d5",
+    "crates/litchi-ole-common/src/object/codec.rs": "33d138224c5d0fcb26d37c14a85ac1467a4ccfe62ea9202934c7b9b46b111da9",
+    "crates/litchi-ole-common/src/object/editor.rs": "6f5c529bd40a6b5aec3ed83ef47e86f78a7eb81734995ce2fb3910d02e1a526b",
+    "crates/litchi-ole-common/src/object/mod.rs": "8c183aec5c6818fdc748739a8881aeb0d4585ae9e1f9ba241ce909c5a3c8b87f",
+    "crates/litchi-ole-common/tests/object.rs": "7ed89df82311dcde1eb6a02c233116280075daf8d78de5f0bd7dc3b1ef3ee2fd"
+  },
+  "patch_sha256": "7279ba1326965ff5189acf036c6b4bf656b892fe148d7eb9739652abb5da5ad4",
+  "tests": {
+    "passed": 1701,
+    "failed": 0,
+    "ignored": 3
+  },
+  "doctests": {
+    "passed": 28,
+    "failed": 0,
+    "ignored": 13
+  },
+  "clippy": "pass",
+  "validation_logs": {
+    "tests": "/var/tmp/litchi-doc-source-admission-tests-v5.log",
+    "clippy": "/var/tmp/litchi-doc-source-admission-clippy-v5.log"
+  },
+  "delta_from_v1": "Delay token target-path and compound-handle capture until all fallible replacement validation succeeds.",
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-cfb -p litchi-ole-common -p litchi-doc --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-cfb -p litchi-ole-common -p litchi-doc --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <eight paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "cargo_lock_sha256": "28499130dfcc9fe70f86205d3872b5cac1290a74099bcaeabb88add3c418f3c5",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "d39f9bc32c0990c82a998586ddc95ab951a57071e2148cfd79cdec1258838375",
+      "raw_sha256": "c018b13f21ab99220baa89e2f23e97ae69c50e8b7301ac1a1630e1148d2d974a"
+    },
+    "clippy.log.gz": {
+      "sha256": "f3a974ca4fdd044b1c6d35a1f9894c49da1cf7d4b47698e5730ea9871149907c",
+      "raw_sha256": "4b898ded6a562770c19bcf23bc5ed22dca10931ae8fcae97469f9d12f7cf3568"
+    }
+  },
+  "format": "pass",
+  "whitespace": "pass",
+  "performance": "No measured performance claim; corrected embedded-object and unique-finish benchmark coverage remains separate work."
+}

@@ -547,6 +547,18 @@ impl Package {
         Ok(())
     }
 
+    pub(crate) fn check_object_limits(&self, limits: Limits) -> Result<(), OleError> {
+        limits.validate()?;
+        if self.storages.len() > limits.max_storage_depth
+            || self.streams.len() > limits.max_streams_per_object
+        {
+            return Err(OleError::InvalidFormat(
+                "selected object exceeds capture limits".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn object_from_root(
         &self,
         target: Target,

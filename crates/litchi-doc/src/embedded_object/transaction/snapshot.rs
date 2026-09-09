@@ -32,9 +32,13 @@ impl Snapshot {
     /// bounds, or `ObjectPool` ownership references are invalid.
     pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         let bytes = input.into();
-        let source = Arc::<[u8]>::from(bytes.clone());
         let editor = Editor::open(bytes, limits)?;
         editor.validate_references()?;
+        // Retain the outer DOC source only after common CFB admission and DOC
+        // reference validation have completed. This is a post-admission copy
+        // from the common owner's retained source; it is intentionally not
+        // advertised as sharing the common Arc allocation.
+        let source = Arc::<[u8]>::from(editor.package.source_shared().as_ref().as_slice());
         Ok(Self {
             source,
             limits,

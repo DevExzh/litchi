@@ -560,6 +560,25 @@ impl From<OleError> for litchi_core::Error {
 }
 
 impl<R: Read + Seek> OleFile<R> {
+    /// Borrows the reader retained by this parsed CFB view.
+    ///
+    /// The reader is the source used for the bounded parse. Callers that need
+    /// to retain source bytes should do so only after completing their own
+    /// validation of the parsed view.
+    #[must_use]
+    pub fn get_ref(&self) -> &R {
+        &self.reader
+    }
+
+    /// Consumes this parsed CFB view and returns its reader.
+    ///
+    /// Parsed index state is discarded. This is useful when an owner has
+    /// completed validation and wants to retain the original reader without
+    /// copying it.
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
     /// Discard the cursor and validation-only state, retaining the parsed CFB
     /// index for the crate's immutable positional reader.
     pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {

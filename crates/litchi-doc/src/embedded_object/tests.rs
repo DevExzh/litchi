@@ -698,6 +698,67 @@ fn snapshot_transactions_keep_invalid_metadata_and_storage_edits_atomic() {
 }
 
 #[test]
+fn storage_replacement_admission_rejects_malformed_and_oversized_before_publish() {
+    let comp_obj = crate::writer::ole_metadata::generate_compobj_stream();
+    let ole = crate::writer::ole_metadata::generate_ole_stream();
+    let obj_info = [0x00, 0x00, 0x03, 0x00];
+    let mut limits = Limits::default();
+    limits.max_object_size = 16 * 1024;
+    limits.max_streams_per_object = 4;
+    let mut editor = super::Editor::open(base_doc(), limits).unwrap();
+    editor
+        .add(super::WriteOptions::new(
+            92,
+            object_cfb(&comp_obj, &ole, &obj_info, &[0xAB, 0xCD]),
+            picture_data(92),
+        ))
+        .unwrap();
+    let source = Snapshot::open(editor.finish().unwrap(), limits).unwrap();
+
+    let mut malformed = source.edit();
+    assert!(malformed.replace_storage(92, vec![0x00, 0x01]).is_err());
+    assert!(!malformed.is_changed().unwrap());
+    let malformed_snapshot = malformed.snapshot().unwrap();
+    assert_eq!(malformed_snapshot, source);
+    assert!(std::sync::Arc::ptr_eq(
+        &source.bytes_shared(),
+        &malformed_snapshot.bytes_shared()
+    ));
+
+    let oversized = object_cfb_with_payload(
+        &comp_obj,
+        &ole,
+        &obj_info,
+        &[0xF0],
+        &vec![0u8; usize::try_from(limits.max_object_size).unwrap()],
+    );
+    let mut oversized_edit = source.edit();
+    assert!(oversized_edit.replace_storage(92, oversized).is_err());
+    assert!(!oversized_edit.is_changed().unwrap());
+    let oversized_snapshot = oversized_edit.snapshot().unwrap();
+    assert_eq!(oversized_snapshot, source);
+    assert!(std::sync::Arc::ptr_eq(
+        &source.bytes_shared(),
+        &oversized_snapshot.bytes_shared()
+    ));
+
+    let too_many_streams = object_cfb_with_payload(&comp_obj, &ole, &obj_info, &[0xF1], &[0xF2]);
+    let mut per_object_edit = source.edit();
+    assert!(
+        per_object_edit
+            .replace_storage(92, too_many_streams)
+            .is_err()
+    );
+    assert!(!per_object_edit.is_changed().unwrap());
+    let per_object_snapshot = per_object_edit.snapshot().unwrap();
+    assert_eq!(per_object_snapshot, source);
+    assert!(std::sync::Arc::ptr_eq(
+        &source.bytes_shared(),
+        &per_object_snapshot.bytes_shared()
+    ));
+}
+
+#[test]
 fn replacing_a_storage_keeps_the_field_reference_and_reparses_opaque_payloads() {
     let comp_obj = crate::writer::ole_metadata::generate_compobj_stream();
     let ole = crate::writer::ole_metadata::generate_ole_stream();
