@@ -1,11 +1,80 @@
 //! Focused regression tests for the MS-XLDM outer-storage facade.
 
-use super::codec::{crc32, utf16le};
-use super::model::{BOM, CRC_SIZE};
+use super::codec::{crc32, decode_xml, utf16le};
+use super::model::{BOM, CRC_SIZE, MAX_DIRECTORY_BYTES};
 use super::{
     FileGroupClass, FileKind, GeneratedNameKind, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
     classify_generated_path, inspect, write,
 };
+
+#[test]
+fn checksum_matches_independent_bitwise_fixture_extractor_vectors() {
+    // Raw remainders from native_tabular_members.py::checksum, with that
+    // fixture profile's final complement undone. Covers every byte value,
+    // opposite orderings, empty input and page-sized repeated payloads.
+    assert_eq!(crc32(b""), 0xFFFF_FFFF);
+    assert_eq!(crc32(b"123456789"), 0x0376_E6E7);
+    let ascending: Vec<u8> = (0..=255).collect();
+    let descending: Vec<u8> = (0..=255).rev().collect();
+    assert_eq!(crc32(&ascending), 0x494A_116A);
+    assert_eq!(crc32(&descending), 0xD7FE_6DA5);
+    assert_eq!(crc32(&[0; 4096]), 0x77FF_C71C);
+    assert_eq!(crc32(&[255; 4096]), 0xAF19_D570);
+}
+
+#[test]
+fn utf16_xml_budget_checks_expansion_and_exact_limit() {
+    let three_byte_characters = MAX_DIRECTORY_BYTES / 3;
+    let mut bytes = Vec::with_capacity(three_byte_characters * 2 + 2);
+    for _ in 0..three_byte_characters {
+        bytes.extend_from_slice(&0x0800u16.to_le_bytes());
+    }
+    bytes.extend_from_slice(&(b'a' as u16).to_le_bytes());
+    let (decoded, _) = decode_xml(&bytes, true).unwrap();
+    assert_eq!(decoded.len(), MAX_DIRECTORY_BYTES);
+    drop(decoded);
+
+    bytes.extend_from_slice(&(b'a' as u16).to_le_bytes());
+    assert!(decode_xml(&bytes, true).is_err());
+}
+
+#[test]
+fn encoded_utf16_and_utf8_xml_budgets_reject_before_owned_copy() {
+    let encoded_over_limit = vec![0u8; MAX_DIRECTORY_BYTES * 2 + 2];
+    assert!(decode_xml(&encoded_over_limit, true).is_err());
+
+    let utf8_over_limit = vec![b'x'; MAX_DIRECTORY_BYTES + 1];
+    assert!(decode_xml(&utf8_over_limit, false).is_err());
+}
+
+#[test]
+fn oversized_valid_crc_marker_is_rejected_before_xml_materialization() {
+    let three_byte_characters = MAX_DIRECTORY_BYTES / 3 + 1;
+    let mut partition = utf16le("<Partitions>");
+    partition.reserve(three_byte_characters * 2 + 32);
+    for _ in 0..three_byte_characters {
+        partition.extend_from_slice(&0x0800u16.to_le_bytes());
+    }
+    partition.extend_from_slice(&utf16le("</Partitions>"));
+    let log = test_backup_log("Model.1.db.xml", 1, 100002);
+    let bytes = build_test_storage(&[
+        ("Partitions", partition.as_slice()),
+        ("Model.1.db.xml", b"x"),
+        ("BackupLog", log.as_bytes()),
+    ]);
+    let marker_start = XLDM_PAGE_SIZE + BOM.len() + partition.len();
+    let marker = u32::from_le_bytes(
+        bytes[marker_start..marker_start + CRC_SIZE]
+            .try_into()
+            .unwrap(),
+    );
+    assert_eq!(marker, crc32(&partition));
+    assert!(matches!(
+        inspect(&bytes),
+        Err(crate::error::Error::Invalid(message))
+            if message == "MS-XLDM XML bytes limit exceeded"
+    ));
+}
 
 #[cfg(test)]
 pub(crate) fn test_xldm_bytes() -> Vec<u8> {
@@ -16,6 +85,28 @@ pub(crate) fn test_xldm_bytes() -> Vec<u8> {
         ("Model.1.db.xml", payload),
         ("BackupLog", log.as_bytes()),
     ])
+}
+
+#[test]
+fn canonical_version_lexical_forms_and_profile_boundaries_are_retained() {
+    let payload = b"opaque";
+    let log = test_backup_log("Model.1.db.xml", 6, 100002).replace(">1153<", ">+001153<");
+    let mut bytes = build_test_storage(&[
+        ("Partitions", partitions_xml().as_bytes()),
+        ("Model.1.db.xml", payload),
+        ("BackupLog", log.as_bytes()),
+    ]);
+    assert_eq!(
+        inspect(&bytes).unwrap().profile(),
+        super::StorageProfile::Xldm140
+    );
+    let original = utf16le(">140<");
+    let position = bytes
+        .windows(original.len())
+        .position(|part| part == original)
+        .unwrap();
+    bytes[position..position + original.len()].copy_from_slice(&utf16le(">150<"));
+    assert!(inspect(&bytes).is_err());
 }
 
 #[cfg(test)]
@@ -123,13 +214,46 @@ mod tests {
     }
 
     #[test]
-    fn rejects_overlap_gap_and_nonzero_page_padding() {
+    fn rejects_nonzero_page_padding() {
         let mut bytes = test_xldm_bytes();
         let storage = inspect(&bytes).unwrap();
         let padding = storage.files.last().unwrap().offset.0 as usize
             + storage.files.last().unwrap().stored_size.0 as usize;
         bytes[padding] = 1;
         assert!(inspect(&bytes).is_err());
+    }
+
+    #[test]
+    fn rejects_overlapping_duplicate_and_gapped_allocations_without_panicking() {
+        let base = test_xldm_bytes();
+        let storage = inspect(&base).unwrap();
+        // Change only a directory offset, leaving all payload CRCs intact.
+        // Exercise both ordinary and final (backup-log) allocations.
+        for index in [1, 2] {
+            let previous = &storage.files[index - 1];
+            let entry = &storage.files[index];
+            let old = utf16le(&format!(
+                "<m_cbOffsetHeader>{}</m_cbOffsetHeader>",
+                entry.offset.0
+            ));
+            let directory_start = storage.header.directory_offset.0 as usize;
+            let start =
+                directory_start + memchr::memmem::find(&base[directory_start..], &old).unwrap();
+            for offset in [
+                previous.offset.0,
+                previous.offset.0 + previous.stored_size.0 - 1,
+                entry.offset.0 + 1,
+            ] {
+                let new = utf16le(&format!("<m_cbOffsetHeader>{offset}</m_cbOffsetHeader>"));
+                assert_eq!(old.len(), new.len());
+                let mut bytes = base.clone();
+                bytes[start..start + old.len()].copy_from_slice(&new);
+                assert!(
+                    inspect(&bytes).is_err(),
+                    "accepted offset {offset} at {index}"
+                );
+            }
+        }
     }
 
     #[test]

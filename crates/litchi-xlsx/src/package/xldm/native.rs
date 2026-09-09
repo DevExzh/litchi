@@ -251,6 +251,11 @@ pub fn inspect<'a>(
     storage: &'a Storage<'a>,
     options: &NativeParseOptions,
 ) -> NativeResult<NativeModel<'a>> {
+    if storage.profile() != super::StorageProfile::Xldm140 {
+        return Err(NativeError::new(
+            "version-150 compressed logical members require owned inner-model decoding",
+        ));
+    }
     let mut files = Vec::new();
     for group in &storage.backup_log.file_groups {
         for logged in &group.files {

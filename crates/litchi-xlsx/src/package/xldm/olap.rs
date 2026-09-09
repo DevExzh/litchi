@@ -254,6 +254,7 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> OlapResult<Opti
         GeneratedNameKind::TableInformation => OlapFileKind::DimensionInformation,
         GeneratedNameKind::CubeInformation => OlapFileKind::CubeInformation,
         GeneratedNameKind::DataSourceOrDimensionDefinition
+        | GeneratedNameKind::CryptographicKey
         | GeneratedNameKind::TableMetadata
         | GeneratedNameKind::TableRelationshipMetadata
         | GeneratedNameKind::ColumnHierarchyMetadata
@@ -299,6 +300,11 @@ pub fn inspect<'a>(
     storage: &'a Storage<'a>,
     metadata: &MetadataModel<'_>,
 ) -> OlapResult<OlapModel<'a>> {
+    if storage.profile() != super::StorageProfile::Xldm140 {
+        return Err(OlapError::new(
+            "version-150 compressed logical members require owned inner-model decoding",
+        ));
+    }
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     for group in &storage.backup_log.file_groups {
