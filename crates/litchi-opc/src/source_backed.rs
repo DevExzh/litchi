@@ -42,6 +42,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
+mod read_session;
+pub use read_session::PartReadSession;
+
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 /// Fixed part of the ZIP preservation writer's bounded generated-member
 /// capacity. The payload and target-name terms are charged separately using
