@@ -1,0 +1,180 @@
+{
+  "final_gates": [
+    {
+      "bytes": 1581,
+      "label": "format-final2",
+      "path": "validation/format-final2.json",
+      "sha256": "143304eff2448f518c5696635661c162b1c683dbb93eb54cb339d0b0e0bcc3e6"
+    },
+    {
+      "bytes": 1722,
+      "label": "tests-all-features-final4",
+      "path": "validation/tests-all-features-final4.json",
+      "sha256": "3287d88a5032d6c40b3c0f13fb69d0ad568bcf94eeddfbc3d95af2a303be21fb",
+      "test_totals": {
+        "failed": 0,
+        "ignored": 32,
+        "passed": 1989
+      }
+    },
+    {
+      "bytes": 1723,
+      "label": "tests-no-default-final2",
+      "path": "validation/tests-no-default-final2.json",
+      "sha256": "d5fbca076aab0b80d85bc7d709c941378f803f03070d77d951993d544fd242ae",
+      "test_totals": {
+        "failed": 0,
+        "ignored": 32,
+        "passed": 1948
+      }
+    },
+    {
+      "bytes": 1669,
+      "label": "clippy-final3",
+      "path": "validation/clippy-final3.json",
+      "sha256": "8b8ee769befb1ccc440b95aba088583360ff0f00ceafba70a4821e652a6a377d"
+    },
+    {
+      "bytes": 1672,
+      "label": "rustdoc-final1",
+      "path": "validation/rustdoc-final1.json",
+      "sha256": "9adff0b55b96c03bde8cbbcf7632030fc5d909b5670793f09c034ccd7b2a99f1"
+    },
+    {
+      "bytes": 1787,
+      "label": "bench-tests-final1",
+      "path": "validation/bench-tests-final1.json",
+      "sha256": "b3620bffc7667b40eecb9d2cc4f764ebe484837d36f3faf551f15d7612c024c3",
+      "test_totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 5
+      }
+    },
+    {
+      "bytes": 1735,
+      "label": "python-final2",
+      "path": "validation/python-final2.json",
+      "sha256": "7b9d1b2c9d84505324b3d01cb287281dd32f7f3f4436b9bc570bbb26313e3df0"
+    },
+    {
+      "bytes": 1652,
+      "label": "boundaries-final1",
+      "path": "validation/boundaries-final1.json",
+      "sha256": "995666399f0beb0d7beeafd2c89a474196cc33890416171a6757d162db49d720"
+    },
+    {
+      "bytes": 1692,
+      "label": "build-normal-after1",
+      "path": "validation/build-normal-after1.json",
+      "sha256": "3f3c21167099ceb9d648c7af51f9175e0f93f389dbffbc1e254ee6fa953ef628"
+    },
+    {
+      "bytes": 1744,
+      "label": "build-allocator-after1",
+      "path": "validation/build-allocator-after1.json",
+      "sha256": "90755b4587418056e715fe40a3d9fe2e9d9567c110b53e320c75e1d7c567cf65"
+    },
+    {
+      "bytes": 1606,
+      "label": "protocol-final1",
+      "path": "validation/protocol-final1.json",
+      "sha256": "089380e5f567c4a222c9be0ce45ce6c78dde6e984dbd4519ed63b9399acc410b"
+    },
+    {
+      "bytes": 1686,
+      "label": "pilot-before-pilot1",
+      "path": "validation/pilot-before-pilot1.json",
+      "sha256": "967c57bcbb88c30b2a9f348a3efa800d2899de2bb1e97f22984dd4575ce9d352"
+    },
+    {
+      "bytes": 1682,
+      "label": "pilot-after-pilot1",
+      "path": "validation/pilot-after-pilot1.json",
+      "sha256": "baf0360a01f014406dcbcf61c109795955ef12c086df0b877fa02b628446ebaa"
+    },
+    {
+      "bytes": 1699,
+      "label": "capture-before-formal1",
+      "path": "validation/capture-before-formal1.json",
+      "sha256": "bae85d260a618515b7f8070484ae9475cf055081e284d04926719ab2fccf20fe"
+    },
+    {
+      "bytes": 1695,
+      "label": "capture-after-formal1",
+      "path": "validation/capture-after-formal1.json",
+      "sha256": "62d332ac34d42cc9e0470ebad47174b9f80e438e1ddf6a679423bb87d65a97de"
+    },
+    {
+      "bytes": 1679,
+      "label": "analyze-final1",
+      "path": "validation/analyze-final1.json",
+      "sha256": "9a8494f16a8a5f3706bbdbff880640f11718618d624a7cc76196ca14d09acb56"
+    },
+    {
+      "bytes": 1618,
+      "label": "profiles-profiles1",
+      "path": "validation/profiles-profiles1.json",
+      "sha256": "5e8be94f56c3e2d45dee5951f7d7a6338437400e17de62b74134dfdc066f9852"
+    },
+    {
+      "bytes": 1644,
+      "label": "summary-profiles-final2",
+      "path": "validation/summary-profiles-final2.json",
+      "sha256": "d9b99897be7b91f4760bab68a6aaab20dfd8aa78d9c5a6b8cd83985ae4badb96"
+    },
+    {
+      "bytes": 1725,
+      "label": "fuzz-build-candidate1",
+      "path": "validation/fuzz-build-candidate1.json",
+      "sha256": "09430c3592f045295be17f140346cc79099ccf967467f403dfa71f722486c447"
+    },
+    {
+      "bytes": 1727,
+      "label": "fuzz-smoke-candidate1",
+      "path": "validation/fuzz-smoke-candidate1.json",
+      "sha256": "55ca10333592cff6cac60ba12df30104edd27632523649faafc4f56b180bf57b"
+    },
+    {
+      "bytes": 1586,
+      "label": "plot-final1",
+      "path": "validation/plot-final1.json",
+      "sha256": "ea9d83c6026b079989b924120e170b3342aaa108895ea5fac47386954bb64c85"
+    }
+  ],
+  "fuzz_positive_cases": 27,
+  "fuzz_requested_and_completed_runs": [
+    10000,
+    10000
+  ],
+  "retained_failed_attempts": [
+    {
+      "exit_code": 101,
+      "label": "clippy-final1"
+    },
+    {
+      "exit_code": 101,
+      "label": "opc-focused-dev1"
+    },
+    {
+      "exit_code": 1,
+      "label": "summary-profiles-final1"
+    },
+    {
+      "exit_code": 101,
+      "label": "tests-all-features-final1"
+    },
+    {
+      "exit_code": 101,
+      "label": "tests-all-features-final3"
+    }
+  ],
+  "retained_source_changed_attempts": [
+    "boundaries-dev1"
+  ],
+  "source": {
+    "files": 7157,
+    "path": "validation-sources/c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe.json",
+    "sha256": "c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe"
+  }
+}

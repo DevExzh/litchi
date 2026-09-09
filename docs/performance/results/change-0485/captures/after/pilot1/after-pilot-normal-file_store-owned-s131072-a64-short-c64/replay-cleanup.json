@@ -1,0 +1,11 @@
+{
+  "device": 66305,
+  "empty_before_removal": true,
+  "entries_before_removal": [],
+  "inode": 39646856,
+  "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/captures/after/pilot1/after-pilot-normal-file_store-owned-s131072-a64-short-c64/replay",
+  "removed": true,
+  "removed_utc": "2026-09-09T12:15:28.805810+00:00",
+  "schema": "docx-opc-splice-audit-replay-cleanup-v1",
+  "version": 1
+}

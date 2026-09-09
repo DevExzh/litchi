@@ -1,0 +1,12 @@
+test_all_frozen_0484_report_validators_and_resource_parsers (test_compare.CompareHelperTests.test_all_frozen_0484_report_validators_and_resource_parsers)
+Exercise every selected arm with both retained binary roles. ... ok
+test_artifact_hash_tamper_is_rejected (test_compare.CompareHelperTests.test_artifact_hash_tamper_is_rejected) ... ok
+test_before_after_flags_include_rss_and_zero_baseline_is_safe (test_compare.CompareHelperTests.test_before_after_flags_include_rss_and_zero_baseline_is_safe) ... ok
+test_content_identity_tamper_is_rejected (test_compare.CompareHelperTests.test_content_identity_tamper_is_rejected) ... ok
+test_frozen_matrix_cardinality_and_order (test_compare.CompareHelperTests.test_frozen_matrix_cardinality_and_order) ... ok
+test_metric_extraction_retains_samples_heap_and_rss_scope (test_compare.CompareHelperTests.test_metric_extraction_retains_samples_heap_and_rss_scope) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.294s
+
+OK

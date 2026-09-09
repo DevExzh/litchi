@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0485/fuzz-stream.py",
+    "prepare",
+    "candidate1"
+  ],
+  "attempt": "candidate1",
+  "common_sha256": "64bd433363b6d3aaefd21b9e1aade9c64dd5eab48cfa4d22cf303a88a165a5a2",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "5a23d8dcb8c4d986df5e63e9639e0b8ae25ecab70fe3652fb37ba84d5058742d",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "fuzz-prepare-candidate1",
+  "schema": "docx-stream-append-gate-v1",
+  "source_before": {
+    "files": 7157,
+    "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+    "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+  },
+  "started_utc": "2026-09-09T11:33:02.025848+00:00"
+}

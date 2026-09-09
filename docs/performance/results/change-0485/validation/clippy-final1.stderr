@@ -1,0 +1,31 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: this `let...else` may be rewritten with the `?` operator
+    --> crates/litchi-opc/src/source_backed/splice.rs:2445:9
+     |
+2445 | /         let Some(source) = self.source_snapshot else {
+2446 | |             return None;
+2447 | |         };
+     | |__________^ help: replace it with: `let source = self.source_snapshot?;`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#question_mark
+     = note: `-D clippy::question-mark` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::question_mark)]`
+
+error: redundant guard
+    --> crates/litchi-opc/src/source_backed/splice.rs:2500:34
+     |
+2500 |                 Ok(available) if available.is_empty() => Err(io::Error::new(
+     |                                  ^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_guards
+     = note: `-D clippy::redundant-guards` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::redundant_guards)]`
+help: try
+     |
+2500 -                 Ok(available) if available.is_empty() => Err(io::Error::new(
+2500 +                 Ok([]) => Err(io::Error::new(
+     |
+
+error: could not compile `litchi-opc` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib test) due to 2 previous errors

@@ -1,0 +1,145 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0485/captures/after/pilot1/after-pilot-normal-deterministic-owned-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0485/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "3",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0485/captures/after/pilot1/after-pilot-normal-deterministic-owned-s64-a64-short-c64/report.json"
+  ],
+  "arm": {
+    "authored_count": 64,
+    "chunk_mode": "64",
+    "cli_provider": "deterministic",
+    "compression": "current",
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "family": "route",
+    "id": "deterministic-owned-s64-a64-short-c64",
+    "input_backing": "owned",
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_mode": "owned",
+    "old_axis_arm": null,
+    "old_route_case": "s64-a64-short-c64",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "report_provider": "deterministic_replayable_bounded_cursor",
+    "route": "deterministic",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "text_mode": "short",
+    "workload": "s64-a64-short-c64"
+  },
+  "artifacts": {
+    "report.json": {
+      "bytes": 13613,
+      "sha256": "2b9cd1730865f6a99482a0755fece87c14ecefe66f8b854955bd592ea1736a24"
+    },
+    "resource.txt": {
+      "bytes": 1195,
+      "sha256": "72fefcec764c73adfec127d38fad551eaf46e12a1cb6355748566c9d861366e1"
+    },
+    "started.json": {
+      "bytes": 3574,
+      "sha256": "d83b6784a4e5d3e18442ce593ee76fb3ae56f3c6e68a3fcea9aeda2a440d1762"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "pilot1",
+  "binary": {
+    "bytes": 423333512,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0485/after1/normal/docx_replayable_tail_append",
+    "sha256": "fe2d708e10a9070d1223ac854901c377a5f080565653757767093640584edbec"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/build-normal.json",
+    "role": "normal",
+    "sha256": "f04a306ef192c835bd26d7b1585f8e8baedf0e0033f51e854893a5c038355ac2"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T12:14:46.526175+00:00",
+  "input_file": null,
+  "machine": {
+    "path": "machine.json",
+    "sha256": "2392c2af22b970aa712843e4ff3c02e49bc503389072d83955700d0b036ef396",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "phase": "after",
+  "protocol": {
+    "path": "comparison-protocol.json",
+    "sha256": "93e7ce28b09a70cc2ccb2b065de9073d70166783650c9777381bba7bbe0ea372"
+  },
+  "replay_dir": null,
+  "run": {
+    "arm": "deterministic-owned-s64-a64-short-c64",
+    "input_mode": "owned",
+    "kind": "pilot",
+    "label": "after-pilot-normal-deterministic-owned-s64-a64-short-c64",
+    "phase": "after",
+    "repeat": null,
+    "role": "normal",
+    "route": "deterministic",
+    "workload": "s64-a64-short-c64"
+  },
+  "schema": "docx-opc-splice-audit-comparison-capture-v1",
+  "started_utc": "2026-09-09T12:14:46.509418+00:00",
+  "status": "pass",
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "version": 1
+}

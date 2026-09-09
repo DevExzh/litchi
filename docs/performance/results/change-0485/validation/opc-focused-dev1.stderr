@@ -1,0 +1,51 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0308]: mismatched types
+    --> crates/litchi-opc/src/source_backed/splice.rs:3049:13
+     |
+3047 |         let mut reader = SpliceAuditReader::new(
+     |                          ---------------------- arguments to this function are incorrect
+3048 |             &mut source,
+3049 |             sink,
+     |             ^^^^ expected `&mut dyn Write`, found `RecordingSink`
+     |
+     = note: expected mutable reference `&mut dyn std::io::Write`
+                           found struct `RecordingSink`
+note: associated function defined here
+    --> crates/litchi-opc/src/source_backed/splice.rs:2334:8
+     |
+2334 |     fn new(
+     |        ^^^
+2335 |         source: &'source mut dyn BufRead,
+2336 |         output: &'output mut dyn Write,
+     |         ------------------------------
+help: consider mutably borrowing here
+     |
+3049 |             &mut sink,
+     |             ++++
+
+error[E0308]: mismatched types
+    --> crates/litchi-opc/src/source_backed/splice.rs:3138:13
+     |
+3136 |         let mut reader = SpliceAuditReader::new(
+     |                          ---------------------- arguments to this function are incorrect
+3137 |             &mut source,
+3138 |             sink,
+     |             ^^^^ expected `&mut dyn Write`, found `Sink`
+     |
+     = note: expected mutable reference `&mut dyn std::io::Write`
+                           found struct `std::io::Sink`
+note: associated function defined here
+    --> crates/litchi-opc/src/source_backed/splice.rs:2334:8
+     |
+2334 |     fn new(
+     |        ^^^
+2335 |         source: &'source mut dyn BufRead,
+2336 |         output: &'output mut dyn Write,
+     |         ------------------------------
+help: consider mutably borrowing here
+     |
+3138 |             &mut sink,
+     |             ++++
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-opc` (lib test) due to 2 previous errors
