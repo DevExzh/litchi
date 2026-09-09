@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "c85997bc0d93ea523731d6e7622b2300e1747255",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-xlsb/src/lib.rs": "cc48759cec7378a7c86b34f2131d72e2e941f98e29098a0c215983968abe2bdd",
+    "crates/litchi-xlsb/docs/FEATURE_MATRIX.md": "0680a094690b1fcf90fcb08e248b0a218d503996cf93d4e45496c2f1d1cdc745",
+    "crates/litchi-xlsb/src/raw/kind.rs": "de3ae5b9b46493190c3079529191590eba9145d60fac342fc36c602c6caca4b7",
+    "crates/litchi-xlsb/src/writer/workbook/codec.rs": "9ef9860ce087b7c1c0133dbf55654fbb75c14ac595b8c936e667edbf7d8876a1",
+    "crates/litchi-xlsb/src/writer/workbook/model.rs": "62376312e227bd4925ca99d82db2e2b86a4e4f604dbb617a7cd921a8dab32f19",
+    "crates/litchi-xlsb/src/writer/workbook/package.rs": "acf1f6259dd04d9bc3189a6f23defdef92f1e6b700aba2026095e8b540636f25",
+    "crates/litchi-xlsb/tests/data_model.rs": "d30365ec07d34ec5ad5e038d0b0f8aee856b1a0f3458e844031d752fa2c4313a",
+    "crates/litchi-xlsb/src/data_model/codec.rs": "f7a42c48afc8039e61476034a90545dd199d5b8d37a6d801493c38a969b2d02c",
+    "crates/litchi-xlsb/src/data_model/mod.rs": "1051c43f1cce7bbb9b17307f8a47a5dff1c6c7c29ed9d6fd244d6a316d3c4887",
+    "crates/litchi-xlsb/src/data_model/model.rs": "51d4287355bceeb924cdf4a57e410aa2ff8049da13e12fd3a239efc2551dd63f",
+    "crates/litchi-xlsb/src/data_model/package.rs": "2fc9f676e7c674d90399772c5541a13acace20277751005ed811c997084a8522",
+    "crates/litchi-xlsb/src/data_model/patch.rs": "52fca4c38d1ce463b519e1409a48705704630b4ae0d29b7943d707031dd6d97f",
+    "crates/litchi-xlsb/src/data_model/snapshot.rs": "cdf7f0f248d92a98926d3de95fd8141dc05637a2c5fb6f50cc834aafccae4448",
+    "crates/litchi-xlsb/src/data_model/transaction.rs": "5bfa4a123cdef7f2732aa7c91c3233ea98f5908403fa34007c8d803e44843567",
+    "crates/litchi-xlsb/src/data_model/workbook.rs": "93f95a9e97e688fc81b23d7c8153de74d8069895646c2c1afea1b62fbf5bc70c",
+    "crates/litchi-xlsb/src/host/connections/package.rs": "7292bfb7b0c6fe20be4732b7fdff9d0ebace1bff5a0d78f484a5198098dc0e6b"
+  },
+  "scope": "Bounded XLSB workbook Data Model records and relationship-free inert model part; source-bound Package/Workbook snapshots, transactions and reversible patches; validated Connections bindings, signed-source policy and physical URI resolution; exact content-type/relationship token restoration under propagated caller limits. Structural metadata changes that cannot prove opaque payload closure are refused. Synthetic XLSB evidence, not native producer or inner-model semantic authoring evidence.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-xlsb --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 807,
+      "tests_ignored": 1,
+      "doctests_passed": 9,
+      "doctests_ignored": 11
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-xlsb --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "d034bb19fe471fd3e76dd81c27a89f793f95fc3618061c2776f9bf1bf7f5f168",
+      "uncompressed_sha256": "2029d0e751d572117d0708d2e1a9984bf4208d5f4791e90448d684797c9de26d"
+    },
+    "clippy.log.gz": {
+      "sha256": "abecaad03134f5ab79c9efc761872dea70a9f7eb5771794ae57f04b1bc8820c0",
+      "uncompressed_sha256": "ee4e4c7e16e909aae36574506c7b92b658511eb81fd42cae5a5a99bb0d4c0710"
+    }
+  },
+  "regressions": [
+    "Typed table/relationship/time-grouping record grammar and bounded unknown-record preservation.",
+    "Load-version/payload owner changes, source-bound exact noops, stale refusal and inverse.",
+    "Signed Package/Workbook noops and changed-publication refusal.",
+    "Raw ZIP remove/save/reopen/inverse preserving noncanonical content types and explicit empty model relationships.",
+    "Content-types source larger than OPC default 8 MiB restored exactly using caller-specified 16 MiB owner limits."
+  ],
+  "limitations": [
+    "The metadata charge estimates modeled part and relationship fields; it is not a total allocation budget. OPC provenance has separate bounds.",
+    "Synthetic XLSB records/payloads do not prove native-producer compatibility.",
+    "No DAX/MDX evaluation, refresh, external access, inner-model semantic authoring, timing, throughput or total-memory improvement claim."
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

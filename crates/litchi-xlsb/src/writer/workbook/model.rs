@@ -56,6 +56,7 @@ pub struct WorkbookWriter {
     pub(super) external_links: Vec<crate::external_link::Link>,
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
     pub(super) xml_maps: Option<crate::xml_maps::XmlMapInfo>,
+    pub(super) data_model: Option<crate::data_model::Model>,
     #[cfg(feature = "vba-inspection")]
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
@@ -105,6 +106,7 @@ impl WorkbookWriter {
             external_links: Vec::new(),
             pivot_caches: Vec::new(),
             xml_maps: None,
+            data_model: None,
             #[cfg(feature = "vba-inspection")]
             vba: None,
         }
@@ -231,6 +233,12 @@ impl WorkbookWriter {
         connections: crate::package::connections::Connections,
     ) -> Result<()> {
         crate::package::connections::write::validate_connections(&connections)?;
+        if let Some(model) = self.data_model.as_ref() {
+            crate::data_model::validate_definition_connections(
+                &model.definition,
+                Some(&connections),
+            )?;
+        }
         self.connections = Some(connections);
         Ok(())
     }
@@ -292,6 +300,32 @@ impl WorkbookWriter {
     /// Compatibility alias for [`Self::clear_xml_maps`].
     pub fn clear_xml_map_info(&mut self) -> Option<crate::xml_maps::XmlMapInfo> {
         self.clear_xml_maps()
+    }
+
+    /// Attach a complete inert XLSB Data Model pair for a new workbook.
+    ///
+    /// The workbook records are validated and emitted by the BIFF12 writer;
+    /// the model part remains opaque and is never refreshed or evaluated.
+    pub fn set_data_model(&mut self, value: crate::data_model::Model) -> Result<&mut Self> {
+        crate::data_model::serialize_workbook_records(&value.definition)?;
+        if let Some(connections) = self.connections.as_ref() {
+            crate::data_model::validate_definition_connections(
+                &value.definition,
+                Some(connections),
+            )?;
+        }
+        self.data_model = Some(value);
+        Ok(self)
+    }
+
+    /// Borrow the Data Model scheduled for authoring.
+    pub fn data_model(&self) -> Option<&crate::data_model::Model> {
+        self.data_model.as_ref()
+    }
+
+    /// Remove and return the Data Model scheduled for authoring.
+    pub fn clear_data_model(&mut self) -> Option<crate::data_model::Model> {
+        self.data_model.take()
     }
 
     /// Attach a PivotCache definition (MS-XLSB 2.1.7.38) to the workbook.
