@@ -27,11 +27,14 @@ use super::integrity::{
 };
 use super::labels::{self, List};
 use litchi_ole_common::custom_xml::{Promotion, Store, inspect as inspect_custom_xml};
+use litchi_ole_common::dataspaces::{
+    MAX_STREAM_BYTES as DATASPACES_MAX_STREAM_BYTES, read_stream as read_bounded_stream,
+};
 
 const HEADER_LENGTH: u32 = 8;
 const TRANSFORM_TYPE: u32 = 1;
 const EXTENSIBILITY_HEADER_LENGTH: u32 = 4;
-const MAX_STREAM_BYTES: usize = 16 * 1024 * 1024;
+const MAX_STREAM_BYTES: usize = DATASPACES_MAX_STREAM_BYTES;
 const MAX_ENTRIES: usize = 65_536;
 const MAX_COMPONENTS: usize = MAX_ENTRIES * 8;
 const MAX_STRING_BYTES: usize = 1_048_576;
@@ -2515,14 +2518,7 @@ fn write_utf8_lpp4(output: &mut Vec<u8>, value: Option<&str>) -> Result<(), Erro
 }
 
 fn read_stream<R: Read + Seek>(ole: &mut OleFile<R>, path: &[&str]) -> Result<Vec<u8>, Error> {
-    let bytes = ole.open_stream(path)?;
-    if bytes.len() > MAX_STREAM_BYTES {
-        return Err(invalid(format!(
-            "stream '{}' exceeds {MAX_STREAM_BYTES} bytes",
-            path.join("/")
-        )));
-    }
-    Ok(bytes)
+    read_bounded_stream(ole, path).map_err(Error::Ole)
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -2550,6 +2546,10 @@ mod tests {
     }
 
     fn editable_package() -> Vec<u8> {
+        editable_package_with_extra_stream(None)
+    }
+
+    fn editable_package_with_extra_stream(extra: Option<&[u8]>) -> Vec<u8> {
         let map = write_map(&Map {
             entries: vec![MapEntry {
                 references: vec![Reference {
@@ -2634,6 +2634,19 @@ mod tests {
                 &write_transform_header(&second).unwrap(),
             )
             .unwrap();
+        if let Some(bytes) = extra {
+            writer
+                .create_stream(
+                    &[
+                        STORAGE,
+                        "TransformInfo",
+                        "FirstTransform",
+                        "OversizedOpaqueStream",
+                    ],
+                    bytes,
+                )
+                .unwrap();
+        }
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         bytes.into_inner()
@@ -3026,6 +3039,21 @@ mod tests {
         assert!(commit.patch().is_noop());
         assert_eq!(commit.snapshot(), &snapshot);
         assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
+    }
+
+    #[test]
+    fn snapshot_rejects_oversized_opaque_stream_before_materialization() {
+        let oversized = vec![0u8; MAX_STREAM_BYTES + 1];
+        let bytes = editable_package_with_extra_stream(Some(&oversized));
+        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        assert!(matches!(
+            Snapshot::from_ole(&mut ole),
+            Err(Error::Ole(OleError::LimitExceeded {
+                resource: "DataSpaces stream bytes",
+                observed,
+                maximum,
+            })) if observed == (MAX_STREAM_BYTES + 1) as u64 && maximum == MAX_STREAM_BYTES as u64
+        ));
     }
 
     #[test]
