@@ -14,7 +14,8 @@ use crate::{
     accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
     extra_fields::{ExtraFieldId, ExtraFields},
 };
-use std::io::Write;
+use flate2::{Compress, Compression, FlushCompress, Status};
+use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -779,6 +780,24 @@ where
     }
 
     fn prepare(&self, plan: &PreservationPlan) -> Result<Vec<PreparedEntry>, Error> {
+        if plan_requires_deflate_workspace(plan) {
+            let mut deflate_workspace = DeflateWorkspace::default();
+            self.prepare_with_generator(plan, |entry| {
+                generated_entry_with_workspace(entry, &mut deflate_workspace)
+            })
+        } else {
+            self.prepare_with_generator(plan, generated_entry_without_workspace)
+        }
+    }
+
+    fn prepare_with_generator<F>(
+        &self,
+        plan: &PreservationPlan,
+        mut generate: F,
+    ) -> Result<Vec<PreparedEntry>, Error>
+    where
+        F: FnMut(&RegeneratedEntry) -> Result<PreparedEntry, Error>,
+    {
         if plan.actions.len() != self.entries.len() {
             return Err(unsupported("plan does not cover every entry exactly once"));
         }
@@ -844,7 +863,7 @@ where
                         generated_payload: None,
                         omitted: false,
                     },
-                    Some(entry) => generated_entry(entry)?,
+                    Some(entry) => generate(entry)?,
                 }
             });
         }
@@ -864,7 +883,7 @@ where
             );
         }
         for entry in &plan.appended {
-            complete.push(generated_entry(entry)?);
+            complete.push(generate(entry)?);
         }
         Ok(complete)
     }
@@ -1962,6 +1981,21 @@ fn validate_prepared_local(entry: &PreparedEntry, source_end: u64) -> Result<(),
     }
 }
 
+fn plan_requires_deflate_workspace(plan: &PreservationPlan) -> bool {
+    plan.actions.iter().any(|action| match action {
+        PreservationAction::Regenerate { entry, .. } => entry_requires_deflate_workspace(entry),
+        PreservationAction::Copy(_) | PreservationAction::Omit(_) => false,
+    }) || plan.appended.iter().any(entry_requires_deflate_workspace)
+}
+
+fn entry_requires_deflate_workspace(entry: &RegeneratedEntry) -> bool {
+    entry.compression == CompressionMethod::Deflate
+        && matches!(
+            &entry.data,
+            RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_)
+        )
+}
+
 /// Select ZIP64 framing before a one-pass Deflate stream emits its local header.
 ///
 /// At the current lockfile versions (`flate2` 1.1.10 and `zlib-rs` 0.6.7), the
@@ -2008,11 +2042,282 @@ fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<
     Ok(member_bound >= zip32_boundary)
 }
 
+const DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
+
+#[derive(Debug)]
+struct DeflateWorkspace {
+    compressor: Option<Compress>,
+    output: [u8; DEFLATE_OUTPUT_BUFFER_SIZE],
+    pending_len: usize,
+}
+
+impl Default for DeflateWorkspace {
+    fn default() -> Self {
+        Self {
+            compressor: None,
+            output: [0; DEFLATE_OUTPUT_BUFFER_SIZE],
+            pending_len: 0,
+        }
+    }
+}
+
+impl DeflateWorkspace {
+    fn reset(&mut self) {
+        if let Some(compressor) = self.compressor.as_mut() {
+            compressor.reset();
+        }
+        self.pending_len = 0;
+    }
+
+    fn poison(&mut self) {
+        self.compressor = None;
+        self.pending_len = 0;
+    }
+}
+
+/// Streams raw Deflate output through the ordinary ZIP entry writer while
+/// retaining the compressor and one fixed output buffer in the operation.
+/// Feeding logical bytes through `ZipDataWriter` preserves its CRC and
+/// uncompressed-size descriptor accounting.
+struct ReusableDeflate<'workspace, 'sink, W> {
+    workspace: &'workspace mut DeflateWorkspace,
+    sink: &'sink mut W,
+    finished: bool,
+}
+
+impl<'workspace, 'sink, W: Write> ReusableDeflate<'workspace, 'sink, W> {
+    fn new(workspace: &'workspace mut DeflateWorkspace, sink: &'sink mut W) -> Self {
+        Self {
+            workspace,
+            sink,
+            finished: false,
+        }
+    }
+
+    fn compress_once(
+        &mut self,
+        input: &[u8],
+        flush: FlushCompress,
+    ) -> io::Result<(usize, usize, Status)> {
+        if self.finished {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "reusable Deflate stream already finished",
+            ));
+        }
+        let (consumed, produced, status) = {
+            let workspace = &mut *self.workspace;
+            let (compressor_slot, output) = (&mut workspace.compressor, &mut workspace.output);
+            let compressor =
+                compressor_slot.get_or_insert_with(|| Compress::new(Compression::default(), false));
+            let before_in = compressor.total_in();
+            let before_out = compressor.total_out();
+            let status = compressor
+                .compress(input, &mut output[workspace.pending_len..], flush)
+                .map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Deflate compression failed")
+                })?;
+            let consumed = usize::try_from(compressor.total_in() - before_in).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "Deflate input count overflow")
+            })?;
+            let produced = usize::try_from(compressor.total_out() - before_out).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "Deflate output count overflow")
+            })?;
+            workspace.pending_len =
+                workspace.pending_len.checked_add(produced).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Deflate output length overflow")
+                })?;
+            (consumed, produced, status)
+        };
+        Ok((consumed, produced, status))
+    }
+
+    fn dump_pending(&mut self) -> io::Result<()> {
+        if self.workspace.pending_len == 0 {
+            return Ok(());
+        }
+        self.sink
+            .write_all(&self.workspace.output[..self.workspace.pending_len])?;
+        self.workspace.pending_len = 0;
+        Ok(())
+    }
+
+    fn compressor_total_out(&mut self) -> u64 {
+        self.workspace
+            .compressor
+            .as_ref()
+            .expect("Deflate compressor initialized before total_out")
+            .total_out()
+    }
+
+    fn finish_stream_inner(&mut self) -> io::Result<()> {
+        loop {
+            self.dump_pending()?;
+            let before = self.compressor_total_out();
+            self.compress_once(&[], FlushCompress::Finish)?;
+            if before == self.compressor_total_out() {
+                self.finished = true;
+                return Ok(());
+            }
+        }
+    }
+
+    fn finish_stream(&mut self) -> io::Result<()> {
+        let result = self.finish_stream_inner();
+        if result.is_err() {
+            self.workspace.poison();
+        }
+        result
+    }
+}
+
+impl<W> Write for ReusableDeflate<'_, '_, W>
+where
+    W: Write,
+{
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let result = (|| {
+            let mut offset = 0usize;
+            while offset < buffer.len() {
+                self.dump_pending()?;
+                let (consumed, produced, status) =
+                    self.compress_once(&buffer[offset..], FlushCompress::None)?;
+                if consumed == 0 {
+                    if status == Status::StreamEnd || produced == 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::WriteZero,
+                            "Deflate stream made no progress",
+                        ));
+                    }
+                    continue;
+                }
+                offset = offset.checked_add(consumed).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Deflate input offset overflow")
+                })?;
+            }
+            Ok(buffer.len())
+        })();
+        if result.is_err() {
+            self.workspace.poison();
+        }
+        result
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let result = (|| {
+            // Match flate2's zio::Writer: the initial SYNC call appends to any
+            // output retained by the preceding write, then each subsequent
+            // call dumps the pending bytes before polling with NONE.
+            self.compress_once(&[], FlushCompress::Sync)?;
+            loop {
+                self.dump_pending()?;
+                let before = self.compressor_total_out();
+                self.compress_once(&[], FlushCompress::None)?;
+                if before == self.compressor_total_out() {
+                    break;
+                }
+            }
+            self.sink.flush()
+        })();
+        if result.is_err() {
+            self.workspace.poison();
+        }
+        result
+    }
+}
+
+fn write_generated_deflate_entry(
+    writer: &mut ZipArchiveWriter<Vec<u8>>,
+    entry: &RegeneratedEntry,
+    payload_len: usize,
+    deflate: &mut DeflateWorkspace,
+) -> Result<(), Error> {
+    let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
+    let (mut file, config) = writer
+        .new_file(&entry.name)
+        .compression_method(CompressionMethod::Deflate)
+        .zip64(zip64)
+        .start()?;
+    let result = (|| -> Result<(), Error> {
+        let descriptor = {
+            let stream = ReusableDeflate::new(deflate, &mut file);
+            let mut data_writer = config.wrap(stream);
+            data_writer.write_all(entry.data.as_slice())?;
+            let (mut stream, descriptor) = data_writer.finish()?;
+            stream.finish_stream()?;
+            descriptor
+        };
+        file.finish(descriptor)?;
+        Ok(())
+    })();
+    if result.is_ok() {
+        deflate.reset();
+    } else {
+        deflate.poison();
+    }
+    result
+}
+
+trait GeneratedDeflateWriter {
+    fn write_generated_deflate(
+        &mut self,
+        writer: &mut ZipArchiveWriter<Vec<u8>>,
+        entry: &RegeneratedEntry,
+        payload_len: usize,
+    ) -> Result<(), Error>;
+}
+
+impl GeneratedDeflateWriter for DeflateWorkspace {
+    fn write_generated_deflate(
+        &mut self,
+        writer: &mut ZipArchiveWriter<Vec<u8>>,
+        entry: &RegeneratedEntry,
+        payload_len: usize,
+    ) -> Result<(), Error> {
+        write_generated_deflate_entry(writer, entry, payload_len, self)
+    }
+}
+
+struct NoDeflateWriter;
+
+impl GeneratedDeflateWriter for NoDeflateWriter {
+    fn write_generated_deflate(
+        &mut self,
+        _writer: &mut ZipArchiveWriter<Vec<u8>>,
+        _entry: &RegeneratedEntry,
+        _payload_len: usize,
+    ) -> Result<(), Error> {
+        Err(unsupported("generated Deflate workspace was not selected"))
+    }
+}
+
+#[cfg(test)]
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
+    let mut deflate = DeflateWorkspace::default();
+    generated_entry_with_workspace(entry, &mut deflate)
+}
+
+fn generated_entry_with_workspace(
+    entry: &RegeneratedEntry,
+    deflate: &mut DeflateWorkspace,
+) -> Result<PreparedEntry, Error> {
+    generated_entry_impl(entry, deflate)
+}
+
+fn generated_entry_without_workspace(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
+    let mut deflate = NoDeflateWriter;
+    generated_entry_impl(entry, &mut deflate)
+}
+
+fn generated_entry_impl<D: GeneratedDeflateWriter>(
+    entry: &RegeneratedEntry,
+    deflate: &mut D,
+) -> Result<PreparedEntry, Error> {
     // Sized members already have their final CRC and sizes. Prepare only the
     // local/central framing at offset zero and retain the verified/shared
     // payload itself for the forward publication pass. This is the bounded
-    // passthrough path; generated Deflate below remains fully buffered.
+    // passthrough path; generated Deflate below streams through an operation-
+    // local compressor and fixed output scratch.
     let direct = match &entry.data {
         RegeneratedPayload::Precompressed(data) => {
             let kind = match data.compression_method() {
@@ -2095,23 +2400,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
                 writer.write_stored_file(&entry.name, entry.data.as_slice())?
             },
             CompressionMethod::Deflate => {
-                use flate2::Compression;
-                use flate2::write::DeflateEncoder;
-
-                // This helper remains fully buffered; the selector only establishes
-                // valid ZIP framing before the one-pass compressor starts.
-                let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
-                let (mut file, config) = writer
-                    .new_file(&entry.name)
-                    .compression_method(CompressionMethod::Deflate)
-                    .zip64(zip64)
-                    .start()?;
-                let encoder = DeflateEncoder::new(&mut file, Compression::default());
-                let mut data_writer = config.wrap(encoder);
-                data_writer.write_all(entry.data.as_slice())?;
-                let (encoder, descriptor) = data_writer.finish()?;
-                encoder.finish()?;
-                file.finish(descriptor)?;
+                deflate.write_generated_deflate(&mut writer, entry, payload_len)?;
             },
             _ => return Err(unsupported("generated compression method")),
         },
@@ -3795,6 +4084,147 @@ mod tests {
         assert_eq!(&local_bytes[range.clone()], data.as_slice());
         assert!(matches!(&prepared.central, PreparedCentral::Generated(_)));
         assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn copy_and_store_preparation_leave_deflate_workspace_uninitialized() {
+        let source = ordinary_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let copy_plan = PreservationPlan::copy_all(&index);
+        assert!(!plan_requires_deflate_workspace(&copy_plan));
+        index.prepare(&copy_plan).unwrap();
+
+        let mut store_plan = PreservationPlan::copy_all(&index);
+        let stored =
+            RegeneratedEntry::new_shared("stored.bin", Arc::new(b"stored payload".to_vec()));
+        store_plan.try_append(stored.clone()).unwrap();
+        assert!(!plan_requires_deflate_workspace(&store_plan));
+        generated_entry_without_workspace(&stored).unwrap();
+        index.prepare(&store_plan).unwrap();
+    }
+
+    fn fresh_generated_deflate_archive(name: &str, data: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let zip64 = generated_deflate_needs_zip64(data.len(), name.len()).unwrap();
+        let (mut file, config) = writer
+            .new_file(name)
+            .compression_method(CompressionMethod::Deflate)
+            .zip64(zip64)
+            .start()
+            .unwrap();
+        let encoder = DeflateEncoder::new(&mut file, Compression::default());
+        let mut data_writer = config.wrap(encoder);
+        data_writer.write_all(data).unwrap();
+        let (encoder, descriptor) = data_writer.finish().unwrap();
+        encoder.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn generated_archive(prepared: &PreparedEntry) -> &[u8] {
+        let PreparedLocal::Shared { bytes, .. } = &prepared.local else {
+            panic!("generated Deflate entry should retain one archive buffer");
+        };
+        bytes
+    }
+
+    #[test]
+    fn reused_deflate_state_matches_fresh_streams_for_mixed_payloads() {
+        let mut payloads = vec![
+            Vec::new(),
+            vec![0x5a],
+            b"small repeated payload".repeat(17),
+            (0..256 * 1024)
+                .map(|index| u8::try_from(index % 251).unwrap())
+                .collect(),
+        ];
+        let mut state = 0x1234_5678_u32;
+        for length in [
+            32 * 1024 - 1,
+            32 * 1024,
+            32 * 1024 + 1,
+            64 * 1024 - 1,
+            64 * 1024,
+            64 * 1024 + 1,
+        ] {
+            let mut payload = Vec::with_capacity(length);
+            for _ in 0..length {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                payload.push((state >> 24) as u8);
+            }
+            payloads.push(payload);
+        }
+        // Exercise reset after a large member and the empty-stream flush path.
+        payloads.extend([Vec::new(), Vec::new()]);
+        let mut workspace = DeflateWorkspace::default();
+        for (index, payload) in payloads.iter().enumerate() {
+            let name = format!("mixed-{index}.bin");
+            let entry = RegeneratedEntry::new_shared(&name, Arc::new(payload.clone()))
+                .compression_method(CompressionMethod::Deflate);
+            let prepared = generated_entry_with_workspace(&entry, &mut workspace).unwrap();
+            let reused = generated_archive(&prepared);
+            let fresh = fresh_generated_deflate_archive(&name, payload);
+            assert_eq!(
+                reused,
+                fresh.as_slice(),
+                "reused Deflate output changed for payload {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn reused_deflate_empty_flush_before_finish_matches_fresh_stream() {
+        let mut reused = Vec::new();
+        let mut workspace = DeflateWorkspace::default();
+        {
+            let mut stream = ReusableDeflate::new(&mut workspace, &mut reused);
+            stream.flush().unwrap();
+            stream.finish_stream().unwrap();
+        }
+
+        let mut fresh = Vec::new();
+        let mut encoder = DeflateEncoder::new(&mut fresh, Compression::default());
+        encoder.flush().unwrap();
+        encoder.finish().unwrap();
+        assert_eq!(reused, fresh);
+    }
+
+    #[test]
+    fn failed_reused_deflate_stream_is_discarded_before_retry() {
+        let payload = b"partial stream must not be reused".repeat(4096);
+
+        #[derive(Debug)]
+        struct FailingSink;
+
+        impl Write for FailingSink {
+            fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+                Err(io::Error::new(io::ErrorKind::Other, "test stream failure"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Err(io::Error::new(io::ErrorKind::Other, "test stream failure"))
+            }
+        }
+
+        let mut workspace = DeflateWorkspace::default();
+        {
+            let mut sink = FailingSink;
+            let mut stream = ReusableDeflate::new(&mut workspace, &mut sink);
+            let failed = match stream.write_all(&payload) {
+                Err(error) => error,
+                Ok(()) => stream.finish_stream().unwrap_err(),
+            };
+            assert_eq!(failed.kind(), io::ErrorKind::Other);
+        }
+        assert!(workspace.compressor.is_none());
+
+        let entry = RegeneratedEntry::new_shared("retry.bin", Arc::new(payload.clone()))
+            .compression_method(CompressionMethod::Deflate);
+        let reused = generated_entry_with_workspace(&entry, &mut workspace).unwrap();
+        let fresh = generated_entry(&entry).unwrap();
+        assert_eq!(generated_archive(&reused), generated_archive(&fresh));
     }
 
     #[test]
