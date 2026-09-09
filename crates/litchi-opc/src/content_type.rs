@@ -73,6 +73,10 @@ impl ContentTypeMap {
         }
     }
 
+    pub(crate) fn mapping_count(&self) -> usize {
+        self.defaults.len().saturating_add(self.overrides.len())
+    }
+
     pub(crate) fn from_xml(xml: &[u8], limits: ReadLimits) -> Result<Self> {
         limits.check(
             ReadResource::ContentTypesBytes,
