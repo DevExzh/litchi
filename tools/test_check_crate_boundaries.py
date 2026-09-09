@@ -876,6 +876,52 @@ def add_iwa_common_formula_render_ownership_scaffold(
         path.write_text(reader, encoding="utf-8")
 
 
+def add_iwa_numbers_wire_formula_render_scaffold(
+    root: Path,
+    *,
+    wire_source: str | None = None,
+    reader_suffix: str = "",
+) -> None:
+    """Install the low-level formula owner and migrated reader adapters."""
+
+    wire = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE
+    wire.parent.mkdir(parents=True, exist_ok=True)
+    wire.write_text(
+        wire_source
+        if wire_source is not None
+        else (
+            "use litchi_iwa_common::formula::render::{FormulaExpr, "
+            "FormulaRenderBudget, FormulaRenderer};\n"
+            "use litchi_iwa_protos::numbers_formula_codec;\n"
+            "pub trait FormulaEventRenderBudget: FormulaRenderBudget {}\n"
+            "pub trait ReferenceResolver {}\n"
+            "pub fn render_scalar_formula_nodes() {}\n"
+            "pub struct CompatibilityFormulaVisitor;\n"
+            "pub struct FormulaRenderCodecVisitor;\n"
+            "impl numbers_formula_codec::FormulaRenderVisitor "
+            "for FormulaRenderCodecVisitor {}\n"
+            "fn render_arena(_: FormulaExpr, _: FormulaRenderer) {}\n"
+        ),
+        encoding="utf-8",
+    )
+    reader = (
+        "use litchi_numbers_wire::formula_render::{"
+        "CompatibilityFormulaVisitor, FormulaRenderCodecVisitor, "
+        "FormulaEventRenderBudget, ReferenceResolver, "
+        "render_scalar_formula_nodes};\n"
+        "fn preflight_formula_archive_envelope() {}\n"
+        "fn decode_formula_archive_with_visitor() {}\n"
+        "fn decode_formula_archive_for_render() {}\n"
+        "fn charge_formula_wire() {}\n"
+        "fn charge_formula_render_work() {}\n"
+        + reader_suffix
+    )
+    for relative in boundaries.IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reader, encoding="utf-8")
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -7652,7 +7698,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 238)
+        self.assertEqual(len(all_policy_edges), 239)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
@@ -27112,6 +27158,124 @@ fn rewrite_movie_title_operation(
                     violations = boundaries.audit_iwa_common_formula_render_ownership(root)
                     self.assertEqual(len(violations), 1)
                     self.assertIn("format/protobuf owner", violations[0])
+
+    def test_iwa_numbers_wire_formula_render_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_render_owner_requires_shared_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(
+                root,
+                wire_source="pub struct FormulaRenderCodecVisitor;\n",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                root
+            )
+            self.assertEqual(
+                len(violations),
+                len(boundaries.IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS) + 1,
+            )
+            for marker in boundaries.IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS:
+                if marker == "FormulaRenderCodecVisitor":
+                    continue
+                self.assertTrue(any(marker in item for item in violations), marker)
+            self.assertTrue(any("common expression arena import" in item for item in violations))
+            self.assertTrue(any("sanctioned generated codec import" in item for item in violations))
+
+    def test_iwa_numbers_wire_formula_render_owner_rejects_duplicate_reader_routes(
+        self,
+    ) -> None:
+        duplicate_sources = {
+            "visitor": "struct CompatibilityFormulaVisitor;\n",
+            "codec": "type FormulaRenderCodecVisitor = ();\n",
+            "dispatch": (
+                "impl numbers_formula_codec::FormulaRenderVisitor "
+                "for CompatibilityFormulaVisitor {}\n"
+            ),
+            "scalar": "fn render_scalar_formula_nodes() {}\n",
+        }
+        for label, duplicate in duplicate_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_formula_render_scaffold(
+                        root,
+                        reader_suffix=duplicate,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                        root
+                    )
+                    self.assertEqual(len(violations), 2)
+                    self.assertTrue(
+                        all("redeclares the Numbers wire owner" in item for item in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_formula_render_owner_masks_test_only_duplicates(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(
+                root,
+                reader_suffix=(
+                    "#[cfg(test)]\n"
+                    "struct CompatibilityFormulaVisitor;\n"
+                    "#[cfg(test)]\n"
+                    "impl numbers_formula_codec::FormulaRenderVisitor "
+                    "for CompatibilityFormulaVisitor {}\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_render_owner_requires_reader_import(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::formula_render::{"
+                    "CompatibilityFormulaVisitor, FormulaRenderCodecVisitor, "
+                    "FormulaEventRenderBudget, ReferenceResolver, "
+                    "render_scalar_formula_nodes};\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("missing the Numbers wire owner import", violations[0])
+
+    def test_iwa_numbers_wire_formula_render_owner_allows_retired_reader_source(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(root)
+            (root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
 
     def test_iwa_numbers_formula_table_requires_real_adapter_use(
         self,

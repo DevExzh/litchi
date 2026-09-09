@@ -14,6 +14,12 @@ pub mod popup_menu;
 /// Borrowed parser for legacy pre-BNC Numbers cell storage.
 pub mod pre_bnc;
 
+/// Shared generated-free Numbers formula event renderer.
+pub mod formula_render;
+
+/// Shared native Numbers formula function-token registry.
+pub mod function_map;
+
 use std::collections::BTreeMap;
 
 use std::fmt;

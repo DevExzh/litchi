@@ -1,0 +1,31 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "file": "formula-events-native.numbers",
+  "size": 104679,
+  "sha256": "d826007f816e2feca7d688f1d73b36e70688538c5eb3ab435e3e8c5429d209b3",
+  "source": "formula-arena-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 4,
+  "columns": 3,
+  "formulas": {
+    "B4": {
+      "input": "=\"Café\"&\"北京\"",
+      "native_display": "Café北京"
+    },
+    "C4": {
+      "input": "=SUM(B2:C2)",
+      "native_display": "48.5"
+    }
+  },
+  "lifecycle": [
+    "Copied the formula arena native control into a disposable directory.",
+    "Pasted a range-reference formula and a Unicode concatenation formula through Numbers UI.",
+    "Saved and closed the actual document window.",
+    "Reopened the exact saved path with Open Finder item; accessibility confirmed results Café北京 and 48.5, with existing results 6 and 北京 preserved.",
+    "Closed to the template chooser."
+  ],
+  "scope": "Native range-reference and Unicode concatenation formula save/close/reopen control; synthetic tests cover broader native event and refusal behavior."
+}

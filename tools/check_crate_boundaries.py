@@ -13353,12 +13353,72 @@ IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS = (
     "charge_formula_wire",
     "charge_formula_render_work",
 )
+# Wave108 gives the generated-free formula event visitor a low-level home in
+# ``litchi-numbers-wire``.  The wire crate is allowed to depend on the
+# generated Numbers codec because it is the codec's immediate adapter; format
+# readers must consume this semantic owner instead of carrying another event
+# visitor or scalar expression walk.  Keep this ratchet independent from the
+# legacy host renderer audit above: the host still owns archive admission and
+# decoder-report charging while the shared visitor migrates out.
+IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/formula_render.rs"
+)
+IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS = (
+    "FormulaEventRenderBudget",
+    "ReferenceResolver",
+    "render_scalar_formula_nodes",
+    "CompatibilityFormulaVisitor",
+    "FormulaRenderCodecVisitor",
+    "FormulaRenderVisitor",
+)
+IWA_NUMBERS_WIRE_FORMULA_RENDER_COMMON_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*formula"
+    r"[ \t\r\n]*::[ \t\r\n]*render\b"
+)
+IWA_NUMBERS_WIRE_FORMULA_RENDER_PROTOS_IMPORT = re.compile(
+    r"\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*"
+    r"numbers_formula_codec\b"
+)
+IWA_FORMULA_RENDER_WIRE_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*formula_render\b"
+)
+IWA_FORMULA_RENDER_LOCAL_VISITOR_DECLARATIONS = (
+    (
+        "CompatibilityFormulaVisitor",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?CompatibilityFormulaVisitor\b"
+        ),
+    ),
+    (
+        "FormulaRenderCodecVisitor",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?FormulaRenderCodecVisitor\b"
+        ),
+    ),
+    (
+        "FormulaRenderVisitor implementation",
+        re.compile(
+            r"(?ms)^[ \t]*impl\b[^{};]*\bFormulaRenderVisitor\b"
+        ),
+    ),
+    (
+        "render_scalar_formula_nodes helper",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?render_scalar_formula_nodes\b"
+        ),
+    ),
+)
 # Wave107 moves the allocation-conscious expression arena out of both format
-# readers.  The readers retain their format-specific wire visitors and budget
-# adapters, while the archive-free common renderer owns the handles, nodes,
-# parts, and iterative output walk.  Keep this audit separate from the older
-# generated-free FormulaArchive ratchet above: a reader may still mention the
-# generated-free codec's FormulaNode event type without owning a second arena.
+# readers.  The readers retain only their format-specific budget adapters,
+# while the archive-free common renderer owns the handles, nodes, parts, and
+# iterative output walk.  Keep this audit separate from the older generated-
+# free FormulaArchive ratchet above: a reader may still mention the codec's
+# FormulaNode type without owning a second arena.
 IWA_COMMON_FORMULA_RENDER_SOURCE = Path(
     "crates/litchi-iwa-common/src/formula/render.rs"
 )
@@ -13431,8 +13491,9 @@ IWA_FORMULA_RENDER_READER_SOURCES = (
     NUMBERS_EXTRACTOR_SOURCE,
 )
 IWA_FORMULA_RENDER_COMMON_IMPORT = re.compile(
-    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*formula"
-    r"[ \t\r\n]*::[ \t\r\n]*render\b"
+    r"\b(?:litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*formula"
+    r"[ \t\r\n]*::[ \t\r\n]*render|"
+    r"litchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*formula_render)\b"
 )
 IWA_FORMULA_RENDER_LOCAL_ARENA_DECLARATIONS = (
     (
@@ -45033,10 +45094,11 @@ def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
 
     The adapter is intentionally split between ``table_extractor.rs`` and
     ``formula_renderer.rs``.  The table extractor owns the import and budget
-    hand-off, while the renderer owns the bounded byte retention, preflight,
-    and neutral ``numbers_formula_codec`` visitors.  Inventory both files so
-    a migration cannot satisfy the ratchet with a marker-only import in the
-    wrong file.
+    hand-off, while the renderer owns bounded byte retention, preflight, and
+    decoder-report charging.  Semantic event visitors live in the
+    low-level ``litchi-numbers-wire`` owner audited separately.  Inventory
+    both files so a migration cannot satisfy the ratchet with a marker-only
+    import in the wrong file.
 
     ``litchi-iwa`` still owns unrelated generated TST/TSCE compatibility
     readers, so the forbidden vocabulary is limited to the FormulaArchive
@@ -45110,16 +45172,85 @@ def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_wire_formula_render_ownership(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Numbers formula event rendering in the low-level wire owner.
+
+    ``litchi-numbers-wire`` is the one sanctioned bridge between the generated
+    Numbers formula codec and the shared, archive-free expression arena.  The
+    host and focused readers continue to retain bounded archive admission and
+    decoder report charging, but their semantic event visitor and scalar
+    expression walk must be delegated to the wire module.  Missing reader
+    files are accepted so the ratchet survives the eventual monolith exit;
+    any reader that remains is checked strictly after test-only items and
+    non-code have been masked.
+    """
+
+    violations: list[str] = []
+    wire_path = root / IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE
+    if not wire_path.is_file():
+        return [
+            "Numbers wire formula renderer owner is missing: "
+            f"{IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE}"
+        ]
+
+    wire_raw = wire_path.read_text(encoding="utf-8")
+    wire_code = _mask_rust_non_code(_mask_rust_cfg_test_items(wire_raw))
+    for marker in IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", wire_code) is None:
+            violations.append(
+                "Numbers wire formula renderer is missing shared "
+                f"{marker} route: {IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE}"
+            )
+    if IWA_NUMBERS_WIRE_FORMULA_RENDER_COMMON_IMPORT.search(wire_code) is None:
+        violations.append(
+            "Numbers wire formula renderer is missing the common expression "
+            f"arena import: {IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_FORMULA_RENDER_PROTOS_IMPORT.search(wire_code) is None:
+        violations.append(
+            "Numbers wire formula renderer is missing its sanctioned generated "
+            "codec import: "
+            f"{IWA_NUMBERS_WIRE_FORMULA_RENDER_SOURCE}"
+        )
+
+    for relative in IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            # The old host reader is allowed to disappear when its callers
+            # have moved to the focused package.  A present file must still
+            # delegate so a stale copy cannot quietly return later.
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+        if IWA_FORMULA_RENDER_WIRE_IMPORT.search(production_code) is None:
+            violations.append(
+                "formula renderer reader is missing the Numbers wire owner "
+                f"import: {relative}"
+            )
+        for label, declaration in IWA_FORMULA_RENDER_LOCAL_VISITOR_DECLARATIONS:
+            for match in declaration.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "formula renderer reader redeclares the Numbers wire "
+                    f"owner {label}: {relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_common_formula_render_ownership(
     root: Path = ROOT,
 ) -> list[str]:
     """Keep the shared formula arena independent and singular.
 
-    Format readers retain their wire visitors and adapt their own budget/error
-    types through ``FormulaRenderBudget``.  The archive-free common module is
-    the only owner of the expression handles and renderer arena.  This audit
-    deliberately checks declarations and import boundaries rather than
-    private field names, so a storage optimization can evolve without
+    The archive-free common module is the only owner of the expression handles
+    and renderer arena.  Readers may reach it directly while the migration is
+    staged, or through the low-level ``litchi-numbers-wire`` formula adapter;
+    the companion wire audit checks that the latter owns the event visitor.
+    This audit deliberately checks declarations and import boundaries rather
+    than private field names, so a storage optimization can evolve without
     weakening the ownership rule.
     """
 
@@ -69099,6 +69230,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
+        + audit_iwa_numbers_wire_formula_render_ownership()
         + audit_iwa_common_formula_render_ownership()
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()

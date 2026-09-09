@@ -32,7 +32,9 @@ use crate::cell::Value as CellValue;
 use crate::cell::wire::{BncCellView, CachedScalar, StoredValue};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
-use litchi_iwa_common::formula::render::{FormulaExpr, FormulaRenderBudget, FormulaRenderer};
+use litchi_iwa_common::formula::render::FormulaRenderBudget;
+#[cfg(test)]
+use litchi_iwa_common::formula::render::{FormulaExpr, FormulaRenderer};
 use litchi_iwa_common::wire::{
     WireDescent, parse_wire_view_with_limits, preflight_wire_tree_with_limits,
 };
@@ -43,12 +45,17 @@ use litchi_iwa_protos::table_info_codec;
 #[cfg(test)]
 use litchi_iwa_protos::tsce;
 use litchi_iwa_protos::{numbers_formula_codec, numbers_table_cell_storage_codec, tst};
+use litchi_numbers_wire::formula_render::{
+    self as shared_formula_render, FormulaCategoryId, FormulaEventRenderBudget,
+    FormulaRenderCodecVisitor, FormulaTablePrefix, ReferenceResolver,
+};
 use litchi_numbers_wire::pre_bnc::PreBncCellView;
 #[cfg(test)]
 use prost::Message as _;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
 use std::fmt::Write as _;
 use std::sync::Arc;
 
@@ -4441,6 +4448,7 @@ impl<'a> TableDataExtractor<'a> {
                 host_column,
                 row_count,
                 column_count,
+                formula_references,
                 projection_budget,
             )?
         {
@@ -6113,6 +6121,44 @@ impl FormulaRenderBudget for ProjectionBudget {
     }
 }
 
+impl FormulaEventRenderBudget for ProjectionBudget {
+    fn check_render_depth(&self, depth: usize) -> std::result::Result<(), Self::Error> {
+        self.check_formula_render_depth(depth)
+    }
+
+    fn parse_error(&self, message: String) -> Self::Error {
+        Error::ParseError(message)
+    }
+
+    fn invalid_format(&self, message: String) -> Self::Error {
+        Error::InvalidFormat(message)
+    }
+}
+
+impl ReferenceResolver for FormulaReferenceMaps {
+    fn table_prefix(
+        &self,
+        id: &numbers_formula_codec::FormulaRenderCfuuid,
+    ) -> Option<FormulaTablePrefix<'_>> {
+        let key = [id.word0?, id.word1?, id.word2?, id.word3?];
+        let name = self.owners.get(&key)?;
+        Some(FormulaTablePrefix {
+            sheet: name.sheet.as_str(),
+            table: name.table.as_str(),
+        })
+    }
+
+    fn category_name(&self, id: FormulaCategoryId) -> Option<&str> {
+        self.categories
+            .get(&[id.lower, id.upper])
+            .map(String::as_str)
+    }
+
+    fn function_name(&self, index: u32) -> Option<&str> {
+        super::function_map::function_name(index)
+    }
+}
+
 /// Compact source-order node sink used for the scalar generated-free formula
 /// subset. The node vector is bounded by the exact wire-preflight node count;
 /// no generated repeated-message tree is retained on this route.
@@ -6173,6 +6219,7 @@ fn render_scalar_formula(
     host_column: usize,
     row_count: usize,
     column_count: usize,
+    formula_references: &FormulaReferenceMaps,
     budget: &mut ProjectionBudget,
 ) -> Result<Option<String>> {
     let owner = 1;
@@ -6245,130 +6292,11 @@ fn render_scalar_formula(
         return Ok(None);
     }
     debug_assert_eq!(report.node_count(), formula.scalar_visitor_node_count);
-    Ok(Some(render_scalar_formula_nodes(&visitor.nodes, budget)?))
-}
-
-fn render_scalar_formula_nodes(
-    nodes: &[numbers_formula_codec::FormulaNode],
-    budget: &mut ProjectionBudget,
-) -> Result<String> {
-    if nodes.is_empty() {
-        return retain_text("=", budget);
-    }
-    let mut renderer = FormulaRenderer::default();
-    let mut stack = Vec::new();
-    stack
-        .try_reserve_exact(nodes.len())
-        .map_err(|_| allocation_error("Numbers scalar formula expression stack", nodes.len()))?;
-    for node in nodes {
-        use numbers_formula_codec::{BinaryOperator, FormulaNode};
-        let expression = match *node {
-            FormulaNode::Binary(operator) => {
-                let (symbol, operation) = match operator {
-                    BinaryOperator::Add => ("+", "addition"),
-                    BinaryOperator::Subtract => ("-", "subtraction"),
-                    BinaryOperator::Multiply => ("*", "multiplication"),
-                    BinaryOperator::Divide => ("/", "division"),
-                    BinaryOperator::Power => ("^", "power"),
-                    BinaryOperator::Concatenate => ("&", "concatenation"),
-                    BinaryOperator::GreaterThan => (">", "greater than"),
-                    BinaryOperator::GreaterThanOrEqual => (">=", "greater than or equal"),
-                    BinaryOperator::LessThan => ("<", "less than"),
-                    BinaryOperator::LessThanOrEqual => ("<=", "less than or equal"),
-                    BinaryOperator::Equal => ("=", "equality"),
-                    BinaryOperator::NotEqual => ("<>", "inequality"),
-                };
-                Some(render_binary(
-                    &mut stack,
-                    &mut renderer,
-                    symbol,
-                    operation,
-                    true,
-                    budget,
-                )?)
-            },
-            FormulaNode::Negation => stack
-                .pop()
-                .map(|operand| renderer.unary("-(", operand, ")", budget))
-                .transpose()?,
-            FormulaNode::Percent => {
-                let operand = stack.pop().ok_or_else(|| {
-                    Error::ParseError(
-                        "Numbers formula percent operator is missing an operand".to_owned(),
-                    )
-                })?;
-                Some(renderer.unary("(", operand, ")%", budget)?)
-            },
-            FormulaNode::Function {
-                identifier,
-                argument_count,
-            } => {
-                let arguments = pop_formula_arguments(&mut stack, argument_count, "function")?;
-                Some(renderer.comma_joined(
-                    Some(fallible_function_name(identifier, &renderer, budget)?),
-                    arguments,
-                    "(",
-                    ")",
-                    budget,
-                )?)
-            },
-            FormulaNode::Number { bits } => {
-                let value = fallible_formula_display(f64::from_bits(bits), &renderer, budget)?;
-                Some(renderer.owned_expr(value, budget)?)
-            },
-            FormulaNode::Boolean(value) | FormulaNode::Token(value) => {
-                Some(renderer.static_expr(if value { "TRUE" } else { "FALSE" }, budget)?)
-            },
-            FormulaNode::Empty => Some(renderer.static_expr("", budget)?),
-            FormulaNode::LocalCell {
-                coordinate,
-                row_is_sticky,
-                column_is_sticky,
-            } => {
-                let column = FormulaColumn(coordinate.column());
-                let row = checked_formula_row_number(coordinate.row())?;
-                let value = fallible_formula_format(&renderer, budget, |output| {
-                    write!(
-                        output,
-                        "{}{column}{}{row}",
-                        if column_is_sticky != 0 { "$" } else { "" },
-                        if row_is_sticky != 0 { "$" } else { "" },
-                    )
-                })?;
-                Some(renderer.owned_expr(value, budget)?)
-            },
-            FormulaNode::Colon | FormulaNode::ColonWithUids => Some(render_binary(
-                &mut stack,
-                &mut renderer,
-                ":",
-                "range",
-                false,
-                budget,
-            )?),
-            FormulaNode::PlusSign
-            | FormulaNode::AppendWhitespace
-            | FormulaNode::PrependWhitespace => None,
-            FormulaNode::LocalCellReference { .. }
-            | FormulaNode::LocalRange { .. }
-            | FormulaNode::CellReference { .. }
-            | FormulaNode::ResolvedCellReference { .. }
-            | FormulaNode::ResolvedRange { .. } => {
-                return Err(Error::InvalidFormat(
-                    "Numbers scalar formula visitor received an owner-bearing node".to_owned(),
-                ));
-            },
-        };
-        if let Some(expression) = expression {
-            stack.push(expression);
-        }
-    }
-    let Some(root) = stack.pop() else {
-        // Keep parity with the historical compatibility renderer: an archive
-        // containing only ignored postfix markers (or a missing negation
-        // operand) falls through to its FORMULA() placeholder.
-        return retain_text("=FORMULA()", budget);
-    };
-    renderer.render(root, budget)
+    Ok(Some(shared_formula_render::render_scalar_formula_nodes(
+        &visitor.nodes,
+        formula_references,
+        budget,
+    )?))
 }
 
 fn render_formula_compatibility(
@@ -6390,7 +6318,7 @@ fn render_formula_compatibility(
     let columns = u32::try_from(column_count)
         .map_err(|_| Error::ParseError("Numbers formula column count exceeds u32".to_owned()))?;
     // Keep raw wire recursion independent from the semantic AST depth. The
-    // codec validates the former while the visitor enforces the latter.
+    // codec validates the former while the shared visitor enforces the latter.
     let raw_depth = u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX);
     let render_depth = u32::try_from(budget.max_formula_render_depth).unwrap_or(u32::MAX);
     let max_fields = budget.remaining_payload_fields();
@@ -6409,7 +6337,7 @@ fn render_formula_compatibility(
     let context =
         numbers_formula_codec::FormulaContext::new(owner, host_row, host_column, rows, columns);
     let mut visitor =
-        CompatibilityFormulaVisitor::new(host_row, host_column, formula_references, budget);
+        FormulaRenderCodecVisitor::new(host_row, host_column, formula_references, budget);
     let decoded = numbers_formula_codec::decode_formula_archive_for_render(
         formula.bytes.as_ref(),
         context,
@@ -6420,13 +6348,12 @@ fn render_formula_compatibility(
         Ok(report) => report,
         Err(error) => {
             return Err(visitor
-                .error
-                .take()
+                .take_error()
                 .unwrap_or_else(|| map_formula_render_decode_error(error)));
         },
     };
-    visitor.budget.charge_formula_decode_report(report)?;
-    if let Some(error) = visitor.error.take() {
+    visitor.budget_mut().charge_formula_decode_report(report)?;
+    if let Some(error) = visitor.take_error() {
         return Err(error);
     }
     debug_assert_eq!(report.node_count(), formula.scalar_visitor_node_count);
@@ -6478,698 +6405,6 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
         None => Error::MalformedPayload {
             path: SemanticPath::StructuredTables,
         },
-    }
-}
-
-struct CompatibilityFormulaArray {
-    expressions: Vec<FormulaExpr>,
-    had_node: bool,
-    is_thunk: bool,
-}
-
-struct CompatibilityFormulaVisitor<'references, 'budget> {
-    host_row: u32,
-    host_column: u32,
-    formula_references: &'references FormulaReferenceMaps,
-    budget: &'budget mut ProjectionBudget,
-    renderer: FormulaRenderer,
-    arrays: Vec<CompatibilityFormulaArray>,
-    root_expression: Option<FormulaExpr>,
-    pending_thunk: bool,
-    error: Option<Error>,
-}
-
-impl<'references, 'budget> CompatibilityFormulaVisitor<'references, 'budget> {
-    fn new(
-        host_row: u32,
-        host_column: u32,
-        formula_references: &'references FormulaReferenceMaps,
-        budget: &'budget mut ProjectionBudget,
-    ) -> Self {
-        Self {
-            host_row,
-            host_column,
-            formula_references,
-            budget,
-            renderer: FormulaRenderer::default(),
-            arrays: Vec::new(),
-            root_expression: None,
-            pending_thunk: false,
-            error: None,
-        }
-    }
-
-    fn fail(&mut self, error: Error) -> numbers_formula_codec::DecodeError {
-        self.error = Some(error);
-        numbers_formula_codec::DecodeError::allocation(0)
-    }
-
-    fn current_array_mut(&mut self) -> std::result::Result<&mut CompatibilityFormulaArray, Error> {
-        self.arrays.last_mut().ok_or_else(|| {
-            Error::ParseError("Numbers formula event stream has no active array".to_owned())
-        })
-    }
-
-    fn mark_node(&mut self) -> std::result::Result<(), Error> {
-        self.current_array_mut()?.had_node = true;
-        Ok(())
-    }
-
-    fn push_expression(&mut self, expression: FormulaExpr) -> std::result::Result<(), Error> {
-        let array = self.current_array_mut()?;
-        array.expressions.try_reserve(1).map_err(|_error| {
-            allocation_error(
-                "Numbers formula compatibility expression stack",
-                array.expressions.len().saturating_add(1),
-            )
-        })?;
-        array.expressions.push(expression);
-        Ok(())
-    }
-
-    fn pop_binary(
-        &mut self,
-        operation: &str,
-    ) -> std::result::Result<(FormulaExpr, FormulaExpr), Error> {
-        let array = self.current_array_mut()?;
-        pop_binary_operands(&mut array.expressions, operation)
-    }
-
-    fn pop_arguments(
-        &mut self,
-        count: u32,
-        node_kind: &str,
-    ) -> std::result::Result<Vec<FormulaExpr>, Error> {
-        let array = self.current_array_mut()?;
-        pop_formula_arguments(&mut array.expressions, count, node_kind)
-    }
-
-    fn begin_array(&mut self, depth: u32) -> std::result::Result<(), Error> {
-        // The codec reports logical AST-array depth (root = 1, each thunk
-        // adds one). Check that depth directly so the package limit remains
-        // identical to the legacy renderer's semantic recursion bound.
-        let semantic_depth = usize::try_from(depth).unwrap_or(usize::MAX);
-        self.budget.check_formula_render_depth(semantic_depth)?;
-        let is_thunk = self.pending_thunk;
-        self.pending_thunk = false;
-        self.arrays.try_reserve(1).map_err(|_error| {
-            allocation_error(
-                "Numbers formula compatibility arrays",
-                self.arrays.len().saturating_add(1),
-            )
-        })?;
-        self.arrays.push(CompatibilityFormulaArray {
-            expressions: Vec::new(),
-            had_node: false,
-            is_thunk,
-        });
-        Ok(())
-    }
-
-    fn end_array(&mut self) -> std::result::Result<(), Error> {
-        let array = self.arrays.pop().ok_or_else(|| {
-            Error::ParseError("Numbers formula event stream ended an inactive array".to_owned())
-        })?;
-        let expression = if let Some(expression) = array.expressions.last().copied() {
-            expression
-        } else if array.is_thunk {
-            self.renderer
-                .static_expr(if array.had_node { "FORMULA()" } else { "" }, self.budget)?
-        } else if array.had_node {
-            self.renderer.static_expr("FORMULA()", self.budget)?
-        } else {
-            // The root empty archive is handled by `finish`; retaining no
-            // expression here preserves the legacy decoder's `=` result.
-            return Ok(());
-        };
-        if self.arrays.is_empty() {
-            self.root_expression = Some(expression);
-        } else if array.is_thunk {
-            self.push_expression(expression)?;
-        } else {
-            return Err(Error::ParseError(
-                "Numbers formula event stream nested an unexpected array".to_owned(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn render_event(
-        &mut self,
-        event: numbers_formula_codec::FormulaRenderEvent<'_>,
-    ) -> std::result::Result<Option<FormulaExpr>, Error> {
-        use numbers_formula_codec::{BinaryOperator, FormulaRenderEvent};
-        let expression = match event {
-            FormulaRenderEvent::Binary(operator) => {
-                let (symbol, operation) = match operator {
-                    BinaryOperator::Add => ("+", "addition"),
-                    BinaryOperator::Subtract => ("-", "subtraction"),
-                    BinaryOperator::Multiply => ("*", "multiplication"),
-                    BinaryOperator::Divide => ("/", "division"),
-                    BinaryOperator::Power => ("^", "power"),
-                    BinaryOperator::Concatenate => ("&", "concatenation"),
-                    BinaryOperator::GreaterThan => (">", "greater than"),
-                    BinaryOperator::GreaterThanOrEqual => (">=", "greater than or equal"),
-                    BinaryOperator::LessThan => ("<", "less than"),
-                    BinaryOperator::LessThanOrEqual => ("<=", "less than or equal"),
-                    BinaryOperator::Equal => ("=", "equality"),
-                    BinaryOperator::NotEqual => ("<>", "inequality"),
-                };
-                let (left, right) = self.pop_binary(operation)?;
-                Some(
-                    self.renderer
-                        .binary(left, symbol, right, true, self.budget)?,
-                )
-            },
-            FormulaRenderEvent::Negation => self
-                .current_array_mut()?
-                .expressions
-                .pop()
-                .map(|operand| self.renderer.unary("-(", operand, ")", self.budget))
-                .transpose()?,
-            FormulaRenderEvent::Percent => {
-                let operand = self.current_array_mut()?.expressions.pop().ok_or_else(|| {
-                    Error::ParseError(
-                        "Numbers formula percent operator is missing an operand".to_owned(),
-                    )
-                })?;
-                Some(self.renderer.unary("(", operand, ")%", self.budget)?)
-            },
-            FormulaRenderEvent::Number { value } => Some(self.renderer.owned_expr(
-                fallible_formula_display(value, &self.renderer, self.budget)?,
-                self.budget,
-            )?),
-            FormulaRenderEvent::String(value) => Some(self.renderer.owned_expr(
-                formula_string_literal(value, &self.renderer, self.budget)?,
-                self.budget,
-            )?),
-            FormulaRenderEvent::Boolean(value) | FormulaRenderEvent::Token(value) => Some(
-                self.renderer
-                    .static_expr(if value { "TRUE" } else { "FALSE" }, self.budget)?,
-            ),
-            FormulaRenderEvent::Date { value } => {
-                let days = value / 86_400.0;
-                Some(self.renderer.owned_expr(
-                    fallible_formula_format(&self.renderer, self.budget, |output| {
-                        write!(output, "(DATE(2001,1,1)+{days})")
-                    })?,
-                    self.budget,
-                )?)
-            },
-            FormulaRenderEvent::Duration { value } => Some(self.renderer.owned_expr(
-                fallible_formula_display(value, &self.renderer, self.budget)?,
-                self.budget,
-            )?),
-            FormulaRenderEvent::EmptyArgument => Some(self.renderer.static_expr("", self.budget)?),
-            FormulaRenderEvent::Function {
-                identifier,
-                argument_count,
-            } => {
-                let arguments = self.pop_arguments(argument_count, "function")?;
-                Some(self.renderer.comma_joined(
-                    Some(fallible_function_name(
-                        identifier,
-                        &self.renderer,
-                        self.budget,
-                    )?),
-                    arguments,
-                    "(",
-                    ")",
-                    self.budget,
-                )?)
-            },
-            FormulaRenderEvent::List { argument_count } => {
-                let arguments = self.pop_arguments(argument_count, "list")?;
-                Some(
-                    self.renderer
-                        .comma_joined(None, arguments, "", "", self.budget)?,
-                )
-            },
-            FormulaRenderEvent::Array { columns, rows } => {
-                let count = columns.checked_mul(rows).ok_or_else(|| {
-                    Error::ParseError("Numbers formula array size overflow".to_owned())
-                })?;
-                let values = self.pop_arguments(count, "array")?;
-                let columns = usize::try_from(columns).map_err(|_| {
-                    Error::ParseError("Numbers formula array width exceeds usize".to_owned())
-                })?;
-                Some(self.renderer.array(values, columns, self.budget)?)
-            },
-            FormulaRenderEvent::UnknownFunction {
-                name,
-                argument_count,
-            } => {
-                let arguments = self.pop_arguments(argument_count, "unknown function")?;
-                Some(self.renderer.comma_joined(
-                    Some(fallible_formula_owned(
-                        name.unwrap_or("UNKNOWN"),
-                        &self.renderer,
-                        self.budget,
-                    )?),
-                    arguments,
-                    "(",
-                    ")",
-                    self.budget,
-                )?)
-            },
-            FormulaRenderEvent::CellReference(reference) => {
-                Some(self.render_cell_reference(&reference)?)
-            },
-            FormulaRenderEvent::LocalCellReference(reference) => {
-                Some(self.render_standalone_local_cell_reference(reference)?)
-            },
-            FormulaRenderEvent::CrossTableCellReference(reference) => {
-                Some(self.render_cross_table_cell_reference(reference)?)
-            },
-            FormulaRenderEvent::Colon => Some(self.render_binary("colon", ":", false)?),
-            FormulaRenderEvent::ColonWithUids => Some(self.render_binary("range", ":", false)?),
-            FormulaRenderEvent::ColonTract(tract) => Some(self.render_colon_tract(&tract)?),
-            FormulaRenderEvent::CategoryReference(category) => {
-                Some(self.render_category_reference(category)?)
-            },
-            FormulaRenderEvent::ReferenceError => {
-                Some(self.renderer.static_expr("#REF!", self.budget)?)
-            },
-            FormulaRenderEvent::Ignored { .. }
-            | FormulaRenderEvent::PlusSign
-            | FormulaRenderEvent::AppendWhitespace
-            | FormulaRenderEvent::PrependWhitespace
-            | FormulaRenderEvent::BeginArray { .. }
-            | FormulaRenderEvent::EndArray
-            | FormulaRenderEvent::ThunkBegin
-            | FormulaRenderEvent::ThunkEnd => None,
-        };
-        Ok(expression)
-    }
-
-    fn render_binary(
-        &mut self,
-        operation: &str,
-        operator: &'static str,
-        wrapped: bool,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let (left, right) = self.pop_binary(operation)?;
-        self.renderer
-            .binary(left, operator, right, wrapped, self.budget)
-    }
-
-    fn render_cell_reference(
-        &mut self,
-        reference: &numbers_formula_codec::FormulaRenderCellReference,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        if let Some(coordinates) = reference.coordinates {
-            let column_absolute = coordinates.column.absolute;
-            let row_absolute = coordinates.row.absolute;
-            let column = FormulaColumn(resolve_formula_coordinate(
-                self.host_column as usize,
-                coordinates.column.coordinate,
-                column_absolute,
-                "column",
-            )?);
-            let row = checked_formula_row_number(resolve_formula_coordinate(
-                self.host_row as usize,
-                coordinates.row.coordinate,
-                row_absolute,
-                "row",
-            )?)?;
-            let prefix = reference.cross_table_extra.as_ref().and_then(|extra| {
-                formula_render_prefix_parts(&extra.table_id, self.formula_references)
-            });
-            return self.renderer.owned_expr(
-                fallible_formula_format(&self.renderer, self.budget, |output| {
-                    if reference.cross_table_extra.is_some() {
-                        write_formula_reference_prefix(output, prefix)?;
-                    }
-                    write!(
-                        output,
-                        "{}{column}{}{row}",
-                        if column_absolute { "$" } else { "" },
-                        if row_absolute { "$" } else { "" },
-                    )
-                })?,
-                self.budget,
-            );
-        }
-        if let Some(local) = reference.local {
-            return self.render_local_cell_reference(Some(local));
-        }
-        if let Some(cross) = reference.cross_table {
-            return self.render_cross_table_cell_reference(Some(cross));
-        }
-        self.renderer.owned_expr(
-            fallible_formula_owned("#REF!", &self.renderer, self.budget)?,
-            self.budget,
-        )
-    }
-
-    fn render_local_cell_reference(
-        &mut self,
-        reference: Option<numbers_formula_codec::FormulaRenderLocalCellReference>,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let Some(reference) = reference else {
-            return self.renderer.owned_expr(
-                fallible_formula_owned("#REF!", &self.renderer, self.budget)?,
-                self.budget,
-            );
-        };
-        let column = FormulaColumn(reference.column_handle);
-        let row = checked_formula_row_number(reference.row_handle)?;
-        self.renderer.owned_expr(
-            fallible_formula_format(&self.renderer, self.budget, |output| {
-                write!(
-                    output,
-                    "{}{column}{}{row}",
-                    if reference.column_is_sticky != 0 {
-                        "$"
-                    } else {
-                        ""
-                    },
-                    if reference.row_is_sticky != 0 {
-                        "$"
-                    } else {
-                        ""
-                    },
-                )
-            })?,
-            self.budget,
-        )
-    }
-
-    /// A standalone LocalCellReferenceNode is rendered by the legacy
-    /// generated path without consulting its sticky flags.  Keep that quirk
-    /// distinct from CellReferenceNode's nested-local fallback, which does
-    /// preserve the flags.
-    fn render_standalone_local_cell_reference(
-        &mut self,
-        reference: Option<numbers_formula_codec::FormulaRenderLocalCellReference>,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let Some(reference) = reference else {
-            return self.renderer.owned_expr(
-                fallible_formula_owned("#REF!", &self.renderer, self.budget)?,
-                self.budget,
-            );
-        };
-        let column = FormulaColumn(reference.column_handle);
-        let row = checked_formula_row_number(reference.row_handle)?;
-        self.renderer.owned_expr(
-            fallible_formula_format(&self.renderer, self.budget, |output| {
-                write!(output, "{column}{row}")
-            })?,
-            self.budget,
-        )
-    }
-
-    fn render_cross_table_cell_reference(
-        &mut self,
-        reference: Option<numbers_formula_codec::FormulaRenderCrossTableCellReference>,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let Some(reference) = reference else {
-            return self.renderer.owned_expr(
-                fallible_formula_owned("#REF!", &self.renderer, self.budget)?,
-                self.budget,
-            );
-        };
-        let prefix = formula_render_prefix_parts(&reference.table_id, self.formula_references);
-        let column = FormulaColumn(reference.column_handle);
-        let row = checked_formula_row_number(reference.row_handle)?;
-        self.renderer.owned_expr(
-            fallible_formula_format(&self.renderer, self.budget, |output| {
-                write_formula_reference_prefix(output, prefix)?;
-                write!(output, "{column}{row}")
-            })?,
-            self.budget,
-        )
-    }
-
-    fn render_colon_tract(
-        &mut self,
-        tract: &numbers_formula_codec::FormulaRenderColonTract,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let whole_rows = tract.relative_column.count == 0
-            && tract.absolute_column.count == 1
-            && tract.absolute_column.first_begin == Some(i16::MAX as i64)
-            && tract.absolute_column.first_end.is_none();
-        let whole_columns = tract.relative_row.count == 0
-            && tract.absolute_row.count == 1
-            && tract.absolute_row.first_begin == Some(i32::MAX as i64)
-            && tract.absolute_row.first_end.is_none();
-        let has_columns =
-            !whole_rows && (tract.relative_column.count != 0 || tract.absolute_column.count != 0);
-        let has_rows =
-            !whole_columns && (tract.relative_row.count != 0 || tract.absolute_row.count != 0);
-        if !has_columns && !has_rows {
-            return Err(Error::ParseError(
-                "Numbers formula colon tract has no row or column coordinates".to_owned(),
-            ));
-        }
-        let columns = if has_columns {
-            Some((
-                resolve_render_colon_axis(
-                    &tract.relative_column,
-                    &tract.absolute_column,
-                    tract.sticky.begin_column_is_absolute,
-                    false,
-                    self.host_column as usize,
-                    "column",
-                )?,
-                resolve_render_colon_axis(
-                    &tract.relative_column,
-                    &tract.absolute_column,
-                    tract.sticky.end_column_is_absolute,
-                    true,
-                    self.host_column as usize,
-                    "column",
-                )?,
-            ))
-        } else {
-            None
-        };
-        let rows = if has_rows {
-            Some((
-                resolve_render_colon_axis(
-                    &tract.relative_row,
-                    &tract.absolute_row,
-                    tract.sticky.begin_row_is_absolute,
-                    false,
-                    self.host_row as usize,
-                    "row",
-                )?,
-                resolve_render_colon_axis(
-                    &tract.relative_row,
-                    &tract.absolute_row,
-                    tract.sticky.end_row_is_absolute,
-                    true,
-                    self.host_row as usize,
-                    "row",
-                )?,
-            ))
-        } else {
-            None
-        };
-        let rows = rows
-            .map(|(begin, end)| {
-                Ok::<(u64, u64), Error>((
-                    checked_formula_row_number(begin)?,
-                    checked_formula_row_number(end)?,
-                ))
-            })
-            .transpose()?;
-        let prefix = tract.cross_table_extra.as_ref().and_then(|extra| {
-            formula_render_prefix_parts(&extra.table_id, self.formula_references)
-        });
-        self.renderer.owned_expr(
-            fallible_formula_format(&self.renderer, self.budget, |output| {
-                if tract.cross_table_extra.is_some() {
-                    write_formula_reference_prefix(output, prefix)?;
-                }
-                if let Some((begin, end)) = columns {
-                    if tract.sticky.begin_column_is_absolute {
-                        output.write_char('$')?;
-                    }
-                    write!(output, "{}", FormulaColumn(begin))?;
-                    if let Some((row_begin, _)) = rows {
-                        if tract.sticky.begin_row_is_absolute {
-                            output.write_char('$')?;
-                        }
-                        write!(output, "{row_begin}")?;
-                    }
-                    output.write_char(':')?;
-                    if tract.sticky.end_column_is_absolute {
-                        output.write_char('$')?;
-                    }
-                    write!(output, "{}", FormulaColumn(end))?;
-                    if let Some((_, row_end)) = rows {
-                        if tract.sticky.end_row_is_absolute {
-                            output.write_char('$')?;
-                        }
-                        write!(output, "{row_end}")?;
-                    }
-                } else if let Some((begin, end)) = rows {
-                    if tract.sticky.begin_row_is_absolute {
-                        output.write_char('$')?;
-                    }
-                    write!(output, "{begin}")?;
-                    output.write_char(':')?;
-                    if tract.sticky.end_row_is_absolute {
-                        output.write_char('$')?;
-                    }
-                    write!(output, "{end}")?;
-                }
-                Ok(())
-            })?,
-            self.budget,
-        )
-    }
-
-    fn render_category_reference(
-        &mut self,
-        category: Option<numbers_formula_codec::FormulaRenderCategoryReference>,
-    ) -> std::result::Result<FormulaExpr, Error> {
-        let category_uid = category.and_then(|category| {
-            category
-                .absolute_group_uid
-                .or(category.relative_group_uid)
-                .or(category.last_group_uid)
-        });
-        let Some(category_uid) = category_uid else {
-            return self.renderer.owned_expr(
-                fallible_formula_owned("#CATEGORY!", &self.renderer, self.budget)?,
-                self.budget,
-            );
-        };
-        let Some(label) = self
-            .formula_references
-            .categories
-            .get(&[category_uid.lower, category_uid.upper])
-        else {
-            return self.renderer.owned_expr(
-                fallible_formula_owned("#CATEGORY!", &self.renderer, self.budget)?,
-                self.budget,
-            );
-        };
-        self.renderer.owned_expr(
-            render_category_label_checked(label, &self.renderer, self.budget)?,
-            self.budget,
-        )
-    }
-
-    fn finish(mut self) -> Result<String> {
-        if let Some(error) = self.error.take() {
-            return Err(error);
-        }
-        if !self.arrays.is_empty() {
-            return Err(Error::ParseError(
-                "Numbers formula event stream left an active array".to_owned(),
-            ));
-        }
-        match self.root_expression {
-            Some(expression) => self.renderer.render(expression, self.budget),
-            None => retain_text("=", self.budget),
-        }
-    }
-}
-
-impl numbers_formula_codec::FormulaRenderVisitor for CompatibilityFormulaVisitor<'_, '_> {
-    fn visit(
-        &mut self,
-        event: numbers_formula_codec::FormulaRenderEvent<'_>,
-    ) -> std::result::Result<(), numbers_formula_codec::DecodeError> {
-        let result = match event {
-            numbers_formula_codec::FormulaRenderEvent::BeginArray { depth } => {
-                self.begin_array(depth).map(|_| None)
-            },
-            numbers_formula_codec::FormulaRenderEvent::EndArray => self.end_array().map(|_| None),
-            numbers_formula_codec::FormulaRenderEvent::ThunkBegin => self.mark_node().map(|_| {
-                self.pending_thunk = true;
-                None
-            }),
-            numbers_formula_codec::FormulaRenderEvent::ThunkEnd => Ok(None),
-            event => self.mark_node().and_then(|()| self.render_event(event)),
-        };
-        match result {
-            Ok(Some(expression)) => match self.push_expression(expression) {
-                Ok(()) => Ok(()),
-                Err(error) => Err(self.fail(error)),
-            },
-            Ok(None) => Ok(()),
-            Err(error) => Err(self.fail(error)),
-        }
-    }
-}
-
-fn formula_render_prefix_parts<'a>(
-    owner: &numbers_formula_codec::FormulaRenderCfuuid,
-    references: &'a FormulaReferenceMaps,
-) -> FormulaPrefix<'a> {
-    let key = [owner.word0?, owner.word1?, owner.word2?, owner.word3?];
-    references.owners.get(&key)
-}
-
-fn render_category_label_checked(
-    label: &str,
-    renderer: &FormulaRenderer,
-    budget: &ProjectionBudget,
-) -> Result<String> {
-    let escaped_extra = label
-        .bytes()
-        .filter(|byte| *byte == b'\\' || *byte == b']')
-        .count();
-    let required = "#CATEGORY!["
-        .len()
-        .checked_add(label.len())
-        .and_then(|length| length.checked_add(escaped_extra))
-        .and_then(|length| length.checked_add(1))
-        .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-    renderer.check_additional_owned(required, budget)?;
-    let mut output = String::new();
-    output
-        .try_reserve_exact(required)
-        .map_err(|_error| allocation_error("Numbers formula category text", required))?;
-    output.push_str("#CATEGORY![");
-    for character in label.chars() {
-        if character == '\\' || character == ']' {
-            output.push('\\');
-        }
-        output.push(character);
-    }
-    output.push(']');
-    Ok(output)
-}
-
-fn resolve_render_colon_axis(
-    relative: &numbers_formula_codec::FormulaRenderRangeSummary,
-    absolute: &numbers_formula_codec::FormulaRenderRangeSummary,
-    is_absolute: bool,
-    is_end: bool,
-    host: usize,
-    axis: &str,
-) -> Result<u32> {
-    let summary = if is_absolute { absolute } else { relative };
-    let stored = if is_end {
-        summary.first_end.or(summary.first_begin)
-    } else {
-        summary.first_begin
-    }
-    .ok_or_else(|| {
-        Error::ParseError(format!(
-            "Numbers formula colon tract has no {} {} coordinate",
-            if is_absolute { "absolute" } else { "relative" },
-            axis
-        ))
-    })?;
-    if is_absolute {
-        u32::try_from(stored).map_err(|_| {
-            Error::ParseError(format!(
-                "Numbers formula colon tract absolute {axis} coordinate is out of range"
-            ))
-        })
-    } else {
-        let stored = i32::try_from(stored).map_err(|_| {
-            Error::ParseError(format!(
-                "Numbers formula colon tract relative {axis} coordinate is out of range"
-            ))
-        })?;
-        resolve_formula_coordinate(host, stored, false, axis)
     }
 }
 
@@ -7587,6 +6822,7 @@ fn render_formula_ast_array(
     Ok(stack.pop())
 }
 
+#[cfg(test)]
 fn fallible_formula_owned(
     value: &str,
     renderer: &FormulaRenderer,
@@ -7601,6 +6837,7 @@ fn fallible_formula_owned(
     Ok(owned)
 }
 
+#[cfg(test)]
 fn fallible_formula_display(
     value: impl std::fmt::Display,
     renderer: &FormulaRenderer,
@@ -7629,6 +6866,7 @@ fn fallible_formula_display(
     Ok(output)
 }
 
+#[cfg(test)]
 fn fallible_formula_format(
     renderer: &FormulaRenderer,
     budget: &ProjectionBudget,
@@ -7654,9 +6892,11 @@ fn fallible_formula_format(
     Ok(output)
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy)]
 struct FormulaColumn(u32);
 
+#[cfg(test)]
 impl std::fmt::Display for FormulaColumn {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut bytes = [0_u8; 7];
@@ -7675,6 +6915,7 @@ impl std::fmt::Display for FormulaColumn {
     }
 }
 
+#[cfg(test)]
 fn fallible_function_name(
     index: u32,
     renderer: &FormulaRenderer,
@@ -7697,6 +6938,7 @@ fn formula_reference_prefix_parts<'a>(
     cfuuid_key(owner).and_then(|key| references.owners.get(&key))
 }
 
+#[cfg(test)]
 fn write_formula_reference_prefix(
     output: &mut dyn std::fmt::Write,
     prefix: FormulaPrefix<'_>,
@@ -7757,6 +6999,7 @@ fn render_category_reference_checked(
     Ok(output)
 }
 
+#[cfg(test)]
 fn render_binary(
     stack: &mut Vec<FormulaExpr>,
     renderer: &mut FormulaRenderer,
@@ -7769,6 +7012,7 @@ fn render_binary(
     renderer.binary(left, operator, right, wrapped, budget)
 }
 
+#[cfg(test)]
 fn formula_string_literal(
     value: &str,
     renderer: &FormulaRenderer,
@@ -7928,6 +7172,7 @@ fn render_cell_reference_checked(
     fallible_formula_owned("#REF!", renderer, budget)
 }
 
+#[cfg(test)]
 fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &str) -> Result<u32> {
     let coordinate = if absolute {
         i64::from(stored)
@@ -7946,6 +7191,7 @@ fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &s
     })
 }
 
+#[cfg(test)]
 fn checked_formula_row_number(row: u32) -> Result<u64> {
     u64::from(row)
         .checked_add(1)
