@@ -390,6 +390,8 @@ impl BodyTableLockCommit {
 pub(crate) struct BodyTableTarget {
     pub(crate) table_position: usize,
     pub(crate) table_name: Box<str>,
+    pub(crate) table_rows: u32,
+    pub(crate) table_columns: u32,
     pub(crate) sheet_identifier: NonZeroU64,
     pub(crate) sheet_component_index: usize,
     pub(crate) sheet_object_index: usize,
@@ -570,6 +572,27 @@ fn native_body_table_targets_with_budget(
     package: &Package,
     budget: &mut WireBudget,
 ) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+    native_body_table_targets_with_budget_mode(package, budget, false)
+}
+
+/// Discover the semantic body-table facts used by the focused read catalog.
+///
+/// The resolver intentionally shares the complete rooted graph walk with the
+/// selector-first mutation adapters.  `allow_empty` only changes the normal
+/// result for a valid body-less or table-less root; malformed rooted metadata
+/// continues to fail closed in the shared walk.
+pub(crate) fn body_table_catalog_with_budget(
+    package: &Package,
+    budget: &mut WireBudget,
+) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+    native_body_table_targets_with_budget_mode(package, budget, true)
+}
+
+fn native_body_table_targets_with_budget_mode(
+    package: &Package,
+    budget: &mut WireBudget,
+    allow_empty: bool,
+) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
     let source = physical_source(package)?;
     let components = source.components();
     let object_index = index_objects(components, budget)?;
@@ -611,15 +634,20 @@ fn native_body_table_targets_with_budget(
         .ok_or(BodyTableLockError::InvalidSource)?;
     let Some(body_identifier) = body else {
         // A body-less Pages document is a valid empty/rootless source, but a
-        // retained field-4 object edge is contradictory archive metadata. Do
-        // not collapse that tampered rooted edge into an ordinary selector
-        // miss.
+        // retained field-4 object or data edge is contradictory archive
+        // metadata. Do not collapse that tampered rooted edge into an
+        // ordinary selector miss.
         if root_message_info.field_infos.iter().any(|field| {
-            field.path.as_slice() == [ROOT_BODY_FIELD] && !field.object_references.is_empty()
+            field.path.as_slice() == [ROOT_BODY_FIELD]
+                && (!field.object_references.is_empty() || !field.data_references.is_empty())
         }) {
             return Err(BodyTableLockError::InvalidSource);
         }
-        return Err(BodyTableLockError::TableNotFound);
+        return if allow_empty {
+            Ok(Vec::new())
+        } else {
+            Err(BodyTableLockError::TableNotFound)
+        };
     };
     if !message_declares_reference(
         root_message_info,
@@ -677,7 +705,11 @@ fn native_body_table_targets_with_budget(
         // Validate the empty inventory so stale declarations cannot be
         // silently treated as an absent table.
         validate_body_table_ownership(body_message_info, &[], budget)?;
-        return Err(BodyTableLockError::TableNotFound);
+        return if allow_empty {
+            Ok(Vec::new())
+        } else {
+            Err(BodyTableLockError::TableNotFound)
+        };
     };
     let table_view = budget.parse(table_field.payload(), 1)?;
     let entry_count = table_view
@@ -848,11 +880,14 @@ fn native_body_table_targets_with_budget(
             return Err(BodyTableLockError::InvalidSource);
         }
         seen_models.push(model_identifier);
-        let table_name = decode_table_model_name(budget, &model_message.data)?;
+        let (table_name, table_rows, table_columns) =
+            decode_table_model_facts(budget, &model_message.data)?;
         let table_position = targets.len();
         let target = BodyTableTarget {
             table_position,
             table_name,
+            table_rows,
+            table_columns,
             // Pages' rooted body is the section/sheet owner for table
             // attachment dependencies. Keep this proof on the target so
             // sibling semantic adapters can inspect the exact body payload
@@ -891,7 +926,11 @@ fn native_body_table_targets_with_budget(
         targets.push(target);
     }
     if targets.is_empty() {
-        return Err(BodyTableLockError::TableNotFound);
+        return if allow_empty {
+            Ok(targets)
+        } else {
+            Err(BodyTableLockError::TableNotFound)
+        };
     }
     Ok(targets)
 }
@@ -930,10 +969,10 @@ fn parse_drawable_attachment(
     parse_local_reference(budget, field.payload(), 3)
 }
 
-fn decode_table_model_name(
+fn decode_table_model_facts(
     budget: &mut WireBudget,
     source: &[u8],
-) -> Result<Box<str>, BodyTableLockError> {
+) -> Result<(Box<str>, u32, u32), BodyTableLockError> {
     let limits = budget.wire_limits();
     let options = table_model_discovery_codec::DecodeOptions::new(
         source.len().max(1).min(limits.max_input_bytes()),
@@ -955,7 +994,11 @@ fn decode_table_model_name(
         .try_reserve_exact(text.len())
         .map_err(|_| BodyTableLockError::Allocation { amount: text.len() })?;
     owned.push_str(text);
-    Ok(owned.into_boxed_str())
+    Ok((
+        owned.into_boxed_str(),
+        snapshot.number_of_rows(),
+        snapshot.number_of_columns(),
+    ))
 }
 
 fn map_table_model_codec_error(
@@ -3022,6 +3065,8 @@ mod tests {
         let target = BodyTableTarget {
             table_position: 17,
             table_name: "private-table-name".into(),
+            table_rows: 5,
+            table_columns: 4,
             sheet_identifier: NonZeroU64::new(0xfeed_babe).expect("identifier"),
             sheet_component_index: 1,
             sheet_object_index: 2,
@@ -3520,6 +3565,8 @@ mod tests {
         let target = BodyTableTarget {
             table_position: 0,
             table_name: "test-table".into(),
+            table_rows: 5,
+            table_columns: 4,
             sheet_identifier: identifier,
             sheet_component_index: 0,
             sheet_object_index: 0,

@@ -119,6 +119,9 @@ pub use package::{
     BodyTableAppearancePath,
 };
 pub use package::{
+    BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
+};
+pub use package::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
     BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
 };

@@ -4394,3 +4394,19 @@ are under test-data/iwork/pages/body-table-name-*. ADR0028's matching amendment
 records the proof and remaining name-only publication scope. Legacy
 PagesEditor::tables and physical table/cell responsibilities remain in the
 monolith; no package/dependency/debt deletion is claimed.
+
+## 2026-09-09 Pages semantic table catalog follow-up
+
+`litchi-pages` now owns `Package::body_tables()`, a bounded read-only catalog
+of rooted body-table positions, names, and declared dimensions. It shares
+one discovery walk and cumulative budget, uses the borrowed Buffa model
+projection, and exposes no native identities. Default entry selectors use
+snapshot positions; duplicate exact names remain explicit lookup ambiguity.
+The retained Pages 14.4 two-table fixture and its receipt qualify native
+order/name/dimension readback after save, close, and reopen. The corresponding
+ADR0028 amendment records the implementation and verification scope.
+
+The legacy stylesheet-closure test uses this focused catalog for semantic
+facts. Physical cell/graph witnesses remain host-owned, as do the raw-ID
+consumers preventing removal of PagesEditor::tables. This adds the catalog
+prerequisite without claiming table-cell support or a retired dependency edge.

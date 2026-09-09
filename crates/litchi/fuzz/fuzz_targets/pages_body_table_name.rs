@@ -18,6 +18,7 @@ const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_IWA_STREAM_BYTES: usize = 1024 * 1024;
 const MAX_COMMAND_BYTES: usize = 1024;
 const MAX_NAME_BYTES: usize = 1024;
+const MAX_CATALOG_TABLES: usize = 128;
 const OVERSIZED_INPUT_BYTES: usize = MAX_INPUT_BYTES as usize + 1;
 const PRIVATE_TABLE: &str = "__litchi_private_pages_name_table_107__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_name_input_107__";
@@ -27,8 +28,38 @@ const NATIVE_VISIBLE_PAGES: &[u8] =
     include_bytes!("../../../../test-data/iwork/pages/body-table-name-visible-native.pages");
 const SOURCE_BUILT_BEFORE_PAGES: &[u8] =
     include_bytes!("../../../../test-data/iwork/pages/source-built-table-stylesheet-before.pages");
-const NATIVE_VISIBLE_NAME: &str = "Table 1";
-const SOURCE_BUILT_BEFORE_NAME: &str = "Cities";
+const NATIVE_CATALOG_PAGES: &[u8] =
+    include_bytes!("../../../../test-data/iwork/pages/body-table-catalog-native.pages");
+
+#[derive(Clone, Copy)]
+struct CatalogExpectation {
+    name: &'static str,
+    rows: u32,
+    columns: u32,
+}
+
+const NATIVE_VISIBLE_CATALOG: &[CatalogExpectation] = &[CatalogExpectation {
+    name: "Table 1",
+    rows: 5,
+    columns: 4,
+}];
+const SOURCE_BUILT_BEFORE_CATALOG: &[CatalogExpectation] = &[CatalogExpectation {
+    name: "Cities",
+    rows: 5,
+    columns: 4,
+}];
+const NATIVE_CATALOG: &[CatalogExpectation] = &[
+    CatalogExpectation {
+        name: "Table 1",
+        rows: 5,
+        columns: 4,
+    },
+    CatalogExpectation {
+        name: "Table 2",
+        rows: 3,
+        columns: 2,
+    },
+];
 
 fuzz_target!(|data: &[u8]| {
     let command = command_input(data);
@@ -48,12 +79,13 @@ fuzz_target!(|data: &[u8]| {
     // These two retained fixtures are qualified body-table name sources. A
     // parse or selector-read regression must fail the fuzz run instead of
     // being silently treated as an unsupported profile.
-    exercise_required_package(native_visible_package(), NATIVE_VISIBLE_NAME, &command);
+    exercise_required_package(native_visible_package(), NATIVE_VISIBLE_CATALOG, &command);
     exercise_required_package(
         source_built_before_package(),
-        SOURCE_BUILT_BEFORE_NAME,
+        SOURCE_BUILT_BEFORE_CATALOG,
         &command,
     );
+    exercise_required_package(native_catalog_package(), NATIVE_CATALOG, &command);
     exercise_semantic_values(data);
     exercise_redacted_ingress();
     exercise_input_limit();
@@ -94,6 +126,15 @@ fn source_built_before_package() -> &'static Package {
     PACKAGE.get_or_init(|| {
         Package::from_bytes_with_limits(SOURCE_BUILT_BEFORE_PAGES, fuzz_limits()).unwrap_or_else(
             |error| panic!("qualified source-built Pages name seed must parse: {error}"),
+        )
+    })
+}
+
+fn native_catalog_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        Package::from_bytes_with_limits(NATIVE_CATALOG_PAGES, fuzz_limits()).unwrap_or_else(
+            |error| panic!("qualified native Pages catalog seed must parse: {error}"),
         )
     })
 }
@@ -141,6 +182,31 @@ fn hex_nibble(byte: u8) -> Option<u8> {
 
 fn exercise_package(package: &Package, data: &[u8]) {
     let source_before = package_bytes(package);
+    exercise_package_with_source(package, data, source_before, None);
+}
+
+fn exercise_required_package(
+    package: &Package,
+    expected_catalog: &[CatalogExpectation],
+    data: &[u8],
+) {
+    let source_before = package_bytes(package);
+    exercise_package_with_source(package, data, source_before, Some(expected_catalog));
+}
+
+fn exercise_package_with_source(
+    package: &Package,
+    data: &[u8],
+    source_before: Vec<u8>,
+    expected_catalog: Option<&[CatalogExpectation]>,
+) {
+    exercise_catalog(package, &source_before, expected_catalog);
+    if let Some(expected_catalog) = expected_catalog {
+        let name = package
+            .body_table_name(BodyTableSelector::index(0))
+            .unwrap_or_else(|error| panic!("qualified Pages name seed read failed: {error}"));
+        assert_eq!(name.as_str(), expected_catalog[0].name);
+    }
     let selector = BodyTableSelector::index(0);
 
     observe_result(package.body_table_name(selector));
@@ -324,12 +390,89 @@ fn exercise_package(package: &Package, data: &[u8]) {
     assert_source_unchanged(package, &source_before);
 }
 
-fn exercise_required_package(package: &Package, expected_name: &str, data: &[u8]) {
-    let name = package
-        .body_table_name(BodyTableSelector::index(0))
-        .unwrap_or_else(|error| panic!("qualified Pages name seed read failed: {error}"));
-    assert_eq!(name.as_str(), expected_name);
-    exercise_package(package, data);
+fn exercise_catalog(
+    package: &Package,
+    source_before: &[u8],
+    expected: Option<&[CatalogExpectation]>,
+) {
+    let catalog = match package.body_tables() {
+        Ok(catalog) => catalog,
+        Err(error) => {
+            if expected.is_some() {
+                panic!("qualified Pages body-table catalog read failed: {error}");
+            }
+            observe_error(error);
+            assert_source_unchanged(package, source_before);
+            return;
+        },
+    };
+    if let Some(expected) = expected {
+        assert!(
+            expected.len() <= MAX_CATALOG_TABLES,
+            "qualified Pages catalog exceeds the fuzz iteration bound"
+        );
+        assert_eq!(
+            catalog.len(),
+            expected.len(),
+            "qualified catalog table count"
+        );
+    }
+
+    for (index, snapshot) in catalog.iter().take(MAX_CATALOG_TABLES).enumerate() {
+        assert_eq!(snapshot.index(), index, "catalog source order");
+        assert_eq!(snapshot.selector().as_index(), Some(index));
+        if let Some(expected) = expected {
+            let table = expected
+                .get(index)
+                .unwrap_or_else(|| panic!("qualified catalog table {index} is unexpected"));
+            assert_eq!(snapshot.name(), table.name, "catalog table name");
+            assert_eq!(snapshot.rows(), table.rows, "catalog table rows");
+            assert_eq!(snapshot.columns(), table.columns, "catalog table columns");
+        }
+
+        let by_position = catalog
+            .select(BodyTableSelector::index(index))
+            .unwrap_or_else(|error| panic!("catalog position selector failed: {error}"))
+            .unwrap_or_else(|| panic!("catalog position selector {index} was missing"));
+        assert_eq!(by_position, snapshot, "catalog position selector parity");
+        let by_snapshot_position = catalog
+            .select(snapshot.selector())
+            .unwrap_or_else(|error| panic!("catalog snapshot selector failed: {error}"))
+            .unwrap_or_else(|| panic!("catalog snapshot selector {index} was missing"));
+        assert_eq!(
+            by_snapshot_position, snapshot,
+            "catalog snapshot selector parity"
+        );
+
+        if expected.is_some() {
+            match catalog.select(snapshot.name_selector()) {
+                Ok(Some(by_name)) => assert_eq!(by_name.name(), snapshot.name()),
+                Ok(None) => panic!("catalog name selector unexpectedly missed a table"),
+                Err(error) => observe_error(error),
+            }
+        }
+    }
+    if let Some(expected) = expected {
+        assert_eq!(
+            catalog.len(),
+            expected.len(),
+            "qualified catalog iteration count"
+        );
+    }
+    let out_of_range = catalog
+        .select(BodyTableSelector::index(catalog.len()))
+        .unwrap_or_else(|error| panic!("catalog upper-bound selector failed: {error}"));
+    assert!(out_of_range.is_none(), "catalog accepted its upper bound");
+    if expected.is_some() {
+        assert!(
+            catalog
+                .select(BodyTableSelector::name(PRIVATE_TABLE))
+                .unwrap_or_else(|error| panic!("catalog missing-name selector failed: {error}"))
+                .is_none(),
+            "qualified catalog resolved a private missing name"
+        );
+    }
+    assert_source_unchanged(package, source_before);
 }
 
 fn requested_name(before: &BodyTableName, data: &[u8]) -> BodyTableName {

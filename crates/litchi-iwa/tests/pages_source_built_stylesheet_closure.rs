@@ -315,6 +315,22 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         "{label} focused read/reencode changed the native package"
     );
 
+    let focused_tables = focused.body_tables()?;
+    assert_eq!(
+        focused_tables.len(),
+        1,
+        "{label} should expose one body table"
+    );
+    let focused_table = focused_tables
+        .get(0)
+        .ok_or_else(|| io::Error::other(format!("{label} body table is missing")))?;
+    assert_eq!(focused_table.name(), "Cities", "{label} table name changed");
+    assert_eq!(
+        (focused_table.rows(), focused_table.columns()),
+        (5, 4),
+        "{label} dimensions changed"
+    );
+
     let editor = PagesEditor::from_bytes(source).map_err(|error| {
         io::Error::other(format!("{label} legacy package parse failed: {error:?}"))
     })?;
@@ -329,17 +345,6 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         body_text.contains('\u{fffc}'),
         "{label} legacy body text lost the table object replacement character: {body_text:?}"
     );
-    let tables = editor.tables()?;
-    assert_eq!(tables.len(), 1, "{label} should expose one body table");
-    let table = tables
-        .first()
-        .ok_or_else(|| io::Error::other(format!("{label} body table is missing")))?;
-    assert_eq!(table.name, "Cities", "{label} table name changed");
-    assert_eq!(
-        (table.rows, table.columns),
-        (5, 4),
-        "{label} dimensions changed"
-    );
     assert_eq!(
         editor.to_bytes()?,
         source,
@@ -352,9 +357,12 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         body_text,
         "{label} body changed on reopen"
     );
+    let focused_reopened = FocusedPagesPackage::from_bytes(source).map_err(|error| {
+        io::Error::other(format!("{label} focused package reopen failed: {error:?}"))
+    })?;
     assert_eq!(
-        reopened.tables()?,
-        tables,
+        focused_reopened.body_tables()?,
+        focused_tables,
         "{label} table changed on reopen"
     );
     assert_eq!(reopened.to_bytes()?, source, "{label} reopen changed bytes");

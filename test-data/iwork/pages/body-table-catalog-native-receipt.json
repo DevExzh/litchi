@@ -1,0 +1,32 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "file": "body-table-catalog-native.pages",
+  "size": 128566,
+  "sha256": "fca40ca80e9bf2138005080dc55cf1760ca41a8847a81fa55cec68952a60a3c3",
+  "source": "body-table-name-visible-native.pages",
+  "lifecycle": [
+    "Opened a disposable copy of the source in Pages without repair.",
+    "Added a plain second table at the end of the document body; set rows to 3 and columns to 2, and displayed its title.",
+    "Saved and closed the actual document window to the template chooser.",
+    "Reopened the exact saved path without repair; visually verified both titles, both grids, and the original body marker.",
+    "Closed the actual document window to the template chooser."
+  ],
+  "tables_in_body_order": [
+    {
+      "position": 0,
+      "name": "Table 1",
+      "rows": 5,
+      "columns": 4
+    },
+    {
+      "position": 1,
+      "name": "Table 2",
+      "rows": 3,
+      "columns": 2
+    }
+  ],
+  "body_marker": "Pages hidden-axis native oracle — 2026-09-05",
+  "scope": "Native creation, save, close, reopen, body table ordering, names, and dimensions. No Rust mutation is involved in this read-only catalog fixture."
+}

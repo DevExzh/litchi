@@ -7,6 +7,7 @@
 mod body_chart_arrangement;
 mod body_footnote;
 pub(crate) mod body_table_appearance;
+mod body_table_catalog;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
@@ -74,6 +75,9 @@ pub use body_table_appearance::{
     BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
     BodyTableAppearanceError, BodyTableAppearanceLimitKind, BodyTableAppearancePatch,
     BodyTableAppearancePath,
+};
+pub use body_table_catalog::{
+    BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
 };
 pub use body_table_dimension::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
