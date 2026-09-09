@@ -81,7 +81,7 @@ edits preserve them.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Body-table selection and rooted ownership discovery | 🟡 | 🟡 | N/A | Selector-driven resolution proves the private body, drawable, attachment, table-info, model, and storage ownership chain for each operation. There is no public table catalog or general semantic table enumeration API. Body-table name discovery uses the borrowed [`table_model_discovery_codec`](../src/package/body_table_name.rs) projection and allocates only the returned semantic name. Evidence: [`body-table selectors`](../src/selector.rs), [`table ownership proof`](../src/package/table_lock.rs), [`table-lock tests`](../tests/table_lock.rs), and [`body-table name tests`](../tests/body_table_name.rs) (E1). |
-| Body-table hidden rows and columns | 🟡 | ✅ | 🟡 | `Package::{body_table_hidden_axes, edit_body_table_hidden_axes, apply_body_table_hidden_axes}` uses [`BodyTableSelector`](../src/selector.rs) (checked position or exact visible name) and archive-free [`table::hidden_axes::{AxisIndex, HiddenAxes}`](../src/table/hidden_axes.rs). The strict source-backed route validates one role-qualified `TableInfoArchive` (current type 6000 or qualified legacy type 6003) and `TableModelArchive` (current type 6001 or qualified legacy type 6000), the canonical type-6267 row/column UID map (qualified legacy type 6200 is admitted only through its legacy route), type-4008 formula-owner chain, active hidden-state UUID, and directional row/column extents; only user-hidden positions are projected. Bounds, duplicate positions, missing/duplicate owners, malformed wire, stale UUIDs, bad UID maps, unsupported pivot/dependency graphs, locked tables, and finite wire/archive limits fail closed before publication. On admitted existing-owner rewrites, non-user filtered/pivot markers and unknown model/info/owner fields remain preserved; unsupported pivot/dependency topologies refuse changed edits. An absent hidden-state owner reads as empty, an empty request is an exact source no-op, and a nonempty absent-owner request is unsupported and returns `UnsupportedDependency` or `UnsupportedSource` without publication. Existing-owner commits use copy-on-write, touch one selected component, invalidate the three canonical root previews, reopen/read back the candidate, and return exact source-bound apply/inverse patches. This is visibility metadata only: no cell/formula, filter/pivot CRUD, row/column topology, or sorting API is implied. Focused graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The checked-in [`body-table-visible.pages`](../../../test-data/iwork/pages/body-table-visible.pages) fixture is a native Pages 14.4 visible 5-by-4 body-table baseline with a body marker; disposable Computer Use copies were saved, closed, and reopened without repair, and the focused package save path produced byte-identical output for the visible-table/no-op operation. The checked-in fixture has no user-hidden axes, so it is native baseline/no-op evidence rather than positive hidden-axis E2 or E3/E4 mutation evidence. The registered fuzz target and corpus remain bounded evidence; current fuzz verification is tracked with ADR 0008. |
+| Body-table hidden rows and columns | 🟡 | ✅ | 🟡 | `Package::{body_table_hidden_axes, edit_body_table_hidden_axes, apply_body_table_hidden_axes}` uses [`BodyTableSelector`](../src/selector.rs) (checked position or exact visible name) and archive-free [`table::hidden_axes::{AxisIndex, HiddenAxes}`](../src/table/hidden_axes.rs). The strict source-backed route validates one role-qualified `TableInfoArchive` (current type 6000 or qualified legacy type 6003) and `TableModelArchive` (current type 6001 or qualified legacy type 6000), the canonical type-6267 row/column UID map (qualified legacy type 6200 is admitted only through its legacy route), type-4008 formula-owner chain, active hidden-state UUID, and directional row/column extents; only user-hidden positions are projected. Bounds, duplicate positions, missing/duplicate owners, malformed wire, stale UUIDs, bad UID maps, unsupported pivot/dependency graphs, locked tables, and finite wire/archive limits fail closed before publication. On admitted existing-owner rewrites, including the qualified Pages-native 6000/6001 profile, non-user filtered/pivot markers and unknown model/info/owner fields remain preserved; unsupported pivot/dependency topologies refuse changed edits. An admitted indexed table with no hidden-state owner reads as empty; an empty request is an exact source no-op. Its separately bounded owner-creation path remains available where the dependency proof passes. Native owner creation remains unsupported. Existing-owner commits use copy-on-write, touch one selected component, invalidate the three canonical root previews, reopen/read back the candidate, and return exact source-bound apply/inverse patches. This is visibility metadata only: no cell/formula, filter/pivot CRUD, row/column topology, or sorting API is implied. Focused graph, codec, identity/COW, concurrency, and native-fixture tests cover the E1 source/self-round-trip and qualified native existing-owner contracts. The checked-in Pages 14.4 fixtures [`body-table-hidden-axes-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-native.pages), [`body-table-hidden-axes-focused-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-focused-native.pages), and [`body-table-hidden-axes-cleared-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-cleared-native.pages) cover hidden row 3/column B, empty visibility, exact package no-ops, and native save/close/reopen readback without repair. Operation-specific native evidence covers existing-owner set and clear/reset behavior; it does not certify native owner creation, arbitrary native dependency graphs, or package-wide hidden-state support. The registered fuzz target and corpus remain bounded evidence; current fuzz verification is tracked with ADR 0008. |
 | Table appearance | 🟡 | ✅ | 🟡 | Existing tables expose validated style, gridline, banding, and row-sizing settings; exact-source edits support the admitted appearance profile, preserve unselected native fields/slots, refuse unsupported style graphs, and invalidate canonical root previews when changed. Evidence: [`appearance value`](../src/table/appearance.rs), [`appearance transaction`](../src/package/body_table_appearance.rs), [`appearance tests`](../tests/body_table_appearance.rs) (E1). |
 | Table dimensions | 🟡 | ✅ | 🟡 | Existing table width/height and row/column dimension values are read and edited with checked finite bounds. This changes presentation metadata, not table row/column topology; changed publication invalidates canonical root previews while no-ops and inverses preserve the source artifact. Evidence: [`dimension value`](../src/table/dimension.rs), [`dimension transaction`](../src/package/body_table_dimension.rs), [`dimension tests`](../tests/body_table_dimensions.rs) (E1). |
 | Header, footer, freeze, and repeat settings | 🟡 | ✅ | 🟡 | Existing body-table header/footer counts and freeze/repeat flags are presence-preserving and editable within the validated native graph. Physical header-row data and table topology are not exposed; changed partition edits invalidate canonical root previews and keep native ownership slots closed. Evidence: [`header settings`](../src/table/headers.rs), [`header transaction`](../src/package/body_table_headers.rs), [`header tests`](../tests/body_table_header_settings.rs) (E1). |
@@ -131,7 +131,7 @@ make the focused package a media owner. None of these host capabilities is count
 | Body images, movies, and audio | 🟡 | ✅ | 🟡 | Host [`images`](../../litchi-iwa/src/pages/editor/images.rs), [`movies`](../../litchi-iwa/src/pages/editor/movies.rs), and [`audio`](../../litchi-iwa/src/pages/editor/audio.rs) retain discovery, creation, duplication, geometry/properties, replacement, playback settings, and removal. Drawable graph selection remains raw-ID based; focused `litchi-pages` has no package media reader or asset CRUD owner. |
 | Body charts and chart properties | 🟡 | ✅ | 🟡 | Host [`charts`](../../litchi-iwa/src/pages/editor/charts.rs) retains inline chart discovery/creation/duplication/removal, data/kind/direction/geometry, and many chart-property mutations. The focused `litchi-pages` owner now covers only existing body-chart Arrange flags through semantic selection; the broader chart graph and its lifecycle remain migration-host scope. |
 | Body shapes, drawings, and drawable order | 🟡 | ✅ | 🟡 | Host [`body shapes`](../../litchi-iwa/src/pages/editor/body_shapes.rs) retains creation, duplication, removal, geometry, and raw-ID shape operations. The focused `litchi-pages` package owns the bounded opaque body-order transaction; no legacy host drawable-order editor remains, and shape lifecycle or geometry are not part of that owner. |
-| Body tables, cells, formulas, and table comments | 🟡 | ✅ | 🟡 | Host [`tables`](../../litchi-iwa/src/pages/editor/tables/mod.rs) retains broad table topology/storage/value/formula operations and [`table comments`](../../litchi-iwa/src/pages/editor/tables/comments.rs) retains cell comment/reply CRUD. The Pages raw-ID hidden-axis convenience route remains compatibility debt until creation parity and native mutation gates pass; focused Pages owns the bounded selector-first existing-owner metadata transaction. Attached Numbers/Keynote hidden-axis compatibility also remains migration-host-only. No focused cell/formula/comment owner exists. |
+| Body tables, cells, formulas, and table comments | 🟡 | ✅ | 🟡 | Host [`tables`](../../litchi-iwa/src/pages/editor/tables/mod.rs) retains broad table topology/storage/value/formula operations and [`table comments`](../../litchi-iwa/src/pages/editor/tables/comments.rs) retains cell comment/reply CRUD. The Pages raw-ID hidden-axis convenience route remains compatibility debt until legacy source-built creation and comment-bearing package parity pass; focused Pages owns the bounded selector-first existing-owner metadata transaction, including the qualified native 6000/6001 profile. Attached Numbers/Keynote hidden-axis compatibility also remains migration-host-only. No focused cell/formula/comment owner exists. |
 | Drawable/text-box comments and replies | 🟡 | ✅ | 🟡 | Host [`PagesEditor` comment methods](../../litchi-iwa/src/pages/editor.rs) and the shared comment editor retain raw-ID comment/reply CRUD for drawable/text-box targets. This is explicitly a remaining host gap; focused `litchi-pages` has no comment-thread model or transaction. |
 | Legacy host as a replacement for the focused API | ❌ | N/A | ❌ | The host is not a substitute for the `litchi-pages` public contract; the deletion gate and remaining migration dependencies still apply. |
 
@@ -140,10 +140,10 @@ make the focused package a media owner. None of these host capabilities is count
 The tracked native fixture is [`test-data/iwork/pages/basic.pages`](../../../test-data/iwork/pages/basic.pages),
 with provenance and hashes in [`test-data/iwork/README.md`](../../../test-data/iwork/README.md).
 Its focused test proves package open, semantic text/section readback, validation, exact no-op
-streaming, and ZIP/bytes parity. Focused transaction tests are primarily synthetic or
-self-roundtrip (`E1`). No complete checked-in `E3`/`E4` ledger currently proves that every changed
-candidate opens in Apple Pages, survives a native save/close/reopen cycle, and then passes a
-strict Litchi reread.
+streaming, and ZIP/bytes parity. Most focused transaction tests are synthetic or self-roundtrip
+(`E1`), while the hidden-axis owner has the operation-specific native fixtures described below.
+There is no complete checked-in `E3`/`E4` ledger for every Pages transaction or arbitrary native
+dependency graph.
 
 An operation-specific current-producer probe is recorded in [ADR 0028](../../../docs/adr/0028-iwa-monolith-exit.md#2026-09-03-amendment-typed-media-boundaries-and-bounded-archive-verification):
 Apple Pages authored a marker, square, and circle; Arrange > Send to Back saved without repair
@@ -154,33 +154,33 @@ candidate with the marker and both shapes intact, without repair or conversion U
 evidence for that bounded drawable-order operation only, not a complete Pages E3/E4 ledger or
 package-wide acceptance claim.
 
-The focused Pages graph, codec, identity/COW, and concurrency tests cover E1
-source/self-round-trip behavior. The checked-in [`body-table-visible.pages`](../../../test-data/iwork/pages/body-table-visible.pages)
-fixture is a native Pages 14.4 baseline with a visible 5-by-4 body table and a body marker.
-Disposable Computer Use copies were saved, closed, and reopened without repair UI; the focused
-package save path produced byte-identical output for the visible-table/no-op operation. A separate
-disposable copy was edited in Pages by entering `Native profile read back` in cell A2, then saved,
-closed, and reopened with the body marker, visible five-by-four table, and new cell text intact and
-without a repair prompt. Its post-close SHA-256 was
-`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`; this is native
-authoring/save/reopen evidence for the visible profile only. The checked-in fixture was restored
-after those UI checks. The native hidden-state envelope is ownerful with one state, but both row
-and column state lists are empty. The native visible profile admits this exact producer shape for
-an empty read and exact empty no-op; a changed hidden-axis request is refused as
-`UnsupportedDependency` before publication. The fixture has no user-hidden axes, so it supplies
-native visible-table/read/no-op evidence rather than positive hidden-axis E2 or E3/E4 mutation
-evidence. An older exploratory Pages 14.4 attempt logged an NSCocoa MissingObject/TSPersistence
-Import document error for a generated candidate; save/close timed out and no reopen occurred.
-AppleScript table creation also stalled without GUI inspection. That attempt remains historical
-negative exploratory evidence only. The private [`pages_hidden_state_codec`](../../litchi-iwa-protos/src/pages_hidden_state_codec.rs)
-keeps repeated state/extents on a bounded caller-owned wire walk and uses the narrow Buffa
-projection only for singular envelopes. The registered Pages hidden-axis fuzz target and checked-in
-valid, malformed, ownership, and limit corpus remain bounded evidence; current fuzz verification
-is tracked with ADR 0008. No positive hidden-axis native mutation, native byte parity, or
-package-wide hidden-state support claim follows.
+The focused Pages graph, codec, identity/COW, concurrency, and native-fixture tests cover the E1
+source/self-round-trip contract and the qualified native existing-owner profile. The checked-in
+[`body-table-visible.pages`](../../../test-data/iwork/pages/body-table-visible.pages) fixture remains
+a native Pages 14.4 visible 5-by-4 body-table baseline with a body marker; its visible profile
+supports strict empty reads and exact no-op preservation. The hidden-axis fixtures
+[`body-table-hidden-axes-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-native.pages),
+[`body-table-hidden-axes-focused-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-focused-native.pages),
+and [`body-table-hidden-axes-cleared-native.pages`](../../../test-data/iwork/pages/body-table-hidden-axes-cleared-native.pages)
+were opened, saved, closed, and reopened in Pages 14.4 without repair. They preserve the body
+marker and exercise hidden row 3/column B, all-visible state, exact no-op rereads, and strict
+semantic readback. The focused native set candidate and the native clear/reset candidate provide
+operation-specific existing-owner native evidence; the focused test also reopens library-produced
+set, clear, reset, and inverse candidates and checks source locality and dependency payload
+preservation. Native owner creation remains explicitly unsupported, and these fixtures do not
+certify arbitrary native dependency graphs, native byte parity for every rewrite, or package-wide
+hidden-state support. An older exploratory Pages 14.4 attempt logged an NSCocoa
+MissingObject/TSPersistence Import document error for a generated candidate; save/close timed out
+and no reopen occurred. AppleScript table creation also stalled without GUI inspection. That
+attempt remains historical negative exploratory evidence only. The private
+[`pages_hidden_state_codec`](../../litchi-iwa-protos/src/pages_hidden_state_codec.rs) keeps repeated
+state/extents on a bounded caller-owned wire walk and uses the narrow Buffa projection only for
+singular envelopes. The registered Pages hidden-axis fuzz target and checked-in valid, malformed,
+ownership, and limit corpus remain bounded evidence; current fuzz verification is tracked with
+ADR 0008.
 
 Feature-level verification is recorded in [ADR 0008](../../../docs/adr/0008-migration-and-verification.md#2026-09-05-amendment-pages-body-table-hidden-axis-owner-and-retained-host-compatibility).
-It does not certify the whole workspace or close the Pages native-mutation gate.
+It does not certify the whole workspace or imply package-wide Pages native acceptance.
 
 When a public Pages capability changes, update this file in the same change. Keep package
 preservation, semantic read support, focused transaction support, and native-app acceptance as

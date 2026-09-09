@@ -1,0 +1,37 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "source_file": "body-table-visible.pages",
+  "candidate_producer": "litchi_pages::Package::edit_body_table_hidden_axes",
+  "native_file": "body-table-hidden-axes-focused-native.pages",
+  "sha256": "0e76218ece2e2cf6ea12d65552459a9f3de567095e096b6b1a26293c3be0dd76",
+  "size": 108936,
+  "hidden_row_indices": [
+    2
+  ],
+  "hidden_column_indices": [
+    1
+  ],
+  "visible_row_tabs": [
+    1,
+    2,
+    4,
+    5
+  ],
+  "visible_column_tabs": [
+    "A",
+    "C",
+    "D"
+  ],
+  "body_marker": "Pages hidden-axis native oracle — 2026-09-05",
+  "lifecycle": [
+    "opened focused candidate without repair warning",
+    "verified row 3 and column B hidden",
+    "saved in Pages",
+    "closed actual document window to template chooser",
+    "reopened exact saved file without repair warning",
+    "visually verified body marker and hidden row/column tabs",
+    "closed document window to template chooser"
+  ]
+}

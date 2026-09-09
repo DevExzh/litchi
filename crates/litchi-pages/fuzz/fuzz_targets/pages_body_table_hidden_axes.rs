@@ -1539,6 +1539,7 @@ fn metadata_profile_for_descriptor(descriptor: &[u8]) -> MetadataProfile {
 
 fuzz_target!(|data: &[u8]| {
     let descriptor = normalize_descriptor(data);
+    exercise_native_existing_owner(&descriptor);
 
     // This is the primary path for every input, including malformed-mode
     // bytes.  The descriptor controls the selector, command, topology,
@@ -1569,6 +1570,81 @@ fuzz_target!(|data: &[u8]| {
     static CODEC_SWEEP: OnceLock<()> = OnceLock::new();
     CODEC_SWEEP.get_or_init(exercise_nested_codec_limits);
 });
+
+fn exercise_native_existing_owner(descriptor: &[u8]) {
+    const VISIBLE: &[u8] =
+        include_bytes!("../../../../test-data/iwork/pages/body-table-visible.pages");
+    const HIDDEN: &[u8] =
+        include_bytes!("../../../../test-data/iwork/pages/body-table-hidden-axes-native.pages");
+    let starts_hidden = descriptor.first().copied().unwrap_or_default() & 1 != 0;
+    let source = if starts_hidden { HIDDEN } else { VISIBLE };
+    let limits = Limits::new(
+        2 * 1024 * 1024,
+        128,
+        2 * 1024 * 1024,
+        4 * 1024 * 1024,
+        2 * 1024 * 1024,
+    )
+    .expect("finite native fixture limits");
+    let package = Package::from_bytes_with_limits(source, limits)
+        .expect("qualified native hidden-axis source");
+    let before = package.body_table_hidden_axes(0usize).expect("native read");
+    let expected_before = if starts_hidden {
+        HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).expect("native axes")
+    } else {
+        HiddenAxes::empty()
+    };
+    assert_eq!(before, expected_before);
+    let command = descriptor.get(1).copied().unwrap_or_default() % 4;
+    let requested = HiddenAxes::new([
+        AxisIndex::row(usize::from(
+            descriptor.get(2).copied().unwrap_or_default() % 5,
+        )),
+        AxisIndex::column(usize::from(
+            descriptor.get(3).copied().unwrap_or_default() % 4,
+        )),
+    ])
+    .expect("bounded native axes");
+    let edit = package
+        .edit_body_table_hidden_axes(0usize)
+        .expect("native edit");
+    let (edit, expected) = match command {
+        COMMAND_SET => (edit.set(requested.clone()), requested),
+        COMMAND_CLEAR => (edit.clear(), HiddenAxes::empty()),
+        COMMAND_RESET => (edit.reset(), HiddenAxes::empty()),
+        _ => (edit.set(before.clone()), before),
+    };
+    let commit = edit.commit().expect("qualified native existing-owner edit");
+    assert_eq!(
+        commit
+            .package()
+            .body_table_hidden_axes(0usize)
+            .expect("native readback"),
+        expected
+    );
+    assert_eq!(
+        commit.package().text().expect("native text"),
+        package.text().expect("source text")
+    );
+    let target_bytes = commit.package().exact_bytes();
+    let reopened = Package::from_bytes_with_limits(&target_bytes, limits).expect("native reopen");
+    assert_eq!(
+        reopened
+            .body_table_hidden_axes(0usize)
+            .expect("reopened axes"),
+        expected
+    );
+    let applied = package
+        .apply_body_table_hidden_axes(commit.patch())
+        .expect("native patch apply");
+    assert_eq!(applied.package().exact_bytes(), target_bytes);
+    let restored = applied
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())
+        .expect("native inverse");
+    assert_eq!(restored.package().exact_bytes(), source);
+    assert_eq!(package.exact_bytes(), source);
+}
 
 fn normalize_descriptor(data: &[u8]) -> Vec<u8> {
     let bounded = &data[..data.len().min(MAX_INPUT_BYTES)];
