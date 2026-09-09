@@ -253,6 +253,40 @@ impl Package {
         crate::calculation_properties::Snapshot::load_with_limits(&self.0, limits)
     }
 
+    /// Read the table-owned Survey catalog without changing the package graph.
+    pub fn surveys(&self) -> Result<crate::survey::Snapshot> {
+        crate::survey::Snapshot::load(&self.0)
+    }
+
+    /// Read the table-owned Survey catalog with explicit resource limits.
+    pub fn surveys_with_limits(
+        &self,
+        limits: &crate::survey::Limits,
+    ) -> Result<crate::survey::Snapshot> {
+        crate::survey::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Start a source-bound Survey transaction.
+    pub fn edit_surveys(&mut self) -> Result<crate::survey::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_surveys")?;
+        crate::survey::Transaction::new(&mut self.0)
+    }
+
+    /// Start a Survey transaction with explicit resource limits.
+    pub fn edit_surveys_with_limits(
+        &mut self,
+        limits: &crate::survey::Limits,
+    ) -> Result<crate::survey::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_surveys_with_limits")?;
+        crate::survey::Transaction::with_limits(&mut self.0, limits)
+    }
+
+    /// Apply an exact source-bound Survey patch.
+    pub fn apply_surveys_patch(&mut self, patch: &crate::survey::Patch) -> Result<()> {
+        self.ensure_mutation_allowed("apply_surveys_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Start a source-bound calculation-metadata transaction.
     pub fn edit_calculation_metadata(
         &mut self,
