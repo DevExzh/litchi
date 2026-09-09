@@ -44,6 +44,14 @@ pub enum Error {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
+    /// A DOCX InkML inventory exhausted a finite resource budget.
+    #[error("DOCX ink {resource} limit exceeded: {actual} > {maximum}")]
+    InkLimit {
+        resource: &'static str,
+        actual: usize,
+        maximum: usize,
+    },
+
     /// Bounded, inert VBA parsing or authoring failed.
     #[cfg(feature = "vba-inspection")]
     #[error("VBA error: {0}")]

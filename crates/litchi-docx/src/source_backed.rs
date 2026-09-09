@@ -8,6 +8,8 @@
 //! transactions retain the raw XML and may be published to a sequential sink
 //! while raw-copying every unselected ZIP member.
 
+mod ink;
+
 pub mod paragraph_copy;
 pub mod paragraph_remove;
 pub mod story_text;

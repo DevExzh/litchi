@@ -25,6 +25,7 @@ pub mod glossary;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
+pub mod ink;
 pub mod list;
 pub mod mail_merge;
 pub mod math;
