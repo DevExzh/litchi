@@ -4459,3 +4459,16 @@ typed errors, and operation budgets. Native object discovery, retained-wire
 admission, decoding, and aggregate report charging remain concrete adapter
 responsibilities. Sharing the event renderer is a prerequisite for focused
 Pages/Keynote table reads; it does not by itself retire their host readers.
+
+## 2026-09-10 Shared formula-envelope validation
+
+The native formula envelope schema and bounded preflight move into
+`litchi-numbers-wire::formula_envelope`, alongside the shared native event
+renderer. The focused Numbers reader and migration host use one validator
+for known wire types, canonical scalar encodings, required and duplicate
+fields, UTF-8, scalar-render eligibility, and lazy traversal counts.
+
+Concrete readers retain the owned formula bytes, package budget mutation,
+format-specific error mapping, and decode-at-use policy. The shared scan
+returns costs for successful and failed attempts; this boundary does not
+retire the remaining Pages/Keynote host table-reader dependencies.

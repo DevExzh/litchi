@@ -11374,3 +11374,39 @@ review confirms native operator/reference/thunk compatibility and preserves
 typed semantic failures across the codec visitor bridge.
 The new `formula_render_events` fuzz target also passes 1,000
 AddressSanitizer runs without crashes.
+
+## 2026-09-10 Shared retained-formula envelope preflight
+
+The remaining duplicated native formula schema walk belongs in
+`litchi-numbers-wire::formula_envelope`. It validates borrowed wire without
+materializing generated AST objects and reports scalar eligibility, exact
+AST-node counts, and repeated metadata traversal counts. The caller retains
+the bounded byte copy and decodes only when a cell references the entry.
+
+The format adapters continue to own aggregate budget mutation. Raw formula
+bytes are charged before admission; successful scan costs are merged
+atomically, and failed attempts retain their observed field/work costs.
+Format-specific error variants remain in the host and focused adapters.
+Empty default archives and opaque unknown fields preserve their previous
+compatibility behavior.
+
+The native `formula-envelope-native.numbers` control was created in Numbers
+14.4 by entering `IF(AND(B2>0,C2=6),SUM(B2:C2),0)`. After saving, closing,
+and reopening the exact path, Numbers displayed 48.5 and retained the
+preceding arithmetic, Unicode conditional, and range results. The fixture
+receipt records its hash and the native verification scope.
+
+Required-field and node-type checks now inspect borrowed direct-field visits
+instead of allocating temporary field-span vectors. Their bounded secondary
+passes retain the established logical wire-tree accounting thresholds;
+reported work is not a count of every CPU parsing pass. Public limit profiles
+are validated against common hard ceilings and consistent spent-cost totals
+before scanning, including for empty archives.
+
+Validation passes nine independent shared-envelope tests, 100 focused
+extractor tests, 42 host extractor tests, all four native Numbers formula
+controls, and the native Pages table-values roundtrip. Strict Clippy for the
+shared-envelope tests passes. The full crate-boundary audit and all 1,039
+Python boundary tests pass, including acceptance of future reader deletion.
+The new `formula_envelope` fuzz target also completes 1,000 AddressSanitizer
+runs without crashes.

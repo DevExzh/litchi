@@ -60,3 +60,24 @@ fn native_range_and_concatenation_formulas_use_shared_event_renderer() -> Result
     }
     Ok(())
 }
+
+#[test]
+fn native_nested_formula_survives_shared_envelope_preflight() -> Result<(), Box<dyn Error>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/formula-envelope-native.numbers");
+    let package = Package::open(path)?;
+    for (address, expected) in [
+        ("B4", "=IF(AND((B2>0),(C2=6)),SUM(B2:C2),0)"),
+        ("C2", "=(SUM(1,2)*2)"),
+        ("C3", "=IF(TRUE,\"北京\",\"Café\")"),
+        ("C4", "=SUM(B2:C2)"),
+    ] {
+        let state =
+            package.table_cell("Sheet 1", "shared-model", CellPosition::from_a1(address)?)?;
+        match state.storage() {
+            Storage::Stored(Value::Formula(formula)) => assert_eq!(formula, expected),
+            other => panic!("expected native formula at {address}, got {other:?}"),
+        }
+    }
+    Ok(())
+}

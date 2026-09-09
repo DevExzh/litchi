@@ -14,6 +14,7 @@ pub mod popup_menu;
 /// Borrowed parser for legacy pre-BNC Numbers cell storage.
 pub mod pre_bnc;
 
+pub mod formula_envelope;
 /// Shared generated-free Numbers formula event renderer.
 pub mod formula_render;
 
