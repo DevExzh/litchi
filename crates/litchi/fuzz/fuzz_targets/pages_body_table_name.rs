@@ -23,6 +23,12 @@ const PRIVATE_TABLE: &str = "__litchi_private_pages_name_table_107__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_name_input_107__";
 const PRIVATE_NAME: &str = "__litchi_private_pages_name_value_107__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
+const NATIVE_VISIBLE_PAGES: &[u8] =
+    include_bytes!("../../../../test-data/iwork/pages/body-table-name-visible-native.pages");
+const SOURCE_BUILT_BEFORE_PAGES: &[u8] =
+    include_bytes!("../../../../test-data/iwork/pages/source-built-table-stylesheet-before.pages");
+const NATIVE_VISIBLE_NAME: &str = "Table 1";
+const SOURCE_BUILT_BEFORE_NAME: &str = "Cities";
 
 fuzz_target!(|data: &[u8]| {
     let command = command_input(data);
@@ -33,12 +39,21 @@ fuzz_target!(|data: &[u8]| {
 
     // ZIP checksums make arbitrary mutations unlikely to reach the focused
     // table graph. Reuse each bounded input as a command against the tracked
-    // Pages seed. The seed is deliberately optional here: it is a valid
-    // native-like Pages package, but may not contain an admitted body table on
-    // every repository revision, so an unsupported selector must not panic.
+    // compatibility seed. This seed is deliberately optional because it is
+    // retained for broad ingress coverage and may not contain an admitted
+    // body table on every repository revision.
     if let Some(package) = native_package() {
         exercise_package(package, &command);
     }
+    // These two retained fixtures are qualified body-table name sources. A
+    // parse or selector-read regression must fail the fuzz run instead of
+    // being silently treated as an unsupported profile.
+    exercise_required_package(native_visible_package(), NATIVE_VISIBLE_NAME, &command);
+    exercise_required_package(
+        source_built_before_package(),
+        SOURCE_BUILT_BEFORE_NAME,
+        &command,
+    );
     exercise_semantic_values(data);
     exercise_redacted_ingress();
     exercise_input_limit();
@@ -64,6 +79,23 @@ fn native_package() -> Option<&'static Package> {
     PACKAGE
         .get_or_init(|| Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits()).ok())
         .as_ref()
+}
+
+fn native_visible_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        Package::from_bytes_with_limits(NATIVE_VISIBLE_PAGES, fuzz_limits())
+            .unwrap_or_else(|error| panic!("qualified native Pages name seed must parse: {error}"))
+    })
+}
+
+fn source_built_before_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        Package::from_bytes_with_limits(SOURCE_BUILT_BEFORE_PAGES, fuzz_limits()).unwrap_or_else(
+            |error| panic!("qualified source-built Pages name seed must parse: {error}"),
+        )
+    })
 }
 
 fn command_input(data: &[u8]) -> Vec<u8> {
@@ -290,6 +322,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
         before.as_str(),
     );
     assert_source_unchanged(package, &source_before);
+}
+
+fn exercise_required_package(package: &Package, expected_name: &str, data: &[u8]) {
+    let name = package
+        .body_table_name(BodyTableSelector::index(0))
+        .unwrap_or_else(|error| panic!("qualified Pages name seed read failed: {error}"));
+    assert_eq!(name.as_str(), expected_name);
+    exercise_package(package, data);
 }
 
 fn requested_name(before: &BodyTableName, data: &[u8]) -> BodyTableName {

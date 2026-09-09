@@ -10975,3 +10975,73 @@ as qualified by the legacy readback.
 Scoped validation passes two stylesheet/native-fixture integration tests,
 eight Pages creation tests, 43 Pages table tests, and 40 focused hidden-axis
 tests. Strict library Clippy and workspace formatting pass.
+
+## 2026-09-09 Pages native body-table name qualification
+
+The focused name owner now admits the native and source-built packages that
+the previous stylesheet repair exposed. Its metadata proof follows the
+selected-model scope documented in Wave107 and already used by appearance:
+one current component must match the model's effective locator, and exactly
+one selected UUID binding must belong to that component. Duplicate component
+IDs, duplicate UUID bindings, duplicate current locators, versioned or foreign
+selected bindings, unknown metadata, and external/data/ambiguous/root-map
+routes touching the selected model remain terminal. Visitor facts are staged
+until bounded inspection completes. Allocation failures retain their typed
+error instead of becoming generic invalid-source errors.
+
+Unrelated known metadata routes and missing unrelated UUID registrations are
+opaque-preserved. The removed whole-package UUID bijection had incorrectly
+required registrations for the metadata archive and empty component roots.
+The physical header census also now distinguishes object references from
+data-asset references: object references must resolve to physical objects;
+unrelated data IDs are not treated as object IDs. Selected-model data routes
+and foreign inbound ownership remain rejected. No builder UUID registrations
+are invented and no metadata-less synthetic profile is removed.
+
+Changed rename and changed patch application additionally prove the rooted
+Pages calculation-engine dependency route, TP.DocumentArchive field 15 to
+TSA.DocumentArchive field 4. The private dependency module uses the shared
+Buffa lazy calculation-engine/tracker/formula-owner codecs and cumulative wire
+budgets. It checks local payload references and archive declaration paths,
+unique reachable type-4008 owners, and volatile name cells. Active volatile
+sheet/table-name cells and selected pivot owners return UnsupportedSource;
+malformed or unproven reachable routes fail before publication. Ordinary
+time-cell dependencies and empty name-cell envelopes remain supported. Reads
+and exact no-ops do not run changed-name dependency guards.
+
+The native control was created from body-table-visible.pages by showing its
+title in Pages 14.4, then saving, closing, and reopening it. Its visible title
+was Table 1. A focused transaction renamed it to Native renamed table; Pages
+opened the exact candidate without repair, displayed the new title and the
+five-by-four grid, saved, closed to the chooser, and reopened the exact saved
+path with the title and body marker intact. The control, candidate, app-saved
+file, and receipts are retained as body-table-name-*. The Rust publication
+contract remains one selected model component plus preview invalidation, with
+metadata preserved byte-for-byte. Pages itself changes metadata during save;
+the native receipt does not claim that app-saved metadata stays identical.
+
+Regression coverage includes native, source-built, and native-saved reads by
+index/name, rename, exact no-op, candidate reopen, exact inverse, member
+locality, partial unrelated registries, selected registration loss, foreign
+component assignment, duplicate current locators, alias reassignment, and
+typed budget refusal with source atomicity. Dependency regressions distinguish
+active name volatility from ordinary time volatility and cover malformed
+root paths, missing/duplicate reachable owners, and pivot refusal. The fuzz
+harness now requires native title-visible and source-built seed admission
+instead of silently skipping those lifecycle paths.
+
+This qualifies the focused name operation; it does not retire PagesEditor::tables
+or its raw-ID consumers. A bounded semantic table catalog and focused physical
+table/cell owners are still required before deleting that compatibility route.
+No crate, dependency edge, or ordered monolith-exit debt is removed here.
+
+Validation passes 44 focused name integration tests (22 existing, eight
+dependency, and 14 native/readback), four dependency unit tests, strict Pages
+library Clippy, and a 20-input AddressSanitizer smoke run with the required
+native/source seeds (495 MiB peak reported RSS). The existing canonical
+unknown-group preservation regression remains green: the pivot probe uses a
+bounded borrowed raw-field scan and charges cumulative fields, work, and depth.
+
+The legacy host regression now asserts successful focused rename, an exact
+repeated no-op, and preserved name/cell content through resize and reopen; its
+former source-builder rejection expectation is obsolete for this qualified slice.

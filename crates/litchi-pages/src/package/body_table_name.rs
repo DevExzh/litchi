@@ -30,6 +30,8 @@ use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
 use crate::table::name::Name;
 
+mod dependencies;
+
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
@@ -444,6 +446,7 @@ impl Package {
         {
             return Err(BodyTableNameError::PatchConflict);
         }
+        dependencies::validate(self, &patch.proof, &mut budget)?;
         charge_fingerprint(patch.target.as_ref(), &mut budget)?;
         if page_layout::fingerprint(patch.target.as_ref()) != patch.target_fingerprint {
             return Err(BodyTableNameError::PatchConflict);
@@ -498,6 +501,7 @@ fn commit_edit(edit: BodyTableNameEdit<'_>) -> Result<BodyTableNameCommit, BodyT
         return Err(BodyTableNameError::TableLocked);
     }
     reject_name_collision(source, &edit.target, &edit.name, &mut budget)?;
+    dependencies::validate(source, &edit.target, &mut budget)?;
     let package = rewrite_name(source, &edit.target, &edit.before, &edit.name, &mut budget)?;
     let target = package.state.source.shared_source();
     charge_fingerprint(target.as_ref(), &mut budget)?;
@@ -714,13 +718,11 @@ fn validate_name_authority(
                 if info
                     .object_references
                     .iter()
-                    .chain(info.data_references.iter())
                     .any(|reference| !identifiers.contains(reference))
                     || info.field_infos.iter().any(|field| {
                         field
                             .object_references
                             .iter()
-                            .chain(field.data_references.iter())
                             .any(|reference| !identifiers.contains(reference))
                     })
                 {
@@ -788,21 +790,13 @@ fn validate_name_authority(
     // Every selected model-header reference must resolve to a physical object;
     // this rejects stale/unknown archive-info references without constraining
     // opaque fields in unrelated native messages.
-    for reference in model_info
-        .object_references
-        .iter()
-        .chain(model_info.data_references.iter())
-    {
+    for reference in model_info.object_references.iter() {
         if !identifiers.contains(reference) {
             return Err(BodyTableNameError::InvalidSource);
         }
     }
     for field in &model_info.field_infos {
-        for reference in field
-            .object_references
-            .iter()
-            .chain(field.data_references.iter())
-        {
+        for reference in field.object_references.iter() {
             if !identifiers.contains(reference) {
                 return Err(BodyTableNameError::InvalidSource);
             }
@@ -876,8 +870,8 @@ fn validate_metadata_authority(
     // This transaction owns only the selected model's current component and
     // locator authority. UUID bit patterns and component assignments for
     // unrelated objects have no independent physical truth in this slice, so
-    // they remain opaque; uniqueness, complete object-ID coverage, and every
-    // inbound/ambiguous/data route are still checked below.
+    // they remain opaque; duplicate bindings, a unique current locator, and
+    // every selected external/ambiguous/data route are still checked below.
     let Some(component) = package
         .state
         .source
@@ -956,11 +950,9 @@ fn validate_metadata_authority(
         || visitor.invalid_authority
         || visitor.duplicate_component
         || visitor.duplicate_object
+        || visitor.duplicate_locator
         || !visitor.selected_model
-        || visitor.object_ids.len() != identifiers.len()
-        || identifiers
-            .iter()
-            .any(|id| !visitor.object_ids.contains(id))
+        || visitor.current_locator_identifier != visitor.selected_component_identifier
     {
         return Err(BodyTableNameError::InvalidSource);
     }
@@ -978,6 +970,9 @@ struct MetadataAuthorityVisitor<'expected> {
     expected_locator: &'expected str,
     components: HashSet<u64>,
     object_ids: HashSet<u64>,
+    current_locator_identifier: Option<u64>,
+    selected_component_identifier: Option<u64>,
+    duplicate_locator: bool,
 }
 
 impl<'expected> MetadataAuthorityVisitor<'expected> {
@@ -1013,6 +1008,15 @@ impl PackageMetadataVisitor for MetadataAuthorityVisitor<'_> {
         if !self.components.insert(component.identifier()) {
             self.duplicate_component = true;
         }
+        if component.is_current() && component.effective_locator() == self.expected_locator {
+            if self
+                .current_locator_identifier
+                .replace(component.identifier())
+                .is_some()
+            {
+                self.duplicate_locator = true;
+            }
+        }
         Ok(())
     }
 
@@ -1028,6 +1032,7 @@ impl PackageMetadataVisitor for MetadataAuthorityVisitor<'_> {
             if !component.is_current() || component.effective_locator() != self.expected_locator {
                 self.invalid_authority = true;
             }
+            self.selected_component_identifier = Some(component.identifier());
             self.selected_model = true;
         }
         Ok(())
@@ -1035,48 +1040,63 @@ impl PackageMetadataVisitor for MetadataAuthorityVisitor<'_> {
 
     fn visit_external_reference(
         &mut self,
-        _reference: ExternalReferenceDescriptor<'_>,
+        reference: ExternalReferenceDescriptor<'_>,
     ) -> Result<(), MetadataError> {
-        self.invalid_authority = true;
+        if reference.object_identifier() == Some(self.expected_identifier) {
+            self.invalid_authority = true;
+        }
         Ok(())
     }
 
     fn visit_data_reference(
         &mut self,
-        _reference: DataReferenceDescriptor<'_>,
+        reference: DataReferenceDescriptor<'_>,
     ) -> Result<(), MetadataError> {
-        self.invalid_authority = true;
+        if reference.data_identifier() == self.expected_identifier {
+            self.invalid_authority = true;
+        }
         Ok(())
     }
 
     fn visit_data_reference_owner(
         &mut self,
-        _owner: DataReferenceOwnerDescriptor<'_>,
+        owner: DataReferenceOwnerDescriptor<'_>,
     ) -> Result<(), MetadataError> {
-        self.invalid_authority = true;
+        if owner.object_identifier() == self.expected_identifier
+            || owner.data_identifier() == self.expected_identifier
+        {
+            self.invalid_authority = true;
+        }
         Ok(())
     }
 
     fn visit_ambiguous_object_identifier(
         &mut self,
         _component: ComponentDescriptor<'_>,
-        _identifier: u64,
+        identifier: u64,
     ) -> Result<(), MetadataError> {
-        self.invalid_authority = true;
+        if identifier == self.expected_identifier {
+            self.invalid_authority = true;
+        }
         Ok(())
     }
 
     fn visit_data_metadata_map(
         &mut self,
-        _object_identifier: u64,
+        object_identifier: u64,
         _has_unknown_fields: bool,
     ) -> Result<(), MetadataError> {
-        self.invalid_authority = true;
+        if object_identifier == self.expected_identifier {
+            self.invalid_authority = true;
+        }
         Ok(())
     }
 }
 
 fn map_metadata_error(error: MetadataError) -> BodyTableNameError {
+    if let Some(amount) = error.allocation_request() {
+        return BodyTableNameError::Allocation { amount };
+    }
     match error.resource_limit() {
         Some(limit) => {
             let (kind, observed, maximum) = match limit {

@@ -4376,3 +4376,21 @@ mutation metadata admission.
 This retires a read-side compatibility implementation. Public selector-first
 mutation admission, native changed-edit parity, and the remaining monolith
 exit gates are unchanged. See the [ADR 0028 follow-up](0028-iwa-monolith-exit.md#2026-09-06-follow-up-focused-catalog-appearance-reads-and-native-datetime).
+
+## 2026-09-09 Pages name-owner native admission follow-up
+
+The Wave107 name owner now supports the retained native and source-built
+body-table fixtures. Selected-model authority remains strict; unrelated known
+metadata and data-asset references no longer require a physical-object UUID
+bijection. Unique current effective locators and selected binding ownership
+are verified before publication. A private Buffa-based dependency module
+guards changed renames and patch application against active volatile name
+cells, pivot owners, and malformed rooted calculation-engine routes. Reads
+and exact no-ops retain their separate behavior.
+
+Pages 14.4 displayed a focused rename, saved it, closed, and reopened the exact
+file with its title, grid, and body marker preserved. The fixtures and receipts
+are under test-data/iwork/pages/body-table-name-*. ADR0028's matching amendment
+records the proof and remaining name-only publication scope. Legacy
+PagesEditor::tables and physical table/cell responsibilities remain in the
+monolith; no package/dependency/debt deletion is claimed.

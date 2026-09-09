@@ -2032,7 +2032,7 @@ fn out_of_bounds_cell_update_is_transactional() {
 }
 
 #[test]
-fn source_built_table_rejects_unsupported_focused_rename_and_roundtrips_resize() {
+fn source_built_table_roundtrips_focused_rename_and_resize() {
     let mut editor = PagesDocumentBuilder::new()
         .body_table("Original", 3, 2)
         .build()
@@ -2042,16 +2042,15 @@ fn source_built_table_rejects_unsupported_focused_rename_and_roundtrips_resize()
         .set_table_cell(model_id, 1, 1, CellValue::Text("kept".to_owned()))
         .unwrap();
 
-    // Builder snapshots are not admitted by the strict focused package
-    // owner.  Keep this host path fail-closed rather than reviving the raw
-    // rename setter as a compatibility fallback.
-    let before_rename = editor.to_bytes().unwrap();
-    assert!(set_pages_table_name(&mut editor, model_id, "Renamed").is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before_rename);
+    set_pages_table_name(&mut editor, model_id, "Renamed").unwrap();
+    assert_eq!(editor.tables().unwrap()[0].name, "Renamed");
+    let renamed = editor.to_bytes().unwrap();
+    set_pages_table_name(&mut editor, model_id, "Renamed").unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), renamed);
     editor.resize_table(model_id, 5, 4).unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let info = reopened.tables().unwrap().remove(0);
-    assert_eq!(info.name, "Original");
+    assert_eq!(info.name, "Renamed");
     assert_eq!((info.rows, info.columns), (5, 4));
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),

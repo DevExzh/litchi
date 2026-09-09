@@ -627,7 +627,14 @@ The name owner carries its wire, text, reference, output, and transaction
 ceilings internally; this harness observes typed failures and does not invent
 caller knobs that the public API does not expose. Recipes under
 `corpus/pages_body_table_name/` are command inputs, not native Pages package
-copies.
+copies. The target also embeds the retained qualified sources
+`test-data/iwork/pages/body-table-name-visible-native.pages` and
+`test-data/iwork/pages/source-built-table-stylesheet-before.pages`. Each is
+parsed once through `OnceLock`, and each must successfully read its first
+body-table name (`Table 1` and `Cities`, respectively); parse or selector-read
+regressions fail the fuzz run. The command recipes already cover ASCII,
+UTF-8, no-op, inverse/conflict, malformed, selector, and limit cases, so no
+native package copies are added to the corpus.
 
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same

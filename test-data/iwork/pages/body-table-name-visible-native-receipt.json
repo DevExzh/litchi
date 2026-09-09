@@ -1,0 +1,18 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "source": "body-table-visible.pages",
+  "file": "body-table-name-visible-native.pages",
+  "size": 114134,
+  "sha256": "3b34070e8dfaa07d614efc69c3d15416540676e2c1f2a0f1075d711aacf4f738",
+  "lifecycle": [
+    "opened a disposable copy of the existing native visible table fixture",
+    "enabled the table Title checkbox in Pages",
+    "observed visible title Table 1 and the five-by-four grid",
+    "saved and closed the actual document window to the template chooser",
+    "reopened the exact saved path without repair and observed the same title and grid",
+    "closed to the template chooser"
+  ],
+  "scope": "Native baseline with visible table title for focused rename verification. No Litchi name mutation is qualified by this baseline alone."
+}
