@@ -753,19 +753,94 @@ struct CommentListFact {
     root: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct CommentSegmentFact {
+    root_id: u64,
+    segment_id: u64,
+    root_component_index: usize,
+    segment_component_index: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CommentCellFact {
+    table_id: u64,
+    key: u32,
+}
+
 #[derive(Debug, Default)]
 struct CommentOwnershipCensus {
     comment_list_ids: Vec<u64>,
     rooted_segment_ids: Vec<u64>,
+    segment_edges: Vec<CommentSegmentFact>,
     list_entries: Vec<CommentListFact>,
     table_references: Vec<u64>,
     cell_comment_keys: Vec<u32>,
     cell_comment_owners: Vec<(usize, u32)>,
+    cell_comments: Vec<CommentCellFact>,
     storages: Vec<CommentStorageFact>,
     author_ids: Vec<u64>,
     reply_ids: Vec<u64>,
     entry_storage_ids: Vec<u64>,
     uuids: Vec<(u64, u64)>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CensusBudget {
+    observed: usize,
+    maximum: usize,
+}
+
+impl CensusBudget {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            observed: 0,
+            maximum,
+        }
+    }
+
+    fn charge(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        let observed = self
+            .observed
+            .checked_add(amount)
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::References,
+                observed: usize::MAX,
+                maximum: self.maximum,
+                path,
+            })?;
+        if observed > self.maximum {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::References,
+                observed,
+                maximum: self.maximum,
+                path,
+            });
+        }
+        self.observed = observed;
+        Ok(())
+    }
+}
+
+/// The archive census serves two different contracts.  Mutation requires an
+/// exact ArchiveInfo aggregate/FieldInfo ownership proof and one inbound owner
+/// for every reply leaf.  A semantic read only needs the source graph to be
+/// coherent: the aggregate references, list entries, storage payloads, and
+/// direct reply topology must agree.  Keeping this policy explicit prevents a
+/// native reader quirk from weakening any write authorization gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommentCensusMode {
+    Mutation,
+    Read,
+}
+
+impl CommentCensusMode {
+    const fn requires_field_infos(self) -> bool {
+        matches!(self, Self::Mutation)
+    }
+
+    const fn allows_shared_replies(self) -> bool {
+        matches!(self, Self::Read)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -824,6 +899,7 @@ impl ArchiveMutation {
 #[derive(Debug, Clone)]
 struct CommentEntryLocation {
     owner: EntryOwner,
+    segment_id: Option<u64>,
     route: MessageRoute,
     entry: EntryFact,
     storage_occurrences: usize,
@@ -882,7 +958,13 @@ impl Package {
             return Err(Error::CommentNotFound { path });
         }
 
-        let census = census_comment_ownership(self, path)?;
+        // The semantic reader uses a deliberately separate census policy.
+        // ArchiveInfo/FieldInfo ownership is required before a mutation, but
+        // native Numbers may omit the FieldInfo mirror for an otherwise
+        // readable comment list.  Likewise, a reply may live in another
+        // current component or be shared by more than one root.  Keep those
+        // facts out of the mutation census below.
+        let census = census_comment_read(self, path)?;
         validate_comment_authors(self, &census, path)?;
         validate_reply_package_metadata(self, path)?;
         let entry = located
@@ -911,34 +993,58 @@ impl Package {
             )
             .ok_or(Error::InvalidSource { path })?;
         let selected_key = located.comment_key.ok_or(Error::InvalidSource { path })?;
+        let selected_table_id = located
+            .comment_table_id
+            .ok_or(Error::InvalidSource { path })?;
         let selected_storage_id = entry.entry.storage_id;
         let mut matching_lists = census.list_entries.iter().filter(|fact| {
             fact.list_type == tst::table_data_list::ListType::CommentStorage as i32
-                && fact.table_id == located.comment_table_id.unwrap_or(0)
                 && fact.key == selected_key
                 && fact.storage_id == Some(selected_storage_id)
-                && fact.root
+                && match entry.owner {
+                    EntryOwner::Root => {
+                        fact.root
+                            && fact.table_id == selected_table_id
+                            && fact.component_index == entry.route.component_index
+                    },
+                    // A segmented entry is owned by its 6011 object.  The
+                    // semantic route intentionally keeps the root list route;
+                    // ownership here is established by the selected root's
+                    // explicit segment edge, rather than by a global key.
+                    EntryOwner::Segment => {
+                        let Some(segment_id) = entry.segment_id else {
+                            return false;
+                        };
+                        !fact.root
+                            && fact.table_id == segment_id
+                            && census.segment_edges.iter().any(|edge| {
+                                edge.root_id == selected_table_id
+                                    && edge.segment_id == segment_id
+                                    && edge.root_component_index == entry.route.component_index
+                                    && edge.segment_component_index == fact.component_index
+                            })
+                    },
+                }
         });
         let list = matching_lists.next().ok_or(Error::InvalidSource { path })?;
+        let selected_cells = census
+            .cell_comments
+            .iter()
+            .filter(|cell| cell.table_id == selected_table_id && cell.key == selected_key)
+            .count();
         if matching_lists.next().is_some()
-            || usize::try_from(list.refcount).ok()
-                != Some(
-                    census
-                        .cell_comment_keys
-                        .iter()
-                        .filter(|key| **key == selected_key)
-                        .count(),
-                )
+            || census
+                .table_references
+                .iter()
+                .filter(|identifier| **identifier == selected_table_id)
+                .count()
+                != 1
+            || usize::try_from(list.refcount).ok() != Some(selected_cells)
         {
             return Err(Error::InvalidSource { path });
         }
         if root.reply_ids != located.reply_ids {
             return Err(Error::InvalidSource { path });
-        }
-        prove_archive_reference_ownership(self, root.object_id, entry.route, path)?;
-        let root_route = located.storage.ok_or(Error::InvalidSource { path })?;
-        for reply_id in &located.reply_ids {
-            prove_archive_reference_ownership(self, *reply_id, root_route, path)?;
         }
         if located.reply_ids.is_empty() {
             return Ok(Box::default());
@@ -1192,7 +1298,12 @@ fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), E
         payload_len.saturating_mul(2).max(1),
         1,
     );
-    super::comments_metadata::inspect(source, options)
+    // A semantic read may encounter a current component whose descriptor is
+    // not present in the legacy metadata registry (native Numbers does this
+    // for otherwise readable empty-reply graphs). The mutation path remains
+    // strict in comments_reply.rs; this read-only inspection still validates
+    // metadata syntax, conflicts, and ownership namespaces.
+    super::comments_metadata::inspect_cross_component_read(source, options)
         .map_err(|_| Error::InvalidSource { path })?;
     Ok(())
 }
@@ -1614,6 +1725,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
     let details = decode_comment_storage(source, storage_message.data.as_slice(), target.path)?;
     let entry = CommentEntryLocation {
         owner: list_location.owner,
+        segment_id: list_location.segment_id,
         route: list_location.route,
         entry: list_location.entry,
         storage_occurrences: list_location.storage_occurrences,
@@ -3126,6 +3238,7 @@ fn validate_comment_segment_key_range(
 #[derive(Debug, Clone)]
 struct ListLocation {
     owner: EntryOwner,
+    segment_id: Option<u64>,
     route: MessageRoute,
     entry: EntryFact,
     storage_id: u64,
@@ -3172,7 +3285,7 @@ fn comment_table_entry(
     let (table_route, mut root_probe) = selected.ok_or(Error::InvalidSource { path })?;
     let mut selected_entry = root_probe
         .target_entry
-        .map(|entry| (entry, EntryOwner::Root));
+        .map(|entry| (entry, EntryOwner::Root, None));
     let mut storage_ids = std::mem::take(&mut root_probe.storage_ids);
     for (segment_id, _segment_occurrence) in root_probe.segment_ids {
         let segment = source
@@ -3181,6 +3294,17 @@ fn comment_table_entry(
             .resolve_ref_id(&source.state.components, segment_id)
             .map_err(|_| Error::InvalidSource { path })?
             .ok_or(Error::InvalidSource { path })?;
+        let segment_object_id = source
+            .state
+            .components
+            .catalog()
+            .get_index(segment.component_index)
+            .and_then(|component| component.archive().objects.get(segment.object_index))
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if segment_object_id != segment_id {
+            return Err(Error::InvalidSource { path });
+        }
         let segment_message_index = unique_message_index(segment.messages, 6_011, path)?;
         let segment_message = &segment.messages[segment_message_index];
         let (segment_probe, segment_type) = decode_list_probe(
@@ -3210,13 +3334,13 @@ fn comment_table_entry(
             if selected_entry.is_some() {
                 return Err(Error::InvalidSource { path });
             }
-            selected_entry = Some((entry, EntryOwner::Segment));
+            selected_entry = Some((entry, EntryOwner::Segment, Some(segment_id)));
         }
     }
     if root_probe.target_missing_storage {
         return Err(Error::InvalidSource { path });
     }
-    let (entry, owner) = selected_entry.ok_or(Error::InvalidSource { path })?;
+    let (entry, owner, segment_id) = selected_entry.ok_or(Error::InvalidSource { path })?;
     if entry.refcount == 0 {
         return Err(Error::InvalidSource { path });
     }
@@ -3229,6 +3353,7 @@ fn comment_table_entry(
     }
     Ok(ListLocation {
         owner,
+        segment_id,
         route: table_route,
         entry,
         storage_id: entry.storage_id,
@@ -3719,7 +3844,20 @@ fn prove_archive_reference_ownership(
 }
 
 fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Mutation)
+}
+
+fn census_comment_read(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Read)
+}
+
+fn census_comment_ownership_with_mode(
+    source: &Package,
+    path: Path,
+    mode: CommentCensusMode,
+) -> Result<CommentOwnershipCensus, Error> {
     let mut census = CommentOwnershipCensus::default();
+    let mut budget = CensusBudget::new(source.state.options.semantic().max_references());
     let mut storage_ids = HashSet::new();
     for (component_index, component) in source.state.components.catalog().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -3758,19 +3896,32 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                                 object,
                                 message_index,
                                 &expected,
+                                mode.requires_field_infos(),
                                 path,
                             )?;
                         } else {
-                            validate_comment_message_metadata(object, message_index, &[], path)?;
+                            validate_comment_message_metadata(
+                                object,
+                                message_index,
+                                &[],
+                                mode.requires_field_infos(),
+                                path,
+                            )?;
                         }
                         if is_comment {
                             if census.comment_list_ids.contains(&object_id) {
                                 return Err(Error::InvalidSource { path });
                             }
-                            push_nonzero(&mut census.comment_list_ids, object_id, path)?;
+                            push_nonzero(
+                                &mut census.comment_list_ids,
+                                object_id,
+                                &mut budget,
+                                path,
+                            )?;
                         }
                         append_list_facts(
                             &mut census,
+                            &mut budget,
                             component_index,
                             object_id,
                             list_type,
@@ -3823,15 +3974,29 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                                     .identifier
                                     .ok_or(Error::InvalidSource { path })?;
                                 if segment_object_id == 0
-                                    || census.rooted_segment_ids.contains(&segment_object_id)
+                                    || segment_object_id != segment_id
+                                    || (matches!(mode, CommentCensusMode::Mutation)
+                                        && census.rooted_segment_ids.contains(&segment_object_id))
                                 {
                                     return Err(Error::InvalidSource { path });
                                 }
                                 push_nonzero(
                                     &mut census.rooted_segment_ids,
                                     segment_object_id,
+                                    &mut budget,
                                     path,
                                 )?;
+                                budget.charge(1, path)?;
+                                census
+                                    .segment_edges
+                                    .try_reserve(1)
+                                    .map_err(|_| Error::Allocation { amount: 1, path })?;
+                                census.segment_edges.push(CommentSegmentFact {
+                                    root_id: object_id,
+                                    segment_id,
+                                    root_component_index: component_index,
+                                    segment_component_index: segment.component_index,
+                                });
                             }
                             let (segment_probe, segment_type) = decode_list_probe(
                                 source,
@@ -3849,6 +4014,7 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                                 segment_object,
                                 segment_message_index,
                                 &expected,
+                                mode.requires_field_infos(),
                                 path,
                             )?;
                         }
@@ -3869,9 +4035,16 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                             None,
                         )?;
                         let expected = probe.storage_ids.clone();
-                        validate_comment_message_metadata(object, message_index, &expected, path)?;
+                        validate_comment_message_metadata(
+                            object,
+                            message_index,
+                            &expected,
+                            mode.requires_field_infos(),
+                            path,
+                        )?;
                         append_list_facts(
                             &mut census,
+                            &mut budget,
                             component_index,
                             object_id,
                             list_type,
@@ -3883,6 +4056,22 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                     COMMENT_STORAGE_MESSAGE_TYPE => {
                         let details =
                             decode_comment_storage_graph(source, message.data.as_slice(), path)?;
+                        // A reply may be shared by multiple roots, but one
+                        // root must never list the same direct leaf twice.
+                        // The read census permits cross-root sharing and this
+                        // local check preserves ordinal unambiguity.
+                        let mut direct_reply_ids = HashSet::new();
+                        direct_reply_ids
+                            .try_reserve(details.reply_ids.len())
+                            .map_err(|_| Error::Allocation {
+                                amount: details.reply_ids.len(),
+                                path,
+                            })?;
+                        for reply_id in &details.reply_ids {
+                            if !direct_reply_ids.insert(*reply_id) {
+                                return Err(Error::InvalidSource { path });
+                            }
+                        }
                         let mut expected = Vec::new();
                         expected
                             .try_reserve(
@@ -3902,7 +4091,13 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                             expected.push(author);
                         }
                         expected.extend(details.reply_ids.iter().copied());
-                        validate_comment_message_metadata(object, message_index, &expected, path)?;
+                        validate_comment_message_metadata(
+                            object,
+                            message_index,
+                            &expected,
+                            mode.requires_field_infos(),
+                            path,
+                        )?;
                         let fact = CommentStorageFact {
                             object_id,
                             author_id: details.author_id,
@@ -3913,12 +4108,14 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                         if details.author_id == Some(0) || details.storage_uuid == Some((0, 0)) {
                             return Err(Error::InvalidSource { path });
                         }
+                        if storage_ids.contains(&object_id) {
+                            return Err(Error::InvalidSource { path });
+                        }
+                        budget.charge(1, path)?;
                         storage_ids
                             .try_reserve(1)
                             .map_err(|_| Error::Allocation { amount: 1, path })?;
-                        if !storage_ids.insert(object_id) {
-                            return Err(Error::InvalidSource { path });
-                        }
+                        storage_ids.insert(object_id);
                         census
                             .storages
                             .try_reserve(1)
@@ -3928,15 +4125,16 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                             if author == object_id {
                                 return Err(Error::InvalidSource { path });
                             }
-                            push_nonzero(&mut census.author_ids, author, path)?;
+                            push_nonzero(&mut census.author_ids, author, &mut budget, path)?;
                         }
                         for reply in &details.reply_ids {
                             if *reply == object_id {
                                 return Err(Error::InvalidSource { path });
                             }
-                            push_nonzero(&mut census.reply_ids, *reply, path)?;
+                            push_nonzero(&mut census.reply_ids, *reply, &mut budget, path)?;
                         }
                         if let Some(uuid) = details.storage_uuid {
+                            budget.charge(1, path)?;
                             census
                                 .uuids
                                 .try_reserve(1)
@@ -3950,10 +4148,17 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
             }
         }
     }
-    census_models_and_cells(source, &mut census, path)?;
+    census_models_and_cells(
+        source,
+        &mut census,
+        &mut budget,
+        mode.requires_field_infos(),
+        path,
+    )?;
     census_alias_checks(
         &census,
         source.state.options.semantic().max_references(),
+        mode.allows_shared_replies(),
         path,
     )?;
     Ok(census)
@@ -3961,6 +4166,7 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
 
 fn append_list_facts(
     census: &mut CommentOwnershipCensus,
+    budget: &mut CensusBudget,
     component_index: usize,
     table_id: u64,
     list_type: i32,
@@ -3985,8 +4191,9 @@ fn append_list_facts(
             return Err(Error::InvalidSource { path });
         }
         if let Some(storage_id) = entry.storage_id {
-            push_nonzero(&mut census.entry_storage_ids, storage_id, path)?;
+            push_nonzero(&mut census.entry_storage_ids, storage_id, budget, path)?;
         }
+        budget.charge(1, path)?;
         census
             .list_entries
             .try_reserve(1)
@@ -4004,10 +4211,16 @@ fn append_list_facts(
     Ok(())
 }
 
-fn push_nonzero(values: &mut Vec<u64>, value: u64, path: Path) -> Result<(), Error> {
+fn push_nonzero(
+    values: &mut Vec<u64>,
+    value: u64,
+    budget: &mut CensusBudget,
+    path: Path,
+) -> Result<(), Error> {
     if value == 0 {
         return Err(Error::InvalidSource { path });
     }
+    budget.charge(1, path)?;
     values.try_reserve(1).map_err(|_| Error::Allocation {
         amount: values.len().saturating_add(1),
         path,
@@ -4019,15 +4232,19 @@ fn push_nonzero(values: &mut Vec<u64>, value: u64, path: Path) -> Result<(), Err
 fn census_alias_checks(
     census: &CommentOwnershipCensus,
     maximum_references: usize,
+    allow_shared_replies: bool,
     path: Path,
 ) -> Result<(), Error> {
     let observed = [
         census.comment_list_ids.len(),
         census.rooted_segment_ids.len(),
+        census.segment_edges.len(),
         census.list_entries.len(),
+        census.entry_storage_ids.len(),
         census.table_references.len(),
         census.cell_comment_keys.len(),
         census.cell_comment_owners.len(),
+        census.cell_comments.len(),
         census.storages.len(),
         census.author_ids.len(),
         census.reply_ids.len(),
@@ -4071,7 +4288,7 @@ fn census_alias_checks(
             path,
         })?;
     for reply in &census.reply_ids {
-        if !reply_ids.insert(*reply) {
+        if !reply_ids.insert(*reply) && !allow_shared_replies {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -4137,6 +4354,26 @@ fn census_alias_checks(
     }
     for key in &census.cell_comment_keys {
         if !comment_entry_keys.contains(key) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for cell in &census.cell_comments {
+        let root_entry = census.list_entries.iter().any(|entry| {
+            entry.root
+                && entry.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                && entry.table_id == cell.table_id
+                && entry.key == cell.key
+        });
+        let segment_entry = census.segment_edges.iter().any(|edge| {
+            edge.root_id == cell.table_id
+                && census.list_entries.iter().any(|entry| {
+                    !entry.root
+                        && entry.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                        && entry.table_id == edge.segment_id
+                        && entry.key == cell.key
+                })
+        });
+        if !root_entry && !segment_entry {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -4259,6 +4496,7 @@ fn validate_comment_message_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
     expected: &[u64],
+    require_field_infos: bool,
     path: Path,
 ) -> Result<(), Error> {
     if object.archive_info.message_infos.len() != object.messages.len() {
@@ -4308,7 +4546,7 @@ fn validate_comment_message_metadata(
     if !expected.is_empty() && info.object_references != expected {
         return Err(Error::InvalidSource { path });
     }
-    if !expected.is_empty() && info.field_infos.is_empty() {
+    if !expected.is_empty() && require_field_infos && info.field_infos.is_empty() {
         return Err(Error::InvalidSource { path });
     }
     let mut field_reference_index = 0usize;
@@ -4343,7 +4581,14 @@ fn validate_comment_message_metadata(
             }
         }
     }
-    if !expected.is_empty() && field_reference_index != expected.len() {
+    // Native Numbers sometimes keeps the aggregate ArchiveInfo edge while
+    // omitting the corresponding FieldInfo mirror.  A read census may admit
+    // that representation, but a present FieldInfo sequence is still checked
+    // in full above and a mutation census still requires it.
+    if !expected.is_empty()
+        && (require_field_infos || !info.field_infos.is_empty())
+        && field_reference_index != expected.len()
+    {
         return Err(Error::InvalidSource { path });
     }
     Ok(())
@@ -4352,6 +4597,8 @@ fn validate_comment_message_metadata(
 fn census_models_and_cells(
     source: &Package,
     census: &mut CommentOwnershipCensus,
+    budget: &mut CensusBudget,
+    require_field_infos: bool,
     path: Path,
 ) -> Result<(), Error> {
     let mut scan_work = 0;
@@ -4367,7 +4614,13 @@ fn census_models_and_cells(
                 {
                     return Err(Error::InvalidSource { path });
                 }
-                validate_comment_message_metadata(object, message_index, &[], path)?;
+                validate_comment_message_metadata(
+                    object,
+                    message_index,
+                    &[],
+                    require_field_infos,
+                    path,
+                )?;
                 let options = table_cell_decode_options(
                     source,
                     message.data.len(),
@@ -4429,7 +4682,12 @@ fn census_models_and_cells(
                 };
                 let comment_table = store.comment_storage_table();
                 if let Some(reference) = comment_table {
-                    push_nonzero(&mut census.table_references, reference.identifier(), path)?;
+                    push_nonzero(
+                        &mut census.table_references,
+                        reference.identifier(),
+                        budget,
+                        path,
+                    )?;
                 }
                 let decoded = DecodedTableStorage {
                     data_store: store,
@@ -4453,6 +4711,12 @@ fn census_models_and_cells(
                     return Err(Error::InvalidSource { path });
                 }
                 let key_count = keys.len();
+                if comment_table.is_none() && key_count != 0 {
+                    return Err(Error::InvalidSource { path });
+                }
+                budget.charge(key_count, path)?;
+                budget.charge(key_count, path)?;
+                budget.charge(key_count, path)?;
                 census
                     .cell_comment_keys
                     .try_reserve(key_count)
@@ -4468,9 +4732,24 @@ fn census_models_and_cells(
                         path,
                     })?;
                 census
+                    .cell_comments
+                    .try_reserve(key_count)
+                    .map_err(|_| Error::Allocation {
+                        amount: key_count,
+                        path,
+                    })?;
+                census
                     .cell_comment_keys
                     .extend(keys.iter().map(|(_, key)| *key));
-                census.cell_comment_owners.extend(keys);
+                census.cell_comment_owners.extend(keys.iter().copied());
+                if let Some(table) = comment_table {
+                    census
+                        .cell_comments
+                        .extend(keys.iter().map(|(_, key)| CommentCellFact {
+                            table_id: table.identifier(),
+                            key: *key,
+                        }));
+                }
             }
         }
     }
@@ -4534,9 +4813,9 @@ fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> 
 #[cfg(test)]
 mod tests {
     use super::{
-        ArchiveMutation, Comment, CommentAuthor, CommentOwnershipCensus, CommentReply,
-        CommentStorageFact, CommentTimestamp, Error, LimitKind, MessageRoute, Path, WireLimits,
-        cell_ranges, census_alias_checks,
+        ArchiveMutation, CensusBudget, Comment, CommentAuthor, CommentOwnershipCensus,
+        CommentReply, CommentStorageFact, CommentTimestamp, Error, LimitKind, MessageRoute, Path,
+        WireLimits, cell_ranges, census_alias_checks,
     };
 
     #[test]
@@ -4666,7 +4945,7 @@ mod tests {
             ..CommentOwnershipCensus::default()
         };
 
-        let error = census_alias_checks(&census, 1, Path::Package)
+        let error = census_alias_checks(&census, 1, false, Path::Package)
             .expect_err("the complete census must share one reference ceiling");
 
         assert_eq!(
@@ -4678,6 +4957,40 @@ mod tests {
                 path: Path::Package,
             }
         );
+    }
+
+    #[test]
+    fn census_budget_accepts_exact_reference_limit() {
+        let mut budget = CensusBudget::new(2);
+        budget
+            .charge(1, Path::Package)
+            .expect("first retained fact should fit");
+        budget
+            .charge(1, Path::Package)
+            .expect("the inclusive reference boundary should fit");
+        assert_eq!(budget.observed, 2);
+    }
+
+    #[test]
+    fn census_budget_rejects_overflow_without_advancing() {
+        let mut budget = CensusBudget::new(usize::MAX);
+        budget
+            .charge(usize::MAX, Path::Package)
+            .expect("the maximum representable charge should fit");
+        let error = budget
+            .charge(1, Path::Package)
+            .expect_err("a checked reference charge must reject arithmetic overflow");
+
+        assert_eq!(
+            error,
+            Error::LimitExceeded {
+                kind: LimitKind::References,
+                observed: usize::MAX,
+                maximum: usize::MAX,
+                path: Path::Package,
+            }
+        );
+        assert_eq!(budget.observed, usize::MAX);
     }
 
     #[test]
@@ -4694,7 +5007,7 @@ mod tests {
             ..CommentOwnershipCensus::default()
         };
         assert!(matches!(
-            census_alias_checks(&duplicate_reply, 16, Path::Package),
+            census_alias_checks(&duplicate_reply, 16, false, Path::Package),
             Err(Error::InvalidSource {
                 path: Path::Package
             })
@@ -4705,7 +5018,7 @@ mod tests {
             ..CommentOwnershipCensus::default()
         };
         assert!(matches!(
-            census_alias_checks(&duplicate_uuid, 16, Path::Package),
+            census_alias_checks(&duplicate_uuid, 16, false, Path::Package),
             Err(Error::InvalidSource {
                 path: Path::Package
             })

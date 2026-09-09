@@ -647,10 +647,8 @@ fn malformed_reply_graphs_are_rejected_before_any_public_value() -> TestResult {
         Corruption::ZeroRefcount,
         Corruption::AggregateMissing,
         Corruption::AggregateExtra,
-        Corruption::FieldInfoMissing,
         Corruption::FieldInfoDuplicate,
         Corruption::FieldInfoWrong,
-        Corruption::OpaqueInbound,
         Corruption::UnknownMetadata,
         Corruption::MissingAuthor,
     ] {
@@ -1039,9 +1037,15 @@ fn shared_root_edit_is_copy_on_write_and_preserves_sibling() -> TestResult {
 }
 
 #[test]
-fn shared_reply_graph_is_rejected_by_the_direct_leaf_scope() -> TestResult {
+fn shared_reply_graph_reads_but_rejects_mutation() -> TestResult {
     let source = fixture(FixtureMode::SharedReply, None)?;
-    assert_read_rejected(&source, "shared reply archive")?;
+    let package = load_package(&source)?;
+    assert_eq!(
+        read_all(&package, 0)?,
+        vec!["shared reply".to_owned(), "second reply".to_owned()]
+    );
+    assert_eq!(read_all(&package, 1)?, vec!["shared reply".to_owned()]);
+    assert_eq!(exact_bytes(&package)?, source);
     assert_edit_rejected_atomically(&source, "shared reply archive")
 }
 
@@ -1129,5 +1133,60 @@ fn export_comment_metadata_fuzz_fixture() -> TestResult {
     let package = load_package(&source)?;
     assert_eq!(read_all(&package, 0)?, ["duplicate"; 3]);
     std::fs::write(path, source)?;
+    Ok(())
+}
+
+#[test]
+fn export_comment_read_parity_fuzz_fixtures() -> TestResult {
+    let Some(directory) = std::env::var_os("LITCHI_NUMBERS_COMMENT_READ_FUZZ_DIRECTORY") else {
+        return Ok(());
+    };
+    let directory = std::path::PathBuf::from(directory);
+    std::fs::create_dir_all(&directory)?;
+    for (name, mode, corruption) in [
+        ("shared-root", FixtureMode::SharedRoot, None),
+        ("shared-reply", FixtureMode::SharedReply, None),
+        ("cross-component", FixtureMode::CrossComponent, None),
+        ("segmented-root", FixtureMode::SegmentedRoot, None),
+        (
+            "native-field-info-absence",
+            FixtureMode::DuplicateText,
+            Some(Corruption::FieldInfoMissing),
+        ),
+    ] {
+        let source = fixture(mode, corruption)?;
+        let package = load_package(&source)?;
+        assert!(!read_all(&package, 0)?.is_empty());
+        assert_eq!(exact_bytes(&package)?, source);
+        std::fs::write(directory.join(format!("{name}.numbers")), source)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn read_only_graphs_preserve_strict_mutation_ownership() -> TestResult {
+    for corruption in [Corruption::FieldInfoMissing, Corruption::OpaqueInbound] {
+        let source = with_corruption(FixtureMode::SingleRoot, corruption)?;
+        let package = load_package(&source)?;
+        assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
+        assert_eq!(exact_bytes(&package)?, source);
+        assert_edit_rejected_atomically(&source, &format!("{corruption:?}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn independent_tables_reusing_comment_keys_read_without_combining_refcounts() -> TestResult {
+    let source = multitable_same_key_fixture()?;
+    let package = load_package(&source)?;
+    for (table, text) in [
+        (TABLE_NAME, "first reply"),
+        (SECOND_TABLE_NAME, "second table reply"),
+    ] {
+        let replies = package.table_cell_comment_replies_a1(SHEET_NAME, table, "A1")?;
+        assert_eq!(replies.len(), 1);
+        assert_eq!(replies[0].text(), text);
+    }
+    assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }

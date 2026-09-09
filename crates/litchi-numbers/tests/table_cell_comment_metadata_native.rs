@@ -3,12 +3,15 @@
 use std::{fs, io::Read, path::PathBuf};
 
 use litchi_numbers::{
-    CellPosition, Package, SheetSelector, TableCellComment, TableCellCommentError, TableSelector,
+    CellPosition, Package, SheetSelector, TableCellComment, TableSelector, cell::Value,
+    table::cells::Storage,
 };
 
 const SOURCE: &[u8] = include_bytes!("fixtures/comment-edit-root.numbers");
 const NATIVE: &[u8] =
     include_bytes!("../../../test-data/iwork/numbers/comment-metadata-native-resaved.numbers");
+const NATIVE_CREATED: &[u8] =
+    include_bytes!("../../../test-data/iwork/numbers/comment-reader-native-created.numbers");
 const OPTIONAL_NATIVE_PATH_ENV: &str = "LITCHI_NATIVE_COMMENT_METADATA_PATH";
 const MAX_OPTIONAL_NATIVE_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -25,6 +28,15 @@ fn assert_native_root_metadata(
         Some("litchi-iwa")
     );
     Ok(root)
+}
+
+fn assert_native_created_sentinel(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
+    let state = package.table_cell_a1("Sheet 1", "Table 1", "B2")?;
+    match state.storage() {
+        Storage::Stored(Value::Text(value)) => assert_eq!(value, "Native comment parity"),
+        storage => panic!("native-created B2 sentinel mismatch: {storage:?}"),
+    }
+    Ok(())
 }
 
 #[test]
@@ -97,15 +109,52 @@ fn optional_native_saved_root_readback_preserves_semantic_metadata()
 }
 
 #[test]
-fn native_saved_reply_list_read_remains_an_explicit_gap() -> Result<(), Box<dyn std::error::Error>>
-{
+fn native_saved_empty_reply_list_reads_without_field_info_header()
+-> Result<(), Box<dyn std::error::Error>> {
     let native = Package::from_bytes(NATIVE)?;
-    assert!(matches!(
-        native.table_cell_comment_replies_a1("Sheet 1", "Review", "B2"),
-        Err(TableCellCommentError::InvalidSource { .. })
-    ));
+    assert!(
+        native
+            .table_cell_comment_replies_a1("Sheet 1", "Review", "B2")?
+            .is_empty()
+    );
     let mut unchanged = Vec::new();
     native.write_to(&mut unchanged)?;
     assert_eq!(unchanged, NATIVE);
+    Ok(())
+}
+
+#[test]
+fn native_created_root_read_preserves_metadata_and_empty_replies()
+-> Result<(), Box<dyn std::error::Error>> {
+    let native = Package::from_bytes(NATIVE_CREATED)?;
+    let root = native
+        .table_cell_comment_a1("Sheet 1", "Table 1", "B2")?
+        .ok_or("native-created B2 comment missing")?;
+    assert_eq!(root.text(), "Native root comment");
+    assert!(root.timestamp().is_some());
+    assert_eq!(
+        root.author().and_then(|author| author.display_name()),
+        Some("Ryker Zhu")
+    );
+    assert_native_created_sentinel(&native)?;
+    assert!(
+        native
+            .table_cell_comment_replies_a1("Sheet 1", "Table 1", "B2")?
+            .is_empty()
+    );
+    let mut unchanged = Vec::new();
+    native.write_to(&mut unchanged)?;
+    assert_eq!(unchanged, NATIVE_CREATED);
+    let reopened = Package::from_bytes(&unchanged)?;
+    let reopened_root = reopened
+        .table_cell_comment_a1("Sheet 1", "Table 1", "B2")?
+        .ok_or("reopened native-created B2 comment missing")?;
+    assert_eq!(reopened_root, root);
+    assert_native_created_sentinel(&reopened)?;
+    assert!(
+        reopened
+            .table_cell_comment_replies_a1("Sheet 1", "Table 1", "B2")?
+            .is_empty()
+    );
     Ok(())
 }

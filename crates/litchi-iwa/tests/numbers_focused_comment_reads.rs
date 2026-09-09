@@ -265,13 +265,30 @@ fn wire_root_identifier(source: &[u8], row: usize) -> TestResult<u64> {
     let mut roots = Vec::new();
     for object in &archive.objects {
         for payload in &object.messages {
-            let Ok(list) = tst::TableDataList::decode(payload.data.as_slice()) else {
-                continue;
-            };
-            if list.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
+            if payload.type_ == fixture::TABLE_DATA_LIST_TYPE || payload.type_ == 6_201 {
+                let Ok(list) = tst::TableDataList::decode(payload.data.as_slice()) else {
+                    continue;
+                };
+                if list.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
+                    continue;
+                }
+                if let Some(entry) = list.entries.iter().find(|entry| entry.key == key) {
+                    if let Some(reference) = entry.comment_storage.as_ref() {
+                        roots.push(reference.identifier);
+                    }
+                }
                 continue;
             }
-            if let Some(entry) = list.entries.iter().find(|entry| entry.key == key) {
+            if payload.type_ != 6_011 {
+                continue;
+            }
+            let Ok(segment) = tst::TableDataListSegment::decode(payload.data.as_slice()) else {
+                continue;
+            };
+            if segment.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
+                continue;
+            }
+            if let Some(entry) = segment.entries.iter().find(|entry| entry.key == key) {
                 if let Some(reference) = entry.comment_storage.as_ref() {
                     roots.push(reference.identifier);
                 }
@@ -283,6 +300,46 @@ fn wire_root_identifier(source: &[u8], row: usize) -> TestResult<u64> {
         [] => Err(io::Error::other("comment fixture list key is missing").into()),
         _ => Err(io::Error::other("comment fixture list key is ambiguous").into()),
     }
+}
+
+fn assert_focused_replies_match_wire(
+    package: &Package,
+    source: &[u8],
+    row: usize,
+    address: &str,
+) -> TestResult {
+    let root_identifier = wire_root_identifier(source, row)?;
+    assert_focused_replies_match_wire_for_table(
+        package,
+        source,
+        fixture::TABLE_NAME,
+        address,
+        root_identifier,
+    )
+}
+
+fn assert_focused_replies_match_wire_for_table(
+    package: &Package,
+    source: &[u8],
+    table: &str,
+    address: &str,
+    root_identifier: u64,
+) -> TestResult {
+    let expected = wire_comment(source, root_identifier)?;
+    let root = package
+        .table_cell_comment_a1(fixture::SHEET_NAME, table, address)?
+        .ok_or_else(|| io::Error::other(format!("focused root comment is missing at {address}")))?;
+    assert_metadata(&root, &expected);
+    let replies = package.table_cell_comment_replies_a1(fixture::SHEET_NAME, table, address)?;
+    assert_eq!(
+        replies.len(),
+        expected.replies.len(),
+        "reply count at {address}"
+    );
+    for (reply, expected) in replies.iter().zip(expected.replies.iter()) {
+        assert_metadata(reply, expected);
+    }
+    Ok(())
 }
 
 fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -445,16 +502,82 @@ fn focused_numbers_comment_reads_handle_absent_and_shared_roots() -> TestResult 
 }
 
 #[test]
-fn focused_numbers_cross_component_reply_reads_are_an_explicit_gap() -> TestResult {
-    // The focused reader currently rejects this valid host-reader topology.
-    // Keep the refusal typed and source-preserving until cross-component read
-    // parity is admitted by the focused owner.
+fn focused_numbers_shared_reply_reads_match_wire_oracle_for_each_root() -> TestResult {
+    let source = fixture::fixture(FixtureMode::SharedReply, None)?;
+    let package = Package::from_bytes(&source)?;
+    assert_focused_replies_match_wire(&package, &source, 0, "A1")?;
+    assert_focused_replies_match_wire(&package, &source, 1, "A2")?;
+    assert_source_unchanged(&package, &source)?;
+    Ok(())
+}
+
+#[test]
+fn focused_numbers_cross_component_reply_reads_match_wire_oracle() -> TestResult {
     let source = fixture::fixture(FixtureMode::CrossComponent, None)?;
     let package = Package::from_bytes(&source)?;
-    assert!(matches!(
-        package.table_cell_comment_replies_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1"),
-        Err(TableCellCommentError::InvalidSource { .. })
-    ));
+    assert_focused_replies_match_wire(&package, &source, 0, "A1")?;
+    assert_focused_replies_match_wire(&package, &source, 1, "A2")?;
+    assert_source_unchanged(&package, &source)?;
+    Ok(())
+}
+
+#[test]
+fn focused_numbers_multitable_same_key_reads_use_selected_list_local_refcount() -> TestResult {
+    let source = fixture::multitable_same_key_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    assert_focused_replies_match_wire_for_table(
+        &package,
+        &source,
+        fixture::TABLE_NAME,
+        "A1",
+        fixture::ROOT_COMMENT_ID,
+    )?;
+    assert_focused_replies_match_wire_for_table(
+        &package,
+        &source,
+        fixture::SECOND_TABLE_NAME,
+        "A1",
+        fixture::SECOND_ROOT_COMMENT_ID,
+    )?;
+    assert_source_unchanged(&package, &source)?;
+    Ok(())
+}
+
+#[test]
+fn focused_numbers_segmented_comment_reads_match_wire_oracle() -> TestResult {
+    let source = fixture::fixture(FixtureMode::SegmentedRoot, None)?;
+    let package = Package::from_bytes(&source)?;
+    assert_focused_replies_match_wire(&package, &source, 0, "A1")?;
+    assert_source_unchanged(&package, &source)?;
+    Ok(())
+}
+
+#[test]
+fn focused_numbers_segmented_reads_pin_the_selected_parent_edge() -> TestResult {
+    let source = fixture::segmented_with_unrelated_segment_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    assert_focused_replies_match_wire_for_table(
+        &package,
+        &source,
+        fixture::TABLE_NAME,
+        "A1",
+        fixture::ROOT_COMMENT_ID,
+    )?;
+    assert_source_unchanged(&package, &source)?;
+    Ok(())
+}
+
+#[test]
+fn focused_numbers_read_accepts_native_style_missing_field_info_headers() -> TestResult {
+    let source = fixture::fixture(FixtureMode::SingleRoot, Some(Corruption::FieldInfoMissing))?;
+    let package = Package::from_bytes(&source)?;
+    package
+        .table_cell_comment_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1")?
+        .ok_or_else(|| io::Error::other("missing-field-info root comment is missing"))?;
+    let replies = package
+        .table_cell_comment_replies_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1")
+        .map_err(|error| io::Error::other(format!("missing-field-info replies: {error:?}")))?;
+    assert_eq!(replies.len(), 1);
     assert_source_unchanged(&package, &source)?;
     Ok(())
 }
@@ -471,6 +594,7 @@ fn focused_numbers_comment_reads_reject_malformed_graphs_atomically_and_keep_unk
         Corruption::TypedReplyReference,
         Corruption::MissingReply,
         Corruption::WrongReplyType,
+        Corruption::SegmentedList,
     ] {
         let source = fixture::fixture(FixtureMode::SingleRoot, Some(corruption))?;
         let before = source.clone();

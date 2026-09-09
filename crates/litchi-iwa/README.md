@@ -1436,10 +1436,12 @@ and synchronized sibling-temporary, distinct-output, no-clobber publication.
 Selector-first `litchi_numbers::Package` reads and A1 edits provide root
 comments and ordered direct replies with optional checked timestamps and
 author display metadata. Native object identifiers stay inside the adapter.
+Focused reads support shared replies, cross-component storage, segmented lists,
+and native empty threads while retaining strict mutation ownership checks.
 The deprecated `NumbersEditor::cell_comment` and
-`NumbersEditor::cell_comment_replies` readers remain available for shared,
-cross-component, and segmented comment graphs until their semantic parity is
-proven.
+`NumbersEditor::cell_comment_replies` readers remain for legacy compatibility
+sources outside the strict native package profile. Their retirement also needs
+a semantic compatibility path and native reply save/reopen evidence.
 
 ```rust
 #![allow(deprecated)]

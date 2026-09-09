@@ -10603,3 +10603,72 @@ tests. Cargo manifest sorting is skipped because no manifest changed.
 The final normal commit hooks passed. Afterward, scoped
 `cargo clean -p litchi-numbers -p litchi-iwa` removed 32,667 files
 (13.1 GiB).
+
+## 2026-09-09 Numbers comment reader parity
+
+Focused ordered direct-reply reads now admit shared leaves, cross-component
+storage, segmented lists, and valid native headers without FieldInfo mirrors.
+Present FieldInfo sequences remain fully validated. Root-to-segment provenance
+is explicit, and cell refcounts are scoped to the selected comment list so
+identical keys in independent tables cannot interfere. Retained census facts
+are charged incrementally to the reference budget. The reader uses the existing
+metadata policy that allows unmapped current components; malformed metadata,
+ambiguous ownership namespaces, duplicate direct replies, and unsupported
+nested or cyclic topology remain rejected. Mutation census and metadata
+ownership policies remain strict.
+
+A fresh Blank workbook was created through Computer Use in Numbers 14.4.
+B2 contains `Native comment parity` and the root comment `Native root comment`
+by `Ryker Zhu`. After saving, closing to the template chooser, and reopening
+the exact path, the text and author were visually verified without a repair
+warning. The permanent file is
+`test-data/iwork/numbers/comment-reader-native-created.numbers`; its adjacent
+receipt records its hash, size, and lifecycle. Native reply creation was not
+established. Both this file and the previous native-resaved golden now read an
+empty reply list successfully while retaining exact source bytes.
+
+Both public legacy comment readers remain. A trial migration of the host
+root/reply assertions exposed eight source-built compatibility cases rejected
+by strict `Package::from_bytes` at table-storage projection, before comment
+resolution. These legacy table models omit native style-reference envelopes;
+they remain supported by the host compatibility reader. The trial removal
+was therefore not retained. Retiring either reader requires a selector-first
+semantic compatibility path, or equivalent proven coverage of that existing
+behavior, without normalizing away source fields or weakening native ingress.
+Native direct-reply creation/save/reopen evidence remains outstanding as well.
+The eleven ordered migration debts and the monolithic crate remain open.
+
+### Reader parity validation
+
+The focused cross-crate suite passes 17 independent wire-oracle tests; the
+reply integration suite passes 27 tests, and native metadata/readback passes
+four tests. Coverage includes independent tables reusing a key, an unrelated
+segment with the same key/storage edge, absent native FieldInfo mirrors,
+malformed graphs, source preservation, and fresh native sentinel/reopen checks.
+The boundary suite passes 1,008 tests; the scanner accepts 64 packages and
+238 internal dependency declarations with eleven explicit migration debts.
+The fresh native receipt hash and size match its permanent file.
+
+The nightly AddressSanitizer target builds and replays fifteen inputs in
+sixteen executions including initialization: the ten checked-in command seeds
+and five exported shared-root/shared-reply/cross-component/segmented/missing-
+FieldInfo packages. Both permanent native files are embedded as fixed root
+metadata and empty-reply assertions. The bounded replay completes without a
+sanitizer failure; it is not exhaustive fuzzing or native reply-creation
+validation.
+
+The final host editor suite passes all 166 tests with the compatibility readers
+retained. Normal commit hooks pass formatting, strict all-feature workspace
+Clippy, all-feature workspace library/integration tests, and documentation
+tests. No Cargo manifest changed. After validation, scoped `cargo clean` of the
+isolated sanitizer target removed 2,237 files (2.2 GiB); the scratch native
+copy, exported corpus, logs, Python cache, and generated fuzz lockfile were
+removed. Permanent fixtures, receipts, and checked-in corpus seeds remain.
+
+The next bounded retirement step is a private physical package context and
+selector-based semantic compatibility comment reads, modeled on the existing
+table-sort compatibility handoff. It must preserve rooted sheet/table identity,
+reuse bounded comment decoding and graph validation, keep the incomplete
+physical context private, and retain strict native ingress. The eight legacy
+compatibility cases must pass without rewriting their source graphs before
+retiring the host readers.
