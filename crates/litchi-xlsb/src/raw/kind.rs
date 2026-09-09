@@ -147,6 +147,22 @@ pub const END_VOL_MAIN: Kind = Kind(519);
 pub const END_VOL_TOPIC: Kind = Kind(521);
 pub const END_VOL_TYPE: Kind = Kind(517);
 
+// Spreadsheet Data Model workbook records (MS-XLSB 2.4.46, 2.4.116-120,
+// 2.4.402, 2.4.470-473, and 2.4.714-716).
+pub const BEGIN_DATA_MODEL: Kind = Kind(2121);
+pub const END_DATA_MODEL: Kind = Kind(2122);
+pub const BEGIN_MODEL_TABLES: Kind = Kind(2123);
+pub const END_MODEL_TABLES: Kind = Kind(2124);
+pub const MODEL_TABLE: Kind = Kind(2125);
+pub const BEGIN_MODEL_RELATIONSHIPS: Kind = Kind(2126);
+pub const END_MODEL_RELATIONSHIPS: Kind = Kind(2127);
+pub const MODEL_RELATIONSHIP: Kind = Kind(2128);
+pub const BEGIN_MODEL_TIME_GROUPINGS: Kind = Kind(2137);
+pub const END_MODEL_TIME_GROUPINGS: Kind = Kind(2138);
+pub const BEGIN_MODEL_TIME_GROUPING: Kind = Kind(2139);
+pub const END_MODEL_TIME_GROUPING: Kind = Kind(2140);
+pub const MODEL_TIME_GROUPING_CALC_COL: Kind = Kind(2141);
+
 // Filter records
 pub const BEGIN_A_FILTER: Kind = Kind(0x00A1);
 pub const END_A_FILTER: Kind = Kind(0x00A2);

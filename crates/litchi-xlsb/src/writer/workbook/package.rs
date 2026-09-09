@@ -17,7 +17,6 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
-#[cfg(feature = "vba-inspection")]
 use std::sync::Arc;
 
 pub(super) fn checked_capacity(resource: &'static str, terms: &[usize]) -> Result<usize> {
@@ -43,6 +42,12 @@ impl WorkbookWriter {
     ///
     /// * `writer` - A writer that implements `Write` and `Seek`
     pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+        if let Some(model) = self.data_model.as_ref() {
+            crate::data_model::validate_definition_connections(
+                &model.definition,
+                self.connections.as_ref(),
+            )?;
+        }
         self.validate_formula_metadata()?;
         let mut xml_maps_plan = crate::writer::xml_maps::stage(
             self.xml_maps.as_ref(),
@@ -358,6 +363,17 @@ impl WorkbookWriter {
 
         // Add part to package
         package.add_part(Box::new(workbook_part));
+
+        // The Data Model payload is an implicit, relationship-free model part
+        // (MS-XLSB 2.1.7.35 and MS-XLSX 2.1.6). It is discovered by content
+        // type; no workbook or package relationship is emitted.
+        if let Some(model) = &self.data_model {
+            package.add_part(Box::new(BlobPart::new_shared(
+                PackURI::new(crate::data_model::DATA_MODEL_PART_NAME)?,
+                crate::data_model::DATA_MODEL_CONTENT_TYPE.to_string(),
+                Arc::clone(&model.part.bytes),
+            )));
+        }
 
         // Add relationship from root to workbook
         package.relate_to(

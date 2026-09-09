@@ -1,0 +1,7 @@
+# XLSB Data Model owner
+
+The owner reads typed workbook Data Model table, relationship and time-grouping records, validates their Connections bindings, and exposes the fixed relationship-free model part as bounded inert bytes. Package and Workbook facades support source-bound snapshots, transactions and reversible patches. Load-version and explicit payload replacement retain source boundaries; structural identity edits are refused when the opaque payload dependency closure cannot be proved.
+
+Rust 1.95.0 validation passed 807 tests and nine doctests, strict all-target/all-feature Clippy, changed-file formatting, and whitespace checks. One existing corpus-dependent Calculation Chain test and 11 doctests remain ignored. Fifteen focused Data Model integration tests include signed/no-op behavior, metadata admission, physical URI equivalence, source conflicts, and actual remove/save/reopen/inverse restoration of noncanonical content types and explicit empty relationship members. The elevated-limit case restores a content-types member larger than the OPC default 8 MiB ceiling using explicit 16 MiB owner limits.
+
+The receipt binds the 16 reviewed files and compressed root logs. XLSB fixtures here are synthetic; native XLSX/XLDM codec evidence belongs to its separate batch and does not prove XLSB producer compatibility. Modeled metadata estimates are distinct from total allocations and OPC provenance budgets. No refresh, execution, model evaluation, latency, throughput or total-memory improvement is claimed.

@@ -112,6 +112,7 @@ pub mod cell_watches;
 pub mod chart;
 pub mod comments;
 pub mod conditional_formatting;
+pub mod data_model;
 pub mod data_validation;
 pub mod date_utils;
 pub mod external_link;
