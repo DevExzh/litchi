@@ -68263,6 +68263,64 @@ IWA_TABLE_CELL_BORDERS_COMMON_IMPORT = re.compile(
     r"(?:Borders\b|\{[^;\n]*\bBorders\b)"
 )
 
+# Keep the neutral sparse table owner below concrete iWork formats; facade
+# behavior remains covered by cross-crate tests.
+NEUTRAL_TABLE_MANIFEST = Path("crates/litchi-iwa-common/Cargo.toml")
+NEUTRAL_TABLE_SOURCE_ROOT = Path("crates/litchi-iwa-common/src/table")
+NEUTRAL_TABLE_MODULE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "mod.rs"
+NEUTRAL_TABLE_CELL_MODULE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "cell.rs"
+NEUTRAL_TABLE_VALUE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "cell" / "value.rs"
+NEUTRAL_TABLE_COORDINATE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "coordinate.rs"
+NEUTRAL_TABLE_MODEL_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "model.rs"
+NEUTRAL_TABLE_REQUIRED_EXPORTS = {
+    NEUTRAL_TABLE_VALUE_SOURCE: frozenset({"FiniteF64", "FiniteF64Error", "Type", "Update", "Value"}),
+    NEUTRAL_TABLE_COORDINATE_SOURCE: frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+    NEUTRAL_TABLE_MODEL_SOURCE: frozenset({"Builder", "Cell", "Dimensions", "Error", "Grid", "Table", "View"}),
+}
+NEUTRAL_TABLE_REQUIRED_MODULES = {
+    NEUTRAL_TABLE_MODULE_SOURCE: frozenset({"cell", "coordinate", "model"}),
+    NEUTRAL_TABLE_CELL_MODULE_SOURCE: frozenset({"value"}),
+}
+NEUTRAL_TABLE_FORBIDDEN_DEPENDENCIES = frozenset(
+    {"buffa", "prost", "prost-types"}
+    | {
+        f"litchi-{name}"
+        for name in (
+            "iwa", "iwa-archive", "iwa-core", "iwa-detect", "iwa-graph",
+            "iwa-index", "iwa-package", "iwa-protos", "iwa-text-wire",
+            "keynote", "numbers", "numbers-wire", "pages",
+        )
+    }
+)
+NEUTRAL_TABLE_FORBIDDEN_IMPORTS = frozenset(
+    {"archive", "proto", "protobuf", "wire"}
+    | {name.replace("-", "_") for name in NEUTRAL_TABLE_FORBIDDEN_DEPENDENCIES}
+)
+NEUTRAL_TABLE_FORBIDDEN_PATH = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    + "|".join(
+        re.escape(name)
+        for name in sorted(NEUTRAL_TABLE_FORBIDDEN_IMPORTS, key=len, reverse=True)
+    )
+    + r")(?![A-Za-z0-9_])[ \t\r\n]*::"
+)
+NEUTRAL_TABLE_FORBIDDEN_USE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:[ \t]*\([^()\r\n]*\))?[ \t]+)?use\b"
+)
+NEUTRAL_TABLE_EXTERN_CRATE = re.compile(
+    r"(?m)^[ \t]*extern[ \t]+crate[ \t]+(?:r#)?"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+NEUTRAL_TABLE_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_FIELD = re.compile(
+    r"\bsemantic_table[ \t\r\n]*:[ \t\r\n]*"
+    r"litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table"
+    r"[ \t\r\n]*::[ \t\r\n]*model[ \t\r\n]*::[ \t\r\n]*Table\b"
+)
+
 
 def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the cell-border value in common and the old path compatibility-only."""
@@ -68343,6 +68401,151 @@ def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]
                 )
 
     return sorted(set(violations))
+
+
+def audit_neutral_table_model_source_topology(root: Path = ROOT) -> list[str]:
+    """Protect neutral table ownership and the Numbers/Pages source boundary."""
+
+    common_root = root / NEUTRAL_TABLE_SOURCE_ROOT
+    if not common_root.is_dir():
+        return []
+    violations: list[str] = []
+
+    manifest_path = root / NEUTRAL_TABLE_MANIFEST
+    if not manifest_path.is_file():
+        violations.append(f"neutral table model manifest is missing: {NEUTRAL_TABLE_MANIFEST}")
+    else:
+        try:
+            manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            violations.append(f"neutral table model manifest cannot be parsed: {error}")
+        else:
+            cache: dict[Path, str | None] = {}
+            for table_name, dependencies in _cargo_dependency_tables(manifest):
+                for alias, specification in dependencies.items():
+                    for candidate in _cargo_dependency_candidates(
+                        manifest_path, table_name, alias, specification, cache
+                    ):
+                        if candidate.replace("_", "-") in NEUTRAL_TABLE_FORBIDDEN_DEPENDENCIES:
+                            violations.append(
+                                "neutral table model depends on concrete format/archive "
+                                f"or wire crate {candidate}: {NEUTRAL_TABLE_MANIFEST} "
+                                f"[{table_name}] alias={alias}"
+                            )
+
+    for relative_path, required in NEUTRAL_TABLE_REQUIRED_MODULES.items():
+        path = root / relative_path
+        if not path.is_file():
+            violations.append(f"neutral table module source is missing: {relative_path}")
+            continue
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        declared = {
+            match.group("name") for match in NEUTRAL_TABLE_PUBLIC_MODULE.finditer(source)
+        }
+        for name in sorted(required - declared):
+            violations.append(f"neutral table module is missing public {name}: {relative_path}")
+
+    for relative_path, required in NEUTRAL_TABLE_REQUIRED_EXPORTS.items():
+        path = root / relative_path
+        if not path.is_file():
+            violations.append(f"neutral table semantic owner source is missing: {relative_path}")
+            continue
+        source = path.read_text(encoding="utf-8")
+        missing = required - _rust_canonical_exports(source, required)
+        for name in sorted(missing):
+            violations.append(f"neutral table semantic owner is missing public {name}: {relative_path}")
+        for declaration, line_number in _rust_public_declarations(source):
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                reason = _iwork_public_leak(match.group(1))
+                if reason is None:
+                    continue
+                line = line_number + declaration.count("\n", 0, match.start(1))
+                violations.append(
+                    f"neutral table semantic owner exposes {reason} {match.group(1)}: "
+                    f"{relative_path}:{line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    f"neutral table semantic owner exposes raw byte slice: "
+                    f"{relative_path}:{line}"
+                )
+
+    # Mask trivia and apply the import ratchet to every table sidecar.
+    for path in sorted(common_root.rglob("*.rs")):
+        code = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for match in NEUTRAL_TABLE_FORBIDDEN_PATH.finditer(code):
+            line = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"neutral table source imports forbidden path: {path.relative_to(root)}:{line}"
+            )
+        for match in NEUTRAL_TABLE_FORBIDDEN_USE.finditer(code):
+            end = code.find(";", match.end())
+            statement = code[match.start() : len(code) if end < 0 else end]
+            for identifier in RUST_IDENTIFIER.finditer(statement):
+                if identifier.group(1) not in NEUTRAL_TABLE_FORBIDDEN_IMPORTS:
+                    continue
+                line = code.count("\n", 0, match.start() + identifier.start(1)) + 1
+                violations.append(
+                    f"neutral table source imports forbidden crate/module "
+                    f"{identifier.group(1)}: {path.relative_to(root)}:{line}"
+                )
+        for match in NEUTRAL_TABLE_EXTERN_CRATE.finditer(code):
+            if match.group("name") not in NEUTRAL_TABLE_FORBIDDEN_IMPORTS:
+                continue
+            line = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"neutral table source declares forbidden external crate "
+                f"{match.group('name')}: {path.relative_to(root)}:{line}"
+            )
+
+    # Numbers may wrap and alias the common model, but cannot re-define it.
+    numbers_definition_checks = (
+        (
+            Path("crates/litchi-numbers/src/cell/mod.rs"),
+            frozenset({"FiniteF64", "FiniteF64Error", "Type", "Update", "Value"}),
+        ),
+        (
+            Path("crates/litchi-numbers/src/table/coordinate.rs"),
+            frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+        ),
+        (
+            Path("crates/litchi-numbers/src/table.rs"),
+            frozenset({"Cell", "Dimensions", "Error", "Grid", "View"}),
+        ),
+    )
+    local_definition = re.compile(
+        r"(?m)^\s*pub\s+(?:struct|enum|trait|union)\s+"
+        r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    for relative_path, forbidden in numbers_definition_checks:
+        path = root / relative_path
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for match in local_definition.finditer(source):
+            if match.group("name") not in forbidden:
+                continue
+            line = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"Numbers facade re-defines neutral table type {match.group('name')}: "
+                f"{relative_path}:{line}"
+            )
+
+    # A deleted host is allowed while its focused replacement lands.
+    pages_semantic_path = root / Path(
+        "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+    )
+    if pages_semantic_path.is_file():
+        pages_code = _mask_rust_non_code(pages_semantic_path.read_text(encoding="utf-8"))
+        if NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_FIELD.search(pages_code) is None:
+            violations.append(
+                "Pages semantic table must store common table::model::Table: "
+                "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+            )
+
+    return sorted(set(violations))
+
 
 
 def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
@@ -68860,6 +69063,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_section_background_source_topology()
         + audit_pages_section_background_facade_source_topology()
         + audit_iwa_table_cell_borders_source_topology()
+        + audit_neutral_table_model_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

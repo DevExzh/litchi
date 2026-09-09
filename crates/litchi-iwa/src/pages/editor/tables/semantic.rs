@@ -36,7 +36,7 @@ pub struct PagesTableInfo {
 pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
-    semantic_table: litchi_numbers::Table,
+    semantic_table: litchi_iwa_common::table::model::Table,
     comments: Box<[((usize, usize), Comment)]>,
     merges: Vec<Region>,
 }
@@ -44,7 +44,8 @@ pub struct PagesTable {
 impl PagesTable {
     /// Borrow a materialized cell value, or return `None` for an empty cell.
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
-        let position = litchi_numbers::Position::try_from_usize(row, column).ok()?;
+        let position =
+            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
         self.semantic_table.get(position)
     }
 
@@ -130,7 +131,7 @@ impl PagesEditor {
         let (semantic_table, comments) = table.into_semantic_parts()?;
         Ok(PagesTable {
             info,
-            semantic_table,
+            semantic_table: semantic_table.into_shared(),
             comments,
             merges: crate::numbers::editor::table_cell_merges_in_package(
                 self.package(),

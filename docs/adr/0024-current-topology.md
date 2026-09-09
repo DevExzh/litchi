@@ -4435,3 +4435,13 @@ The view retains caller-owned source bytes and opaque suffixes, with a fixed
 semantic values, sidecar resolution, and operation budgets remain with their
 existing owners. No format-peer edge or supported raw-ID API is introduced;
 complete Pages table/cell ownership and monolith removal remain outstanding.
+
+## 2026-09-09 Neutral sparse table model
+
+The archive-free cell value, coordinate, and sparse table implementations now
+belong to `litchi-iwa-common::table::{cell::value, coordinate, model}`. Numbers
+preserves its facade with explicit value/coordinate re-exports and thin
+Table/Builder wrappers. The host PagesTable stores the shared core directly.
+Format selectors, native graph resolution, sidecars, and transactions retain
+their concrete owners. This establishes shared semantic storage for future
+focused Pages reads without introducing a Pages-to-Numbers dependency.
