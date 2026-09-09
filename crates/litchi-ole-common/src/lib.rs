@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod custom_xml;
+pub mod dataspaces;
 pub mod object;
 pub mod property_set;
 pub mod protection;
