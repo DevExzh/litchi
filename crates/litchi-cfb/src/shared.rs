@@ -21,6 +21,7 @@ use std::{
 pub struct SharedOleFileLimits {
     max_input_bytes: u64,
     max_directory_bytes: u64,
+    max_allocation_table_bytes: u64,
 }
 
 impl SharedOleFileLimits {
@@ -32,6 +33,12 @@ impl SharedOleFileLimits {
     pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES;
     /// Largest directory stream ceiling accepted by the shared reader.
     pub const MAX_DIRECTORY_BYTES: u64 = OleFileLimits::MAX_DIRECTORY_BYTES;
+    /// Default combined decoded FAT/DIFAT/MiniFAT table ceiling.
+    pub const DEFAULT_MAX_ALLOCATION_TABLE_BYTES: u64 =
+        OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES;
+    /// Largest combined decoded FAT/DIFAT/MiniFAT table ceiling accepted by
+    /// the shared reader.
+    pub const MAX_ALLOCATION_TABLE_BYTES: u64 = OleFileLimits::MAX_ALLOCATION_TABLE_BYTES;
 
     /// Creates a finite input ceiling for one positional CFB source.
     ///
@@ -44,6 +51,7 @@ impl SharedOleFileLimits {
         Ok(Self {
             max_input_bytes: limits.max_input_bytes(),
             max_directory_bytes: limits.max_directory_bytes(),
+            max_allocation_table_bytes: limits.max_allocation_table_bytes(),
         })
     }
 
@@ -57,7 +65,8 @@ impl SharedOleFileLimits {
     /// parsing one positional CFB source.
     pub fn with_max_directory_bytes(mut self, max_directory_bytes: u64) -> Result<Self, OleError> {
         let limits = OleFileLimits::new(self.max_input_bytes)?
-            .with_max_directory_bytes(max_directory_bytes)?;
+            .with_max_directory_bytes(max_directory_bytes)?
+            .with_max_allocation_table_bytes(self.max_allocation_table_bytes)?;
         self.max_directory_bytes = limits.max_directory_bytes();
         Ok(self)
     }
@@ -67,6 +76,29 @@ impl SharedOleFileLimits {
     pub const fn max_directory_bytes(self) -> u64 {
         self.max_directory_bytes
     }
+
+    /// Selects the combined decoded FAT/DIFAT/MiniFAT table ceiling accepted
+    /// while parsing one positional CFB source.
+    ///
+    /// This uses the same decoded table and sector-location accounting as
+    /// [`OleFileLimits::with_max_allocation_table_bytes`].
+    pub fn with_max_allocation_table_bytes(
+        mut self,
+        max_allocation_table_bytes: u64,
+    ) -> Result<Self, OleError> {
+        let limits = OleFileLimits::new(self.max_input_bytes)?
+            .with_max_directory_bytes(self.max_directory_bytes)?
+            .with_max_allocation_table_bytes(max_allocation_table_bytes)?;
+        self.max_allocation_table_bytes = limits.max_allocation_table_bytes();
+        Ok(self)
+    }
+
+    /// Maximum combined decoded FAT/DIFAT/MiniFAT table bytes accepted during
+    /// parsing.
+    #[must_use]
+    pub const fn max_allocation_table_bytes(self) -> u64 {
+        self.max_allocation_table_bytes
+    }
 }
 
 impl Default for SharedOleFileLimits {
@@ -74,6 +106,7 @@ impl Default for SharedOleFileLimits {
         Self {
             max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
         }
     }
 }
@@ -502,7 +535,8 @@ impl SharedOleFile {
         }
 
         let parser_limits = OleFileLimits::new(limits.max_input_bytes())?
-            .with_max_directory_bytes(limits.max_directory_bytes())?;
+            .with_max_directory_bytes(limits.max_directory_bytes())?
+            .with_max_allocation_table_bytes(limits.max_allocation_table_bytes())?;
         let parsed = OleFile::open_with_limits(
             ReadAtCursor::new(source.clone(), source_length),
             parser_limits,
@@ -3303,6 +3337,18 @@ mod tests {
             SharedOleFileLimits::default().max_directory_bytes(),
             SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
         );
+        assert_eq!(
+            SharedOleFileLimits::default().max_allocation_table_bytes(),
+            SharedOleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES
+        );
+        assert_eq!(
+            SharedOleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
+            64 * 1024 * 1024
+        );
+        assert_eq!(
+            SharedOleFileLimits::MAX_ALLOCATION_TABLE_BYTES,
+            2 * 1024 * 1024 * 1024
+        );
         assert!(matches!(
             SharedOleFileLimits::default().with_max_directory_bytes(0),
             Err(OleError::InvalidLimit {
@@ -3316,6 +3362,23 @@ mod tests {
                 .with_max_directory_bytes(SharedOleFileLimits::MAX_DIRECTORY_BYTES + 1),
             Err(OleError::InvalidLimit {
                 resource: "CFB directory bytes",
+                value,
+                maximum,
+            }) if value == maximum + 1
+        ));
+        assert!(matches!(
+            SharedOleFileLimits::default().with_max_allocation_table_bytes(0),
+            Err(OleError::InvalidLimit {
+                resource: "CFB allocation table bytes",
+                value: 0,
+                maximum: OleFileLimits::MAX_ALLOCATION_TABLE_BYTES,
+            })
+        ));
+        assert!(matches!(
+            SharedOleFileLimits::default()
+                .with_max_allocation_table_bytes(SharedOleFileLimits::MAX_ALLOCATION_TABLE_BYTES + 1),
+            Err(OleError::InvalidLimit {
+                resource: "CFB allocation table bytes",
                 value,
                 maximum,
             }) if value == maximum + 1
@@ -3338,6 +3401,24 @@ mod tests {
                 observed,
                 maximum,
             }) if maximum == 511 && observed > maximum
+        ));
+    }
+
+    #[test]
+    fn shared_open_propagates_allocation_table_byte_limit() {
+        let source: Arc<dyn ReadAt> = Arc::new(TestSource::new(sample_bytes()));
+        let limits = SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES)
+            .unwrap()
+            .with_max_allocation_table_bytes(1)
+            .unwrap();
+
+        assert!(matches!(
+            SharedOleFile::open_with_limits(source, limits),
+            Err(OleError::LimitExceeded {
+                resource: "allocation table bytes",
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == 1
         ));
     }
 
