@@ -603,7 +603,7 @@ mod tests {
     #[test]
     fn changed_worksheet_can_compact_an_oversized_whitespace_input() {
         let mut input = format!(r#"<worksheet xmlns="{MAIN_NAMESPACE}">"#).into_bytes();
-        input.extend(std::iter::repeat(b' ').take(16 * 1024 * 1024 + 1));
+        input.extend(std::iter::repeat_n(b' ', 16 * 1024 * 1024 + 1));
         input.extend_from_slice(b"<sheetData/></worksheet>");
         assert!(input.len() > 16 * 1024 * 1024);
 
