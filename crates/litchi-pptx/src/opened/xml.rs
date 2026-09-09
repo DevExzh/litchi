@@ -1436,7 +1436,7 @@ fn slide_id_elements(
             },
             Event::End(element) => {
                 if pml_namespace && element.local_name().as_ref() == b"sldId" {
-                    if !open.as_ref().is_some_and(|active| active.depth == depth) {
+                    if open.as_ref().is_none_or(|active| active.depth != depth) {
                         return Err(invalid(
                             "opened-presentation slide ID is nested or not opened",
                         ));

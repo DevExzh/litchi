@@ -28,6 +28,6 @@ pub use source::{
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
     SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
-    SourceImageTarget, SourceSlide,
+    SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
 pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};

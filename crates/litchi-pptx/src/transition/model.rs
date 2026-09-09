@@ -3,6 +3,8 @@
 use std::fmt;
 use std::sync::Arc;
 
+use crate::{Error, Result as PptxResult};
+
 /// Largest millisecond value accepted by `PowerPoint`'s transition timing
 /// attributes.
 ///
@@ -173,6 +175,176 @@ pub enum Ripple {
     RightDown,
 }
 
+/// Matching granularity for a PowerPoint Morph transition.
+///
+/// The values are the complete `ST_TransitionMorphOption` vocabulary from
+/// `[MS-PPTX]` 2.6.4.1. Keeping this as a closed value prevents a malformed
+/// token from being emitted by the ordinary transition writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Morph {
+    /// Match and move whole objects.
+    ByObject,
+    /// Match and move objects and individual words.
+    ByWord,
+    /// Match and move objects and individual characters.
+    ByChar,
+}
+
+/// Maximum UTF-8 bytes retained for one preset transition name.
+pub const MAX_PRESET_NAME_BYTES: usize = 64 * 1024;
+
+impl Morph {
+    pub(crate) const fn wire(self) -> &'static str {
+        match self {
+            Self::ByObject => "byObject",
+            Self::ByWord => "byWord",
+            Self::ByChar => "byChar",
+        }
+    }
+}
+
+/// A typed PowerPoint preset transition (`p15:prstTrans`).
+///
+/// `prst` is intentionally retained as a checked string because the
+/// Microsoft schema declares it as `xsd:string`, while the specification only
+/// documents the presets known to a particular Office release. This keeps
+/// newer producer names readable and writable without guessing their visual
+/// meaning. The optional value also preserves the schema's omitted-attribute
+/// form.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Preset {
+    name: Option<Box<str>>,
+    invert_x: bool,
+    invert_y: bool,
+}
+
+impl Preset {
+    /// Creates a preset with the supplied `prst` name and default inversion.
+    ///
+    /// The value is checked for XML 1.0 characters before it is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is too large or contains an invalid XML
+    /// 1.0 character.
+    pub fn new(name: impl AsRef<str>) -> PptxResult<Self> {
+        Self::with_options(name.as_ref(), false, false)
+    }
+
+    /// Creates a preset with all three schema attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is too large or contains an invalid XML
+    /// 1.0 character.
+    pub fn with_options(name: impl AsRef<str>, invert_x: bool, invert_y: bool) -> PptxResult<Self> {
+        Ok(Self {
+            name: Some(validate_preset_name(name.as_ref())?),
+            invert_x,
+            invert_y,
+        })
+    }
+
+    /// Creates the schema-valid form with an omitted `prst` attribute.
+    #[must_use]
+    pub const fn without_name() -> Self {
+        Self {
+            name: None,
+            invert_x: false,
+            invert_y: false,
+        }
+    }
+
+    /// Returns the optional `prst` name.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Returns the `invX` value.
+    #[must_use]
+    pub const fn invert_x(&self) -> bool {
+        self.invert_x
+    }
+
+    /// Returns the `invY` value.
+    #[must_use]
+    pub const fn invert_y(&self) -> bool {
+        self.invert_y
+    }
+
+    /// Sets whether the preset's X coordinates are inverted.
+    pub fn set_invert_x(&mut self, value: bool) {
+        self.invert_x = value;
+    }
+
+    /// Sets whether the preset's Y coordinates are inverted.
+    pub fn set_invert_y(&mut self, value: bool) {
+        self.invert_y = value;
+    }
+
+    /// Sets X inversion in a builder chain.
+    pub fn with_invert_x(mut self, value: bool) -> Self {
+        self.set_invert_x(value);
+        self
+    }
+
+    /// Sets Y inversion in a builder chain.
+    pub fn with_invert_y(mut self, value: bool) -> Self {
+        self.set_invert_y(value);
+        self
+    }
+
+    pub(crate) fn from_parts(
+        name: Option<String>,
+        invert_x: bool,
+        invert_y: bool,
+    ) -> PptxResult<Self> {
+        Ok(Self {
+            name: name.map(validate_owned_preset_name).transpose()?,
+            invert_x,
+            invert_y,
+        })
+    }
+}
+
+impl Default for Preset {
+    fn default() -> Self {
+        Self::without_name()
+    }
+}
+
+fn validate_preset_name(name: &str) -> PptxResult<Box<str>> {
+    validate_preset_name_bytes(name)?;
+    Ok(name.into())
+}
+
+fn validate_owned_preset_name(name: String) -> PptxResult<Box<str>> {
+    validate_preset_name_bytes(&name)?;
+    Ok(name.into_boxed_str())
+}
+
+fn validate_preset_name_bytes(name: &str) -> PptxResult<()> {
+    if name.len() > MAX_PRESET_NAME_BYTES {
+        return Err(Error::Limit {
+            resource: "preset transition name bytes",
+            limit: MAX_PRESET_NAME_BYTES,
+        });
+    }
+    if name.chars().any(|character| {
+        let value = character as u32;
+        !matches!(
+            value,
+            0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+        )
+    }) {
+        return Err(Error::Invalid(
+            "preset transition name contains an invalid XML character".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// PowerPoint-supported wheel spoke counts.
 ///
 /// Unlike an integer field, this enum cannot represent spoke counts that
@@ -313,6 +485,10 @@ pub enum Kind {
     Newsflash,
     /// `PowerPoint` 2010 ripple with a standard fade fallback.
     Ripple(Ripple),
+    /// PowerPoint Morph transition with a standard fade fallback.
+    Morph(Morph),
+    /// PowerPoint 2012 preset transition with a standard fade fallback.
+    Preset(Preset),
     /// Diagonal strips from a corner.
     Strips(Corner),
     /// Comb along an axis.
@@ -510,14 +686,4 @@ impl Transition {
             .as_deref()
             .map_or(&[], |preserved| preserved.after.as_ref())
     }
-}
-
-pub(crate) fn preserved_effect_xml(value: &Transition) -> Option<&str> {
-    value.effect_xml().map(Raw::xml)
-}
-
-pub(crate) fn semantic_clone(value: &Transition) -> Transition {
-    let mut value = value.clone();
-    value.preserved = None;
-    value
 }

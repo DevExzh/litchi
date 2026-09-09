@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
-use litchi_ooxml_common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::{unqualified_attribute_value, xsd_token_atom};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -13,14 +13,18 @@ use quick_xml::reader::NsReader;
 use crate::{Error, Result};
 
 use super::model::{
-    Axis, Corner, InOut, Kind, Ms, Origin, Preserved, Raw, Ripple, Shape, Side, Speed, Spokes,
-    Transition,
+    Axis, Corner, InOut, Kind, MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preserved, Preset, Raw,
+    Ripple, Shape, Side, Speed, Spokes, Transition,
 };
 
 const PRESENTATIONML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 pub(super) const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+pub(super) const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
+pub(super) const P159: &str = "http://schemas.microsoft.com/office/powerpoint/2015/09/main";
 const P14_BYTES: &[u8] = P14.as_bytes();
+const P15_BYTES: &[u8] = P15.as_bytes();
+const P159_BYTES: &[u8] = P159.as_bytes();
 
 /// Resource limits for one transition read.
 ///
@@ -121,6 +125,9 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
 
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14);
+    capabilities
+        .understand_namespace(P15)
+        .understand_namespace(P159);
     let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: limits.input_bytes,
         max_output_bytes: limits.input_bytes,
@@ -441,6 +448,22 @@ fn parse_kind(
         return Ok(Some(Kind::Ripple(parse_ripple(&value)?)));
     }
 
+    if is_p15_name(namespace, element.name(), b"prstTrans") {
+        let name = bounded_attribute_value(element, b"prst", decoder)?;
+        let invert_x = parse_optional_bool(element, b"invX", decoder)?.unwrap_or(false);
+        let invert_y = parse_optional_bool(element, b"invY", decoder)?.unwrap_or(false);
+        return Ok(Some(Kind::Preset(Preset::from_parts(
+            name, invert_x, invert_y,
+        )?)));
+    }
+
+    if is_p159_name(namespace, element.name(), b"morph") {
+        let value = unqualified_attribute_value(element, b"option", decoder)?.ok_or_else(|| {
+            Error::Invalid("morph transition requires an option attribute".into())
+        })?;
+        return Ok(Some(Kind::Morph(parse_morph(&value)?)));
+    }
+
     let local = element.local_name();
     if !is_presentationml_name(namespace, element.name(), local.as_ref()) {
         return Ok(None);
@@ -619,6 +642,53 @@ fn parse_ripple(value: &str) -> Result<Ripple> {
     }
 }
 
+fn bounded_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
+            if value.is_some() {
+                return Err(Error::Invalid(format!(
+                    "duplicate transition attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+            if attribute.value.len() > MAX_PRESET_NAME_BYTES {
+                return Err(Error::Limit {
+                    resource: "preset transition name bytes",
+                    limit: MAX_PRESET_NAME_BYTES,
+                });
+            }
+            let decoded = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            if decoded.len() > MAX_PRESET_NAME_BYTES {
+                return Err(Error::Limit {
+                    resource: "preset transition name bytes",
+                    limit: MAX_PRESET_NAME_BYTES,
+                });
+            }
+            value = Some(decoded.into_owned());
+        }
+    }
+    Ok(value)
+}
+
+fn parse_morph(value: &str) -> Result<Morph> {
+    match xsd_token_atom(value) {
+        Some("byObject") => Ok(Morph::ByObject),
+        Some("byWord") => Ok(Morph::ByWord),
+        Some("byChar") => Ok(Morph::ByChar),
+        _ => Err(Error::Invalid(format!(
+            "invalid morph transition option '{value}'"
+        ))),
+    }
+}
+
 fn parse_spokes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Spokes> {
     let value = unqualified_attribute_value(element, b"spokes", decoder)?
         .unwrap_or_else(|| "4".to_string());
@@ -709,8 +779,24 @@ fn is_p14_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14_BYTES)
 }
 
+fn is_p15_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P15_BYTES)
+}
+
+fn is_p159_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P159_BYTES)
+}
+
 fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
     name.local_name().as_ref() == local && is_p14_namespace(namespace)
+}
+
+fn is_p15_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
+    name.local_name().as_ref() == local && is_p15_namespace(namespace)
+}
+
+fn is_p159_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
+    name.local_name().as_ref() == local && is_p159_namespace(namespace)
 }
 
 fn raw_is_portable(xml: &str) -> Result<bool> {

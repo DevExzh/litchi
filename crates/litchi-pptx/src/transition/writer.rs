@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use crate::{Error, Result};
 
 use super::model::{Axis, Corner, InOut, Kind, Origin, Ripple, Shape, Side, Speed, Transition};
-use super::reader::P14;
+use super::reader::{P14, P15, P159};
 
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -31,24 +31,39 @@ pub fn write(value: &Transition) -> Result<String> {
 pub fn write_to(value: &Transition, xml: &mut String) -> Result<()> {
     validate_raw(value)?;
 
-    if matches!(value.kind, Kind::Ripple(_)) {
-        write_alternate_start(xml);
-        xml.push_str("<mc:Choice Requires=\"p14\">");
+    if let Some(requires) = extension_requirement(value) {
+        write_alternate_start(xml, requires);
+        xml.push_str("<mc:Choice Requires=\"");
+        xml.push_str(requires);
+        xml.push_str("\">");
         write_transition(value, xml, value.duration, Effect::Value)?;
         xml.push_str("</mc:Choice><mc:Fallback>");
-        write_transition(value, xml, None, Effect::FadeFallback)?;
-        xml.push_str("</mc:Fallback></mc:AlternateContent>");
-    } else if value.duration.is_some() {
-        write_alternate_start(xml);
-        xml.push_str("<mc:Choice Requires=\"p14\">");
-        write_transition(value, xml, value.duration, Effect::Value)?;
-        xml.push_str("</mc:Choice><mc:Fallback>");
-        write_transition(value, xml, None, Effect::Value)?;
+        let fallback = if matches!(
+            value.kind,
+            Kind::Ripple(_) | Kind::Morph(_) | Kind::Preset(_)
+        ) {
+            Effect::FadeFallback
+        } else {
+            Effect::Value
+        };
+        write_transition(value, xml, None, fallback)?;
         xml.push_str("</mc:Fallback></mc:AlternateContent>");
     } else {
         write_transition(value, xml, None, Effect::Value)?;
     }
     Ok(())
+}
+
+fn extension_requirement(value: &Transition) -> Option<&'static str> {
+    match (&value.kind, value.duration.is_some()) {
+        (Kind::Ripple(_), _) => Some("p14"),
+        (Kind::Morph(_), true) => Some("p14 p159"),
+        (Kind::Morph(_), false) => Some("p159"),
+        (Kind::Preset(_), true) => Some("p14 p15"),
+        (Kind::Preset(_), false) => Some("p15"),
+        (_, true) => Some("p14"),
+        (_, false) => None,
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -57,11 +72,30 @@ enum Effect {
     FadeFallback,
 }
 
-fn write_alternate_start(xml: &mut String) {
+fn write_alternate_start(xml: &mut String, requires: &str) {
     xml.push_str("<mc:AlternateContent xmlns:mc=\"");
     xml.push_str(MCE);
-    xml.push_str("\" xmlns:p14=\"");
-    xml.push_str(P14);
+    if requires
+        .split_ascii_whitespace()
+        .any(|value| value == "p14")
+    {
+        xml.push_str("\" xmlns:p14=\"");
+        xml.push_str(P14);
+    }
+    if requires
+        .split_ascii_whitespace()
+        .any(|value| value == "p15")
+    {
+        xml.push_str("\" xmlns:p15=\"");
+        xml.push_str(P15);
+    }
+    if requires
+        .split_ascii_whitespace()
+        .any(|value| value == "p159")
+    {
+        xml.push_str("\" xmlns:p159=\"");
+        xml.push_str(P159);
+    }
     xml.push_str("\">");
 }
 
@@ -151,6 +185,12 @@ fn write_effect(value: &Transition, xml: &mut String) -> Result<()> {
             xml.push_str(ripple_value(*direction));
             xml.push_str("\"/>");
         },
+        Kind::Morph(option) => {
+            xml.push_str("<p159:morph option=\"");
+            xml.push_str(option.wire());
+            xml.push_str("\"/>");
+        },
+        Kind::Preset(preset) => write_preset(preset, xml)?,
         Kind::Strips(corner) => {
             write_direction(xml, "strips", "dir", corner_value(*corner));
         },
@@ -182,6 +222,53 @@ fn validate_raw(value: &Transition) -> Result<()> {
 
 fn write_raw(raw: &super::Raw, xml: &mut String) {
     xml.push_str(raw.xml());
+}
+
+fn write_preset(value: &super::Preset, xml: &mut String) -> Result<()> {
+    xml.push_str("<p15:prstTrans");
+    if let Some(name) = value.name() {
+        xml.push_str(" prst=\"");
+        escape_attribute(name, xml)?;
+        xml.push('"');
+    }
+    if value.invert_x() {
+        xml.push_str(" invX=\"1\"");
+    }
+    if value.invert_y() {
+        xml.push_str(" invY=\"1\"");
+    }
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn escape_attribute(value: &str, output: &mut String) -> Result<()> {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&apos;"),
+            '\t' => output.push_str("&#x9;"),
+            '\n' => output.push_str("&#xA;"),
+            '\r' => output.push_str("&#xD;"),
+            character
+                if {
+                    let value = character as u32;
+                    !matches!(
+                        value,
+                        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+                    )
+                } =>
+            {
+                return Err(Error::Invalid(
+                    "preset transition name contains an invalid XML character".into(),
+                ));
+            },
+            character => output.push(character),
+        }
+    }
+    Ok(())
 }
 
 fn write_black(xml: &mut String, tag: &str, black: Option<bool>) {
