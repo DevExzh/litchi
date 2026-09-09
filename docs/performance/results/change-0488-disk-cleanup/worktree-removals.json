@@ -1,0 +1,309 @@
+[
+  {
+    "path": "/tmp/litchi-0399-selected-cell-amend",
+    "head": "e74ad837729ea171f9a5a160e88d4d112762235d",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/xlsx-selected-cell"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471367680,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-0399-selected-cell-amend"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:02:33.507822+00:00"
+  },
+  {
+    "path": "/tmp/litchi-0403-evidence-packager-amend4.qCBEWs",
+    "head": "ab31bcdd11536d987741470d9380b183c6808b08",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/change-0403-packager"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471334912,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-0403-evidence-packager-amend4.qCBEWs"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:02:33.691101+00:00"
+  },
+  {
+    "path": "/tmp/litchi-0403-evidence.n6sUIL/candidate-worktree",
+    "head": "fadf43722289fc78f565b8265a03d4763d2660b5",
+    "retaining_refs": [
+      "refs/heads/agent-backup/process-delta-strict-original",
+      "refs/heads/agent-candidates/atomic-save-evidence",
+      "refs/heads/agent-candidates/cfb-legacy-whole-read",
+      "refs/heads/agent-candidates/change-0403-packager",
+      "refs/heads/agent-candidates/cold-evidence-validator",
+      "refs/heads/agent-candidates/cold-source-identity",
+      "refs/heads/agent-candidates/current-head-orchestrator",
+      "refs/heads/agent-candidates/docx-source-backed-inline-images",
+      "refs/heads/agent-candidates/docx-streaming-memory-evidence",
+      "refs/heads/agent-candidates/example-target-fix",
+      "refs/heads/agent-candidates/odp-prepared-limits-harness",
+      "refs/heads/agent-candidates/odp-prepared-limits-reuse",
+      "refs/heads/agent-candidates/opc-cache-wait-events",
+      "refs/heads/agent-candidates/opc-deferred-preservation",
+      "refs/heads/agent-candidates/opc-eager-casefold-index",
+      "refs/heads/agent-candidates/opc-materialization-session",
+      "refs/heads/agent-candidates/perf-aggregate-v2",
+      "refs/heads/agent-candidates/perf-selectors-batch-provisional",
+      "refs/heads/agent-candidates/process-delta-strict",
+      "refs/heads/agent-candidates/process-delta-strict-amended",
+      "refs/heads/agent-candidates/process-delta-strict-final",
+      "refs/heads/agent-candidates/process-delta-strict-v2",
+      "refs/heads/agent-candidates/region-peak-allocator",
+      "refs/heads/agent-candidates/strict-read-ahead",
+      "refs/heads/agent-candidates/xlsx-full-scan-evidence",
+      "refs/heads/agent-candidates/xlsx-selected-cell",
+      "refs/heads/agent-candidates/xlsx-selected-cell-evidence",
+      "refs/heads/agent-candidates/zip64-reader-foundation",
+      "refs/heads/agent-candidates/zip64-writer-current",
+      "refs/heads/agent-candidates/zip64-writer-preservation",
+      "refs/heads/backup/office-format-completeness-before-rebase-20260907-403ff0beb",
+      "refs/heads/feat/office-format-completeness",
+      "refs/heads/feat/spec-gap-implementation",
+      "refs/remotes/origin/feat/office-format-completeness"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 469839872,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-0403-evidence.n6sUIL/candidate-worktree"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:48.395861+00:00"
+  },
+  {
+    "path": "/tmp/litchi-0403-evidence.n6sUIL/control-worktree",
+    "head": "cca80d89bac0aa4e2740a7879cf39cdcd8cbbb44",
+    "retaining_refs": [
+      "refs/heads/agent-backup/process-delta-strict-original",
+      "refs/heads/agent-candidates/atomic-save-evidence",
+      "refs/heads/agent-candidates/cfb-legacy-whole-read",
+      "refs/heads/agent-candidates/change-0403-packager",
+      "refs/heads/agent-candidates/cold-evidence-validator",
+      "refs/heads/agent-candidates/cold-source-identity",
+      "refs/heads/agent-candidates/current-head-orchestrator",
+      "refs/heads/agent-candidates/docx-source-backed-inline-images",
+      "refs/heads/agent-candidates/docx-streaming-memory-evidence",
+      "refs/heads/agent-candidates/example-target-fix",
+      "refs/heads/agent-candidates/odp-prepared-limits-harness",
+      "refs/heads/agent-candidates/odp-prepared-limits-reuse",
+      "refs/heads/agent-candidates/opc-cache-wait-events",
+      "refs/heads/agent-candidates/opc-deferred-preservation",
+      "refs/heads/agent-candidates/opc-eager-casefold-index",
+      "refs/heads/agent-candidates/opc-materialization-session",
+      "refs/heads/agent-candidates/perf-aggregate-v2",
+      "refs/heads/agent-candidates/perf-selectors-batch-provisional",
+      "refs/heads/agent-candidates/process-delta-strict",
+      "refs/heads/agent-candidates/process-delta-strict-amended",
+      "refs/heads/agent-candidates/process-delta-strict-final",
+      "refs/heads/agent-candidates/process-delta-strict-v2",
+      "refs/heads/agent-candidates/region-peak-allocator",
+      "refs/heads/agent-candidates/strict-read-ahead",
+      "refs/heads/agent-candidates/xlsx-full-scan-evidence",
+      "refs/heads/agent-candidates/xlsx-selected-cell",
+      "refs/heads/agent-candidates/xlsx-selected-cell-evidence",
+      "refs/heads/agent-candidates/zip64-reader-foundation",
+      "refs/heads/agent-candidates/zip64-writer-current",
+      "refs/heads/agent-candidates/zip64-writer-preservation",
+      "refs/heads/backup/office-format-completeness-before-rebase-20260907-403ff0beb",
+      "refs/heads/feat/office-format-completeness",
+      "refs/heads/feat/spec-gap-implementation",
+      "refs/remotes/origin/feat/office-format-completeness"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 469811200,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-0403-evidence.n6sUIL/control-worktree"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:48.569000+00:00"
+  },
+  {
+    "path": "/tmp/litchi-odp-prepared-limits-harness-amend",
+    "head": "51fa11b4b8b8a2eb8e3367e2cd8e21aef32be0fd",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/odp-prepared-limits-harness"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471314432,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-odp-prepared-limits-harness-amend"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:48.743151+00:00"
+  },
+  {
+    "path": "/tmp/litchi-opc-lookup.mtD0GB",
+    "head": "13abd73ee8431fe6503258136c8314c30e44c9f3",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/opc-eager-casefold-index"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471662592,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-opc-lookup.mtD0GB"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:48.912245+00:00"
+  },
+  {
+    "path": "/tmp/litchi-opc-review.nJS5NM",
+    "head": "5e5d83b843290b6e9935c4bcb446ae2a959be91a",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/opc-deferred-preservation"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471367680,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-opc-review.nJS5NM"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:49.076880+00:00"
+  },
+  {
+    "path": "/tmp/litchi-perf-selectors-batch.asJ04A",
+    "head": "3b2e9a82e34f8a4742e5d083f82227ab883e667b",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/perf-selectors-batch-provisional"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 471539712,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/tmp/litchi-perf-selectors-batch.asJ04A"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:49.260199+00:00"
+  },
+  {
+    "path": "/var/tmp/litchi-atomic-save-evidence",
+    "head": "1ecd4528a78aae9411d436c504375456abf972c0",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/atomic-save-evidence"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 478265344,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/var/tmp/litchi-atomic-save-evidence"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:49.466145+00:00"
+  },
+  {
+    "path": "/var/tmp/litchi-docx-streaming-candidate-v2",
+    "head": "efb85a1ff843546e68703979f90e05b53568958b",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/docx-streaming-memory-evidence"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 8424275968,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/var/tmp/litchi-docx-streaming-candidate-v2"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:49.759851+00:00"
+  },
+  {
+    "path": "/var/tmp/litchi-read-ahead-control",
+    "head": "73641c606c7ae58e4befb2c59d30b6e13f62f375",
+    "retaining_refs": [
+      "refs/heads/agent-candidates/atomic-save-evidence",
+      "refs/heads/agent-candidates/docx-streaming-memory-evidence",
+      "refs/heads/agent-candidates/opc-deferred-preservation",
+      "refs/heads/agent-candidates/opc-eager-casefold-index",
+      "refs/heads/agent-candidates/perf-selectors-batch-provisional",
+      "refs/heads/agent-candidates/strict-read-ahead",
+      "refs/heads/agent-candidates/zip64-writer-current",
+      "refs/heads/backup/office-format-completeness-before-rebase-20260907-403ff0beb",
+      "refs/heads/feat/office-format-completeness",
+      "refs/heads/feat/spec-gap-implementation",
+      "refs/remotes/origin/feat/office-format-completeness"
+    ],
+    "clean_before": true,
+    "live_process_references_before": [],
+    "allocated_bytes_before": 478171136,
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/var/tmp/litchi-read-ahead-control"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "removed": true,
+    "finished_utc": "2026-09-09T14:03:49.958936+00:00"
+  }
+]
