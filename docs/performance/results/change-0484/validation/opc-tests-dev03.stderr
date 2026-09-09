@@ -1,0 +1,55 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unused imports: `Condvar` and `Mutex`
+  --> crates/litchi-opc/tests/source_part_splice_replay.rs:17:10
+   |
+17 |     Arc, Condvar, Mutex, RwLock,
+   |          ^^^^^^^  ^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: unused import: `std::thread`
+  --> crates/litchi-opc/tests/source_part_splice_replay.rs:20:5
+   |
+20 | use std::thread;
+   |     ^^^^^^^^^^^
+
+error: unused imports: `ExecutionError` and `Resource`
+  --> crates/litchi-opc/tests/source_part_splice_replay.rs:23:51
+   |
+23 |     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, OwnedSource,
+   |                                                   ^^^^^^^^^^^^^^
+24 |     ReadAt, Resource, SourceVersion,
+   |             ^^^^^^^^
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/source_part_splice_replay.rs:586:24
+    |
+586 |             Arc::clone(&provider),
+    |             ---------- ^^^^^^^^^ expected `&Arc<dyn SourcePartSpliceReplay>`, found `&Arc<MutableProofProvider>`
+    |             |
+    |             arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn SourcePartSpliceReplay>`
+               found reference `&Arc<MutableProofProvider>`
+    = help: `MutableProofProvider` implements `SourcePartSpliceReplay` so you could box the found value and coerce it to the trait object `Box<dyn SourcePartSpliceReplay>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/source_part_splice_replay.rs:821:64
+    |
+821 |     let package = SourceBackedPackage::from_read_at(Arc::clone(&source))
+    |                                                     ---------- ^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MutableSource>`
+    |                                                     |
+    |                                                     arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<MutableSource>`
+    = help: `MutableSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-opc` (test "source_part_splice_replay") due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...

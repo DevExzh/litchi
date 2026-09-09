@@ -1,0 +1,20 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: struct `CallbackSink` is never constructed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:104:8
+    |
+104 | struct CallbackSink<F> {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `encode_to_callback` is never used
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:523:15
+    |
+523 | pub(crate) fn encode_to_callback<C, F>(
+    |               ^^^^^^^^^^^^^^^^^^
+
+error: could not compile `litchi-docx` (lib) due to 2 previous errors

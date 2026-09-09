@@ -75,10 +75,12 @@ pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     AuthorizedPrecompressedPart, PartData, PartView, RetainedPrecompressedPart, SourceArtifact,
-    SourceArtifactFingerprint, SourceBackedPackage, SourceCacheCounterDelta,
-    SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
-    SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
-    SourcePartSpliceProof, SourcePartSplicePublication, SourceRelationshipTarget,
+    SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
+    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
+    SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
+    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
+    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceRelationshipTarget,
     SourceTopologyPlan, VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]

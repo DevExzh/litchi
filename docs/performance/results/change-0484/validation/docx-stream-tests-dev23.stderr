@@ -1,0 +1,69 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0609]: no field `generated_count` on type `CandidateProof`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/patch.rs:381:70
+    |
+381 |             && self.candidate.generated_paragraph_count == candidate.generated_count
+    |                                                                      ^^^^^^^^^^^^^^^ unknown field
+    |
+help: a field with a similar name exists
+    |
+381 -             && self.candidate.generated_paragraph_count == candidate.generated_count
+381 +             && self.candidate.generated_paragraph_count == candidate.generated_once
+    |
+
+error[E0282]: type annotations needed for `ParagraphStreamEdit<'_, _>`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1205:13
+     |
+1205 |         let edit = ParagraphStreamEdit {
+     |             ^^^^
+...
+1213 |             marker: PhantomData,
+     |                     ----------- type must be known at this point
+     |
+help: consider giving `edit` an explicit type, where the type for type parameter `S` is specified
+     |
+1205 |         let edit: ParagraphStreamEdit<'_, S> = ParagraphStreamEdit {
+     |                 ++++++++++++++++++++++++++++
+
+error[E0609]: no field `generated_count` on type `CandidateProof`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1597:57
+     |
+1597 |         && expected.generated_paragraph_count == actual.generated_count
+     |                                                         ^^^^^^^^^^^^^^^ unknown field
+     |
+help: a field with a similar name exists
+     |
+1597 -         && expected.generated_paragraph_count == actual.generated_count
+1597 +         && expected.generated_paragraph_count == actual.generated_once
+     |
+
+error[E0015]: cannot call non-const operator in constant functions
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/patch.rs:392:9
+    |
+392 |         self.candidate.archive == archive
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: impl defined here, but it is not `const`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/patch.rs:31:30
+    |
+ 31 | #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    |                              ^^^^^^^^^
+    = note: calls in constant functions are limited to constant functions, tuple structs and tuple variants
+
+error[E0382]: use of moved value: `replay_window_reservation`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1705:41
+     |
+1674 |         let replay_window_reservation = context
+     |             ------------------------- move occurs because `replay_window_reservation` has type `Option<Reservation>`, which does not implement the `Copy` trait
+...
+1684 |             .map_err(|_| {
+     |                      --- value moved into closure here
+1685 |                 drop(replay_window_reservation);
+     |                      ------------------------- variable moved due to use in closure
+...
+1705 |             _replay_window_reservation: replay_window_reservation,
+     |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^ value used here after move
+
+Some errors have detailed explanations: E0015, E0282, E0382, E0609.
+For more information about an error, try `rustc --explain E0015`.
+error: could not compile `litchi-docx` (lib) due to 5 previous errors

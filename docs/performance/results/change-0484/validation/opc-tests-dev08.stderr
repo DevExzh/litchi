@@ -1,0 +1,5 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.65s
+     Running tests/source_artifact_restore.rs (target/debug/deps/source_artifact_restore-6e81a5b3d77a7f60)
+     Running tests/source_part_splice.rs (target/debug/deps/source_part_splice-3f15b3212969a028)
+     Running tests/source_part_splice_replay.rs (target/debug/deps/source_part_splice_replay-5d3126c0d8f41c2d)

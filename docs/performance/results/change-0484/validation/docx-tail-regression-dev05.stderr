@@ -1,0 +1,287 @@
+   Compiling hybrid-array v0.4.14
+   Compiling syn v2.0.114
+   Compiling libc v0.2.189
+   Compiling pkg-config v0.3.34
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling getrandom v0.2.17
+   Compiling shlex v2.0.1
+   Compiling rand_core v0.6.4
+   Compiling find-msvc-tools v0.1.11
+   Compiling cc v1.4.4
+   Compiling cmov v0.5.4
+   Compiling either v1.18.0
+   Compiling ctutils v0.4.2
+   Compiling getrandom v0.4.3
+   Compiling digest v0.11.3
+   Compiling chrono v0.4.45
+   Compiling sha2 v0.11.0
+   Compiling rand v0.10.2
+   Compiling vcpkg v0.2.15
+   Compiling synstructure v0.13.2
+   Compiling libz-sys v1.1.29
+   Compiling rayon v1.12.0
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling encoding_rs v0.8.35
+   Compiling der_derive v0.7.3
+   Compiling zerofrom-derive v0.1.6
+   Compiling der v0.7.10
+   Compiling yoke-derive v0.7.5
+   Compiling zerovec-derive v0.10.4
+   Compiling zerofrom v0.1.4
+   Compiling displaydoc v0.2.6
+   Compiling yoke v0.7.4
+   Compiling spki v0.7.3
+   Compiling thiserror-impl v2.0.18
+   Compiling pkcs8 v0.10.2
+   Compiling icu_provider_macros v1.5.0
+   Compiling zerovec v0.10.4
+   Compiling sec1 v0.7.3
+   Compiling zerocopy-derive v0.8.56
+   Compiling elliptic-curve v0.13.8
+   Compiling tinystr v0.7.6
+   Compiling thiserror v2.0.18
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling icu_locid v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling icu_provider v1.5.0
+   Compiling rand_chacha v0.3.1
+   Compiling signature v2.2.0
+   Compiling icu_locid_transform v1.5.0
+   Compiling num-integer v0.1.47
+   Compiling tinyvec v1.12.0
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling num-iter v0.1.46
+   Compiling flate2 v1.1.10
+   Compiling icu_properties v1.5.1
+   Compiling rand v0.8.8
+   Compiling pathfinder_simd v0.5.6
+   Compiling block-padding v0.4.2
+   Compiling proc-macro2-diagnostics v0.10.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling inout v0.2.2
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling pkcs1 v0.7.5
+   Compiling icu_normalizer v1.5.0
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling freetype-sys v0.20.1
+   Compiling yeslogic-fontconfig-sys v6.0.1
+   Compiling yansi v1.0.1
+   Compiling idna_adapter v1.2.0
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling cipher v0.5.2
+   Compiling getrandom v0.3.4
+   Compiling x509-cert v0.2.5
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling libloading v0.8.8
+   Compiling byteorder v1.5.0
+   Compiling unicode-canonical-combining-class v1.0.0
+   Compiling heck v0.4.1
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling unicode-general-category v1.1.0
+   Compiling unicode-joining-type v1.0.0
+   Compiling log v0.4.29
+   Compiling option-ext v0.2.0
+   Compiling dirs-sys v0.5.0
+   Compiling pathfinder_geometry v0.5.1
+   Compiling ouroboros_macro v0.18.5
+   Compiling alloc-stdlib v0.2.4
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling dlib v0.5.3
+   Compiling idna v1.1.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling unicode-normalization v0.1.25
+   Compiling enumflags2_derive v0.7.12
+   Compiling static_assertions v1.1.0
+   Compiling aliasable v0.1.3
+   Compiling same-file v1.0.6
+   Compiling font-kit v0.14.3
+   Compiling walkdir v2.5.0
+   Compiling ouroboros v0.18.5
+   Compiling enumflags2 v0.7.12
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling brotli-decompressor v5.0.3
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling dirs v6.0.0
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling itertools v0.14.0
+   Compiling bitreader v0.3.11
+   Compiling cpubits v0.1.1
+   Compiling bytemuck v1.25.2
+   Compiling ucd-trie v0.1.7
+   Compiling glyph-names v0.2.0
+   Compiling float-ord v0.3.2
+   Compiling rustc-hash v2.1.3
+   Compiling allsorts v0.17.0
+   Compiling roaring v0.11.1
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling aes v0.9.3
+   Compiling rc4 v0.2.0
+   Compiling cbc v0.2.1
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling hmac v0.13.0
+   Compiling sha1 v0.11.0
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0106]: missing lifetime specifier
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1310:56
+     |
+1310 |     pub fn prepare(self) -> Result<ParagraphStreamPlan<'_>, Error> {
+     |                                                        ^^ expected named lifetime parameter
+     |
+     = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+help: consider using the `'static` lifetime, but this is uncommon unless you're returning a borrowed value from a `const` or a `static`, or if you will only have owned values
+     |
+1310 -     pub fn prepare(self) -> Result<ParagraphStreamPlan<'_>, Error> {
+1310 +     pub fn prepare(self) -> Result<ParagraphStreamPlan<'static>, Error> {
+     |
+help: instead, you are more likely to want to change the argument to be borrowed
+     |
+1310 |     pub fn prepare(&self) -> Result<ParagraphStreamPlan<'_>, Error> {
+     |                    +
+
+error[E0106]: missing lifetime specifier
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1315:57
+     |
+1315 |     pub fn commit(self) -> Result<ParagraphStreamCommit<'_>, Error> {
+     |                                                         ^^ expected named lifetime parameter
+     |
+     = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+help: consider using the `'static` lifetime, but this is uncommon unless you're returning a borrowed value from a `const` or a `static`, or if you will only have owned values
+     |
+1315 -     pub fn commit(self) -> Result<ParagraphStreamCommit<'_>, Error> {
+1315 +     pub fn commit(self) -> Result<ParagraphStreamCommit<'static>, Error> {
+     |
+help: instead, you are more likely to want to change the argument to be borrowed
+     |
+1315 |     pub fn commit(&self) -> Result<ParagraphStreamCommit<'_>, Error> {
+     |                   +
+
+error[E0106]: missing lifetime specifier
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1395:50
+     |
+1395 |     pub fn commit(self) -> ParagraphStreamCommit<'_> {
+     |                                                  ^^ expected named lifetime parameter
+     |
+     = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+help: consider using the `'static` lifetime, but this is uncommon unless you're returning a borrowed value from a `const` or a `static`, or if you will only have owned values
+     |
+1395 -     pub fn commit(self) -> ParagraphStreamCommit<'_> {
+1395 +     pub fn commit(self) -> ParagraphStreamCommit<'static> {
+     |
+help: instead, you are more likely to want to change the argument to be borrowed
+     |
+1395 |     pub fn commit(&self) -> ParagraphStreamCommit<'_> {
+     |                   +
+
+error: unused imports: `ExecutionError` and `Resource`
+  --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:11:56
+   |
+11 | use litchi_core::{CancellationToken, ExecutionContext, ExecutionError, Resource};
+   |                                                        ^^^^^^^^^^^^^^  ^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: unused import: `SourceBackedPackage`
+  --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:16:45
+   |
+16 | use litchi_opc::{SourceArtifactFingerprint, SourceBackedPackage};
+   |                                             ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: `R` cannot be sent between threads safely
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1208:30
+     |
+1208 | impl<P, R> AuthoredInput for ProducerInput<P, R>
+     |                              ^^^^^^^^^^^^^^^^^^^ `R` cannot be sent between threads safely
+     |
+     = note: required because it appears within the type `(P, R)`
+note: required because it appears within the type `Option<(P, R)>`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:598:9
+     = note: required for `std::sync::Mutex<Option<(P, R)>>` to implement `Sync`
+note: required because it appears within the type `ProducerInput<P, R>`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1204:8
+     |
+1204 | struct ProducerInput<P, R> {
+     |        ^^^^^^^^^^^^^
+note: required by a bound in `AuthoredInput`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1159:29
+     |
+1159 | trait AuthoredInput: Send + Sync {
+     |                             ^^^^ required by this bound in `AuthoredInput`
+help: consider further restricting type parameter `R` with trait `Send`
+     |
+1211 |     R: AuthoredReplayStore + 'static + std::marker::Send,
+     |                                      +++++++++++++++++++
+
+error[E0277]: the size for values of type `dyn BufRead` cannot be known at compilation time
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2785:25
+     |
+2785 |             scan_reader(reader, expected_len, limits, context, cancellation, None)
+     |             ----------- ^^^^^^ doesn't have a size known at compile-time
+     |             |
+     |             required by a bound introduced by this call
+     |
+     = help: the trait `Sized` is not implemented for `dyn BufRead`
+note: required by an implicit `Sized` bound in `scan_reader`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2801:27
+     |
+2801 | pub(super) fn scan_reader<R: BufRead>(
+     |                           ^ required by the implicit `Sized` requirement on this type parameter in `scan_reader`
+help: consider relaxing the implicit `Sized` restriction
+     |
+2801 | pub(super) fn scan_reader<R: BufRead + ?Sized>(
+     |                                      ++++++++
+
+error[E0599]: the method `read` exists for struct `std::io::Cursor<std::sync::Arc<Vec<u8>>>`, but its trait bounds were not satisfied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:558:32
+    |
+558 |         let count = self.inner.read(output)?;
+    |                                ^^^^ method cannot be called on `std::io::Cursor<std::sync::Arc<Vec<u8>>>` due to unsatisfied trait bounds
+    |
+    = note: the following trait bounds were not satisfied:
+            `std::sync::Arc<Vec<u8>>: AsRef<[u8]>`
+            which is required by `std::io::Cursor<std::sync::Arc<Vec<u8>>>: std::io::Read`
+
+error[E0599]: no method named `finish` found for struct `EncodingReader<C>` in the current scope
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1194:28
+     |
+ 208 |     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError>;
+     |        ------       --------- the method might not be found because of this arbitrary self type
+     |        |
+     |        the method is available for `std::boxed::Box<EncodingReader<<S as ReplayableParagraphSource>::Cursor<'_>>>` here
+...
+ 988 | struct EncodingReader<C> {
+     | ------------------------ method `finish` not found for this struct
+...
+1194 |         let proof = reader.finish()?.proof();
+     |                            ^^^^^^ method not found in `EncodingReader<<S as ReplayableParagraphSource>::Cursor<'_>>`
+     |
+help: consider wrapping the receiver expression with the appropriate type
+     |
+1194 |         let proof = Box::new(reader).finish()?.proof();
+     |                     +++++++++      +
+
+error[E0499]: cannot borrow `*self.state` as mutable more than once at a time
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1261:48
+     |
+1260 |         let mut sink = self.store_sink();
+     |                        ---- first mutable borrow occurs here
+1261 |         if let Err(error) = emit_encoded_event(self.state, event, &mut sink) {
+     |                                                ^^^^^^^^^^         --------- first borrow later used here
+     |                                                |
+     |                                                second mutable borrow occurs here
+
+Some errors have detailed explanations: E0106, E0277, E0499, E0599.
+For more information about an error, try `rustc --explain E0106`.
+error: could not compile `litchi-docx` (lib) due to 10 previous errors

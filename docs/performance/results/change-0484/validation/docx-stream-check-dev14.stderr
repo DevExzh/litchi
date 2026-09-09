@@ -1,0 +1,1176 @@
+    Checking crypto-common v0.2.2
+    Checking der v0.7.10
+    Checking zerofrom v0.1.4
+    Checking chrono v0.4.45
+    Checking yoke v0.7.4
+    Checking zerovec v0.10.4
+    Checking digest v0.11.3
+    Checking sha2 v0.11.0
+    Checking spki v0.7.3
+    Checking pkcs8 v0.10.2
+    Checking tinystr v0.7.6
+    Checking thiserror v2.0.18
+    Checking sec1 v0.7.3
+    Checking rand_chacha v0.3.1
+    Checking icu_locid v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking libz-sys v1.1.29
+    Checking elliptic-curve v0.13.8
+    Checking icu_collections v1.5.0
+    Checking num-integer v0.1.47
+    Checking icu_provider v1.5.0
+    Checking tinyvec v1.12.0
+    Checking num-iter v0.1.46
+    Checking flate2 v1.1.10
+    Checking icu_locid_transform v1.5.0
+    Checking rand v0.8.8
+    Checking ecdsa v0.16.9
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking num-bigint-dig v0.8.6
+    Checking icu_properties v1.5.1
+    Checking primeorder v0.13.6
+    Checking pkcs1 v0.7.5
+    Checking p256 v0.13.2
+    Checking rsa v0.9.10
+    Checking pathfinder_simd v0.5.6
+    Checking cipher v0.5.2
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking x509-cert v0.2.5
+    Checking libloading v0.8.8
+    Checking alloc-no-stdlib v2.0.4
+    Checking option-ext v0.2.0
+    Checking log v0.4.29
+    Checking tempfile v3.27.0
+    Checking pathfinder_geometry v0.5.1
+    Checking icu_normalizer v1.5.0
+    Checking dirs-sys v0.5.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking alloc-stdlib v0.2.4
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking dlib v0.5.3
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking unicode-normalization v0.1.25
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking static_assertions v1.1.0
+    Checking same-file v1.0.6
+    Checking aliasable v0.1.3
+    Checking caseless v0.2.2
+    Checking walkdir v2.5.0
+    Checking ouroboros v0.18.5
+    Checking enumflags2 v0.7.12
+    Checking url v2.5.8
+    Checking yeslogic-fontconfig-sys v6.0.1
+    Checking unicode-general-category v1.1.0
+    Checking brotli-decompressor v5.0.3
+    Checking dirs v6.0.0
+    Checking unicode-canonical-combining-class v1.0.0
+    Checking unicode-joining-type v1.0.0
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking freetype-sys v0.20.1
+    Checking itertools v0.14.0
+    Checking bitreader v0.3.11
+    Checking rustc-hash v2.1.3
+    Checking float-ord v0.3.2
+    Checking glyph-names v0.2.0
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking ucd-trie v0.1.7
+    Checking bytemuck v1.25.2
+    Checking font-kit v0.14.3
+    Checking roaring v0.11.1
+    Checking aes v0.9.3
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking allsorts v0.17.0
+    Checking cbc v0.2.1
+    Checking rc4 v0.2.0
+    Checking hmac v0.13.0
+    Checking sha1 v0.11.0
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: hidden lifetime parameters in types are deprecated
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:184:17
+    |
+184 |     ) -> Result<EventBytes, AuthoredReplayError> {
+    |                 ^^^^^^^^^^ expected lifetime parameter
+    |
+    = note: `-D elided-lifetimes-in-paths` implied by `-D rust-2018-idioms`
+    = help: to override `-D rust-2018-idioms` add `#[allow(elided_lifetimes_in_paths)]`
+help: indicate the anonymous lifetime
+    |
+184 |     ) -> Result<EventBytes<'_>, AuthoredReplayError> {
+    |                           ++++
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:54:10
+    |
+ 54 |     ) -> Result<Option<PlainParagraphEvent<'event>>, Self::Error>;
+    |          ^^^^^^ expected 1 generic argument        ------------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:67:40
+    |
+ 67 |     fn open<'source>(&'source self) -> Result<Self::Cursor<'source>, Self::Error>;
+    |                                        ^^^^^^                      ------------- help: remove the unnecessary generic argument
+    |                                        |
+    |                                        expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:189:35
+    |
+189 |     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError>;
+    |                                   ^^^^^^                  --------------------- help: remove the unnecessary generic argument
+    |                                   |
+    |                                   expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:197:23
+    |
+197 |     fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError>;
+    |                       ^^^^^^ expected 1 generic argument       --------------------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:208:43
+    |
+208 |     fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError>;
+    |                                           ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |                                           |
+    |                                           expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:211:52
+    |
+211 |     fn finish(self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError>;
+    |                                                    ^^^^^^             --------------------- help: remove the unnecessary generic argument
+    |                                                    |
+    |                                                    expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:220:10
+    |
+220 |     ) -> Result<(), AuthoredReplayError>;
+    |          ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |          |
+    |          expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:227:12
+    |
+227 |         -> Result<(), AuthoredReplayError>;
+    |            ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |            |
+    |            expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:645:10
+    |
+645 |     ) -> Result<Arc<dyn AuthoredReplayHandle>, Error>;
+    |          ^^^^^^ expected 1 generic argument  ------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:237:10
+    |
+237 |     ) -> Result<(), AuthoredReplayError> {
+    |          ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |          |
+    |          expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:662:10
+    |
+662 |     ) -> Result<Arc<dyn AuthoredReplayHandle>, Error> {
+    |          ^^^^^^ expected 1 generic argument  ------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:691:10
+    |
+691 |     ) -> Result<Arc<dyn AuthoredReplayHandle>, Error> {
+    |          ^^^^^^ expected 1 generic argument  ------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:722:43
+    |
+722 |     fn accept(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+    |                                           ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |                                           |
+    |                                           expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:735:10
+    |
+735 |     ) -> Result<(), AuthoredReplayError> {
+    |          ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |          |
+    |          expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:960:10
+    |
+960 |     ) -> Result<(), Error> {
+    |          ^^^^^^   ------- help: remove the unnecessary generic argument
+    |          |
+    |          expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:995:10
+    |
+995 |     ) -> Result<ParagraphStreamEdit<'_, R::Handle>, Error>
+    |          ^^^^^^ expected 1 generic argument       ------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1301:10
+     |
+1301 |     ) -> Result<Self, AuthoredReplayError> {
+     |          ^^^^^^     --------------------- help: remove the unnecessary generic argument
+     |          |
+     |          expected 1 generic argument
+     |
+note: type alias defined here, with 1 generic parameter: `T`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+     |
+ 352 | pub type Result<T> = std::result::Result<T, Error>;
+     |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1341:36
+     |
+1341 |     fn finish_replay(&mut self) -> Result<AuthoredPassProof, AuthoredReplayError> {
+     |                                    ^^^^^^                  --------------------- help: remove the unnecessary generic argument
+     |                                    |
+     |                                    expected 1 generic argument
+     |
+note: type alias defined here, with 1 generic parameter: `T`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+     |
+ 352 | pub type Result<T> = std::result::Result<T, Error>;
+     |          ^^^^^^ -
+
+error[E0053]: method `open` has an incompatible type for trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:668:23
+    |
+668 |     fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `tail_append_stream::Error`, found `AuthoredReplayError`
+    |
+note: type in trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:197:23
+    |
+197 |     fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError>;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: expected signature `fn(&DeterministicReplayHandle<_>) -> std::result::Result<std::boxed::Box<dyn AuthoredReplayReader>, tail_append_stream::Error>`
+               found signature `fn(&DeterministicReplayHandle<_>) -> std::result::Result<std::boxed::Box<dyn AuthoredReplayReader>, AuthoredReplayError>`
+help: change the output type to match the trait
+    |
+668 -     fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+668 +     fn open(&self) -> std::result::Result<std::boxed::Box<dyn AuthoredReplayReader>, tail_append_stream::Error> {
+    |
+
+error[E0053]: method `finish` has an incompatible type for trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:887:35
+    |
+887 |     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `tail_append_stream::Error`, found `AuthoredReplayError`
+    |
+note: type in trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:189:35
+    |
+189 |     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError>;
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: expected signature `fn(std::boxed::Box<_>) -> std::result::Result<_, tail_append_stream::Error>`
+               found signature `fn(std::boxed::Box<_>) -> std::result::Result<_, AuthoredReplayError>`
+help: change the output type to match the trait
+    |
+887 -     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
+887 +     fn finish(self: Box<Self>) -> std::result::Result<AuthoredPassProof, tail_append_stream::Error> {
+    |
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:232:46
+    |
+232 |     F: FnMut(&mut dyn ParagraphEventSink) -> Result<(), AuthoredReplayError> + Send,
+    |                                              ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |                                              |
+    |                                              expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:354:70
+    |
+354 | fn check_limit(resource: &'static str, actual: u64, maximum: u64) -> Result<(), Error> {
+    |                                                                      ^^^^^^   ------- help: remove the unnecessary generic argument
+    |                                                                      |
+    |                                                                      expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:446:35
+    |
+446 |     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
+    |                                   ^^^^^^                  --------------------- help: remove the unnecessary generic argument
+    |                                   |
+    |                                   expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:465:23
+    |
+465 |     fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+    |                       ^^^^^^ expected 1 generic argument       --------------------- help: remove the unnecessary generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:487:23
+    |
+487 |     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+    |                       ^^^^^^                   ----------------------------- help: remove the unnecessary generic argument
+    |                       |
+    |                       expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0053]: method `open` has an incompatible type for trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:487:23
+    |
+487 |     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `SourcePartSpliceReplayError`, found `tail_append_stream::Error`
+    |
+    = note: expected signature `fn(&MemoryReplayHandle) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, SourcePartSpliceReplayError>`
+               found signature `fn(&MemoryReplayHandle) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, tail_append_stream::Error>`
+help: change the output type to match the trait
+    |
+487 -     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+487 +     fn open(&self) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, SourcePartSpliceReplayError> {
+    |
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:503:43
+    |
+503 |     fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+    |                                           ^^^^^^   --------------------- help: remove the unnecessary generic argument
+    |                                           |
+    |                                           expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:530:52
+    |
+530 |     fn finish(self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
+    |                                                    ^^^^^^             --------------------- help: remove the unnecessary generic argument
+    |                                                    |
+    |                                                    expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:623:23
+    |
+623 |     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+    |                       ^^^^^^                   ----------------------------- help: remove the unnecessary generic argument
+    |                       |
+    |                       expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0053]: method `open` has an incompatible type for trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:623:23
+    |
+623 |     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `SourcePartSpliceReplayError`, found `tail_append_stream::Error`
+    |
+    = note: expected signature `fn(&OpcReplayAdapter) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, SourcePartSpliceReplayError>`
+               found signature `fn(&OpcReplayAdapter) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, tail_append_stream::Error>`
+help: change the output type to match the trait
+    |
+623 -     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+623 +     fn open(&self) -> std::result::Result<std::boxed::Box<dyn std::io::Read>, SourcePartSpliceReplayError> {
+    |
+
+error[E0053]: method `accept` has an incompatible type for trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:722:43
+    |
+722 |     fn accept(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `AuthoredReplayError`, found `tail_append_stream::Error`
+    |
+note: type in trait
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:101:43
+    |
+101 |     fn accept(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError>;
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: expected signature `fn(&mut StoreChunkSink<'_, _>, &_) -> std::result::Result<_, AuthoredReplayError>`
+               found signature `fn(&mut StoreChunkSink<'_, _>, &_) -> std::result::Result<_, tail_append_stream::Error>`
+help: change the output type to match the trait
+    |
+722 |     fn accept(&mut self, chunk: &[u8]) -> std::result::Result<(), AuthoredReplayError> {
+    |                                           +++++++++++++
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1213:6
+     |
+1213 | ) -> Result<(), Error> {
+     |      ^^^^^^   ------- help: remove the unnecessary generic argument
+     |      |
+     |      expected 1 generic argument
+     |
+note: type alias defined here, with 1 generic parameter: `T`
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+     |
+ 352 | pub type Result<T> = std::result::Result<T, Error>;
+     |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:84:58
+    |
+ 84 |     pub fn try_from_bytes(bytes: &[u8], maximum: u64) -> Result<Self, AuthoredReplayError> {
+    |                                                          ^^^^^^     --------------------- help: remove the unnecessary generic argument
+    |                                                          |
+    |                                                          expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:299:30
+    |
+299 |     pub fn validate(self) -> Result<(), Error> {
+    |                              ^^^^^^   ------- help: remove the unnecessary generic argument
+    |                              |
+    |                              expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:379:33
+    |
+379 |     pub fn new(maximum: u64) -> Result<Self, AuthoredReplayError> {
+    |                                 ^^^^^^     --------------------- help: remove the unnecessary generic argument
+    |                                 |
+    |                                 expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:352:10
+    |
+352 | pub type Result<T> = std::result::Result<T, Error>;
+    |          ^^^^^^ -
+
+error[E0277]: the size for values of type `dyn BufRead` cannot be known at compilation time
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2785:25
+     |
+2785 |             scan_reader(&mut *reader, expected_len, limits, context, cancellation, None)
+     |             ----------- ^^^^^^^^^^^^ doesn't have a size known at compile-time
+     |             |
+     |             required by a bound introduced by this call
+     |
+     = help: the trait `Sized` is not implemented for `dyn BufRead`
+note: required by an implicit `Sized` bound in `scan_reader`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2801:27
+     |
+2801 | pub(super) fn scan_reader<R: BufRead>(
+     |                           ^ required by the implicit `Sized` requirement on this type parameter in `scan_reader`
+help: consider relaxing the implicit `Sized` restriction
+     |
+2801 | pub(super) fn scan_reader<R: BufRead + ?Sized>(
+     |                                      ++++++++
+
+error[E0308]: mismatched types
+  --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:91:24
+   |
+91 |               return Err(AuthoredReplayError::Limit {
+   |  ____________________---_^
+   | |                    |
+   | |                    arguments to this enum variant are incorrect
+92 | |                 resource: "durable replay reference bytes",
+93 | |                 actual: length,
+94 | |                 maximum,
+95 | |             });
+   | |_____________^ expected `Error`, found `AuthoredReplayError`
+   |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+  --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:91:20
+   |
+91 |                return Err(AuthoredReplayError::Limit {
+   |   ____________________^   -
+   |  |________________________|
+92 | ||                 resource: "durable replay reference bytes",
+93 | ||                 actual: length,
+94 | ||                 maximum,
+95 | ||             });
+   | ||_____________-^
+   | |______________|
+   |                this argument influences the type of `Err`
+note: tuple variant defined here
+  --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+   |
+91 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Limit {
+92 |                 resource: "durable replay reference bytes",
+93 |                 actual: length,
+94 |                 maximum,
+95 ~             }));
+   |
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:381:24
+    |
+381 |               return Err(AuthoredReplayError::Limit {
+    |  ____________________---_^
+    | |                    |
+    | |                    arguments to this enum variant are incorrect
+382 | |                 resource: "replay bytes",
+383 | |                 actual: maximum,
+384 | |                 maximum: maximum.saturating_sub(1),
+385 | |             });
+    | |_____________^ expected `Error`, found `AuthoredReplayError`
+    |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:381:20
+    |
+381 |                return Err(AuthoredReplayError::Limit {
+    |   ____________________^   -
+    |  |________________________|
+382 | ||                 resource: "replay bytes",
+383 | ||                 actual: maximum,
+384 | ||                 maximum: maximum.saturating_sub(1),
+385 | ||             });
+    | ||_____________-^
+    | |______________|
+    |                this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+    |
+381 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Limit {
+382 |                 resource: "replay bytes",
+383 |                 actual: maximum,
+384 |                 maximum: maximum.saturating_sub(1),
+385 ~             }));
+    |
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:397:24
+    |
+397 |               return Err(AuthoredReplayError::Store(
+    |  ____________________---_^
+    | |                    |
+    | |                    arguments to this enum variant are incorrect
+398 | |                 "replay store allocation exceeded its reservation",
+399 | |             ));
+    | |_____________^ expected `Error`, found `AuthoredReplayError`
+    |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:397:20
+    |
+397 |                return Err(AuthoredReplayError::Store(
+    |   ____________________^   -
+    |  |________________________|
+398 | ||                 "replay store allocation exceeded its reservation",
+399 | ||             ));
+    | ||_____________-^
+    | |______________|
+    |                this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+    |
+397 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Store(
+398 |                 "replay store allocation exceeded its reservation",
+399 ~             )));
+    |
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:454:24
+    |
+454 |             return Err(AuthoredReplayError::Changed);
+    |                    --- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Error`, found `AuthoredReplayError`
+    |                    |
+    |                    arguments to this enum variant are incorrect
+    |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:454:20
+    |
+454 |             return Err(AuthoredReplayError::Changed);
+    |                    ^^^^----------------------------^
+    |                        |
+    |                        this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+    |
+454 |             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Changed));
+    |                        +++++++++++++++++++++++++++++++++++++++++++++++++                            +
+
+error[E0277]: `?` couldn't convert the error to `tail_append_stream::Error`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:489:85
+    |
+488 |         let reader = <Self as AuthoredReplayHandle>::open(self)
+    |                      ------------------------------------------ this has type `Result<_, tail_append_stream::Error>`
+489 |             .map_err(|error| SourcePartSpliceReplayError::Provider(Box::new(error)))?;
+    |              -----------------------------------------------------------------------^ the trait `From<SourcePartSpliceReplayError>` is not implemented for `tail_append_stream::Error`
+    |              |
+    |              this can't be annotated with `?` because it has type `Result<_, SourcePartSpliceReplayError>`
+    |
+note: `tail_append_stream::Error` needs to implement `From<SourcePartSpliceReplayError>`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:326:1
+    |
+326 | pub enum Error {
+    | ^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: `tail_append_stream::Error` implements trait `From<T>`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:329:18
+    |
+329 |     TailAppend(#[from] tail_append::Error),
+    |                  ^^^^ `From<tail_append::Error>`
+...
+332 |     Replay(#[from] AuthoredReplayError),
+    |              ^^^^ `From<AuthoredReplayError>`
+...
+335 |     Opc(#[from] litchi_opc::error::OpcError),
+    |           ^^^^ `From<OpcError>`
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:520:24
+    |
+520 |               return Err(AuthoredReplayError::Limit {
+    |  ____________________---_^
+    | |                    |
+    | |                    arguments to this enum variant are incorrect
+521 | |                 resource: "replay bytes",
+522 | |                 actual: next,
+523 | |                 maximum: self.maximum,
+524 | |             });
+    | |_____________^ expected `Error`, found `AuthoredReplayError`
+    |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:520:20
+    |
+520 |                return Err(AuthoredReplayError::Limit {
+    |   ____________________^   -
+    |  |________________________|
+521 | ||                 resource: "replay bytes",
+522 | ||                 actual: next,
+523 | ||                 maximum: self.maximum,
+524 | ||             });
+    | ||_____________-^
+    | |______________|
+    |                this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+    |
+520 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Limit {
+521 |                 resource: "replay bytes",
+522 |                 actual: next,
+523 |                 maximum: self.maximum,
+524 ~             }));
+    |
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:538:24
+    |
+538 |             return Err(AuthoredReplayError::Changed);
+    |                    --- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Error`, found `AuthoredReplayError`
+    |                    |
+    |                    arguments to this enum variant are incorrect
+    |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:538:20
+    |
+538 |             return Err(AuthoredReplayError::Changed);
+    |                    ^^^^----------------------------^
+    |                        |
+    |                        this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+    |
+538 |             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Changed));
+    |                        +++++++++++++++++++++++++++++++++++++++++++++++++                            +
+
+error[E0631]: type mismatch in function arguments
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:577:43
+    |
+365 | fn map_replay_io(error: AuthoredReplayError) -> io::Error {
+    | --------------------------------------------------------- found signature defined here
+...
+577 |         let pass = inner.finish().map_err(map_replay_io)?.proof();
+    |                                   ------- ^^^^^^^^^^^^^ expected due to this
+    |                                   |
+    |                                   required by a bound introduced by this call
+    |
+    = note: expected function signature `fn(tail_append_stream::Error) -> _`
+               found function signature `fn(AuthoredReplayError) -> _`
+note: required by a bound in `std::result::Result::<T, E>::map_err`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:960:4
+help: consider wrapping the function in a closure
+    |
+577 |         let pass = inner.finish().map_err(|arg0: tail_append_stream::Error| map_replay_io(/* AuthoredReplayError */))?.proof();
+    |                                           +++++++++++++++++++++++++++++++++              +++++++++++++++++++++++++++
+
+error[E0277]: `?` couldn't convert the error to `tail_append_stream::Error`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:627:85
+    |
+626 |             .open()
+    |              ------ this has type `Result<_, tail_append_stream::Error>`
+627 |             .map_err(|error| SourcePartSpliceReplayError::Provider(Box::new(error)))?;
+    |              -----------------------------------------------------------------------^ the trait `From<SourcePartSpliceReplayError>` is not implemented for `tail_append_stream::Error`
+    |              |
+    |              this can't be annotated with `?` because it has type `Result<_, SourcePartSpliceReplayError>`
+    |
+note: `tail_append_stream::Error` needs to implement `From<SourcePartSpliceReplayError>`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:326:1
+    |
+326 | pub enum Error {
+    | ^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: `tail_append_stream::Error` implements trait `From<T>`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:329:18
+    |
+329 |     TailAppend(#[from] tail_append::Error),
+    |                  ^^^^ `From<tail_append::Error>`
+...
+332 |     Replay(#[from] AuthoredReplayError),
+    |              ^^^^ `From<AuthoredReplayError>`
+...
+335 |     Opc(#[from] litchi_opc::error::OpcError),
+    |           ^^^^ `From<OpcError>`
+
+error[E0308]: mismatched types
+   --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:736:9
+    |
+735 |     ) -> Result<(), AuthoredReplayError> {
+    |          ------------------------------- expected `std::result::Result<(), tail_append_stream::Error>` because of return type
+736 |         self.encoder.push_event(event)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), Error>`, found `Result<(), AuthoredReplayError>`
+    |
+    = note: expected enum `std::result::Result<_, tail_append_stream::Error>`
+               found enum `std::result::Result<_, AuthoredReplayError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+736 |         Ok(self.encoder.push_event(event)?)
+    |         +++                              ++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1112:53
+     |
+1017 |     Replay(AuthoredReplayError),
+     |     ------ found signature defined here
+...
+1112 |         let replay_reader = authored.open().map_err(CandidateError::Replay)?;
+     |                                             ------- ^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |                                             |
+     |                                             required by a bound introduced by this call
+     |
+     = note: expected function signature `fn(tail_append_stream::Error) -> _`
+                found function signature `fn(AuthoredReplayError) -> _`
+note: required by a bound in `std::result::Result::<T, E>::map_err`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:960:4
+help: consider wrapping the function in a closure
+     |
+1112 |         let replay_reader = authored.open().map_err(|arg0: tail_append_stream::Error| CandidateError::Replay(/* AuthoredReplayError */))?;
+     |                                                     +++++++++++++++++++++++++++++++++                       +++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1120:18
+     |
+1017 |     Replay(AuthoredReplayError),
+     |     ------ found signature defined here
+...
+1120 |         .map_err(CandidateError::Replay)?;
+     |          ------- ^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |          |
+     |          required by a bound introduced by this call
+     |
+     = note: expected function signature `fn(tail_append_stream::Error) -> _`
+                found function signature `fn(AuthoredReplayError) -> _`
+note: required by a bound in `std::result::Result::<T, E>::map_err`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:960:4
+help: consider wrapping the function in a closure
+     |
+1120 |         .map_err(|arg0: tail_append_stream::Error| CandidateError::Replay(/* AuthoredReplayError */))?;
+     |                  +++++++++++++++++++++++++++++++++                       +++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1134:51
+     |
+1017 |     Replay(AuthoredReplayError),
+     |     ------ found signature defined here
+...
+1134 |         let pass = splice.finish_replay().map_err(CandidateError::Replay)?;
+     |                                           ------- ^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |                                           |
+     |                                           required by a bound introduced by this call
+     |
+     = note: expected function signature `fn(tail_append_stream::Error) -> _`
+                found function signature `fn(AuthoredReplayError) -> _`
+note: required by a bound in `std::result::Result::<T, E>::map_err`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:960:4
+help: consider wrapping the function in a closure
+     |
+1134 |         let pass = splice.finish_replay().map_err(|arg0: tail_append_stream::Error| CandidateError::Replay(/* AuthoredReplayError */))?;
+     |                                                   +++++++++++++++++++++++++++++++++                       +++++++++++++++++++++++++++
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1303:24
+     |
+1303 |               return Err(AuthoredReplayError::Invalid(
+     |  ____________________---_^
+     | |                    |
+     | |                    arguments to this enum variant are incorrect
+1304 | |                 "replay insertion offset is outside the source",
+1305 | |             ));
+     | |_____________^ expected `Error`, found `AuthoredReplayError`
+     |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1303:20
+     |
+1303 |                return Err(AuthoredReplayError::Invalid(
+     |   ____________________^   -
+     |  |________________________|
+1304 | ||                 "replay insertion offset is outside the source",
+1305 | ||             ));
+     | ||_____________-^
+     | |______________|
+     |                this argument influences the type of `Err`
+note: tuple variant defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+     |
+1303 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Invalid(
+1304 |                 "replay insertion offset is outside the source",
+1305 ~             )));
+     |
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1313:24
+     |
+1313 |               return Err(AuthoredReplayError::Limit {
+     |  ____________________---_^
+     | |                    |
+     | |                    arguments to this enum variant are incorrect
+1314 | |                 resource: "replay window bytes",
+1315 | |                 actual: 0,
+1316 | |                 maximum: 0,
+1317 | |             });
+     | |_____________^ expected `Error`, found `AuthoredReplayError`
+     |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1313:20
+     |
+1313 |                return Err(AuthoredReplayError::Limit {
+     |   ____________________^   -
+     |  |________________________|
+1314 | ||                 resource: "replay window bytes",
+1315 | ||                 actual: 0,
+1316 | ||                 maximum: 0,
+1317 | ||             });
+     | ||_____________-^
+     | |______________|
+     |                this argument influences the type of `Err`
+note: tuple variant defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+     |
+1313 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Limit {
+1314 |                 resource: "replay window bytes",
+1315 |                 actual: 0,
+1316 |                 maximum: 0,
+1317 ~             }));
+     |
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1324:24
+     |
+1324 |               return Err(AuthoredReplayError::Store(
+     |  ____________________---_^
+     | |                    |
+     | |                    arguments to this enum variant are incorrect
+1325 | |                 "replay window allocation exceeded its reservation",
+1326 | |             ));
+     | |_____________^ expected `Error`, found `AuthoredReplayError`
+     |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1324:20
+     |
+1324 |                return Err(AuthoredReplayError::Store(
+     |   ____________________^   -
+     |  |________________________|
+1325 | ||                 "replay window allocation exceeded its reservation",
+1326 | ||             ));
+     | ||_____________-^
+     | |______________|
+     |                this argument influences the type of `Err`
+note: tuple variant defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+     |
+1324 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Store(
+1325 |                 "replay window allocation exceeded its reservation",
+1326 ~             )));
+     |
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1343:24
+     |
+1343 |               return Err(AuthoredReplayError::Invalid(
+     |  ____________________---_^
+     | |                    |
+     | |                    arguments to this enum variant are incorrect
+1344 | |                 "candidate scanner did not consume the complete authored replay",
+1345 | |             ));
+     | |_____________^ expected `Error`, found `AuthoredReplayError`
+     |
+help: the type constructed contains `AuthoredReplayError` due to the type of the argument passed
+    --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:1343:20
+     |
+1343 |                return Err(AuthoredReplayError::Invalid(
+     |   ____________________^   -
+     |  |________________________|
+1344 | ||                 "candidate scanner did not consume the complete authored replay",
+1345 | ||             ));
+     | ||_____________-^
+     | |______________|
+     |                this argument influences the type of `Err`
+note: tuple variant defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try wrapping the expression in `source_backed::tail_append_stream::Error::Replay`
+     |
+1343 ~             return Err(source_backed::tail_append_stream::Error::Replay(AuthoredReplayError::Invalid(
+1344 |                 "candidate scanner did not consume the complete authored replay",
+1345 ~             )));
+     |
+
+error: lifetime may not live long enough
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:271:9
+    |
+182 |         &mut self,
+    |         - let's call the lifetime of this reference `'2`
+183 |         event: PlainParagraphEvent<'_>,
+    |         ----- has type `PlainParagraphEvent<'1>`
+...
+271 |         Ok(result)
+    |         ^^^^^^^^^^ method was supposed to return data with lifetime `'2` but it is returning data with lifetime `'1`
+    |
+help: consider introducing a named lifetime parameter and update trait if needed
+    |
+181 ~     fn event_preflight<'a>(
+182 |         &mut self,
+183 ~         event: PlainParagraphEvent<'a>,
+184 ~     ) -> Result<EventBytes<'a>, AuthoredReplayError> {
+    |
+
+error[E0499]: cannot borrow `*self` as mutable more than once at a time
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:422:21
+    |
+399 |         let event_bytes = self.state.event_preflight(event)?;
+    |                           ---------- first mutable borrow occurs here
+...
+414 |                 for character in text.chars() {
+    |                                  ------------ first borrow later used here
+...
+422 |                     self.emit(&scratch[..written])?;
+    |                     ^^^^ second mutable borrow occurs here
+
+error[E0507]: cannot move out of `*self` which is behind a mutable reference
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:453:9
+    |
+453 |         self.finish()
+    |         ^^^^ -------- `*self` moved due to this method call
+    |         |
+    |         move occurs because `*self` has type `StreamingParagraphEncoder<S>`, which does not implement the `Copy` trait
+    |
+note: `StreamingParagraphEncoder::<S>::finish` takes ownership of the receiver `self`, which moves `*self`
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:467:30
+    |
+467 |     pub(crate) fn finish(mut self) -> Result<AuthoredPassProof, AuthoredReplayError> {
+    |                              ^^^^
+note: if `StreamingParagraphEncoder<S>` implemented `Clone`, you could clone the value
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:129:1
+    |
+129 | pub(crate) struct StreamingParagraphEncoder<S> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ consider implementing `Clone` for this type
+...
+453 |         self.finish()
+    |         ---- you could clone this value
+
+error[E0596]: cannot borrow `callback` as mutable, as it is not declared as mutable
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:541:71
+    |
+541 |         callback: |bytes: &[u8]| -> Result<(), AuthoredReplayError> { callback(bytes) },
+    |                                                                       ^^^^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+534 |     mut callback: F,
+    |     +++
+
+error[E0505]: cannot move out of `source` because it is borrowed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:613:13
+    |
+584 |         source: Arc<S>,
+    |         ------ binding `source` declared here
+...
+605 |         let mut cursor = source
+    |                          ------ borrow of `source` occurs here
+...
+613 |             source,
+    |             ^^^^^^ move out of `source` occurs here
+...
+622 |     }
+    |     - borrow might be used here, when `cursor` is dropped and runs the destructor for type `<S as ReplayableParagraphSource>::Cursor<'_>`
+
+error[E0506]: cannot assign to `self.poisoned` because it is borrowed
+   --> crates/litchi-docx/src/source_backed/tail_append_stream/encoder.rs:831:17
+    |
+827 |     fn pending_for_read(&mut self) -> io::Result<&mut PendingSink> {
+    |                         - let's call the lifetime of this reference `'1`
+828 |         match self.pending() {
+    |               ---- `self.poisoned` is borrowed here
+829 |             Ok(pending) => Ok(pending),
+    |                            ----------- returning this value requires that `*self` is borrowed for `'1`
+830 |             Err(error) => {
+831 |                 self.poisoned = true;
+    |                 ^^^^^^^^^^^^^^^^^^^^ `self.poisoned` is assigned to here but it was already borrowed
+
+Some errors have detailed explanations: E0053, E0107, E0277, E0308, E0499, E0505, E0506, E0507, E0596...
+For more information about an error, try `rustc --explain E0053`.
+error: could not compile `litchi-docx` (lib) due to 60 previous errors

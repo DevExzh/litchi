@@ -1,0 +1,4 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.28s
+     Running `tools/perf-baseline/target/debug/docx_replayable_tail_append --source-counts 2 --authored-counts 2 --chunks 64 --text short,near --samples 1 --warmups 0 --json /home/zhuhe/.cache/litchi-goal-0484/cli-dev47.json --fixture-dir /home/zhuhe/.cache/litchi-goal-0484/native-dev47`
+Error: "unsupported --source-counts count 2; expected one of [64, 8192, 131072]"

@@ -1,0 +1,16 @@
+
+running 11 tests
+test docx_replayable_tail_append::tests::authored_counter_oracle_rejects_partial_and_extra_empty_events ... ok
+test docx_replayable_tail_append::tests::source_adapter_records_returned_bytes_and_request_histogram ... ok
+test docx_replayable_tail_append::tests::near_limit_text_is_fixed_across_authored_counts ... ok
+test docx_replayable_tail_append::tests::candidate_xml_oracle_rejects_a_wrong_byte ... ok
+test docx_replayable_tail_append::tests::sink_records_all_fixed_write_histogram_bins ... ok
+test docx_replayable_tail_append::tests::raw_untouched_oracle_rejects_central_metadata_mutation_with_same_payload ... ok
+test docx_replayable_tail_append::tests::untouched_member_oracle_rejects_changed_opaque_bytes ... ok
+test docx_replayable_tail_append::tests::build_fixture_smoke_exercises_stream_and_full_oracles ... ok
+test docx_replayable_tail_append::tests::cursor_event_framing_matches_the_independent_authored_proof ... ok
+test docx_replayable_tail_append::tests::near_limit_fixture_uses_dynamic_parser_workspace ... ok
+test docx_replayable_tail_append::tests::generated_text_and_proof_accounting_are_independent_of_chunking ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 394 filtered out; finished in 0.77s
+

@@ -1,0 +1,13 @@
+
+running 8 tests
+test source_backed::tail_append_stream::patch::tests::process_local_patch_cannot_be_serialized ... ok
+test source_backed::tail_append_stream::patch::tests::exact_inverse_wire_round_trips ... ok
+test source_backed::tail_append_stream::patch::tests::canonical_wire_round_trips ... ok
+test source_backed::tail_append_stream::authenticated_reader_tests::authenticated_reader_rejects_bytes_beyond_proof_before_hashing ... ok
+test source_backed::tail_append_stream::patch::tests::inverse_allows_larger_current_candidate ... ok
+test source_backed::tail_append_stream::patch::tests::candidate_parser_events_are_independent_of_authored_framing ... ok
+test source_backed::tail_append_stream::authenticated_reader_tests::authenticated_reader_rejects_overreported_count_and_poison_repeats ... ok
+test source_backed::tail_append_stream::patch::tests::duplicate_and_unknown_fields_are_rejected ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 938 filtered out; finished in 0.00s
+

@@ -1,0 +1,81 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0308]: mismatched types
+    --> crates/litchi-opc/src/source_backed/splice.rs:639:25
+     |
+ 635 |                     stream_splice(
+     |                     ------------- arguments to this function are incorrect
+...
+ 639 |                         fragment.as_deref(),
+     |                         ^^^^^^^^^^^^^^^^^^^ expected `Option<&[u8]>`, found `Option<&Vec<u8>>`
+     |
+     = note: expected enum `Option<&[u8]>`
+                found enum `Option<&Vec<u8>>`
+note: function defined here
+    --> crates/litchi-opc/src/source_backed/splice.rs:1793:4
+     |
+1793 | fn stream_splice(
+     |    ^^^^^^^^^^^^^
+...
+1797 |     fragment: Option<&[u8]>,
+     |     -----------------------
+help: try using `.map(|v| &**v)` to convert `Option<&Vec<u8>>` to `Option<&[u8]>`
+     |
+ 639 |                         fragment.as_deref().map(|v| &**v),
+     |                                            ++++++++++++++
+
+error[E0283]: type annotations needed
+    --> crates/litchi-opc/src/source_backed/splice.rs:2244:46
+     |
+2244 |                 if hasher.clone().finalize().as_ref() != proof.encoded_sha256.as_slice() {
+     |                                              ^^^^^^
+     |
+     = note: multiple `impl`s satisfying `sha2::digest::hybrid_array::Array<u8, UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>>: AsRef<_>` found in the `hybrid_array` crate:
+             - impl<T, U, N> AsRef<[T; N]> for sha2::digest::hybrid_array::Array<T, U>
+               where <U as ArraySize>::ArrayType<T> == [T; N], the constant `N` has type `usize`, U: ArraySize;
+             - impl<T, U> AsRef<[T]> for sha2::digest::hybrid_array::Array<T, U>
+               where U: ArraySize;
+             - impl<T, U> AsRef<sha2::digest::hybrid_array::Array<T, U>> for sha2::digest::hybrid_array::Array<T, U>
+               where U: ArraySize;
+help: try using a fully qualified path to specify the expected types
+     |
+2244 -                 if hasher.clone().finalize().as_ref() != proof.encoded_sha256.as_slice() {
+2244 +                 if <sha2::digest::hybrid_array::Array<u8, UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>> as AsRef<T>>::as_ref(&hasher.clone().finalize()) != proof.encoded_sha256.as_slice() {
+     |
+
+error[E0283]: type annotations needed
+    --> crates/litchi-opc/src/source_backed/splice.rs:2244:46
+     |
+2244 |                 if hasher.clone().finalize().as_ref() != proof.encoded_sha256.as_slice() {
+     |                                              ^^^^^^   -- type must be known at this point
+     |
+     = note: multiple `impl`s satisfying `_: PartialEq<[u8]>` found in the following crates: `alloc`, `core`:
+             - impl PartialEq<[u8]> for ByteStr;
+             - impl PartialEq<[u8]> for ByteString;
+             - impl<T, U, A> PartialEq<[U]> for Vec<T, A>
+               where A: Allocator, T: PartialEq<U>;
+             - impl<T, U, N> PartialEq<[U]> for [T; N]
+               where the constant `N` has type `usize`, T: PartialEq<U>;
+             - impl<T, U> PartialEq<[U]> for [T]
+               where T: PartialEq<U>;
+     = note: required for `&_` to implement `PartialEq<&[u8]>`
+help: try using a fully qualified path to specify the expected types
+     |
+2244 -                 if hasher.clone().finalize().as_ref() != proof.encoded_sha256.as_slice() {
+2244 +                 if <sha2::digest::hybrid_array::Array<u8, UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>> as AsRef<T>>::as_ref(&hasher.clone().finalize()) != proof.encoded_sha256.as_slice() {
+     |
+
+error: variable does not need to be mutable
+   --> crates/litchi-opc/src/source_backed/splice.rs:934:9
+    |
+934 |         mut replay: SourcePartSpliceReplayHandle,
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+Some errors have detailed explanations: E0283, E0308.
+For more information about an error, try `rustc --explain E0283`.
+error: could not compile `litchi-opc` (lib) due to 4 previous errors

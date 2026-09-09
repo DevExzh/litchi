@@ -1,0 +1,13 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: this `repeat().take()` can be written more concisely
+   --> crates/litchi-opc/tests/source_part_splice_replay.rs:266:24
+    |
+266 |         payload.extend(std::iter::repeat(b'a').take(128 * 1024));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `repeat_n()` instead: `std::iter::repeat_n(b'a', 128 * 1024)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_repeat_n
+    = note: `-D clippy::manual-repeat-n` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_repeat_n)]`
+
+error: could not compile `litchi-opc` (test "source_part_splice_replay") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

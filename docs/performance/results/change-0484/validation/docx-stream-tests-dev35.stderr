@@ -1,0 +1,40 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: unnecessary qualification
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:452:16
+    |
+452 |         proof: litchi_docx::source_backed::tail_append_stream::AuthoredStreamProof,
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+452 -         proof: litchi_docx::source_backed::tail_append_stream::AuthoredStreamProof,
+452 +         proof: AuthoredStreamProof,
+    |
+
+error: trivial cast: `Arc<MemoryReplayHandle>` as `Arc<dyn AuthoredReplayHandle>`
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:536:12
+    |
+536 |         Ok(Arc::clone(&self.handle) as Arc<dyn AuthoredReplayHandle>)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: cast can be replaced by coercion; this might require a temporary variable
+    = note: requested on the command line with `-D trivial-casts`
+
+error: associated function `with_durable_reference` is never used
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:126:8
+    |
+ 99 | impl EventSource {
+    | ---------------- associated function in this implementation
+...
+126 |     fn with_durable_reference(events: Vec<EventData>, durable: AuthoredReplayReference) -> Self {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `litchi-docx` (test "source_backed_tail_append_stream") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

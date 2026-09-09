@@ -638,10 +638,11 @@ Report, per route and per axis:
 * cancellation/refusal phase, typed error class, accepted output, and the
   exact proof fields for every retained sample.
 
-The 0483 early pilot is directional only: at a 131,072-paragraph source the
-bounded one-paragraph route was observed at roughly twice the elapsed time of
-the materialized route while its heap increment was about 610 KiB versus about
-35 MiB. Those values are not a 0484 result and do not establish a stream
+The sealed 0483 comparison is limited to one authored paragraph: at a
+131,072-paragraph source the bounded route took roughly twice the elapsed time of
+the materialized route while its heap increment was 609,875 bytes versus
+35,371,290 bytes (about 596 KiB versus 33.7 MiB). Those values are not a 0484
+result and do not establish a stream
 benefit. The stream design deliberately retains the repeated source/candidate
 DOCX and OPC proof passes required by the contracts; their CPU cost must be
 measured and reported by pass. A summed allocator “requested bytes” counter

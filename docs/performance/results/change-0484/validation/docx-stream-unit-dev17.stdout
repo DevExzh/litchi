@@ -1,0 +1,9 @@
+
+running 4 tests
+test source_backed::tail_append_stream::patch::tests::process_local_patch_cannot_be_serialized ... ok
+test source_backed::tail_append_stream::patch::tests::exact_inverse_wire_round_trips ... ok
+test source_backed::tail_append_stream::patch::tests::canonical_wire_round_trips ... ok
+test source_backed::tail_append_stream::patch::tests::duplicate_and_unknown_fields_are_rejected ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 938 filtered out; finished in 0.00s
+

@@ -1,0 +1,63 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0425]: cannot find value `section` in this scope
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:437:30
+    |
+437 |                     .windows(section.len())
+    |                              ^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `section` in this scope
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:438:45
+    |
+438 |                     .any(|window| window == section.as_slice()),
+    |                                             ^^^^^^^ not found in this scope
+
+error[E0618]: expected function, found `litchi_docx::source_backed::Package`
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:447:29
+    |
+229 | fn package(bytes: Vec<u8>) -> source_backed::Package {
+    | ---------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+395 |             let package = package(source_archive.clone());
+    |                 ------- `package` has type `litchi_docx::source_backed::Package`
+...
+447 |             let candidate = package(output.clone());
+    |                             ^^^^^^^----------------
+    |                             |
+    |                             call expression requires function
+
+error[E0618]: expected function, found `litchi_docx::source_backed::Package`
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:524:19
+    |
+229 | fn package(bytes: Vec<u8>) -> source_backed::Package {
+    | ---------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+514 |     let package = package(source_archive.clone());
+    |         ------- `package` has type `litchi_docx::source_backed::Package`
+...
+524 |     let package = package(source_archive.clone());
+    |                   ^^^^^^^------------------------
+    |                   |
+    |                   call expression requires function
+
+error[E0618]: expected function, found `litchi_docx::source_backed::Package`
+   --> crates/litchi-docx/tests/source_backed_tail_append_stream.rs:635:19
+    |
+229 | fn package(bytes: Vec<u8>) -> source_backed::Package {
+    | ---------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+624 |     let package = package(source_archive.clone());
+    |         ------- `package` has type `litchi_docx::source_backed::Package`
+...
+635 |     let package = package(source_archive.clone());
+    |                   ^^^^^^^------------------------
+    |                   |
+    |                   call expression requires function
+
+Some errors have detailed explanations: E0425, E0618.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `litchi-docx` (test "source_backed_tail_append_stream") due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...

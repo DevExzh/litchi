@@ -31,6 +31,7 @@ const DEFAULT_MAX_OUTPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const DEFAULT_MAX_XML_WORKSPACE_BYTES: u64 = 64 * 1024 * 1024;
 const DEFAULT_MAX_PRESERVATION_MEMORY_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_REPLAY_MEMORY_BYTES: u64 = 8 * 1024 * 1024;
+const DEFAULT_MAX_AUTHORED_REPLAY_WINDOW_BYTES: u64 = super::SOURCE_PUBLICATION_CHUNK_BYTES as u64;
 
 /// Finite limits for one decoded-member splice.
 ///
@@ -55,6 +56,11 @@ pub struct SourcePartSpliceLimits {
     pub max_preservation_memory_bytes: u64,
     /// Maximum reserved replay writer and compressor workspace.
     pub max_replay_memory_bytes: u64,
+    /// Maximum reserved adapter window for one fresh caller-authored replay
+    /// reader.  Retained bytes in an explicit replay store are accounted by
+    /// that store's transferred reservation and are not charged once per
+    /// consumer.
+    pub max_authored_replay_window_bytes: u64,
     /// Explicit streaming XML audit profile. The default narrows the
     /// tokenizer to 64 KiB; callers that need a larger OOXML token must opt
     /// into that finite profile explicitly.
@@ -81,6 +87,7 @@ impl SourcePartSpliceLimits {
             max_xml_workspace_bytes: DEFAULT_MAX_XML_WORKSPACE_BYTES,
             max_preservation_memory_bytes: DEFAULT_MAX_PRESERVATION_MEMORY_BYTES,
             max_replay_memory_bytes: DEFAULT_MAX_REPLAY_MEMORY_BYTES,
+            max_authored_replay_window_bytes: DEFAULT_MAX_AUTHORED_REPLAY_WINDOW_BYTES,
             xml_audit_limits: default_xml_audit_limits(),
         };
         limits.validate()?;
@@ -115,6 +122,10 @@ impl SourcePartSpliceLimits {
             (
                 SpliceResource::ReplayMemoryBytes,
                 self.max_replay_memory_bytes,
+            ),
+            (
+                SpliceResource::AuthoredReplayMemoryBytes,
+                self.max_authored_replay_window_bytes,
             ),
         ] {
             validate_splice_limit(resource, value)?;
@@ -160,6 +171,13 @@ impl SourcePartSpliceLimits {
         self.max_replay_memory_bytes = maximum;
         self
     }
+
+    /// Bound the adapter window used by one fresh authored replay reader.
+    #[must_use]
+    pub const fn with_max_authored_replay_window_bytes(mut self, maximum: u64) -> Self {
+        self.max_authored_replay_window_bytes = maximum;
+        self
+    }
 }
 
 impl Default for SourcePartSpliceLimits {
@@ -174,6 +192,7 @@ impl Default for SourcePartSpliceLimits {
             max_xml_workspace_bytes: DEFAULT_MAX_XML_WORKSPACE_BYTES,
             max_preservation_memory_bytes: DEFAULT_MAX_PRESERVATION_MEMORY_BYTES,
             max_replay_memory_bytes: DEFAULT_MAX_REPLAY_MEMORY_BYTES,
+            max_authored_replay_window_bytes: DEFAULT_MAX_AUTHORED_REPLAY_WINDOW_BYTES,
             xml_audit_limits: default_xml_audit_limits(),
         }
     }
@@ -209,6 +228,155 @@ impl SourcePartSpliceProof {
         self.fragment_len == 0
             && self.candidate_len == self.source_len
             && self.insertion_offset <= self.source_len
+    }
+}
+
+/// Compact proof for one format-owned replay payload.
+///
+/// The digest covers the exact decoded bytes returned by every replay reader.
+/// OPC does not interpret those bytes; the format owner remains responsible
+/// for semantic validation of the payload.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SourcePartSpliceReplayProof {
+    /// Total decoded authored bytes that each fresh reader must return.
+    pub encoded_len: u64,
+    /// SHA-256 over the exact decoded authored bytes.
+    pub encoded_sha256: [u8; 32],
+}
+
+/// Error returned while opening or reading an explicit authored replay
+/// provider.
+///
+/// The provider error remains outside [`OpcError`] so an OPC plan can carry a
+/// format-owned provider without making the public OPC error generic.  The
+/// physical splice maps it to a typed I/O/overlay refusal at the publication
+/// boundary while preserving the source-freshness precedence rules.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourcePartSpliceReplayError {
+    /// The provider reported an I/O failure.
+    Io(io::Error),
+    /// The provider rejected a bounded replay operation for a static reason.
+    Invalid(&'static str),
+    /// A format-owned provider error that is safe to send across the replay
+    /// trait object boundary.
+    Provider(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl fmt::Display for SourcePartSpliceReplayError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(formatter, "authored replay I/O failed: {error}"),
+            Self::Invalid(reason) => write!(formatter, "authored replay refused: {reason}"),
+            Self::Provider(error) => write!(formatter, "authored replay provider failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for SourcePartSpliceReplayError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Provider(error) => Some(error.as_ref()),
+            Self::Invalid(_) => None,
+        }
+    }
+}
+
+impl From<io::Error> for SourcePartSpliceReplayError {
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+/// Format-neutral source of authenticated, replayable decoded bytes.
+///
+/// `open` must return a fresh reader for every call.  A reader is accepted as
+/// authenticated only after it reaches EOF and its length and digest match
+/// [`Self::proof`].  Providers may retain bytes in caller-owned storage; OPC
+/// never creates an ambient file, network client, executor, or global cache
+/// to implement this capability.
+pub trait SourcePartSpliceReplay: Send + Sync {
+    /// Return the immutable length/hash proof for this replay source.
+    fn proof(&self) -> SourcePartSpliceReplayProof;
+
+    /// Open one fresh sequential reader.
+    fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError>;
+}
+
+/// Owned replay capability retained by a source-part splice plan.
+///
+/// The optional retained-storage reservation is transferred by ownership from
+/// the caller's explicit store/encoder.  It is kept once on the handle and
+/// therefore is not charged once per fresh reader.  Every plan always
+/// reserves its own bounded OPC adapter window from the exact package
+/// execution context; an encoder/store window cannot authorize that charge.
+pub struct SourcePartSpliceReplayHandle {
+    provider: Arc<dyn SourcePartSpliceReplay>,
+    retained_storage_reservation: Option<Arc<Reservation>>,
+}
+
+impl fmt::Debug for SourcePartSpliceReplayHandle {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourcePartSpliceReplayHandle")
+            .field(
+                "retained_storage_reservation",
+                &self
+                    .retained_storage_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Clone for SourcePartSpliceReplayHandle {
+    fn clone(&self) -> Self {
+        Self {
+            provider: Arc::clone(&self.provider),
+            retained_storage_reservation: self.retained_storage_reservation.clone(),
+        }
+    }
+}
+
+impl SourcePartSpliceReplayHandle {
+    /// Wrap a replay provider without claiming ownership of provider storage.
+    #[must_use]
+    pub fn new(provider: Arc<dyn SourcePartSpliceReplay>) -> Self {
+        Self {
+            provider,
+            retained_storage_reservation: None,
+        }
+    }
+
+    /// Wrap a provider and transfer one reservation for bytes retained by an
+    /// explicit replay store.
+    #[must_use]
+    pub fn with_retained_storage_reservation(
+        provider: Arc<dyn SourcePartSpliceReplay>,
+        reservation: Arc<Reservation>,
+    ) -> Self {
+        Self {
+            provider,
+            retained_storage_reservation: Some(reservation),
+        }
+    }
+
+    /// Return the immutable payload proof.
+    #[must_use]
+    pub fn proof(&self) -> SourcePartSpliceReplayProof {
+        self.provider.proof()
+    }
+
+    /// Borrow the underlying format-neutral provider for one pass.
+    #[must_use]
+    pub(crate) fn provider(&self) -> &dyn SourcePartSpliceReplay {
+        self.provider.as_ref()
+    }
+
+    fn retained_storage_reservation(&self) -> Option<&Arc<Reservation>> {
+        self.retained_storage_reservation.as_ref()
     }
 }
 
@@ -252,13 +420,15 @@ impl SourcePartSpliceFragment<'_> {
 /// A prepared source-backed decoded-member splice.
 ///
 /// The plan borrows the immutable source-backed package and retains only the
-/// source artifact handle, proof scalars, and bounded immutable fragment. The
-/// package's physical ZIP implementation remains private to OPC.
+/// source artifact handle, proof scalars, and either a bounded immutable
+/// fragment or an explicit replay handle. The package's physical ZIP
+/// implementation remains private to OPC.
 pub struct SourcePartSplicePlan<'package> {
     package: &'package SourceBackedPackage,
     target: usize,
     audit_xml: bool,
-    fragment: Arc<Vec<u8>>,
+    fragment: Option<Arc<Vec<u8>>>,
+    replay: Option<SourcePartSpliceReplayHandle>,
     proof: SourcePartSpliceProof,
     limits: SourcePartSpliceLimits,
     source_artifact: SourceArtifact,
@@ -272,7 +442,11 @@ impl fmt::Debug for SourcePartSplicePlan<'_> {
             .debug_struct("SourcePartSplicePlan")
             .field("target", &self.target)
             .field("audit_xml", &self.audit_xml)
-            .field("fragment_bytes", &self.fragment.len())
+            .field(
+                "fragment_bytes",
+                &self.fragment.as_ref().map(|fragment| fragment.len()),
+            )
+            .field("replay", &self.replay)
             .field(
                 "fragment_memory_reservation",
                 &self
@@ -315,7 +489,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     /// Publish the plan to a sequential sink and retain an exact inverse
     /// authorization for the resulting artifact.
     pub fn write_to_stream<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, None)
+        self.write_to_stream_inner(writer, None, true)
     }
 
     /// Publish while recording accepted output and low-level ZIP work in an
@@ -325,13 +499,87 @@ impl<'package> SourcePartSplicePlan<'package> {
         writer: W,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, Some(accounting))
+        self.write_to_stream_inner(writer, Some(accounting), true)
+    }
+
+    /// Authenticate the complete candidate artifact in a bounded sink before
+    /// publishing it to the caller's sink. The preview consumes a private
+    /// sequential shallow copy of this plan and does not charge external
+    /// output bytes; the publishing pass retains the ordinary output-budget
+    /// and partial-output semantics.
+    pub fn write_to_stream_with_expected_artifact<W: Write>(
+        self,
+        writer: W,
+        expected_len: u64,
+        expected_sha256: SourceArtifactFingerprint,
+    ) -> Result<SourcePartSplicePublication> {
+        let (preview_len, preview_sha256) = {
+            let preview = self.clone_for_preview();
+            let publication = match preview.write_to_stream_inner(io::sink(), None, false) {
+                Ok(publication) => publication,
+                Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
+                Err(error) => return Err(error),
+            };
+            (
+                publication.candidate_artifact_len,
+                publication.candidate_artifact,
+            )
+        };
+        if preview_len != expected_len {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "length",
+            });
+        }
+        if preview_sha256 != expected_sha256 {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "fingerprint",
+            });
+        }
+
+        let publication = self.write_to_stream_inner(writer, None, true)?;
+        if publication.candidate_artifact_len != expected_len {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "length",
+                }),
+            });
+        }
+        if publication.candidate_artifact != expected_sha256 {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "fingerprint",
+                }),
+            });
+        }
+        Ok(publication)
+    }
+
+    fn clone_for_preview(&self) -> Self {
+        Self {
+            package: self.package,
+            target: self.target,
+            audit_xml: self.audit_xml,
+            fragment: self.fragment.as_ref().map(Arc::clone),
+            replay: self.replay.clone(),
+            proof: self.proof,
+            limits: self.limits,
+            source_artifact: self.source_artifact.clone(),
+            fragment_memory_reservation: self.fragment_memory_reservation.as_ref().map(Arc::clone),
+            xml_workspace_reservation: self.xml_workspace_reservation.as_ref().map(Arc::clone),
+        }
     }
 
     fn write_to_stream_inner<W: Write>(
         self,
         writer: W,
         mut accounting: Option<&mut OpcOperationAccounting>,
+        charge_output: bool,
     ) -> Result<SourcePartSplicePublication> {
         self.package.source.ensure_current()?;
         self.package
@@ -349,16 +597,26 @@ impl<'package> SourcePartSplicePlan<'package> {
                 self.limits.archive_limit(),
             )?;
             let mut hashing = HashingSink::new(writer);
-            match accounting.as_deref_mut() {
-                Some(report) => self
-                    .source_artifact
-                    .write_to_stream_with_accounting(&mut hashing, report)?,
-                None => self.source_artifact.write_to_stream(&mut hashing)?,
+            if charge_output {
+                match accounting.as_deref_mut() {
+                    Some(report) => self
+                        .source_artifact
+                        .write_to_stream_with_accounting(&mut hashing, report)?,
+                    None => self.source_artifact.write_to_stream(&mut hashing)?,
+                }
+            } else {
+                write_source_artifact_without_output_budget(
+                    &self.source_artifact,
+                    &mut hashing,
+                    self.package.cache.context().cloned(),
+                )?;
             }
+            let candidate_artifact_len = hashing.accepted;
             let candidate_artifact = hashing.finish();
             return Ok(SourcePartSplicePublication {
                 source_artifact: self.source_artifact,
                 candidate_artifact,
+                candidate_artifact_len,
                 proof: self.proof,
             });
         }
@@ -433,7 +691,11 @@ impl<'package> SourcePartSplicePlan<'package> {
             index: self.target,
         };
         let proof = self.proof;
-        let fragment = Arc::clone(&self.fragment);
+        let fragment = self.fragment.as_ref().map(Arc::clone);
+        let replay = self
+            .replay
+            .as_ref()
+            .map(|handle| Arc::clone(&handle.provider));
         let mut hashing = HashingSink::new(writer);
         let mut written = 0_u64;
         let mut accounting_error = None;
@@ -448,7 +710,10 @@ impl<'package> SourcePartSplicePlan<'package> {
                         reader,
                         output,
                         proof,
-                        fragment.as_slice(),
+                        fragment.as_ref().map(|bytes| bytes.as_slice()),
+                        replay.as_deref(),
+                        self.limits.max_authored_replay_window_bytes,
+                        self.limits.max_xml_workspace_bytes,
                         self.limits.xml_audit_limits,
                         part.partname().as_str(),
                         self.audit_xml,
@@ -466,51 +731,87 @@ impl<'package> SourcePartSplicePlan<'package> {
         };
 
         let result = if let Some(context) = self.package.cache.context() {
-            let output_reservation_failures = self
-                .package
-                .source
-                .output_reservation_failures
-                .as_ref()
-                .ok_or_else(|| {
-                    overlay_unavailable("managed source output reservation counter is unavailable")
-                })?
-                .clone();
-            let counted = match accounting.as_deref_mut() {
-                Some(report) => Counted::with_accounting(
-                    &mut hashing,
-                    &mut written,
-                    report,
-                    &mut accounting_error,
-                    false,
-                ),
-                None => Counted::new(&mut hashing, &mut written),
-            };
-            let checked = SourceCheckedSink {
-                inner: counted,
-                snapshot: source_snapshot.clone(),
-            };
-            let cooperative = ContextCheckedSink {
-                inner: checked,
-                context: Some(context.clone()),
-                failure: Arc::clone(&execution_failure),
-            };
-            let budgeted = OutputBudgetedSink {
-                inner: cooperative,
-                context: context.clone(),
-                failure: Arc::clone(&execution_failure),
-                output_reservation_failures,
-            };
-            match run_replay(
-                &index,
-                preservation_target,
-                compression,
-                replay_limits,
-                Chunked { inner: budgeted },
-                &mut callback,
-                &mut zip_accounting,
-            ) {
-                Ok(mut sink) => sink.flush().map_err(map_io_error),
-                Err(error) => Err(map_replay_error(error)),
+            if charge_output {
+                let output_reservation_failures = self
+                    .package
+                    .source
+                    .output_reservation_failures
+                    .as_ref()
+                    .ok_or_else(|| {
+                        overlay_unavailable(
+                            "managed source output reservation counter is unavailable",
+                        )
+                    })?
+                    .clone();
+                let counted = match accounting.as_deref_mut() {
+                    Some(report) => Counted::with_accounting(
+                        &mut hashing,
+                        &mut written,
+                        report,
+                        &mut accounting_error,
+                        false,
+                    ),
+                    None => Counted::new(&mut hashing, &mut written),
+                };
+                let checked = SourceCheckedSink {
+                    inner: counted,
+                    snapshot: source_snapshot.clone(),
+                };
+                let cooperative = ContextCheckedSink {
+                    inner: checked,
+                    context: Some(context.clone()),
+                    failure: Arc::clone(&execution_failure),
+                };
+                let budgeted = OutputBudgetedSink {
+                    inner: cooperative,
+                    context: context.clone(),
+                    failure: Arc::clone(&execution_failure),
+                    output_reservation_failures,
+                };
+                match run_replay(
+                    &index,
+                    preservation_target,
+                    compression,
+                    replay_limits,
+                    Chunked { inner: budgeted },
+                    &mut callback,
+                    &mut zip_accounting,
+                ) {
+                    Ok(mut sink) => sink.flush().map_err(map_io_error),
+                    Err(error) => Err(map_replay_error(error)),
+                }
+            } else {
+                let counted = match accounting.as_deref_mut() {
+                    Some(report) => Counted::with_accounting(
+                        &mut hashing,
+                        &mut written,
+                        report,
+                        &mut accounting_error,
+                        false,
+                    ),
+                    None => Counted::new(&mut hashing, &mut written),
+                };
+                let checked = SourceCheckedSink {
+                    inner: counted,
+                    snapshot: source_snapshot.clone(),
+                };
+                let cooperative = ContextCheckedSink {
+                    inner: checked,
+                    context: self.package.cache.context().cloned(),
+                    failure: Arc::clone(&execution_failure),
+                };
+                match run_replay(
+                    &index,
+                    preservation_target,
+                    compression,
+                    replay_limits,
+                    Chunked { inner: cooperative },
+                    &mut callback,
+                    &mut zip_accounting,
+                ) {
+                    Ok(mut sink) => sink.flush().map_err(map_io_error),
+                    Err(error) => Err(map_replay_error(error)),
+                }
             }
         } else {
             let counted = match accounting.as_deref_mut() {
@@ -582,13 +883,111 @@ impl<'package> SourcePartSplicePlan<'package> {
                 "decoded splice sink progress differs from accepted output",
             ));
         }
+        let candidate_artifact_len = hashing.accepted;
         let candidate_artifact = hashing.finish();
         Ok(SourcePartSplicePublication {
             source_artifact: self.source_artifact,
             candidate_artifact,
+            candidate_artifact_len,
             proof: self.proof,
         })
     }
+}
+
+fn write_source_artifact_without_output_budget(
+    artifact: &SourceArtifact,
+    writer: &mut dyn Write,
+    context: Option<ExecutionContext>,
+) -> Result<()> {
+    if let Some(context) = context.as_ref() {
+        context.check().map_err(map_execution_error)?;
+    }
+    let source = &artifact.snapshot;
+    source.monitor_publication();
+    source.ensure_current()?;
+    let _workspace_reservation = context
+        .as_ref()
+        .map(|context| {
+            context
+                .reserve(
+                    Resource::Memory,
+                    super::SOURCE_PUBLICATION_CHUNK_BYTES as u64,
+                )
+                .map(Arc::new)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(super::SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC preview publication buffer",
+            source,
+        })?;
+    if buffer.capacity() != super::SOURCE_PUBLICATION_CHUNK_BYTES {
+        return Err(overlay_unavailable(
+            "source-backed OPC preview allocation exceeds its reserved window",
+        ));
+    }
+    buffer.resize(super::SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+    let mut written = 0_u64;
+    let execution_failure = Arc::new(Mutex::new(None));
+    let counted = Counted::new(writer, &mut written);
+    let checked = SourceCheckedSink {
+        inner: counted,
+        snapshot: source.clone(),
+    };
+    let mut cooperative = ContextCheckedSink {
+        inner: checked,
+        context,
+        failure: Arc::clone(&execution_failure),
+    };
+    let result = (|| {
+        let mut offset = 0_u64;
+        while offset < source.length {
+            if let Some(context) = cooperative.context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+            let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+            let read = super::read_source_at_with_context(
+                source,
+                cooperative.context.as_ref(),
+                offset,
+                &mut buffer[..remaining],
+                "preview publication",
+            )
+            .map_err(super::map_source_backed_error)?;
+            if read == 0 {
+                return Err(OpcError::IoError(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "source-backed OPC source ended during preview publication",
+                )));
+            }
+            if let Some(context) = cooperative.context.as_ref() {
+                context
+                    .consume(
+                        Resource::Work,
+                        u64::try_from(read)
+                            .map_err(|_| overlay_unavailable("preview length exceeds u64"))?,
+                    )
+                    .map_err(map_execution_error)?;
+            }
+            cooperative
+                .write_all(&buffer[..read])
+                .map_err(map_io_error)?;
+            offset = offset
+                .checked_add(read as u64)
+                .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+        }
+        cooperative.flush().map_err(map_io_error)
+    })();
+    let result = execution_failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
+        .map_or(result, |error| Err(map_execution_error(error)));
+    finish_source_publication(result, source, written)
 }
 
 impl SourceBackedPackage {
@@ -708,6 +1107,176 @@ impl SourceBackedPackage {
         limits: SourcePartSpliceLimits,
     ) -> Result<SourcePartSplicePlan<'_>> {
         self.prepare_source_part_splice_inner(partname, proof, fragment, limits, false, None)
+    }
+
+    /// Prepare an insertion whose authored bytes are opened from one explicit
+    /// fresh replay provider for each physical pass.
+    ///
+    /// The provider is never materialized into a `Vec`.  Its compact proof
+    /// must agree with `proof.fragment_*`; candidate validation drains one
+    /// fresh reader before this method returns.  Publication opens another
+    /// fresh reader through the same retained handle.
+    pub fn prepare_source_part_splice_with_replay(
+        &self,
+        partname: &PackURI,
+        proof: SourcePartSpliceProof,
+        replay: Arc<dyn SourcePartSpliceReplay>,
+        limits: SourcePartSpliceLimits,
+    ) -> Result<SourcePartSplicePlan<'_>> {
+        self.prepare_source_part_splice_with_replay_handle(
+            partname,
+            proof,
+            SourcePartSpliceReplayHandle::new(replay),
+            limits,
+        )
+    }
+
+    /// Prepare a replay insertion while transferring retained-store storage
+    /// already owned by the caller.
+    ///
+    /// A handle created by a caller-owned bounded store can carry one
+    /// retained-storage reservation.  This plan keeps that reservation once;
+    /// it does not charge a copy for every `open` call.
+    pub fn prepare_source_part_splice_with_replay_handle(
+        &self,
+        partname: &PackURI,
+        proof: SourcePartSpliceProof,
+        replay: SourcePartSpliceReplayHandle,
+        limits: SourcePartSpliceLimits,
+    ) -> Result<SourcePartSplicePlan<'_>> {
+        limits.validate()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let target = self
+            .part_index(partname)
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+        let audit_xml = xml_minifier::audit::package::is_xml_part(
+            partname.as_str(),
+            &self.parts[target].content_type,
+        );
+        let target_entry = self.parts[target].entry_id;
+        let source_version = self.source.version();
+        if proof.source_version != source_version {
+            return Err(OpcError::SourceChanged {
+                expected: proof.source_version,
+                actual: source_version,
+            });
+        }
+        let declared_source_len = self
+            .archive
+            .metadata_for(target_entry)
+            .map_err(map_preservation_error)?
+            .uncompressed_size();
+        if proof.source_len != declared_source_len {
+            return Err(overlay_unavailable(
+                "decoded replay source length does not match its ZIP declaration",
+            ));
+        }
+        self.limits.check(
+            ReadResource::PartBytes,
+            proof.source_len,
+            self.limits.max_part_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::PartBytes,
+            proof.source_len,
+            limits.max_source_bytes,
+        )?;
+        let replay_proof = replay.proof();
+        if replay_proof.encoded_len != proof.fragment_len {
+            return Err(overlay_unavailable(
+                "decoded replay length does not match its splice proof",
+            ));
+        }
+        if replay_proof.encoded_sha256 != proof.fragment_sha256 {
+            return Err(overlay_unavailable(
+                "decoded replay hash does not match its splice proof",
+            ));
+        }
+        if let Some(reservation) = replay.retained_storage_reservation() {
+            if reservation.resource() != Resource::Memory
+                || reservation.amount() < replay_proof.encoded_len
+            {
+                return Err(OpcError::SourcePartSpliceLimit {
+                    resource: SpliceResource::AuthoredReplayMemoryBytes,
+                    actual: replay_proof.encoded_len,
+                    maximum: reservation.amount(),
+                });
+            }
+        }
+        limits_check(
+            ReadResource::PartBytes,
+            replay_proof.encoded_len,
+            limits.max_fragment_bytes,
+        )?;
+        let candidate_len = proof
+            .source_len
+            .checked_add(replay_proof.encoded_len)
+            .ok_or_else(|| overlay_unavailable("decoded replay candidate length overflows u64"))?;
+        if proof.candidate_len != candidate_len {
+            return Err(overlay_unavailable(
+                "decoded replay candidate length is not source plus replay",
+            ));
+        }
+        limits_check(
+            ReadResource::PartBytes,
+            candidate_len,
+            limits.max_candidate_bytes,
+        )?;
+        if proof.insertion_offset > proof.source_len {
+            return Err(overlay_unavailable(
+                "decoded replay insertion offset is outside the source member",
+            ));
+        }
+        let candidate_len_usize = usize::try_from(candidate_len).map_err(|_| {
+            overlay_unavailable("decoded replay candidate length does not fit this platform")
+        })?;
+        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)))?;
+        let is_noop = proof.is_exact_insertion_noop();
+        if !is_noop {
+            if self.has_signature_infrastructure() {
+                return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+            }
+            if self.has_encrypted_entries() {
+                return Err(overlay_unavailable(
+                    "decoded replay splice refuses encrypted ZIP members",
+                ));
+            }
+        }
+        if is_noop {
+            verify_noop_source_proof(&self.part(partname)?, proof)?;
+        } else {
+            verify_source_proof(
+                &self.part(partname)?,
+                proof,
+                limits.xml_audit_limits,
+                audit_xml,
+                Some(limits.max_xml_workspace_bytes),
+            )?;
+            verify_candidate_proof_replay(
+                &self.part(partname)?,
+                proof,
+                replay.provider(),
+                limits.max_authored_replay_window_bytes,
+                limits.max_xml_workspace_bytes,
+                limits.xml_audit_limits,
+                audit_xml,
+            )?;
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+        }
+        Ok(SourcePartSplicePlan {
+            package: self,
+            target,
+            audit_xml,
+            fragment: None,
+            replay: Some(replay),
+            proof: SourcePartSpliceProof { ..proof },
+            limits,
+            source_artifact: self.source_artifact(),
+            fragment_memory_reservation: None,
+            xml_workspace_reservation: None,
+        })
     }
 
     fn prepare_source_part_splice_inner(
@@ -850,6 +1419,7 @@ impl SourceBackedPackage {
                 proof,
                 limits.xml_audit_limits,
                 audit_xml,
+                None,
             )?;
             verify_candidate_proof(
                 &self.part(partname)?,
@@ -865,7 +1435,8 @@ impl SourceBackedPackage {
             package: self,
             target,
             audit_xml,
-            fragment,
+            fragment: Some(fragment),
+            replay: None,
             proof: SourcePartSpliceProof { ..proof },
             limits,
             source_artifact: self.source_artifact(),
@@ -880,6 +1451,7 @@ impl SourceBackedPackage {
 pub struct SourcePartSplicePublication {
     source_artifact: SourceArtifact,
     candidate_artifact: SourceArtifactFingerprint,
+    candidate_artifact_len: u64,
     proof: SourcePartSpliceProof,
 }
 
@@ -904,6 +1476,12 @@ impl SourcePartSplicePublication {
     #[must_use]
     pub const fn candidate_artifact_fingerprint(&self) -> SourceArtifactFingerprint {
         self.candidate_artifact
+    }
+
+    /// Return the exact number of bytes in the published archive.
+    #[must_use]
+    pub const fn candidate_artifact_len(&self) -> u64 {
+        self.candidate_artifact_len
     }
 
     /// Return whether this publication used the exact source artifact path.
@@ -940,6 +1518,12 @@ impl SourcePartSplicePublication {
         }
         current.source.monitor_publication();
         retained.monitor_publication();
+        if current.source.length != self.candidate_artifact_len {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "current",
+                field: "length",
+            });
+        }
         let _workspace_reservation = operation_context
             .as_ref()
             .map(|context| {
@@ -959,6 +1543,11 @@ impl SourcePartSplicePublication {
                 resource: "source-backed OPC inverse publication buffer",
                 source,
             })?;
+        if buffer.capacity() != super::SOURCE_PUBLICATION_CHUNK_BYTES {
+            return Err(overlay_unavailable(
+                "source-backed OPC inverse allocation exceeds its reserved window",
+            ));
+        }
         buffer.resize(super::SOURCE_PUBLICATION_CHUNK_BYTES, 0);
         let actual = fingerprint_inverse_snapshot(
             current,
@@ -1053,7 +1642,17 @@ fn splice_limits_check(resource: SpliceResource, actual: u64, maximum: u64) -> R
     Ok(())
 }
 
-fn finish_inverse_publication(
+fn authored_replay_window_requirement(maximum: u64) -> Result<u64> {
+    let default = u64::try_from(super::SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|_| overlay_unavailable("authored replay window exceeds u64"))?;
+    Ok(default.min(maximum))
+}
+
+fn replay_error_to_io(error: SourcePartSpliceReplayError) -> io::Error {
+    io::Error::other(error)
+}
+
+pub(super) fn finish_inverse_publication(
     result: Result<()>,
     source: &SourceSnapshot,
     retained: &SourceSnapshot,
@@ -1082,7 +1681,7 @@ fn finish_inverse_publication(
     }
 }
 
-fn check_inverse_state(
+pub(super) fn check_inverse_state(
     current: &SourceBackedPackage,
     retained: &SourceSnapshot,
     operation_context: Option<&ExecutionContext>,
@@ -1099,7 +1698,7 @@ fn check_inverse_state(
     Ok(())
 }
 
-fn fingerprint_inverse_snapshot(
+pub(super) fn fingerprint_inverse_snapshot(
     current: &SourceBackedPackage,
     snapshot: &SourceSnapshot,
     retained: &SourceSnapshot,
@@ -1118,7 +1717,8 @@ fn fingerprint_inverse_snapshot(
             offset,
             &mut buffer[..remaining],
             "inverse fingerprinting",
-        )?;
+        )
+        .map_err(super::map_source_backed_error)?;
         if read == 0 {
             return Err(OpcError::IoError(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
@@ -1126,6 +1726,11 @@ fn fingerprint_inverse_snapshot(
             )));
         }
         check_inverse_state(current, retained, operation_context)?;
+        if let Some(context) = operation_context {
+            context
+                .consume(Resource::Work, read as u64)
+                .map_err(map_execution_error)?;
+        }
         hasher.update(&buffer[..read]);
         offset = offset
             .checked_add(read as u64)
@@ -1137,7 +1742,7 @@ fn fingerprint_inverse_snapshot(
     ))
 }
 
-fn copy_inverse_snapshot(
+pub(super) fn copy_inverse_snapshot(
     current: &SourceBackedPackage,
     retained: &SourceSnapshot,
     operation_context: Option<&ExecutionContext>,
@@ -1173,18 +1778,31 @@ fn copy_inverse_snapshot(
 }
 
 fn splice_workspace_requirement(limits: SourcePartSpliceLimits, audit_xml: bool) -> Result<u64> {
+    splice_workspace_requirement_from_xml(limits.xml_audit_limits, audit_xml)
+}
+
+fn splice_workspace_requirement_from_xml(
+    limits: xml_minifier::audit::Limits,
+    audit_xml: bool,
+) -> Result<u64> {
+    let parser = xml_parser_workspace_requirement(limits, audit_xml)?;
+    parser
+        .checked_add(super::SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+        .ok_or_else(|| overlay_unavailable("XML audit workspace bound exceeds u64"))
+}
+
+fn xml_parser_workspace_requirement(
+    limits: xml_minifier::audit::Limits,
+    audit_xml: bool,
+) -> Result<u64> {
     let parser = if audit_xml {
         limits
-            .xml_audit_limits
             .streaming_memory_upper_bound()
             .ok_or_else(|| overlay_unavailable("XML audit workspace bound overflows usize"))?
     } else {
         0
     };
-    u64::try_from(parser)
-        .ok()
-        .and_then(|parser| parser.checked_add(super::SOURCE_PUBLICATION_CHUNK_BYTES as u64))
-        .ok_or_else(|| overlay_unavailable("XML audit workspace bound exceeds u64"))
+    u64::try_from(parser).map_err(|_| overlay_unavailable("XML audit workspace bound exceeds u64"))
 }
 
 fn preservation_memory_requirement(package: &SourceBackedPackage) -> Result<u64> {
@@ -1225,7 +1843,23 @@ fn verify_source_proof(
     proof: SourcePartSpliceProof,
     limits: xml_minifier::audit::Limits,
     audit_xml: bool,
+    per_pass_xml_workspace: Option<u64>,
 ) -> Result<()> {
+    let _xml_workspace_reservation = if audit_xml {
+        per_pass_xml_workspace
+            .map(|maximum| {
+                let workspace = splice_workspace_requirement_from_xml(limits, audit_xml)?;
+                reserve_memory(
+                    part.package.source.context.as_ref(),
+                    workspace,
+                    maximum,
+                    SpliceResource::XmlWorkspaceBytes,
+                )
+            })
+            .transpose()?
+    } else {
+        None
+    };
     let partname = part.partname().as_str().to_owned();
     let observed = part.with_verified_decoded_reader(|reader| {
         if audit_xml {
@@ -1234,7 +1868,8 @@ fn verify_source_proof(
                 reader,
                 &mut sink,
                 proof,
-                &[],
+                SplicePayloadRef::Fixed(&[]),
+                SpliceAuditMemoryLimits::unbounded(),
                 proof.source_len,
                 limits,
                 &partname,
@@ -1310,6 +1945,52 @@ fn verify_candidate_proof(
     limits: xml_minifier::audit::Limits,
     audit_xml: bool,
 ) -> Result<()> {
+    verify_candidate_payload(
+        part,
+        proof,
+        SplicePayloadRef::Fixed(fragment),
+        SpliceAuditMemoryLimits::unbounded(),
+        limits,
+        audit_xml,
+    )
+}
+
+fn verify_candidate_proof_replay(
+    part: &PartView<'_>,
+    proof: SourcePartSpliceProof,
+    replay: &dyn SourcePartSpliceReplay,
+    max_replay_window_bytes: u64,
+    max_xml_workspace_bytes: u64,
+    limits: xml_minifier::audit::Limits,
+    audit_xml: bool,
+) -> Result<()> {
+    verify_candidate_payload(
+        part,
+        proof,
+        SplicePayloadRef::Replay {
+            provider: replay,
+            proof: SourcePartSpliceReplayProof {
+                encoded_len: proof.fragment_len,
+                encoded_sha256: proof.fragment_sha256,
+            },
+        },
+        SpliceAuditMemoryLimits {
+            authored_replay_window_bytes: max_replay_window_bytes,
+            xml_workspace_bytes: max_xml_workspace_bytes,
+        },
+        limits,
+        audit_xml,
+    )
+}
+
+fn verify_candidate_payload(
+    part: &PartView<'_>,
+    proof: SourcePartSpliceProof,
+    payload: SplicePayloadRef<'_>,
+    memory_limits: SpliceAuditMemoryLimits,
+    limits: xml_minifier::audit::Limits,
+    audit_xml: bool,
+) -> Result<()> {
     let partname = part.partname().as_str().to_owned();
     let observed = part.with_verified_decoded_reader(|reader| {
         let mut sink = io::sink();
@@ -1317,7 +1998,8 @@ fn verify_candidate_proof(
             reader,
             &mut sink,
             proof,
-            fragment,
+            payload,
+            memory_limits,
             proof.insertion_offset,
             limits,
             &partname,
@@ -1368,7 +2050,10 @@ fn stream_splice(
     reader: &mut dyn BufRead,
     output: &mut dyn Write,
     proof: SourcePartSpliceProof,
-    fragment: &[u8],
+    fragment: Option<&[u8]>,
+    replay: Option<&dyn SourcePartSpliceReplay>,
+    max_replay_window_bytes: u64,
+    max_xml_workspace_bytes: u64,
     limits: xml_minifier::audit::Limits,
     partname: &str,
     audit_xml: bool,
@@ -1379,7 +2064,25 @@ fn stream_splice(
         reader,
         output,
         proof,
-        fragment,
+        match (fragment, replay) {
+            (Some(fragment), None) => SplicePayloadRef::Fixed(fragment),
+            (None, Some(replay)) => SplicePayloadRef::Replay {
+                provider: replay,
+                proof: SourcePartSpliceReplayProof {
+                    encoded_len: proof.fragment_len,
+                    encoded_sha256: proof.fragment_sha256,
+                },
+            },
+            _ => {
+                return Err(overlay_unavailable(
+                    "decoded splice replay payload has an invalid representation",
+                ));
+            },
+        },
+        SpliceAuditMemoryLimits {
+            authored_replay_window_bytes: max_replay_window_bytes,
+            xml_workspace_bytes: max_xml_workspace_bytes,
+        },
         proof.insertion_offset,
         limits,
         partname,
@@ -1396,11 +2099,27 @@ fn stream_splice(
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SpliceAuditMemoryLimits {
+    authored_replay_window_bytes: u64,
+    xml_workspace_bytes: u64,
+}
+
+impl SpliceAuditMemoryLimits {
+    const fn unbounded() -> Self {
+        Self {
+            authored_replay_window_bytes: u64::MAX,
+            xml_workspace_bytes: u64::MAX,
+        }
+    }
+}
+
 fn audit_splice(
     reader: &mut dyn BufRead,
     output: &mut dyn Write,
     proof: SourcePartSpliceProof,
-    fragment: &[u8],
+    payload: SplicePayloadRef<'_>,
+    memory: SpliceAuditMemoryLimits,
     insertion_offset: u64,
     limits: xml_minifier::audit::Limits,
     partname: &str,
@@ -1409,12 +2128,46 @@ fn audit_splice(
     source: Option<&SourceSnapshot>,
     context: Option<&ExecutionContext>,
 ) -> Result<(u64, [u8; 32], u64, [u8; 32])> {
+    // The replay adapter owns one fresh bounded payload window per live pass.
+    // Reserve it here, for the exact package context, so concurrent plans or
+    // concurrent publications retain independently charged windows. Fixed
+    // fragments retain their historical 64 KiB buffer and do not need this
+    // authored-replay resource.
+    let adapter_window_bytes =
+        authored_replay_window_requirement(memory.authored_replay_window_bytes)?;
+    let _replay_window_reservation = if matches!(&payload, SplicePayloadRef::Replay { .. }) {
+        reserve_memory(
+            context,
+            adapter_window_bytes,
+            memory.authored_replay_window_bytes,
+            SpliceResource::AuthoredReplayMemoryBytes,
+        )?
+    } else {
+        None
+    };
+    let adapter_window_bytes = usize::try_from(adapter_window_bytes)
+        .map_err(|_| overlay_unavailable("authored replay window exceeds usize"))?;
+    let _replay_xml_workspace_reservation =
+        if audit_xml && matches!(&payload, SplicePayloadRef::Replay { .. }) {
+            let parser = xml_parser_workspace_requirement(limits, audit_xml)?;
+            reserve_memory(
+                context,
+                parser,
+                memory.xml_workspace_bytes,
+                SpliceResource::XmlWorkspaceBytes,
+            )?
+        } else {
+            None
+        };
     let mut splice_reader = SpliceAuditReader::new(
         reader,
         output,
-        proof.source_len,
-        insertion_offset,
-        fragment,
+        SpliceAuditBounds {
+            source_length: proof.source_len,
+            insertion_offset,
+            adapter_window_bytes,
+        },
+        payload,
         source,
         context,
     )?;
@@ -1484,6 +2237,29 @@ enum SplicePhase {
     Done,
 }
 
+#[derive(Clone, Copy)]
+enum SplicePayloadRef<'payload> {
+    Fixed(&'payload [u8]),
+    Replay {
+        provider: &'payload dyn SourcePartSpliceReplay,
+        proof: SourcePartSpliceReplayProof,
+    },
+}
+
+enum SplicePayload<'payload> {
+    Fixed {
+        bytes: &'payload [u8],
+        position: usize,
+    },
+    Replay {
+        reader: Box<dyn Read + 'payload>,
+        proof: SourcePartSpliceReplayProof,
+        position: u64,
+        hasher: Sha256,
+        eof_checked: bool,
+    },
+}
+
 /// A bounded logical candidate view used by XML auditing or binary draining.
 ///
 /// `quick_xml` consumes a `BufRead` view, so this adapter copies at most one
@@ -1491,16 +2267,22 @@ enum SplicePhase {
 /// written to the replay sink only when the auditor consumes them. That keeps
 /// candidate validation and publication on the same byte stream without
 /// retaining the complete source or candidate.
-struct SpliceAuditReader<'source, 'fragment, 'output, 'snapshot, 'context> {
+#[derive(Clone, Copy)]
+struct SpliceAuditBounds {
+    source_length: u64,
+    insertion_offset: u64,
+    adapter_window_bytes: usize,
+}
+
+struct SpliceAuditReader<'source, 'payload, 'output, 'snapshot, 'context> {
     source: &'source mut dyn BufRead,
-    fragment: &'fragment [u8],
+    payload: SplicePayload<'payload>,
     output: &'output mut dyn Write,
     source_snapshot: Option<&'snapshot SourceSnapshot>,
     context: Option<&'context ExecutionContext>,
     insertion_offset: u64,
     source_length: u64,
     source_position: u64,
-    fragment_position: usize,
     phase: SplicePhase,
     buffer: Vec<u8>,
     buffer_start: usize,
@@ -1514,41 +2296,54 @@ struct SpliceAuditReader<'source, 'fragment, 'output, 'snapshot, 'context> {
     pending_failure: Option<OpcError>,
 }
 
-impl<'source, 'fragment, 'output, 'snapshot, 'context>
-    SpliceAuditReader<'source, 'fragment, 'output, 'snapshot, 'context>
+impl<'source, 'payload, 'output, 'snapshot, 'context>
+    SpliceAuditReader<'source, 'payload, 'output, 'snapshot, 'context>
 {
     fn new(
         source: &'source mut dyn BufRead,
         output: &'output mut dyn Write,
-        source_length: u64,
-        insertion_offset: u64,
-        fragment: &'fragment [u8],
+        bounds: SpliceAuditBounds,
+        payload: SplicePayloadRef<'payload>,
         source_snapshot: Option<&'snapshot SourceSnapshot>,
         context: Option<&'context ExecutionContext>,
     ) -> Result<Self> {
-        if insertion_offset > source_length {
+        if bounds.insertion_offset > bounds.source_length {
             return Err(overlay_unavailable(
                 "decoded splice insertion offset is outside the source member",
             ));
         }
         let mut buffer = Vec::new();
         buffer
-            .try_reserve_exact(super::SOURCE_PUBLICATION_CHUNK_BYTES)
+            .try_reserve_exact(bounds.adapter_window_bytes)
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC decoded splice audit buffer",
                 source,
             })?;
-        buffer.resize(super::SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+        if buffer.capacity() != bounds.adapter_window_bytes {
+            return Err(overlay_unavailable(
+                "decoded splice audit allocation exceeds its reserved window",
+            ));
+        }
+        buffer.resize(bounds.adapter_window_bytes, 0);
+        let payload = match payload {
+            SplicePayloadRef::Fixed(bytes) => SplicePayload::Fixed { bytes, position: 0 },
+            SplicePayloadRef::Replay { provider, proof } => SplicePayload::Replay {
+                reader: provider.open().map_err(replay_error_to_io)?,
+                proof,
+                position: 0,
+                hasher: Sha256::new(),
+                eof_checked: false,
+            },
+        };
         Ok(Self {
             source,
-            fragment,
+            payload,
             output,
             source_snapshot,
             context,
-            insertion_offset,
-            source_length,
+            insertion_offset: bounds.insertion_offset,
+            source_length: bounds.source_length,
             source_position: 0,
-            fragment_position: 0,
             phase: SplicePhase::Prefix,
             buffer,
             buffer_start: 0,
@@ -1596,8 +2391,17 @@ impl<'source, 'fragment, 'output, 'snapshot, 'context>
                 SplicePhase::Prefix if self.source_position >= self.insertion_offset => {
                     SplicePhase::Fragment
                 },
-                SplicePhase::Fragment if self.fragment_position >= self.fragment.len() => {
-                    SplicePhase::Suffix
+                SplicePhase::Fragment => match &self.payload {
+                    SplicePayload::Fixed { bytes, position } if *position >= bytes.len() => {
+                        SplicePhase::Suffix
+                    },
+                    SplicePayload::Replay {
+                        proof,
+                        position,
+                        eof_checked,
+                        ..
+                    } if *position >= proof.encoded_len && *eof_checked => SplicePhase::Suffix,
+                    _ => SplicePhase::Fragment,
                 },
                 SplicePhase::Suffix if self.source_position >= self.source_length => {
                     SplicePhase::Done
@@ -1633,16 +2437,57 @@ impl<'source, 'fragment, 'output, 'snapshot, 'context>
         Ok(&self.buffer[..count])
     }
 
-    fn fill_fragment_buffer(&mut self) -> &[u8] {
-        let remaining = self.fragment.len().saturating_sub(self.fragment_position);
-        let count = remaining.min(self.buffer.len());
-        self.buffer[..count].copy_from_slice(
-            &self.fragment[self.fragment_position..self.fragment_position + count],
-        );
-        self.buffer_start = 0;
-        self.buffer_len = count;
-        self.buffer_source_bytes = 0;
-        &self.buffer[..count]
+    fn fill_fragment_buffer(&mut self) -> io::Result<&[u8]> {
+        match &mut self.payload {
+            SplicePayload::Fixed { bytes, position } => {
+                let remaining = bytes.len().saturating_sub(*position);
+                let count = remaining.min(self.buffer.len());
+                self.buffer[..count].copy_from_slice(&bytes[*position..*position + count]);
+                self.buffer_start = 0;
+                self.buffer_len = count;
+                self.buffer_source_bytes = 0;
+                Ok(&self.buffer[..count])
+            },
+            SplicePayload::Replay {
+                reader,
+                proof,
+                position,
+                eof_checked,
+                ..
+            } => {
+                if *position >= proof.encoded_len {
+                    let mut extra = [0_u8; 1];
+                    let read = reader.read(&mut extra)?;
+                    if read != 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "decoded splice replay returned bytes beyond its proved length",
+                        ));
+                    }
+                    *eof_checked = true;
+                    self.buffer_start = 0;
+                    self.buffer_len = 0;
+                    self.buffer_source_bytes = 0;
+                    self.advance_phase();
+                    return Ok(&[]);
+                }
+                let remaining = proof.encoded_len - *position;
+                let count = usize::try_from(remaining)
+                    .unwrap_or(usize::MAX)
+                    .min(self.buffer.len());
+                let read = reader.read(&mut self.buffer[..count])?;
+                if read == 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "decoded splice replay ended before its declared length",
+                    ));
+                }
+                self.buffer_start = 0;
+                self.buffer_len = read;
+                self.buffer_source_bytes = 0;
+                Ok(&self.buffer[..read])
+            },
+        }
     }
 
     fn add_candidate_length(&mut self, amount: usize) {
@@ -1706,6 +2551,34 @@ impl<'source, 'fragment, 'output, 'snapshot, 'context>
                 "decoded splice source length changed during replay",
             ));
         }
+        match &self.payload {
+            SplicePayload::Fixed { bytes, position } => {
+                if *position != bytes.len() {
+                    return Err(overlay_unavailable(
+                        "decoded splice fixed payload was not fully consumed",
+                    ));
+                }
+            },
+            SplicePayload::Replay {
+                proof,
+                position,
+                hasher,
+                eof_checked,
+                ..
+            } => {
+                if *position != proof.encoded_len || !*eof_checked {
+                    return Err(overlay_unavailable(
+                        "decoded splice replay did not reach authenticated EOF",
+                    ));
+                }
+                let digest: [u8; 32] = hasher.clone().finalize().into();
+                if digest != proof.encoded_sha256 {
+                    return Err(overlay_unavailable(
+                        "decoded splice replay hash changed during replay",
+                    ));
+                }
+            },
+        }
         if self.output_accepted != self.candidate_length {
             return Err(overlay_unavailable(
                 "decoded splice sink accepted fewer candidate bytes than audited",
@@ -1745,7 +2618,14 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
                 let remaining = self.insertion_offset - self.source_position;
                 self.fill_source_buffer(remaining)
             },
-            SplicePhase::Fragment => Ok(self.fill_fragment_buffer()),
+            SplicePhase::Fragment => {
+                let empty = self.fill_fragment_buffer()?.is_empty();
+                if empty && self.phase != SplicePhase::Fragment {
+                    self.fill_buf()
+                } else {
+                    Ok(&self.buffer[self.buffer_start..self.buffer_len])
+                }
+            },
             SplicePhase::Suffix => {
                 let remaining = self.source_length - self.source_position;
                 self.fill_source_buffer(remaining)
@@ -1809,7 +2689,17 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
             self.source.consume(source_amount);
             self.source_position = self.source_position.saturating_add(source_amount as u64);
         } else {
-            self.fragment_position = self.fragment_position.saturating_add(amount);
+            match &mut self.payload {
+                SplicePayload::Fixed { position, .. } => {
+                    *position = position.saturating_add(amount);
+                },
+                SplicePayload::Replay {
+                    position, hasher, ..
+                } => {
+                    hasher.update(&self.buffer[start..start + amount]);
+                    *position = position.saturating_add(amount as u64);
+                },
+            }
         }
         self.buffer_start += amount;
         if self.buffer_start == self.buffer_len {
