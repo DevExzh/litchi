@@ -11139,3 +11139,47 @@ Validation includes 11 shared span tests, 42 host extractor tests, and the
 native Pages cell readback regression. AddressSanitizer completes 1,000
 numbers_tile_storage fuzz runs with 63 MiB reported RSS, exercising raw and
 mutated narrow/wide span tables in addition to existing protobuf projections.
+
+## 2026-09-09 Legacy cell storage ownership
+
+Both the migration-host table extractor and the focused Numbers extractor now
+consume `litchi_numbers_wire::pre_bnc::PreBncCellView`. Their local pre-BNC
+header, ordered-field, scalar, and cursor helpers are removed. This follows
+the BNC storage ownership decision above without introducing a format-peer
+dependency or publishing native identifiers through a supported facade.
+
+The view borrows the exact source and its opaque suffix, validates at most
+21 fixed-width fields, and allocates no successful parse state. Versions
+zero/one retain their eight-byte header and 16-bit flags; versions two through
+four retain the twelve-byte header and 32-bit flags, with version four's
+separate type position. All recognized fields are validated before returning,
+including finite number/date fields when a formula takes precedence. Zero
+identifiers remain present, unknown flags and trailing bytes remain opaque,
+and callers route modern BNC storage through the existing modern view.
+
+Consumers retain ownership of semantic values, string/rich-text/error lookup,
+formula rendering and its budgets, and comments. The shared parser exposes
+physical values privately to those adapters; it does not add a Pages cell API
+or retire the complete PagesTable reader. The enclosing protobuf row/storage
+projection remains the existing bounded Buffa path; pre-BNC bytes themselves
+are a fixed binary layout, not a Protocol Buffers message.
+
+Validation passes six independent legacy-view integration tests, 97 focused
+Numbers extractor tests, 42 host extractor tests, and the native Pages cell
+readback regression. The crate-boundary audit passes. The new standalone
+`litchi-numbers-wire/fuzz` target completes 10,000 AddressSanitizer runs with
+79 MiB reported RSS, using a copied disposable corpus.
+
+Native Pages 14.4 opens the existing modern cell control with the expected
+Unicode, numbers, booleans, SUM result, and formula-error display. A disposable
+source-built probe converted one row to four v4 pre-BNC cells and removed its
+modern mirror; Pages opened it but displayed that row blank. That failed
+native gate is not a supported writing path or a retained positive fixture.
+The reader migration preserves the previously accepted historical storage
+contract; it does not claim current Pages accepts newly manufactured legacy
+rows or that native style metadata has a qualified legacy encoding.
+
+A disposable Rust integration check against the exact probe bytes passed the
+full two-table value/catalog/no-op assertions, confirming the distinction
+between accepted legacy reader input and native application rendering. The
+probe, temporary test, and intermediate files are removed after qualification.

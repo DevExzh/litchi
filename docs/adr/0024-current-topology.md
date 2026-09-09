@@ -4424,3 +4424,14 @@ nonempty table cells and formulas while preserving the existing host reader.
 This shared storage primitive supports the next Pages/Keynote cell migration;
 it is not a focused Pages cell API, full table-reader retirement, or a removed
 crate dependency. ADR0028's matching amendment records the boundaries.
+
+## 2026-09-09 Legacy cell storage follow-up
+
+`litchi-numbers-wire` now owns the borrowed pre-BNC cell view alongside modern
+BNC storage. Both the migration host and focused Numbers table reader consume
+that view and have removed their local legacy header/field/scalar decoders.
+The view retains caller-owned source bytes and opaque suffixes, with a fixed
+21-field validation bound and finite typed scalars. Package topology,
+semantic values, sidecar resolution, and operation budgets remain with their
+existing owners. No format-peer edge or supported raw-ID API is introduced;
+complete Pages table/cell ownership and monolith removal remain outstanding.

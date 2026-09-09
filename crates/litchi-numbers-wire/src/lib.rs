@@ -11,6 +11,9 @@
 /// Source-preserving Pop-Up Menu BNC transition planner and executor.
 pub mod popup_menu;
 
+/// Borrowed parser for legacy pre-BNC Numbers cell storage.
+pub mod pre_bnc;
+
 use std::collections::BTreeMap;
 
 use std::fmt;
