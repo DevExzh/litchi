@@ -83,6 +83,7 @@ pub use source_backed::{
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
 pub use validation::{validate_read_at, validate_read_at_with_limits};
 pub use xml_splice::{
-    AuthoredXmlFragment, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
+    AuthoredXmlFragment, OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit,
+    OwnedElementUpdate, OwnedXmlPart, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
     authored_xml_requires_source_proof,
 };
