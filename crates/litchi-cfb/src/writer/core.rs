@@ -1376,8 +1376,16 @@ impl OleWriter {
             directory.set_root_modified_time(root.modified_time);
         }
 
-        // Pre-create storages declared explicitly by user
-        for storage_path in &self.storages {
+        // Storage admission uses a hash set for lookup, but directory SIDs must
+        // not depend on its randomized iteration order. Sort borrowed paths;
+        // do not clone the path strings or their metadata.
+        let mut storage_paths = Vec::new();
+        storage_paths
+            .try_reserve_exact(self.storages.len())
+            .map_err(|source| OleError::allocation("storage directory order", source))?;
+        storage_paths.extend(self.storages.iter());
+        storage_paths.sort_unstable();
+        for storage_path in storage_paths {
             directory.add_storage_path(storage_path)?;
         }
         for (storage_path, clsid) in &self.storage_clsids {
@@ -2260,6 +2268,32 @@ mod tests {
         let mut writer = OleWriter::new();
         writer.create_storage(&["Storage"]).unwrap();
         assert_eq!(writer.storages.len(), 1);
+    }
+
+    #[test]
+    fn explicit_storage_order_is_deterministic_across_writer_instances() {
+        let mut expected = None;
+        for reverse in [false, true].into_iter().cycle().take(16) {
+            let mut writer = OleWriter::new();
+            let mut paths = [["Pool", "Alpha"], ["Pool", "Beta"], ["Other", "Child"]];
+            if reverse {
+                paths.reverse();
+            }
+            for path in paths {
+                writer.create_storage(&path).unwrap();
+            }
+            writer
+                .create_stream(&["Pool", "Alpha", "Payload"], b"stable")
+                .unwrap();
+            let mut output = Cursor::new(Vec::new());
+            writer.write_to(&mut output).unwrap();
+            let bytes = output.into_inner();
+            if let Some(expected) = &expected {
+                assert!(bytes == *expected, "storage emission must be deterministic");
+            } else {
+                expected = Some(bytes);
+            }
+        }
     }
 
     #[test]
