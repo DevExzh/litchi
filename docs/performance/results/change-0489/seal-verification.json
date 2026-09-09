@@ -1,0 +1,22 @@
+{
+  "files": 2073,
+  "final_gates": 18,
+  "formal_processes": 144,
+  "formal_samples": 4320,
+  "fuzz_runs": 2,
+  "manifest": {
+    "bytes": 436138,
+    "path": "seal.json",
+    "sha256": "1f6d745129b7235b9a4f9cd066100f7179be9f4994d8f8d5159d9dc3d74784d5"
+  },
+  "profile_passes": 12,
+  "profile_records": 12,
+  "schema": "docx-opc-splice-audit-seal-verification-v1",
+  "status": "pass",
+  "verified_utc": "2026-09-09T14:52:02.713540+00:00",
+  "verifier": {
+    "bytes": 36444,
+    "path": "verify_seal.py",
+    "sha256": "c95f4ebc2589c79469f9e2b3fd8b9ea5614798a772e235208eab73590c095e2f"
+  }
+}

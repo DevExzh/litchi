@@ -1,0 +1,146 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r2-normal-memory_store-owned-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/before/formal1/before-r2-normal-memory_store-owned-s64-a16384-short-c64/report.json"
+  ],
+  "arm": {
+    "authored_count": 16384,
+    "chunk_mode": "64",
+    "cli_provider": "memory-store",
+    "compression": "current",
+    "expected_authored_opens": 0,
+    "expected_replay_opens": 4,
+    "family": "route",
+    "id": "memory_store-owned-s64-a16384-short-c64",
+    "input_backing": "owned",
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_mode": "owned",
+    "old_axis_arm": null,
+    "old_route_case": "s64-a16384-short-c64",
+    "provider": "memory_store",
+    "replay_max_bytes": 8388608,
+    "replay_sync": "none",
+    "report_provider": "memory_explicit_replay_store",
+    "route": "memory_store",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "storage_profile": {
+      "provider": "memory_store",
+      "replay_max_bytes": 8388608,
+      "replay_store": "memory_store",
+      "replay_sync": "none"
+    },
+    "text_mode": "short",
+    "workload": "s64-a16384-short-c64"
+  },
+  "artifacts": {
+    "report.json": {
+      "bytes": 120121,
+      "sha256": "a526d7209a30327551deb5915189f10dfc49cec616ab0a2cdaa765764a648e01"
+    },
+    "resource.txt": {
+      "bytes": 1210,
+      "sha256": "82ce95799fc893bc8466fc688f5040a3c8a5f941671a2e24102ec11c28c8b0f9"
+    },
+    "started.json": {
+      "bytes": 3670,
+      "sha256": "069ec3e1c03d19339a49899a54a6a713e732df925eef970afaf9c61cf962f700"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423367880,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0487/after1/normal/docx_replayable_tail_append",
+    "sha256": "2486a9a84558b58815d8a4cc9a78a921c0e017650335d2d64f3a1d28053ff933"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0487/build-normal.json",
+    "role": "normal",
+    "sha256": "91f99a5d1a123c5b6e62c7b3179a5132ce7c6456ee7383c2da52cc1618bc7f86"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0489",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T14:19:23.080837+00:00",
+  "input_file": null,
+  "machine": {
+    "path": "machine.json",
+    "sha256": "069d82b229a105ac9a4f58b89b5fd63eaaf2783af00c25cc94d731d690a9b7bf",
+    "status": "ready"
+  },
+  "missing_artifacts": [],
+  "phase": "before",
+  "protocol": {
+    "path": "comparison-protocol.json",
+    "sha256": "27fa75f85d8ea839410ab9cecc85a59acec69e00665636052e54e77022f406f8"
+  },
+  "replay_dir": null,
+  "run": {
+    "arm": "memory_store-owned-s64-a16384-short-c64",
+    "input_mode": "owned",
+    "kind": "formal",
+    "label": "before-r2-normal-memory_store-owned-s64-a16384-short-c64",
+    "phase": "before",
+    "repeat": 2,
+    "role": "normal",
+    "route": "memory_store",
+    "workload": "s64-a16384-short-c64"
+  },
+  "schema": "docx-opc-candidate-audit-reuse-capture-v1",
+  "started_utc": "2026-09-09T14:19:20.461181+00:00",
+  "status": "pass",
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "version": 1
+}

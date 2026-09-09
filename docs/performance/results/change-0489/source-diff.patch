@@ -1,0 +1,870 @@
+diff --git a/crates/litchi-opc/src/source_backed/splice.rs b/crates/litchi-opc/src/source_backed/splice.rs
+index 4a42b635c..ed9f5982c 100644
+--- a/crates/litchi-opc/src/source_backed/splice.rs
++++ b/crates/litchi-opc/src/source_backed/splice.rs
+@@ -426,7 +426,7 @@ impl SourcePartSpliceFragment<'_> {
+ pub struct SourcePartSplicePlan<'package> {
+     package: &'package SourceBackedPackage,
+     target: usize,
+-    audit_xml: bool,
++    validation_mode: SpliceAuditMode,
+     fragment: Option<Arc<Vec<u8>>>,
+     replay: Option<SourcePartSpliceReplayHandle>,
+     proof: SourcePartSpliceProof,
+@@ -441,7 +441,7 @@ impl fmt::Debug for SourcePartSplicePlan<'_> {
+         formatter
+             .debug_struct("SourcePartSplicePlan")
+             .field("target", &self.target)
+-            .field("audit_xml", &self.audit_xml)
++            .field("validation_mode", &self.validation_mode)
+             .field(
+                 "fragment_bytes",
+                 &self.fragment.as_ref().map(|fragment| fragment.len()),
+@@ -564,7 +564,7 @@ impl<'package> SourcePartSplicePlan<'package> {
+         Self {
+             package: self.package,
+             target: self.target,
+-            audit_xml: self.audit_xml,
++            validation_mode: self.validation_mode,
+             fragment: self.fragment.as_ref().map(Arc::clone),
+             replay: self.replay.clone(),
+             proof: self.proof,
+@@ -712,11 +712,10 @@ impl<'package> SourcePartSplicePlan<'package> {
+                         proof,
+                         fragment.as_ref().map(|bytes| bytes.as_slice()),
+                         replay.as_deref(),
+-                        self.limits.max_authored_replay_window_bytes,
+-                        self.limits.max_xml_workspace_bytes,
+-                        self.limits.xml_audit_limits,
++                        self.target,
+                         part.partname().as_str(),
+-                        self.audit_xml,
++                        self.validation_mode,
++                        self.limits,
+                         &source_snapshot,
+                         self.package.source.context.as_ref(),
+                     )
+@@ -1245,30 +1244,33 @@ impl SourceBackedPackage {
+         }
+         if is_noop {
+             verify_noop_source_proof(&self.part(partname)?, proof)?;
++        }
++        let validation_mode = if is_noop {
++            SpliceAuditMode::for_target(false)
+         } else {
++            let initial_mode = SpliceAuditMode::for_target(audit_xml);
+             verify_source_proof(
+                 &self.part(partname)?,
+                 proof,
+-                limits.xml_audit_limits,
+-                audit_xml,
++                initial_mode,
++                limits,
+                 Some(limits.max_xml_workspace_bytes),
+             )?;
+-            verify_candidate_proof_replay(
++            let validation_mode = verify_candidate_proof_replay(
+                 &self.part(partname)?,
+                 proof,
+                 replay.provider(),
+-                limits.max_authored_replay_window_bytes,
+-                limits.max_xml_workspace_bytes,
+-                limits.xml_audit_limits,
+-                audit_xml,
++                limits,
++                initial_mode,
+             )?;
+             self.source.ensure_current()?;
+             self.cache.check_context().map_err(map_execution_error)?;
+-        }
++            validation_mode
++        };
+         Ok(SourcePartSplicePlan {
+             package: self,
+             target,
+-            audit_xml,
++            validation_mode,
+             fragment: None,
+             replay: Some(replay),
+             proof: SourcePartSpliceProof { ..proof },
+@@ -1385,6 +1387,7 @@ impl SourceBackedPackage {
+                 ));
+             }
+         }
++        let initial_mode = SpliceAuditMode::for_target(audit_xml);
+         let fragment_memory_reservation = if fragment_preallocated {
+             reservation
+         } else {
+@@ -1403,7 +1406,7 @@ impl SourceBackedPackage {
+         let xml_workspace_reservation = if is_noop {
+             None
+         } else {
+-            let workspace = splice_workspace_requirement(limits, audit_xml)?;
++            let workspace = splice_workspace_requirement(limits, initial_mode)?;
+             reserve_memory(
+                 self.source.context.as_ref(),
+                 workspace,
+@@ -1413,28 +1416,26 @@ impl SourceBackedPackage {
+         };
+         if is_noop {
+             verify_noop_source_proof(&self.part(partname)?, proof)?;
++        }
++        let validation_mode = if is_noop {
++            SpliceAuditMode::for_target(false)
+         } else {
+-            verify_source_proof(
+-                &self.part(partname)?,
+-                proof,
+-                limits.xml_audit_limits,
+-                audit_xml,
+-                None,
+-            )?;
+-            verify_candidate_proof(
++            verify_source_proof(&self.part(partname)?, proof, initial_mode, limits, None)?;
++            let validation_mode = verify_candidate_proof(
+                 &self.part(partname)?,
+                 proof,
+                 fragment.as_slice(),
+-                limits.xml_audit_limits,
+-                audit_xml,
++                limits,
++                initial_mode,
+             )?;
+             self.source.ensure_current()?;
+             self.cache.check_context().map_err(map_execution_error)?;
+-        }
++            validation_mode
++        };
+         Ok(SourcePartSplicePlan {
+             package: self,
+             target,
+-            audit_xml,
++            validation_mode,
+             fragment: Some(fragment),
+             replay: None,
+             proof: SourcePartSpliceProof { ..proof },
+@@ -1777,8 +1778,11 @@ pub(super) fn copy_inverse_snapshot(
+     Ok(())
+ }
+ 
+-fn splice_workspace_requirement(limits: SourcePartSpliceLimits, audit_xml: bool) -> Result<u64> {
+-    splice_workspace_requirement_from_xml(limits.xml_audit_limits, audit_xml)
++fn splice_workspace_requirement(
++    limits: SourcePartSpliceLimits,
++    mode: SpliceAuditMode,
++) -> Result<u64> {
++    splice_workspace_requirement_from_xml(limits.xml_audit_limits, mode.needs_xml_workspace())
+ }
+ 
+ fn splice_workspace_requirement_from_xml(
+@@ -1841,14 +1845,17 @@ fn reserve_memory(
+ fn verify_source_proof(
+     part: &PartView<'_>,
+     proof: SourcePartSpliceProof,
+-    limits: xml_minifier::audit::Limits,
+-    audit_xml: bool,
++    mode: SpliceAuditMode,
++    limits: SourcePartSpliceLimits,
+     per_pass_xml_workspace: Option<u64>,
+ ) -> Result<()> {
+-    let _xml_workspace_reservation = if audit_xml {
++    let _xml_workspace_reservation = if mode.needs_xml_workspace() {
+         per_pass_xml_workspace
+             .map(|maximum| {
+-                let workspace = splice_workspace_requirement_from_xml(limits, audit_xml)?;
++                let workspace = splice_workspace_requirement_from_xml(
++                    limits.xml_audit_limits,
++                    mode.needs_xml_workspace(),
++                )?;
+                 reserve_memory(
+                     part.package.source.context.as_ref(),
+                     workspace,
+@@ -1862,7 +1869,7 @@ fn verify_source_proof(
+     };
+     let partname = part.partname().as_str().to_owned();
+     let observed = part.with_verified_decoded_reader(|reader| {
+-        if audit_xml {
++        if mode.runs_xml_parser() {
+             let mut sink = io::sink();
+             audit_splice(
+                 reader,
+@@ -1874,7 +1881,7 @@ fn verify_source_proof(
+                 limits,
+                 &partname,
+                 false,
+-                true,
++                mode,
+                 Some(&part.package.source),
+                 part.package.source.context.as_ref(),
+             )
+@@ -1942,28 +1949,27 @@ fn verify_candidate_proof(
+     part: &PartView<'_>,
+     proof: SourcePartSpliceProof,
+     fragment: &[u8],
+-    limits: xml_minifier::audit::Limits,
+-    audit_xml: bool,
+-) -> Result<()> {
++    limits: SourcePartSpliceLimits,
++    mode: SpliceAuditMode,
++) -> Result<SpliceAuditMode> {
+     verify_candidate_payload(
+         part,
+         proof,
+         SplicePayloadRef::Fixed(fragment),
+         SpliceAuditMemoryLimits::unbounded(),
+         limits,
+-        audit_xml,
+-    )
++        mode,
++    )?;
++    mode.after_candidate_audit(proof, part.index, limits)
+ }
+ 
+ fn verify_candidate_proof_replay(
+     part: &PartView<'_>,
+     proof: SourcePartSpliceProof,
+     replay: &dyn SourcePartSpliceReplay,
+-    max_replay_window_bytes: u64,
+-    max_xml_workspace_bytes: u64,
+-    limits: xml_minifier::audit::Limits,
+-    audit_xml: bool,
+-) -> Result<()> {
++    limits: SourcePartSpliceLimits,
++    mode: SpliceAuditMode,
++) -> Result<SpliceAuditMode> {
+     verify_candidate_payload(
+         part,
+         proof,
+@@ -1975,12 +1981,13 @@ fn verify_candidate_proof_replay(
+             },
+         },
+         SpliceAuditMemoryLimits {
+-            authored_replay_window_bytes: max_replay_window_bytes,
+-            xml_workspace_bytes: max_xml_workspace_bytes,
++            authored_replay_window_bytes: limits.max_authored_replay_window_bytes,
++            xml_workspace_bytes: limits.max_xml_workspace_bytes,
+         },
+         limits,
+-        audit_xml,
+-    )
++        mode,
++    )?;
++    mode.after_candidate_audit(proof, part.index, limits)
+ }
+ 
+ fn verify_candidate_payload(
+@@ -1988,8 +1995,8 @@ fn verify_candidate_payload(
+     proof: SourcePartSpliceProof,
+     payload: SplicePayloadRef<'_>,
+     memory_limits: SpliceAuditMemoryLimits,
+-    limits: xml_minifier::audit::Limits,
+-    audit_xml: bool,
++    limits: SourcePartSpliceLimits,
++    mode: SpliceAuditMode,
+ ) -> Result<()> {
+     let partname = part.partname().as_str().to_owned();
+     let observed = part.with_verified_decoded_reader(|reader| {
+@@ -2004,7 +2011,7 @@ fn verify_candidate_payload(
+             limits,
+             &partname,
+             true,
+-            audit_xml,
++            mode,
+             Some(&part.package.source),
+             part.package.source.context.as_ref(),
+         )
+@@ -2052,14 +2059,14 @@ fn stream_splice(
+     proof: SourcePartSpliceProof,
+     fragment: Option<&[u8]>,
+     replay: Option<&dyn SourcePartSpliceReplay>,
+-    max_replay_window_bytes: u64,
+-    max_xml_workspace_bytes: u64,
+-    limits: xml_minifier::audit::Limits,
++    target: usize,
+     partname: &str,
+-    audit_xml: bool,
++    mode: SpliceAuditMode,
++    limits: SourcePartSpliceLimits,
+     source: &SourceSnapshot,
+     context: Option<&ExecutionContext>,
+ ) -> Result<()> {
++    mode.validate_publication(proof, target, limits)?;
+     let observed = audit_splice(
+         reader,
+         output,
+@@ -2080,14 +2087,14 @@ fn stream_splice(
+             },
+         },
+         SpliceAuditMemoryLimits {
+-            authored_replay_window_bytes: max_replay_window_bytes,
+-            xml_workspace_bytes: max_xml_workspace_bytes,
++            authored_replay_window_bytes: limits.max_authored_replay_window_bytes,
++            xml_workspace_bytes: limits.max_xml_workspace_bytes,
+         },
+         proof.insertion_offset,
+         limits,
+         partname,
+         true,
+-        audit_xml,
++        mode,
+         Some(source),
+         context,
+     )?;
+@@ -2121,13 +2128,14 @@ fn audit_splice(
+     payload: SplicePayloadRef<'_>,
+     memory: SpliceAuditMemoryLimits,
+     insertion_offset: u64,
+-    limits: xml_minifier::audit::Limits,
++    limits: SourcePartSpliceLimits,
+     partname: &str,
+     check_candidate: bool,
+-    audit_xml: bool,
++    mode: SpliceAuditMode,
+     source: Option<&SourceSnapshot>,
+     context: Option<&ExecutionContext>,
+ ) -> Result<(u64, [u8; 32], u64, [u8; 32])> {
++    mode.validate_for_pass(proof, limits)?;
+     // The replay adapter owns one fresh bounded payload window per live pass.
+     // Reserve it here, for the exact package context, so concurrent plans or
+     // concurrent publications retain independently charged windows. Fixed
+@@ -2147,18 +2155,24 @@ fn audit_splice(
+     };
+     let adapter_window_bytes = usize::try_from(adapter_window_bytes)
+         .map_err(|_| overlay_unavailable("authored replay window exceeds usize"))?;
+-    let _replay_xml_workspace_reservation =
+-        if audit_xml && matches!(&payload, SplicePayloadRef::Replay { .. }) {
+-            let parser = xml_parser_workspace_requirement(limits, audit_xml)?;
+-            reserve_memory(
+-                context,
+-                parser,
+-                memory.xml_workspace_bytes,
+-                SpliceResource::XmlWorkspaceBytes,
+-            )?
+-        } else {
+-            None
+-        };
++    let _replay_xml_workspace_reservation = if mode.needs_xml_workspace()
++        && matches!(&payload, SplicePayloadRef::Replay { .. })
++    {
++        // Retain the established per-pass XML admission reservation for
++        // replay payloads even when publication only drains the already
++        // audited candidate. The capability changes parser work, not the
++        // caller's finite workspace authorization.
++        let parser =
++            xml_parser_workspace_requirement(limits.xml_audit_limits, mode.needs_xml_workspace())?;
++        reserve_memory(
++            context,
++            parser,
++            memory.xml_workspace_bytes,
++            SpliceResource::XmlWorkspaceBytes,
++        )?
++    } else {
++        None
++    };
+     let mut splice_reader = SpliceAuditReader::new(
+         reader,
+         output,
+@@ -2171,8 +2185,11 @@ fn audit_splice(
+         source,
+         context,
+     )?;
+-    if audit_xml {
+-        let audit_result = xml_minifier::audit::verify_authored_reader(&mut splice_reader, limits);
++    if mode.runs_xml_parser() {
++        let audit_result = xml_minifier::audit::verify_authored_reader(
++            &mut splice_reader,
++            limits.xml_audit_limits,
++        );
+         // A parser may return an error while the current adapter window still
+         // contains a consumed prefix.  Flush that prefix before observing the
+         // callback result. Any accepted output is an exact prefix of the
+@@ -2249,6 +2266,124 @@ enum SplicePhase {
+     Done,
+ }
+ 
++/// Internal authorization state for one prepared splice.
++///
++/// `XmlAudit` is used only while the source and candidate are being checked
++/// during preparation.  A successful candidate audit mints the private
++/// `PreviouslyVerifiedXml` capability, which is copied into the immutable
++/// plan and checked again at every publication pass.  Binary payloads keep
++/// the existing raw-drain path without carrying XML authorization.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum SpliceAuditKind {
++    Binary,
++    XmlAudit,
++    PreviouslyVerifiedXml,
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++struct SpliceAuditMode {
++    kind: SpliceAuditKind,
++    authorization: Option<CandidateXmlAuthorization>,
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++struct CandidateXmlAuthorization {
++    proof: SourcePartSpliceProof,
++    target: usize,
++    limits: SourcePartSpliceLimits,
++}
++
++impl SpliceAuditMode {
++    const fn for_target(is_xml: bool) -> Self {
++        if is_xml {
++            Self {
++                kind: SpliceAuditKind::XmlAudit,
++                authorization: None,
++            }
++        } else {
++            Self {
++                kind: SpliceAuditKind::Binary,
++                authorization: None,
++            }
++        }
++    }
++
++    const fn needs_xml_workspace(self) -> bool {
++        matches!(
++            self.kind,
++            SpliceAuditKind::XmlAudit | SpliceAuditKind::PreviouslyVerifiedXml
++        )
++    }
++
++    const fn runs_xml_parser(self) -> bool {
++        matches!(self.kind, SpliceAuditKind::XmlAudit)
++    }
++
++    fn after_candidate_audit(
++        self,
++        proof: SourcePartSpliceProof,
++        target: usize,
++        limits: SourcePartSpliceLimits,
++    ) -> Result<Self> {
++        match (self.kind, self.authorization) {
++            (SpliceAuditKind::Binary, None) => Ok(Self::for_target(false)),
++            (SpliceAuditKind::XmlAudit, None) => Ok(Self {
++                kind: SpliceAuditKind::PreviouslyVerifiedXml,
++                authorization: Some(CandidateXmlAuthorization {
++                    proof,
++                    target,
++                    limits,
++                }),
++            }),
++            _ => Err(overlay_unavailable(
++                "decoded splice candidate XML authorization was reused during preparation",
++            )),
++        }
++    }
++
++    fn validate_publication(
++        self,
++        proof: SourcePartSpliceProof,
++        target: usize,
++        limits: SourcePartSpliceLimits,
++    ) -> Result<()> {
++        match (self.kind, self.authorization) {
++            (SpliceAuditKind::Binary, None) => Ok(()),
++            (SpliceAuditKind::XmlAudit, None) => Err(overlay_unavailable(
++                "decoded splice publication received an initial XML audit mode",
++            )),
++            (SpliceAuditKind::PreviouslyVerifiedXml, Some(authorization))
++                if authorization.proof == proof
++                    && authorization.target == target
++                    && authorization.limits == limits =>
++            {
++                Ok(())
++            },
++            _ => Err(overlay_unavailable(
++                "decoded splice candidate XML authorization does not match its plan",
++            )),
++        }
++    }
++
++    fn validate_for_pass(
++        self,
++        proof: SourcePartSpliceProof,
++        limits: SourcePartSpliceLimits,
++    ) -> Result<()> {
++        match (self.kind, self.authorization) {
++            (SpliceAuditKind::Binary, None) | (SpliceAuditKind::XmlAudit, None) => Ok(()),
++            (SpliceAuditKind::PreviouslyVerifiedXml, Some(authorization))
++                if authorization.proof == proof && authorization.limits == limits =>
++            {
++                Ok(())
++            },
++            _ => Err(overlay_unavailable(
++                "decoded splice candidate XML authorization does not match this pass",
++            )),
++        }
++    }
++}
++
+ #[derive(Clone, Copy)]
+ enum SplicePayloadRef<'payload> {
+     Fixed(&'payload [u8]),
+@@ -2765,7 +2900,7 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
+         if self.pending_failure.is_none() && self.pending_error.is_none() && self.pending_len != 0 {
+             // `audit_splice` normally flushes on both success and error. Keep
+             // this invariant local as well for direct reader users: every
+-            // parser-consumed prefix is either published once or produces its
++            // caller-consumed prefix is either published once or produces its
+             // typed pending failure before proof finalization.
+             self.flush_pending_consumed();
+         }
+@@ -2883,8 +3018,10 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
+         if self.pending_failure.is_some() || self.pending_error.is_some() {
+             return;
+         }
+-        // Work remains charged at the parser's consumed-fragment boundary so
+-        // cancellation and cumulative limits retain their original timing.
++        // Charge Work for consumed payload bytes; the verified source reader
++        // accounts for source bytes upstream. XML parsing may consume token
++        // ranges, while verified publication deliberately charges whole payload
++        // windows. Limit failures retain exact accepted-prefix accounting.
+         // Freshness is checked only when this charge fails; successful work
+         // cannot emit anything until the bounded window flush below, where
+         // the source fence is checked around the external sink callback.
+@@ -2907,7 +3044,7 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
+                     // cancellation error so a concurrent source mutation
+                     // remains the primary failure.
+                     if self.check_source_after_external_error().is_none() {
+-                        // A prior parser-consumed prefix may already be
++                        // A prior consumed prefix may already be
+                         // pending in this window.  Preserve its ordinary
+                         // limit-failure progress before retaining the Work
+                         // error; cancellation or a source/sink failure found
+@@ -4181,6 +4318,242 @@ mod tests {
+         );
+     }
+ 
++    fn audit_test_proof(
++        source: &[u8],
++        insertion_offset: usize,
++        fragment: &[u8],
++    ) -> SourcePartSpliceProof {
++        let mut candidate = Vec::with_capacity(source.len() + fragment.len());
++        candidate.extend_from_slice(&source[..insertion_offset]);
++        candidate.extend_from_slice(fragment);
++        candidate.extend_from_slice(&source[insertion_offset..]);
++        SourcePartSpliceProof {
++            source_version: SourceVersion::new(0x00A1_1D17, 1),
++            source_len: source.len() as u64,
++            source_sha256: digest_bytes(source),
++            insertion_offset: insertion_offset as u64,
++            fragment_len: fragment.len() as u64,
++            fragment_sha256: digest_bytes(fragment),
++            candidate_len: candidate.len() as u64,
++            candidate_sha256: digest_bytes(&candidate),
++        }
++    }
++
++    #[test]
++    fn initial_xml_audits_refuse_malformed_source_candidate_and_limits() {
++        let malformed_source = b"<root>";
++        let source_proof = audit_test_proof(malformed_source, malformed_source.len(), &[]);
++        let source_error = audit_splice(
++            &mut Cursor::new(malformed_source.as_slice()),
++            &mut io::sink(),
++            source_proof,
++            SplicePayloadRef::Fixed(&[]),
++            SpliceAuditMemoryLimits::unbounded(),
++            source_proof.source_len,
++            SourcePartSpliceLimits::default(),
++            "word/document.xml",
++            false,
++            SpliceAuditMode::for_target(true),
++            None,
++            None,
++        )
++        .expect_err("the initial source XML audit must reject malformed XML");
++        assert!(matches!(source_error, OpcError::XmlPublication { .. }));
++
++        let source = b"<root></root>";
++        let fragment = b"<unclosed>";
++        let candidate_proof = audit_test_proof(source, b"<root>".len(), fragment);
++        let candidate_error = audit_splice(
++            &mut Cursor::new(source.as_slice()),
++            &mut io::sink(),
++            candidate_proof,
++            SplicePayloadRef::Fixed(fragment),
++            SpliceAuditMemoryLimits::unbounded(),
++            candidate_proof.insertion_offset,
++            SourcePartSpliceLimits::default(),
++            "word/document.xml",
++            true,
++            SpliceAuditMode::for_target(true),
++            None,
++            None,
++        )
++        .expect_err("the initial candidate XML audit must reject malformed XML");
++        assert!(matches!(candidate_error, OpcError::XmlPublication { .. }));
++
++        let limits = SourcePartSpliceLimits::default().with_xml_audit_limits(
++            xml_minifier::audit::Limits::default()
++                .narrow(xml_minifier::audit::Resource::TokenBytes, 1),
++        );
++        let limited_proof = audit_test_proof(source, source.len(), &[]);
++        let limit_error = audit_splice(
++            &mut Cursor::new(source.as_slice()),
++            &mut io::sink(),
++            limited_proof,
++            SplicePayloadRef::Fixed(&[]),
++            SpliceAuditMemoryLimits::unbounded(),
++            limited_proof.source_len,
++            limits,
++            "word/document.xml",
++            true,
++            SpliceAuditMode::for_target(true),
++            None,
++            None,
++        )
++        .expect_err("the initial XML audit must honor its finite token limit");
++        assert!(matches!(limit_error, OpcError::XmlPublication { .. }));
++    }
++
++    #[test]
++    fn candidate_xml_authorization_is_bound_to_proof_target_and_limits() {
++        let source = b"<root></root>";
++        let fragment = b"<inserted/>";
++        let proof = audit_test_proof(source, b"<root>".len(), fragment);
++        let limits = SourcePartSpliceLimits::default();
++        let authorization = SpliceAuditMode::for_target(true)
++            .after_candidate_audit(proof, 3, limits)
++            .expect("an initial candidate audit must mint its private capability");
++        authorization
++            .validate_publication(proof, 3, limits)
++            .expect("the capability must authorize only its own plan pass");
++
++        let mut changed_proof = proof;
++        changed_proof.candidate_len += 1;
++        assert!(
++            authorization
++                .validate_publication(changed_proof, 3, limits)
++                .is_err()
++        );
++        assert!(
++            authorization
++                .validate_publication(proof, 4, limits)
++                .is_err()
++        );
++        let changed_limits =
++            limits.with_max_xml_workspace_bytes(limits.max_xml_workspace_bytes.saturating_sub(1));
++        assert!(
++            authorization
++                .validate_publication(proof, 3, changed_limits)
++                .is_err()
++        );
++        assert!(
++            SpliceAuditMode::for_target(true)
++                .validate_publication(proof, 3, limits)
++                .is_err()
++        );
++    }
++
++    #[test]
++    fn previously_verified_xml_mode_raw_drains_exact_candidate() {
++        let source = b"<root></root>";
++        let fragment = b"<inserted/>";
++        let insertion_offset = b"<root>".len();
++        let proof = audit_test_proof(source, insertion_offset, fragment);
++        let limits = SourcePartSpliceLimits::default();
++        let mode = SpliceAuditMode::for_target(true)
++            .after_candidate_audit(proof, 3, limits)
++            .expect("test capability must be minted privately");
++        let mut output = Vec::new();
++        let observed = audit_splice(
++            &mut Cursor::new(source.as_slice()),
++            &mut output,
++            proof,
++            SplicePayloadRef::Fixed(fragment),
++            SpliceAuditMemoryLimits::unbounded(),
++            proof.insertion_offset,
++            limits,
++            "word/document.xml",
++            true,
++            mode,
++            None,
++            None,
++        )
++        .expect("a previously audited XML candidate must use the raw drain path");
++        assert_eq!(observed.0, proof.source_len);
++        assert_eq!(observed.1, proof.source_sha256);
++        assert_eq!(observed.2, proof.candidate_len);
++        assert_eq!(observed.3, proof.candidate_sha256);
++        assert_eq!(output, b"<root><inserted/></root>");
++    }
++
++    #[test]
++    fn previously_verified_xml_raw_drain_retains_work_limit_prefix() {
++        let source = b"<root></root>";
++        let fragment = b"<inserted/>";
++        let proof = audit_test_proof(source, b"<root>".len(), fragment);
++        let limits = SourcePartSpliceLimits::default();
++        let mode = SpliceAuditMode::for_target(true)
++            .after_candidate_audit(proof, 3, limits)
++            .expect("test capability must be minted privately");
++        let (budget, _cancellation, context) = managed_context(4);
++        let mut output = Vec::new();
++        let error = audit_splice(
++            &mut Cursor::new(source.as_slice()),
++            &mut output,
++            proof,
++            SplicePayloadRef::Fixed(fragment),
++            SpliceAuditMemoryLimits::unbounded(),
++            proof.insertion_offset,
++            limits,
++            "word/document.xml",
++            true,
++            mode,
++            None,
++            Some(&context),
++        )
++        .expect_err("raw drain must preserve its Work limit");
++        assert!(matches!(
++            error,
++            OpcError::Execution(ExecutionError::ResourceLimit(limit))
++                if limit.resource == Resource::Work && limit.limit == 4
++        ));
++        assert_eq!(output, b"<root>");
++        // The whole bounded fragment window exceeds the remaining budget, so
++        // the atomic Work reservation is refused before any Work is charged.
++        assert_eq!(budget.used(Resource::Work), 0);
++    }
++
++    #[test]
++    fn previously_verified_xml_replay_keeps_xml_admission_reservation() {
++        let source = b"<root></root>";
++        let fragment = b"<inserted/>";
++        let proof = audit_test_proof(source, b"<root>".len(), fragment);
++        let limits = SourcePartSpliceLimits::default()
++            .with_max_authored_replay_window_bytes(1)
++            .with_max_xml_workspace_bytes(1);
++        let mode = SpliceAuditMode::for_target(true)
++            .after_candidate_audit(proof, 3, limits)
++            .expect("test capability must be minted privately");
++        let (provider, _reads) = OneByteReplayProvider::new(fragment.to_vec());
++        let error = audit_splice(
++            &mut Cursor::new(source.as_slice()),
++            &mut io::sink(),
++            proof,
++            SplicePayloadRef::Replay {
++                provider: &provider,
++                proof: provider.proof(),
++            },
++            SpliceAuditMemoryLimits {
++                authored_replay_window_bytes: 1,
++                xml_workspace_bytes: 1,
++            },
++            proof.insertion_offset,
++            limits,
++            "word/document.xml",
++            true,
++            mode,
++            None,
++            None,
++        )
++        .expect_err("replay XML admission must remain bounded on raw drain");
++        assert!(matches!(
++            error,
++            OpcError::SourcePartSpliceLimit {
++                resource: SpliceResource::XmlWorkspaceBytes,
++                ..
++            }
++        ));
++    }
++
+     struct OverreportProvider;
+ 
+     impl SourcePartSpliceReplay for OverreportProvider {
+diff --git a/crates/litchi-opc/tests/source_part_splice_replay.rs b/crates/litchi-opc/tests/source_part_splice_replay.rs
+index 5169631ea..e3c28958f 100644
+--- a/crates/litchi-opc/tests/source_part_splice_replay.rs
++++ b/crates/litchi-opc/tests/source_part_splice_replay.rs
+@@ -228,6 +228,8 @@ enum ReplayMode {
+     OpenError,
+     ReadError,
+     ReadErrorAtOpen(usize),
++    TruncatedAtOpen(usize),
++    ExtraAtOpen(usize),
+     ChangeAfterFirstOpen,
+     ChangeAtOpen(usize),
+ }
+@@ -259,6 +261,11 @@ impl ReplayProvider {
+                 bytes.pop();
+             },
+             ReplayMode::Extra => bytes.push(b'X'),
++            ReplayMode::TruncatedAtOpen(change_at) if open_number >= change_at => {
++                bytes.pop();
++            },
++            ReplayMode::ExtraAtOpen(change_at) if open_number >= change_at => bytes.push(b'X'),
++            ReplayMode::TruncatedAtOpen(_) | ReplayMode::ExtraAtOpen(_) => {},
+             ReplayMode::HashChanged => {
+                 bytes = CHANGED_FRAGMENT.to_vec();
+             },
+@@ -1435,3 +1442,65 @@ fn replay_source_change_after_sink_progress_is_incomplete() {
+     assert!(!sink.bytes.is_empty());
+     assert!(matches!(error, OpcError::IncompleteOutput { written, .. } if written > 0));
+ }
++
++#[test]
++fn prepared_replay_authenticates_late_length_and_hash_failures_in_every_pass() {
++    for deflated in [false, true] {
++        let (_, expected_len, expected_hash) = expected_replay_artifact(deflated);
++        for expected_artifact in [false, true] {
++            let last_open = if expected_artifact { 5 } else { 3 };
++            for changed_open in 2..=last_open {
++                for mode in [
++                    ReplayMode::TruncatedAtOpen(changed_open),
++                    ReplayMode::ExtraAtOpen(changed_open),
++                    ReplayMode::ChangeAtOpen(changed_open),
++                ] {
++                    let (package, _) = open(deflated);
++                    let provider = ReplayProvider::new(FRAGMENT, mode);
++                    let plan = replay_plan(
++                        &package,
++                        provider.clone(),
++                        SourcePartSpliceLimits::default(),
++                    );
++                    assert_eq!(provider.open_count(), 1);
++                    let mut output = Vec::new();
++                    let result = if expected_artifact {
++                        plan.write_to_stream_with_expected_artifact(
++                            &mut output,
++                            expected_len,
++                            expected_hash,
++                        )
++                    } else {
++                        plan.write_to_stream(&mut output)
++                    };
++                    let error =
++                        result.expect_err("every later replay pass must authenticate bytes");
++                    assert_eq!(provider.open_count(), changed_open);
++                    let refusal = if changed_open == last_open {
++                        match error {
++                            OpcError::IncompleteOutput { written, source } => {
++                                assert_eq!(written, output.len() as u64);
++                                assert!(written > 0);
++                                *source
++                            },
++                            other => panic!("publication must report accepted output: {other:?}"),
++                        }
++                    } else {
++                        assert!(
++                            output.is_empty(),
++                            "preview/measurement must not publish bytes"
++                        );
++                        error
++                    };
++                    assert!(
++                        matches!(
++                            refusal,
++                            OpcError::IoError(_) | OpcError::SourceBackedOverlayUnavailable { .. }
++                        ),
++                        "late replay failure must retain byte-authentication refusal: {refusal:?}"
++                    );
++                }
++            }
++        }
++    }
++}

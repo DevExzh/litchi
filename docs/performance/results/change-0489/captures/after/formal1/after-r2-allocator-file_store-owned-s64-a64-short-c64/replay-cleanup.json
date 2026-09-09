@@ -1,0 +1,11 @@
+{
+  "device": 66305,
+  "empty_before_removal": true,
+  "entries_before_removal": [],
+  "inode": 40141963,
+  "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/captures/after/formal1/after-r2-allocator-file_store-owned-s64-a64-short-c64/replay",
+  "removed": true,
+  "removed_utc": "2026-09-09T14:40:31.445946+00:00",
+  "schema": "docx-opc-candidate-audit-reuse-replay-cleanup-v1",
+  "version": 1
+}

@@ -1,0 +1,927 @@
+{
+  "case_count": 27,
+  "cases": [
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-default-namespace-deflate.bin",
+        "-runs=1",
+        "-seed=4841",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/001-valid-empty-default-namespace-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 793,
+          "sha256": "55802190190ba5f77678268d519ddef676408b0beff689b2f197af38b02f8c42"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.262981+00:00",
+      "input": {
+        "bytes": 1157,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-default-namespace-deflate.bin",
+        "sha256": "c07b5d08fd183f1306302daa085dbd2ac7d027e24e5176ec65dda01d2e7d64af"
+      },
+      "name": "valid-empty-default-namespace-deflate.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "default-namespace-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.235277+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-default-namespace-stored.bin",
+        "-runs=1",
+        "-seed=4842",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/002-valid-empty-default-namespace-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 791,
+          "sha256": "8bc0820a2bd80c9b13c34a9c759af11a70b241c12cb1c153865b8d0beeaed960"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.286695+00:00",
+      "input": {
+        "bytes": 1459,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-default-namespace-stored.bin",
+        "sha256": "f941631a8cc417cff162fcea50cc5bef47565b3b5e8dafd020328c98a5580f4a"
+      },
+      "name": "valid-empty-default-namespace-stored.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "default-namespace-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.263187+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-empty-paragraph-stored.bin",
+        "-runs=1",
+        "-seed=4843",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/003-valid-empty-empty-paragraph-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 787,
+          "sha256": "c848ce888f8d568b430246b4a8d2c3acb39204548ed43b37a55bebc086665e53"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.309922+00:00",
+      "input": {
+        "bytes": 1450,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-empty-paragraph-stored.bin",
+        "sha256": "48c3c79e5e642140e99ba945d201dbba235e909282baf9cb84bade4d1c3e0676"
+      },
+      "name": "valid-empty-empty-paragraph-stored.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "empty-paragraph-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.286872+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-plain-deflate.bin",
+        "-runs=1",
+        "-seed=4844",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/004-valid-empty-plain-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 769,
+          "sha256": "26c2abeb4783ba1363bcb93e7e032f2f6459cd32d5f1e0eb3e612a79ab69687b"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.336271+00:00",
+      "input": {
+        "bytes": 1188,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-plain-deflate.bin",
+        "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+      },
+      "name": "valid-empty-plain-deflate.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "plain-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.310093+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-plain-stored.bin",
+        "-runs=1",
+        "-seed=4845",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/005-valid-empty-plain-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 767,
+          "sha256": "b8f4f8e4baa23210619c34d645b0019b075eef22d82d665c73a3d6f7e7c44d39"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.360051+00:00",
+      "input": {
+        "bytes": 1515,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-plain-stored.bin",
+        "sha256": "031400401d43db54f8329435ea0ccec86b01fbd30ac8d3ba1da706ee72cbbdaa"
+      },
+      "name": "valid-empty-plain-stored.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "plain-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.336446+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-section-deflate.bin",
+        "-runs=1",
+        "-seed=4846",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/006-valid-empty-section-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 773,
+          "sha256": "5952e89916f9d447bfcd722c14e5d9f78422bb87859faa5e88e531be9afc7615"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.387056+00:00",
+      "input": {
+        "bytes": 1236,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-section-deflate.bin",
+        "sha256": "31c3100192e655b9afc324403dabe82138289ca6d80b59b4b7f2bfac7ab54e96"
+      },
+      "name": "valid-empty-section-deflate.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "section-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.360205+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-section-stored.bin",
+        "-runs=1",
+        "-seed=4847",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/007-valid-empty-section-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 771,
+          "sha256": "44055475fdb14046ee504e894c524168bcb0f2beefa78b291b86edc384c134b2"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.410540+00:00",
+      "input": {
+        "bytes": 1593,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-section-stored.bin",
+        "sha256": "3de3456c64ae2f2dc304f23d2aa8ac96f440b1e4c25cd8260c199d62de7c77c2"
+      },
+      "name": "valid-empty-section-stored.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "section-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.387206+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-strict-deflate.bin",
+        "-runs=1",
+        "-seed=4848",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/008-valid-empty-strict-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 771,
+          "sha256": "44dbff09758775129bfe38fbe0966b0df04a8f00bf8abfcc3ed0b6e3f6d334c0"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.437179+00:00",
+      "input": {
+        "bytes": 1185,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-strict-deflate.bin",
+        "sha256": "fb4b0438bb04e84f2bc4e0a0d2726003417ac995d8a910de3d1fd1f665c89d30"
+      },
+      "name": "valid-empty-strict-deflate.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "strict-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.410688+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-strict-stored.bin",
+        "-runs=1",
+        "-seed=4849",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/009-valid-empty-strict-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 769,
+          "sha256": "e541816b91e8adcced391576615661b8420e1811a2038dc39c603a93316d23a8"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.460159+00:00",
+      "input": {
+        "bytes": 1491,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-empty-strict-stored.bin",
+        "sha256": "7b8b9326abf576dec2193904b0a2909f29189fe7c1b03fddc105ca44b2bc6b86"
+      },
+      "name": "valid-empty-strict-stored.bin",
+      "recipe_hex": "",
+      "recipe_name": "valid-empty",
+      "source_seed": "strict-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.437316+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-default-namespace-deflate.bin",
+        "-runs=1",
+        "-seed=4850",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/010-valid-escaped-chunks-default-namespace-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 811,
+          "sha256": "91b9ff107dff86ee9e053e98fe4512f7bedc8e54b35999abc4a48bc76301a544"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.486092+00:00",
+      "input": {
+        "bytes": 1167,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-default-namespace-deflate.bin",
+        "sha256": "9f5aa51f556958cc20d3a71be4ca9c965e7dbb61282f553ccb7c0a1bac8fbfe3"
+      },
+      "name": "valid-escaped-chunks-default-namespace-deflate.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "default-namespace-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.460303+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-default-namespace-stored.bin",
+        "-runs=1",
+        "-seed=4851",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/011-valid-escaped-chunks-default-namespace-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 809,
+          "sha256": "db9131f939c0bf7a067b92dbd953be1d1e3f4357bf02d0f5c519920a386582f3"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.509034+00:00",
+      "input": {
+        "bytes": 1469,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-default-namespace-stored.bin",
+        "sha256": "07bb49dde9f5dbdca817c2c2b4cfbc67548a52af6f181eb70ea1db0463d85733"
+      },
+      "name": "valid-escaped-chunks-default-namespace-stored.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "default-namespace-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.486244+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-empty-paragraph-stored.bin",
+        "-runs=1",
+        "-seed=4852",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/012-valid-escaped-chunks-empty-paragraph-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 805,
+          "sha256": "79563022cabe5a879fc66befec464e5bc751aec20cb1e0deab467fd210337e67"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.532118+00:00",
+      "input": {
+        "bytes": 1460,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-empty-paragraph-stored.bin",
+        "sha256": "4b848ad11af4e1136ee135f1c9bed8e3f91040d94277e19793df51343a1fa9ec"
+      },
+      "name": "valid-escaped-chunks-empty-paragraph-stored.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "empty-paragraph-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.509181+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-plain-deflate.bin",
+        "-runs=1",
+        "-seed=4853",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/013-valid-escaped-chunks-plain-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 787,
+          "sha256": "f3e4d2bac8ae4a33435a208e81eb14f7cf3f59f1aea601f19808a3fb77db729c"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.558931+00:00",
+      "input": {
+        "bytes": 1198,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-plain-deflate.bin",
+        "sha256": "2ef0a55a4e7152c9fae9fa2d5e4ded0d539ebc20bc77241d0dad57820e0b7dc6"
+      },
+      "name": "valid-escaped-chunks-plain-deflate.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "plain-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.532255+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-plain-stored.bin",
+        "-runs=1",
+        "-seed=4854",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/014-valid-escaped-chunks-plain-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 785,
+          "sha256": "5bed3b52c7f0795c882af9329532a0bdc51d547177c7e21110061c964ddc18a2"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.582309+00:00",
+      "input": {
+        "bytes": 1525,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-plain-stored.bin",
+        "sha256": "bd589dcbcf4038e8edf2a0e64bcc58aab009b288262a2a7fb138dca80a1023fa"
+      },
+      "name": "valid-escaped-chunks-plain-stored.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "plain-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.559081+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-section-deflate.bin",
+        "-runs=1",
+        "-seed=4855",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/015-valid-escaped-chunks-section-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 791,
+          "sha256": "d2b71b58d0c44ad2b6df38b56f834b66d722a17093bf417d93aa82e5c05097c5"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.608926+00:00",
+      "input": {
+        "bytes": 1246,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-section-deflate.bin",
+        "sha256": "be2b5b8890961e3cf0a9298311551ff597475be402477ae28bfede52775a82d3"
+      },
+      "name": "valid-escaped-chunks-section-deflate.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "section-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.582459+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-section-stored.bin",
+        "-runs=1",
+        "-seed=4856",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/016-valid-escaped-chunks-section-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 789,
+          "sha256": "154a24abad3d1dd936305d57958c32930ee0a1e7be7a7b317163d9f32642ab87"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.633122+00:00",
+      "input": {
+        "bytes": 1603,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-section-stored.bin",
+        "sha256": "ea5699c0583db6d8634192bbd7730f356820a231846493c168416d5267a7c691"
+      },
+      "name": "valid-escaped-chunks-section-stored.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "section-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.609062+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-strict-deflate.bin",
+        "-runs=1",
+        "-seed=4857",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/017-valid-escaped-chunks-strict-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 789,
+          "sha256": "60ac1360ed51ca8ad146463b825129328e0ddb889a72f033404b662e9f82ed6f"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.660123+00:00",
+      "input": {
+        "bytes": 1195,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-strict-deflate.bin",
+        "sha256": "3f7933f2e82d9fb724b03dd9dc6d9228c05897faac19b4bb1b9052d72841f805"
+      },
+      "name": "valid-escaped-chunks-strict-deflate.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "strict-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.633255+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-strict-stored.bin",
+        "-runs=1",
+        "-seed=4858",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/018-valid-escaped-chunks-strict-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 787,
+          "sha256": "612ca9e9d45bc8dbe0f590a68cc1b58f314604e27f14b6fa4f115f7706872202"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.683631+00:00",
+      "input": {
+        "bytes": 1501,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-escaped-chunks-strict-stored.bin",
+        "sha256": "945758b390334dea019e8a660043b617b45c1b0db5bde432b19f0062dab5aea8"
+      },
+      "name": "valid-escaped-chunks-strict-stored.bin",
+      "recipe_hex": "00000203040506070809",
+      "recipe_name": "valid-escaped-chunks",
+      "source_seed": "strict-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.660272+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-default-namespace-deflate.bin",
+        "-runs=1",
+        "-seed=4859",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/019-valid-many-paragraphs-default-namespace-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 813,
+          "sha256": "cf9c4da03913f60faa3c52597e3815cf524f9a1fb20c85b951a78241a41b9fc5"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.711608+00:00",
+      "input": {
+        "bytes": 1168,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-default-namespace-deflate.bin",
+        "sha256": "68e06d8974bfaa6cd0f622b9d18b408a9652897f7ae75988ba935981a222fc44"
+      },
+      "name": "valid-many-paragraphs-default-namespace-deflate.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "default-namespace-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.683761+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-default-namespace-stored.bin",
+        "-runs=1",
+        "-seed=4860",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/020-valid-many-paragraphs-default-namespace-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 811,
+          "sha256": "cde0fe01d4c1942ba9d19fec86288cc52f56f3306b751e748acaf8d7adbcc253"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.736147+00:00",
+      "input": {
+        "bytes": 1470,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-default-namespace-stored.bin",
+        "sha256": "c757c805d514200ec01ebb88fc79a3523d012e920b5ca320fb85ffe7e6066a39"
+      },
+      "name": "valid-many-paragraphs-default-namespace-stored.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "default-namespace-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.711735+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-empty-paragraph-stored.bin",
+        "-runs=1",
+        "-seed=4861",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/021-valid-many-paragraphs-empty-paragraph-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 807,
+          "sha256": "462e4cf1164d69b434b3bbbbadbe0b9dd0a9f14c59d311abfb904ca32e89f364"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.760752+00:00",
+      "input": {
+        "bytes": 1461,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-empty-paragraph-stored.bin",
+        "sha256": "43b46dabe75845bd569515e37cdcc1eff07b7d10df5431bdf76e27af7c385630"
+      },
+      "name": "valid-many-paragraphs-empty-paragraph-stored.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "empty-paragraph-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.736280+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-plain-deflate.bin",
+        "-runs=1",
+        "-seed=4862",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/022-valid-many-paragraphs-plain-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 789,
+          "sha256": "319f75aa940752287d124db3a5aedb49d0ee096f15ec0285513edb994ab32ee4"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.788339+00:00",
+      "input": {
+        "bytes": 1199,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-plain-deflate.bin",
+        "sha256": "1b13a544827636b2a67c8975fddd6fe6777d96864af5b0053aa566be8045146d"
+      },
+      "name": "valid-many-paragraphs-plain-deflate.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "plain-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.760885+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-plain-stored.bin",
+        "-runs=1",
+        "-seed=4863",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/023-valid-many-paragraphs-plain-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 787,
+          "sha256": "90d1cf919502a36d89dc76a5b14ced75e2fd172b24b9ab04e796f8fdce54d920"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.812976+00:00",
+      "input": {
+        "bytes": 1526,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-plain-stored.bin",
+        "sha256": "a12eaeaf014017dbcc190ca2faa8852104f16896a1184bea0813f8fd6bdcd7ae"
+      },
+      "name": "valid-many-paragraphs-plain-stored.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "plain-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.788488+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-section-deflate.bin",
+        "-runs=1",
+        "-seed=4864",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/024-valid-many-paragraphs-section-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 793,
+          "sha256": "bcaf014afb84283dd08d08e768cfe00a6808595a9ba60a87889ff4c63f5aab9e"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.841852+00:00",
+      "input": {
+        "bytes": 1247,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-section-deflate.bin",
+        "sha256": "dcea19875772e44ca491b3e4a1674904a74ab3982f93253937f74afbd9a75d17"
+      },
+      "name": "valid-many-paragraphs-section-deflate.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "section-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.813114+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-section-stored.bin",
+        "-runs=1",
+        "-seed=4865",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/025-valid-many-paragraphs-section-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 791,
+          "sha256": "fd494d3ecc4058515087936c2f0f276a054d1b045e420fd609c172d9da8eb83a"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.866665+00:00",
+      "input": {
+        "bytes": 1604,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-section-stored.bin",
+        "sha256": "76ba13d0c56ab5ef207742283bd33e632e9a4ef06f9c4d17fc415eca80b19d52"
+      },
+      "name": "valid-many-paragraphs-section-stored.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "section-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.842000+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-strict-deflate.bin",
+        "-runs=1",
+        "-seed=4866",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/026-valid-many-paragraphs-strict-deflate.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 791,
+          "sha256": "ed9de398a22d87227120dbb82d0cb32fb01452145451b2c152b8f8792c594d4e"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.894119+00:00",
+      "input": {
+        "bytes": 1196,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-strict-deflate.bin",
+        "sha256": "d1eb318aaa4d82a886f5bceddc8a5c34003f2296cafe07520d39cc5a5f595861"
+      },
+      "name": "valid-many-paragraphs-strict-deflate.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "strict-deflate.docx",
+      "started_utc": "2026-09-09T14:43:10.866806+00:00"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cache/litchi-goal-0489/fuzz-docx-stream-candidate1/source_backed_tail_append_stream",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-strict-stored.bin",
+        "-runs=1",
+        "-seed=4867",
+        "-max_len=65536",
+        "-timeout=10",
+        "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/positive-check/027-valid-many-paragraphs-strict-stored.bin/artifacts/"
+      ],
+      "artifacts": {
+        "stderr": {
+          "bytes": 789,
+          "sha256": "a9717f4586795fb1426db6ec952a8fddd6372634f35e3ea5d49307d433a16dd5"
+        },
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T14:43:10.917977+00:00",
+      "input": {
+        "bytes": 1502,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0489/fuzz-stream/candidate1/seeds/valid-many-paragraphs-strict-stored.bin",
+        "sha256": "29c08397d848b66bf84ad9cd1099f8315ea2efe296ac535282dbb4df4cea93be"
+      },
+      "name": "valid-many-paragraphs-strict-stored.bin",
+      "recipe_hex": "0003010203040506070809",
+      "recipe_name": "valid-many-paragraphs",
+      "source_seed": "strict-stored.docx",
+      "started_utc": "2026-09-09T14:43:10.894271+00:00"
+    }
+  ],
+  "environment_variable": "LITCHI_DOCX_STREAM_REQUIRE_SUCCESS",
+  "exit_code": 0,
+  "input_cap_bytes": 65536,
+  "schema": "docx-stream-fuzz-positive-v1"
+}

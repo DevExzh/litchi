@@ -228,6 +228,8 @@ enum ReplayMode {
     OpenError,
     ReadError,
     ReadErrorAtOpen(usize),
+    TruncatedAtOpen(usize),
+    ExtraAtOpen(usize),
     ChangeAfterFirstOpen,
     ChangeAtOpen(usize),
 }
@@ -259,6 +261,11 @@ impl ReplayProvider {
                 bytes.pop();
             },
             ReplayMode::Extra => bytes.push(b'X'),
+            ReplayMode::TruncatedAtOpen(change_at) if open_number >= change_at => {
+                bytes.pop();
+            },
+            ReplayMode::ExtraAtOpen(change_at) if open_number >= change_at => bytes.push(b'X'),
+            ReplayMode::TruncatedAtOpen(_) | ReplayMode::ExtraAtOpen(_) => {},
             ReplayMode::HashChanged => {
                 bytes = CHANGED_FRAGMENT.to_vec();
             },
@@ -1434,4 +1441,66 @@ fn replay_source_change_after_sink_progress_is_incomplete() {
     );
     assert!(!sink.bytes.is_empty());
     assert!(matches!(error, OpcError::IncompleteOutput { written, .. } if written > 0));
+}
+
+#[test]
+fn prepared_replay_authenticates_late_length_and_hash_failures_in_every_pass() {
+    for deflated in [false, true] {
+        let (_, expected_len, expected_hash) = expected_replay_artifact(deflated);
+        for expected_artifact in [false, true] {
+            let last_open = if expected_artifact { 5 } else { 3 };
+            for changed_open in 2..=last_open {
+                for mode in [
+                    ReplayMode::TruncatedAtOpen(changed_open),
+                    ReplayMode::ExtraAtOpen(changed_open),
+                    ReplayMode::ChangeAtOpen(changed_open),
+                ] {
+                    let (package, _) = open(deflated);
+                    let provider = ReplayProvider::new(FRAGMENT, mode);
+                    let plan = replay_plan(
+                        &package,
+                        provider.clone(),
+                        SourcePartSpliceLimits::default(),
+                    );
+                    assert_eq!(provider.open_count(), 1);
+                    let mut output = Vec::new();
+                    let result = if expected_artifact {
+                        plan.write_to_stream_with_expected_artifact(
+                            &mut output,
+                            expected_len,
+                            expected_hash,
+                        )
+                    } else {
+                        plan.write_to_stream(&mut output)
+                    };
+                    let error =
+                        result.expect_err("every later replay pass must authenticate bytes");
+                    assert_eq!(provider.open_count(), changed_open);
+                    let refusal = if changed_open == last_open {
+                        match error {
+                            OpcError::IncompleteOutput { written, source } => {
+                                assert_eq!(written, output.len() as u64);
+                                assert!(written > 0);
+                                *source
+                            },
+                            other => panic!("publication must report accepted output: {other:?}"),
+                        }
+                    } else {
+                        assert!(
+                            output.is_empty(),
+                            "preview/measurement must not publish bytes"
+                        );
+                        error
+                    };
+                    assert!(
+                        matches!(
+                            refusal,
+                            OpcError::IoError(_) | OpcError::SourceBackedOverlayUnavailable { .. }
+                        ),
+                        "late replay failure must retain byte-authentication refusal: {refusal:?}"
+                    );
+                }
+            }
+        }
+    }
 }
