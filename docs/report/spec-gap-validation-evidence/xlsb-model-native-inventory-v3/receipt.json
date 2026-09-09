@@ -1,0 +1,58 @@
+{
+  "source_commit_observed": "5ffc03ebe1bb3ec885210edbb36f0f90e44619e3",
+  "archive_sha256": "a32d513653a5d1d5ad3c9fb7e200f5c11956f61e1898ef626f11ecf67b698abd",
+  "members": {
+    "RECEIPT-v2.md": "65e3f2e31fb9db1187a425792c6ac633a4b0e8791b4a4942500131f756321e58",
+    "RECEIPT.md": "210bcbed3beec8cab9fd1e0453259b08b680f156c21e8457c45210186d725a42",
+    "biff12.py": "fa50889b98f2be91fb3e1c94aaf597732fb45fcb8132dd1268e64ab05e7f18b1",
+    "commands.txt": "6c1e8ad5d62f74a73c28fc09354bf0740447f14ae21a2b1851b06e6e30ece4f1",
+    "coverage-summary.json": "fee1c41fdd684b23c912f645df1947873c96aba7d2986c1b419667eb4c2953e6",
+    "coverage.py": "513571169a18b03330dbf604cbf0f8a2fe57b93386dc304ee0ee7a8362886f09",
+    "coverage.stdout": "b80d3319218e94b1550b499d3848a09a1e840491c572b90d0b113b30cba5eba7",
+    "frame-errors.tsv": "c85fc7e62c6c1ec92ac662f70b0aa307f1fb2f649340d24a8b3eaa5434a3b3c6",
+    "inventory.json": "a454eba32385be42d09bed8288feb65d2ac0c4b132ea8867f4cd5154ab36e01d",
+    "manifest.sha256": "5399efecc401bd1c83e40fcdf18d320fb426c1064bbcfce57634814863fd0677",
+    "positive-control.json": "2fedc4371f22db777453ea71d8b98b50ba3bc00f91c27b57199e1fb9e3f4f667",
+    "positive-control.log": "bffc568e5791a354609374905ec053479f743ba6003f8415e8a51e0e0fa5cc23",
+    "positive-control.py": "c700cde7fbc2dce5e90a7c63b0e6392f966ab05909e6b9d1a6c689fa7dbe85cd",
+    "positive-control.stdout": "bd8b1cad891b0216703fbddd06efe1d002cc21db7b786902a8d31eccba713bb9",
+    "run.stdout": "aa6553bacb73466d0f8b8b16ff4d766c85d8a1afb485f640e149fadbf2e92e4b",
+    "scan.log": "7a0bd528d5a9488b694e5f011af237e6c1daebf4aba18f9fe5dde848d9a79b9a",
+    "scan.py": "1a09973ae2a2a2ecbe7aff3e1da3a92dc5d06addbab71ab4a98dc348430dad98",
+    "scan.stdout": "8ade0a9b57543c476325338f4f6dcf45e7f607c78f822e0bff041cc4a99ccc64",
+    "skipped-errors.tsv": "2e6d1a184a36311dbfdb852e64ca651520798e18fc7b033619e4ebd3c2e38c10",
+    "source-manifest.tsv": "39c1e11853cc9d994ad339cb2aa5764621645312e5adba4c8c897224aff66cfa",
+    "spec-notes.md": "4c8178012f287258bd68633311c0dfe8fdb238c425f9af73b841cc4b712c52d2",
+    "v2-receipt-binding.sha256": "72b442ebbc6a91d933e53ebfbb80f6c6219ce0874a33d8e649acfa5d11a507d6",
+    "workbook-bin.tsv": "0350b3b5e91ec1e4285b18647be6eb1439be71700485967d1051bd3d6f5365e1",
+    "workbook-model-hits.tsv": "4295505710aee7757cc6f875fc406fc0016e29691ea86483e5a50a08c520b78e",
+    "xlsx-native-model.md": "79b39eace82381baf894524fd981d85c05682c56e4f33af5c6123d3955364af5"
+  },
+  "source_manifest_sha256": "39c1e11853cc9d994ad339cb2aa5764621645312e5adba4c8c897224aff66cfa",
+  "root_verification": {
+    "actual_source_archives_rehashed": 35,
+    "bundle_members_rehashed": 25,
+    "matched_rerun_files": {
+      "coverage-summary.json": "fee1c41fdd684b23c912f645df1947873c96aba7d2986c1b419667eb4c2953e6",
+      "skipped-errors.tsv": "2e6d1a184a36311dbfdb852e64ca651520798e18fc7b033619e4ebd3c2e38c10",
+      "positive-control.log": "bffc568e5791a354609374905ec053479f743ba6003f8415e8a51e0e0fa5cc23",
+      "workbook-model-hits.tsv": "4295505710aee7757cc6f875fc406fc0016e29691ea86483e5a50a08c520b78e",
+      "workbook-bin.tsv": "0350b3b5e91ec1e4285b18647be6eb1439be71700485967d1051bd3d6f5365e1",
+      "positive-control.py": "c700cde7fbc2dce5e90a7c63b0e6392f966ab05909e6b9d1a6c689fa7dbe85cd",
+      "frame-errors.tsv": "c85fc7e62c6c1ec92ac662f70b0aa307f1fb2f649340d24a8b3eaa5434a3b3c6",
+      "positive-control.json": "2fedc4371f22db777453ea71d8b98b50ba3bc00f91c27b57199e1fb9e3f4f667",
+      "biff12.py": "fa50889b98f2be91fb3e1c94aaf597732fb45fcb8132dd1268e64ab05e7f18b1"
+    },
+    "commands": [
+      "python3 coverage.py /home/zhuhe/code/litchi-spec-gaps /var/tmp/litchi-xlsb-model-inventory-v3-root-check",
+      "python3 /var/tmp/litchi-xlsb-model-inventory-v3-root-check/positive-control.py"
+    ],
+    "positive_control_passed": 8,
+    "inspectable_workbooks": 34,
+    "complete_workbook_records": 713,
+    "workbook_model_hits": 0,
+    "encrypted_inputs_unexamined": 1,
+    "other_binary_framing_errors": 8,
+    "bound_skipped_entries": 0
+  }
+}
