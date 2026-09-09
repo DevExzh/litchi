@@ -1,0 +1,48 @@
+{
+  "base_commit": "5ffc03ebe1bb3ec885210edbb36f0f90e44619e3",
+  "toolchain": "1.95.0",
+  "sources": {
+    "crates/litchi-ole-common/src/property_set/binding/codec.rs": "a59ac826931ffb528f0ed5e69c0d997167236ae8197d0b9089a760dba4937254",
+    "crates/litchi-ole-common/src/property_set/binding/model.rs": "2df5572063d792445c05b9150dc78bf92357a7be78b21f4f087f5b317bd7ff52",
+    "crates/litchi-ole-common/src/property_set/binding/mod.rs": "f2dfaf65849f55d371e92b3af5ae10c5cce1eedf30e947d259db57be3dcfeacd",
+    "crates/litchi-ole-common/src/property_set/binding/tests.rs": "6f6e056b9e76c56a8dfeb36a7c6e1e9ea231162b5fddc4463ce939240cf06557",
+    "crates/litchi-ole-common/src/property_set/mod.rs": "d85bb83ed2e1446b942a19c01e94021006f28ca958974393b479b89e0a3093ff"
+  },
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "commands": [
+    "cargo +1.95.0 test --offline -p litchi-ole-common --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-ole-common --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <five source files>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "results": {
+    "passed": 208,
+    "failed": 0,
+    "ignored": 1,
+    "doctests": 0,
+    "clippy": "pass",
+    "format": "pass",
+    "whitespace": "pass"
+  },
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "622a6d034d764c747997be38df28c3503775629ecf34ef62c2a4e7f5e9ba2ad0",
+      "raw_sha256": "844ec74825b39cc6ec0c45e5472cbed19904d3644cd9c9c3c6ed02875b244f40"
+    },
+    "clippy.log.gz": {
+      "sha256": "ef107c151e6e02f119a7801378da87dc717e3d3e403bb9c1c2ce75e8b2a6885d",
+      "raw_sha256": "63af3f4b8418468cb1dfacfe777310a00427c2b48ba87f94542d18cb5f0fb4a9"
+    }
+  },
+  "specs": [
+    "3rdparty/specs/[MS-OLEPS]/2 Structures/2.23 Property Set Stream and Storage Names.md",
+    "3rdparty/specs/[MS-OLEPS]/3 Structure Examples/3.2 PropertyBag Property Set.md",
+    "3rdparty/specs/[MS-DTYP]/2 Data Types/2.3 Common Data Structures.md"
+  ]
+}
