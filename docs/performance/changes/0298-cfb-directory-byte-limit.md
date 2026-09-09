@@ -43,3 +43,12 @@ Focused tests cover default and invalid CFB limits, exact and one-byte-under or
 over v3/v4 boundaries, shared propagation and revalidation retention, generic
 CFB blocked reporting, and an XLS fixture whose two-sector directory validates
 at the exact ceiling but is blocked without errors at one sector.
+
+
+## Follow-up: 2026-09-09 range-lock support
+
+The directory policy above remains 64 MiB by default with a 2 GiB hard maximum.
+CFB input admission now distinguishes a 2 GiB default from an explicitly selected
+v4 source ceiling up to 32 GiB. Version-3 files remain limited to 2 GiB. These
+source ceilings do not independently cap FAT/MiniFAT allocation bytes; the
+allocation exclusions in this report still apply.

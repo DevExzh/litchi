@@ -35,6 +35,14 @@ let word_doc = ole.open_stream(&["WordDocument"])?;
 - Stream extraction by path through the storage tree
 - CFB storage primitives consumed by the shared OLE Property Set owner
 - Optional `write` feature for authoring new CFB containers via `OleWriter`
+- Version 4 range-lock sector reservation in seekable and sequential output,
+  including FAT/DIFAT layouts that cross the 2 GiB boundary. Readers reject
+  metadata or data chains that reuse the reserved sector. Large sequential
+  output requires explicit writer limits that admit the requested size.
+  Readers retain a 2 GiB default input limit; `OleFileLimits::new` and
+  `SharedOleFileLimits::new` allow explicit v4 input ceilings up to 32 GiB.
+  This is a resource profile, below the format's theoretical maximum. Input
+  ceilings do not independently cap decoded FAT/MiniFAT allocation bytes.
 
 ## License
 

@@ -1,7 +1,8 @@
 use super::consts::{
     DIFSECT, DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES,
-    HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, SECTOR_SIZE_V3,
-    SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, RANGE_LOCK_SECTOR_V4,
+    SECTOR_SIZE_V3, SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, directory_name_data};
 use smallvec::SmallVec;
@@ -140,6 +141,7 @@ enum PhysicalSectorRole {
     MiniFat,
     MiniStream,
     RegularStream,
+    RangeLock,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -160,6 +162,7 @@ impl PhysicalSectorRole {
             Self::MiniFat => "MiniFAT",
             Self::MiniStream => "mini stream",
             Self::RegularStream => "regular stream",
+            Self::RangeLock => "range lock",
         }
     }
 }
@@ -315,8 +318,13 @@ pub struct OleFileLimits {
 }
 
 impl OleFileLimits {
-    /// Largest source accepted by the low-level CFB reader.
-    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default source ceiling; larger version-4 files require explicit limits.
+    pub const DEFAULT_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Largest source admitted by this reader's bounded input profile.
+    ///
+    /// This 32-GiB resource ceiling is deliberately below the format maximum.
+    /// Version-3 files remain limited to 2 GiB even with a larger input ceiling.
+    pub const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024 * 1024;
     /// Default directory stream ceiling used by the low-level CFB reader.
     pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = 64 * 1024 * 1024;
     /// Largest directory stream ceiling accepted by the low-level CFB reader.
@@ -381,7 +389,7 @@ impl OleFileLimits {
 impl Default for OleFileLimits {
     fn default() -> Self {
         Self {
-            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
         }
     }
@@ -604,6 +612,13 @@ impl<R: Read + Seek> OleFile<R> {
                 )));
             },
         };
+        // A larger caller budget admits v4 sources, but cannot relax the
+        // version-3 compatibility limit in MS-CFB 2.9. Check before indexing.
+        if dll_version == 3 && file_size > TWO_GIB_BYTES {
+            return Err(OleError::InvalidFormat(
+                "Version 3 CFB input cannot exceed 2 GiB".to_string(),
+            ));
+        }
         if sector_shift != expected_sector_shift {
             return Err(OleError::InvalidFormat(format!(
                 "Invalid sector shift {sector_shift} for CFB version {dll_version}"
@@ -711,6 +726,7 @@ impl<R: Read + Seek> OleFile<R> {
             first_difat_sector,
             num_difat_sectors,
         )?;
+        ole.validate_range_lock_sector(first_dir_sector, first_minifat_sector, first_difat_sector)?;
 
         // Load directory
         ole.load_directory(
@@ -892,6 +908,63 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
+    /// Validate the fixed version-4 range-lock sector before any directory
+    /// or stream chain is traversed.  Reserving its physical role up front
+    /// prevents a later chain loader from silently treating the lock bytes as
+    /// user data.
+    fn validate_range_lock_sector(
+        &mut self,
+        first_dir_sector: u32,
+        first_minifat_sector: u32,
+        first_difat_sector: u32,
+    ) -> Result<(), OleError> {
+        if self.sector_size != SECTOR_SIZE_V4 {
+            return Ok(());
+        }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let lock_index = usize::try_from(lock).map_err(|_err| {
+            OleError::CorruptedFile("range-lock sector index is too large".to_string())
+        })?;
+        if lock_index >= self.sector_roles.len() {
+            // A v4 file below the lock offset has no physical range-lock
+            // sector.  A file beyond 2 GiB cannot take this branch because
+            // its physical sector count necessarily includes the fixed ID.
+            if self.file_size > TWO_GIB_BYTES {
+                return Err(OleError::CorruptedFile(
+                    "CFB file beyond 2 GiB is missing its range-lock sector".to_string(),
+                ));
+            }
+            return Ok(());
+        }
+        let marker = *self.fat.get(lock_index).ok_or_else(|| {
+            OleError::CorruptedFile("FAT is missing the range-lock sector entry".to_string())
+        })?;
+        if self.file_size > TWO_GIB_BYTES {
+            if marker != ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "range-lock sector must be marked ENDOFCHAIN beyond 2 GiB".to_string(),
+                ));
+            }
+        } else if !matches!(marker, FREESECT | ENDOFCHAIN) {
+            return Err(OleError::CorruptedFile(
+                "range-lock sector has a non-terminal FAT marker".to_string(),
+            ));
+        }
+        if first_dir_sector == lock || first_minifat_sector == lock || first_difat_sector == lock {
+            return Err(OleError::CorruptedFile(
+                "CFB metadata chain points to the range-lock sector".to_string(),
+            ));
+        }
+        for (sector, &next) in self.fat.iter().take(self.sector_roles.len()).enumerate() {
+            if next == lock {
+                return Err(OleError::CorruptedFile(format!(
+                    "FAT chain at sector {sector} points to the range-lock sector"
+                )));
+            }
+        }
+        self.claim_sector(lock, PhysicalSectorRole::RangeLock)
+    }
+
     /// Load the Mini FAT (for small streams)
     fn load_minifat(
         &mut self,
@@ -1065,6 +1138,11 @@ impl<R: Read + Seek> OleFile<R> {
             .ok_or_else(|| OleError::CorruptedFile("Missing root directory entry".to_string()))?;
         let root_start = root.start_sector;
         let root_size = root.size;
+        if self.sector_size == SECTOR_SIZE_V4 && root_start == RANGE_LOCK_SECTOR_V4 {
+            return Err(OleError::CorruptedFile(
+                "root mini stream points to the range-lock sector".to_string(),
+            ));
+        }
         let root_sector_count = usize::try_from(root_size.div_ceil(self.sector_size as u64))
             .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
         let root_chain = collect_sector_chain_exact(
@@ -1098,6 +1176,14 @@ impl<R: Read + Seek> OleFile<R> {
             }
             let (is_minifat, start_sector, size) =
                 (entry.is_minifat, entry.start_sector, entry.size);
+            if self.sector_size == SECTOR_SIZE_V4
+                && !is_minifat
+                && start_sector == RANGE_LOCK_SECTOR_V4
+            {
+                return Err(OleError::CorruptedFile(
+                    "regular stream points to the range-lock sector".to_string(),
+                ));
+            }
             if is_minifat {
                 let sector_count = usize::try_from(size.div_ceil(self.mini_sector_size as u64))
                     .map_err(|_err| {
@@ -3282,6 +3368,61 @@ mod tests {
 
         assert!(result.is_ok(), "malformed CFB input must not panic");
         assert!(result.as_ref().is_ok_and(Result::is_err));
+    }
+
+    fn synthetic_v4_range_lock_file(file_size: u64, marker: u32) -> OleFile<Cursor<Vec<u8>>> {
+        let physical_count =
+            usize::try_from(file_size / u64::try_from(SECTOR_SIZE_V4).unwrap() - 1).unwrap();
+        let lock = usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap();
+        let mut fat = vec![FREESECT; physical_count];
+        fat[lock] = marker;
+        OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size,
+            sector_size: SECTOR_SIZE_V4,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: 0,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
+        }
+    }
+
+    #[test]
+    fn validates_v4_range_lock_marker_and_rejects_chain_pointers() {
+        let exact_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 2) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut below = synthetic_v4_range_lock_file(exact_two_gib, FREESECT);
+        below
+            .validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN)
+            .unwrap();
+        assert_eq!(
+            below.sector_roles[usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap()],
+            PhysicalSectorRole::RangeLock
+        );
+
+        let beyond_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 3) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut malformed = synthetic_v4_range_lock_file(beyond_two_gib, FREESECT);
+        assert!(matches!(
+            malformed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("must be marked ENDOFCHAIN")
+        ));
+
+        let mut pointed = synthetic_v4_range_lock_file(beyond_two_gib, ENDOFCHAIN);
+        pointed.fat[1] = RANGE_LOCK_SECTOR_V4;
+        assert!(matches!(
+            pointed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("points to the range-lock sector")
+        ));
     }
 
     #[test]
