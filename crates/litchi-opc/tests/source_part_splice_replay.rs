@@ -1309,6 +1309,37 @@ fn replay_short_sink_reports_exact_partial_output() {
     assert_eq!(written, 19);
 }
 
+#[test]
+fn replay_reader_error_during_publication_reports_accepted_output() {
+    for deflated in [false, true] {
+        let (package, _) = open(deflated);
+        // Preparation and measurement succeed. The publishing reader returns
+        // a short prefix, then fails while that prefix can still be buffered.
+        let provider = ReplayProvider::new(FRAGMENT, ReplayMode::ReadErrorAtOpen(3));
+        let plan = replay_plan(
+            &package,
+            Arc::clone(&provider),
+            SourcePartSpliceLimits::default(),
+        );
+        let mut output = Vec::new();
+        let error = plan
+            .write_to_stream(&mut output)
+            .expect_err("reader failure must refuse an incomplete publication");
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert_eq!(written, output.len() as u64);
+                assert!(written > 0, "ZIP publication must have accepted a prefix");
+                assert!(
+                    matches!(*source, OpcError::IoError(ref error) if error.kind() == io::ErrorKind::BrokenPipe),
+                    "the original replay I/O error must remain authoritative: {source:?}"
+                );
+            },
+            other => panic!("expected incomplete publication, got {other:?}"),
+        }
+        assert_eq!(provider.open_count(), 3);
+    }
+}
+
 #[derive(Debug)]
 struct MutableSource {
     bytes: RwLock<Vec<u8>>,

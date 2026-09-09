@@ -1,0 +1,9 @@
+{
+  "files": {
+    "crates/litchi-opc/src/source_backed/splice.rs": "5613a8d1275ff213319a1aec3b99cadf98b9ba5b4abcd172bf1623b58cf4bdc6",
+    "crates/litchi-opc/tests/source_part_splice_replay.rs": "a4d3d406ed2aaec3396e15fd5c9478a1826c1f32c018b4df20170b02d33ed50b"
+  },
+  "patch_sha256": "56a5a3ce40943ef0609c50bbce549d10a94ca4b7e70f95abd4b4f554b4a824ed",
+  "review": "Independent review found no retained-prefix overwrite or EOF/phase bug. Callback-injected faults, exact version-count assertion and accepted-output wording were corrected before the final source build.",
+  "scope": "Private OPC adapter and focused tests; no public API, dependency, source-version policy or added allocation."
+}
