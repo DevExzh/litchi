@@ -1,0 +1,10 @@
+usage: record_environment.py [-h] --scratch-dir SCRATCH_DIR --output OUTPUT
+                             [--cpu CPU]
+
+Record current host and explicit scratch-filesystem evidence before capture.
+
+options:
+  -h, --help            show this help message and exit
+  --scratch-dir SCRATCH_DIR
+  --output OUTPUT
+  --cpu CPU

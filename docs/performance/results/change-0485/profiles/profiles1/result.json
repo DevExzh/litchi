@@ -1,0 +1,114 @@
+{
+  "finished_utc": "2026-09-09T12:33:37.138271+00:00",
+  "records": [
+    {
+      "label": "before-perf-owned-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 6053,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/before-perf-owned-s131072-a64-short-c64/receipt.json",
+        "sha256": "827c6207ce16ae9469585b21205c35fb9fa36f9e62e417d532ff08021af2614c"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "before-perf-file-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 6633,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/before-perf-file-s131072-a64-short-c64/receipt.json",
+        "sha256": "bc00aaf892bac7546f7ddb72ab35c45cff0c1a19502f9941aca32bb078392b7f"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "before-perf-owned-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 6043,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/before-perf-owned-s64-a16384-short-c64/receipt.json",
+        "sha256": "2cc49afd0672e2a4ed607cdf83372d10e3fe05667e9d98ce34dc086b9a332c68"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "before-perf-file-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 6615,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/before-perf-file-s64-a16384-short-c64/receipt.json",
+        "sha256": "75c587714c98dbefe871c4c0d038580c5158919cbbacf5844c0a97e833d806a5"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-perf-owned-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 5985,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-perf-owned-s131072-a64-short-c64/receipt.json",
+        "sha256": "7c9072b12ff4d70cf94ed61080348e7567201d277652023b36670b3145cf2433"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-strace-owned-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 6042,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-strace-owned-s131072-a64-short-c64/receipt.json",
+        "sha256": "e70c7097d13e241be0c37ce76e221133df50024cbbad6d8e188840b181028c81"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-perf-file-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 6565,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-perf-file-s131072-a64-short-c64/receipt.json",
+        "sha256": "cb4ed03d105e4efc8d5d9f54ca5d803c2e0e31ba511647ef1f6d53b7dbb3e884"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-strace-file-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 6622,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-strace-file-s131072-a64-short-c64/receipt.json",
+        "sha256": "9f79de2bb3273207b2ec8b4092fde693f87c06012cf295d14aaa63ec97002a73"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-perf-owned-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 5975,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-perf-owned-s64-a16384-short-c64/receipt.json",
+        "sha256": "f32e88e46bf4b330f58229224578976b813e6c98b4a4dc9486470303e6b7606e"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-strace-owned-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 6032,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-strace-owned-s64-a16384-short-c64/receipt.json",
+        "sha256": "f25307d759aa16e5b34e5a14a04a9bd3764206ec6bc33601e6365815f3dd83c4"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-perf-file-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 6547,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-perf-file-s64-a16384-short-c64/receipt.json",
+        "sha256": "a9a6a7243b67c4b81102cbd312759bdbb75312f034b3e2b84cb57a2058c8dfd3"
+      },
+      "status": "pass"
+    },
+    {
+      "label": "after-strace-file-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 6604,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/profiles/profiles1/after-strace-file-s64-a16384-short-c64/receipt.json",
+        "sha256": "0a5fe6c7ec5a46d0f169b9a5e4c5f7740ef81a1c1ba13cd239229c65fd3cc0ce"
+      },
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

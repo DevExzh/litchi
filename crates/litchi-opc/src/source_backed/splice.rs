@@ -2173,8 +2173,16 @@ fn audit_splice(
     )?;
     if audit_xml {
         let audit_result = xml_minifier::audit::verify_authored_reader(&mut splice_reader, limits);
+        // A parser may return an error while the current adapter window still
+        // contains a consumed prefix.  Flush that prefix before observing the
+        // callback result so accepted output remains exactly the bytes the
+        // parser consumed, even on a partial publication.
+        splice_reader.flush_pending_consumed();
         if let Some(error) = splice_reader.take_failure() {
             return Err(error);
+        }
+        if let Some(error) = splice_reader.take_error() {
+            return Err(map_io_error(error));
         }
         match audit_result {
             Ok(_) => {},
@@ -2195,8 +2203,12 @@ fn audit_splice(
         }
     } else {
         let drain_result = drain_splice_reader(&mut splice_reader);
+        splice_reader.flush_pending_consumed();
         if let Some(error) = splice_reader.take_failure() {
             return Err(error);
+        }
+        if let Some(error) = splice_reader.take_error() {
+            return Err(map_io_error(error));
         }
         drain_result?;
     }
@@ -2264,14 +2276,31 @@ enum SplicePayload<'payload> {
 ///
 /// `quick_xml` consumes a `BufRead` view, so this adapter copies at most one
 /// fixed-size chunk from the verified source into its own buffer. Bytes are
-/// written to the replay sink only when the auditor consumes them. That keeps
-/// candidate validation and publication on the same byte stream without
-/// retaining the complete source or candidate.
+/// written to the replay sink only after the auditor has consumed their
+/// complete bounded window. That keeps candidate validation and publication
+/// on the same byte stream without retaining the complete source or candidate,
+/// while avoiding one source/sink boundary call per XML token.
 #[derive(Clone, Copy)]
 struct SpliceAuditBounds {
     source_length: u64,
     insertion_offset: u64,
     adapter_window_bytes: usize,
+}
+
+fn check_splice_external_state(
+    source: Option<&SourceSnapshot>,
+    context: Option<&ExecutionContext>,
+) -> Result<()> {
+    // Source freshness is deliberately checked first.  If cancellation and a
+    // source mutation race an external callback, the source boundary remains
+    // the primary failure and the callback is never treated as authorized.
+    if let Some(source) = source {
+        source.ensure_current()?;
+    }
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    Ok(())
 }
 
 struct SpliceAuditReader<'source, 'payload, 'output, 'snapshot, 'context> {
@@ -2288,6 +2317,9 @@ struct SpliceAuditReader<'source, 'payload, 'output, 'snapshot, 'context> {
     buffer_start: usize,
     buffer_len: usize,
     buffer_source_bytes: usize,
+    pending_start: usize,
+    pending_len: usize,
+    pending_source_bytes: usize,
     source_hash: Sha256,
     candidate_hash: Sha256,
     candidate_length: u64,
@@ -2327,12 +2359,26 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
         buffer.resize(bounds.adapter_window_bytes, 0);
         let payload = match payload {
             SplicePayloadRef::Fixed(bytes) => SplicePayload::Fixed { bytes, position: 0 },
-            SplicePayloadRef::Replay { provider, proof } => SplicePayload::Replay {
-                reader: provider.open().map_err(replay_error_to_io)?,
-                proof,
-                position: 0,
-                hasher: Sha256::new(),
-                eof_checked: false,
+            SplicePayloadRef::Replay { provider, proof } => {
+                check_splice_external_state(source_snapshot, context)?;
+                let opened = provider.open().map_err(replay_error_to_io);
+                // A provider may mutate the source while opening.  Preserve
+                // source-first precedence before exposing either the provider
+                // result or a fresh reader to the audit loop.
+                if let Some(source) = source_snapshot {
+                    source.ensure_current()?;
+                }
+                let reader = opened?;
+                if let Some(context) = context {
+                    context.check().map_err(map_execution_error)?;
+                }
+                SplicePayload::Replay {
+                    reader,
+                    proof,
+                    position: 0,
+                    hasher: Sha256::new(),
+                    eof_checked: false,
+                }
             },
         };
         Ok(Self {
@@ -2349,6 +2395,9 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
             buffer_start: 0,
             buffer_len: 0,
             buffer_source_bytes: 0,
+            pending_start: 0,
+            pending_len: 0,
+            pending_source_bytes: 0,
             source_hash: Sha256::new(),
             candidate_hash: Sha256::new(),
             candidate_length: 0,
@@ -2381,8 +2430,35 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
         }
     }
 
+    fn check_external_state(&mut self) -> io::Result<()> {
+        match check_splice_external_state(self.source_snapshot, self.context) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let message = error.to_string();
+                self.set_failure(error);
+                Err(io::Error::other(message))
+            },
+        }
+    }
+
+    fn check_source_after_external_error(&mut self) -> Option<io::Error> {
+        let source = self.source_snapshot?;
+        match source.ensure_current() {
+            Ok(()) => None,
+            Err(error) => {
+                let message = error.to_string();
+                self.set_failure(error);
+                Some(io::Error::other(message))
+            },
+        }
+    }
+
     fn take_failure(&mut self) -> Option<OpcError> {
         self.pending_failure.take()
+    }
+
+    fn take_error(&mut self) -> Option<io::Error> {
+        self.pending_error.take()
     }
 
     fn advance_phase(&mut self) {
@@ -2416,78 +2492,132 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
     }
 
     fn fill_source_buffer(&mut self, remaining: u64) -> io::Result<&[u8]> {
-        let count;
-        {
-            let available = self.source.fill_buf()?;
-            if available.is_empty() {
-                return Err(io::Error::new(
+        self.check_external_state()?;
+        let source_result = {
+            match self.source.fill_buf() {
+                Ok([]) => Err(io::Error::new(
                     io::ErrorKind::UnexpectedEof,
                     "decoded splice source ended before its declared length",
-                ));
+                )),
+                Ok(available) => {
+                    let count = available
+                        .len()
+                        .min(usize::try_from(remaining).unwrap_or(usize::MAX))
+                        .min(self.buffer.len());
+                    self.buffer[..count].copy_from_slice(&available[..count]);
+                    Ok(count)
+                },
+                Err(error) => Err(error),
             }
-            count = available
-                .len()
-                .min(usize::try_from(remaining).unwrap_or(usize::MAX))
-                .min(self.buffer.len());
-            self.buffer[..count].copy_from_slice(&available[..count]);
-        }
+        };
+        let count = match source_result {
+            Ok(count) => count,
+            Err(error) => {
+                if let Some(source_error) = self.check_source_after_external_error() {
+                    return Err(source_error);
+                }
+                return Err(error);
+            },
+        };
         self.buffer_start = 0;
         self.buffer_len = count;
         self.buffer_source_bytes = count;
+        self.check_external_state()?;
         Ok(&self.buffer[..count])
     }
 
     fn fill_fragment_buffer(&mut self) -> io::Result<&[u8]> {
-        match &mut self.payload {
-            SplicePayload::Fixed { bytes, position } => {
-                let remaining = bytes.len().saturating_sub(*position);
-                let count = remaining.min(self.buffer.len());
-                self.buffer[..count].copy_from_slice(&bytes[*position..*position + count]);
-                self.buffer_start = 0;
-                self.buffer_len = count;
-                self.buffer_source_bytes = 0;
-                Ok(&self.buffer[..count])
-            },
-            SplicePayload::Replay {
-                reader,
-                proof,
-                position,
-                eof_checked,
-                ..
-            } => {
-                if *position >= proof.encoded_len {
-                    let mut extra = [0_u8; 1];
-                    let read = reader.read(&mut extra)?;
-                    if read != 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "decoded splice replay returned bytes beyond its proved length",
-                        ));
-                    }
-                    *eof_checked = true;
-                    self.buffer_start = 0;
-                    self.buffer_len = 0;
-                    self.buffer_source_bytes = 0;
-                    self.advance_phase();
-                    return Ok(&[]);
-                }
-                let remaining = proof.encoded_len - *position;
-                let count = usize::try_from(remaining)
-                    .unwrap_or(usize::MAX)
-                    .min(self.buffer.len());
-                let read = reader.read(&mut self.buffer[..count])?;
-                if read == 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::UnexpectedEof,
-                        "decoded splice replay ended before its declared length",
-                    ));
-                }
-                self.buffer_start = 0;
-                self.buffer_len = read;
-                self.buffer_source_bytes = 0;
-                Ok(&self.buffer[..read])
-            },
+        if let SplicePayload::Fixed { bytes, position } = &self.payload {
+            let remaining = bytes.len().saturating_sub(*position);
+            let count = remaining.min(self.buffer.len());
+            self.buffer[..count].copy_from_slice(&bytes[*position..*position + count]);
+            self.buffer_start = 0;
+            self.buffer_len = count;
+            self.buffer_source_bytes = 0;
+            return Ok(&self.buffer[..count]);
         }
+
+        let (position, encoded_len) = match &self.payload {
+            SplicePayload::Replay {
+                proof, position, ..
+            } => (*position, proof.encoded_len),
+            SplicePayload::Fixed { .. } => unreachable!("fixed replay branch returned above"),
+        };
+        if position >= encoded_len {
+            let mut extra = [0_u8; 1];
+            self.check_external_state()?;
+            let read_result = match &mut self.payload {
+                SplicePayload::Replay { reader, .. } => reader.read(&mut extra),
+                SplicePayload::Fixed { .. } => unreachable!("fixed replay branch returned above"),
+            };
+            if let Some(error) = self.check_source_after_external_error() {
+                return Err(error);
+            }
+            let read = read_result?;
+            if let Some(context) = self.context {
+                if let Err(error) = context.check().map_err(map_execution_error) {
+                    let message = error.to_string();
+                    self.set_failure(error);
+                    return Err(io::Error::other(message));
+                }
+            }
+            if read > extra.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "decoded splice replay returned more bytes than its EOF probe",
+                ));
+            }
+            if read != 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "decoded splice replay returned bytes beyond its proved length",
+                ));
+            }
+            if let SplicePayload::Replay { eof_checked, .. } = &mut self.payload {
+                *eof_checked = true;
+            }
+            self.buffer_start = 0;
+            self.buffer_len = 0;
+            self.buffer_source_bytes = 0;
+            self.advance_phase();
+            return Ok(&[]);
+        }
+
+        let count = usize::try_from(encoded_len - position)
+            .unwrap_or(usize::MAX)
+            .min(self.buffer.len());
+        self.check_external_state()?;
+        let read_result = match &mut self.payload {
+            SplicePayload::Replay { reader, .. } => reader.read(&mut self.buffer[..count]),
+            SplicePayload::Fixed { .. } => unreachable!("fixed replay branch returned above"),
+        };
+        if let Some(error) = self.check_source_after_external_error() {
+            return Err(error);
+        }
+        let read = read_result?;
+        if let Some(context) = self.context {
+            if let Err(error) = context.check().map_err(map_execution_error) {
+                let message = error.to_string();
+                self.set_failure(error);
+                return Err(io::Error::other(message));
+            }
+        }
+        if read > count {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "decoded splice replay returned more bytes than its window",
+            ));
+        }
+        if read == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "decoded splice replay ended before its declared length",
+            ));
+        }
+        self.buffer_start = 0;
+        self.buffer_len = read;
+        self.buffer_source_bytes = 0;
+        Ok(&self.buffer[..read])
     }
 
     fn add_candidate_length(&mut self, amount: usize) {
@@ -2506,31 +2636,112 @@ impl<'source, 'payload, 'output, 'snapshot, 'context>
     fn write_consumed_range(&mut self, start: usize, amount: usize) {
         let mut offset = 0usize;
         while offset < amount && self.pending_error.is_none() && self.pending_failure.is_none() {
-            match self
+            if self.check_external_state().is_err() {
+                break;
+            }
+            let result = self
                 .output
-                .write(&self.buffer[start + offset..start + amount])
-            {
-                Ok(0) => self.set_error(io::Error::new(
-                    io::ErrorKind::WriteZero,
-                    "decoded splice sink accepted no progress",
-                )),
-                Ok(written) if written > amount - offset => self.set_error(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "decoded splice sink accepted more bytes than supplied",
-                )),
+                .write(&self.buffer[start + offset..start + amount]);
+            match result {
+                Ok(0) => {
+                    if self.check_source_after_external_error().is_none() {
+                        self.set_error(io::Error::new(
+                            io::ErrorKind::WriteZero,
+                            "decoded splice sink accepted no progress",
+                        ));
+                    }
+                },
+                Ok(written) if written > amount - offset => {
+                    if self.check_source_after_external_error().is_none() {
+                        self.set_error(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "decoded splice sink accepted more bytes than supplied",
+                        ));
+                    }
+                },
                 Ok(written) => {
                     self.output_accepted = self
                         .output_accepted
                         .checked_add(u64::try_from(written).unwrap_or(u64::MAX))
                         .unwrap_or(u64::MAX);
                     offset += written;
+                    if self.check_external_state().is_err() {
+                        break;
+                    }
                 },
-                Err(error) => self.set_error(error),
+                Err(error) => {
+                    // A source mutation during a sink callback is the
+                    // authoritative failure.  Preserve an ordinary sink
+                    // error only when the source remains fresh.
+                    if self.check_source_after_external_error().is_none() {
+                        self.set_error(error);
+                    }
+                },
+            }
+        }
+    }
+
+    /// Flush bytes that the parser has consumed from the current bounded
+    /// adapter window.  The metadata is cleared before invoking callbacks so
+    /// an error path cannot replay a consumed range a second time.
+    fn flush_pending_consumed(&mut self) {
+        if self.pending_len == 0 {
+            return;
+        }
+        let start = self.pending_start;
+        let amount = self.pending_len;
+        let source_amount = self.pending_source_bytes;
+        self.pending_start = 0;
+        self.pending_len = 0;
+        self.pending_source_bytes = 0;
+
+        // The adapter window remains live until this point, so hashing and
+        // accounting can process the exact contiguous consumed range once
+        // instead of once per parser token.  Positions were advanced by
+        // `consume` already because phase transitions depend on them; these
+        // digest/counter updates are deliberately delayed until the same
+        // boundary that authorizes external output.
+        if source_amount != 0 {
+            self.source_hash
+                .update(&self.buffer[start..start + source_amount]);
+        }
+        self.candidate_hash
+            .update(&self.buffer[start..start + amount]);
+        self.add_candidate_length(amount);
+        if source_amount == 0 {
+            if let SplicePayload::Replay { hasher, .. } = &mut self.payload {
+                hasher.update(&self.buffer[start..start + amount]);
+            }
+        }
+
+        // Source freshness and cancellation are checked before invoking the
+        // sink.  Source failure therefore wins a race with cancellation or a
+        // sink failure; Work was charged at each parser fragment above.
+        if self.check_external_state().is_err() {
+            return;
+        }
+        self.write_consumed_range(start, amount);
+
+        // Preserve the historical ordering: the verified source reader is
+        // advanced only after the consumed bytes have been offered to the
+        // sink.  A sink failure still reports its accepted prefix exactly;
+        // the reader is no longer reusable after that failure.
+        if source_amount != 0 {
+            self.source.consume(source_amount);
+            if self.pending_failure.is_none() && self.pending_error.is_none() {
+                let _ = self.check_external_state();
             }
         }
     }
 
     fn finish(mut self) -> Result<(u64, [u8; 32], u64, [u8; 32])> {
+        if self.pending_failure.is_none() && self.pending_error.is_none() && self.pending_len != 0 {
+            // `audit_splice` normally flushes on both success and error. Keep
+            // this invariant local as well for direct reader users: every
+            // parser-consumed prefix is either published once or produces its
+            // typed pending failure before proof finalization.
+            self.flush_pending_consumed();
+        }
         if let Some(error) = self.pending_failure.take() {
             return Err(error);
         }
@@ -2645,13 +2856,12 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
         if self.pending_failure.is_some() || self.pending_error.is_some() {
             return;
         }
+        // Work remains charged at the parser's consumed-fragment boundary so
+        // cancellation and cumulative limits retain their original timing.
+        // Freshness is checked only when this charge fails; successful work
+        // cannot emit anything until the bounded window flush below, where
+        // the source fence is checked around the external sink callback.
         if source_amount == 0 {
-            if let Some(source) = self.source_snapshot {
-                if let Err(error) = source.ensure_current() {
-                    self.set_failure(error);
-                    return;
-                }
-            }
             if let Some(context) = self.context {
                 let work = match u64::try_from(amount) {
                     Ok(work) => work,
@@ -2666,43 +2876,50 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
                     .consume(Resource::Work, work)
                     .map_err(map_execution_error)
                 {
-                    self.set_failure(error);
-                    return;
-                }
-            }
-            if let Some(source) = self.source_snapshot {
-                if let Err(error) = source.ensure_current() {
-                    self.set_failure(error);
+                    // Recheck freshness before retaining the budget or
+                    // cancellation error so a concurrent source mutation
+                    // remains the primary failure.
+                    if self.check_source_after_external_error().is_none() {
+                        // A prior parser-consumed prefix may already be
+                        // pending in this window.  Preserve its ordinary
+                        // limit-failure progress before retaining the Work
+                        // error; cancellation or a source/sink failure found
+                        // while flushing remains authoritative.
+                        self.flush_pending_consumed();
+                        if self.pending_failure.is_none() && self.pending_error.is_none() {
+                            self.set_failure(error);
+                        }
+                    }
                     return;
                 }
             }
         }
-        if source_amount != 0 {
-            self.source_hash
-                .update(&self.buffer[start..start + source_amount]);
+        if self.pending_len == 0 {
+            self.pending_start = start;
+        } else if self.pending_start.saturating_add(self.pending_len) != start {
+            self.set_failure(overlay_unavailable(
+                "decoded splice consumed range is not contiguous",
+            ));
+            return;
         }
-        self.candidate_hash
-            .update(&self.buffer[start..start + amount]);
-        self.add_candidate_length(amount);
-        self.write_consumed_range(start, amount);
         if source_amount != 0 {
-            self.source.consume(source_amount);
             self.source_position = self.source_position.saturating_add(source_amount as u64);
-        } else {
+        }
+        if source_amount == 0 {
             match &mut self.payload {
                 SplicePayload::Fixed { position, .. } => {
                     *position = position.saturating_add(amount);
                 },
-                SplicePayload::Replay {
-                    position, hasher, ..
-                } => {
-                    hasher.update(&self.buffer[start..start + amount]);
+                SplicePayload::Replay { position, .. } => {
                     *position = position.saturating_add(amount as u64);
                 },
             }
         }
+        self.pending_len = self.pending_len.saturating_add(amount);
+        self.pending_source_bytes = self.pending_source_bytes.saturating_add(source_amount);
         self.buffer_start += amount;
         if self.buffer_start == self.buffer_len {
+            self.flush_pending_consumed();
             self.buffer_start = 0;
             self.buffer_len = 0;
             self.buffer_source_bytes = 0;
@@ -2807,5 +3024,643 @@ impl<W: Write> Write for HashingSink<W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::source_backed::SourceLineage;
+    use std::io::{BufRead, Cursor, Read, Write};
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
+        ReadAt, Resource,
+    };
+
+    #[derive(Clone, Default)]
+    struct RecordingSink {
+        bytes: Arc<Mutex<Vec<u8>>>,
+        writes: Arc<Mutex<usize>>,
+    }
+
+    impl Write for RecordingSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .extend_from_slice(bytes);
+            *self
+                .writes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) += 1;
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct PrefixFailSink {
+        bytes: Vec<u8>,
+        remaining: usize,
+    }
+
+    impl PrefixFailSink {
+        fn new(remaining: usize) -> Self {
+            Self {
+                bytes: Vec::new(),
+                remaining,
+            }
+        }
+    }
+
+    impl Write for PrefixFailSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.remaining == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "test sink stopped",
+                ));
+            }
+            let accepted = bytes.len().min(self.remaining);
+            self.bytes.extend_from_slice(&bytes[..accepted]);
+            self.remaining -= accepted;
+            Ok(accepted)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct VersionCounter {
+        revision: AtomicU64,
+        versions: AtomicUsize,
+    }
+
+    impl VersionCounter {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                revision: AtomicU64::new(0),
+                versions: AtomicUsize::new(0),
+            })
+        }
+
+        fn bump(&self) {
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl ReadAt for VersionCounter {
+        fn len(&self) -> io::Result<u64> {
+            Ok(0)
+        }
+
+        fn read_at(&self, _offset: u64, _output: &mut [u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            self.versions.fetch_add(1, Ordering::SeqCst);
+            Ok(SourceVersion::new(
+                0x5350_4c43_455f_5445,
+                self.revision.load(Ordering::SeqCst),
+            ))
+        }
+    }
+
+    fn snapshot_for_versions(source: Arc<VersionCounter>, length: u64) -> SourceSnapshot {
+        SourceSnapshot {
+            source,
+            version: SourceVersion::new(0x5350_4c43_455f_5445, 0),
+            length,
+            monitor_reads: Arc::new(AtomicBool::new(false)),
+            lineage: SourceLineage(Arc::new(())),
+            context: None,
+            input_reservation_failures: None,
+            output_reservation_failures: None,
+        }
+    }
+
+    fn managed_context(work: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let budget = Budget::root(
+            "splice-audit-reader-test",
+            Limits::new(
+                8 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                work,
+            ),
+        );
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("worker limit must be nonzero"),
+            NonZeroUsize::new(1).expect("operation limit must be nonzero"),
+            NonZeroU64::new(8 * 1024 * 1024).expect("memory limit must be nonzero"),
+            0,
+        )
+        .expect("execution limits must be valid");
+        (
+            budget.clone(),
+            cancellation_source,
+            ExecutionContext::new(budget, cancellation, limits),
+        )
+    }
+
+    struct MutatingSink {
+        bytes: Vec<u8>,
+        source: Arc<VersionCounter>,
+    }
+
+    impl Write for MutatingSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.bytes.extend_from_slice(bytes);
+            self.source.bump();
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct MutatingPayloadProvider;
+
+    impl SourcePartSpliceReplay for MutatingPayloadProvider {
+        fn proof(&self) -> SourcePartSpliceReplayProof {
+            SourcePartSpliceReplayProof {
+                encoded_len: 2,
+                encoded_sha256: digest_bytes(b"XY"),
+            }
+        }
+
+        fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+            Ok(Box::new(MutatingPayloadReader { reads: 0 }))
+        }
+    }
+
+    struct MutatingPayloadReader {
+        reads: usize,
+    }
+
+    impl Read for MutatingPayloadReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if output.is_empty() {
+                return Ok(0);
+            }
+            let byte = match self.reads {
+                0 => b'X',
+                1 => b'Z',
+                _ => return Ok(0),
+            };
+            output[0] = byte;
+            self.reads += 1;
+            Ok(1)
+        }
+    }
+
+    #[test]
+    fn consumed_bytes_are_emitted_once_per_adapter_window() {
+        let mut source = Cursor::new(b"abcd".to_vec());
+        let sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let writes = Arc::clone(&sink.writes);
+        let mut sink = sink;
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 4,
+                insertion_offset: 4,
+                adapter_window_bytes: 8,
+            },
+            SplicePayloadRef::Fixed(b"XY"),
+            None,
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("source window must fill"), b"abcd");
+        reader.consume(1);
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+        reader.consume(3);
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"abcd"
+        );
+        assert_eq!(
+            *writes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            1
+        );
+
+        assert_eq!(reader.fill_buf().expect("fragment window must fill"), b"XY");
+        reader.consume(1);
+        assert_eq!(
+            *writes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            1
+        );
+        reader.consume(1);
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"abcdXY"
+        );
+        assert_eq!(
+            *writes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            2
+        );
+    }
+
+    #[test]
+    fn source_mutation_after_batched_sink_write_is_source_first() {
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 4);
+        let mut source = Cursor::new(b"abcd".to_vec());
+        let mut sink = MutatingSink {
+            bytes: Vec::new(),
+            source: Arc::clone(&source_state),
+        };
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 4,
+                insertion_offset: 4,
+                adapter_window_bytes: 4,
+            },
+            SplicePayloadRef::Fixed(b""),
+            Some(&snapshot),
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("source window must fill"), b"abcd");
+        reader.consume(4);
+        assert!(matches!(
+            reader.take_failure(),
+            Some(OpcError::SourceChanged { .. })
+        ));
+        assert_eq!(sink.bytes, b"abcd");
+    }
+
+    #[test]
+    fn replay_digest_catches_payload_mutation_at_window_boundary() {
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 0);
+        let provider = MutatingPayloadProvider;
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let proof = provider.proof();
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 1,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof,
+            },
+            Some(&snapshot),
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(
+            reader.fill_buf().expect("first replay byte must fill"),
+            b"X"
+        );
+        reader.consume(1);
+        assert_eq!(
+            reader.fill_buf().expect("second replay byte must fill"),
+            b"Z"
+        );
+        reader.consume(1);
+        assert!(
+            reader
+                .fill_buf()
+                .expect("authenticated replay EOF must be checked")
+                .is_empty()
+        );
+        let error = reader
+            .finish()
+            .expect_err("mutated replay must fail its digest proof");
+        assert!(matches!(
+            error,
+            OpcError::SourceBackedOverlayUnavailable { .. }
+        ));
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"XZ"
+        );
+    }
+
+    #[test]
+    fn short_sink_preserves_accepted_prefix_across_batched_windows() {
+        let mut sink = PrefixFailSink::new(5);
+        let error = {
+            let mut source = Cursor::new(b"abcd".to_vec());
+            let mut reader = SpliceAuditReader::new(
+                &mut source,
+                &mut sink,
+                SpliceAuditBounds {
+                    source_length: 4,
+                    insertion_offset: 4,
+                    adapter_window_bytes: 4,
+                },
+                SplicePayloadRef::Fixed(b"XY"),
+                None,
+                None,
+            )
+            .expect("bounded reader must initialize");
+
+            let source_len = reader.fill_buf().expect("source window must fill").len();
+            reader.consume(source_len);
+            let fragment_len = reader.fill_buf().expect("fragment window must fill").len();
+            reader.consume(fragment_len);
+            reader
+                .take_error()
+                .expect("short sink must retain its I/O failure")
+        };
+
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(sink.bytes, b"abcdX");
+    }
+
+    #[test]
+    fn work_limit_flushes_prior_consumed_fragment_prefix() {
+        let (budget, _cancellation, context) = managed_context(1);
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 8,
+            },
+            SplicePayloadRef::Fixed(b"XY"),
+            None,
+            Some(&context),
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("fragment window must fill"), b"XY");
+        reader.consume(1);
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+        reader.consume(1);
+        assert!(matches!(
+            reader.take_failure(),
+            Some(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::Work && limit.limit == 1
+        ));
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            b"X"
+        );
+        assert_eq!(budget.used(Resource::Work), 1);
+    }
+
+    #[test]
+    fn cancellation_with_pending_fragment_prefix_stays_typed() {
+        let (_budget, cancellation, context) = managed_context(u64::MAX);
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 8,
+            },
+            SplicePayloadRef::Fixed(b"XY"),
+            None,
+            Some(&context),
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("fragment window must fill"), b"XY");
+        reader.consume(1);
+        cancellation.cancel();
+        reader.consume(1);
+        assert!(matches!(reader.take_failure(), Some(OpcError::Cancelled)));
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn source_version_checks_are_bounded_by_adapter_windows() {
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 128);
+        let source_data = vec![b'a'; 128];
+        let mut source = Cursor::new(source_data.clone());
+        let mut sink = RecordingSink::default();
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: source_data.len() as u64,
+                insertion_offset: source_data.len() as u64,
+                adapter_window_bytes: 16,
+            },
+            SplicePayloadRef::Fixed(b""),
+            Some(&snapshot),
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        loop {
+            let amount = reader.fill_buf().expect("source window must fill").len();
+            if amount == 0 {
+                break;
+            }
+            for _ in 0..amount {
+                reader.consume(1);
+            }
+        }
+        reader.finish().expect("complete source stream must finish");
+        assert!(
+            source_state.versions.load(Ordering::SeqCst) < source_data.len() / 2,
+            "source freshness checks should scale with windows, not parser tokens"
+        );
+    }
+
+    #[test]
+    fn authored_payload_version_checks_are_bounded_and_digests_are_exact() {
+        let source_state = VersionCounter::new();
+        let snapshot = snapshot_for_versions(Arc::clone(&source_state), 0);
+        let payload: Vec<u8> = (0..128).map(|byte| byte as u8).collect();
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 16,
+            },
+            SplicePayloadRef::Fixed(&payload),
+            Some(&snapshot),
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        loop {
+            let amount = reader.fill_buf().expect("authored window must fill").len();
+            if amount == 0 {
+                break;
+            }
+            for _ in 0..amount {
+                reader.consume(1);
+            }
+        }
+        let (source_length, source_digest, candidate_length, candidate_digest) = reader
+            .finish()
+            .expect("complete authored payload must finish");
+        assert_eq!(source_length, 0);
+        assert_eq!(source_digest, digest_bytes(&[]));
+        assert_eq!(candidate_length, payload.len() as u64);
+        assert_eq!(candidate_digest, digest_bytes(&payload));
+        assert_eq!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_slice(),
+            payload.as_slice()
+        );
+        assert!(
+            source_state.versions.load(Ordering::SeqCst) < 64,
+            "authored version checks should scale with windows, not parser tokens"
+        );
+    }
+
+    #[test]
+    fn finish_does_not_flush_after_recorded_failure() {
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = RecordingSink::default();
+        let bytes = Arc::clone(&sink.bytes);
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 8,
+            },
+            SplicePayloadRef::Fixed(b"XY"),
+            None,
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        assert_eq!(reader.fill_buf().expect("fragment window must fill"), b"XY");
+        reader.consume(1);
+        reader.set_failure(OpcError::Cancelled);
+        assert!(matches!(reader.finish(), Err(OpcError::Cancelled)));
+        assert!(
+            bytes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty(),
+            "finish must not invoke the sink after a prior typed failure"
+        );
+    }
+
+    struct OverreportProvider;
+
+    impl SourcePartSpliceReplay for OverreportProvider {
+        fn proof(&self) -> SourcePartSpliceReplayProof {
+            SourcePartSpliceReplayProof {
+                encoded_len: 1,
+                encoded_sha256: [0; 32],
+            }
+        }
+
+        fn open(&self) -> std::result::Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
+            Ok(Box::new(OverreportReader))
+        }
+    }
+
+    struct OverreportReader;
+
+    impl Read for OverreportReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            Ok(output.len().saturating_add(1))
+        }
+    }
+
+    #[test]
+    fn replay_reader_overreport_is_rejected_before_buffer_use() {
+        let provider = OverreportProvider;
+        let mut source = Cursor::new(Vec::<u8>::new());
+        let mut sink = io::sink();
+        let mut reader = SpliceAuditReader::new(
+            &mut source,
+            &mut sink,
+            SpliceAuditBounds {
+                source_length: 0,
+                insertion_offset: 0,
+                adapter_window_bytes: 8,
+            },
+            SplicePayloadRef::Replay {
+                provider: &provider,
+                proof: provider.proof(),
+            },
+            None,
+            None,
+        )
+        .expect("bounded reader must initialize");
+
+        let error = reader
+            .fill_buf()
+            .expect_err("an overreported replay read must fail");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
     }
 }

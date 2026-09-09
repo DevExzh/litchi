@@ -1,0 +1,55 @@
+{
+  "attempt": "after1",
+  "binary": {
+    "bytes": 423341888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0485/after1/allocator/docx_replayable_tail_append",
+    "sha256": "36c7ad69f2895f73852fc223fecf1d452090a69475481aebd5fbbd4a8bfa65da"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "docx_replayable_tail_append",
+    "--features",
+    "allocator-metrics"
+  ],
+  "copied_utc": "2026-09-09T12:13:37.351230+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0485/validation/build-allocator-after1.json",
+    "sha256": "90755b4587418056e715fe40a3d9fe2e9d9567c110b53e320c75e1d7c567cf65"
+  },
+  "original_binary": {
+    "bytes": 423341888,
+    "executable": true,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/docx_replayable_tail_append",
+    "sha256": "36c7ad69f2895f73852fc223fecf1d452090a69475481aebd5fbbd4a8bfa65da"
+  },
+  "role": "allocator",
+  "schema": "docx-replayable-tail-append-build-v1",
+  "source_after": {
+    "files": 7157,
+    "path": "validation-sources/c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe.json",
+    "sha256": "c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe"
+  },
+  "source_before": {
+    "files": 7157,
+    "path": "validation-sources/c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe.json",
+    "sha256": "c4594536bc2b80c6693be6bf5617ed7e699dd117945bc13183338fb0fd437abe"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

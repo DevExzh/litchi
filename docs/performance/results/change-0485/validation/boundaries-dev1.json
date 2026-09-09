@@ -1,0 +1,46 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "artifacts": {
+    "boundaries-dev1.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "boundaries-dev1.stdout": {
+      "bytes": 565,
+      "sha256": "6141948b1724bb5582ee484fa594adea74ba9ce03c955c1d774de43b424c6d56"
+    }
+  },
+  "attempt": "dev1",
+  "common_sha256": "64bd433363b6d3aaefd21b9e1aade9c64dd5eab48cfa4d22cf303a88a165a5a2",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "5a23d8dcb8c4d986df5e63e9639e0b8ae25ecab70fe3652fb37ba84d5058742d",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T11:37:14.477062+00:00",
+  "label": "boundaries-dev1",
+  "schema": "docx-stream-append-gate-v1",
+  "source_after": {
+    "files": 7157,
+    "path": "validation-sources/651c0361bd9ccea29b8ac48d1ea5804a0a3a4ed8a9fc2e63d810a10683f18907.json",
+    "sha256": "651c0361bd9ccea29b8ac48d1ea5804a0a3a4ed8a9fc2e63d810a10683f18907"
+  },
+  "source_before": {
+    "files": 7157,
+    "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+    "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+  },
+  "source_unchanged": false,
+  "started_utc": "2026-09-09T11:33:27.201957+00:00"
+}

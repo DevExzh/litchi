@@ -1,5 +1,28 @@
 # Performance hotspot inventory
 
+## 0485: lower splice overhead with remaining metadata and audit cost
+
+[0485](changes/0485-opc-splice-consumed-window-batching.md) coalesces hashing
+and sink output for already-consumed parser bytes in the private OPC window.
+Authored-heavy file p50 improves by 45.76–46.05%, with effectively unchanged
+operation heap and exact candidate archive bytes. The separate source XML
+audit, replay authentication, per-fragment Work charges, and FileSource
+freshness policy remain intact.
+
+The [profile review](results/change-0485/results-review.md) shows
+authored-heavy file `statx` calls dropping from 3,735,939 to 1,475,055.
+Substantial metadata overhead remains: owned p50 is about 107 ms while file
+p50 remains about 239 ms. Source-heavy file metadata calls increase from
+15,415 to 25,219 even as p50 improves by about 19%; source/replay callback
+fences are a retained tradeoff. Logical I/O and `pread64` counts are unchanged.
+Whole-child instructions drop by 10.57–32.78% in the selected diagnostics.
+
+Further caller-level profiling is needed before reducing remaining freshness
+checks or replay/audit work. The batch also retains a normal p99 regression
+on injected-latency authored-heavy input and nine small-workload RSS increases;
+these open concerns must not be hidden by lower medians. Broader cold-cache,
+concurrency, and native Office validation remain open.
+
 ## 0484: authored replay cost and file-input metadata investigation
 
 [0484](changes/0484-docx-replayable-tail-stream.md) implements a replayable

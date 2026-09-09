@@ -1,0 +1,6 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling litchi-docx-fuzz v0.0.0 (/home/zhuhe/.cache/litchi-goal-0485/fuzz-docx-stream-candidate1)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 42s

@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0485: consumed-window OPC splice comparison
+
+[0485](changes/0485-opc-splice-consumed-window-batching.md) batches bytes
+already consumed by the parser within the existing OPC adapter window.
+The [144-process, 4,320-sample comparison](results/change-0485/results-review.md)
+keeps identical source and candidate archive bytes. At 64 source / 16,384
+authored paragraphs, file-input p50 falls from 443.916 / 440.383 ms to
+239.499 / 238.865 ms (45.76–46.05% lower). At 131,072 source / 64 authored
+paragraphs, owned-input p50 falls from 482.325 / 476.215 ms to
+385.058 / 385.006 ms. Operation heap peaks remain effectively unchanged.
+All 36 normal p50 comparisons improve, but three latency quantiles and nine
+whole-child RSS observations exceed the adverse five-percent threshold.
+These remain explicit tradeoffs in the review, with two-repeat uncertainty
+and host-load limits. Full tables, profiles, tests, fuzz, and custody records
+are retained in the [bundle](results/change-0485/README.md).
+
 ## 0484: replayable DOCX authored stream measurements
 
 [0484](changes/0484-docx-replayable-tail-stream.md) extends logical tail append

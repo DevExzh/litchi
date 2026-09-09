@@ -1,0 +1,7 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.84s
+     Running unittests src/lib.rs (target/debug/deps/litchi_docx-5eaaa5b5f7d240d5)
+error: test failed, to rerun pass `-p litchi-docx --lib`
