@@ -1,0 +1,80 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0061]: this function takes 7 arguments but 6 arguments were supplied
+    --> crates/litchi-opc/src/source_backed/splice.rs:1711:5
+     |
+1711 |     verify_candidate_payload(
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1715 |         SpliceAuditMemoryLimits::unbounded(),
+     |         ------------------------------------ expected `u64`, found `SpliceAuditMemoryLimits`
+1716 |         limits,
+     |         ------ argument #5 of type `u64` is missing
+     |
+note: function defined here
+    --> crates/litchi-opc/src/source_backed/splice.rs:1749:4
+     |
+1749 | fn verify_candidate_payload(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1753 |     max_replay_window_bytes: u64,
+     |     ----------------------------
+1754 |     max_xml_workspace_bytes: u64,
+     |     ----------------------------
+help: provide the argument
+     |
+1711 ~     verify_candidate_payload(
+1712 +         part,
+1713 +         proof,
+1714 +         SplicePayloadRef::Fixed(fragment),
+1715 +         /* u64 */,
+1716 +         /* u64 */,
+1717 +         limits,
+1718 +         audit_xml,
+1719 +     )
+     |
+
+error[E0061]: this function takes 7 arguments but 6 arguments were supplied
+    --> crates/litchi-opc/src/source_backed/splice.rs:1730:5
+     |
+1730 |       verify_candidate_payload(
+     |       ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1740 | /         SpliceAuditMemoryLimits {
+1741 | |             authored_replay_window_bytes: max_replay_window_bytes,
+1742 | |             xml_workspace_bytes: max_xml_workspace_bytes,
+1743 | |         },
+     | |_________- expected `u64`, found `SpliceAuditMemoryLimits`
+1744 |           limits,
+     |           ------ argument #5 of type `u64` is missing
+     |
+note: function defined here
+    --> crates/litchi-opc/src/source_backed/splice.rs:1749:4
+     |
+1749 | fn verify_candidate_payload(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1753 |     max_replay_window_bytes: u64,
+     |     ----------------------------
+1754 |     max_xml_workspace_bytes: u64,
+     |     ----------------------------
+help: provide the argument
+     |
+1730 ~     verify_candidate_payload(
+1731 +         part,
+1732 +         proof,
+1733 +         SplicePayloadRef::Replay {
+1734 +             provider: replay,
+1735 +             proof: SourcePartSpliceReplayProof {
+1736 +                 encoded_len: proof.fragment_len,
+1737 +                 encoded_sha256: proof.fragment_sha256,
+1738 +             },
+1739 +         },
+1740 +         /* u64 */,
+1741 +         /* u64 */,
+1742 +         limits,
+1743 +         audit_xml,
+1744 +     )
+     |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `litchi-opc` (lib) due to 2 previous errors

@@ -1,0 +1,88 @@
+
+running 13 tests
+test restore_rejects_finite_output_cap_before_output ... ok
+test restore_observes_original_context_cancellation_after_an_exact_short_prefix ... ok
+test restore_reports_exact_prefix_for_short_sink ... ok
+test managed_restore_charges_shared_output_once_and_releases_memory_lease ... ok
+test restore_rejects_wrong_hashes_and_lengths_before_output ... ok
+test restore_uses_current_context_for_all_io_work_and_output ... ok
+test restore_rehashes_original_after_output_started_when_version_is_stable ... ok
+test restore_succeeds_with_independently_reopened_artifacts ... ok
+test restore_detects_both_artifact_versions_during_authentication ... ok
+test managed_restore_releases_workspace_on_memory_hash_and_sink_failures ... ok
+test restore_detects_both_artifact_versions_from_write_and_flush_callbacks ... ok
+test restore_rejects_truncated_and_overreported_providers_before_output ... ok
+test restore_observes_cancellation_before_output_and_from_sink_callbacks ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 29 tests
+test central_record_oracle_detects_metadata_changes_outside_local_record ... ok
+test candidate_limit_is_refused_without_output ... ok
+test authored_fragment_refusals_release_memory_and_preserve_typed_limits ... ok
+test exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit ... ok
+test raw_record_oracle_includes_descriptor_mode_compressed_payload ... ok
+test authored_fragment_zero_fill_checks_cancellation_between_work_chunks ... ok
+test interrupted_splice_source_observes_cancellation_before_retry ... ok
+test authored_fragment_cannot_transfer_a_foreign_package_budget ... ok
+test source_version_mutation_is_refused_before_output ... ok
+test mismatched_proof_fields_are_refused_before_publication ... ok
+test cancellation_is_observed_before_plan_and_write ... ok
+test signed_non_noop_refuses_before_output ... ok
+test exact_noop_copies_malformed_and_signed_source_byte_for_byte ... ok
+test malformed_source_or_candidate_is_rejected_before_output ... ok
+test source_mutation_after_the_first_sink_write_wins_over_publication ... ok
+test splice_memory_quotas_are_typed_and_release_after_success_or_failure ... ok
+test interrupted_splice_source_retries_without_double_charging_input ... ok
+test publication_inverse_shared_context_charges_retained_archive_once ... ok
+test publication_inverse_uses_current_candidate_output_budget ... ok
+test accounting_reports_two_fresh_decoded_reader_passes ... ok
+test binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs ... ok
+test partial_and_flush_sink_failures_preserve_typed_progress ... ok
+test authored_fragment_transfers_one_reservation_and_publishes_reversibly ... ok
+test store_and_deflate_splices_preserve_opaque_members_without_caching_target ... ok
+test publication_inverse_requires_the_authenticated_candidate_artifact ... ok
+test publication_inverse_rechecks_candidate_freshness_during_write_and_flush ... ok
+test publication_inverse_observes_candidate_cancellation_during_write_and_flush ... ok
+test large_binary_fragment_refuses_scoped_work_before_preparation_succeeds ... ok
+test large_binary_fragment_observes_managed_cancellation_between_work_chunks ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+
+running 19 tests
+test replay_zero_window_limit_is_rejected_before_retaining_the_plan ... ok
+test replay_reader_cancellation_is_reported_as_typed_cancelled ... ok
+test replay_expected_artifact_noop_releases_preview_memory_and_charges_once ... FAILED
+test replay_provider_change_on_measurement_stops_before_sink_output ... ok
+test replay_source_change_after_sink_progress_is_incomplete ... ok
+test mutable_replay_proof_cannot_expand_a_bounded_candidate_reader ... ok
+test replay_provider_open_and_mid_read_errors_are_typed ... ok
+test replay_short_sink_reports_exact_partial_output ... ok
+test replay_opens_fresh_readers_for_candidate_measurement_and_emission ... ok
+test replay_rejects_truncated_extra_and_hash_changed_readers_before_output ... ok
+test replay_expected_artifact_preview_failure_keeps_caller_sink_empty ... ok
+test concurrent_replay_publications_charge_one_window_per_live_reader ... ok
+test replay_expected_artifact_change_during_measurement_writes_zero_bytes ... ok
+test replay_expected_artifact_change_during_emission_is_incomplete ... ok
+test replay_store_and_deflate_preserve_opaque_members_and_target_bytes ... ok
+test replay_512_byte_window_handles_multi_window_source_and_payload ... ok
+test replay_expected_artifact_charges_one_managed_output_artifact ... ok
+test replay_expected_artifact_accepts_exact_store_and_deflate_output ... ok
+test replay_expected_artifact_mismatch_writes_zero_bytes ... ok
+
+failures:
+
+---- replay_expected_artifact_noop_releases_preview_memory_and_charges_once stdout ----
+
+thread 'replay_expected_artifact_noop_releases_preview_memory_and_charges_once' (4015949) panicked at crates/litchi-opc/tests/source_part_splice_replay.rs:953:5:
+each managed no-op pass must own its bounded 64 KiB copy workspace
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    replay_expected_artifact_noop_releases_preview_memory_and_charges_once
+
+test result: FAILED. 18 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

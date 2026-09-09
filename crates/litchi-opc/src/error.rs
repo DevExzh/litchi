@@ -201,6 +201,19 @@ pub enum OpcError {
     #[error("signed OPC source requires an explicit signature edit policy")]
     SignedSourceRequiresExplicitPolicy,
 
+    /// An explicitly supplied source artifact did not match its authenticated
+    /// length or digest proof.  Keeping the artifact role and field typed lets
+    /// durable inverse callers distinguish current-candidate and original
+    /// provider mismatches without exposing provider implementation details.
+    #[error("source artifact {artifact} does not match its {field} proof")]
+    SourceArtifactMismatch {
+        /// Artifact role being authenticated, such as `current` or
+        /// `original`.
+        artifact: &'static str,
+        /// Authenticated field that differed.
+        field: &'static str,
+    },
+
     /// An owned source package cannot preserve its physical ZIP layout after
     /// an exact-source authorization was revoked. Falling back to the normal
     /// writer would silently discard opaque source members or framing bytes.
@@ -287,6 +300,13 @@ pub enum SpliceResource {
     PreservationMemoryBytes,
     /// Replay payload windows and compressor state.
     ReplayMemoryBytes,
+    /// The bounded adapter window used to replay caller-authored bytes.
+    ///
+    /// This is separate from [`Self::ReplayMemoryBytes`], which remains the
+    /// ZIP replay/compressor workspace.  A caller-owned replay store may have
+    /// additional storage that is transferred through its replay handle; it
+    /// is not charged once per reader.
+    AuthoredReplayMemoryBytes,
 }
 
 impl std::fmt::Display for SpliceResource {
@@ -296,6 +316,7 @@ impl std::fmt::Display for SpliceResource {
             Self::XmlWorkspaceBytes => "XML splice workspace bytes",
             Self::PreservationMemoryBytes => "preservation splice workspace bytes",
             Self::ReplayMemoryBytes => "replay splice workspace bytes",
+            Self::AuthoredReplayMemoryBytes => "authored replay window bytes",
         })
     }
 }
@@ -422,7 +443,8 @@ impl From<OpcError> for litchi_core::Error {
             OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
             error @ (OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::PreservationUnavailable { .. }
-            | OpcError::SignedSourceRequiresExplicitPolicy) => {
+            | OpcError::SignedSourceRequiresExplicitPolicy
+            | OpcError::SourceArtifactMismatch { .. }) => {
                 litchi_core::Error::Unsupported(error.to_string())
             },
             OpcError::InvalidReadLimit { .. }
@@ -472,7 +494,8 @@ impl From<OpcError> for litchi_core::Error {
                     SpliceResource::OutputBytes => litchi_core::Resource::OutputBytes,
                     SpliceResource::XmlWorkspaceBytes
                     | SpliceResource::PreservationMemoryBytes
-                    | SpliceResource::ReplayMemoryBytes => litchi_core::Resource::Memory,
+                    | SpliceResource::ReplayMemoryBytes
+                    | SpliceResource::AuthoredReplayMemoryBytes => litchi_core::Resource::Memory,
                 },
                 observed: actual,
                 limit: maximum,

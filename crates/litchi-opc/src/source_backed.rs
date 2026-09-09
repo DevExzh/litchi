@@ -42,10 +42,13 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
+mod artifact_restore;
+pub use artifact_restore::SourceArtifactRestoreProof;
 mod splice;
 pub use splice::{
     SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
-    SourcePartSplicePublication,
+    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
+    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
 };
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
@@ -2721,12 +2724,46 @@ impl SourceArtifactFingerprint {
     pub const fn from_sha256(digest: [u8; 32]) -> Self {
         Self(digest)
     }
+
+    /// Borrow the digest bytes without exposing the source-artifact owner.
+    #[must_use]
+    pub const fn as_sha256(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Return the digest bytes by value.
+    #[must_use]
+    pub const fn into_sha256(self) -> [u8; 32] {
+        self.0
+    }
 }
 
 impl SourceArtifact {
+    /// Return the exact byte length captured by this artifact handle.
+    #[must_use]
+    pub const fn len(&self) -> u64 {
+        self.snapshot.length
+    }
+
+    /// Return whether this artifact has no bytes.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.snapshot.length == 0
+    }
+
     /// Hash the exact current artifact without materializing it.
     pub fn fingerprint(&self) -> Result<SourceArtifactFingerprint> {
         self.snapshot.ensure_current()?;
+        let _workspace_reservation = self
+            .snapshot
+            .context
+            .as_ref()
+            .map(|context| {
+                context
+                    .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                    .map_err(map_execution_error)
+            })
+            .transpose()?;
         let mut hasher = Sha256::new();
         let mut buffer = Vec::new();
         buffer
@@ -2735,6 +2772,11 @@ impl SourceArtifact {
                 resource: "source artifact fingerprint buffer",
                 source,
             })?;
+        if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
+            return Err(overlay_unavailable(
+                "source artifact fingerprint allocation reported capacity beyond its reservation",
+            ));
+        }
         buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
         let mut offset = 0_u64;
         while offset < self.snapshot.length {
@@ -2747,7 +2789,8 @@ impl SourceArtifact {
                 offset,
                 &mut buffer[..remaining],
                 "fingerprinting",
-            )?;
+            )
+            .map_err(map_source_backed_error)?;
             if read == 0 {
                 return Err(OpcError::IoError(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
@@ -2755,6 +2798,11 @@ impl SourceArtifact {
                 )));
             }
             self.snapshot.ensure_current()?;
+            if let Some(context) = self.snapshot.context.as_ref() {
+                context
+                    .consume(Resource::Work, read as u64)
+                    .map_err(map_execution_error)?;
+            }
             hasher.update(&buffer[..read]);
             offset = offset
                 .checked_add(read as u64)
@@ -10718,6 +10766,13 @@ fn write_exact_snapshot<W: Write>(
     }
     source.monitor_publication();
     source.ensure_current()?;
+    let _workspace_reservation = context
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
     let mut buffer = Vec::new();
     buffer
         .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
@@ -10725,6 +10780,11 @@ fn write_exact_snapshot<W: Write>(
             resource: "source-backed OPC publication buffer",
             source,
         })?;
+    if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
+        return Err(overlay_unavailable(
+            "exact publication allocation exceeds its reserved window",
+        ));
+    }
     buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
     let mut written = 0_u64;
     let result = if let Some(context) = context {
@@ -10831,6 +10891,13 @@ fn write_exact_snapshot_with_accounting<W: Write>(
     }
     source.monitor_publication();
     source.ensure_current()?;
+    let _workspace_reservation = context
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
     let mut buffer = Vec::new();
     buffer
         .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
@@ -10838,6 +10905,11 @@ fn write_exact_snapshot_with_accounting<W: Write>(
             resource: "source-backed OPC publication buffer",
             source,
         })?;
+    if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
+        return Err(overlay_unavailable(
+            "exact publication allocation exceeds its reserved window",
+        ));
+    }
     buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
     let mut written = 0_u64;
     let mut accounting_error = None;
@@ -11713,7 +11785,8 @@ mod tests {
     fn managed_context_with_output(
         output_bytes: u64,
     ) -> (Budget, CancellationSource, ExecutionContext) {
-        managed_context_with_all_resources(4096, u64::MAX, output_bytes, u64::MAX, u64::MAX)
+        let memory = SOURCE_PUBLICATION_CHUNK_BYTES as u64 + 4096;
+        managed_context_with_all_resources(memory, u64::MAX, output_bytes, u64::MAX, u64::MAX)
     }
 
     fn managed_context(memory: u64) -> (Budget, ExecutionContext) {
@@ -17665,6 +17738,45 @@ mod tests {
     }
 
     #[test]
+    fn managed_exact_publication_refuses_memory_window_before_output_and_releases() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+
+        for with_accounting in [false, true] {
+            let (budget, _cancellation_source, context) = managed_context_with_all_resources(
+                SOURCE_PUBLICATION_CHUNK_BYTES as u64 - 1,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            );
+            let package = SourceBackedPackage::from_read_at_with_execution_context(
+                Arc::new(CountingSource::new(source_bytes.clone())),
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap();
+            let artifact = package.source_artifact();
+            let mut output = Vec::new();
+            let error = if with_accounting {
+                let mut accounting = OpcOperationAccounting::default();
+                artifact
+                    .write_to_stream_with_accounting(&mut output, &mut accounting)
+                    .unwrap_err()
+            } else {
+                artifact.write_to_stream(&mut output).unwrap_err()
+            };
+
+            assert!(matches!(
+                error,
+                OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                    if limit.resource == Resource::Memory
+            ));
+            assert!(output.is_empty());
+            assert_eq!(budget.used(Resource::Memory), 0);
+        }
+    }
+
+    #[test]
     fn managed_large_exact_publication_refuses_mid_stream_with_exact_partial_charge() {
         let source_bytes = large_archive_bytes(root_relationships(), b"<before/>", 150_000);
         assert!(source_bytes.len() > SOURCE_PUBLICATION_CHUNK_BYTES * 2);
@@ -17704,19 +17816,34 @@ mod tests {
     fn managed_output_charge_reaches_hierarchical_parent_and_child_budgets() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let output_bytes = source_bytes.len() as u64;
+        let publication_memory = SOURCE_PUBLICATION_CHUNK_BYTES as u64 + 4096;
         let root = Budget::root(
             "opc-source-output-root",
-            Limits::new(4096, u64::MAX, output_bytes, u64::MAX, u64::MAX, u64::MAX),
+            Limits::new(
+                publication_memory,
+                u64::MAX,
+                output_bytes,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
         );
         let child = root.child(
             "opc-source-output-child",
-            Limits::new(4096, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+            Limits::new(
+                publication_memory,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
         );
         let (cancellation_source, cancellation) = CancellationSource::pair();
         let execution_limits = ExecutionLimits::new(
             NonZeroUsize::new(1).unwrap(),
             NonZeroUsize::new(1).unwrap(),
-            NonZeroU64::new(4096).unwrap(),
+            NonZeroU64::new(publication_memory).unwrap(),
             0,
         )
         .unwrap();
@@ -17996,7 +18123,14 @@ mod tests {
 
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let target = PackURI::new("/word/document.xml").unwrap();
-        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let tight_memory = SOURCE_PUBLICATION_CHUNK_BYTES as u64 + b"<before/>".len() as u64;
+        let (budget, _cancellation_source, context) = managed_context_with_all_resources(
+            tight_memory,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        );
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::new(CountingSource::new(source_bytes.clone())),
@@ -18016,7 +18150,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(sink.bytes, source_bytes);
-        assert_eq!(sink.first_memory, Some(0));
+        assert_eq!(
+            sink.first_memory,
+            Some(SOURCE_PUBLICATION_CHUNK_BYTES as u64),
+            "comparison payload reservation must be released before exact publication"
+        );
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 

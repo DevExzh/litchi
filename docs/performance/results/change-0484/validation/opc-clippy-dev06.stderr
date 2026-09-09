@@ -1,0 +1,35 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: function `splice_parser_workspace_requirement` is never used
+    --> crates/litchi-opc/src/source_backed/splice.rs:1557:4
+     |
+1557 | fn splice_parser_workspace_requirement(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `-D dead-code` implied by `-D unused`
+     = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: this function has too many arguments (13/12)
+    --> crates/litchi-opc/src/source_backed/splice.rs:1872:1
+     |
+1872 | / fn audit_splice(
+1873 | |     reader: &mut dyn BufRead,
+1874 | |     output: &mut dyn Write,
+1875 | |     proof: SourcePartSpliceProof,
+...    |
+1885 | |     context: Option<&ExecutionContext>,
+1886 | | ) -> Result<(u64, [u8; 32], u64, [u8; 32])> {
+     | |___________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `-D clippy::too-many-arguments` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::too_many_arguments)]`
+
+error: could not compile `litchi-opc` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib test) due to 2 previous errors

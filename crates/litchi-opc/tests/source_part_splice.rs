@@ -618,6 +618,7 @@ fn store_and_deflate_splices_preserve_opaque_members_without_caching_target() {
 
         assert_eq!(target_bytes(&output), expected);
         assert!(!publication.is_noop());
+        assert_eq!(publication.candidate_artifact_len(), output.len() as u64);
         assert_eq!(package.cache_diagnostics().cold_loads, 0);
         assert_eq!(
             local_record(&source_archive, SCRATCH_MEMBER),
@@ -720,6 +721,7 @@ fn exact_noop_copies_malformed_and_signed_source_byte_for_byte() {
             .expect("exact no-op must bypass XML and signature policy");
         assert!(publication.is_noop());
         assert_eq!(output, source_archive);
+        assert_eq!(publication.candidate_artifact_len(), output.len() as u64);
     }
 }
 
@@ -1176,7 +1178,10 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
         .expect_err("a different candidate must not authorize inverse");
     assert!(matches!(
         error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
+        OpcError::SourceArtifactMismatch {
+            artifact: "current",
+            field: "length",
+        }
     ));
     assert!(rejected.is_empty());
 }
