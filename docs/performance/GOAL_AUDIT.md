@@ -1,5 +1,38 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0485: bounded consumed-window batching; full goal remains open
+
+[0485](changes/0485-opc-splice-consumed-window-batching.md) applies a private
+OPC adapter optimization to the replayable DOCX logical-append route. It
+batches hashing and sink output for bytes already consumed inside the existing
+bounded window while retaining the separate source XML audit, replay
+authentication, source freshness policy, per-fragment Work charges, and
+source-bound preservation checks.
+
+The matched evidence contains 144 formal processes and 4,320 samples. At 64
+existing and 16,384 authored paragraphs, file-input p50 falls from
+443.916/440.383 ms to 239.499/238.865 ms across the two repeats. At 131,072
+existing and 64 authored paragraphs, owned-input p50 falls from
+482.325/476.215 ms to 385.058/385.006 ms. Operation heap peaks are effectively
+unchanged. Three latency quantiles and nine small-workload whole-child RSS
+observations exceed the five-percent review threshold and remain part of the
+accepted scope.
+
+The profile bundle records authored-heavy file `statx` falling from 3,735,939
+to 1,475,055 while `pread64` remains 114, and source-heavy file `statx` rising
+from 15,415 to 25,219 while `pread64` remains 264. These are one-sample,
+one-warmup whole-child diagnostics that include setup and oracle work. They
+justify caller-level attribution before any further change; they do not justify
+relaxing freshness checks or deleting the independent source proof.
+
+The route passes its scoped all-feature/no-default tests, formatting, warning-
+denied Clippy and rustdoc, boundary, helper, benchmark, and sanitizer gates.
+It does not close cold-cache, concurrent, atomic-save, all provider/input
+intersections, or broad native Office validation. It also does not add a
+representative CRUD selector. The machine-readable index therefore remains 15
+categories and 34 rows: 11 measured, 22 correctness-only, and one explicitly
+unsupported dynamic-content row (33 selector-backed mappings).
+
 ## 0482: shared primitives complete; end-to-end append remains open
 
 [0482](changes/0482-bounded-xml-opc-splice.md) implements bounded XML auditing and decoded OPC insertion publication.
@@ -1272,20 +1305,22 @@ ADRs 0010/0011.
 
 | Goal requirement | Evidence at audit time | Assessment |
 | --- | --- | --- |
-| Reproducible CRUD baseline | The coverage index maps 15 categories and 30 representative selectors. Change 0411 now retains an independently verified six-selector opt-in XLS/CFB descriptive baseline, while measured rows still require a validated `target/perf/container-baseline.json`; the index itself is only an identity/contract artifact. | Partial. The full required scenario matrix and metric set are not evidenced. |
+| Reproducible CRUD baseline | The current coverage index maps 15 categories and 34 representative rows: 11 measured, 22 correctness-only, and one unsupported dynamic-content row (33 selector-backed mappings). Its measured rows still require a validated `target/perf/container-baseline.json`; the index itself is only an identity/contract artifact. The 0485 DOCX route is supplementary evidence without a registered selector. | Partial. The full required scenario matrix and metric set are not evidenced. |
 | Scoped claims | The earlier strict checker validated 6 claims; 0410 adds a seventh strict-registry entry, and the current strict checker passes all 7 claims. The report classifier snapshot has 167 rows: 0 `strict_claim`, 145 historical, 14 descriptive, and 8 withheld. | Claims are deliberately scoped; the current check and snapshot counts do not establish program completion. |
-| Correctness and boundaries | 0409 checks report 862 Python tests run with 20 skips and no failures, 258 release harness tests passing with one ignored, and a passing crate-boundary check. The final all-feature three-crate run passes 1,918 tests; 0411 adds 1,238 passing all-feature XLSX tests and 9 passing harness/allocator tests under four threads. Current rustdoc, crate-boundary, and scoped-format checks pass. The existing graph has 64 packages, 240 internal declarations, and 14 iWork debts. | Useful gates, but they do not establish latency, memory, I/O, or full CRUD coverage. |
-| OPC/ZIP/ODF correctness | The earlier integrated run recorded 362 ZIP, 316 OPC and 287 ODF library tests (1,227 total passed, two ignored). The final all-feature three-crate run now passes 1,918 tests, including the ZIP64 and row-visibility coverage. | Strong package/format correctness evidence for exercised fixtures; not a complete workspace performance or native-producer gate. |
-| Full gate health | The prior ODF MIME/unsafe-text false positive and late ZIP64 topology assertion were repaired. OPC/common warning-denied Clippy passes after two preexisting test-lint fixes, and 0411's all-feature/all-target XLSX Clippy now passes. | These scoped gates are green; they do not establish the full performance or CRUD goal. |
-| Hardware/resource profiling | `perf stat` counters, 32 affinity CPUs, 128 GiB RAM, Heaptrack, strace, fincore, and cargo-flamegraph are available. | 0406 retains a pinned release OPC materialization baseline, perf counters and self/inclusive reports, Heaptrack, RSS, syscall traces, and a CPU flamegraph. 0408 adds reusable expectations, operation-local allocations and decoded-byte counters, and usable frame-pointer caller attribution. 0409 extends this to XLSX selected-cell and matched edit/save, corrects member-range attribution, and validates native L2 events. 0410 measures the selected MCE ownership candidate and reports residual `clone_bounded_name_part` leaf weight of 10.91% and `parse_element` at 5.89% self / 23.42% inclusive; these are not paired CPU deltas. Generic L1 zeroes are unusable and exact LLC events are unavailable in the guest. The wider matrix remains open. |
+| Correctness and boundaries | The 0485 scoped bundle records 1,989 all-feature OPC/DOCX tests, 1,948 no-default-feature tests, warning-denied formatting/lint/documentation gates, a 64-package/239-dependency boundary check, nine helper tests, five replay benchmark tests, and sanitizer smoke campaigns. | Useful scoped gates, but they do not establish latency, memory, I/O, or full CRUD coverage for the workspace. |
+| OPC/ZIP/ODF correctness | The 0485 route preserves candidate archive bytes, semantic output, untouched members, source identities, and reopen/patch oracles while retaining the independent source proof. | Strong correctness evidence for the exercised DOCX/OPC route; not a complete workspace performance or native-producer gate. |
+| Full gate health | The 0485 all-feature/no-default, formatting, warning-denied Clippy/rustdoc, boundary, helper, benchmark, and sanitizer lanes pass under the retained source/build identities. | These scoped gates are green; they do not establish the full performance or CRUD goal. |
+| Hardware/resource profiling | `perf stat` counters, CPU pinning, strace, RSS, allocator instrumentation, and profiling helpers remain available. | 0485 retains 12 whole-child diagnostic profiles. Authored-heavy file `statx` falls 3,735,939→1,475,055; source-heavy file `statx` rises 15,415→25,219; `pread64` remains 114/264. One sample/one warmup and setup/oracle inclusion limit this to caller-level attribution. Cold/warm, lock-wait, and Amdahl scaling evidence remain open. |
 
-The passing library suites establish behavior for the exercised fixtures. They
-do not establish the `docs/GOAL.md` requirements for p50/p95/p99, throughput,
-allocations, peak RSS, copied/decompressed/recompressed bytes, physical I/O,
-lock wait, cold/warm behavior, or Amdahl scaling. The [0404 correctness evidence](results/change-0404/validation.json) retains
-commands, source hashes, and compressed logs, including the explicit ODF lint
-failure. ZIP/OPC warning-denied Clippy and warning-denied documentation builds
-for all three crates pass.
+The passing 0485 lanes establish behavior for the exercised DOCX/OPC fixtures.
+They do not establish the `docs/GOAL.md` requirements for complete p50/p95/p99
+coverage, throughput, allocations, peak RSS, copied/decompressed/recompressed
+bytes, physical I/O, lock wait, cold/warm behavior, or Amdahl scaling. The
+0485 profile includes setup and oracle work and has only one sample and one
+warmup per child, so its metadata counts remain diagnostic. The bundle's
+adverse latency and RSS rows, source-heavy metadata increase, and unmeasured
+provider/native intersections remain explicit rather than being absorbed into
+a completion claim.
 
 ## ZIP64 passthrough audit
 
@@ -1363,9 +1398,9 @@ a normalizing fallback for a different unsupported source.
 | Priority | Requirement from `docs/GOAL.md` | Next reviewable evidence |
 | --- | --- | --- |
 | P0 | Close the ZIP64 integration and preservation contract | 0414 adds offset/count promotion and repeated OPC publication beyond the count sentinel. 0415 adds streaming Deflate framing and independent large Python OPC coverage. The 0416 batch adds local-only forced-ZIP64 reader/source-backed compatibility fixtures and focused refusal cases. Semantic bounded-memory creation/append, native producers, ODF local-sentinel catalog classification, and the broader failure-atomicity matrix remain open. |
-| P0 | Establish the Phase-1 baseline before selecting further optimizations | 0411 supplies a clean, descriptive six-selector XLS/CFB warm baseline with normal and allocator observations. Continue the full non-iWork capture with p50/p95/p99, throughput, `perf stat` counters, allocation/peak RSS, source calls/bytes/ranges, decompressed/recompressed/copied bytes, output bytes, lock-wait fields, and cold/warm plus explicit bounded-worker cases. |
+| P0 | Establish the Phase-1 baseline before selecting further optimizations | 0485 supplies a matched DOCX/OPC route comparison with p50/p95/p99, allocator peaks, whole-child RSS, source counters, `perf stat` diagnostics, and syscall profiles. Continue the full non-iWork capture with throughput, copied/decompressed/recompressed bytes, output bytes, lock-wait fields, cold/warm behavior, provider intersections, and explicit bounded-worker cases. |
 | P0 | Turn cache correctness into accepted observation | 0405 now retains validated direct-lock acquisition observations, cache counters, and explicit timing scope in 24 normal and 24 observed smoke rows. The release harness passes 256 tests with one ignored. Extend this descriptive evidence to representative workloads with operation-local attribution. Keep cache observations separate from latency claims until an accepted ABBA protocol exists. |
-| P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. 0410 measures the expanded-name ownership candidate, with residual selected-path attribution but no paired CPU delta. 0411 adds the six-selector XLS/CFB lifecycle and allocation baseline, still without a speedup claim. 0412 isolates diagnostic ReadAt observer cost with plain-source selectors; 0413 retains a scoped CFB reservation optimization with paired CPU/PMU evidence and a reviewed CFB guard cost. Remaining CFB FAT/stream/physical validation costs need attribution before further production changes. The broader semantic CRUD, cold-source, and resource matrix remains open. |
+| P0 | Capture current hardware/resource evidence | 0485 binds machine, corpus, source/build identities, raw samples, allocator observations, RSS, syscall evidence, and profiling limitations. Its caller-level profile leaves 1,475,055 authored-heavy file `statx` calls and records a source-heavy increase to 25,219; further attribution must precede any freshness-policy or replay/audit change. Remaining CFB FAT/stream/physical costs, cold-source behavior, lock wait, and the broader resource matrix remain open. |
 | P1 | Finish source-backed OPC CRUD adoption | Extend selective open/read/edit/save across format facades and topology changes; measure the selected-Part/compressor buffer, physical I/O, allocation/RSS, and semantic phase boundaries. The current report calls this migration incomplete. |
 | P1 | Cover the high-impact CRUD categories | Add or explicitly classify conversion, stream append, structural edits, deletion/sanitization, cross-document dependency copy, merge/split, patch and inverse timing, repair/normalize, dynamic calculation, security, malformed, and real-producer scenarios. Correctness-only selectors cannot close the timing requirement. |
 | P1 | Finish CFB consumer evidence | Move exact-range and overlay substrate work into DOC/XLS/PPT semantic owners; add physical-cold and high-latency range-source cases, FAT-tail behavior, and operation-local memory/resource attribution. |
@@ -1374,5 +1409,6 @@ a normalizing fallback for a different unsupported source.
 | P2 | Consider layout and SIMD changes | Only after the release profiles identify a hot loop and show a material benefit with scalar fallback and differential correctness tests. |
 
 No row in this audit should be read as a completion claim. The current
-evidence supports targeted capability progress and an integrated ZIP64 change
-with retained validation; it does not close the full non-iWork performance goal.
+evidence supports targeted capability progress, including the scoped 0485 DOCX
+splice comparison and retained ZIP64 validation; it does not close the full
+non-iWork performance goal.

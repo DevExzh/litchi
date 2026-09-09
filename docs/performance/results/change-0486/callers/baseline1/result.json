@@ -1,0 +1,37 @@
+{
+  "records": [
+    {
+      "label": "owned-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 7215,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/owned-s131072-a64-short-c64/receipt.json",
+        "sha256": "cba0def3458340e17f23ac1ae103431e08648d26ee048b796f420796d2f1cd9a"
+      }
+    },
+    {
+      "label": "file-s131072-a64-short-c64",
+      "receipt": {
+        "bytes": 7794,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/file-s131072-a64-short-c64/receipt.json",
+        "sha256": "0d1232cfaa90926ae095fee9f2e3f11bd66c0c40d27fdd7a5b4d5c4de5d33d01"
+      }
+    },
+    {
+      "label": "owned-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 7203,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/owned-s64-a16384-short-c64/receipt.json",
+        "sha256": "ea74049c2de7dabba3963ca3cc6b8ecfbedb21bd351bafca84acc93d2bcb76e9"
+      }
+    },
+    {
+      "label": "file-s64-a16384-short-c64",
+      "receipt": {
+        "bytes": 7776,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0486/callers/baseline1/file-s64-a16384-short-c64/receipt.json",
+        "sha256": "522906deb167931d20652c9fcb0bc3edb6a2f0cb1316fbea26dbdd95ffd5ca1e"
+      }
+    }
+  ],
+  "status": "pass"
+}

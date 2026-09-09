@@ -1,0 +1,3 @@
+usage: record_environment.py [-h] --scratch-dir SCRATCH_DIR --output OUTPUT
+                             [--cpu CPU]
+record_environment.py: error: the following arguments are required: --output
