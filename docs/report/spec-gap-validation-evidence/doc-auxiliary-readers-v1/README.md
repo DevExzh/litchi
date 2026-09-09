@@ -1,0 +1,11 @@
+# DOC auxiliary metadata readers
+
+This batch adds bounded, inert readers for paragraph-group properties (`PGPArray`), frame/list records (`RgDofr`), and printer metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`). `Document::paragraph_groups()`, `dofr_records()` and `print_environment()` expose them through deferred getters. Parsing never applies layout, opens frame files, contacts printers or executes list styles.
+
+Document admission retains only the selected raw FIB ranges, not the complete table stream. Missing ranges retain no bytes. Invalid, oversized or unallocatable ranges retain deferred diagnostics so malformed optional metadata does not prevent ordinary document access. Semantic getters cache both successful values and errors. Raw-source limits are 16 MiB for PGP, 16 MiB/65,536 records for DOFR, and 1 MiB for each printer range; these are source limits, not a peak-memory measurement.
+
+PGP validates identifiers, uniqueness, parent closure and cycles, typed options and bounded variable fields while retaining exact source and opaque bytes. DOFR checks record framing, enum domains, string terminators, frame associations and push/pop balance. Push markers accept the preceding frame's name/path records. Unknown DOFR record types are retained under the reader's preservation policy; fields the specification says to ignore remain uninterpreted. Printer strings are slices of one retained source buffer, with all four terminators validated before copying.
+
+The isolated Rust 1.95.0 gate passed 1,192 unit/integration tests and fourteen doctests, with two existing integration and twelve doctest ignores. Strict all-target/all-feature Clippy, formatting and whitespace checks passed. Independent review cleared the final reader source. Regressions cover deferred malformed/oversized ranges, repeated cached diagnostics, absent metadata, a two-byte PGP range in a table padded by 1 MiB, source preservation and DOFR association boundaries.
+
+The receipt hashes twelve source/documentation paths and compressed logs. Coverage is synthetic and does not establish native producer changed-save compatibility or measured performance. This batch provides readers; DOFR transaction publication and broader paragraph/print authoring remain separate work.
