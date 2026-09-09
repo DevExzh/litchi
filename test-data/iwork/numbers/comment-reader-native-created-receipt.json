@@ -1,0 +1,25 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "native_file": "comment-reader-native-created.numbers",
+  "sha256": "79491e0d004c16a4b18836f933995f19943cfee0f45a1307594a8767f7dd8da7",
+  "size": 136175,
+  "sheet": "Sheet 1",
+  "table": "Table 1",
+  "cell": "B2",
+  "cell_text": "Native comment parity",
+  "root_text": "Native root comment",
+  "author_display_name": "Ryker Zhu",
+  "lifecycle": [
+    "created a Blank workbook in Numbers",
+    "entered B2 sentinel value",
+    "added B2 root comment with native toolbar and saved the comment with Command-Return",
+    "saved native workbook",
+    "closed document window to template chooser",
+    "reopened exact file path without repair warning",
+    "visually verified root text and author plus B2 sentinel",
+    "closed document window to template chooser"
+  ],
+  "reply_creation": "Not established: Reply control was visible but did not open an editor through Computer Use."
+}

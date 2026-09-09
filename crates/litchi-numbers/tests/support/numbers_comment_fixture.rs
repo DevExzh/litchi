@@ -10,6 +10,7 @@ use std::io;
 use litchi_iwa_archive::{
     Limits,
     iwa::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream},
+    package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::append_varint_field;
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
@@ -40,6 +41,12 @@ pub(crate) const SIDECAR_ID: u64 = 5;
 pub(crate) const TILE_ID: u64 = 6;
 pub(crate) const ROOT_COMMENT_ID: u64 = 20;
 pub(crate) const SECOND_ROOT_COMMENT_ID: u64 = 21;
+pub(crate) const SEGMENT_ID: u64 = 700;
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate provenance fixture"
+)]
+pub(crate) const UNRELATED_SEGMENT_ID: u64 = 701;
 pub(crate) const FIRST_REPLY_ID: u64 = 30;
 pub(crate) const SECOND_REPLY_ID: u64 = 31;
 pub(crate) const THIRD_REPLY_ID: u64 = 32;
@@ -54,6 +61,31 @@ pub(crate) const ANNOTATION_AUTHOR_STORAGE_TYPE: u32 = 213;
 
 pub(crate) const SHEET_NAME: &str = "Reply fixture sheet";
 pub(crate) const TABLE_NAME: &str = "Reply fixture table";
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) const SECOND_TABLE_NAME: &str = "Reply fixture table 2";
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) const SECOND_TABLE_INFO_ID: u64 = 7;
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) const SECOND_TABLE_MODEL_ID: u64 = 8;
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) const SECOND_SIDECAR_ID: u64 = 9;
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) const SECOND_TILE_ID: u64 = 10;
 
 #[allow(
     dead_code,
@@ -73,6 +105,8 @@ pub(crate) enum FixtureMode {
     SharedReply,
     /// One root/reply pair is unshared and can be culled after removal.
     SingleRoot,
+    /// The selected root entry lives in a valid TableDataListSegment.
+    SegmentedRoot,
     /// The reply archive is moved to a second current component.
     CrossComponent,
 }
@@ -265,12 +299,59 @@ pub(crate) fn list_message(
     }
 }
 
+/// A valid comment-list segment used by the read-parity cases. The segment
+/// owns the same semantic key as the root-list cases, but its entry and
+/// storage edge are carried by the type-6011 payload.
+pub(crate) fn comment_segment() -> TestResult<ArchiveObject> {
+    let mut result = object(
+        SEGMENT_ID,
+        6_011,
+        tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::CommentStorage as i32,
+            key_range: tsp::Range {
+                location: 1,
+                length: 1,
+            },
+            entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    set_message_info(&mut result, &[ROOT_COMMENT_ID])?;
+    set_field_info(&mut result, vec![3, 1], &[ROOT_COMMENT_ID])?;
+    Ok(result)
+}
+
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate provenance fixture"
+)]
+fn unrelated_comment_segment() -> TestResult<ArchiveObject> {
+    let mut result = object(
+        UNRELATED_SEGMENT_ID,
+        6_011,
+        tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::CommentStorage as i32,
+            key_range: tsp::Range {
+                location: 1,
+                length: 1,
+            },
+            entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    set_message_info(&mut result, &[ROOT_COMMENT_ID])?;
+    set_field_info(&mut result, vec![3, 1], &[ROOT_COMMENT_ID])?;
+    Ok(result)
+}
+
 pub(crate) fn sidecar(
     mode: FixtureMode,
     corruption: Option<Corruption>,
 ) -> TestResult<ArchiveObject> {
     let mut comment_entries = match mode {
-        FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
+        FixtureMode::Rootless | FixtureMode::SparseCell | FixtureMode::SegmentedRoot => Vec::new(),
         FixtureMode::SharedRoot | FixtureMode::DuplicateText | FixtureMode::SingleRoot => {
             vec![comment_entry(
                 1,
@@ -333,8 +414,10 @@ pub(crate) fn sidecar(
         list_message(
             tst::table_data_list::ListType::CommentStorage,
             comment_entries,
-            if matches!(corruption, Some(Corruption::SegmentedList)) {
-                vec![reference(700)]
+            if matches!(mode, FixtureMode::SegmentedRoot)
+                || matches!(corruption, Some(Corruption::SegmentedList))
+            {
+                vec![reference(SEGMENT_ID)]
             } else {
                 Vec::new()
             },
@@ -365,6 +448,7 @@ pub(crate) fn sidecar(
         .ok_or_else(|| io::Error::other("comment list info is missing"))?;
     let roots: Vec<u64> = match mode {
         FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
+        FixtureMode::SegmentedRoot => vec![SEGMENT_ID],
         FixtureMode::SharedReply | FixtureMode::CrossComponent => {
             vec![ROOT_COMMENT_ID, SECOND_ROOT_COMMENT_ID]
         },
@@ -372,7 +456,12 @@ pub(crate) fn sidecar(
     };
     info.object_references = roots.clone();
     for (key, root) in roots.iter().enumerate() {
-        let mut field = FieldInfo::new(vec![3, u32::try_from(key + 1)?]);
+        let field_number = if matches!(mode, FixtureMode::SegmentedRoot) {
+            4
+        } else {
+            3
+        };
+        let mut field = FieldInfo::new(vec![field_number, u32::try_from(key + 1)?]);
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![*root];
         info.field_infos.push(field);
@@ -459,7 +548,9 @@ pub(crate) fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
         FixtureMode::Rootless | FixtureMode::SparseCell => [None, None],
         FixtureMode::SharedRoot => [Some(1), Some(1)],
         FixtureMode::SharedReply | FixtureMode::CrossComponent => [Some(1), Some(2)],
-        FixtureMode::DuplicateText | FixtureMode::SingleRoot => [Some(1), None],
+        FixtureMode::DuplicateText | FixtureMode::SingleRoot | FixtureMode::SegmentedRoot => {
+            [Some(1), None]
+        },
     };
     let mut rows = Vec::new();
     for (row, key) in keys.into_iter().enumerate() {
@@ -560,7 +651,10 @@ pub(crate) fn reply_objects(
             },
             Corruption::SelfReplyReference => vec![reference(ROOT_COMMENT_ID)],
             Corruption::MissingReplyReference => vec![reference(999_999)],
-            Corruption::NestedReplyReference => vec![reference(SECOND_REPLY_ID)],
+            // Keep every node present so this is a true nested graph rather
+            // than a missing-reference case; the focused reader must reject
+            // the second-level reply before publishing the first reply.
+            Corruption::NestedReplyReference => vec![reference(FIRST_REPLY_ID)],
             Corruption::ExternalReplyReference => vec![external_reference(FIRST_REPLY_ID)],
             Corruption::TypedReplyReference => vec![typed_reference(FIRST_REPLY_ID)],
             _ => first_replies,
@@ -584,7 +678,18 @@ pub(crate) fn reply_objects(
         "first reply"
     };
     if !matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
-        result.push(comment_archive(FIRST_REPLY_ID, first_text, &[])?);
+        let nested = matches!(corruption, Some(Corruption::NestedReplyReference));
+        let nested_replies = nested
+            .then(|| vec![reference(SECOND_REPLY_ID)])
+            .unwrap_or_default();
+        result.push(comment_archive(
+            FIRST_REPLY_ID,
+            first_text,
+            &nested_replies,
+        )?);
+        if nested {
+            result.push(comment_archive(SECOND_REPLY_ID, "nested reply", &[])?);
+        }
     }
     if matches!(mode, FixtureMode::DuplicateText) {
         result.push(comment_archive(SECOND_REPLY_ID, "duplicate", &[])?);
@@ -646,6 +751,7 @@ pub(crate) fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> Tes
         TABLE_MODEL_ID,
         SIDECAR_ID,
         TILE_ID,
+        SEGMENT_ID,
         ROOT_COMMENT_ID,
         SECOND_ROOT_COMMENT_ID,
         FIRST_REPLY_ID,
@@ -668,6 +774,9 @@ pub(crate) fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> Tes
                     | AUTHOR_ID
             )
         });
+    }
+    if !matches!(mode, FixtureMode::SegmentedRoot) {
+        document_ids.retain(|identifier| *identifier != SEGMENT_ID);
     }
     if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
         document_ids.retain(|identifier| !matches!(*identifier, AUTHOR_ID | AUTHOR_STORAGE_ID));
@@ -879,6 +988,9 @@ pub(crate) fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> Test
     set_message_info(&mut tile, &[])?;
     let sidecar = sidecar(mode, corruption)?;
     let mut document_objects = vec![document, sheet, info, model, sidecar, tile];
+    if matches!(mode, FixtureMode::SegmentedRoot) {
+        document_objects.push(comment_segment()?);
+    }
     if !matches!(corruption, Some(Corruption::MissingAuthor)) {
         document_objects.extend(author_objects(matches!(
             (mode, corruption),
@@ -949,6 +1061,258 @@ pub(crate) fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> Test
     }
     Ok(litchi_iwa_archive::package::to_bytes(
         entries.iter().map(|(name, data)| (*name, data.as_slice())),
+        Limits::default(),
+    )?)
+}
+
+/// Extend the ordinary fixture with a second independent table whose first
+/// cell deliberately reuses key `1`. Numbers list keys are local to a table's
+/// comment-storage list; this source proves that a reader does not use the
+/// package-wide number of cells carrying the same key as the selected list's
+/// refcount.
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate multitable fixture"
+)]
+pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
+    let source = fixture(FixtureMode::SingleRoot, None)?;
+    let catalog = Catalog::from_bytes(&source)?;
+
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let document_stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(document_stream.as_bytes())?;
+
+    {
+        let sheet = document
+            .object_mut(SHEET_ID)
+            .ok_or_else(|| io::Error::other("comment fixture sheet is missing"))?;
+        let message = sheet
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("comment fixture sheet payload is missing"))?;
+        let mut archive = tn::SheetArchive::decode(message.data.as_slice())?;
+        archive.drawable_infos.push(reference(SECOND_TABLE_INFO_ID));
+        message.data = archive.encode_to_vec();
+        let info = sheet
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("comment fixture sheet metadata is missing"))?;
+        info.object_references.push(SECOND_TABLE_INFO_ID);
+        let mut field = FieldInfo::new(vec![4, 2]);
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references.push(SECOND_TABLE_INFO_ID);
+        info.field_infos.push(field);
+    }
+
+    let mut second_info = object(
+        SECOND_TABLE_INFO_ID,
+        TABLE_INFO_TYPE,
+        tst::TableInfoArchive {
+            super_: tsd::DrawableArchive::default(),
+            table_model: reference(SECOND_TABLE_MODEL_ID),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    set_message_info(&mut second_info, &[SECOND_TABLE_MODEL_ID])?;
+    set_field_info(&mut second_info, vec![4], &[SECOND_TABLE_MODEL_ID])?;
+
+    let mut second_model_archive = table_model(true, 1);
+    second_model_archive.table_id = "reply-fixture-table-2-id".to_owned();
+    second_model_archive.table_name = SECOND_TABLE_NAME.to_owned();
+    second_model_archive.table_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.body_text_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.header_row_text_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.header_column_text_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.footer_row_text_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.body_cell_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.header_row_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.header_column_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.footer_row_style = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.column_headers = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.tiles.tiles[0].tile = reference(SECOND_TILE_ID);
+    second_model_archive.base_data_store.string_table = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.style_table = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.formula_table = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.formula_error_table = Some(reference(SECOND_SIDECAR_ID));
+    second_model_archive.base_data_store.format_table_pre_bnc = reference(SECOND_SIDECAR_ID);
+    second_model_archive.base_data_store.format_table = Some(reference(SECOND_SIDECAR_ID));
+    second_model_archive.base_data_store.comment_storage_table = Some(reference(SECOND_SIDECAR_ID));
+    let mut second_model = object(
+        SECOND_TABLE_MODEL_ID,
+        TABLE_MODEL_TYPE,
+        second_model_archive.encode_to_vec(),
+    )?;
+    set_message_info(&mut second_model, &[SECOND_SIDECAR_ID, SECOND_TILE_ID])?;
+    set_field_info(&mut second_model, vec![25], &[SECOND_SIDECAR_ID])?;
+    set_field_info(&mut second_model, vec![26], &[SECOND_TILE_ID])?;
+    set_field_info(&mut second_model, vec![4, 19], &[SECOND_SIDECAR_ID])?;
+
+    let mut second_sidecar = sidecar(FixtureMode::SingleRoot, None)?;
+    second_sidecar.archive_info.identifier = Some(SECOND_SIDECAR_ID);
+    let comment_index = second_sidecar
+        .messages
+        .iter()
+        .position(|message| {
+            tst::TableDataList::decode(message.data.as_slice())
+                .map(|list| list.list_type == tst::table_data_list::ListType::CommentStorage as i32)
+                .unwrap_or(false)
+        })
+        .ok_or_else(|| io::Error::other("second comment list is missing"))?;
+    let list_message = second_sidecar
+        .messages
+        .get_mut(comment_index)
+        .ok_or_else(|| io::Error::other("second comment list payload is missing"))?;
+    let mut list = tst::TableDataList::decode(list_message.data.as_slice())?;
+    let entry = list
+        .entries
+        .first_mut()
+        .ok_or_else(|| io::Error::other("second comment list entry is missing"))?;
+    entry.comment_storage = Some(reference(SECOND_ROOT_COMMENT_ID));
+    list_message.data = list.encode_to_vec();
+    let info = second_sidecar
+        .archive_info
+        .message_infos
+        .get_mut(comment_index)
+        .ok_or_else(|| io::Error::other("second comment list metadata is missing"))?;
+    info.object_references = vec![SECOND_ROOT_COMMENT_ID];
+    for field in &mut info.field_infos {
+        field.object_references = vec![SECOND_ROOT_COMMENT_ID];
+    }
+
+    let mut second_tile = object(
+        SECOND_TILE_ID,
+        TILE_TYPE,
+        tile(FixtureMode::SingleRoot)?.encode_to_vec(),
+    )?;
+    set_message_info(&mut second_tile, &[])?;
+    let second_root = comment_archive(
+        SECOND_ROOT_COMMENT_ID,
+        "second table root",
+        &[reference(SECOND_REPLY_ID)],
+    )?;
+    let second_reply = comment_archive(SECOND_REPLY_ID, "second table reply", &[])?;
+    document.objects.extend([
+        second_info,
+        second_model,
+        second_sidecar,
+        second_tile,
+        second_root,
+        second_reply,
+    ]);
+
+    let compressed_document = SnappyStream::compress(&document.to_bytes()?)?;
+
+    let metadata_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
+    let metadata_stream = SnappyStream::decompress(metadata_entry.data())?;
+    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes())?;
+    let metadata = metadata_archive
+        .object_mut(METADATA_OBJECT_ID)
+        .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
+    let metadata_message = metadata
+        .messages
+        .first_mut()
+        .ok_or_else(|| io::Error::other("comment fixture metadata payload is missing"))?;
+    let mut package_metadata = tsp::PackageMetadata::decode(metadata_message.data.as_slice())?;
+    let document_component = package_metadata
+        .components
+        .iter_mut()
+        .find(|component| component.preferred_locator == "Document")
+        .ok_or_else(|| io::Error::other("comment fixture Document component is missing"))?;
+    for identifier in [
+        SECOND_TABLE_INFO_ID,
+        SECOND_TABLE_MODEL_ID,
+        SECOND_SIDECAR_ID,
+        SECOND_TILE_ID,
+        SECOND_ROOT_COMMENT_ID,
+        SECOND_REPLY_ID,
+    ] {
+        if !document_component
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == identifier)
+        {
+            document_component
+                .object_uuid_map_entries
+                .push(uuid_entry(identifier));
+        }
+    }
+    metadata_message.data = package_metadata.encode_to_vec();
+    let compressed_metadata = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+
+    Ok(catalog.reassemble_to_bytes(
+        &[
+            EntryEdit::new(DOCUMENT_MEMBER, compressed_document.as_slice()),
+            EntryEdit::new(METADATA_MEMBER, compressed_metadata.as_slice()),
+        ],
+        Limits::default(),
+    )?)
+}
+
+/// Add an unreferenced segment carrying the same key and storage edge as the
+/// selected segment. The root list still points only to `SEGMENT_ID`; a
+/// reader must use that parent edge when resolving the selected entry rather
+/// than accepting an unrelated segment by key/storage coincidence.
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate provenance fixture"
+)]
+pub(crate) fn segmented_with_unrelated_segment_fixture() -> TestResult<Vec<u8>> {
+    let source = fixture(FixtureMode::SegmentedRoot, None)?;
+    let catalog = Catalog::from_bytes(&source)?;
+
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let document_stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(document_stream.as_bytes())?;
+    document.objects.push(unrelated_comment_segment()?);
+    let compressed_document = SnappyStream::compress(&document.to_bytes()?)?;
+
+    let metadata_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
+    let metadata_stream = SnappyStream::decompress(metadata_entry.data())?;
+    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes())?;
+    let metadata = metadata_archive
+        .object_mut(METADATA_OBJECT_ID)
+        .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
+    let metadata_message = metadata
+        .messages
+        .first_mut()
+        .ok_or_else(|| io::Error::other("comment fixture metadata payload is missing"))?;
+    let mut package_metadata = tsp::PackageMetadata::decode(metadata_message.data.as_slice())?;
+    let document_component = package_metadata
+        .components
+        .iter_mut()
+        .find(|component| component.preferred_locator == "Document")
+        .ok_or_else(|| io::Error::other("comment fixture Document component is missing"))?;
+    if !document_component
+        .object_uuid_map_entries
+        .iter()
+        .any(|entry| entry.identifier == UNRELATED_SEGMENT_ID)
+    {
+        document_component
+            .object_uuid_map_entries
+            .push(uuid_entry(UNRELATED_SEGMENT_ID));
+    }
+    metadata_message.data = package_metadata.encode_to_vec();
+    let compressed_metadata = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+
+    Ok(catalog.reassemble_to_bytes(
+        &[
+            EntryEdit::new(DOCUMENT_MEMBER, compressed_document.as_slice()),
+            EntryEdit::new(METADATA_MEMBER, compressed_metadata.as_slice()),
+        ],
         Limits::default(),
     )?)
 }

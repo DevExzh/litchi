@@ -44,6 +44,8 @@ const PRIVATE_INPUT: &[u8] = b"__litchi_private_reply_input_93__";
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
 const NATIVE_COMMENT_METADATA: &[u8] =
     include_bytes!("../../../../test-data/iwork/numbers/comment-metadata-native-resaved.numbers");
+const NATIVE_CREATED_COMMENT: &[u8] =
+    include_bytes!("../../../../test-data/iwork/numbers/comment-reader-native-created.numbers");
 const NATIVE_SHEET: &str = "Sheet 1";
 const NATIVE_TABLE: &str = "Review";
 const NATIVE_COMMENT_ADDRESS: &str = "$B$2";
@@ -99,6 +101,31 @@ fn options() -> PackageReadOptions {
 
 fn exercise_native_metadata(data: &[u8], command: u8) {
     exercise_package(native_metadata_package(), data, command);
+    exercise_package(native_created_package(), data, command);
+}
+
+fn native_created_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        let package = Package::from_bytes_with_options(NATIVE_CREATED_COMMENT, options())
+            .unwrap_or_else(|error| panic!("native-created comment seed must open: {error}"));
+        let comment = package
+            .table_cell_comment_a1("Sheet 1", "Table 1", "B2")
+            .unwrap_or_else(|error| panic!("native-created root must read: {error}"))
+            .unwrap_or_else(|| panic!("native-created root is missing"));
+        assert_eq!(comment.text(), "Native root comment");
+        assert!(comment.timestamp().is_some());
+        assert_eq!(
+            comment.author().and_then(|author| author.display_name()),
+            Some("Ryker Zhu")
+        );
+        let replies = package
+            .table_cell_comment_replies_a1("Sheet 1", "Table 1", "B2")
+            .unwrap_or_else(|error| panic!("native-created empty replies must read: {error}"));
+        assert!(replies.is_empty());
+        assert_eq!(package_bytes(&package), NATIVE_CREATED_COMMENT);
+        package
+    })
 }
 
 fn native_metadata_package() -> &'static Package {
@@ -135,15 +162,10 @@ fn verify_native_metadata(package: &Package) {
         Some(NATIVE_AUTHOR)
     );
 
-    let replies = match package.table_cell_comment_replies(sheet, table, position) {
-        Ok(replies) => replies,
-        Err(error) => {
-            observe_error(error);
-            assert_eq!(package_bytes(package), source_bytes);
-            exercise_ingress_limits(&source_bytes);
-            return;
-        },
-    };
+    let replies = package
+        .table_cell_comment_replies(sheet, table, position)
+        .unwrap_or_else(|error| panic!("native metadata replies must read: {error}"));
+    assert!(replies.is_empty());
     for reply in &replies {
         assert_eq!(reply.timestamp(), timestamp);
         assert_eq!(reply.author(), author.as_ref());
