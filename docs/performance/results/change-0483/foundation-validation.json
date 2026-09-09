@@ -1,0 +1,645 @@
+{
+  "gates": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1610,
+          "path": "validation/opc-tests-final-10.json",
+          "sha256": "de19c76d977694fede15dc9903c9334e4e3b973ed4bae58cda13c9d2b51ef509"
+        },
+        {
+          "bytes": 967,
+          "path": "validation/opc-tests-final-10.started.json",
+          "sha256": "4e9b6d705a80d86743ea1e2802610e6f4e759f7865e4cf25d3578eaf8a5fcbb2"
+        },
+        {
+          "bytes": 46587,
+          "path": "validation/opc-tests-final-10.stdout",
+          "sha256": "270f3e887796299ca6ebf8ecf66a79c07194111ea2ac1b6f1612175af53d9a31"
+        },
+        {
+          "bytes": 1969,
+          "path": "validation/opc-tests-final-10.stderr",
+          "sha256": "90f73d097b8407f8b1368002ecfc386b68cb9999e79ba9fd81966fb3d361be79"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": true,
+      "label": "opc-tests-final-10",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "bfd911044d450d57d970306acaf209fc98670e84a986c7e65c2ef1ec9806be1b",
+          "before": "bfd911044d450d57d970306acaf209fc98670e84a986c7e65c2ef1ec9806be1b",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--test",
+        "source_part_splice"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1669,
+          "path": "validation/opc-splice-tests-final-13.json",
+          "sha256": "c65a0ce2b6ba9e080cc1be2f0aa9ffee23cabc249c919d41bb653304b653e323"
+        },
+        {
+          "bytes": 1014,
+          "path": "validation/opc-splice-tests-final-13.started.json",
+          "sha256": "677ad1896ce67e16a3d6d2083c956beec056a66ed945fbc532bbad6912ffaad6"
+        },
+        {
+          "bytes": 2250,
+          "path": "validation/opc-splice-tests-final-13.stdout",
+          "sha256": "577d82b1bb449cdd60a9146eab063d1b0e0100e4c8450f679f11914402535d61"
+        },
+        {
+          "bytes": 249,
+          "path": "validation/opc-splice-tests-final-13.stderr",
+          "sha256": "8d188251128dbf1746150da5a166c05fbbfced33d722d7ef304fb90b6a7bb9bc"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": true,
+      "label": "opc-splice-tests-final-13",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--all-features"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1672,
+          "path": "validation/opc-all-features-tests-final-14.json",
+          "sha256": "af63f86eb946139b0e618cb376ecf65f194893b5f27f5f69d942ba59fc9c1f0a"
+        },
+        {
+          "bytes": 1002,
+          "path": "validation/opc-all-features-tests-final-14.started.json",
+          "sha256": "ddcfe8754c48b4026aa6eb393977f12baba86154135e0416e7c855cf30489208"
+        },
+        {
+          "bytes": 48607,
+          "path": "validation/opc-all-features-tests-final-14.stdout",
+          "sha256": "1f540477c875f876ed2d73e8ae8ac970706862bf9c4bb8a54ea850523904ef27"
+        },
+        {
+          "bytes": 1969,
+          "path": "validation/opc-all-features-tests-final-14.stderr",
+          "sha256": "34ddb7163654a79a6e868d9a855b2d77dfb330774e8bc0134a993072c240b313"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": false,
+      "label": "opc-all-features-tests-final-14",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1667,
+          "path": "validation/opc-clippy-final-11.json",
+          "sha256": "66005f625fdf20a12fb7d056e046558210ba18857f9a370908e2959844fb4323"
+        },
+        {
+          "bytes": 1027,
+          "path": "validation/opc-clippy-final-11.started.json",
+          "sha256": "b06752b721fb8530a69f39386645cfdfd199dafad7098dee605f8515240861ba"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/opc-clippy-final-11.stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 228,
+          "path": "validation/opc-clippy-final-11.stderr",
+          "sha256": "fbd2df1fba2cc4fdd604f2c1454a05ed380e6db6bf5841d9da114d79c71738c1"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": true,
+      "label": "opc-clippy-final-11",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "bfd911044d450d57d970306acaf209fc98670e84a986c7e65c2ef1ec9806be1b",
+          "before": "bfd911044d450d57d970306acaf209fc98670e84a986c7e65c2ef1ec9806be1b",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "env",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "doc",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--no-deps"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1683,
+          "path": "validation/opc-docs-final-15.json",
+          "sha256": "8f21f43f75f2c7454d0bf5aebf99810f5c07a7bd9a746c069fb4e4f08690f021"
+        },
+        {
+          "bytes": 1046,
+          "path": "validation/opc-docs-final-15.started.json",
+          "sha256": "743380b8ed67dbacf417e03681ffafd9a0df500ef0c5a89edfb43cae45f6b3ee"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/opc-docs-final-15.stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 608,
+          "path": "validation/opc-docs-final-15.stderr",
+          "sha256": "b36ad863062a2ff6836e987fd6cf33ea8cbb6e1e54400e45e3f10720e02498c5"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": false,
+      "label": "opc-docs-final-15",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1729,
+          "path": "validation/opc-all-features-clippy-final-16.json",
+          "sha256": "9b61bd72ba5113a69c310d73ec9d806cef068f14ba8a0e131e296af29c09a6d7"
+        },
+        {
+          "bytes": 1062,
+          "path": "validation/opc-all-features-clippy-final-16.started.json",
+          "sha256": "f703fe70775698dcb6185982dc0059487b3724ad0daac2430dc905339413cddf"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/opc-all-features-clippy-final-16.stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 631,
+          "path": "validation/opc-all-features-clippy-final-16.stderr",
+          "sha256": "26aa5b167ba8b6db3769e227c8e6f756ab6dafdf80610e440c478f139b246a6e"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": false,
+      "label": "opc-all-features-clippy-final-16",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "--config",
+        "skip_children=true",
+        "crates/litchi-opc/src/error.rs",
+        "crates/litchi-opc/src/lib.rs",
+        "crates/litchi-opc/src/source_backed.rs",
+        "crates/litchi-opc/src/source_backed/splice.rs",
+        "crates/litchi-opc/tests/source_part_splice.rs",
+        "crates/xml-minifier/src/audit.rs"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1899,
+          "path": "validation/opc-xml-format-final-17.json",
+          "sha256": "31dfe0fd8e7257ef6fd590d59825651d0e14b141c26c19866155320789a9773a"
+        },
+        {
+          "bytes": 1253,
+          "path": "validation/opc-xml-format-final-17.started.json",
+          "sha256": "1e10d76ceefc1e00f34c9bc1b5c49ca76ab741546815c134d5267307cd4bd55d"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/opc-xml-format-final-17.stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/opc-xml-format-final-17.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": true,
+      "label": "opc-xml-format-final-17",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "xml-minifier",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1669,
+          "path": "validation/xml-clippy-final-18.json",
+          "sha256": "241f906c6696e30c2162da9f2e6dc73e600f3f773684e73455285b33c9eabf4a"
+        },
+        {
+          "bytes": 1029,
+          "path": "validation/xml-clippy-final-18.started.json",
+          "sha256": "047e998a0a149adebfe62d27346a92c378d5f2720c3b6ffb41aa4ea1d0d532bc"
+        },
+        {
+          "bytes": 0,
+          "path": "validation/xml-clippy-final-18.stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 246,
+          "path": "validation/xml-clippy-final-18.stderr",
+          "sha256": "27fd1a634c55991a7986c2479137eaf6438473d4812ee9b6b1bc1bd1c85f5319"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": true,
+      "label": "xml-clippy-final-18",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "before": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "before": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "before": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "xml-minifier"
+      ],
+      "artifacts": [
+        {
+          "bytes": 1605,
+          "path": "validation/xml-tests-dev-02.json",
+          "sha256": "55fe64e30cdb02d78aa1c01258cc6d0ac36d217a6e14ed46cc8103078cccdcbd"
+        },
+        {
+          "bytes": 967,
+          "path": "validation/xml-tests-dev-02.started.json",
+          "sha256": "3e3e458a4dae7e2e5cfc6422203c03983e6dc7cebfe7b724aaf51c59b678b674"
+        },
+        {
+          "bytes": 3850,
+          "path": "validation/xml-tests-dev-02.stdout",
+          "sha256": "a27481ecfa356579dd09591bb8deaec3b3b0b614aeecf0795512758ad7d3a411"
+        },
+        {
+          "bytes": 512,
+          "path": "validation/xml-tests-dev-02.stderr",
+          "sha256": "de9c38169783edef747626eaca7be8c65eb835c3b141c70a6edb40762c7f88ad"
+        }
+      ],
+      "exit_code": 0,
+      "full_workspace_source_unchanged": false,
+      "label": "xml-tests-dev-02",
+      "source_bindings": {
+        "crates/litchi-opc/src/error.rs": {
+          "after": "806084a2959628f76c31db7ae636085d79a8ae77a709346571635305929e6c6f",
+          "before": "806084a2959628f76c31db7ae636085d79a8ae77a709346571635305929e6c6f",
+          "current": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de"
+        },
+        "crates/litchi-opc/src/lib.rs": {
+          "after": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "before": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+          "current": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849"
+        },
+        "crates/litchi-opc/src/source_backed.rs": {
+          "after": "d7fd59237849a55ef3fea2e212c2a11a846a9373f7dabbecd4951efb97cc46db",
+          "before": "d7fd59237849a55ef3fea2e212c2a11a846a9373f7dabbecd4951efb97cc46db",
+          "current": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17"
+        },
+        "crates/litchi-opc/src/source_backed/splice.rs": {
+          "after": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "before": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+          "current": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87"
+        },
+        "crates/litchi-opc/tests/source_part_splice.rs": {
+          "after": "208715192306d4994d85312afbe7c7fa63e0d47c4f2dac63a4d2051750bcf927",
+          "before": "208715192306d4994d85312afbe7c7fa63e0d47c4f2dac63a4d2051750bcf927",
+          "current": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35"
+        },
+        "crates/xml-minifier/src/audit.rs": {
+          "after": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "before": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+          "current": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+        }
+      }
+    }
+  ],
+  "prior_head": "61f75cb7c69c97a2e6e1cdc4f2cca35917b51c24",
+  "schema": "opc-fragment-foundation-checkpoint-v1",
+  "scope": "Completed OPC fragment lease transfer, interrupted read retry, typed I/O execution error mapping, independent ZIP preservation oracles, and XML per-token scratch bound. DOCX integration and performance captures remain in progress.",
+  "source_files": {
+    "crates/litchi-opc/src/error.rs": "555b8e8152102936ad66b84592ae63ba3f5d6dfaa7a2bf52fc7441428087e4de",
+    "crates/litchi-opc/src/lib.rs": "747194f85c29db87fe3f92f173ced827f0a0ee501600af9610b6655f8a876849",
+    "crates/litchi-opc/src/source_backed.rs": "597ddcb28c7d1e3b51752ec801def265bc2c6e7a764066af5260b92f76787a17",
+    "crates/litchi-opc/src/source_backed/splice.rs": "b1969bf2680b25b2b5a4725a7f7c8b257d512a4c328caabb0e4d9fbe8e8c3d87",
+    "crates/litchi-opc/tests/source_part_splice.rs": "d0fb67fe71285fe8b6dc9d3940d0c4d2b4e9a29a711c909cccc27cd5edf33c35",
+    "crates/xml-minifier/src/audit.rs": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac"
+  },
+  "validation_note": "Full workspace source manifests include concurrent DOCX work. OPC/XML source bindings distinguish those unrelated changes and the later central-oracle test addition. No final DOCX or performance gate is claimed."
+}

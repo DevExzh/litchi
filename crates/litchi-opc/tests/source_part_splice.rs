@@ -242,32 +242,108 @@ fn u32_at(bytes: &[u8], offset: usize) -> usize {
     .expect("fixture offset must fit usize")
 }
 
-/// Return the complete local record (header, name, extra, and raw compressed
-/// payload) for one member.  Central-directory offsets legitimately move when
-/// an earlier member grows, so local records are the physical preservation
-/// boundary asserted here.
+/// Return a complete local record, including compressed payload and descriptor.
+/// This independent parser is restricted to the generated non-ZIP64, comment-free
+/// fixtures. Sizes come from the central directory: descriptor-mode local sizes
+/// can be zero and byte signatures can occur inside compressed payloads.
 fn local_record(bytes: &[u8], wanted: &str) -> Vec<u8> {
-    let mut cursor = 0usize;
-    while let Some(relative) = bytes[cursor..]
-        .windows(4)
-        .position(|window| window == b"PK\x03\x04")
-    {
-        let start = cursor + relative;
-        let name_len = u16_at(bytes, start + 26);
-        let extra_len = u16_at(bytes, start + 28);
-        let name_start = start + 30;
-        let data_start = name_start + name_len + extra_len;
-        let compressed_len = u32_at(bytes, start + 18);
-        let end = data_start + compressed_len;
-        if std::str::from_utf8(&bytes[name_start..name_start + name_len])
-            .expect("fixture member names are UTF-8")
-            == wanted
-        {
+    let eocd = bytes.len().checked_sub(22).expect("fixture EOCD must fit");
+    assert_eq!(&bytes[eocd..eocd + 4], b"PK\x05\x06");
+    assert_eq!(u16_at(bytes, eocd + 20), 0);
+    let mut central = u32_at(bytes, eocd + 16);
+    for _ in 0..u16_at(bytes, eocd + 10) {
+        assert_eq!(&bytes[central..central + 4], b"PK\x01\x02");
+        let name_len = u16_at(bytes, central + 28);
+        let extra_len = u16_at(bytes, central + 30);
+        let comment_len = u16_at(bytes, central + 32);
+        let name = &bytes[central + 46..central + 46 + name_len];
+        if name == wanted.as_bytes() {
+            let start = u32_at(bytes, central + 42);
+            let compressed = u32_at(bytes, central + 20);
+            assert_ne!(compressed, u32::MAX as usize, "fixture must not use ZIP64");
+            assert_eq!(&bytes[start..start + 4], b"PK\x03\x04");
+            let payload = start + 30 + u16_at(bytes, start + 26) + u16_at(bytes, start + 28);
+            let mut end = payload + compressed;
+            if u16_at(bytes, central + 8) & 8 != 0 {
+                end += if &bytes[end..end + 4] == b"PK\x07\x08" {
+                    16
+                } else {
+                    12
+                };
+            }
             return bytes[start..end].to_vec();
         }
-        cursor = end;
+        central += 46 + name_len + extra_len + comment_len;
     }
     panic!("fixture member {wanted} is missing")
+}
+
+/// Preserve every central-directory byte except the relocated local offset.
+/// This is independent of production ZIP metadata parsing and covers names,
+/// extra fields, comments, flags, versions, timestamps, CRC, sizes and attrs.
+fn central_record(bytes: &[u8], wanted: &str) -> Vec<u8> {
+    let eocd = bytes.len().checked_sub(22).expect("fixture EOCD must fit");
+    assert_eq!(&bytes[eocd..eocd + 4], b"PK\x05\x06");
+    assert_eq!(u16_at(bytes, eocd + 20), 0);
+    let mut central = u32_at(bytes, eocd + 16);
+    for _ in 0..u16_at(bytes, eocd + 10) {
+        assert_eq!(&bytes[central..central + 4], b"PK\x01\x02");
+        let name_len = u16_at(bytes, central + 28);
+        let end =
+            central + 46 + name_len + u16_at(bytes, central + 30) + u16_at(bytes, central + 32);
+        if &bytes[central + 46..central + 46 + name_len] == wanted.as_bytes() {
+            assert_ne!(u32_at(bytes, central + 42), u32::MAX as usize);
+            let mut record = bytes[central..end].to_vec();
+            record[42..46].fill(0);
+            return record;
+        }
+        central = end;
+    }
+    panic!("fixture member {wanted} is missing")
+}
+
+#[test]
+fn central_record_oracle_detects_metadata_changes_outside_local_record() {
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
+        .unwrap();
+    let archive = writer.finish_to_bytes().unwrap();
+    let mut changed = archive.clone();
+    let central = u32_at(&archive, archive.len() - 22 + 16);
+    changed[central + 38] ^= 1; // External attributes occur only in the directory.
+    assert_eq!(
+        local_record(&archive, DOCUMENT_MEMBER),
+        local_record(&changed, DOCUMENT_MEMBER)
+    );
+    assert_ne!(
+        central_record(&archive, DOCUMENT_MEMBER),
+        central_record(&changed, DOCUMENT_MEMBER)
+    );
+    changed[central + 38] ^= 1;
+    changed[central + 42] ^= 1; // Relocation alone is excluded from this comparison.
+    assert_eq!(
+        central_record(&archive, DOCUMENT_MEMBER),
+        central_record(&changed, DOCUMENT_MEMBER)
+    );
+}
+
+#[test]
+fn raw_record_oracle_includes_descriptor_mode_compressed_payload() {
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
+        .expect("descriptor-mode fixture must write");
+    let archive = writer.finish_to_bytes().expect("fixture must finish");
+    let record = local_record(&archive, DOCUMENT_MEMBER);
+    let payload = 30 + u16_at(&record, 26) + u16_at(&record, 28);
+    assert_eq!(u32_at(&record, 18), 0, "fixture uses deferred local sizes");
+    assert_ne!(u16_at(&record, 6) & 8, 0);
+    assert_eq!(&record[record.len() - 16..record.len() - 12], b"PK\x07\x08");
+    assert!(
+        record.len() > payload + 16,
+        "oracle must include compressed bytes"
+    );
 }
 
 fn managed_context_with_limits(
@@ -547,6 +623,11 @@ fn store_and_deflate_splices_preserve_opaque_members_without_caching_target() {
             local_record(&source_archive, SCRATCH_MEMBER),
             local_record(&output, SCRATCH_MEMBER),
             "untyped physical member must remain byte exact"
+        );
+        assert_eq!(
+            central_record(&source_archive, SCRATCH_MEMBER),
+            central_record(&output, SCRATCH_MEMBER),
+            "untyped physical member directory metadata must survive relocation"
         );
     }
 }
@@ -1366,6 +1447,165 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
     assert_eq!(budget.used(Resource::Memory), baseline);
 }
 
+#[test]
+fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
+    for deflated in [false, true] {
+        let source_archive = archive_bytes(VALID_SOURCE, deflated, false);
+        let (budget, _cancellation, context) = managed_context_with_budget();
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(source_archive.clone())),
+            litchi_opc::ReadLimits::default(),
+            context,
+        )
+        .expect("managed source must open");
+        let baseline = budget.used(Resource::Memory);
+        let length = FRAGMENT.len() as u64;
+        let mut fragment = package
+            .allocate_source_part_splice_fragment(length, length)
+            .expect("exact fragment limit must allocate");
+        assert_eq!(budget.used(Resource::Memory), baseline + length);
+        assert_eq!(fragment.as_slice(), vec![0; FRAGMENT.len()]);
+        fragment.as_mut_slice().copy_from_slice(FRAGMENT);
+        let limits = SourcePartSpliceLimits::default();
+        let plan = package
+            .prepare_source_part_splice_with_fragment(
+                &pack(DOCUMENT_URI),
+                proof(&package, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+                fragment,
+                limits,
+            )
+            .expect("authored fragment must transfer into the plan");
+        assert_eq!(
+            budget.used(Resource::Memory),
+            baseline + length + xml_workspace_requirement(limits),
+            "preparation must retain exactly one fragment charge"
+        );
+        let mut output = Vec::new();
+        let publication = plan
+            .write_to_stream(&mut output)
+            .expect("splice must publish");
+        assert_eq!(budget.used(Resource::Memory), baseline);
+        let candidate = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(output)))
+            .expect("candidate must reopen");
+        let mut inverse = Vec::new();
+        publication
+            .write_inverse_to_stream(&candidate, &mut inverse)
+            .expect("authored splice must invert");
+        assert_eq!(inverse, source_archive);
+
+        let fragment = package
+            .allocate_source_part_splice_fragment(length, length)
+            .expect("second fragment must allocate");
+        drop(fragment);
+        assert_eq!(budget.used(Resource::Memory), baseline);
+    }
+}
+
+#[test]
+fn authored_fragment_cannot_transfer_a_foreign_package_budget() {
+    let source_archive = archive_bytes(VALID_SOURCE, false, false);
+    let (budget, _cancellation, context) = managed_context_with_budget();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(source_archive.clone())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .expect("managed source must open");
+    let foreign = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source_archive)))
+        .expect("identical foreign package must open");
+    let baseline = budget.used(Resource::Memory);
+    let mut fragment = package
+        .allocate_source_part_splice_fragment(11, 11)
+        .expect("fragment must allocate");
+    fragment.as_mut_slice().copy_from_slice(FRAGMENT);
+    assert_eq!(budget.used(Resource::Memory), baseline + 11);
+    let error = foreign
+        .prepare_source_part_splice_with_fragment(
+            &pack(DOCUMENT_URI),
+            proof(&foreign, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+            fragment,
+            SourcePartSpliceLimits::default(),
+        )
+        .expect_err("even identical bytes cannot substitute a budget owner");
+    assert!(error.to_string().contains("different source package"));
+    assert_eq!(budget.used(Resource::Memory), baseline);
+}
+
+#[test]
+fn authored_fragment_refusals_release_memory_and_preserve_typed_limits() {
+    let archive = archive_bytes(VALID_SOURCE, false, false);
+    let (budget, cancellation, context) = managed_context_with_budget();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(archive)),
+        litchi_opc::ReadLimits::default(),
+        context.clone(),
+    )
+    .expect("managed source must open");
+    let baseline = budget.used(Resource::Memory);
+    let remaining = 64 * 1024 * 1024 - baseline;
+    let occupied = context
+        .reserve(Resource::Memory, remaining - 10)
+        .expect("test must reserve all but ten remaining bytes");
+    let error = package
+        .allocate_source_part_splice_fragment(11, 11)
+        .expect_err("one byte above remaining budget must refuse");
+    assert!(
+        matches!(error, OpcError::Execution(ExecutionError::ResourceLimit(ref limit))
+        if limit.resource == Resource::Memory)
+    );
+    assert_eq!(budget.used(Resource::Memory), 64 * 1024 * 1024 - 10);
+    drop(occupied);
+    assert_eq!(budget.used(Resource::Memory), baseline);
+
+    let fragment = package
+        .allocate_source_part_splice_fragment(11, 11)
+        .expect("fragment must allocate");
+    let error = package
+        .prepare_source_part_splice_with_fragment(
+            &pack(DOCUMENT_URI),
+            proof(&package, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+            fragment,
+            SourcePartSpliceLimits::default(),
+        )
+        .expect_err("uninitialized authored bytes must fail proof validation");
+    assert!(error.to_string().contains("fragment hash"));
+    assert_eq!(budget.used(Resource::Memory), baseline);
+
+    cancellation.cancel();
+    let error = package
+        .allocate_source_part_splice_fragment(11, 11)
+        .expect_err("cancelled allocation must refuse");
+    assert!(matches!(error, OpcError::Cancelled));
+    assert_eq!(budget.used(Resource::Memory), baseline);
+}
+
+#[test]
+fn authored_fragment_zero_fill_checks_cancellation_between_work_chunks() {
+    const LENGTH: u64 = 1024 * 1024;
+    let (budget, cancellation, context) = managed_context_with_budget();
+    let source = Arc::new(WorkCancellingSource::new(
+        archive_bytes(VALID_SOURCE, false, false),
+        budget.clone(),
+        cancellation,
+    ));
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .expect("managed source must open");
+    let memory = budget.used(Resource::Memory);
+    let work = budget.used(Resource::Work);
+    source.arm(work);
+    let error = package
+        .allocate_source_part_splice_fragment(LENGTH, LENGTH)
+        .expect_err("cancellation during initialization must stop allocation");
+    assert!(matches!(error, OpcError::Cancelled));
+    let consumed = budget.used(Resource::Work) - work;
+    assert!(consumed > 0 && consumed < LENGTH);
+    assert_eq!(budget.used(Resource::Memory), memory);
+}
+
 #[derive(Debug)]
 struct WorkCancellingSource {
     inner: OwnedSource,
@@ -1373,6 +1613,108 @@ struct WorkCancellingSource {
     cancellation: CancellationSource,
     baseline: AtomicU64,
     armed: AtomicBool,
+}
+
+#[derive(Debug)]
+struct InterruptedSource {
+    inner: OwnedSource,
+    armed: AtomicBool,
+    cancellation: Option<CancellationSource>,
+}
+
+impl ReadAt for InterruptedSource {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.armed.swap(false, Ordering::AcqRel) {
+            if let Some(cancellation) = &self.cancellation {
+                cancellation.cancel();
+            }
+            return Err(io::ErrorKind::Interrupted.into());
+        }
+        self.inner.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.inner.version()
+    }
+}
+
+#[test]
+fn interrupted_splice_source_retries_without_double_charging_input() {
+    let mut observations = Vec::new();
+    for interrupt in [false, true] {
+        let (budget, _cancellation, context) = managed_context_with_budget();
+        let source = Arc::new(InterruptedSource {
+            inner: OwnedSource::new(archive_bytes(VALID_SOURCE, true, false)),
+            armed: AtomicBool::new(false),
+            cancellation: None,
+        });
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            litchi_opc::ReadLimits::default(),
+            context,
+        )
+        .expect("managed fixture must open");
+        let input = budget.used(Resource::InputBytes);
+        let work = budget.used(Resource::Work);
+        let memory = budget.used(Resource::Memory);
+        source.armed.store(interrupt, Ordering::Release);
+        let plan = prepare(
+            &package,
+            VALID_SOURCE,
+            INSERTION_OFFSET,
+            FRAGMENT,
+            SourcePartSpliceLimits::default(),
+        );
+        drop(plan);
+        assert_eq!(budget.used(Resource::Memory), memory);
+        observations.push((
+            budget.used(Resource::InputBytes) - input,
+            budget.used(Resource::Work) - work,
+        ));
+    }
+    assert_eq!(
+        observations[0].0, observations[1].0,
+        "interruption accepts no bytes and must not consume input budget"
+    );
+    assert_eq!(
+        observations[0].1 + 1,
+        observations[1].1,
+        "each interrupted retry consumes one bounded work unit"
+    );
+}
+
+#[test]
+fn interrupted_splice_source_observes_cancellation_before_retry() {
+    let (budget, cancellation, context) = managed_context_with_budget();
+    let source = Arc::new(InterruptedSource {
+        inner: OwnedSource::new(archive_bytes(VALID_SOURCE, false, false)),
+        armed: AtomicBool::new(false),
+        cancellation: Some(cancellation),
+    });
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .expect("managed fixture must open");
+    let input = budget.used(Resource::InputBytes);
+    let memory = budget.used(Resource::Memory);
+    source.armed.store(true, Ordering::Release);
+    let error = package
+        .prepare_source_part_splice(
+            &pack(DOCUMENT_URI),
+            proof(&package, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+            Arc::new(FRAGMENT.to_vec()),
+            SourcePartSpliceLimits::default(),
+        )
+        .expect_err("cancelled interrupted reader must stop");
+    assert!(matches!(error, OpcError::Cancelled));
+    assert_eq!(budget.used(Resource::InputBytes), input);
+    assert_eq!(budget.used(Resource::Memory), memory);
 }
 
 impl WorkCancellingSource {

@@ -201,6 +201,12 @@ impl Limits {
     /// transient token-sized decoded and normalized attribute-value buffers, and this
     /// auditor's inherited `xml:space` stack. Counting the reusable event
     /// buffer, these dynamic token windows are bounded by six token capacities.
+    /// Attribute duplicate-check scratch is per lexical event, rather than an
+    /// aggregate document allocation. The parser cannot expose more attribute
+    /// entries in one event than the bounded token window, so its range and hash
+    /// capacities use `min(max_attributes, max_token_bytes + 1)`. The aggregate
+    /// attribute counter still uses `max_attributes` and therefore retains its
+    /// document-wide acceptance policy.
     /// The three BOM bookkeeping arrays (the 3-byte probe, 3-byte history, and
     /// 6-byte history-combine scratch) add 12 bytes separately. The caller's
     /// `BufRead` storage, other fixed-size parser values, allocator metadata,
@@ -226,17 +232,15 @@ impl Limits {
             .checked_mul(size_of::<Space>())?
             .checked_mul(2)?
             .max(8 * size_of::<Space>());
+        let per_event_attributes = self.attributes.min(token);
+        let attribute_entries = per_event_attributes.checked_add(1)?;
         let attribute_range_size = size_of::<std::ops::Range<usize>>();
-        let attribute_ranges = self
-            .attributes
-            .checked_add(1)?
+        let attribute_ranges = attribute_entries
             .checked_mul(attribute_range_size)?
             .checked_mul(2)?
             .max(4 * attribute_range_size);
         let attribute_hash_entry = size_of::<u64>().checked_add(size_of::<u8>())?;
-        let attribute_hashes = self
-            .attributes
-            .checked_add(1)?
+        let attribute_hashes = attribute_entries
             .checked_mul(attribute_hash_entry)?
             .checked_mul(4)?
             .max(attribute_hash_entry.checked_mul(8)?);
@@ -2138,5 +2142,43 @@ mod stream_tests {
         assert!(bound >= (limits.max_token_bytes() + 1) * 2);
         let deep = Limits::new(1024, 8, 32, 32, 16, 1024).unwrap();
         assert!(deep.streaming_memory_upper_bound().unwrap() > bound);
+    }
+
+    #[test]
+    fn streaming_memory_bound_caps_per_event_attribute_scratch_at_token_window() {
+        let token_bytes = 4096;
+        let aggregate =
+            Limits::new(1024, 4, 32, Limits::ATTRIBUTE_CEILING, token_bytes, 1024).unwrap();
+        let token_cap = Limits::new(1024, 4, 32, token_bytes + 1, token_bytes, 1024).unwrap();
+
+        assert_eq!(
+            aggregate.streaming_memory_upper_bound(),
+            token_cap.streaming_memory_upper_bound(),
+            "aggregate attribute accounting must not size one-event scratch"
+        );
+    }
+
+    #[test]
+    fn aggregate_attribute_budget_remains_independent_of_token_scratch() {
+        let mut xml = b"<r>".to_vec();
+        for _ in 0..16 {
+            xml.extend_from_slice(b"<x a=\"1\"/>");
+        }
+        xml.extend_from_slice(b"</r>");
+
+        let limits = Limits::new(xml.len(), 2, 64, 16, 10, 0).unwrap();
+        let report = verify_reader(Chunked::new(&xml, 1), limits)
+            .expect("aggregate attributes across events must remain accepted");
+        assert_eq!(report.attributes(), 16);
+    }
+
+    #[test]
+    fn streaming_memory_bound_reports_checked_arithmetic_overflow() {
+        let overflowing = Limits::bounded(0, 0, 0, usize::MAX, usize::MAX, 0);
+        assert_eq!(
+            overflowing.streaming_memory_upper_bound(),
+            None,
+            "token-window arithmetic must fail closed on usize overflow"
+        );
     }
 }

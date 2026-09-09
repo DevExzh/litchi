@@ -77,9 +77,9 @@ pub use source_backed::{
     AuthorizedPrecompressedPart, PartData, PartView, RetainedPrecompressedPart, SourceArtifact,
     SourceArtifactFingerprint, SourceBackedPackage, SourceCacheCounterDelta,
     SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
-    SourceLineage, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
-    SourcePartSplicePublication, SourceRelationshipTarget, SourceTopologyPlan,
-    VerifiedDecodedReaderError,
+    SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
+    SourcePartSpliceProof, SourcePartSplicePublication, SourceRelationshipTarget,
+    SourceTopologyPlan, VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
