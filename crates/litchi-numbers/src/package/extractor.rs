@@ -32,6 +32,7 @@ use crate::cell::Value as CellValue;
 use crate::cell::wire::{BncCellView, CachedScalar, StoredValue};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
+use litchi_iwa_common::formula::render::{FormulaExpr, FormulaRenderBudget, FormulaRenderer};
 use litchi_iwa_common::wire::{
     WireDescent, parse_wire_view_with_limits, preflight_wire_tree_with_limits,
 };
@@ -6059,320 +6060,56 @@ fn formula_reference_prefix(
         .unwrap_or_else(|| "Table::".to_owned())
 }
 
-type FormulaExpr = usize;
-
-#[derive(Debug)]
-enum FormulaPart {
-    Static(&'static str),
-    Owned(String),
-    Expr(FormulaExpr),
-}
-
-#[derive(Debug)]
-struct FormulaNode {
-    parts: std::ops::Range<usize>,
-    rendered_len: usize,
-}
-
-#[derive(Debug, Default)]
-struct FormulaRenderer {
-    nodes: Vec<FormulaNode>,
-    parts: Vec<FormulaPart>,
-    owned_bytes: usize,
-}
-
-impl FormulaRenderer {
-    fn check_additional_owned(&self, additional: usize, budget: &ProjectionBudget) -> Result<()> {
-        let retained = self
-            .owned_bytes
-            .checked_add(additional)
-            .and_then(|bytes| bytes.checked_add(1))
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        budget.check_output_text(retained)
-    }
-
-    fn static_expr(
-        &mut self,
-        value: &'static str,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        self.fixed([FormulaPart::Static(value)], budget)
-    }
-
-    fn owned_expr(&mut self, value: String, budget: &ProjectionBudget) -> Result<FormulaExpr> {
-        self.fixed([FormulaPart::Owned(value)], budget)
-    }
-
-    fn binary(
-        &mut self,
-        left: FormulaExpr,
-        operator: &'static str,
-        right: FormulaExpr,
-        wrapped: bool,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        if wrapped {
-            self.fixed(
-                [
-                    FormulaPart::Static("("),
-                    FormulaPart::Expr(left),
-                    FormulaPart::Static(operator),
-                    FormulaPart::Expr(right),
-                    FormulaPart::Static(")"),
-                ],
-                budget,
-            )
-        } else {
-            self.fixed(
-                [
-                    FormulaPart::Expr(left),
-                    FormulaPart::Static(operator),
-                    FormulaPart::Expr(right),
-                ],
-                budget,
-            )
-        }
-    }
-
-    fn unary(
-        &mut self,
-        prefix: &'static str,
-        expression: FormulaExpr,
-        suffix: &'static str,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        self.fixed(
-            [
-                FormulaPart::Static(prefix),
-                FormulaPart::Expr(expression),
-                FormulaPart::Static(suffix),
-            ],
-            budget,
-        )
-    }
-
-    fn comma_joined(
-        &mut self,
-        function_prefix: Option<String>,
-        arguments: Vec<FormulaExpr>,
-        open: &'static str,
-        close: &'static str,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        let part_count = arguments
-            .len()
-            .checked_mul(2)
-            .and_then(|count| count.checked_add(3))
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        let mut parts = Vec::new();
-        parts
-            .try_reserve_exact(part_count)
-            .map_err(|_error| allocation_error("Numbers formula render parts", part_count))?;
-        if let Some(label) = function_prefix {
-            parts.push(FormulaPart::Owned(label));
-        }
-        parts.push(FormulaPart::Static(open));
-        for (index, argument) in arguments.into_iter().enumerate() {
-            if index != 0 {
-                parts.push(FormulaPart::Static(","));
-            }
-            parts.push(FormulaPart::Expr(argument));
-        }
-        parts.push(FormulaPart::Static(close));
-        self.dynamic(parts, budget)
-    }
-
-    fn array(
-        &mut self,
-        values: Vec<FormulaExpr>,
-        columns: usize,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        let part_count = values
-            .len()
-            .checked_mul(2)
-            .and_then(|count| count.checked_add(2))
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        let mut parts = Vec::new();
-        parts
-            .try_reserve_exact(part_count)
-            .map_err(|_error| allocation_error("Numbers formula array parts", part_count))?;
-        parts.push(FormulaPart::Static("{"));
-        for (index, value) in values.into_iter().enumerate() {
-            if index != 0 {
-                parts.push(FormulaPart::Static(
-                    if columns != 0 && index % columns == 0 {
-                        ";"
-                    } else {
-                        ","
-                    },
-                ));
-            }
-            parts.push(FormulaPart::Expr(value));
-        }
-        parts.push(FormulaPart::Static("}"));
-        self.dynamic(parts, budget)
-    }
-
-    fn fixed<const N: usize>(
-        &mut self,
-        parts: [FormulaPart; N],
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        let (rendered_len, owned_bytes) = self.measure(&parts, budget)?;
-        self.reserve_node(N)?;
-        let start = self.parts.len();
-        self.parts.extend(parts);
-        self.push_node(start, rendered_len, owned_bytes)
-    }
-
-    fn dynamic(
-        &mut self,
-        parts: Vec<FormulaPart>,
-        budget: &ProjectionBudget,
-    ) -> Result<FormulaExpr> {
-        let (rendered_len, owned_bytes) = self.measure(&parts, budget)?;
-        self.reserve_node(parts.len())?;
-        let start = self.parts.len();
-        self.parts.extend(parts);
-        self.push_node(start, rendered_len, owned_bytes)
-    }
-
-    fn measure(&self, parts: &[FormulaPart], budget: &ProjectionBudget) -> Result<(usize, usize)> {
-        let mut rendered_len = 0usize;
-        let mut owned_bytes = 0usize;
-        for part in parts {
-            let part_len = match part {
-                FormulaPart::Static(value) => value.len(),
-                FormulaPart::Owned(value) => {
-                    owned_bytes = owned_bytes
-                        .checked_add(value.len())
-                        .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-                    value.len()
-                },
-                FormulaPart::Expr(expression) => {
-                    self.nodes
-                        .get(*expression)
-                        .ok_or_else(|| {
-                            Error::ParseError(
-                                "Numbers formula renderer contains an invalid expression"
-                                    .to_owned(),
-                            )
-                        })?
-                        .rendered_len
-                },
-            };
-            rendered_len = rendered_len
-                .checked_add(part_len)
-                .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        }
-        let retained_owned = self
-            .owned_bytes
-            .checked_add(owned_bytes)
-            .and_then(|bytes| bytes.checked_add(1))
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        budget.check_output_text(retained_owned)?;
-        let output_len = rendered_len
-            .checked_add(1)
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        budget.check_output_text(output_len)?;
-        Ok((rendered_len, owned_bytes))
-    }
-
-    fn reserve_node(&mut self, part_count: usize) -> Result<()> {
-        self.nodes.try_reserve_exact(1).map_err(|_error| {
-            allocation_error(
-                "Numbers formula render nodes",
-                self.nodes.len().saturating_add(1),
-            )
-        })?;
-        self.parts.try_reserve_exact(part_count).map_err(|_error| {
-            allocation_error(
-                "Numbers formula render parts",
-                self.parts.len().saturating_add(part_count),
-            )
-        })?;
-        Ok(())
-    }
-
-    fn push_node(
-        &mut self,
-        start: usize,
-        rendered_len: usize,
-        owned_bytes: usize,
-    ) -> Result<FormulaExpr> {
-        self.owned_bytes = self
-            .owned_bytes
-            .checked_add(owned_bytes)
-            .ok_or_else(|| allocation_error("Numbers formula owned text", usize::MAX))?;
-        let end = self.parts.len();
-        let expression = self.nodes.len();
-        self.nodes.push(FormulaNode {
-            parts: start..end,
-            rendered_len,
-        });
-        Ok(expression)
-    }
-
-    fn render(&self, expression: FormulaExpr, budget: &mut ProjectionBudget) -> Result<String> {
-        let node = self.nodes.get(expression).ok_or_else(|| {
-            Error::ParseError("Numbers formula has no renderable expression".to_owned())
-        })?;
-        let output_len = node
-            .rendered_len
-            .checked_add(1)
-            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
-        budget.charge_output_text(output_len)?;
-
-        let mut output = String::new();
-        output
-            .try_reserve_exact(output_len)
-            .map_err(|_error| allocation_error("Numbers rendered formula", output_len))?;
-        output.push('=');
-
-        let mut pending = Vec::new();
-        self.push_parts_reversed(&mut pending, node.parts.clone())?;
-        while let Some(part) = pending.pop() {
-            match part {
-                FormulaPart::Static(value) => output.push_str(value),
-                FormulaPart::Owned(value) => output.push_str(value),
-                FormulaPart::Expr(child) => {
-                    let child_node = self.nodes.get(*child).ok_or_else(|| {
-                        Error::ParseError(
-                            "Numbers formula renderer contains an invalid child".to_owned(),
-                        )
-                    })?;
-                    self.push_parts_reversed(&mut pending, child_node.parts.clone())?;
-                },
-            }
-        }
-        debug_assert_eq!(output.len(), output_len);
-        Ok(output)
-    }
-
-    fn push_parts_reversed<'a>(
-        &'a self,
-        pending: &mut Vec<&'a FormulaPart>,
-        range: std::ops::Range<usize>,
-    ) -> Result<()> {
-        let count = range.len();
-        pending.try_reserve_exact(count).map_err(|_error| {
-            allocation_error(
-                "Numbers formula render stack",
-                pending.len().saturating_add(count),
-            )
-        })?;
-        pending.extend(self.parts[range].iter().rev());
-        Ok(())
-    }
-}
-
 fn formula_output_limit_error(observed: usize, budget: &ProjectionBudget) -> Error {
     Error::SemanticLimit {
         kind: SemanticLimitKind::OutputTextBytes,
         observed,
         maximum: budget.max_output_text_bytes,
         path: SemanticPath::StructuredTables,
+    }
+}
+
+impl FormulaRenderBudget for ProjectionBudget {
+    type Error = Error;
+
+    fn output_limit(&self, observed: usize) -> Self::Error {
+        formula_output_limit_error(observed, self)
+    }
+
+    fn allocation(&self, resource: &'static str, amount: usize) -> Self::Error {
+        allocation_error(resource, amount)
+    }
+
+    fn invalid(&self, message: &'static str) -> Self::Error {
+        Error::ParseError(message.to_owned())
+    }
+
+    fn check(&self, amount: usize) -> std::result::Result<(), Self::Error> {
+        self.check_output_text(amount)
+    }
+
+    fn check_structure(&self, nodes: usize, parts: usize) -> std::result::Result<(), Self::Error> {
+        let max_nodes = self.max_formula_render_work;
+        let max_parts = max_nodes.saturating_mul(8);
+        if nodes > max_nodes {
+            return Err(formula_semantic_limit(
+                SemanticLimitKind::FormulaWork,
+                nodes,
+                max_nodes,
+            ));
+        }
+        if parts > max_parts {
+            return Err(formula_semantic_limit(
+                SemanticLimitKind::FormulaWork,
+                parts,
+                max_parts,
+            ));
+        }
+        Ok(())
+    }
+
+    fn charge(&mut self, amount: usize) -> std::result::Result<(), Self::Error> {
+        self.charge_output_text(amount)
     }
 }
 
@@ -10155,8 +9892,8 @@ mod tests {
             false,
         )?
         .unwrap_or_else(|| panic!("skewed formula did not produce an expression"));
-        assert_eq!(renderer.nodes.len(), VALUES * 2 - 1);
-        assert_eq!(renderer.parts.len(), VALUES + (VALUES - 1) * 5);
+        assert_eq!(renderer.node_count(), VALUES * 2 - 1);
+        assert_eq!(renderer.part_count(), VALUES + (VALUES - 1) * 5);
         let output = renderer.render(root, &mut budget)?;
         assert_eq!(output.len(), VALUES * 4 - 2);
         Ok(())

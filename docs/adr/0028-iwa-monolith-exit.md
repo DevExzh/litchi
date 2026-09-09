@@ -11282,3 +11282,53 @@ audit. The local-reference regression compares against the retained legacy
 renderer: its established standalone-reference output is `=D3`, even when the
 source carries sticky bits. This turn preserves that behavior; it does not
 claim a new absolute-reference rendering feature.
+
+## 2026-09-09 Shared formula expression arena
+
+The migration-host and focused Numbers readers now use
+`litchi-iwa-common::formula::render` for expression storage and text rendering.
+Their duplicate arena implementations are removed. The neutral owner composes
+static and owned text, unary and binary expressions, function argument lists,
+and arrays, measures retained/output bytes before insertion, and renders with
+an explicit fallible stack. It imports neither native formula events nor
+protobuf schemas. The existing borrowed Buffa event decoding and strict
+preflight stay in the concrete reader adapters.
+
+`FormulaRenderBudget` preserves each caller's output accounting and typed
+error mapping. Expression handles are opaque arena-owned values rather than
+public integer offsets. A compact generation/index representation rejects
+foreign-arena handles without per-node allocation, and exhausted generations
+fail instead of wrapping into an existing arena identity. This adds no native
+object identifier to a supported Numbers, Pages, or Keynote API.
+
+The shared budget contract also checks structural node/part ceilings before
+arena and temporary-stack allocation, and bounds cumulative part traversal.
+This matters for standalone callers: output-byte limits alone do not bound
+empty expressions or repeatedly referenced expression graphs. Empty children
+are skipped during output, and the iterative walk remains bounded even when
+the output is short. Concrete adapters derive these structural ceilings from
+their existing formula-work limits rather than charging native decode work a
+second time. Output charging retains the historical terminal-on-error policy;
+an allocation failure after admission can leave output bytes charged.
+
+This extraction shares the complete composition arena, not the native event
+dispatcher. Formula retention, owner/category/function lookup, semantic depth
+and work admission, and native compatibility behavior remain adapter-owned.
+The host Pages and Keynote table readers still require those adapters until
+their focused replacements cover the complete values/comments/merges surface;
+this turn does not retire those debt edges.
+
+The native `formula-arena-native.numbers` control was edited in Numbers 14.4
+and saved, closed, and reopened at its exact path. Nested arithmetic
+`SUM(1,2)*2` displayed 6 and the Unicode conditional
+`IF(TRUE,"北京","Café")` displayed 北京. The receipt records the saved file;
+the fourth row is empty after the UI committed the last edited cell.
+
+Validation passes 11 independent common-arena tests, the isolated generation
+exhaustion test, 100 focused extractor tests, 42 host extractor tests, and both
+native formula readback controls. The common tests include a 10,000-deep
+iterative chain, zero-width shared graphs, and cumulative traversal refusal
+while output still fits. Strict Clippy for those tests passes. The ownership
+audit and all 1,024 Python boundary tests pass, including acceptance of future
+host reader deletion. The new `formula_render_arena` fuzz target completes
+1,000 AddressSanitizer runs without crashes.
