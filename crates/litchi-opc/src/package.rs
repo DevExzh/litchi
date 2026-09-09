@@ -731,7 +731,23 @@ impl OpcPackage {
         expected: &[u8],
         replacement: &OwnedContentTypes,
     ) -> Result<bool> {
-        let current = self.source_content_types()?;
+        self.try_replace_content_types_with_limits(expected, replacement, ReadLimits::default())
+    }
+
+    /// Replace an exact source-manifest snapshot under an explicit bounded
+    /// read policy.
+    ///
+    /// The current manifest is checked before replacement validation or any
+    /// package mutation. A changed signed package is refused before parsing
+    /// or retaining replacement metadata, and the replacement's XML is
+    /// admitted under the same limits used for the current source check.
+    pub fn try_replace_content_types_with_limits(
+        &mut self,
+        expected: &[u8],
+        replacement: &OwnedContentTypes,
+        limits: ReadLimits,
+    ) -> Result<bool> {
+        let current = self.source_content_types_with_limits(limits)?;
         if current.bytes() != expected {
             return Err(OpcError::InvalidContentTypesManifest(
                 "stale content-types source replacement".to_owned(),
@@ -749,6 +765,31 @@ impl OpcPackage {
         }
         if self.is_signed() || self.requires_signature_edit_policy() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        limits.check(
+            crate::ReadResource::ContentTypesBytes,
+            replacement.bytes().len() as u64,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(
+            crate::ReadResource::ContentTypeMappings,
+            replacement.binding.mapping_count() as u64,
+            limits.max_content_type_mappings() as u64,
+        )?;
+        crate::OwnedXmlPart::check_capture_size(
+            &replacement.xml.name,
+            replacement.bytes().len(),
+            limits,
+        )?;
+        // The token's binding is the exact semantic companion of its bytes.
+        // Re-parse under the caller's policy to enforce XML event, depth, and
+        // attribute ceilings without replacing that retained binding.
+        let parsed = ContentTypeMap::from_xml(replacement.bytes(), limits)?;
+        if parsed != *replacement.binding {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-types replacement binding does not match its XML".to_owned(),
+            ));
         }
         self.revoke_exact_source();
         self.source_content_types_xml = Some(Arc::clone(&replacement.xml.bytes));
@@ -2611,6 +2652,68 @@ mod tests {
         assert_eq!(
             archive.read("[Content_Types].xml").unwrap(),
             original_archive.read("[Content_Types].xml").unwrap()
+        );
+    }
+
+    #[test]
+    fn bounded_content_types_replacement_checks_token_before_mutation() {
+        let (source, _) = create_source_with_explicit_relationship_overrides(false);
+        let original = OpcPackage::from_bytes(&source).unwrap();
+        let token = original.source_content_types().unwrap();
+        let custom = PackURI::new("/custom/item.bin").unwrap();
+        let replacement = token
+            .with_part_overrides(&[(&custom, "application/octet-stream")], 4096)
+            .unwrap();
+        let mut package = original.clone();
+        package.add_part(Box::new(BlobPart::new(
+            custom,
+            "application/octet-stream".to_owned(),
+            b"payload".to_vec(),
+        )));
+        let current = package.source_content_types().unwrap();
+        let current_bytes = current.bytes().to_vec();
+        let before_bytes = crate::PackageWriter::to_bytes(&package).unwrap();
+
+        let under = ReadLimits::builder()
+            .max_content_types_bytes(current_bytes.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        let error = package
+            .try_replace_content_types_with_limits(&current_bytes, &replacement, under)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                actual,
+                maximum,
+            } if actual == replacement.bytes().len() as u64
+                && maximum == current_bytes.len() as u64
+        ));
+        assert_eq!(
+            crate::PackageWriter::to_bytes(&package).unwrap(),
+            before_bytes
+        );
+
+        let exact = ReadLimits::builder()
+            .max_content_types_bytes(replacement.bytes().len())
+            .unwrap()
+            .max_part_bytes(replacement.bytes().len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            package
+                .try_replace_content_types_with_limits(&current_bytes, &replacement, exact)
+                .unwrap()
+        );
+        assert_eq!(
+            package
+                .source_content_types_with_limits(exact)
+                .unwrap()
+                .bytes(),
+            replacement.bytes()
         );
     }
 

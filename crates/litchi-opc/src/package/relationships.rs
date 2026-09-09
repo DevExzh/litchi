@@ -434,10 +434,26 @@ impl OpcPackage {
         expected: &OwnedRelationships,
         replacement: &OwnedRelationships,
     ) -> Result<bool> {
+        self.try_replace_relationships_with_limits(expected, replacement, ReadLimits::default())
+    }
+
+    /// Replace an exact expected relationship snapshot under an explicit
+    /// bounded read policy.
+    ///
+    /// The current owner XML is checked before replacement parsing or package
+    /// mutation. A changed signed package is refused before retaining parsed
+    /// replacement fields, and the replacement is parsed under the same
+    /// policy used for the current source check.
+    pub fn try_replace_relationships_with_limits(
+        &mut self,
+        expected: &OwnedRelationships,
+        replacement: &OwnedRelationships,
+        limits: ReadLimits,
+    ) -> Result<bool> {
         if expected.owner != replacement.owner {
             return Err(invalid("relationship replacement has a different owner"));
         }
-        let current = self.source_relationships(&expected.owner)?;
+        let current = self.source_relationships_with_limits(&expected.owner, limits)?;
         if current != *expected {
             return Err(invalid("stale relationship replacement"));
         }
@@ -447,9 +463,10 @@ impl OpcPackage {
         if self.is_signed() || self.requires_signature_edit_policy() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        let relationships = crate::pkgreader::PackageReader::parse_owned_relationships(
+        let relationships = crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
             replacement.bytes(),
             &replacement.owner,
+            limits,
         )?;
         if !replacement.member_present && !relationships.is_empty() {
             return Err(invalid("absent relationship member has edges"));
@@ -713,6 +730,55 @@ mod tests {
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         assert_eq!(package.source_relationships(&owner).unwrap(), empty);
+    }
+
+    #[test]
+    fn bounded_relationship_replacement_checks_token_before_mutation() {
+        let mut package = OpcPackage::from_vec(source(XML)).unwrap();
+        let owner = PackURI::new("/custom/item.bin").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+        let after = before.without_relationship("rId1", XML.len()).unwrap();
+        assert!(package.try_replace_relationships(&before, &after).unwrap());
+        let current = package.source_relationships(&owner).unwrap();
+        let before_bytes = PackageWriter::to_bytes(&package).unwrap();
+
+        let under = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len() - 1)
+            .unwrap()
+            .max_total_relationship_xml_bytes(XML.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.try_replace_relationships_with_limits(&current, &before, under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                actual,
+                maximum,
+            }) if actual == XML.len() as u64 && maximum == (XML.len() - 1) as u64
+        ));
+        assert_eq!(PackageWriter::to_bytes(&package).unwrap(), before_bytes);
+
+        let exact = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len())
+            .unwrap()
+            .max_total_relationship_xml_bytes(XML.len())
+            .unwrap()
+            .max_part_bytes(XML.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(
+            package
+                .try_replace_relationships_with_limits(&current, &before, exact)
+                .unwrap()
+        );
+        assert_eq!(
+            package
+                .source_relationships_with_limits(&owner, exact)
+                .unwrap(),
+            before
+        );
     }
 
     #[test]
