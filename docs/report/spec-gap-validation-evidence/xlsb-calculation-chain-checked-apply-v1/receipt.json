@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "9aa761f071b37edfbb898664338e2819c81e728d",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-xlsb/src/calculation_chain/patch.rs": "2ad19d76ff92f218c2cd569f676c6c7fb9a8c5a4d31569fc379297ad887f4cf6",
+    "crates/litchi-xlsb/src/calculation_chain/workbook.rs": "10d731cb7b653078ebfceb105cc9acc585f1bca1588660a2a55dbcd32c28b1f5",
+    "crates/litchi-xlsb/src/calculation_chain/tests.rs": "3b34d4fd8ae593139e085319af7710b8a4466f1321e6c303d164279de5b61995"
+  },
+  "scope": "Calculation Chain private checked publication seam removes repeated source capture and package clone, retains before-clone source/signature admission and final readback.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline -p litchi-xlsb --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 780,
+      "tests_ignored": 1,
+      "doctests_passed": 9,
+      "doctests_ignored": 11
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-xlsb --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "0d57b6808deeac96ebcf7eb3a5be33a7df76fe4eb04426320fbf11359ee1ab92",
+      "uncompressed_sha256": "ecf63c51ae0609f213d0aa6e6c81ff493d25cab7eef992e6cf235bb33255405e"
+    },
+    "clippy.log.gz": {
+      "sha256": "daaaad478682b70670fc672e3dfbf82f7d5f9c44ff39c5ca5296ce0ee83798dd",
+      "uncompressed_sha256": "d4a69ea2fcfd56cdbf12d732b54009dc4d469bd9b6b5a1d2b6692f33a40fe921"
+    }
+  },
+  "allocation_evidence": {
+    "archive": "allocation-ab.tar.gz",
+    "sha256": "74605d4409fe32ce109ad945276cbc90532b16f9c5275085fc40c69812588ee6",
+    "files": {
+      "control/Cargo.toml": "a4c19b8fbd491d8c69ccedab555c46341d1770467f1deb9553bae6b71bd6ca9c",
+      "control/Cargo.lock": "8f05c2607c0bc195e47595ec895c1a8507afb0b259ea810f8dca57da71de1f3e",
+      "control/README.md": "255a25eb951280775376c80dc821de089b4cc169192afb3193e4e5c5a1b6a759",
+      "control/src/main.rs": "024d42ec23b16aaac2e007a5d9c2b69142252a7cb0da6958f36ed6f1f604bd7b",
+      "control/reports/control-changed_workbook_relationships.jsonl": "a714ab077e13ccc6423ae581124d418a14e2b23f8fd420f432178c9fa0fd5ef0",
+      "control/reports/control-content_types.jsonl": "812e5c61ba7fdd25f8ab4766dceee9555b730e4b432ebcece3875f83b9b0e3e4",
+      "control/reports/control-correctness.jsonl": "7d5beb69e05545701e75128e3c0d59026535280b657410f80d1a62bca6ac4443",
+      "control/reports/control-inverse_apply.jsonl": "3f1b856df2b22f9cf2a177a8372a3ec65090f14a9ab1773909f101a1fbd03463",
+      "control/reports/control-native-inventory.json": "476536c50e7c5abec99826db47718c9d578574a8e93165351587f76b6f7868ab",
+      "control/reports/control-noop_edit_commit.jsonl": "80cae6c8712aa04c6c3079eaf54f1ee114712544e45143caa9fa919327699915",
+      "control/reports/control-opc_package_clone.jsonl": "64556253be85c0e4ce3e5261edd3cc93d5fbd19b163c83adb269bf0a80d3fb59",
+      "control/reports/control-remove_apply.jsonl": "a81360a6b3c1ac4b9a13abdcfef0ed6bccbbe4bf021c4e1a9fd539129195f4a6",
+      "control/reports/control-remove_plan_commit.jsonl": "7e1b1c943993eec1df1a76003378284e6ce5bb762b699db4c8077e473cbd2f33",
+      "control/reports/control-removed_snapshot_read.jsonl": "1cbec0463163d89718209554ffebbbf1606a8372a99d4ff26d8ba26b3cb984ca",
+      "control/reports/control-reopen_inverse.jsonl": "05ebeebf1292354f6218be9f450eedec0577ee2f92a296053202d164affd90f6",
+      "control/reports/control-root_relationships.jsonl": "09d39ce4753911000f2090f8be958662797b1649c4bbead8867e973b218aabd6",
+      "control/reports/control-save_to_bytes.jsonl": "68aa592ebcc48ccedda20272ddb26fb8414758fbf156f9364ebc7d21b0fde8e6",
+      "control/reports/control-snapshot_clone.jsonl": "d72a93c7038a82abb9b284809212586aac2a0f08697ebb8beb3296fcb1388258",
+      "control/reports/control-snapshot_read.jsonl": "45fdd7bc25c9758a494efbc430515496cbc736d712a232e04bf318b27c031320",
+      "control/reports/control-without_workbook_relationship.jsonl": "c66b0551cb6b396902751fed68af81a90fbbc7b84274cdb577372af6ee3169cf",
+      "control/reports/control-workbook_relationships.jsonl": "0fb693977e653af1db9e89c70a0298aee0f50da3dedaa155737a7677b14cc84b",
+      "control/reports/source-manifest.json": "2b74e7eb9ba5b5b1dee5c1b7226407fbc0c7a810977558763ef204ffc7958572",
+      "candidate/Cargo.toml": "b003676660754a865b424430373e2ce6fe3688f3a45d92e10f348e144180e62a",
+      "candidate/Cargo.lock": "8f05c2607c0bc195e47595ec895c1a8507afb0b259ea810f8dca57da71de1f3e",
+      "candidate/README.md": "a7a9553b64673438ac0084defbc3a26327feb1c4d3c3937a687b90180c84b3ae",
+      "candidate/src/main.rs": "80e2e7e998e99bff685207775b13e0ad1c4efad8f39383eb8ef2d05153d24bca",
+      "candidate/reports/checked-apply-allocation-ab-receipt.json": "d28abf8e08f0743ef707f44a543655c29e4bd5691bb976aa2e7d6b5a287a78d2",
+      "candidate/reports/checked-apply-allocation-ab-summary.json": "fd3c44c0c7839184efc9f3d5c1ef0ae6bae6945e9c23eeb2d85233c2e19043e6",
+      "candidate/reports/checked-apply-allocation-ab.md": "062cdfe64568e28b1e402703aed96f653df7409adca3575deeb8861eb4789bd5",
+      "candidate/reports/checked-changed_workbook_relationships.jsonl": "0899fa47c3a9717ae35db8eb348afb9d42ab5fb69de2f2418f90ac8c57a7d19e",
+      "candidate/reports/checked-content_types.jsonl": "d04633ebd38b237eaebb2fbe60fde3864df069e8965d1ec3e465694ec8442c6e",
+      "candidate/reports/checked-correctness.jsonl": "76d0ad5716475f78f1a6dd3ae90933477698265ba6b19588be97d498f4a03c8b",
+      "candidate/reports/checked-inverse_apply.jsonl": "39011f731eb5b9ebee99e835c42fe40890aa509489f84e5ac242799dc413591c",
+      "candidate/reports/checked-native-inventory.json": "77ada36c1ec5444ce92615dfe52aaac9322e4eabaeeedfa253d45572f2443e60",
+      "candidate/reports/checked-noop_edit_commit.jsonl": "38cbde5c576327d0fd524dad755da331f9df5e0715cf3eb2cdbf10a9ad5e7cb5",
+      "candidate/reports/checked-opc_package_clone.jsonl": "777ae7ff26519da6727d75512c9099caeb4d2e876c82641b1d02514bb868d67b",
+      "candidate/reports/checked-remove_apply.jsonl": "a232928c0e5374590ac5c9b515fd004810e7c6e9cd899792c78fa1a9ec6d3899",
+      "candidate/reports/checked-remove_plan_commit.jsonl": "7d7ad59f0b1406894da59ebab2f54598327923cd80671fe8afd7c4d639092f2a",
+      "candidate/reports/checked-removed_snapshot_read.jsonl": "8d2bc6449e7a55aff5942ba93d56210c24a342a7bf400e41346bf29b794f915c",
+      "candidate/reports/checked-reopen_inverse.jsonl": "5df470675a3585bb1e8cc00a11e95d1816386055895e1efe8f0fe0f31fa0be9a",
+      "candidate/reports/checked-root_relationships.jsonl": "5da6397231a849be2d37a76a20cbf92d04180c37b5160259d20a72964dbc6ab7",
+      "candidate/reports/checked-save_to_bytes.jsonl": "743bae2b67f19f356123748fa8d345319d268d69b43bc94f5f9a7c6fe1b30e52",
+      "candidate/reports/checked-snapshot_clone.jsonl": "3be07421d46d370d1043fc03ecd50e1738af4509cb10e123ba030803ed08a0e5",
+      "candidate/reports/checked-snapshot_read.jsonl": "69272e0fd1c6ac1d95ccb93fc2594e26a432cf9c4aa540428c785cb6bae38d82",
+      "candidate/reports/checked-without_workbook_relationship.jsonl": "108c5911573f8194c7f17db46a275a335e5ddab865cb636e272d44249d729457",
+      "candidate/reports/checked-workbook_relationships.jsonl": "5b34a9e839752c49316f460b565d7cc5f75aeb01a93d609376f0f5f847ec6828",
+      "candidate/reports/source-manifest.json": "b62eeb1d1d89e8df7c6e3a2a870988b4f9f1c90f2d73f08a3e5cb08d53bb448d"
+    },
+    "source_baseline": "c40e4522309167bef1232ea22d36923c8f31d7b3",
+    "candidate_measured_runtime_files_match_batch": [
+      "crates/litchi-xlsb/src/calculation_chain/patch.rs",
+      "crates/litchi-xlsb/src/calculation_chain/workbook.rs"
+    ],
+    "scope": "Separate frozen c40 control and two-file candidate, 900 allocation-only rows, 2 profiles, 15 operations, 15 samples per cell, no timing/RSS/syscall claim. The broader 9aa validation baseline is not an allocation baseline."
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

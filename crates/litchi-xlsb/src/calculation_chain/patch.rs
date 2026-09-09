@@ -72,28 +72,40 @@ impl Patch {
         Ok(current)
     }
 
-    /// Apply atomically after checking the complete owner source closure.
-    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = self.check_source(package)?;
-        if self.is_empty() {
-            return Ok(current);
-        }
+    pub(crate) fn check_publication_policy(&self, package: &OpcPackage) -> Result<()> {
         if package.is_signed() || package.requires_signature_edit_policy() {
             return Err(Error::Opc(
                 litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
             ));
         }
+        Ok(())
+    }
 
-        let mut candidate = package.clone();
-        self.materialize(&mut candidate)?;
-        let resulting = Snapshot::read_with_limits(&candidate, self.limits())?;
+    /// Apply a source-checked patch to a caller-owned candidate.
+    ///
+    /// The caller must have checked the original package with [`Self::check_source`]
+    /// and must pass the resulting snapshot unchanged. The candidate is already
+    /// detached from the published package, so this seam performs no second
+    /// source capture and no package clone. It still validates the candidate's
+    /// complete resulting source state before returning it to the caller.
+    pub(crate) fn apply_checked(
+        &self,
+        candidate: &mut OpcPackage,
+        current: Snapshot,
+    ) -> Result<Snapshot> {
+        if self.is_empty() {
+            return Ok(current);
+        }
+        self.check_publication_policy(candidate)?;
+
+        self.materialize(candidate)?;
+        let resulting = Snapshot::read_with_limits(candidate, self.limits())?;
         if !resulting.same_state(&self.after) {
             return Err(Error::InvalidFormat(
                 "Calculation Chain publication changed the planned owned graph or source"
                     .to_string(),
             ));
         }
-        *package = candidate;
         Ok(resulting)
     }
 
