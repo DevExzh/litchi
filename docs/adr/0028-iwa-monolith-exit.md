@@ -10928,3 +10928,50 @@ manifest changed. Scoped `cargo clean` removed 2,102 sanitizer build files
 (1.5 GiB). Disposable Pages copies, probes, build/replay logs, generated fuzz
 lockfile, and Python cache were removed. The three new permanent fixtures and
 their receipts remain; unrelated pre-existing `.codex` content was preserved.
+
+## 2026-09-09 Pages source-built table stylesheet closure repair
+
+Native diagnostics identified a concrete builder defect behind the earlier
+source-built Pages damage alerts. The Numbers stylesheet grew list and paragraph
+presets at IDs 41 through 47, while the Pages table bootstrap still copied only
+styles 11 through 19 and stylesheet root 40. The copied root retained both typed
+references and archive-header references to the omitted objects. ID 41 also
+collides with the Pages body table attachment, so an existence-only census would
+miss one wrong-role edge. Pages' persistence log explicitly reported missing
+style 47. The retained table model, preset, and style network do not depend on
+these omitted Numbers presets.
+
+The importer now prunes the unused stylesheet edges while retaining the table's
+existing styles and Body mapping. Pages' independent paragraph style catalog,
+package topology, table attachment, and focused AggregateOnly route are preserved.
+A regression checks the typed style targets and message kinds, identifier map,
+header styles, and the generated package's complete archive-header reference
+closure after encoding and reopening.
+
+Computer Use opened the minimal repaired package in Pages 14.4, saved it, closed
+the actual window to the template chooser, and reopened the exact path without
+a repair alert. The body marker Cities and accessibility table Cities (five
+rows, four columns) survived. The retained source and app-saved fixtures and
+receipt are `source-built-table-stylesheet-*`. The table grid remained invisible
+in screenshots before and after reopening; this is native opening and structural
+preservation evidence, not visual table or interactive editing qualification.
+The rendering gap remains open.
+
+Independent controls narrow that remaining work: a source-built Pages document
+without a table opened, saved, closed, and reopened with its body marker intact.
+A source-built Numbers table opened and was recognized by accessibility, but
+also lacked visible grid rendering. Moving the Pages table component, adding a
+body newline, and combining those changes did not repair the original dangling
+stylesheet package. These observations do not establish component placement,
+ViewState, or a trailing body newline as mandatory opening invariants. The
+earlier negative fixtures remain valid evidence for their original bytes.
+
+Both retained fixtures pass focused text reading and byte-exact package
+re-encoding, plus legacy semantic body/table/dimension reading and byte-exact
+reopen. The focused table-name reader still rejects the source fixture as
+`InvalidSource`; this separate admission gap remains open and is not treated
+as qualified by the legacy readback.
+
+Scoped validation passes two stylesheet/native-fixture integration tests,
+eight Pages creation tests, 43 Pages table tests, and 40 focused hidden-axis
+tests. Strict library Clippy and workspace formatting pass.
