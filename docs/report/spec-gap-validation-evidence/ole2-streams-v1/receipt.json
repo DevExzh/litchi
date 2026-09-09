@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "8fcb0577ff73e12e88685dc3c8d0896cfb84b6c0",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-ole-common/src/ole_streams.rs": "f90109b0005019714b402d8322754809ddc3727be88b5bf8958dbd97f7797eb2",
+    "crates/litchi-ole-common/tests/ole_streams.rs": "5a49d64eca1d567d4b752ea25e50d52709c8f05ef7bd0851345d58d8de214fd2",
+    "crates/litchi-ole-common/src/object/model.rs": "46b7c03590d68b7812ad279c5c1ae37c9d92a40b24bc0910bfe9631beca31402",
+    "crates/litchi-ole-common/src/object/snapshot.rs": "f3360235a23f7b0e664bd327d5b3acf2a9060278f5681a24c5af03a0a8d6667a",
+    "crates/litchi-ole-common/src/object/editor.rs": "9b94814e6e20278a400f7535864602237a1f7690fe526e0e9eeaf21c5ce3389d",
+    "crates/litchi-ole-common/src/object/mod.rs": "9c1f04a248bdd71f695028f6da81fa87fe81a69e3058b5d2b78a82f4864c64f8",
+    "crates/litchi-ole-common/tests/object_streams.rs": "9f7864ca38355b3b8aff1d5fe12ec5f39d7fb8a757fb384ce66072be787926b4",
+    "crates/litchi-ole-common/src/lib.rs": "1221e28eadc207a76cf0852cf283b091650f5c22239a45ca546c97f4500735c2"
+  },
+  "scope": "Bounded OLE2 presentation, TOC entry and native-stream codecs; shared snapshots, atomic transactions, exact-source reversible patches and target-selected object integration. Payloads remain opaque and inert. No OLE1, native-producer interoperability, timing or total-memory claim.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-cfb -p litchi-ole-common --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 507,
+      "doctests_passed": 14,
+      "doctests_ignored": 1
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-cfb -p litchi-ole-common --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check (batch paths)",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "9458f4b32a7f699c59663e20763043a2b8b8412f4f9e9ea1ec5845a7f32345f8",
+      "uncompressed_sha256": "990eba51c186d4f8210e55fe8e67e010ba33021b331d4f7d1600a195498461e2"
+    },
+    "clippy.log.gz": {
+      "sha256": "5e394fe8142828f014fad0bb7289027f2a9755a9da06e60bbd3838c5317e158b",
+      "uncompressed_sha256": "e0a14f3365421454ec76de66613ddff90d3527c1c6af766aa57c30490e0847d8"
+    }
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

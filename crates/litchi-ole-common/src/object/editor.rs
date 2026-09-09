@@ -4,10 +4,14 @@ use super::cfb_path::CfbPath;
 use super::codec::{self, Package};
 use super::discovery;
 use super::link::{self, Link};
-use super::model::{Limits, Objects};
+use super::model::{self, Limits, Objects};
 use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
+use crate::ole_streams::{
+    self, NativePatch, NativeSnapshot, NativeTransaction, PresentationPatch, PresentationSnapshot,
+    PresentationTransaction,
+};
 use litchi_cfb::{OleError, OleFile};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -531,6 +535,160 @@ impl Editor {
         let mut link = Link::parse_shared(bytes)?;
         edit(&mut link)?;
         self.put_stream(&stream_path, link.to_bytes())
+    }
+
+    /// Atomically edits one selected object's OLEDS presentation stream.
+    ///
+    /// The source stream is parsed into a bounded, shared snapshot before the
+    /// callback runs.  The codec transaction validates and reparses the
+    /// candidate, then this editor publishes it through the ordinary
+    /// clone-render-reopen path.  A callback failure or package validation
+    /// failure leaves this editor unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target or indexed stream is absent, the
+    /// stream is malformed, the callback rejects the edit, or the resulting
+    /// package cannot be validated under the editor limits.
+    pub fn update_presentation<F>(
+        &mut self,
+        key: &str,
+        index: usize,
+        edit: F,
+    ) -> Result<(), OleError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), OleError>,
+    {
+        self.update_presentation_with_limits(key, index, ole_streams::Limits::default(), edit)
+    }
+
+    /// Atomically edits one selected object's OLEDS presentation under
+    /// explicit stream limits.
+    pub fn update_presentation_with_limits<F>(
+        &mut self,
+        key: &str,
+        index: usize,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), OleError>
+    where
+        F: FnOnce(&mut PresentationTransaction) -> Result<(), OleError>,
+    {
+        model::validate_ole_stream_limits(limits)?;
+        let stream_path = self.object_presentation_path(key, index)?;
+        let source = self
+            .package
+            .stream_shared(&stream_path)
+            .ok_or(OleError::StreamNotFound)
+            .and_then(|bytes| PresentationSnapshot::parse_shared(bytes, limits))?;
+        let mut transaction = source.edit();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        self.put_stream_shared(&stream_path, commit.snapshot().bytes_shared())
+    }
+
+    /// Applies a source-checked OLEDS presentation patch to one selected
+    /// object atomically.
+    ///
+    /// The exact source bytes are compared before reparsing, so a stale patch
+    /// is rejected before an editor candidate is cloned or rendered.
+    pub fn apply_presentation_patch(
+        &mut self,
+        key: &str,
+        index: usize,
+        patch: &PresentationPatch,
+    ) -> Result<(), OleError> {
+        let stream_path = self.object_presentation_path(key, index)?;
+        let bytes = self
+            .package
+            .stream_shared(&stream_path)
+            .ok_or(OleError::StreamNotFound)?;
+        if bytes.as_ref() != patch.before_bytes() {
+            return Err(OleError::InvalidFormat(
+                "OLEDS presentation patch source does not match object stream".into(),
+            ));
+        }
+        let source = PresentationSnapshot::parse_shared(bytes, patch.source().limits())?;
+        let replacement = patch.apply(&source)?;
+        self.put_stream_shared(&stream_path, replacement.bytes_shared())
+    }
+
+    /// Atomically edits one selected object's OLEDS native-data stream.
+    ///
+    /// Native bytes remain opaque and inert; the callback only receives the
+    /// bounded stream transaction.
+    pub fn update_native<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), OleError>,
+    {
+        self.update_native_with_limits(key, ole_streams::Limits::default(), edit)
+    }
+
+    /// Atomically edits one selected object's native-data stream under
+    /// explicit stream limits.
+    pub fn update_native_with_limits<F>(
+        &mut self,
+        key: &str,
+        limits: ole_streams::Limits,
+        edit: F,
+    ) -> Result<(), OleError>
+    where
+        F: FnOnce(&mut NativeTransaction) -> Result<(), OleError>,
+    {
+        model::validate_ole_stream_limits(limits)?;
+        let stream_path = self.object_native_path(key)?;
+        let source = self
+            .package
+            .stream_shared(&stream_path)
+            .ok_or(OleError::StreamNotFound)
+            .and_then(|bytes| NativeSnapshot::parse_shared(bytes, limits))?;
+        let mut transaction = source.edit();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        self.put_stream_shared(&stream_path, commit.snapshot().bytes_shared())
+    }
+
+    /// Applies a source-checked OLEDS native-data patch to one selected object
+    /// atomically.
+    ///
+    /// The exact source bytes are compared before reparsing, so a stale patch
+    /// is rejected before an editor candidate is cloned or rendered.
+    pub fn apply_native_patch(&mut self, key: &str, patch: &NativePatch) -> Result<(), OleError> {
+        let stream_path = self.object_native_path(key)?;
+        let bytes = self
+            .package
+            .stream_shared(&stream_path)
+            .ok_or(OleError::StreamNotFound)?;
+        if bytes.as_ref() != patch.before_bytes() {
+            return Err(OleError::InvalidFormat(
+                "OLEDS native patch source does not match object stream".into(),
+            ));
+        }
+        let source = NativeSnapshot::parse_shared(bytes, patch.source().limits())?;
+        let replacement = patch.apply(&source)?;
+        self.put_stream_shared(&stream_path, replacement.bytes_shared())
+    }
+
+    fn object_presentation_path(&self, key: &str, index: usize) -> Result<Vec<String>, OleError> {
+        let object = self
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        object.validate_presentation_count()?;
+        let mut path = object.path().to_vec();
+        path.push(ole_streams::presentation_name(index)?);
+        Ok(path)
+    }
+
+    fn object_native_path(&self, key: &str) -> Result<Vec<String>, OleError> {
+        let object = self
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        object.validate_presentation_count()?;
+        let mut path = object.path().to_vec();
+        path.push(ole_streams::NATIVE_STREAM_NAME.to_string());
+        Ok(path)
     }
 
     /// Adds a target-selected storage after the host has staged its reference.
