@@ -62,6 +62,25 @@ enum StructuralMember<'a> {
 }
 
 impl StructuralMember<'_> {
+    fn into_shared(self) -> Result<Arc<Vec<u8>>> {
+        self.into_shared_with_resource("OPC retained relationship XML")
+    }
+
+    fn into_shared_with_resource(self, resource: &'static str) -> Result<Arc<Vec<u8>>> {
+        match self {
+            Self::Shared(bytes) => Ok(bytes),
+            Self::Owned(bytes) => Ok(Arc::new(bytes)),
+            Self::Borrowed(bytes) => {
+                let mut owned = Vec::new();
+                owned
+                    .try_reserve_exact(bytes.len())
+                    .map_err(|source| allocation(resource, source))?;
+                owned.extend_from_slice(bytes);
+                Ok(Arc::new(owned))
+            },
+        }
+    }
+
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Borrowed(bytes) => bytes,
@@ -441,6 +460,12 @@ mod physical_part_tests {
             .clone();
 
         assert!(Arc::ptr_eq(&archive_blob, &serialized_blob));
+        let relationship_blob = physical.archive().read_shared("_rels/.rels").unwrap();
+        let retained_relationships = reader
+            .source_relationships
+            .get(&PackURI::new("/").unwrap())
+            .unwrap();
+        assert!(Arc::ptr_eq(&relationship_blob, retained_relationships));
     }
 }
 
@@ -513,6 +538,14 @@ impl SerializedRelationship {
 /// This is the main entry point for reading OPC packages. It handles parsing
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
+    /// Exact source bytes for the admitted content-types member. The bytes are
+    /// already charged to the structural XML limit before they are retained.
+    source_content_types_xml: Arc<Vec<u8>>,
+    /// Parsed source declarations used to decide whether those bytes remain
+    /// valid after a package edit.
+    source_content_types: ContentTypeMap,
+    /// Source XML retained only by eager ingress, within relationship read limits.
+    source_relationships: HashMap<PackURI, Arc<Vec<u8>>>,
     /// Package-level relationships
     /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pkg_srels: SmallVec<[SerializedRelationship; 8]>,
@@ -525,6 +558,38 @@ pub struct PackageReader {
 }
 
 impl PackageReader {
+    pub(crate) fn parse_owned_relationships(
+        xml: &[u8],
+        owner: &PackURI,
+    ) -> Result<crate::Relationships> {
+        let limits = ReadLimits::default();
+        let mut ledger = RelationshipLedger::default();
+        ledger.preflight_xml_bytes(limits, xml.len() as u64)?;
+        ledger.retain_xml_bytes(limits, xml.len() as u64)?;
+        let serialized = Self::parse_rels_xml_with_source(
+            xml,
+            owner.base_uri(),
+            Some(owner.as_str()),
+            limits,
+            &mut ledger,
+        )?;
+        let mut relationships = if owner.as_str() == PACKAGE_URI {
+            crate::Relationships::new(PACKAGE_URI.into())
+        } else {
+            crate::Relationships::for_source(owner)
+        };
+        relationships.try_reserve(serialized.len())?;
+        for rel in serialized {
+            relationships.try_add_relationship(
+                rel.reltype,
+                rel.target_ref,
+                rel.r_id,
+                rel.target_mode,
+            )?;
+        }
+        Ok(relationships)
+    }
+
     /// Open and parse an OPC package from a byte slice.
     ///
     /// Uses the eager payload path:
@@ -561,7 +626,7 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
-        let mut relationship_ledger = RelationshipLedger::default();
+        let mut relationship_ledger = RelationshipLedger::retaining_source();
 
         // Phase 1: Decompress and parse content types (on-demand)
         let content_types_member = Self::locate_content_types_member(archive)?;
@@ -573,6 +638,8 @@ impl PackageReader {
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
         let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let source_content_types_xml =
+            content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
         // Phase 2: Get package-level relationships (on-demand decompression)
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
@@ -597,6 +664,9 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            source_content_types_xml,
+            source_content_types: content_types,
+            source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
             pkg_srels,
             sparts,
             non_part_members,
@@ -627,7 +697,7 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
-        let mut relationship_ledger = RelationshipLedger::default();
+        let mut relationship_ledger = RelationshipLedger::retaining_source();
 
         let content_types_member = Self::locate_content_types_member(archive)?;
         let content_types_metadata = archive.metadata(content_types_member)?;
@@ -638,6 +708,8 @@ impl PackageReader {
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
         let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let source_content_types_xml =
+            content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels =
@@ -666,6 +738,9 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            source_content_types_xml,
+            source_content_types: content_types,
+            source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
             pkg_srels,
             sparts,
             non_part_members,
@@ -826,13 +901,20 @@ impl PackageReader {
                 ledger.preflight_xml_bytes(limits, metadata.uncompressed_size())?;
                 let rels_xml = read_structural_member(archive, rels_path)?;
                 ledger.retain_xml_bytes(limits, rels_xml.as_bytes().len() as u64)?;
-                Self::parse_rels_xml_with_source(
+                let relationships = Self::parse_rels_xml_with_source(
                     rels_xml.as_bytes(),
                     source_uri.base_uri(),
                     Some(source_uri.as_str()),
                     limits,
                     ledger,
-                )
+                )?;
+                if let Some(source_xml) = ledger.source_xml.as_mut() {
+                    source_xml
+                        .try_reserve(1)
+                        .map_err(|source| allocation("OPC relationship XML owners", source))?;
+                    source_xml.insert(source_uri.clone(), rels_xml.into_shared()?);
+                }
+                Ok(relationships)
             },
             Err(error) if is_member_missing(&error) => Ok(SmallVec::new()),
             Err(error) => Err(error.into()),
@@ -1438,6 +1520,17 @@ impl PackageReader {
         std::mem::take(&mut self.pkg_srels)
     }
 
+    pub(crate) fn take_source_relationships(&mut self) -> HashMap<PackURI, Arc<Vec<u8>>> {
+        std::mem::take(&mut self.source_relationships)
+    }
+
+    pub(crate) fn take_source_content_types(&mut self) -> (Arc<Vec<u8>>, ContentTypeMap) {
+        (
+            Arc::clone(&self.source_content_types_xml),
+            std::mem::replace(&mut self.source_content_types, ContentTypeMap::empty()),
+        )
+    }
+
     /// Take ownership of all serialized parts (zero-copy move).
     pub fn take_sparts(&mut self) -> Vec<SerializedPart> {
         std::mem::take(&mut self.sparts)
@@ -1460,6 +1553,7 @@ impl PackageReader {
 
 #[derive(Default)]
 struct RelationshipLedger {
+    source_xml: Option<HashMap<PackURI, Arc<Vec<u8>>>>,
     declared_xml_bytes: u64,
     retained_xml_bytes: u64,
     relationships: u64,
@@ -1467,6 +1561,13 @@ struct RelationshipLedger {
 }
 
 impl RelationshipLedger {
+    fn retaining_source() -> Self {
+        Self {
+            source_xml: Some(HashMap::new()),
+            ..Self::default()
+        }
+    }
+
     fn preflight_xml_bytes(&mut self, limits: ReadLimits, bytes: u64) -> Result<()> {
         limits.check(
             ReadResource::RelationshipXmlBytes,

@@ -3,14 +3,17 @@
 //! This module provides functionality to serialize and write OPC packages to disk,
 //! including writing `[Content_Types].xml`, relationships, and all parts.
 use crate::constants::content_type as ct;
+#[cfg(test)]
 use crate::content_type::ContentType;
 use crate::error::Result;
 use crate::package::{OpcPackage, SourceMember, SourceMemberKind};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
 use crate::rel::Relationships;
+#[cfg(test)]
 use litchi_core::xml::escape_xml;
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
 use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
@@ -55,25 +58,34 @@ impl<W: Write> Write for Counted<'_, W> {
 /// serialization and XML audit completes before a sequential sink sees bytes.
 struct PublicationPlan<'package> {
     content_types_uri: PackURI,
-    content_types_xml: String,
+    content_types_xml: Vec<u8>,
+    content_types_source_xml: Option<&'package [u8]>,
     package_rels_uri: PackURI,
     package_rels_xml: Vec<u8>,
+    package_rels_source_xml: Option<&'package [u8]>,
     parts: Vec<PlannedPart<'package>>,
 }
 
 struct PlannedPart<'package> {
     partname: &'package PackURI,
-    content_type: &'package str,
     blob: &'package [u8],
     authored_xml: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
-    relationships: Option<PlannedRelationships>,
+    relationships: Option<PlannedRelationships<'package>>,
 }
 
-struct PlannedRelationships {
+struct PlannedRelationships<'package> {
     uri: PackURI,
+    /// Canonical bytes remain the semantic preservation fingerprint.
     xml: Vec<u8>,
+    source_xml: Option<&'package [u8]>,
+}
+
+impl PlannedRelationships<'_> {
+    fn bytes(&self) -> &[u8] {
+        self.source_xml.unwrap_or(self.xml.as_slice())
+    }
 }
 
 enum PlannedAppend<'package> {
@@ -107,6 +119,16 @@ impl PlannedAppend<'_> {
 }
 
 impl<'package> PublicationPlan<'package> {
+    fn content_types_bytes(&self) -> &[u8] {
+        self.content_types_source_xml
+            .unwrap_or(self.content_types_xml.as_slice())
+    }
+
+    fn package_relationship_bytes(&self) -> &[u8] {
+        self.package_rels_source_xml
+            .unwrap_or(self.package_rels_xml.as_slice())
+    }
+
     fn from_package(package: &'package OpcPackage) -> Result<Self> {
         let mut parts = Vec::new();
         parts
@@ -118,7 +140,6 @@ impl<'package> PublicationPlan<'package> {
         for part in package.iter_parts() {
             parts.push(PlannedPart {
                 partname: part.partname(),
-                content_type: part.content_type(),
                 blob: part.blob(),
                 authored_xml: xml_minifier::audit::package::is_xml_part(
                     part.partname().as_str(),
@@ -134,14 +155,24 @@ impl<'package> PublicationPlan<'package> {
 
         let content_types_uri =
             PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
-        let content_types_xml = ContentTypesItem::from_parts(&parts)?.to_xml();
-        PackageWriter::validate_authored_xml("[Content_Types].xml", content_types_xml.as_bytes())?;
+        let content_types_source_xml = package
+            .source_content_types_source()?
+            .map(|(bytes, _)| bytes);
+        let content_types_xml = if content_types_source_xml.is_some() {
+            Vec::new()
+        } else {
+            let bytes = authored_content_types_xml(package)?;
+            PackageWriter::validate_authored_xml("[Content_Types].xml", &bytes)?;
+            bytes
+        };
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(crate::OpcError::InvalidPackUri)?;
         let package_rels_uri = package_uri
             .rels_uri()
             .map_err(crate::OpcError::InvalidPackUri)?;
         let package_rels_xml = package.rels().try_to_xml_bytes()?;
+        let package_rels_source_xml =
+            package.source_relationships_xml(&package_uri, package.rels())?;
         PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
 
         for part in &mut parts {
@@ -155,26 +186,33 @@ impl<'package> PublicationPlan<'package> {
                     .map_err(crate::OpcError::InvalidPackUri)?;
                 let xml = part.rels.try_to_xml_bytes()?;
                 PackageWriter::validate_authored_xml(uri.as_str(), xml.as_slice())?;
-                part.relationships = Some(PlannedRelationships { uri, xml });
+                let source_xml = package.source_relationships_xml(part.partname, part.rels)?;
+                part.relationships = Some(PlannedRelationships {
+                    uri,
+                    xml,
+                    source_xml,
+                });
             }
         }
 
         Ok(Self {
             content_types_uri,
             content_types_xml,
+            content_types_source_xml,
             package_rels_uri,
             package_rels_xml,
+            package_rels_source_xml,
             parts,
         })
     }
 
     fn write<W: Write>(&self, physical: &mut PhysPkgWriter<W>) -> Result<()> {
-        physical.write(&self.content_types_uri, self.content_types_xml.as_bytes())?;
-        physical.write(&self.package_rels_uri, self.package_rels_xml.as_slice())?;
+        physical.write(&self.content_types_uri, self.content_types_bytes())?;
+        physical.write(&self.package_rels_uri, self.package_relationship_bytes())?;
         for part in &self.parts {
             physical.write(part.partname, part.blob)?;
             if let Some(relationships) = &part.relationships {
-                physical.write(&relationships.uri, relationships.xml.as_slice())?;
+                physical.write(&relationships.uri, relationships.bytes())?;
             }
         }
         Ok(())
@@ -498,20 +536,8 @@ fn try_write_preserved<W: Write>(
         return Ok(PreservationWrite::Fallback(writer));
     }
 
-    let removed_part = provenance
-        .members
-        .iter()
-        .zip(index.entries())
-        .any(|(member, entry)| {
-            omitted_ids.contains(&entry.id()) && matches!(member.kind, SourceMemberKind::Part(_))
-        });
-    let content_types_changed = removed_part
-        || publication.parts.iter().any(|part| {
-            provenance
-                .parts
-                .get(part.partname)
-                .is_none_or(|source| source.content_type != part.content_type)
-        });
+    let content_types_changed =
+        provenance.content_types_xml.as_slice() != publication.content_types_bytes();
     let mut regenerated_bytes = 0_u64;
     let mut regenerated_members = 0_u64;
     let omitted_members = u64::try_from(omitted_ids.len())
@@ -524,13 +550,13 @@ fn try_write_preserved<W: Write>(
         }
         let bytes = match &member.kind {
             SourceMemberKind::ContentTypes if content_types_changed => {
-                Some(publication.content_types_xml.len())
+                Some(publication.content_types_bytes().len())
             },
             SourceMemberKind::PackageRelationships
                 if provenance.package_relationships_xml.as_bytes()
-                    != publication.package_rels_xml.as_slice() =>
+                    != publication.package_relationship_bytes() =>
             {
-                Some(publication.package_rels_xml.len())
+                Some(publication.package_relationship_bytes().len())
             },
             SourceMemberKind::Part(partname) => {
                 let Some(part) = planned_parts.get(partname) else {
@@ -551,8 +577,8 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                (source_part.relationships_xml.as_bytes() != relationships.xml.as_slice())
-                    .then_some(relationships.xml.len())
+                (source_part.relationships_xml.as_bytes() != relationships.bytes())
+                    .then_some(relationships.bytes().len())
             },
             SourceMemberKind::ContentTypes
             | SourceMemberKind::PackageRelationships
@@ -579,7 +605,7 @@ fn try_write_preserved<W: Write>(
                 let Some(relationships) = part.relationships.as_ref() else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                relationships.xml.len()
+                relationships.bytes().len()
             },
         };
         appended_bytes = appended_bytes.checked_add(bytes as u64).ok_or_else(|| {
@@ -618,16 +644,16 @@ fn try_write_preserved<W: Write>(
                 SourceMemberKind::ContentTypes if content_types_changed => regenerated_action(
                     indexed_entry.id(),
                     preservation_member_name(source_member, indexed_entry),
-                    publication.content_types_xml.as_bytes(),
+                    publication.content_types_bytes(),
                 )?,
                 SourceMemberKind::PackageRelationships
                     if provenance.package_relationships_xml.as_bytes()
-                        != publication.package_rels_xml.as_slice() =>
+                        != publication.package_relationship_bytes() =>
                 {
                     regenerated_action(
                         indexed_entry.id(),
                         preservation_member_name(source_member, indexed_entry),
-                        publication.package_rels_xml.as_slice(),
+                        publication.package_relationship_bytes(),
                     )?
                 },
                 SourceMemberKind::Part(partname) => {
@@ -657,13 +683,13 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_part.relationships_xml.as_bytes() == relationships.xml.as_slice() {
+                    if source_part.relationships_xml.as_bytes() == relationships.bytes() {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_action(
                             indexed_entry.id(),
                             preservation_member_name(source_member, indexed_entry),
-                            relationships.xml.as_slice(),
+                            relationships.bytes(),
                         )?
                     }
                 },
@@ -688,7 +714,7 @@ fn try_write_preserved<W: Write>(
                 };
                 regenerated_entry(
                     relationships.uri.membername(),
-                    relationships.xml.as_slice(),
+                    relationships.bytes(),
                     "OPC appended relationship payload",
                 )?
             },
@@ -1012,6 +1038,7 @@ fn owned_source_preservation_error() -> crate::OpcError {
 /// Helper for building `[Content_Types].xml` content.
 ///
 /// Manages Default and Override elements for content type mapping.
+#[cfg(test)]
 struct ContentTypesItem {
     /// Default content types by extension
     defaults: HashMap<String, ContentType>,
@@ -1020,6 +1047,231 @@ struct ContentTypesItem {
     overrides: HashMap<String, ContentType>,
 }
 
+/// Build deterministic authored content-types XML from package metadata only.
+/// This is used by source-bound snapshots for newly authored packages, where
+/// no admitted source manifest exists to retain.
+pub(crate) fn authored_content_types_xml(package: &OpcPackage) -> Result<Vec<u8>> {
+    authored_content_types_xml_with_limits(package, crate::ReadLimits::default())
+}
+
+const AUTHORED_CONTENT_TYPE_DEFAULTS: [(&str, &str); 10] = [
+    ("bin", ct::XLSB_BIN),
+    ("emf", "image/x-emf"),
+    ("gif", "image/gif"),
+    ("jpeg", "image/jpeg"),
+    ("jpg", "image/jpeg"),
+    (
+        "odttf",
+        "application/vnd.openxmlformats-officedocument.obfuscatedFont",
+    ),
+    ("png", "image/png"),
+    ("rels", ct::OPC_RELATIONSHIPS),
+    ("wmf", "image/x-wmf"),
+    ("xml", ct::XML),
+];
+
+struct AuthoredContentTypesBudget {
+    limits: crate::ReadLimits,
+    bytes: usize,
+    mappings: usize,
+}
+
+impl AuthoredContentTypesBudget {
+    fn charge(&mut self, prefix: &[u8], name: &str, content_type: &str) -> Result<()> {
+        use crate::ReadResource;
+        let maximum = self.limits.max_content_types_bytes();
+        self.mappings += 1; // Bounded by the admitted part count plus fixed defaults.
+        self.limits.check(
+            ReadResource::ContentTypeMappings,
+            self.mappings as u64,
+            self.limits.max_content_type_mappings() as u64,
+        )?;
+        self.bytes = self
+            .bytes
+            .checked_add(prefix.len() + b"\" ContentType=\"".len() + b"\"/>".len())
+            .ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types size overflows".into(),
+                )
+            })?;
+        self.limits.check(
+            ReadResource::ContentTypesBytes,
+            self.bytes as u64,
+            maximum as u64,
+        )?;
+        for value in [name, content_type] {
+            // Reject oversized caller strings before scanning their contents.
+            let lower_bound = self.bytes.checked_add(value.len()).ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types size overflows".into(),
+                )
+            })?;
+            self.limits.check(
+                ReadResource::ContentTypesBytes,
+                lower_bound as u64,
+                maximum as u64,
+            )?;
+            let escaped = value.bytes().try_fold(0usize, |length, byte| {
+                length.checked_add(match byte {
+                    b'&' => 5,
+                    b'<' | b'>' => 4,
+                    b'"' | b'\'' => 6,
+                    _ => 1,
+                })
+            });
+            self.bytes = escaped
+                .and_then(|length| self.bytes.checked_add(length))
+                .ok_or_else(|| {
+                    crate::OpcError::InvalidContentTypesManifest(
+                        "authored content-types size overflows".into(),
+                    )
+                })?;
+            self.limits.check(
+                ReadResource::ContentTypesBytes,
+                self.bytes as u64,
+                maximum as u64,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+fn authored_content_types_xml_with_limits(
+    package: &OpcPackage,
+    limits: crate::ReadLimits,
+) -> Result<Vec<u8>> {
+    use crate::ReadResource;
+
+    const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#;
+    const FOOTER: &[u8] = b"</Types>";
+    const DEFAULT_PREFIX: &[u8] = b"<Default Extension=\"";
+    const OVERRIDE_PREFIX: &[u8] = b"<Override PartName=\"";
+
+    limits.check(
+        ReadResource::Parts,
+        package.part_count() as u64,
+        limits.max_parts() as u64,
+    )?;
+    let mut budget = AuthoredContentTypesBudget {
+        limits,
+        bytes: HEADER.len() + FOOTER.len(),
+        mappings: 0,
+    };
+    let mut defaults = [false; AUTHORED_CONTENT_TYPE_DEFAULTS.len()];
+    // Only borrowed metadata is retained before the complete escaped output
+    // size is admitted. Repeated default mappings do not consume output quota.
+    let mut override_count = 0usize;
+    for index in [7, 9] {
+        defaults[index] = true;
+        budget.charge(
+            DEFAULT_PREFIX,
+            AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
+            AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
+        )?;
+    }
+    for part in package.iter_parts() {
+        if let Some(index) =
+            AUTHORED_CONTENT_TYPE_DEFAULTS
+                .iter()
+                .position(|(extension, content_type)| {
+                    part.partname().ext().eq_ignore_ascii_case(extension)
+                        && part.content_type() == *content_type
+                })
+        {
+            if !defaults[index] {
+                budget.charge(
+                    DEFAULT_PREFIX,
+                    AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
+                    AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
+                )?;
+                defaults[index] = true;
+            }
+        } else {
+            budget.charge(
+                OVERRIDE_PREFIX,
+                part.partname().as_str(),
+                part.content_type(),
+            )?;
+            override_count += 1;
+        }
+    }
+    let mut overrides = Vec::new();
+    overrides
+        .try_reserve_exact(override_count)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC authored content-types mapping index",
+            source,
+        })?;
+    for part in package.iter_parts() {
+        if let Err(reason) = crate::content_type::validate_content_type(part.content_type()) {
+            let mut value = String::new();
+            value
+                .try_reserve_exact(part.content_type().len())
+                .map_err(|source| crate::OpcError::Allocation {
+                    resource: "OPC invalid authored content type",
+                    source,
+                })?;
+            value.push_str(part.content_type());
+            return Err(crate::OpcError::InvalidContentType { value, reason });
+        }
+        if !AUTHORED_CONTENT_TYPE_DEFAULTS
+            .iter()
+            .any(|(extension, content_type)| {
+                part.partname().ext().eq_ignore_ascii_case(extension)
+                    && part.content_type() == *content_type
+            })
+        {
+            overrides.push((part.partname().as_str(), part.content_type()));
+        }
+    }
+    overrides.sort_unstable_by_key(|(name, _)| *name);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(budget.bytes)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC authored content-types XML",
+            source,
+        })?;
+    output.extend_from_slice(HEADER);
+    for (index, (name, content_type)) in AUTHORED_CONTENT_TYPE_DEFAULTS.iter().enumerate() {
+        if defaults[index] {
+            append_authored_content_type(&mut output, DEFAULT_PREFIX, name, content_type);
+        }
+    }
+    for (name, content_type) in overrides {
+        append_authored_content_type(&mut output, OVERRIDE_PREFIX, name, content_type);
+    }
+    output.extend_from_slice(FOOTER);
+    debug_assert_eq!(output.len(), budget.bytes);
+    Ok(output)
+}
+
+fn append_authored_content_type(
+    output: &mut Vec<u8>,
+    prefix: &[u8],
+    name: &str,
+    content_type: &str,
+) {
+    output.extend_from_slice(prefix);
+    for (index, value) in [name, content_type].iter().enumerate() {
+        if index == 1 {
+            output.extend_from_slice(b"\" ContentType=\"");
+        }
+        for byte in value.bytes() {
+            match byte {
+                b'&' => output.extend_from_slice(b"&amp;"),
+                b'<' => output.extend_from_slice(b"&lt;"),
+                b'>' => output.extend_from_slice(b"&gt;"),
+                b'"' => output.extend_from_slice(b"&quot;"),
+                b'\'' => output.extend_from_slice(b"&apos;"),
+                _ => output.push(byte),
+            }
+        }
+    }
+    output.extend_from_slice(b"\"/>");
+}
+
+#[cfg(test)]
 impl ContentTypesItem {
     /// Create a new `ContentTypesItem`.
     fn new() -> Result<Self> {
@@ -1033,17 +1285,6 @@ impl ContentTypesItem {
             defaults,
             overrides: HashMap::new(),
         })
-    }
-
-    /// Build `ContentTypesItem` from the sorted publication parts.
-    fn from_parts(parts: &[PlannedPart<'_>]) -> Result<Self> {
-        let mut cti = Self::new()?;
-
-        for part in parts {
-            cti.add_content_type(part.partname, part.content_type)?;
-        }
-
-        Ok(cti)
     }
 
     /// Add a content type for a part.
@@ -1134,6 +1375,111 @@ mod tests {
     use std::io;
 
     use super::*;
+
+    #[test]
+    fn bounded_authored_content_types_match_legacy_bytes_and_exact_limits() {
+        let mut package = OpcPackage::new();
+        for (name, content_type) in [
+            ("/custom/a&b.xml", "application/x-test;id=\"a&b\""),
+            ("/media/a.PNG", "image/png"),
+            ("/media/b.png", "image/png"),
+            ("/custom/plain.xml", ct::XML),
+            ("/custom/data.bin", ct::XLSB_BIN),
+        ] {
+            package
+                .try_add_part(Box::new(crate::BlobPart::new(
+                    PackURI::new(name).unwrap(),
+                    content_type.into(),
+                    Vec::new(),
+                )))
+                .unwrap();
+        }
+        let mut legacy = ContentTypesItem::new().unwrap();
+        for part in package.iter_parts() {
+            legacy
+                .add_content_type(part.partname(), part.content_type())
+                .unwrap();
+        }
+        let expected = legacy.to_xml().into_bytes();
+        let exact = crate::ReadLimits::builder()
+            .max_content_types_bytes(expected.len())
+            .unwrap()
+            .max_content_type_mappings(5)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            authored_content_types_xml_with_limits(&package, exact).unwrap(),
+            expected
+        );
+        let too_small = crate::ReadLimits::builder()
+            .max_content_types_bytes(expected.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, too_small),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+        let too_few = crate::ReadLimits::builder()
+            .max_content_type_mappings(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, too_few),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypeMappings,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn authored_content_type_quota_precedes_oversized_value_retention() {
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(crate::BlobPart::new(
+                PackURI::new("/custom/item.bin").unwrap(),
+                "invalid ".repeat(2048),
+                Vec::new(),
+            )))
+            .unwrap();
+        let limits = crate::ReadLimits::builder()
+            .max_content_types_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, limits),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn override_selector_quota_precedes_invalid_content_type_parsing() {
+        let source = OpcPackage::new().source_content_types().unwrap();
+        let name = PackURI::new("/custom/item.bin").unwrap();
+        let oversized = "invalid ".repeat(2048);
+        let error = source
+            .with_part_overrides(&[(&name, &oversized)], 1024)
+            .unwrap_err();
+        assert!(
+            matches!(error, crate::OpcError::InvalidContentTypesManifest(message)
+            if message.contains("selectors exceed"))
+        );
+        assert!(
+            source
+                .with_part_overrides(&[(&name, "invalid")], 1024)
+                .is_err()
+        );
+    }
 
     struct ChunkSink {
         total: usize,
@@ -1334,6 +1680,92 @@ mod tests {
             .expect("finish boundary source archive")
     }
 
+    #[test]
+    fn borrowed_ingress_preserves_relationship_xml_and_invalidates_changed_edges() {
+        const ROOT: &[u8] = br#"<?xml version='1.0'?>
+<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- root context --> <r:Relationship Target='custom/first.bin' Type='urn:test:part' Id='rId9'/>
+</r:Relationships>"#;
+        const PART: &[u8] = br#"<?xml version='1.0'?>
+<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- edge context --> <Relationship TargetMode='External' Target='https://example.test/?a=1&amp;b=2' Type='urn:test:external' Id='rId7'/>
+</Relationships>"#;
+        const EMPTY: &[u8] = br#"<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- empty owner context -->
+</Relationships>"#;
+        let first = PackURI::new("/custom/first.bin").unwrap();
+        for stored in [false, true] {
+            let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+            for (name, bytes) in [
+                ("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#.as_slice()),
+                ("_rels/.rels", ROOT),
+                ("custom/first.bin", b"first".as_slice()),
+                ("custom/second.bin", b"second".as_slice()),
+                ("custom/_rels/first.bin.rels", PART),
+                ("custom/_rels/second.bin.rels", EMPTY),
+            ] {
+                if stored { writer.write_stored(name, bytes).unwrap(); }
+                else { writer.write_deflated(name, bytes).unwrap(); }
+            }
+            let source = writer.finish_to_bytes().unwrap();
+            let mut package = OpcPackage::from_bytes(&source).unwrap().clone();
+            assert!(package.preservation_source().is_none());
+            let check_original_relationships = |package: &OpcPackage| {
+                let output = PackageWriter::to_bytes(package).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+                for (name, bytes) in [
+                    ("_rels/.rels", ROOT),
+                    ("custom/_rels/first.bin.rels", PART),
+                    ("custom/_rels/second.bin.rels", EMPTY),
+                ] {
+                    assert_eq!(
+                        archive.read(name).unwrap(),
+                        bytes,
+                        "{name}, stored={stored}"
+                    );
+                }
+            };
+            check_original_relationships(&package);
+            package
+                .rels_mut()
+                .retarget("rId9", "custom/second.bin".into())
+                .unwrap();
+            package
+                .get_part_mut(&first)
+                .unwrap()
+                .rels_mut()
+                .retarget("rId7", "https://example.test/changed".into())
+                .unwrap();
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            let reopened = OpcPackage::from_bytes(&output).unwrap();
+            assert_eq!(
+                reopened.rels().get("rId9").unwrap().target_ref(),
+                "custom/second.bin"
+            );
+            assert_eq!(
+                reopened
+                    .get_part(&first)
+                    .unwrap()
+                    .rels()
+                    .get("rId7")
+                    .unwrap()
+                    .target_ref(),
+                "https://example.test/changed"
+            );
+            package
+                .rels_mut()
+                .retarget("rId9", "custom/first.bin".into())
+                .unwrap();
+            package
+                .get_part_mut(&first)
+                .unwrap()
+                .rels_mut()
+                .retarget("rId7", "https://example.test/?a=1&b=2".into())
+                .unwrap();
+            check_original_relationships(&package);
+        }
+    }
+
     fn source_with_explicit_empty_part_relationships() -> (Vec<u8>, PackURI) {
         let partname = PackURI::new("/custom/empty.bin").expect("empty part URI");
         let empty_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
@@ -1364,6 +1796,88 @@ mod tests {
             )
             .expect("write explicit empty part relationships");
         (writer.finish_to_bytes().expect("finish source"), partname)
+    }
+
+    #[test]
+    fn replacing_relationship_owner_does_not_inherit_old_member_provenance() {
+        let (source, name) = source_with_explicit_empty_part_relationships();
+        for owned in [false, true] {
+            for insertion in 0..3 {
+                let mut package = if owned {
+                    OpcPackage::from_vec(source.clone()).unwrap()
+                } else {
+                    OpcPackage::from_bytes(&source).unwrap()
+                };
+                let replacement = Box::new(crate::BlobPart::new(
+                    name.clone(),
+                    "application/octet-stream".into(),
+                    b"replacement".to_vec(),
+                ));
+                if insertion == 0 {
+                    package.add_part(replacement);
+                } else {
+                    assert!(package.remove_part(&name));
+                    if insertion == 1 {
+                        package.try_add_part(replacement).unwrap();
+                    } else {
+                        package.try_add_source_part(replacement).unwrap();
+                    }
+                }
+                let output = PackageWriter::to_bytes(&package).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+                assert!(
+                    !archive
+                        .file_names()
+                        .any(|candidate| candidate == "custom/_rels/empty.bin.rels"),
+                    "owned={owned}, insertion={insertion}"
+                );
+                assert_eq!(archive.read(name.membername()).unwrap(), b"replacement");
+            }
+        }
+    }
+
+    #[test]
+    fn replacement_with_identical_edges_uses_its_own_relationship_xml() {
+        let (source, name) = source_with_explicit_empty_part_relationships();
+        let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+        let rels_uri = name.rels_uri().unwrap();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        for member in original.file_names() {
+            let bytes = if member == rels_uri.membername() {
+                br#"<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+<!-- original owner --> <Relationship TargetMode='External' Target='https://example.test/' Type='urn:test:external' Id='rId1'/>
+</Relationships>"#.to_vec()
+            } else {
+                original.read(member).unwrap()
+            };
+            writer.write_deflated(member, &bytes).unwrap();
+        }
+        let source = writer.finish_to_bytes().unwrap();
+        for owned in [false, true] {
+            let mut package = if owned {
+                OpcPackage::from_vec(source.clone()).unwrap()
+            } else {
+                OpcPackage::from_bytes(&source).unwrap()
+            };
+            let mut replacement = crate::BlobPart::new(
+                name.clone(),
+                "application/octet-stream".into(),
+                b"replacement".to_vec(),
+            );
+            *crate::Part::rels_mut(&mut replacement) =
+                package.get_part(&name).unwrap().rels().clone();
+            let expected = crate::Part::rels(&replacement).to_xml();
+            package.add_part(Box::new(replacement));
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            assert_eq!(
+                soapberry_zip::office::ArchiveReader::new(&output)
+                    .unwrap()
+                    .read(rels_uri.membername())
+                    .unwrap(),
+                expected.as_bytes(),
+                "owned={owned}"
+            );
+        }
     }
 
     fn signed_source() -> (Vec<u8>, PackURI) {
