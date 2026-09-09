@@ -181,6 +181,14 @@ pub struct Document {
     /// first parse error so malformed optional metadata is not reparsed.
     pub(in crate::document) print_environment:
         OnceLock<std::result::Result<Option<DocumentPrintEnvironment>, String>>,
+    /// Bounded raw source for deferred VBA signature parsing, or its deferred
+    /// range/allocation diagnostic.
+    pub(in crate::document) vba_signatures_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict Word VBA signature-variable metadata parse, including
+    /// the first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) vba_signatures: OnceLock<
+        std::result::Result<Option<crate::parts::vba_signature::DocumentVbaSignatures>, String>,
+    >,
     /// Deferred strict caption label and `AutoCaption` metadata parse
     pub(in crate::document) caption_tables: Result<CaptionTables>,
     /// Deferred strict repair-bookmark metadata parse

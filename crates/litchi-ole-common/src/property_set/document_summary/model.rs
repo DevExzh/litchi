@@ -7,6 +7,7 @@ use super::super::model::{
 };
 use super::transaction::Transaction;
 use super::validation::validate_section;
+use crate::vba_signature;
 use litchi_cfb::{OleError, OleFile};
 use std::io::{Read, Seek};
 
@@ -204,6 +205,44 @@ impl Snapshot {
     #[must_use]
     pub fn property(&self, identifier: u32) -> Option<&Value> {
         self.section.property(identifier)
+    }
+
+    /// Reads the inert VBA `DigSigBlob` stored in PIDDSI `DigitalSignature`.
+    ///
+    /// The signature and certificate-store payloads remain opaque. This
+    /// accessor only validates the `[MS-OSHARED]` container; the PKCS#7
+    /// `SignedData` and its `SpcIndirectDataContent` versus
+    /// `SpcIndirectDataContentV2` `contentInfo` form are not decoded. It never
+    /// verifies trust, opens a project, or executes VBA. `None` means that the
+    /// property is absent. A present value must be a `VT_BLOB` containing a
+    /// complete `DigSigBlob`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the property has a different VT or its blob is
+    /// malformed or exceeds `limits`.
+    pub fn vba_signature_with(
+        &self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>, OleError> {
+        let Some(value) = self.section.property(DIGITAL_SIGNATURE) else {
+            return Ok(None);
+        };
+        let Value::Blob(bytes) = value else {
+            return Err(super::super::model::invalid(
+                "PIDDSI DigitalSignature must be a VT_BLOB",
+            ));
+        };
+        vba_signature::Snapshot::parse_with(bytes, vba_signature::Kind::Property, limits)
+            .map(Some)
+            .map_err(|error| super::super::model::invalid(error.to_string()))
+    }
+
+    /// Reads the inert VBA `DigSigBlob` using conservative default limits.
+    ///
+    /// This method never verifies certificate trust or executes VBA.
+    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>, OleError> {
+        self.vba_signature_with(vba_signature::Limits::default())
     }
 
     /// Starts a source-bound transactional edit.

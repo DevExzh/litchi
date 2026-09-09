@@ -1,0 +1,77 @@
+{
+  "base_commit": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "sources": {
+    "crates/litchi-doc/docs/FEATURE_MATRIX.md": "15ffa0dffdfa1589f0d254e88d4e12a24e1fa6cd869d16464084ba7ae68a796c",
+    "crates/litchi-doc/src/document/model/semantic/basics.rs": "afb099f23bff6241b0b22e304383c44ca1fd37618fb218859aea069fb28daadb",
+    "crates/litchi-doc/src/document/model/semantic/prelude.rs": "197a3611c68e4873d3bb603269e3f8831e2c8cdc21397c75a428da20ee423982",
+    "crates/litchi-doc/src/document/model/state.rs": "aefb99fca7fe10e8ed6d776773b3a2a1bd771a8e9c626b5453389d36400c3151",
+    "crates/litchi-doc/src/document/package.rs": "df17204c765809038aca4594ccc2488f8bace439e6c26a9da12be987e67813a4",
+    "crates/litchi-doc/src/lib.rs": "710cf4b1d2b4c8b505dc6a3f77a508d95cb30031240e7fcaa76b98e290a9d86c",
+    "crates/litchi-doc/src/package/codec.rs": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9",
+    "crates/litchi-doc/src/package/property_set.rs": "0b12a7f3b756db68886ff364a96f445970a06a0c22249d6471519663eebf6501",
+    "crates/litchi-doc/src/parts/mod.rs": "53103fe98c262c41954ba82968b8f56ef2f5a681032149624d989151df3424e9",
+    "crates/litchi-doc/src/parts/vba_signature.rs": "b17d99209463f3c294a717f6c6a8d1cd72c8b69d8e02402af300a9bbcab1061c",
+    "crates/litchi-doc/tests/binary_digital_signatures.rs": "0140523577ab054176daa9507fc774ae162a7ec23573f68e2d499f7089bfd440",
+    "crates/litchi-doc/tests/vba_signatures.rs": "81e18fba70abac01e6b0d4cb8c7325fa42587f5f5efd353b046d98330d51c082",
+    "crates/litchi-ole-common/src/property_set/document_summary/model.rs": "ba621672f85ff6f49228e3c760b7924673b2332ba2c4b74dabb449b16375d459",
+    "crates/litchi-ole-common/src/property_set/document_summary/transaction.rs": "ed7f2f68c7d50e0f899f429a5077205aa00163289e52fded9cb1cff31d5d7347"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-doc -p litchi-ole-common --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-doc -p litchi-ole-common --all-features --all-targets -- -D warnings",
+    "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc --offline --locked -p litchi-doc -p litchi-ole-common --all-features --no-deps",
+    "rustfmt --check --edition 2024 --config skip_children=true <declared Rust paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-doc-vba-root-final-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "unit_and_integration_tests": {
+    "passed": 1451,
+    "failed": 0,
+    "ignored": 3
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 12
+  },
+  "clippy": "pass",
+  "rustdoc": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "independent_review": "crypto_native_vectors: final14path/spec/wire/bounds/source-preservation review clear",
+  "scope": [
+    "StwUser Sign/SigAgile/SigV3 bounded deferred reader with cached success/error",
+    "PIDDSI DigitalSignature raw DigSigBlob access/edit through existing generic VT_BLOB framing",
+    "Inert nested blob parsing, source preservation, exact noops and inverse"
+  ],
+  "excluded": [
+    "StwUser writing",
+    "ASN.1 SpcIndirectDataContent/V2 and PKCS#7 interpretation",
+    "certificate trust and signature validity verification",
+    "VBA project activation or execution"
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "525dec9d1d256da029728be37b9eb36e66dad115be0c01120e7d8fc56dcb7c22",
+      "raw_sha256": "dc6996332a324d283b85fcbbaa5a258520284a15c62f91651c5c109dd1d60db3"
+    },
+    "clippy.log.gz": {
+      "sha256": "abc7eb24fe9c2a8a633a8784c4da224bf24998fcedec55f172bf36d22fd572a0",
+      "raw_sha256": "69c9af7c1adb35c95467986a1ce353c26c567105cd83cdadd297a7c335238212"
+    },
+    "rustdoc.log.gz": {
+      "sha256": "79e93f0a61d8b66b12b4ac72235616dc36170b5bf582c98ea9ea0361ad1c73a7",
+      "raw_sha256": "3ca6a33bec58da82f15772a1b4b46da82bf63d224f847feee89886e118a6a1e1"
+    }
+  },
+  "cargo_lock": {
+    "sha256": "37718061c1a24826a91b5904c2a1f7b30593037d243f3fba5b4af814e7b3a40f",
+    "compressed_sha256": "29a8c7d3c80fb98d13bb6ab78f17fa145d2184810fd12ddf0317af6c0645f830"
+  }
+}

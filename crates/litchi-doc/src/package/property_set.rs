@@ -13,6 +13,7 @@ use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
     self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
+use litchi_ole_common::vba_signature;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -64,6 +65,30 @@ impl Snapshot {
         property_set::document_summary::Snapshot::from_stream(&stream)
             .map(Some)
             .map_err(Into::into)
+    }
+
+    /// Reads the inert VBA `DigSigBlob` stored in PIDDSI
+    /// `DocumentSummaryInformation`.
+    ///
+    /// The returned owner validates the `[MS-OSHARED]` container and retains
+    /// exact source bytes. The PKCS#7 `SignedData` payload and its
+    /// `SpcIndirectDataContent`/`SpcIndirectDataContentV2` `contentInfo` form
+    /// remain opaque. It never verifies certificate trust, opens a VBA
+    /// project, or executes code. `None` means the property stream or the
+    /// `DigitalSignature` property is absent.
+    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
+        self.vba_signature_with(vba_signature::Limits::default())
+    }
+
+    /// Reads the inert VBA signature with explicit payload and blob limits.
+    pub fn vba_signature_with(
+        &self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>> {
+        let Some(summary) = self.document_summary_information()? else {
+            return Ok(None);
+        };
+        summary.vba_signature_with(limits).map_err(Into::into)
     }
 
     /// Returns the generic user-defined section, when present.
@@ -164,6 +189,82 @@ impl Transaction {
         property_set::document_summary::Snapshot::from_section(&section)
             .map(Some)
             .map_err(Into::into)
+    }
+
+    /// Reads the current transaction-local inert VBA `DigSigBlob`.
+    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
+        self.vba_signature_with(vba_signature::Limits::default())
+    }
+
+    /// Reads the current transaction-local VBA signature with explicit limits.
+    pub fn vba_signature_with(
+        &self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>> {
+        let Some(summary) = self.document_summary_information()? else {
+            return Ok(None);
+        };
+        summary.vba_signature_with(limits).map_err(Into::into)
+    }
+
+    /// Replaces PIDDSI `DigitalSignature` with an already validated inert
+    /// `DigSigBlob` snapshot. Its nested PKCS#7 `SignedData` and
+    /// `contentInfo` form remain opaque to this package owner.
+    pub fn set_vba_signature(&mut self, signature: &vba_signature::Snapshot) -> Result<bool> {
+        self.edit_document_summary_information(|edit| edit.set_vba_signature(signature))
+    }
+
+    /// Removes PIDDSI `DigitalSignature`, when the property is present.
+    pub fn remove_vba_signature(&mut self) -> Result<bool> {
+        if self
+            .editor
+            .property_set(Binding::DocumentSummaryInformation)?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        self.edit_document_summary_information(|edit| {
+            edit.remove_vba_signature();
+            Ok(())
+        })
+    }
+
+    /// Edits the opaque PKCS#7 signature and certificate-store payloads
+    /// atomically. ASN.1 content form and certificate trust remain outside
+    /// this inert storage owner.
+    ///
+    /// The nested transaction rewrites only those payloads and preserves
+    /// producer-specific gaps and padding. Its closure never receives a
+    /// cryptographic verifier or a VBA execution context.
+    pub fn edit_vba_signature<F>(&mut self, edit: F) -> Result<bool>
+    where
+        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+    {
+        self.edit_vba_signature_with_limits(vba_signature::Limits::default(), edit)
+    }
+
+    /// Edits the opaque VBA signature using explicit nested-blob limits.
+    pub fn edit_vba_signature_with_limits<F>(
+        &mut self,
+        limits: vba_signature::Limits,
+        edit: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+    {
+        let signature = self.vba_signature_with(limits)?.ok_or_else(|| {
+            Error::InvalidFormat(
+                "DocumentSummaryInformation has no VBA DigitalSignature blob".to_string(),
+            )
+        })?;
+        let mut transaction = signature.edit();
+        edit(&mut transaction).map_err(|error| {
+            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+        })?;
+        let commit = transaction.commit().map_err(|error| {
+            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+        })?;
+        self.set_vba_signature(commit.snapshot())
     }
 
     /// Returns the current transaction-local user-defined section.

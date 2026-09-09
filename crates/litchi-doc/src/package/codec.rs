@@ -311,6 +311,34 @@ impl<R: Read + Seek> Package<R> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Doc, policy)
     }
 
+    /// Read the inert VBA `DigSigBlob` stored in PIDDSI
+    /// `DocumentSummaryInformation`.
+    ///
+    /// This accessor validates only the `[MS-OSHARED]` container serialization.
+    /// The PKCS#7 `SignedData` payload and its
+    /// `SpcIndirectDataContent`/`SpcIndirectDataContentV2` `contentInfo` form
+    /// remain opaque. It retains the exact blob for source-preserving edits
+    /// and never verifies certificate trust, opens a VBA project, or executes
+    /// code. `None` means the property stream or its `DigitalSignature`
+    /// property is absent.
+    pub fn vba_signature(&mut self) -> Result<Option<litchi_ole_common::vba_signature::Snapshot>> {
+        self.vba_signature_with(litchi_ole_common::vba_signature::Limits::default())
+    }
+
+    /// Read the inert VBA signature with explicit finite blob and payload
+    /// limits.
+    pub fn vba_signature_with(
+        &mut self,
+        limits: litchi_ole_common::vba_signature::Limits,
+    ) -> Result<Option<litchi_ole_common::vba_signature::Snapshot>> {
+        let Some(stream) = self.document_summary_information()? else {
+            return Ok(None);
+        };
+        let snapshot =
+            litchi_ole_common::property_set::document_summary::Snapshot::from_stream(&stream)?;
+        Ok(snapshot.vba_signature_with(limits)?)
+    }
+
     pub fn document_summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole

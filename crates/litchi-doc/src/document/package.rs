@@ -318,6 +318,13 @@ impl Document {
             crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
             "PrEnvLand",
         );
+        let vba_signatures_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::vba_signature::FIB_INDEX_STW_USER,
+            crate::parts::vba_signature::MAX_STW_USER_BYTES,
+            "StwUser",
+        );
 
         Ok(Self {
             fib,
@@ -368,6 +375,8 @@ impl Document {
             print_environment_portrait_source,
             print_environment_landscape_source,
             print_environment: std::sync::OnceLock::new(),
+            vba_signatures_source,
+            vba_signatures: std::sync::OnceLock::new(),
             caption_tables,
             repair_bookmarks,
             glossary_metadata,
