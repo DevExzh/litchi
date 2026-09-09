@@ -263,7 +263,12 @@ pub use main_master::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use modify_password::ModifyPassword;
 pub use named_shows::{NamedShow, NamedShows};
-pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
+pub use picture_bullets::{
+    MAX_PICTURE_BULLET_INDEX, PictureBullet, PictureBulletChange, PictureBulletChangeKind,
+    PictureBulletCollection, PictureBulletCommit, PictureBulletLimits, PictureBulletPackageLimits,
+    PictureBulletPatch, PictureBulletRevision, PictureBulletSnapshot, PictureBulletTransaction,
+    PictureBulletType,
+};
 pub use placeholder_atom::{
     AtomPlaceholderSize, PlaceholderAtom, PlaceholderContext, PlaceholderEntry, PlaceholderKind,
     PlaceholderLimits, PlaceholderProjection, PresentationPlaceholderEntry,
