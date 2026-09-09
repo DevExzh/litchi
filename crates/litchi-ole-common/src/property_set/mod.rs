@@ -10,6 +10,7 @@
 //! positional counterpart for [`litchi_cfb::SharedOleFile`]. Import the
 //! applicable trait to add property-set readers to an opened compound file.
 
+mod alternate_stream;
 mod binding;
 mod codec;
 pub mod document_summary;
@@ -27,6 +28,9 @@ pub mod user_defined;
 )]
 mod tests;
 
+pub use alternate_stream::{
+    ALTERNATE_STREAM_CONTROL_NAME, AlternateStreamControl, NonSimpleAlternateStreamName,
+};
 pub use binding::Binding as Standard;
 pub use binding::{
     Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID,
