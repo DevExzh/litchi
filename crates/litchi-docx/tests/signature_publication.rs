@@ -1,4 +1,6 @@
+use litchi_core::Position;
 use litchi_docx::Package;
+use litchi_docx::document::{HistoryLimits, RevisionKind};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 use std::io::Cursor;
@@ -28,6 +30,102 @@ fn bytes(package: &mut Package) -> Vec<u8> {
     let mut sink = Cursor::new(Vec::new());
     package.to_stream(&mut sink).unwrap();
     sink.into_inner()
+}
+
+fn durable_limits() -> litchi_core::patch::PatchLimits {
+    litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(1, 32 * 1024 * 1024, 32 * 1024 * 1024),
+        1024 * 1024,
+        32,
+        8,
+        256 * 1024,
+        512 * 1024,
+    )
+}
+
+#[test]
+fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
+    let original = signed_source();
+    let mut package = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
+    let snapshot = package.document_snapshot().unwrap();
+    let noop = snapshot.edit().commit().unwrap();
+    package.apply_document_patch(noop.patch()).unwrap();
+    assert_eq!(bytes(&mut package), original);
+
+    let mut edit = snapshot.edit();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert!(package.is_signed());
+    assert_eq!(bytes(&mut package), original);
+    let durable = commit.patch().to_durable(durable_limits()).unwrap();
+    assert!(package.apply_durable_document_patch(&durable).is_err());
+    assert!(package.is_signed());
+    assert_eq!(bytes(&mut package), original);
+
+    let mut history = snapshot.history(HistoryLimits::new(4, 4 * 1024 * 1024));
+    assert!(
+        package
+            .publish_document_commit_with_history(commit.clone(), &mut history)
+            .is_err()
+    );
+    assert!(!history.can_undo());
+    assert_eq!(history.current().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(bytes(&mut package), original);
+
+    package.unsign();
+    package.apply_durable_document_patch(&durable).unwrap();
+    assert!(!package.is_signed());
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        commit.snapshot().xml_bytes()
+    );
+    package
+        .apply_durable_document_patch(&durable.inverse())
+        .unwrap();
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        snapshot.xml_bytes()
+    );
+}
+
+#[test]
+fn signed_undo_and_redo_restore_history_cursor_on_refusal() {
+    let original = signed_source();
+    let source = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
+    let snapshot = source.document_snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = signed_document(commit.snapshot().xml_bytes());
+    let mut package = Package::from_reader(Cursor::new(target.as_slice())).unwrap();
+    let mut history = snapshot.history(HistoryLimits::new(4, 4 * 1024 * 1024));
+    history.record(commit.clone()).unwrap();
+
+    assert!(package.undo_document(&mut history).is_err());
+    assert!(history.can_undo());
+    assert!(!history.can_redo());
+    assert_eq!(history.current().xml_bytes(), commit.snapshot().xml_bytes());
+    assert_eq!(bytes(&mut package), target);
+
+    assert!(history.undo());
+    let mut package = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
+    assert!(package.redo_document(&mut history).is_err());
+    assert!(!history.can_undo());
+    assert!(history.can_redo());
+    assert_eq!(history.current().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(bytes(&mut package), original);
+
+    package.unsign();
+    assert!(package.redo_document(&mut history).unwrap());
+    assert!(package.undo_document(&mut history).unwrap());
+    assert_eq!(history.current().xml_bytes(), snapshot.xml_bytes());
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        snapshot.xml_bytes()
+    );
 }
 
 #[test]
@@ -124,7 +222,7 @@ fn producer_signed_package_keeps_verifiable_signature_after_noop_and_refusal() {
 }
 
 #[test]
-fn opaque_signature_members_allow_noop_but_refuse_raw_unsign() {
+fn opaque_signature_members_allow_noop_but_refuse_raw_and_semantic_changes() {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
     let signed = signed_source();
@@ -158,4 +256,18 @@ fn opaque_signature_members_allow_noop_but_refuse_raw_unsign() {
             .is_err()
     );
     assert_eq!(bytes(&mut package), original);
+
+    let mut package = Package::from_reader(Cursor::new(original)).unwrap();
+    let snapshot = package.document_snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    package.unsign();
+    assert!(package.is_signed());
+    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        snapshot.xml_bytes()
+    );
 }
