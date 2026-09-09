@@ -368,6 +368,66 @@ fn public_package_facade_preflights_oversized_stale_metadata_before_clone() {
 }
 
 #[test]
+fn checked_publication_keeps_signature_policy_after_source_preflight() {
+    let package = package_with_chain(opaque_records());
+    let before = package.calculation_chain().expect("before");
+    let mut transaction = before.edit();
+    transaction.remove().expect("remove");
+    let commit = transaction.commit().expect("commit");
+    let current = commit
+        .patch()
+        .check_source(package.opc_package())
+        .expect("source preflight");
+
+    let mut signed_candidate = signed_package(package.clone()).into_opc();
+    let error = commit
+        .patch()
+        .apply_checked(&mut signed_candidate, current)
+        .expect_err("changed signed candidate must require an explicit policy");
+    assert!(matches!(
+        error,
+        Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
+}
+
+#[test]
+fn checked_publication_failure_does_not_publish_the_original_package() {
+    let package = package_with_chain(opaque_records());
+    let before = package.calculation_chain().expect("before");
+    let mut transaction = before.edit();
+    transaction.remove().expect("remove");
+    let commit = transaction.commit().expect("commit");
+    let current = commit
+        .patch()
+        .check_source(package.opc_package())
+        .expect("source preflight");
+
+    let mut candidate = package.clone().into_opc();
+    let workbook_name = candidate
+        .main_document_part()
+        .expect("workbook")
+        .partname()
+        .clone();
+    let mut workbook_bytes = candidate
+        .get_part(&workbook_name)
+        .expect("workbook")
+        .blob()
+        .to_vec();
+    workbook_bytes[0] ^= 1;
+    candidate
+        .get_part_mut(&workbook_name)
+        .expect("workbook")
+        .set_blob(workbook_bytes);
+    assert!(
+        commit
+            .patch()
+            .apply_checked(&mut candidate, current)
+            .is_err()
+    );
+    assert_eq!(package.calculation_chain().expect("original"), before);
+}
+
+#[test]
 fn long_relationship_owner_and_many_short_edges_are_bounded_before_clone() {
     let mut package = package_with_chain(opaque_records()).into_opc();
     let owner_name = format!("/xl/{}.bin", "o".repeat(4_090));
