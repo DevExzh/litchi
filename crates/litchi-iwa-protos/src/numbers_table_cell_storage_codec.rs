@@ -665,7 +665,305 @@ impl<'source> TileRowInfoSnapshot<'source> {
     pub const fn has_wide_offsets(self) -> Option<bool> {
         self.has_wide_offsets
     }
+
+    /// Return the active cell storage and offset buffers.
+    ///
+    /// A native row is usable through the modern pair only when both modern
+    /// fields are present.  Otherwise the reader falls back to the complete
+    /// pre-BNC pair, matching the package readers' compatibility rule.
+    #[must_use]
+    pub const fn cell_storage_and_offsets(self) -> (&'source [u8], &'source [u8]) {
+        match (self.cell_storage_buffer, self.cell_offsets) {
+            (Some(storage), Some(offsets)) => (storage, offsets),
+            _ => (self.cell_storage_buffer_pre_bnc, self.cell_offsets_pre_bnc),
+        }
+    }
+
+    /// Validate this row's offset table and return its allocation-free cell
+    /// spans.
+    ///
+    /// The returned report reserves the complete validation pass and one
+    /// subsequent borrowed traversal (either [`CellSpans::iter`] or
+    /// [`CellSpans::get`]) before any offset is inspected.  Callers can merge
+    /// it into their operation budget before consuming the spans.  Structural
+    /// validation is complete before the first span can be yielded.
+    pub fn cell_spans(
+        self,
+        column_count: usize,
+        options: DecodeOptions,
+    ) -> Result<(CellSpans<'source>, DecodeReport), DecodeError> {
+        let (storage, offsets) = self.cell_storage_and_offsets();
+        CellSpans::parse(
+            offsets,
+            storage.len(),
+            self.has_wide_offsets.unwrap_or(false),
+            usize::try_from(self.cell_count).map_err(|_conversion| DecodeError::invalid())?,
+            column_count,
+            options,
+        )
+    }
 }
+
+/// One validated, allocation-free cell range in a tile row.
+///
+/// The range indexes the row's active storage buffer.  It is intentionally
+/// kept separate from that buffer so callers can choose whether to borrow it
+/// or copy the selected cell payload into their own transaction state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellSpan {
+    column: usize,
+    start: usize,
+    end: usize,
+}
+
+impl CellSpan {
+    #[must_use]
+    pub const fn column(self) -> usize {
+        self.column
+    }
+
+    #[must_use]
+    pub const fn start(self) -> usize {
+        self.start
+    }
+
+    #[must_use]
+    pub const fn end(self) -> usize {
+        self.end
+    }
+
+    #[must_use]
+    pub const fn range(self) -> core::ops::Range<usize> {
+        self.start..self.end
+    }
+
+    /// Borrow this span from an active storage buffer.
+    #[must_use]
+    pub fn bytes(self, storage: &[u8]) -> Option<&[u8]> {
+        storage.get(self.start..self.end)
+    }
+}
+
+/// Validated sparse cell spans for one tile row.
+///
+/// `CellSpans` retains only the caller-owned offset bytes and scalar bounds;
+/// it never materializes a per-column or per-cell vector.  The constructor
+/// validates every offset, including producer padding beyond `column_count`,
+/// before exposing [`Self::iter`] or [`Self::get`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CellSpans<'source> {
+    offsets: &'source [u8],
+    storage_length: usize,
+    column_count: usize,
+    expected_cells: usize,
+    present_cells: usize,
+    width: usize,
+}
+
+impl fmt::Debug for CellSpans<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CellSpans")
+            .field("offset_bytes", &self.offsets.len())
+            .field("storage_length", &self.storage_length)
+            .field("column_count", &self.column_count)
+            .field("expected_cells", &self.expected_cells)
+            .field("present_cells", &self.present_cells)
+            .field("wide_offsets", &(self.width == 4))
+            .finish()
+    }
+}
+
+impl<'source> CellSpans<'source> {
+    /// Validate a row offset table without allocating cell ranges.
+    ///
+    /// The offset table stores little-endian `u16` values, with `0xffff`
+    /// denoting a missing column.  Wide rows scale non-sentinel values by
+    /// four.  Missing slots beyond `column_count` are accepted as native
+    /// padding, while populated slots beyond that width are rejected.
+    ///
+    /// The report charges two complete offset scans: one performed before
+    /// publication for structural validation and one reserved for a later
+    /// [`Self::iter`] or [`Self::get`] traversal.  This makes the budget check
+    /// happen before any untrusted offset work and keeps the allocation-free
+    /// accessors from introducing an uncharged second pass. The view is
+    /// reusable: callers that repeat `iter` or `get` (including through a
+    /// copied view or iterator) must charge `offsets.len()` work units for
+    /// each additional traversal before starting it.
+    pub fn parse(
+        offsets: &'source [u8],
+        storage_length: usize,
+        wide_offsets: bool,
+        expected_cells: usize,
+        column_count: usize,
+        options: DecodeOptions,
+    ) -> Result<(Self, DecodeReport), DecodeError> {
+        let mut budget = Budget::new(offsets, options)?;
+        if !offsets.len().is_multiple_of(2) {
+            return Err(DecodeError::invalid());
+        }
+
+        let slot_count = offsets.len() / 2;
+        if expected_cells > slot_count || expected_cells > column_count {
+            return Err(DecodeError::invalid());
+        }
+
+        // Validation and the one prepaid borrowed traversal both inspect
+        // every two-byte slot.  Precharge the complete upper bound before
+        // reading any offset so a hostile oversized table cannot partially
+        // consume a caller's operation budget.
+        let scan_work = offsets
+            .len()
+            .checked_mul(2)
+            .ok_or_else(DecodeError::invalid)?;
+        budget.work(scan_work)?;
+
+        let width = if wide_offsets { 4 } else { 1 };
+        let mut present_cells = 0usize;
+        let mut previous_start = None;
+        for (column, encoded) in offsets.chunks_exact(2).enumerate() {
+            let raw = u16::from_le_bytes([encoded[0], encoded[1]]);
+            if column >= column_count {
+                if raw != u16::MAX {
+                    return Err(DecodeError::invalid());
+                }
+                continue;
+            }
+            if raw == u16::MAX {
+                continue;
+            }
+
+            present_cells = present_cells
+                .checked_add(1)
+                .ok_or_else(DecodeError::invalid)?;
+            let start = usize::from(raw)
+                .checked_mul(width)
+                .ok_or_else(DecodeError::invalid)?;
+            if start >= storage_length || previous_start.is_some_and(|previous| previous >= start) {
+                return Err(DecodeError::invalid());
+            }
+            previous_start = Some(start);
+        }
+        if present_cells != expected_cells {
+            return Err(DecodeError::invalid());
+        }
+
+        let spans = Self {
+            offsets,
+            storage_length,
+            column_count,
+            expected_cells,
+            present_cells,
+            width,
+        };
+        Ok((spans, budget.report()))
+    }
+
+    #[must_use]
+    pub const fn column_count(self) -> usize {
+        self.column_count
+    }
+
+    #[must_use]
+    pub const fn storage_length(self) -> usize {
+        self.storage_length
+    }
+
+    #[must_use]
+    pub const fn len(self) -> usize {
+        self.present_cells
+    }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.present_cells == 0
+    }
+
+    /// Iterate present cells in source column order without allocating.
+    ///
+    /// Only the first traversal is prepaid by [`Self::parse`]. Repeated
+    /// traversals require caller-side work accounting as documented there.
+    #[must_use]
+    pub fn iter(self) -> CellSpanIter<'source> {
+        CellSpanIter {
+            offsets: self.offsets,
+            storage_length: self.storage_length,
+            width: self.width,
+            remaining: self.offsets,
+            pending: None,
+            yielded: 0,
+            total: self.present_cells,
+            finished: false,
+        }
+    }
+
+    /// Find one present cell without allocating.
+    ///
+    /// This starts a traversal and shares the accounting contract of
+    /// [`Self::iter`]; repeated lookups are not constant-time accesses.
+    #[must_use]
+    pub fn get(self, column: usize) -> Option<CellSpan> {
+        self.iter().find(|span| span.column() == column)
+    }
+}
+
+/// Allocation-free iterator over validated row cell spans.
+#[derive(Debug, Clone, Copy)]
+pub struct CellSpanIter<'source> {
+    offsets: &'source [u8],
+    storage_length: usize,
+    width: usize,
+    remaining: &'source [u8],
+    pending: Option<(usize, usize)>,
+    yielded: usize,
+    total: usize,
+    finished: bool,
+}
+
+impl Iterator for CellSpanIter<'_> {
+    type Item = CellSpan;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+
+        while let Some(encoded) = self.remaining.get(..2) {
+            self.remaining = &self.remaining[2..];
+            let column = (self.offsets.len() - self.remaining.len()) / 2 - 1;
+            let raw = u16::from_le_bytes([encoded[0], encoded[1]]);
+            if raw == u16::MAX {
+                continue;
+            }
+            let start = usize::from(raw) * self.width;
+            if let Some((previous_column, previous_start)) = self.pending.replace((column, start)) {
+                self.yielded += 1;
+                return Some(CellSpan {
+                    column: previous_column,
+                    start: previous_start,
+                    end: start,
+                });
+            }
+            self.pending = Some((column, start));
+        }
+
+        self.finished = true;
+        let (column, start) = self.pending.take()?;
+        self.yielded += 1;
+        Some(CellSpan {
+            column,
+            start,
+            end: self.storage_length,
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.total.saturating_sub(self.yielded);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for CellSpanIter<'_> {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HeaderStorageSnapshot {

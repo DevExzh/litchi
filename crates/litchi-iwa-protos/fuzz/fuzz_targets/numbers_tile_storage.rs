@@ -2,8 +2,8 @@
 
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::numbers_table_cell_storage_codec::{
-    DecodeError, DecodeOptions, StorageVisitor, TileRowInfoSnapshot, decode_tile_with_report,
-    decode_tile_with_visitor,
+    CellSpans, DecodeError, DecodeOptions, StorageVisitor, TileRowInfoSnapshot,
+    decode_tile_with_report, decode_tile_with_visitor,
 };
 use litchi_iwa_protos::tst::{Tile, TileRowInfo};
 use prost::Message as _;
@@ -131,6 +131,22 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     exercise(&source);
+    let wide = source.first().is_some_and(|byte| byte & 1 != 0);
+    exercise_spans(
+        &source,
+        64,
+        wide,
+        source.first().copied().unwrap_or(0) as usize,
+        32,
+    );
+    let baseline = [0, 0, 255, 255, 8, 0, 255, 255, 16, 0];
+    exercise_spans(&baseline, 96, wide, 3, 5);
+    let mut mutated = baseline;
+    if let Some(byte) = source.first() {
+        let index = source.get(1).copied().unwrap_or(0) as usize % mutated.len();
+        mutated[index] = *byte;
+    }
+    exercise_spans(&mutated, 96, wide, 3, 5);
 });
 
 fn normalize_input(data: &[u8]) -> Option<Vec<u8>> {
@@ -293,4 +309,52 @@ fn assert_visitor_rows(visitor: &RowCollector<'_>) {
 
 fn assert_slice_summary(summary: &ObservedSlice) {
     assert!(summary.pointer != 0 || summary.length == 0);
+}
+
+// Offset validation is exercised independently of protobuf admission, so
+// arbitrary mutations reach the borrowed row boundary even when no Tile can
+// be decoded. Traversal and retained scratch remain bounded by input size.
+fn exercise_spans(
+    offsets: &[u8],
+    storage_length: usize,
+    wide: bool,
+    expected: usize,
+    columns: usize,
+) {
+    let Ok((spans, report)) =
+        CellSpans::parse(offsets, storage_length, wide, expected, columns, options())
+    else {
+        return;
+    };
+    assert_eq!(spans.len(), expected);
+    assert_eq!(report.work_bytes(), offsets.len() * 2);
+    let storage = [0u8; 96];
+    let storage = &storage[..storage_length];
+    let mut previous_end = None;
+    let mut previous_column = None;
+    let mut iterator = spans.iter();
+    let mut count = 0;
+    while let Some(span) = iterator.next() {
+        assert!(span.column() < columns);
+        assert!(span.start() < span.end());
+        assert!(span.end() <= storage_length);
+        if let Some(end) = previous_end {
+            assert_eq!(span.start(), end);
+        }
+        if let Some(column) = previous_column {
+            assert!(span.column() > column);
+        }
+        let bytes = span.bytes(storage).expect("validated storage range");
+        assert_eq!(bytes.as_ptr(), storage[span.range()].as_ptr());
+        previous_end = Some(span.end());
+        previous_column = Some(span.column());
+        count += 1;
+        assert_eq!(iterator.len(), expected - count);
+    }
+    assert_eq!(count, expected);
+    assert!(iterator.next().is_none());
+    if count != 0 {
+        assert_eq!(previous_end, Some(storage_length));
+    }
+    assert!(spans.get(columns).is_none());
 }

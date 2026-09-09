@@ -11091,3 +11091,51 @@ workspace formatting pass. The final AddressSanitizer smoke run completes
 20 inputs with required native/source catalog seeds and 504 MiB reported RSS.
 Catalog-time cumulative object limits are exercised after successful package
 ingress, with typed refusal and exact source preservation.
+
+## 2026-09-09 Shared borrowed table-row cell spans
+
+The focused Pages cell-reader investigation identified two separate allocating
+row-offset parsers: the remaining monolith TableDataExtractor and the focused
+Numbers extractor. Both now use the shared numbers_table_cell_storage_codec
+`CellSpans` view. The monolith's local parse_cell_offsets implementation is
+removed, rather than wrapped or retained as a fallback. This is a concrete
+shared storage prerequisite for Pages/Keynote physical cell ownership; it does
+not yet publish a focused Pages cell-value API or retire the complete host
+PagesTable reader.
+
+The new view borrows the offset table and retains scalar bounds. It validates
+the complete offset buffer before exposing an iterator or selected span,
+including narrow/four-byte-unit offsets, missing-column sentinels, native
+sentinel padding, expected cell counts, table width, strict start ordering,
+and storage bounds. The iterator yields borrowed cell ranges without a
+per-row Vec of ranges. The decoded Buffa row snapshot owns modern-pair versus
+pre-BNC-pair selection so both readers retain the same fallback rule.
+
+The decoder precharges validation plus one subsequent borrowed traversal and
+returns the existing typed resource report. Each reader merges that report
+into its cumulative projection budget before cell payload decoding. Existing
+semantic cells, formula/text/comment sidecars, and native package ownership
+remain with their current owners; no format-peer dependency is introduced.
+
+Pages 14.4 created a populated two-table fixture from the previous catalog
+control. Native save, actual-window close, exact-path reopen, and visual/AX
+readback retained Unicode text, positive/negative/zero numbers, TRUE/FALSE
+displays, SUM(B2:B3) with displayed result 5.5, date/duration displays, and a
+division-by-zero formula error. The artifact and receipt are retained as
+body-table-cells-native.pages and body-table-cells-native-receipt.json.
+Blank display is not used as evidence of physical empty versus missing cells.
+
+The complete PagesTable host snapshot still includes values, comments, and
+merged regions and still relies on table/formula/sidecar ownership in the
+host. Its retirement requires parity for all existing value variants and
+those sidecars; no ordered crate-boundary debt or dependency edge is claimed
+retired by this shared decoder extraction.
+
+Decoder readback establishes the date/duration displays as Text values and
+the division-by-zero cell as Formula, not Date, Duration, or Error scalar
+coverage. The native regression asserts those exact existing projections.
+
+Validation includes 11 shared span tests, 42 host extractor tests, and the
+native Pages cell readback regression. AddressSanitizer completes 1,000
+numbers_tile_storage fuzz runs with 63 MiB reported RSS, exercising raw and
+mutated narrow/wide span tables in addition to existing protobuf projections.

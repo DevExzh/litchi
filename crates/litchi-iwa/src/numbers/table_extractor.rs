@@ -684,40 +684,39 @@ fn stage_tile_row(
         ))
     })?;
 
-    let (cell_storage, cell_offsets) =
-        match (row_info.cell_storage_buffer(), row_info.cell_offsets()) {
-            (Some(storage), Some(offsets)) => (storage, offsets),
-            _ => (
-                row_info.cell_storage_buffer_pre_bnc(),
-                row_info.cell_offsets_pre_bnc(),
-            ),
-        };
+    let (cell_storage, cell_offsets) = row_info.cell_storage_and_offsets();
 
     let expected_cells = usize::try_from(row_info.cell_count()).map_err(|_| {
         Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
     })?;
     budget.check(expected_cells)?;
-    let cells = TableDataExtractor::parse_cell_offsets(
-        cell_offsets,
-        cell_storage.len(),
-        row_info.has_wide_offsets().unwrap_or(false),
-        expected_cells,
-        dimensions.columns() as usize,
-    )?;
+    let offset_options =
+        table_data_list_decode_options_with_budget(cell_offsets, *formula_budget, false);
+    let (cells, offset_report) = row_info
+        .cell_spans(dimensions.columns() as usize, offset_options)
+        .map_err(|error| map_cell_span_error(error, *formula_budget))?;
+    formula_budget.charge_decode_work(offset_report)?;
     budget.consume(cells.len())?;
     staged
         .try_reserve(cells.len())
         .map_err(|_| allocation_error("Numbers staged tile cells", staged.len() + cells.len()))?;
 
-    for (column_index, range) in cells {
+    for span in cells.iter() {
+        let column_index = span.column();
         dimensions.check_column(column_index).map_err(|_| {
             Error::InvalidFormat(format!(
                 "Numbers cell column {column_index} is outside the declared table width {}",
                 dimensions.columns()
             ))
         })?;
+        let cell_data = span.bytes(cell_storage).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Numbers cell span for column {column_index} is outside storage length {}",
+                cell_storage.len()
+            ))
+        })?;
         let parsed = TableDataExtractor::parse_cell_storage_with_budget(
-            &cell_storage[range],
+            cell_data,
             cell_tables,
             row_index,
             column_index,
@@ -732,6 +731,58 @@ fn stage_tile_row(
         });
     }
     Ok(())
+}
+
+fn map_cell_span_error(
+    error: numbers_table_cell_storage_codec::DecodeError,
+    budget: ProjectionBudget,
+) -> Error {
+    use numbers_table_cell_storage_codec::DecodeLimit;
+
+    match error.resource_limit() {
+        Some(DecodeLimit::Bytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Fields { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed: budget.payload_fields.saturating_add(observed),
+                limit: budget.payload_fields.saturating_add(maximum),
+            })
+        },
+        Some(DecodeLimit::Work { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed: budget.payload_work.saturating_add(observed),
+                limit: budget.payload_work.saturating_add(maximum),
+            })
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: observed as usize,
+                limit: maximum as usize,
+            })
+        },
+        Some(DecodeLimit::Allocation { requested }) => {
+            allocation_error("Numbers cell offset spans", requested)
+        },
+        Some(DecodeLimit::References { .. }) | Some(DecodeLimit::Text { .. }) => {
+            Error::InvalidFormat(
+                "Numbers cell offset spans exceeded an unsupported resource limit".to_owned(),
+            )
+        },
+        Some(DecodeLimit::Retained { .. }) | None => {
+            Error::ParseError("Numbers cell offset table failed strict validation".to_owned())
+        },
+        Some(_) => Error::InvalidFormat(
+            "Numbers cell offset spans exceeded an unknown resource limit".to_owned(),
+        ),
+    }
 }
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
@@ -2175,90 +2226,6 @@ impl<'a> TableDataExtractor<'a> {
         Ok(())
     }
 
-    /// Parse cell offsets from the offsets buffer
-    ///
-    /// The offset table is an array of little-endian `u16` values. `0xffff`
-    /// marks a missing column; wide rows store offsets in four-byte units.
-    fn parse_cell_offsets(
-        offsets_buffer: &[u8],
-        storage_length: usize,
-        wide_offsets: bool,
-        expected_cells: usize,
-        column_count: usize,
-    ) -> Result<Vec<(usize, std::ops::Range<usize>)>> {
-        if !offsets_buffer.len().is_multiple_of(2) {
-            return Err(Error::ParseError(
-                "Numbers cell offset table has an odd byte length".to_string(),
-            ));
-        }
-
-        let slot_count = offsets_buffer.len() / 2;
-        if slot_count > column_count {
-            let populated_outside_width = offsets_buffer[column_count.saturating_mul(2)..]
-                .chunks_exact(2)
-                .any(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX);
-            if populated_outside_width {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers row has a populated offset slot outside table width {column_count}"
-                )));
-            }
-        }
-        if expected_cells > slot_count {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has only {slot_count} offset slots"
-            )));
-        }
-
-        let present_cells = offsets_buffer
-            .chunks_exact(2)
-            .filter(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
-            .count();
-        if present_cells != expected_cells {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has {present_cells} offsets"
-            )));
-        }
-
-        let width = if wide_offsets { 4usize } else { 1usize };
-        let mut cells = Vec::new();
-        cells
-            .try_reserve_exact(expected_cells)
-            .map_err(|_| allocation_error("Numbers cell ranges", expected_cells))?;
-        let mut previous = None;
-        for (column, bytes) in offsets_buffer.chunks_exact(2).enumerate() {
-            let raw_offset = u16::from_le_bytes([bytes[0], bytes[1]]);
-            if raw_offset == u16::MAX {
-                continue;
-            }
-            let offset = usize::from(raw_offset)
-                .checked_mul(width)
-                .ok_or_else(|| Error::ParseError("Numbers cell offset overflow".to_string()))?;
-            if offset >= storage_length {
-                return Err(Error::ParseError(format!(
-                    "Numbers cell offset {offset} exceeds storage length {storage_length}"
-                )));
-            }
-            if let Some((previous_column, previous_offset)) = previous {
-                if offset <= previous_offset {
-                    return Err(Error::ParseError(format!(
-                        "Numbers cell offsets are not strictly increasing: {previous_offset} then {offset}"
-                    )));
-                }
-                cells.push((previous_column, previous_offset..offset));
-            }
-            previous = Some((column, offset));
-        }
-        if let Some((column, start)) = previous {
-            if storage_length <= start {
-                return Err(Error::ParseError(format!(
-                    "Numbers cell offset range ends at {storage_length} after {start}"
-                )));
-            }
-            cells.push((column, start..storage_length));
-        }
-        Ok(cells)
-    }
-
     #[cfg(test)]
     fn parse_cell_storage(
         data: &[u8],
@@ -3680,6 +3647,27 @@ fn finite_zero() -> Result<FiniteF64> {
 mod tests {
     use super::*;
 
+    fn test_cell_spans<'source>(
+        offsets: &'source [u8],
+        storage_length: usize,
+        wide_offsets: bool,
+        expected_cells: usize,
+        column_count: usize,
+    ) -> std::result::Result<
+        numbers_table_cell_storage_codec::CellSpans<'source>,
+        numbers_table_cell_storage_codec::DecodeError,
+    > {
+        numbers_table_cell_storage_codec::CellSpans::parse(
+            offsets,
+            storage_length,
+            wide_offsets,
+            expected_cells,
+            column_count,
+            table_data_list_decode_options(offsets),
+        )
+        .map(|(spans, _report)| spans)
+    }
+
     fn table_info_reference_wire(identifier: u64, include_super: bool) -> Vec<u8> {
         let reference = crate::protobuf::tsp::Reference {
             identifier,
@@ -4377,8 +4365,14 @@ mod tests {
             0x30, 0x00, // column 3 starts at 48
             0xff, 0xff,
         ];
-        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 72, false, 3, 5).unwrap();
-        assert_eq!(cells, vec![(1, 0..24), (2, 24..48), (3, 48..72)]);
+        let cells = test_cell_spans(&offsets, 72, false, 3, 5).unwrap();
+        assert_eq!(
+            cells
+                .iter()
+                .map(|span| (span.column(), span.range()))
+                .collect::<Vec<_>>(),
+            vec![(1, 0..24), (2, 24..48), (3, 48..72)]
+        );
     }
 
     #[test]
@@ -4425,32 +4419,32 @@ mod tests {
 
     #[test]
     fn cell_count_is_validated_before_offset_reservation() {
-        let error =
-            TableDataExtractor::parse_cell_offsets(&[], 0, false, usize::MAX, 0).unwrap_err();
-        assert!(matches!(error, Error::ParseError(message) if message.contains("offset slots")));
+        let error = test_cell_spans(&[], 0, false, usize::MAX, 0).unwrap_err();
+        assert!(error.resource_limit().is_none());
 
         let offsets = [0, 0, 1, 0];
-        let error = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1).unwrap_err();
-        assert!(
-            matches!(error, Error::InvalidFormat(message) if message.contains("outside table width"))
-        );
+        let error = test_cell_spans(&offsets, 1, false, 1, 1).unwrap_err();
+        assert!(error.resource_limit().is_none());
     }
 
     #[test]
     fn malformed_and_sparse_cell_offsets_are_handled_strictly() {
-        let error = TableDataExtractor::parse_cell_offsets(&[0, 0, 1], 2, false, 1, 2).unwrap_err();
-        assert!(matches!(error, Error::ParseError(message) if message.contains("odd")));
+        let error = test_cell_spans(&[0, 0, 1], 2, false, 1, 2).unwrap_err();
+        assert!(error.resource_limit().is_none());
 
         let descending = [0, 0, 2, 0, 1, 0];
-        let error =
-            TableDataExtractor::parse_cell_offsets(&descending, 3, false, 3, 3).unwrap_err();
-        assert!(
-            matches!(error, Error::ParseError(message) if message.contains("strictly increasing"))
-        );
+        let error = test_cell_spans(&descending, 3, false, 3, 3).unwrap_err();
+        assert!(error.resource_limit().is_none());
 
         let sparse = [0xff, 0xff, 0, 0, 2, 0, 0xff, 0xff];
-        let cells = TableDataExtractor::parse_cell_offsets(&sparse, 3, false, 2, 4).unwrap();
-        assert_eq!(cells, vec![(1, 0..2), (2, 2..3)]);
+        let cells = test_cell_spans(&sparse, 3, false, 2, 4).unwrap();
+        assert_eq!(
+            cells
+                .iter()
+                .map(|span| (span.column(), span.range()))
+                .collect::<Vec<_>>(),
+            vec![(1, 0..2), (2, 2..3)]
+        );
     }
 
     #[test]
