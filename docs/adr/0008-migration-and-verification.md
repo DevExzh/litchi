@@ -18221,3 +18221,92 @@ workspace documentation tests. The scoped Cargo clean removed the affected
 crate artifacts; the owned sanitizer build, scratch corpus, native candidate
 copies, temporary probes, generated fuzz lockfile, and bootstrap crash artifact
 were removed after validation. The permanent native source fixture remains.
+
+
+## 2026-09-09 Numbers semantic comment metadata
+
+The focused Numbers `Comment` and `CommentReply` snapshots now carry optional
+checked creation timestamps and author display metadata. `CommentTimestamp`
+rejects non-finite values and canonicalizes signed zero; `CommentAuthor` exposes
+only the optional display name and semantic public author ID. Native object,
+list, storage, reply, and registry identifiers remain private. Author debug
+output is redacted. The package resolves the author object and delegates strict
+borrowed payload decoding to the existing neutral Buffa annotation-author
+codec; no generated protobuf model enters the public API.
+
+Root and reply reads charge comment text and retained author strings to the
+semantic text ceiling. The ownership census retains graph facts without
+projecting author payloads; ignored repeated public author IDs remain governed
+by source wire limits. Text replacement preserves metadata. Reply append
+inherits the same source leaf (or root for an empty thread) as the native
+writer. Root creation verifies the writer's zero-epoch timestamp and selected
+or generated author. Candidate verification and patches retain complete
+semantic snapshots, including metadata, rather than comparing text alone.
+
+The shared test fixture builder supports independent protobuf-oracle checks
+without calling deprecated Numbers comment readers. The merge-anchor text
+assertions use focused selectors, and the README example no longer calls the
+already-retired raw clear method.
+
+A disposable copy of `comment-edit-root.numbers` was inspected in Numbers
+14.4. B2 displayed `Focused source comment`, author `litchi-iwa`, and
+`Aug 24 at 7:39 AM`. After save, actual document-window close to the template
+chooser, and exact-path reopen, the same text and display metadata remained.
+The saved file and original-source hashes are recorded in
+`test-data/iwork/numbers/comment-metadata-native-receipt.json`; the permanent
+saved file is `comment-metadata-native-resaved.numbers` in that directory.
+The Reply control did not open a usable reply editor, so this is root-comment
+evidence only. A second disposable copy of the permanent golden was opened,
+saved with a changed hash, closed, reopened by exact path, and visually checked
+again using Computer Use. The root text, author, and displayed date remained
+unchanged; the repeated lifecycle hashes are recorded in the receipt.
+
+This closes a metadata projection gap, not the Numbers reader retirement gate.
+`NumbersEditor::cell_comment` and `cell_comment_replies` remain while valid
+shared-reply, cross-component, and segmented-thread read parity and remaining
+source-built caller migration are completed. Private native identity witnesses remain necessary for graph
+mutation tests and Pages/Keynote embedded-table adapters. The eleven ordered
+migration debts and the monolithic crate remain open.
+
+The native empty-reply read gap is localized to the ownership census: Numbers
+saves the comment-list archive header with an object-reference edge but no
+corresponding field-location metadata. The root storage itself decodes with
+zero replies. The current strict reply census rejects that header before
+projection; this metadata milestone does not relax the ownership rule or
+retire the legacy readers. The permanent native test records this refusal and
+checks byte-exact source preservation.
+
+### Metadata milestone validation
+
+Focused validation passes 24 reply integration tests, 12 independent wire-oracle
+comment-read tests, and 18 merge tests. All three native metadata tests pass
+with `LITCHI_NATIVE_COMMENT_METADATA_PATH` selecting the disposable second-save
+file. The optional readback caps the input stream, compares the complete
+semantic comment against the source fixture, and verifies exact-byte no-op
+serialization and reopened metadata. The permanent source/native receipt
+hashes and sizes were independently checked. No existing reply integration
+test was removed when the fixture builder moved to its shared test owner.
+
+The nightly AddressSanitizer target builds successfully. The prior saved crash
+replays successfully in 588 ms, and the ten-file checked-in corpus passes all
+11 executions including initialization. The crash exposed a harness error:
+it expected a second application on the immutable source to conflict. The
+corrected check applies the patch to the changed snapshot for the conflict
+case; source replay and inverse byte restoration remain required. This is
+bounded replay evidence, not an exhaustive fuzzing or native-reply claim.
+
+The boundary suite passes 1,008 tests and the repository scanner accepts
+64 packages and 238 dependency declarations with 11 ordered migration debts.
+Metadata activation now ignores names present only in comments and string
+literals. The verified native copies, sanitizer target, scratch corpus, old
+crash artifacts and logs, and generated fuzz lockfile were removed after
+validation, reclaiming 2,517,748,603 logical scratch bytes. Permanent fixtures,
+receipts, and corpus seeds remain.
+
+Required checks pass: Rust formatting, strict all-feature workspace Clippy,
+all-feature workspace library/integration tests, and workspace documentation
+tests. Cargo manifest sorting is skipped because no manifest changed.
+
+The final normal commit hooks passed. Afterward, scoped
+`cargo clean -p litchi-numbers -p litchi-iwa` removed 32,667 files
+(13.1 GiB).

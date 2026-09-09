@@ -6,10 +6,12 @@
 //! that survives bounded ingress is then probed with the same finite command
 //! stream: reply reads by ordinal and A1 address, collection append/set/remove
 //! edits, the direct add/set/remove conveniences, exact patch application,
-//! conflict rejection, inverse restoration, and source-atomic failures. A
+//! conflict rejection, inverse restoration, and source-atomic failures. The
 //! command corpus is intentionally not treated as a package fixture; a valid
 //! reply-bearing package supplied by a fuzz input reaches the lifecycle path
-//! without embedding native identifiers or an unverified native artifact.
+//! without embedding native identifiers. A checked-in Numbers package with
+//! native comment metadata is embedded separately as a fixed projection and
+//! transaction oracle.
 
 use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
@@ -40,6 +42,13 @@ const PRIVATE_SHEET: &str = "__litchi_private_reply_sheet_93__";
 const PRIVATE_TABLE: &str = "__litchi_private_reply_table_93__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_reply_input_93__";
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
+const NATIVE_COMMENT_METADATA: &[u8] =
+    include_bytes!("../../../../test-data/iwork/numbers/comment-metadata-native-resaved.numbers");
+const NATIVE_SHEET: &str = "Sheet 1";
+const NATIVE_TABLE: &str = "Review";
+const NATIVE_COMMENT_ADDRESS: &str = "$B$2";
+const NATIVE_ROOT_TEXT: &str = "Focused source comment";
+const NATIVE_AUTHOR: &str = "litchi-iwa";
 
 fuzz_target!(|data: &[u8]| {
     // A command byte keeps the checked-in corpus useful without embedding a
@@ -48,6 +57,7 @@ fuzz_target!(|data: &[u8]| {
     // package.  The package reader always sees only the selected source
     // bytes, while the command stream chooses bounded selectors/text.
     let (command, package_input) = command_prefix(data);
+    exercise_native_metadata(data, command);
     match Package::from_bytes_with_options(package_input, options()) {
         Ok(package) => exercise_package(&package, package_input, command),
         Err(error) => observe_error(error),
@@ -85,6 +95,198 @@ fn options() -> PackageReadOptions {
                 .unwrap_or_else(|error| unreachable!("valid reply projection limits: {error}"));
         PackageReadOptions::new(archive, semantic)
     })
+}
+
+fn exercise_native_metadata(data: &[u8], command: u8) {
+    exercise_package(native_metadata_package(), data, command);
+}
+
+fn native_metadata_package() -> &'static Package {
+    static PACKAGE: OnceLock<Package> = OnceLock::new();
+    PACKAGE.get_or_init(|| {
+        let package = Package::from_bytes_with_options(NATIVE_COMMENT_METADATA, options())
+            .unwrap_or_else(|error| {
+                panic!("native Numbers comment metadata seed must open: {error}")
+            });
+        verify_native_metadata(&package);
+        package
+    })
+}
+
+fn verify_native_metadata(package: &Package) {
+    let sheet = SheetSelector::name(NATIVE_SHEET);
+    let table = TableSelector::name(NATIVE_TABLE);
+    let position = CellPosition::from_a1(NATIVE_COMMENT_ADDRESS)
+        .unwrap_or_else(|error| unreachable!("native metadata address is valid: {error}"));
+    let source_bytes = package_bytes(package);
+    let root = package
+        .table_cell_comment(sheet, table, position)
+        .unwrap_or_else(|error| panic!("native metadata root read failed: {error}"))
+        .unwrap_or_else(|| panic!("native metadata root is missing"));
+    assert_eq!(root.text(), NATIVE_ROOT_TEXT);
+    let timestamp = root.timestamp();
+    assert!(
+        timestamp.is_some(),
+        "native metadata root timestamp is missing"
+    );
+    let author = root.author().cloned();
+    assert_eq!(
+        author.as_ref().and_then(|author| author.display_name()),
+        Some(NATIVE_AUTHOR)
+    );
+
+    let replies = match package.table_cell_comment_replies(sheet, table, position) {
+        Ok(replies) => replies,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+            exercise_ingress_limits(&source_bytes);
+            return;
+        },
+    };
+    for reply in &replies {
+        assert_eq!(reply.timestamp(), timestamp);
+        assert_eq!(reply.author(), author.as_ref());
+    }
+
+    let root_set =
+        package.set_table_cell_comment(sheet, table, position, "native metadata root update");
+    match root_set {
+        Ok(commit) => {
+            let updated = commit
+                .package()
+                .table_cell_comment(sheet, table, position)
+                .unwrap_or_else(|error| panic!("native metadata root edit read failed: {error}"))
+                .unwrap_or_else(|| panic!("native metadata root edit removed the root"));
+            assert_eq!(updated.text(), "native metadata root update");
+            assert_eq!(updated.timestamp(), timestamp);
+            assert_eq!(updated.author(), author.as_ref());
+            let restored = commit
+                .package()
+                .apply_table_cell_comment(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("native metadata root inverse failed: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+        },
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+        },
+    }
+
+    let added =
+        match package.add_table_cell_comment_reply(sheet, table, position, "native metadata reply")
+        {
+            Ok(commit) => commit,
+            Err(error) => {
+                observe_error(error);
+                assert_eq!(package_bytes(package), source_bytes);
+                exercise_native_refusal(package, sheet, table, position, &source_bytes);
+                exercise_ingress_limits(&source_bytes);
+                return;
+            },
+        };
+    let added_bytes = package_bytes(added.package());
+    let added_replies = added
+        .package()
+        .table_cell_comment_replies(sheet, table, position)
+        .unwrap_or_else(|error| panic!("native metadata added reply read failed: {error}"));
+    assert_eq!(added_replies.len(), replies.len() + 1);
+    let added_reply = added_replies
+        .last()
+        .unwrap_or_else(|| panic!("native metadata added reply is missing"));
+    assert_eq!(added_reply.text(), "native metadata reply");
+    assert_eq!(added_reply.timestamp(), timestamp);
+    assert_eq!(added_reply.author(), author.as_ref());
+
+    let added_restored = added
+        .package()
+        .apply_table_cell_comment_reply(&added.patch().inverse())
+        .unwrap_or_else(|error| panic!("native metadata add inverse failed: {error}"));
+    assert_eq!(package_bytes(added_restored.package()), source_bytes);
+
+    let added_index = CommentReplyIndex::try_from_usize(added_replies.len() - 1)
+        .unwrap_or_else(|error| panic!("native metadata reply ordinal is bounded: {error}"));
+    let updated_reply = added.package().set_table_cell_comment_reply(
+        sheet,
+        table,
+        position,
+        added_index,
+        "native metadata reply update",
+    );
+    match updated_reply {
+        Ok(commit) => {
+            let replies = commit
+                .package()
+                .table_cell_comment_replies(sheet, table, position)
+                .unwrap_or_else(|error| panic!("native metadata reply edit read failed: {error}"));
+            let reply = replies
+                .last()
+                .unwrap_or_else(|| panic!("native metadata reply edit removed the reply"));
+            assert_eq!(reply.text(), "native metadata reply update");
+            assert_eq!(reply.timestamp(), timestamp);
+            assert_eq!(reply.author(), author.as_ref());
+            let restored = commit
+                .package()
+                .apply_table_cell_comment_reply(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("native metadata reply inverse failed: {error}"));
+            assert_eq!(package_bytes(restored.package()), added_bytes);
+        },
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(added.package()), added_bytes);
+        },
+    }
+
+    let removed_reply =
+        added
+            .package()
+            .remove_table_cell_comment_reply(sheet, table, position, added_index);
+    match removed_reply {
+        Ok(commit) => {
+            let replies = commit
+                .package()
+                .table_cell_comment_replies(sheet, table, position)
+                .unwrap_or_else(|error| {
+                    panic!("native metadata reply removal read failed: {error}")
+                });
+            assert_eq!(replies.len(), added_replies.len() - 1);
+            let restored = commit
+                .package()
+                .apply_table_cell_comment_reply(&commit.patch().inverse())
+                .unwrap_or_else(|error| {
+                    panic!("native metadata reply removal inverse failed: {error}")
+                });
+            assert_eq!(package_bytes(restored.package()), added_bytes);
+        },
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(added.package()), added_bytes);
+        },
+    }
+
+    exercise_native_refusal(package, sheet, table, position, &source_bytes);
+    exercise_ingress_limits(&source_bytes);
+}
+
+fn exercise_native_refusal(
+    package: &Package,
+    sheet: SheetSelector<'_>,
+    table: TableSelector<'_>,
+    position: CellPosition,
+    source_bytes: &[u8],
+) {
+    let oversized = "x".repeat(MAX_TEXT_BYTES.saturating_add(1));
+    let result = package.add_table_cell_comment_reply(sheet, table, position, &oversized);
+    assert!(
+        result.is_err(),
+        "native metadata oversized reply was admitted"
+    );
+    observe_error(
+        result
+            .err()
+            .unwrap_or_else(|| unreachable!("native oversized reply has an error")),
+    );
+    assert_eq!(package_bytes(package), source_bytes);
 }
 
 fn exercise_package(package: &Package, data: &[u8], command: u8) {
@@ -316,7 +518,7 @@ fn verify_edit_commit(
                 .unwrap_or_else(|error| panic!("reply patch must apply: {error}"));
             assert_eq!(package_bytes(applied.package()), target_bytes);
             if !patch.is_noop() {
-                let conflict = package.apply_table_cell_comment_reply(&patch);
+                let conflict = commit.package().apply_table_cell_comment_reply(&patch);
                 assert!(conflict.is_err(), "reply patch conflict was accepted");
             }
 

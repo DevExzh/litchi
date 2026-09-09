@@ -12842,6 +12842,19 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAKS = frozenset(
         "Prost",
         "Buffa",
         "bytes",
+        "Archive",
+        "ArchiveInfo",
+        "ArchiveObject",
+        "Component",
+        "DataStore",
+        "FieldInfo",
+        "MessageInfo",
+        "ObjectId",
+        "ObjectIdentifier",
+        "PackageMetadata",
+        "RawBytes",
+        "RawMessage",
+        "StorageObject",
     }
 )
 NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES = (
@@ -12849,6 +12862,50 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES = (
     "Prost",
     "Buffa",
     "Iwa",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_TYPES = frozenset(
+    {"CommentAuthor", "CommentTimestamp"}
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES = {
+    "CommentAuthor": "TableCellCommentAuthor",
+    "CommentTimestamp": "TableCellCommentTimestamp",
+}
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ALLOWED_IDENTIFIERS = frozenset(
+    {"public_id"}
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_NATIVE_IDENTIFIERS = frozenset(
+    {
+        "Archive",
+        "ArchiveInfo",
+        "ArchiveObject",
+        "Component",
+        "DataStore",
+        "FieldInfo",
+        "MessageInfo",
+        "ObjectId",
+        "ObjectIdentifier",
+        "PackageMetadata",
+        "RawBytes",
+        "RawMessage",
+        "StorageId",
+        "StorageObject",
+        "Uuid",
+        "UUID",
+        "author_id",
+        "object_id",
+        "object_identifier",
+        "raw_bytes",
+        "raw_message",
+        "storage_id",
+        "storage_uuid",
+        "wire",
+    }
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_DEBUG_IMPL = re.compile(
+    r"(?<![A-Za-z0-9_#])impl(?:[ \t]+<[^>{}]*>)?[ \t]+"
+    r"(?:std[ \t]*::[ \t]*|core[ \t]*::[ \t]*)?"
+    r"(?:fmt[ \t]*::[ \t]*)?Debug[ \t]+for[ \t]+"
+    r"(?:r#)?CommentAuthor(?![A-Za-z0-9_])"
 )
 NUMBERS_TABLE_CELL_COMMENT_REPLY_A1_ADDRESS = re.compile(
     r"(?<![A-Za-z0-9_])(?:address|a1)(?![A-Za-z0-9_])|"
@@ -14245,7 +14302,12 @@ IWA_NUMBERS_LEGACY_METHOD_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
 )
 IWA_NUMBERS_LEGACY_METHODS = frozenset(
-    {"cell_comment", "set_cell_comment", "clear_cell_comment"}
+    {
+        "cell_comment",
+        "cell_comment_replies",
+        "set_cell_comment",
+        "clear_cell_comment",
+    }
 )
 IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
@@ -14261,6 +14323,10 @@ IWA_NUMBERS_CELL_COMMENT_SOURCE_FILES = (
 IWA_NUMBERS_CELL_COMMENT_HOST_METHOD = "set_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_FOCUSED_METHOD = "set_table_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER = "set_cell_comment_in_package"
+RETAINED_IWA_NUMBERS_COMMENT_READER_METHODS = (
+    "cell_comment",
+    "cell_comment_replies",
+)
 IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS = frozenset(
     {"UnsupportedDependency", "CommentNotFound"}
 )
@@ -22779,6 +22845,47 @@ def audit_iwa_legacy_method_deprecation_source_topology(
                 )
 
     return sorted(set(violations))
+
+
+def audit_iwa_numbers_comment_reader_retention_source_topology(
+    root: Path = ROOT,
+    *,
+    require_retained: bool = True,
+) -> list[str]:
+    """Keep Numbers comment readers while the Numbers migration debt is open.
+
+    The focused package now projects a narrow semantic comment snapshot, but
+    it does not yet cover shared, cross-component, or segmented comment
+    graphs.  The migration host therefore needs both raw-ID readers until the
+    parity gate is closed.  ``require_retained`` is supplied by ``main`` from
+    the checked-in migration policy so a future debt exit can remove these
+    compatibility methods without leaving a permanent source tombstone.
+    """
+
+    if not require_retained:
+        return []
+
+    path = root / IWA_NUMBERS_LEGACY_METHOD_SOURCE
+    if not path.is_file():
+        return [
+            "retained litchi-iwa Numbers comment readers require their source "
+            f"while migration debt 015 is open: {IWA_NUMBERS_LEGACY_METHOD_SOURCE}"
+        ]
+
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    public_methods: set[str] = set()
+    for declaration, _line_number in _rust_public_declarations(source):
+        function = RUST_FUNCTION_DECLARATION.search(declaration)
+        if function is not None:
+            public_methods.add(function.group(1))
+
+    violations = [
+        "retained litchi-iwa Numbers comment reader is missing while migration "
+        f"debt 015 is open {name}: {IWA_NUMBERS_LEGACY_METHOD_SOURCE}"
+        for name in RETAINED_IWA_NUMBERS_COMMENT_READER_METHODS
+        if name not in public_methods
+    ]
+    return sorted(violations)
 
 
 def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
@@ -36152,6 +36259,10 @@ def _numbers_table_cell_control_public_leak(identifier: str) -> str | None:
 def _numbers_table_cell_comment_reply_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden in the reply read facade."""
 
+    if identifier in NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ALLOWED_IDENTIFIERS:
+        return None
+    if identifier in NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_NATIVE_IDENTIFIERS:
+        return "forbidden native comment metadata vocabulary"
     if identifier in NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAKS:
         return "forbidden native reply vocabulary"
     if identifier.lower() in {
@@ -46822,10 +46933,16 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
         return code[declaration.start() : end], line_number
 
     def scan_public_surface(
-        surface: str, path: Path, line_number: int
+        surface: str,
+        path: Path,
+        line_number: int,
+        *,
+        allowed_identifiers: frozenset[str] = frozenset(),
     ) -> None:
         for match in RUST_IDENTIFIER.finditer(surface):
             identifier = match.group(1)
+            if identifier in allowed_identifiers:
+                continue
             reason = _numbers_table_cell_comment_reply_public_leak(identifier)
             if reason is None:
                 continue
@@ -46862,6 +46979,213 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
         if lib_path.is_file()
         else ""
     )
+
+    # The text-only projection is the compatibility baseline.  Once the
+    # focused owner starts publishing typed author/date metadata, keep that
+    # expansion equally narrow: both text-bearing values carry the same
+    # optional semantic fields, the value types are named at the crate root,
+    # and the author debug representation cannot expose display data.  The
+    # activation check is deliberately marker-based so old sources and the
+    # existing text-only fixtures remain valid until the owner actually lands
+    # the metadata types.
+    metadata_activation = any(
+        re.search(r"\b(?:CommentAuthor|CommentTimestamp)\b", source)
+        is not None
+        for source in (owner_code, _mask_rust_non_code(lib_source))
+    )
+    if metadata_activation:
+        metadata_types = NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_TYPES
+        metadata_exports = _rust_canonical_exports(owner_source, metadata_types)
+        for metadata_type in sorted(metadata_types):
+            if metadata_type not in metadata_exports:
+                violations.append(
+                    "focused litchi-numbers comment metadata is missing canonical "
+                    f"type {metadata_type}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+                continue
+            metadata_surface = public_type_surface(owner_source, metadata_type)
+            if metadata_surface is None:
+                violations.append(
+                    "focused litchi-numbers comment metadata is missing readable "
+                    f"type {metadata_type}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+                continue
+            scan_public_surface(
+                metadata_surface[0],
+                owner_path,
+                metadata_surface[1],
+                allowed_identifiers=(
+                    frozenset({"u64"})
+                    if metadata_type == "CommentTimestamp"
+                    else frozenset()
+                ),
+            )
+
+        for value_type in ("Comment", canonical_type):
+            value_surface = public_type_surface(owner_source, value_type)
+            if value_surface is None:
+                violations.append(
+                    "focused litchi-numbers comment metadata is missing semantic "
+                    f"value type {value_type}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+                continue
+            value_code = _mask_rust_non_code(value_surface[0])
+            scan_public_surface(value_surface[0], owner_path, value_surface[1])
+            for field, field_type in (
+                ("timestamp", "CommentTimestamp"),
+                ("author", "CommentAuthor"),
+            ):
+                if re.search(
+                    rf"\b{re.escape(field)}\b[ \t\r\n]*:[ \t\r\n]*"
+                    rf"Option[ \t\r\n]*<[ \t\r\n]*"
+                    rf"{re.escape(field_type)}[ \t\r\n]*>",
+                    value_code,
+                ) is None:
+                    violations.append(
+                        "focused litchi-numbers comment metadata value must retain "
+                        f"Option<{field_type}> field {field} on {value_type}: "
+                        f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                    )
+
+        # Inspect every public inherent method on the metadata-bearing values
+        # as well as the metadata types.  The required accessor checks below
+        # prove the intended signatures; this pass prevents an additional
+        # convenience method from reintroducing a native identity, archive,
+        # or wire value through a return or parameter type.
+        for value_type in (
+            "Comment",
+            canonical_type,
+            *sorted(NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_TYPES),
+        ):
+            for _method, declaration, line_number in _rust_public_methods_in_impl(
+                owner_source, value_type
+            ):
+                scan_public_surface(declaration, owner_path, line_number)
+
+        metadata_root_exports = _rust_canonical_exports(
+            lib_source,
+            frozenset(NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES.values()),
+        )
+        for canonical_metadata, public_metadata in sorted(
+            NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES.items()
+        ):
+            if public_metadata not in metadata_root_exports:
+                violations.append(
+                    "focused litchi-numbers comment metadata is missing named root "
+                    f"alias {public_metadata}: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+                )
+                continue
+            if re.search(
+                rf"\b{re.escape(canonical_metadata)}\b[ \t\r\n]+as[ \t\r\n]+"
+                rf"{re.escape(public_metadata)}\b",
+                lib_source,
+            ) is None:
+                violations.append(
+                    "focused litchi-numbers comment metadata root alias must be a "
+                    f"named re-export of {canonical_metadata}: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+                )
+
+        required_metadata_methods = {
+            "Comment": {
+                "timestamp": r"->\s*Option\s*<\s*CommentTimestamp\s*>",
+                "author": r"->\s*Option\s*<\s*&\s*CommentAuthor\s*>",
+            },
+            canonical_type: {
+                "timestamp": r"->\s*Option\s*<\s*CommentTimestamp\s*>",
+                "author": r"->\s*Option\s*<\s*&\s*CommentAuthor\s*>",
+            },
+            "CommentAuthor": {
+                "display_name": r"->\s*Option\s*<\s*&\s*str\s*>",
+                "public_id": r"->\s*Option\s*<\s*&\s*str\s*>",
+            },
+            "CommentTimestamp": {
+                "new": r"\bseconds\s*:\s*f64\b[\s\S]*->\s*Option\s*<\s*Self\s*>",
+                "as_f64": r"->\s*f64\b",
+            },
+        }
+        for value_type, methods in required_metadata_methods.items():
+            declarations = {
+                name: declaration
+                for name, declaration, _line_number in _rust_public_methods_in_impl(
+                    owner_source, value_type
+                )
+            }
+            for method, return_pattern in methods.items():
+                declaration = declarations.get(method)
+                if declaration is None or re.search(return_pattern, declaration) is None:
+                    violations.append(
+                        "focused litchi-numbers comment metadata is missing typed "
+                        f"{value_type}::{method} accessor: "
+                        f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                    )
+                elif declaration:
+                    scan_public_surface(
+                        declaration,
+                        owner_path,
+                        next(
+                            line_number
+                            for name, _declaration, line_number in _rust_public_methods_in_impl(
+                                owner_source, value_type
+                            )
+                            if name == method
+                        ),
+                    )
+
+        author_derive_debug = re.search(
+            r"#[ \t]*\[[ \t]*derive[ \t]*\([^]]*\bDebug\b[^]]*\)[ \t]*\]"
+            r"(?:[ \t\r\n]*#[ \t]*\[[^]]*\])*[ \t\r\n]*pub[ \t]+"
+            r"(?:struct|enum)[ \t]+(?:r#)?CommentAuthor\b",
+            owner_source,
+        )
+        if author_derive_debug is not None:
+            violations.append(
+                "focused litchi-numbers CommentAuthor must use redacted custom "
+                f"Debug: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+        author_debug = NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_DEBUG_IMPL.search(
+            owner_code
+        )
+        if author_debug is None:
+            violations.append(
+                "focused litchi-numbers CommentAuthor is missing redacted custom "
+                f"Debug: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+        else:
+            opening = owner_code.find("{", author_debug.end())
+            depth = 1
+            cursor = opening + 1
+            while opening >= 0 and cursor < len(owner_code) and depth:
+                if owner_code[cursor] == "{":
+                    depth += 1
+                elif owner_code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            debug_body = owner_code[opening + 1 : cursor - 1] if opening >= 0 and not depth else ""
+            debug_body_source = (
+                owner_source[opening + 1 : cursor - 1]
+                if opening >= 0 and not depth
+                else ""
+            )
+            if (
+                NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION.search(
+                    debug_body_source
+                )
+                is None
+            ):
+                violations.append(
+                    "focused litchi-numbers CommentAuthor Debug must redact "
+                    f"display metadata: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+            if re.search(
+                r"\bself\s*\.\s*(?:display_name|public_id)\b", debug_body
+            ) is not None:
+                violations.append(
+                    "focused litchi-numbers CommentAuthor Debug exposes display "
+                    f"metadata: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+
     lib_exports = _rust_canonical_exports(lib_source, frozenset({public_alias}))
     if public_alias not in lib_exports:
         violations.append(
@@ -47775,14 +48099,29 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
                 "focused Numbers comment-reply mutation Debug must redact authored content: "
                 f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
             )
-        elif re.search(
-            r"\bself\s*\.\s*(?:text|content|body|message|author)\b",
-            debug_region_code,
-        ) is not None:
-            violations.append(
-                "focused Numbers comment-reply mutation Debug exposes authored content: "
-                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+        else:
+            # A typed CommentAuthor has its own redacted Debug implementation.
+            # Once that metadata value is present, including the author value
+            # in the CommentReply debug struct is safe; authored text and all
+            # other content-bearing fields remain forbidden.  Keep the old
+            # ``author`` rejection for text-only/synthetic mutation owners.
+            author_debug_present = (
+                NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_DEBUG_IMPL.search(
+                    debug_code
+                )
+                is not None
             )
+            forbidden_fields = "text|content|body|message"
+            if not author_debug_present:
+                forbidden_fields += "|author"
+            if re.search(
+                rf"\bself\s*\.\s*(?:{forbidden_fields})\b",
+                debug_region_code,
+            ) is not None:
+                violations.append(
+                    "focused Numbers comment-reply mutation Debug exposes authored content: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+                )
 
     return sorted(set(violations))
 
@@ -67367,6 +67706,10 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_direct_core_path_source_topology()
         + audit_iwa_bundle_source_topology()
         + audit_iwa_legacy_method_deprecation_source_topology()
+        + audit_iwa_numbers_comment_reader_retention_source_topology(
+            require_retained=Edge("litchi-iwa", "litchi-numbers")
+            in policy.migration_edges
+        )
         + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_slide_text_info_source_topology()
         + audit_iwa_keynote_document_source_topology()

@@ -1,0 +1,39 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "root_text": "Focused source comment",
+  "author_display_name": "litchi-iwa",
+  "native_display_date": "Aug 24 at 7:39 AM",
+  "source_sha256": "4672156faf679caeeca14f3d7e99c3f8387fafdc6e65d2073b04de4f1b5f77a3",
+  "source_size": 6178,
+  "native_sha256": "ff5ca3e4a4221585ef9dc7a6236051240c7e0646c81b5de8f530e97a84c12f8b",
+  "native_size": 28973,
+  "verification_date": "2026-09-09",
+  "source": "crates/litchi-numbers/tests/fixtures/comment-edit-root.numbers",
+  "native_file": "comment-metadata-native-resaved.numbers",
+  "native_lifecycle": [
+    "opened without repair warning",
+    "B2 root text, author, and displayed date visually inspected",
+    "saved",
+    "document window closed to template chooser",
+    "exact path reopened",
+    "root text, author, and displayed date visually inspected again"
+  ],
+  "reply_acceptance": "Not established: Reply control did not open a reply editor.",
+  "readback_test": "crates/litchi-numbers/tests/table_cell_comment_metadata_native.rs",
+  "repeat_verification": {
+    "verification_date": "2026-09-09",
+    "source_sha256": "ff5ca3e4a4221585ef9dc7a6236051240c7e0646c81b5de8f530e97a84c12f8b",
+    "resaved_sha256": "4bb2616c7afa689e81c89340b102c7e64de44c80c71c53860aa8846aecfe981e",
+    "native_lifecycle": [
+      "opened a disposable copy of the permanent golden without repair warning",
+      "B2 root text, author, and displayed date visually inspected",
+      "saved with changed artifact hash",
+      "document window closed",
+      "exact path reopened",
+      "root text, author, and displayed date visually inspected again",
+      "document window closed to template chooser"
+    ],
+    "artifact_policy": "Disposable second-save copy; permanent first-save golden retained."
+  }
+}

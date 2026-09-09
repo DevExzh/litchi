@@ -897,6 +897,68 @@ def add_numbers_table_cell_comment_reply_scaffold(
     )
 
 
+def add_numbers_table_cell_comment_reply_metadata_scaffold(root: Path) -> None:
+    """Extend the read facade scaffold with its typed metadata contract."""
+
+    add_numbers_table_cell_comment_reply_scaffold(root)
+    owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+    source = owner.read_text(encoding="utf-8")
+    source = source.replace(
+        "pub struct CommentReply { text: String }",
+        "pub struct CommentReply {\n"
+        "    text: String,\n"
+        "    timestamp: Option<CommentTimestamp>,\n"
+        "    author: Option<CommentAuthor>,\n"
+        "}",
+        1,
+    )
+    source += (
+        "pub struct Comment {\n"
+        "    text: String,\n"
+        "    timestamp: Option<CommentTimestamp>,\n"
+        "    author: Option<CommentAuthor>,\n"
+        "}\n"
+        "pub struct CommentTimestamp(f64);\n"
+        "impl CommentTimestamp {\n"
+        "    pub const fn new(seconds: f64) -> Option<Self> {\n"
+        "        seconds.is_finite().then_some(Self(seconds))\n"
+        "    }\n"
+        "    pub const fn as_f64(self) -> f64 { self.0 }\n"
+        "}\n"
+        "pub struct CommentAuthor {\n"
+        "    display_name: Option<Box<str>>,\n"
+        "    public_id: Option<Box<str>>,\n"
+        "}\n"
+        "impl CommentAuthor {\n"
+        "    pub fn display_name(&self) -> Option<&str> { todo!() }\n"
+        "    pub fn public_id(&self) -> Option<&str> { todo!() }\n"
+        "}\n"
+        "impl fmt::Debug for CommentAuthor {\n"
+        "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+        "        f.debug_struct(\"CommentAuthor\").finish_non_exhaustive()\n"
+        "    }\n"
+        "}\n"
+        "impl Comment {\n"
+        "    pub fn timestamp(&self) -> Option<CommentTimestamp> { todo!() }\n"
+        "    pub fn author(&self) -> Option<&CommentAuthor> { todo!() }\n"
+        "}\n"
+        "impl CommentReply {\n"
+        "    pub fn timestamp(&self) -> Option<CommentTimestamp> { todo!() }\n"
+        "    pub fn author(&self) -> Option<&CommentAuthor> { todo!() }\n"
+        "}\n"
+    )
+    owner.write_text(source, encoding="utf-8")
+
+    lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+    lib.write_text(
+        lib.read_text(encoding="utf-8")
+        + "pub use package::{ comments::{"
+        "CommentAuthor as TableCellCommentAuthor, "
+        "CommentTimestamp as TableCellCommentTimestamp} };\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root: Path) -> None:
     codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
     codec.parent.mkdir(parents=True, exist_ok=True)
@@ -9046,6 +9108,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             numbers.parent.mkdir(parents=True)
             numbers.write_text(
                 "pub fn cell_comment() {}\n"
+                "pub fn cell_comment_replies() {}\n"
                 "pub fn set_cell_comment() {}\n"
                 "pub fn clear_cell_comment() {}\n",
                 encoding="utf-8",
@@ -9067,11 +9130,14 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "cell_comment: "
                     "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:1",
                     "litchi-iwa Numbers legacy method must remain deprecated "
+                    "cell_comment_replies: "
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:2",
+                    "litchi-iwa Numbers legacy method must remain deprecated "
                     "clear_cell_comment: "
-                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:3",
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:4",
                     "litchi-iwa Numbers legacy method must remain deprecated "
                     "set_cell_comment: "
-                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:2",
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:3",
                     "litchi-iwa Pages legacy method must remain deprecated "
                     "clear_section_text: "
                     "crates/litchi-iwa/src/pages/editor/section_content.rs:4",
@@ -9091,7 +9157,12 @@ class BoundaryPolicyTests(unittest.TestCase):
             numbers.write_text(
                 "".join(
                     f"{deprecated}pub fn {name}() {{}}\n"
-                    for name in ("cell_comment", "set_cell_comment", "clear_cell_comment")
+                    for name in (
+                        "cell_comment",
+                        "cell_comment_replies",
+                        "set_cell_comment",
+                        "clear_cell_comment",
+                    )
                 ),
                 encoding="utf-8",
             )
@@ -9133,6 +9204,65 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-iwa/src/pages/editor/section_content.rs:5",
                 ],
             )
+
+    def test_iwa_numbers_comment_readers_are_retained_until_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readers = root / boundaries.IWA_NUMBERS_LEGACY_METHOD_SOURCE
+            readers.parent.mkdir(parents=True)
+            readers.write_text(
+                "pub fn cell_comment() {}\n"
+                "pub fn cell_comment_replies() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_comment_reader_retention_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            readers.write_text("pub fn cell_comment() {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_numbers_comment_reader_retention_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("cell_comment_replies", violations[0])
+            self.assertIn("debt 015 is open", violations[0])
+
+            readers.write_text(
+                "pub fn cell_comment() {}\n"
+                "#[cfg(test)]\n"
+                "pub fn cell_comment_replies() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_comment_reader_retention_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("cell_comment_replies", violations[0])
+
+    def test_iwa_numbers_comment_reader_retention_can_close_with_policy_debt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_comment_reader_retention_source_topology(
+                    root, require_retained=False
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_comment_reader_retention_is_policy_dispatched(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_comment_reader_retention_source_topology(",
+            main_source,
+        )
+        self.assertIn(
+            'Edge("litchi-iwa", "litchi-numbers")',
+            main_source,
+        )
 
     def test_retired_iwa_keynote_document_reader_inventory_is_exact(self) -> None:
         self.assertEqual(
@@ -39125,6 +39255,122 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_table_cell_comment_reply_metadata_accepts_typed_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_metadata_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_metadata_activation_masks_root_trivia(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "// CommentAuthor and CommentTimestamp are documented here.\n"
+                + 'const _COMMENT_METADATA_DOC: &str = "CommentAuthor CommentTimestamp";\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_metadata_rejects_native_fields_and_missing_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_metadata_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+
+            for token in (
+                "u64",
+                "StorageId",
+                "Uuid",
+                "ObjectIdentifier",
+                "RawMessage",
+                "Archive",
+                "MessageInfo",
+                "bytes",
+            ):
+                with self.subTest(native_token=token):
+                    owner.write_text(
+                        complete.replace(
+                            "pub struct CommentAuthor {",
+                            f"pub struct CommentAuthor {{\n    native_field: {token},",
+                            1,
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(token in item for item in violations),
+                        msg=f"missing native metadata leak {token!r}: {violations!r}",
+                    )
+
+            owner.write_text(
+                complete
+                + "impl CommentAuthor {\n"
+                + "    pub fn native_id(&self) -> u64 { 0 }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("native_id" in item or " u64" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete.replace(
+                    "timestamp: Option<CommentTimestamp>,",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("Option<CommentTimestamp>" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete.replace(
+                    'f.debug_struct("CommentAuthor").finish_non_exhaustive()',
+                    'f.debug_struct("CommentAuthor").field("public_id", &self.public_id).finish()',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("CommentAuthor Debug exposes display metadata" in item for item in violations),
+                violations,
+            )
+
     def test_numbers_table_cell_comment_reply_projection_requires_type_and_methods(
         self,
     ) -> None:
@@ -39621,6 +39867,57 @@ fn rewrite_movie_title_operation(
             )
             violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
             self.assertTrue(any("text-bearing type must not derive Debug" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_mutation_allows_redacted_author_debug(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub struct CommentAuthor;\n"
+                + "impl fmt::Debug for CommentAuthor {\n"
+                + "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+                + "        f.debug_struct(\"CommentAuthor\").finish_non_exhaustive()\n"
+                + "    }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace(
+                    'f.debug_struct("CommentReply").field("text", &"<redacted>").finish()',
+                    'f.debug_struct("CommentReply").field("text", &"<redacted>").field("author", &self.author).finish()',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub struct CommentAuthor;\n"
+                    "impl fmt::Debug for CommentAuthor {\n"
+                    "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+                    "        f.debug_struct(\"CommentAuthor\").finish_non_exhaustive()\n"
+                    "    }\n"
+                    "}\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("exposes authored content" in item for item in violations), violations)
 
     def test_numbers_table_cell_comment_reply_mutation_masks_cfg_test_decoys_and_requires_fuzz_inventory(
         self,

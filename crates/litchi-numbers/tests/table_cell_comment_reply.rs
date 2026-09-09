@@ -11,939 +11,21 @@
 
 use std::io;
 
+#[path = "support/numbers_comment_fixture.rs"]
+mod fixture;
+use fixture::*;
+
 use litchi_iwa_archive::{Limits, package::Catalog};
-use litchi_iwa_common::wire::append_varint_field;
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
+use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::cell::comment::CommentReplyIndex;
 use litchi_numbers::{
     CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
 };
-use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
-const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
-const REPLIES_MEMBER: &str = "Index/Replies.iwa";
-const VIEW_STATE_MEMBER: &str = "Index/ViewState.iwa";
-const METADATA_MEMBER: &str = "Index/Metadata.iwa";
-
-const DOCUMENT_TYPE: u32 = 1;
-const SHEET_TYPE: u32 = 2;
-const TABLE_INFO_TYPE: u32 = 6_000;
-const TABLE_MODEL_TYPE: u32 = 6_001;
-const TILE_TYPE: u32 = 6_002;
-const TABLE_DATA_LIST_TYPE: u32 = 6_005;
-const COMMENT_STORAGE_TYPE: u32 = 3_056;
-const METADATA_TYPE: u32 = 11_006;
-
-const DOCUMENT_ID: u64 = 1;
-const SHEET_ID: u64 = 2;
-const TABLE_INFO_ID: u64 = 3;
-const TABLE_MODEL_ID: u64 = 4;
-const SIDECAR_ID: u64 = 5;
-const TILE_ID: u64 = 6;
-const ROOT_COMMENT_ID: u64 = 20;
-const SECOND_ROOT_COMMENT_ID: u64 = 21;
-const FIRST_REPLY_ID: u64 = 30;
-const SECOND_REPLY_ID: u64 = 31;
-const THIRD_REPLY_ID: u64 = 32;
-const SHARED_REPLY_ID: u64 = 33;
-const AUTHOR_ID: u64 = 40;
-const AUTHOR_STORAGE_ID: u64 = 41;
-const VIEW_STATE_ID: u64 = 300;
-const METADATA_OBJECT_ID: u64 = 900;
-const WATERMARK: u64 = 1_000;
-const ANNOTATION_AUTHOR_TYPE: u32 = 212;
-const ANNOTATION_AUTHOR_STORAGE_TYPE: u32 = 213;
-
-const SHEET_NAME: &str = "Reply fixture sheet";
-const TABLE_NAME: &str = "Reply fixture table";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FixtureMode {
-    /// An empty comment list plus an empty author registry.
-    Rootless,
-    /// An empty comment graph with a missing second-column slot.
-    SparseCell,
-    /// One rooted comment with duplicate reply text for ordinal selection.
-    DuplicateText,
-    /// The same root comment is referenced by two cells.
-    SharedRoot,
-    /// Two roots share one reply archive.
-    SharedReply,
-    /// One root/reply pair is unshared and can be culled after removal.
-    SingleRoot,
-    /// The reply archive is moved to a second current component.
-    CrossComponent,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Corruption {
-    DuplicateReplyReference,
-    SelfReplyReference,
-    MissingReplyReference,
-    NestedReplyReference,
-    ExternalReplyReference,
-    TypedReplyReference,
-    DuplicateRootPayload,
-    WrongReplyType,
-    MissingReply,
-    SegmentedList,
-    DuplicateListKey,
-    WrongListType,
-    ZeroRefcount,
-    RefcountUndercount,
-    RefcountOvercount,
-    AggregateMissing,
-    AggregateExtra,
-    FieldInfoMissing,
-    FieldInfoDuplicate,
-    FieldInfoWrong,
-    MissingMetadata,
-    MissingReplyUuid,
-    VersionedReplyUuid,
-    DuplicateReplyUuid,
-    AmbiguousReplyIdentifier,
-    DataOwnerReplyIdentifier,
-    RootDataMapReplyIdentifier,
-    OpaqueInbound,
-    UnknownWire,
-    UnknownMetadata,
-    Locked,
-    MissingAuthor,
-    MissingAuthorStorage,
-    MissingCommentList,
-}
-
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        ..Default::default()
-    }
-}
-
-fn external_reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        deprecated_is_external: Some(true),
-        ..Default::default()
-    }
-}
-
-fn typed_reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        deprecated_type: Some(1),
-        ..Default::default()
-    }
-}
-
-fn uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
-    tsp::ObjectUuidMapEntry {
-        identifier,
-        uuid: tsp::Uuid {
-            lower: identifier,
-            upper: identifier.saturating_add(0x1000),
-        },
-    }
-}
-
-fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObject> {
-    Ok(ArchiveObject::new(
-        identifier,
-        vec![RawMessage { type_, data }],
-    )?)
-}
-
-fn set_message_info(object: &mut ArchiveObject, references: &[u64]) -> TestResult {
-    let info = object
-        .archive_info
-        .message_infos
-        .first_mut()
-        .ok_or_else(|| io::Error::other("synthetic object has no message info"))?;
-    info.object_references = references.to_vec();
-    Ok(())
-}
-
-fn set_field_info(
-    object: &mut ArchiveObject,
-    field_path: Vec<u32>,
-    references: &[u64],
-) -> TestResult {
-    let info = object
-        .archive_info
-        .message_infos
-        .first_mut()
-        .ok_or_else(|| io::Error::other("synthetic object has no message info"))?;
-    let mut field = FieldInfo::new(field_path);
-    field.r#type = Some(FieldType::ObjectReference);
-    field.object_references = references.to_vec();
-    info.field_infos.push(field);
-    Ok(())
-}
-
-fn comment_entry(key: u32, root_identifier: u64, refcount: u32) -> tst::table_data_list::ListEntry {
-    tst::table_data_list::ListEntry {
-        key,
-        refcount,
-        comment_storage: Some(reference(root_identifier)),
-        ..Default::default()
-    }
-}
-
-fn string_entry() -> tst::table_data_list::ListEntry {
-    tst::table_data_list::ListEntry {
-        key: 1,
-        refcount: 1,
-        string: Some("fixture seed".to_owned()),
-        ..Default::default()
-    }
-}
-
-fn formula_entry() -> tst::table_data_list::ListEntry {
-    tst::table_data_list::ListEntry {
-        key: 1,
-        refcount: 1,
-        formula: Some(tsce::FormulaArchive {
-            ast_node_array: tsce::AstNodeArrayArchive {
-                ast_node: vec![tsce::ast_node_array_archive::AstNodeArchive {
-                    ast_node_type: tsce::ast_node_array_archive::AstNodeType::NumberNode as i32,
-                    ast_number_node_number: Some(1.0),
-                    ..Default::default()
-                }],
-            },
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
-}
-
-fn formula_error_entry() -> tst::table_data_list::ListEntry {
-    tst::table_data_list::ListEntry {
-        key: 1,
-        refcount: 1,
-        string: Some("#VALUE!".to_owned()),
-        ..Default::default()
-    }
-}
-
-fn format_entry() -> tst::table_data_list::ListEntry {
-    tst::table_data_list::ListEntry {
-        key: 1,
-        refcount: 2,
-        format: Some(tsk::FormatStructArchive {
-            format_type: Some(260),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
-}
-
-fn list_message(
-    list_type: tst::table_data_list::ListType,
-    entries: Vec<tst::table_data_list::ListEntry>,
-    segments: Vec<tsp::Reference>,
-) -> RawMessage {
-    RawMessage {
-        type_: TABLE_DATA_LIST_TYPE,
-        data: tst::TableDataList {
-            list_type: list_type as i32,
-            next_list_id: 10,
-            entries,
-            segments,
-            is_new_for_bnc: Some(true),
-        }
-        .encode_to_vec(),
-    }
-}
-
-fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<ArchiveObject> {
-    let mut comment_entries = match mode {
-        FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
-        FixtureMode::SharedRoot | FixtureMode::DuplicateText | FixtureMode::SingleRoot => {
-            vec![comment_entry(
-                1,
-                ROOT_COMMENT_ID,
-                if matches!(mode, FixtureMode::SharedRoot) {
-                    2
-                } else {
-                    1
-                },
-            )]
-        },
-        FixtureMode::SharedReply | FixtureMode::CrossComponent => vec![
-            comment_entry(1, ROOT_COMMENT_ID, 1),
-            comment_entry(2, SECOND_ROOT_COMMENT_ID, 1),
-        ],
-    };
-    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::DuplicateListKey)) {
-        comment_entries.push(comment_entries[0].clone());
-    }
-    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::ZeroRefcount)) {
-        comment_entries[0].refcount = 0;
-    }
-    let actual_first_key_references: u32 = if matches!(mode, FixtureMode::SharedRoot) {
-        2
-    } else {
-        1
-    };
-    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::RefcountUndercount)) {
-        comment_entries[0].refcount = actual_first_key_references.saturating_sub(1);
-    }
-    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::RefcountOvercount)) {
-        comment_entries[0].refcount = actual_first_key_references + 1;
-    }
-    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::WrongListType)) {
-        comment_entries[0].comment_storage = None;
-        comment_entries[0].string = Some("wrong list payload".to_owned());
-    }
-
-    let mut messages = vec![
-        list_message(
-            tst::table_data_list::ListType::String,
-            vec![string_entry()],
-            Vec::new(),
-        ),
-        list_message(
-            tst::table_data_list::ListType::Formula,
-            vec![formula_entry()],
-            Vec::new(),
-        ),
-        list_message(
-            tst::table_data_list::ListType::FormulaError,
-            vec![formula_error_entry()],
-            Vec::new(),
-        ),
-        list_message(
-            tst::table_data_list::ListType::Format,
-            vec![format_entry()],
-            Vec::new(),
-        ),
-        list_message(
-            tst::table_data_list::ListType::CommentStorage,
-            comment_entries,
-            if matches!(corruption, Some(Corruption::SegmentedList)) {
-                vec![reference(700)]
-            } else {
-                Vec::new()
-            },
-        ),
-    ];
-    if matches!(corruption, Some(Corruption::MissingCommentList)) {
-        messages.pop();
-        return Ok(ArchiveObject::new(SIDECAR_ID, messages)?);
-    }
-    if matches!(corruption, Some(Corruption::DuplicateListKey)) {
-        messages.push(messages[3].clone());
-    }
-
-    let mut result = ArchiveObject::new(SIDECAR_ID, messages)?;
-    let list_index = result
-        .messages
-        .iter()
-        .position(|message| {
-            tst::TableDataList::decode(message.data.as_slice())
-                .map(|list| list.list_type == tst::table_data_list::ListType::CommentStorage as i32)
-                .unwrap_or(false)
-        })
-        .ok_or_else(|| io::Error::other("comment list is missing"))?;
-    let info = result
-        .archive_info
-        .message_infos
-        .get_mut(list_index)
-        .ok_or_else(|| io::Error::other("comment list info is missing"))?;
-    let roots: Vec<u64> = match mode {
-        FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
-        FixtureMode::SharedReply | FixtureMode::CrossComponent => {
-            vec![ROOT_COMMENT_ID, SECOND_ROOT_COMMENT_ID]
-        },
-        _ => vec![ROOT_COMMENT_ID],
-    };
-    info.object_references = roots.clone();
-    for (key, root) in roots.iter().enumerate() {
-        let mut field = FieldInfo::new(vec![3, u32::try_from(key + 1)?]);
-        field.r#type = Some(FieldType::ObjectReference);
-        field.object_references = vec![*root];
-        info.field_infos.push(field);
-    }
-    match corruption {
-        Some(Corruption::AggregateMissing) => info.object_references.clear(),
-        Some(Corruption::AggregateExtra) => info.object_references.push(999_999),
-        Some(Corruption::FieldInfoMissing) => info.field_infos.clear(),
-        Some(Corruption::FieldInfoDuplicate) => {
-            let field = info
-                .field_infos
-                .first()
-                .cloned()
-                .ok_or_else(|| io::Error::other("field info is missing"))?;
-            info.field_infos.push(field);
-        },
-        Some(Corruption::FieldInfoWrong) => {
-            let field = info
-                .field_infos
-                .first_mut()
-                .ok_or_else(|| io::Error::other("field info is missing"))?;
-            field.object_references = vec![999_999];
-        },
-        _ => {},
-    }
-    Ok(result)
-}
-
-fn table_model(comment_list: bool, columns: u32) -> tst::TableModelArchive {
-    tst::TableModelArchive {
-        table_id: "reply-fixture-table-id".to_owned(),
-        table_name: TABLE_NAME.to_owned(),
-        table_style: reference(SIDECAR_ID),
-        body_text_style: reference(SIDECAR_ID),
-        header_row_text_style: reference(SIDECAR_ID),
-        header_column_text_style: reference(SIDECAR_ID),
-        footer_row_text_style: reference(SIDECAR_ID),
-        body_cell_style: reference(SIDECAR_ID),
-        header_row_style: reference(SIDECAR_ID),
-        header_column_style: reference(SIDECAR_ID),
-        footer_row_style: reference(SIDECAR_ID),
-        number_of_rows: 2,
-        number_of_columns: columns,
-        base_data_store: tst::DataStore {
-            row_headers: tst::HeaderStorage {
-                bucket_hash_function: 1,
-                ..Default::default()
-            },
-            column_headers: reference(SIDECAR_ID),
-            tiles: tst::TileStorage {
-                tiles: vec![tst::tile_storage::Tile {
-                    tileid: 0,
-                    tile: reference(TILE_ID),
-                }],
-                tile_size: Some(256),
-                ..Default::default()
-            },
-            string_table: reference(SIDECAR_ID),
-            style_table: reference(SIDECAR_ID),
-            formula_table: reference(SIDECAR_ID),
-            formula_error_table: Some(reference(SIDECAR_ID)),
-            format_table_pre_bnc: reference(SIDECAR_ID),
-            format_table: Some(reference(SIDECAR_ID)),
-            comment_storage_table: comment_list.then(|| reference(SIDECAR_ID)),
-            next_row_strip_id: 1,
-            next_column_strip_id: 1,
-            row_tile_tree: tst::TableRbTree::default(),
-            column_tile_tree: tst::TableRbTree::default(),
-            ..Default::default()
-        },
-        ..Default::default()
-    }
-}
-
-fn comment_cell(key: Option<u32>) -> TestResult<Vec<u8>> {
-    let mut cell = BncCell::minimal();
-    cell.set_number(42.0)?;
-    cell.set_comment_identifier(key);
-    Ok(cell.encode())
-}
-
-fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
-    let keys = match mode {
-        FixtureMode::Rootless | FixtureMode::SparseCell => [None, None],
-        FixtureMode::SharedRoot => [Some(1), Some(1)],
-        FixtureMode::SharedReply | FixtureMode::CrossComponent => [Some(1), Some(2)],
-        FixtureMode::DuplicateText | FixtureMode::SingleRoot => [Some(1), None],
-    };
-    let mut rows = Vec::new();
-    for (row, key) in keys.into_iter().enumerate() {
-        let bytes = comment_cell(key)?;
-        let sparse = matches!(mode, FixtureMode::SparseCell);
-        let offsets = if sparse {
-            vec![0, 0, 0xff, 0xff]
-        } else {
-            vec![0, 0]
-        };
-        rows.push(tst::TileRowInfo {
-            tile_row_index: u32::try_from(row)?,
-            cell_count: 1,
-            storage_version: Some(5),
-            cell_storage_buffer_pre_bnc: bytes.clone(),
-            cell_offsets_pre_bnc: vec![0, 0],
-            cell_storage_buffer: Some(bytes),
-            cell_offsets: Some(offsets),
-            ..Default::default()
-        });
-    }
-    Ok(tst::Tile {
-        max_column: if matches!(mode, FixtureMode::SparseCell) {
-            1
-        } else {
-            0
-        },
-        max_row: 1,
-        num_cells: 2,
-        numrows: 2,
-        row_infos: rows,
-        storage_version: Some(5),
-        last_saved_in_bnc: Some(true),
-        ..Default::default()
-    })
-}
-
-fn comment_archive(
-    identifier: u64,
-    text: &str,
-    replies: &[tsp::Reference],
-) -> TestResult<ArchiveObject> {
-    let mut result = object(
-        identifier,
-        COMMENT_STORAGE_TYPE,
-        tsd::CommentStorageArchive {
-            text: Some(text.to_owned()),
-            creation_date: Some(tsp::Date { seconds: 123.0 }),
-            author: Some(reference(AUTHOR_ID)),
-            replies: replies.to_vec(),
-            storage_uuid: Some(tsp::Uuid {
-                lower: identifier,
-                upper: identifier.rotate_left(13),
-            }),
-        }
-        .encode_to_vec(),
-    )?;
-    let reply_ids = replies
-        .iter()
-        .map(|reply| reply.identifier)
-        .collect::<Vec<_>>();
-    let mut references = vec![AUTHOR_ID];
-    references.extend(reply_ids);
-    set_message_info(&mut result, &references)?;
-    set_field_info(&mut result, vec![3], &[AUTHOR_ID])?;
-    for (ordinal, reply) in replies.iter().enumerate() {
-        set_field_info(
-            &mut result,
-            vec![4, u32::try_from(ordinal)?],
-            &[reply.identifier],
-        )?;
-    }
-    Ok(result)
-}
-
-fn reply_objects(
-    mode: FixtureMode,
-    corruption: Option<Corruption>,
-) -> TestResult<Vec<ArchiveObject>> {
-    if matches!(mode, FixtureMode::Rootless | FixtureMode::SparseCell) {
-        return Ok(Vec::new());
-    }
-    let mut first_replies = match mode {
-        FixtureMode::DuplicateText => vec![
-            reference(FIRST_REPLY_ID),
-            reference(SECOND_REPLY_ID),
-            reference(THIRD_REPLY_ID),
-        ],
-        FixtureMode::SharedReply | FixtureMode::CrossComponent => {
-            vec![reference(SHARED_REPLY_ID), reference(SECOND_REPLY_ID)]
-        },
-        _ => vec![reference(FIRST_REPLY_ID)],
-    };
-    if let Some(kind) = corruption {
-        first_replies = match kind {
-            Corruption::DuplicateReplyReference => {
-                vec![reference(FIRST_REPLY_ID), reference(FIRST_REPLY_ID)]
-            },
-            Corruption::SelfReplyReference => vec![reference(ROOT_COMMENT_ID)],
-            Corruption::MissingReplyReference => vec![reference(999_999)],
-            Corruption::NestedReplyReference => vec![reference(SECOND_REPLY_ID)],
-            Corruption::ExternalReplyReference => vec![external_reference(FIRST_REPLY_ID)],
-            Corruption::TypedReplyReference => vec![typed_reference(FIRST_REPLY_ID)],
-            _ => first_replies,
-        };
-    }
-    let mut result = vec![comment_archive(
-        ROOT_COMMENT_ID,
-        "root comment",
-        &first_replies,
-    )?];
-    if matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
-        result.push(comment_archive(
-            SECOND_ROOT_COMMENT_ID,
-            "second root",
-            &[reference(SHARED_REPLY_ID)],
-        )?);
-    }
-    let first_text = if matches!(mode, FixtureMode::DuplicateText) {
-        "duplicate"
-    } else {
-        "first reply"
-    };
-    if !matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
-        result.push(comment_archive(FIRST_REPLY_ID, first_text, &[])?);
-    }
-    if matches!(mode, FixtureMode::DuplicateText) {
-        result.push(comment_archive(SECOND_REPLY_ID, "duplicate", &[])?);
-        result.push(comment_archive(THIRD_REPLY_ID, "duplicate", &[])?);
-    }
-    if matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
-        result.push(comment_archive(SECOND_REPLY_ID, "second reply", &[])?);
-        result.push(comment_archive(SHARED_REPLY_ID, "shared reply", &[])?);
-    }
-    if matches!(corruption, Some(Corruption::MissingReply)) {
-        result.retain(|object| object.archive_info.identifier != Some(FIRST_REPLY_ID));
-    }
-    if matches!(corruption, Some(Corruption::WrongReplyType)) {
-        if let Some(object) = result
-            .iter_mut()
-            .find(|object| object.archive_info.identifier == Some(FIRST_REPLY_ID))
-        {
-            object.messages[0].type_ = COMMENT_STORAGE_TYPE + 1;
-        }
-    }
-    if matches!(corruption, Some(Corruption::DuplicateRootPayload)) {
-        let root = result
-            .first_mut()
-            .ok_or_else(|| io::Error::other("root comment is missing"))?;
-        let message = root
-            .messages
-            .first()
-            .cloned()
-            .ok_or_else(|| io::Error::other("root payload is missing"))?;
-        root.messages.push(message);
-        root.archive_info
-            .message_infos
-            .push(root.archive_info.message_infos[0].clone());
-    }
-    Ok(result)
-}
-
-fn metadata_component(
-    identifier: u64,
-    locator: &str,
-    save_token: u64,
-    object_ids: &[u64],
-) -> tsp::ComponentInfo {
-    tsp::ComponentInfo {
-        identifier,
-        preferred_locator: locator.to_owned(),
-        locator: Some(locator.to_owned()),
-        save_token: Some(save_token),
-        object_uuid_map_entries: object_ids.iter().copied().map(uuid_entry).collect(),
-        ..Default::default()
-    }
-}
-
-fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<u8>> {
-    let mut document_ids = vec![
-        DOCUMENT_ID,
-        SHEET_ID,
-        TABLE_INFO_ID,
-        TABLE_MODEL_ID,
-        SIDECAR_ID,
-        TILE_ID,
-        ROOT_COMMENT_ID,
-        SECOND_ROOT_COMMENT_ID,
-        FIRST_REPLY_ID,
-        SECOND_REPLY_ID,
-        THIRD_REPLY_ID,
-        SHARED_REPLY_ID,
-        AUTHOR_ID,
-        AUTHOR_STORAGE_ID,
-    ];
-    if matches!(mode, FixtureMode::Rootless | FixtureMode::SparseCell) {
-        document_ids.retain(|identifier| {
-            !matches!(
-                *identifier,
-                ROOT_COMMENT_ID
-                    | SECOND_ROOT_COMMENT_ID
-                    | FIRST_REPLY_ID
-                    | SECOND_REPLY_ID
-                    | THIRD_REPLY_ID
-                    | SHARED_REPLY_ID
-                    | AUTHOR_ID
-            )
-        });
-    }
-    if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
-        document_ids.retain(|identifier| !matches!(*identifier, AUTHOR_ID | AUTHOR_STORAGE_ID));
-    }
-    document_ids.retain(|identifier| {
-        *identifier != SECOND_ROOT_COMMENT_ID
-            || matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent)
-    });
-    if matches!(mode, FixtureMode::CrossComponent) {
-        document_ids.retain(|identifier| {
-            !matches!(
-                *identifier,
-                FIRST_REPLY_ID | SECOND_REPLY_ID | THIRD_REPLY_ID | SHARED_REPLY_ID
-            )
-        });
-    }
-    let reply_ids = if matches!(mode, FixtureMode::CrossComponent) {
-        vec![SECOND_REPLY_ID, SHARED_REPLY_ID]
-    } else {
-        Vec::new()
-    };
-    let document = metadata_component(100, "Document", 9, &document_ids);
-    let view = metadata_component(300, "ViewState", 7, &[VIEW_STATE_ID]);
-    let replies = metadata_component(400, "Replies", 8, &reply_ids);
-    let versioned = metadata_component(101, "Document", 3, &[999]);
-    let mut package = tsp::PackageMetadata {
-        last_object_identifier: WATERMARK,
-        save_token: Some(10),
-        components: vec![document, view],
-        versioned_components: vec![versioned],
-        ..Default::default()
-    };
-    if matches!(mode, FixtureMode::CrossComponent) {
-        package.components.push(replies);
-    }
-    match corruption {
-        Some(Corruption::MissingReplyUuid) => {
-            if let Some(component) = package
-                .components
-                .iter_mut()
-                .find(|component| component.identifier == 100)
-            {
-                component
-                    .object_uuid_map_entries
-                    .retain(|entry| entry.identifier != FIRST_REPLY_ID);
-            }
-        },
-        Some(Corruption::VersionedReplyUuid) => {
-            if let Some(component) = package
-                .components
-                .iter_mut()
-                .find(|component| component.identifier == 100)
-            {
-                component
-                    .object_uuid_map_entries
-                    .retain(|entry| entry.identifier != FIRST_REPLY_ID);
-            }
-            package.versioned_components[0]
-                .object_uuid_map_entries
-                .push(uuid_entry(FIRST_REPLY_ID));
-        },
-        Some(Corruption::DuplicateReplyUuid) => {
-            if let Some(component) = package
-                .components
-                .iter_mut()
-                .find(|component| component.identifier == 100)
-            {
-                component
-                    .object_uuid_map_entries
-                    .push(uuid_entry(FIRST_REPLY_ID));
-            }
-        },
-        Some(Corruption::AmbiguousReplyIdentifier) => {
-            if let Some(component) = package
-                .components
-                .iter_mut()
-                .find(|component| component.identifier == 100)
-            {
-                component.ambiguous_object_identifiers.push(FIRST_REPLY_ID);
-            }
-        },
-        Some(Corruption::DataOwnerReplyIdentifier) => {
-            if let Some(component) = package
-                .components
-                .iter_mut()
-                .find(|component| component.identifier == 100)
-            {
-                component.data_references.push(tsp::ComponentDataReference {
-                    data_identifier: 2_000,
-                    object_reference_list: vec![tsp::component_data_reference::ObjectReference {
-                        object_identifier: FIRST_REPLY_ID,
-                        count: 1,
-                    }],
-                });
-            }
-        },
-        Some(Corruption::RootDataMapReplyIdentifier) => {
-            package.data_metadata_map = Some(reference(FIRST_REPLY_ID));
-        },
-        _ => {},
-    }
-    let mut data = package.encode_to_vec();
-    if matches!(corruption, Some(Corruption::UnknownMetadata)) {
-        append_varint_field(&mut data, 90, 0xfeed_beef)?;
-    }
-    Ok(data)
-}
-
-fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
-}
-
-fn author_objects(empty: bool) -> TestResult<Vec<ArchiveObject>> {
-    if empty {
-        let mut storage = object(
-            AUTHOR_STORAGE_ID,
-            ANNOTATION_AUTHOR_STORAGE_TYPE,
-            tsk::AnnotationAuthorStorageArchive::default().encode_to_vec(),
-        )?;
-        set_message_info(&mut storage, &[])?;
-        return Ok(vec![storage]);
-    }
-    let author = object(
-        AUTHOR_ID,
-        ANNOTATION_AUTHOR_TYPE,
-        tsk::AnnotationAuthorArchive {
-            name: Some("Reply fixture author".to_owned()),
-            public_id: Some("reply-fixture-author".to_owned()),
-            public_ids: vec!["reply-fixture-author".to_owned()],
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    )?;
-    let mut storage = object(
-        AUTHOR_STORAGE_ID,
-        ANNOTATION_AUTHOR_STORAGE_TYPE,
-        tsk::AnnotationAuthorStorageArchive {
-            annotation_author: vec![reference(AUTHOR_ID)],
-        }
-        .encode_to_vec(),
-    )?;
-    set_message_info(&mut storage, &[AUTHOR_ID])?;
-    Ok(vec![author, storage])
-}
-
-fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<u8>> {
-    let mut document = object(
-        DOCUMENT_ID,
-        DOCUMENT_TYPE,
-        tn::DocumentArchive {
-            sheets: vec![reference(SHEET_ID)],
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    )?;
-    set_message_info(&mut document, &[SHEET_ID])?;
-    set_field_info(&mut document, vec![1], &[SHEET_ID])?;
-
-    let mut sheet = object(
-        SHEET_ID,
-        SHEET_TYPE,
-        tn::SheetArchive {
-            name: SHEET_NAME.to_owned(),
-            drawable_infos: vec![reference(TABLE_INFO_ID)],
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    )?;
-    set_message_info(&mut sheet, &[TABLE_INFO_ID])?;
-    set_field_info(&mut sheet, vec![4], &[TABLE_INFO_ID])?;
-
-    let mut info = object(
-        TABLE_INFO_ID,
-        TABLE_INFO_TYPE,
-        tst::TableInfoArchive {
-            super_: tsd::DrawableArchive {
-                locked: matches!(corruption, Some(Corruption::Locked)).then_some(true),
-                ..Default::default()
-            },
-            table_model: reference(TABLE_MODEL_ID),
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    )?;
-    set_message_info(&mut info, &[TABLE_MODEL_ID])?;
-    set_field_info(&mut info, vec![4], &[TABLE_MODEL_ID])?;
-
-    let mut model = object(
-        TABLE_MODEL_ID,
-        TABLE_MODEL_TYPE,
-        table_model(
-            !matches!(corruption, Some(Corruption::MissingCommentList)),
-            if matches!(mode, FixtureMode::SparseCell) {
-                2
-            } else {
-                1
-            },
-        )
-        .encode_to_vec(),
-    )?;
-    set_message_info(&mut model, &[SIDECAR_ID, TILE_ID])?;
-    set_field_info(&mut model, vec![25], &[SIDECAR_ID])?;
-    set_field_info(&mut model, vec![26], &[TILE_ID])?;
-    if !matches!(corruption, Some(Corruption::MissingCommentList)) {
-        set_field_info(&mut model, vec![4, 19], &[SIDECAR_ID])?;
-    }
-
-    let mut tile = object(TILE_ID, TILE_TYPE, tile(mode)?.encode_to_vec())?;
-    set_message_info(&mut tile, &[])?;
-    let sidecar = sidecar(mode, corruption)?;
-    let mut document_objects = vec![document, sheet, info, model, sidecar, tile];
-    if !matches!(corruption, Some(Corruption::MissingAuthor)) {
-        document_objects.extend(author_objects(matches!(
-            (mode, corruption),
-            (FixtureMode::Rootless | FixtureMode::SparseCell, _)
-        ))?);
-    }
-    if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
-        document_objects.retain(|object| {
-            !object.messages.iter().any(|message| {
-                message.type_ == ANNOTATION_AUTHOR_STORAGE_TYPE
-                    || message.type_ == ANNOTATION_AUTHOR_TYPE
-            })
-        });
-    }
-    let all_comments = reply_objects(mode, corruption)?;
-    let mut split_replies = Vec::new();
-    if matches!(mode, FixtureMode::CrossComponent) {
-        for comment in all_comments {
-            let identifier = comment.archive_info.identifier.unwrap_or_default();
-            if matches!(identifier, ROOT_COMMENT_ID | SECOND_ROOT_COMMENT_ID) {
-                document_objects.push(comment);
-            } else {
-                split_replies.push(comment);
-            }
-        }
-    } else {
-        document_objects.extend(all_comments);
-    }
-
-    let mut entries = vec![
-        (DOCUMENT_MEMBER, compressed(document_objects)?),
-        (
-            VIEW_STATE_MEMBER,
-            compressed(vec![object(
-                VIEW_STATE_ID,
-                210,
-                b"unselected view state".to_vec(),
-            )?])?,
-        ),
-        (
-            METADATA_MEMBER,
-            compressed(vec![object(
-                METADATA_OBJECT_ID,
-                METADATA_TYPE,
-                metadata(mode, corruption)?,
-            )?])?,
-        ),
-        ("preview.jpg", b"reply preview".to_vec()),
-        ("preview-micro.jpg", b"reply micro".to_vec()),
-        ("preview-web.jpg", b"reply web".to_vec()),
-        ("Data/sentinel.bin", b"unselected data".to_vec()),
-    ];
-    if matches!(mode, FixtureMode::CrossComponent) {
-        entries.insert(1, (REPLIES_MEMBER, compressed(split_replies)?));
-    }
-    if matches!(corruption, Some(Corruption::OpaqueInbound)) {
-        let mut inbound = object(700, 99_999, b"opaque inbound".to_vec())?;
-        set_message_info(&mut inbound, &[FIRST_REPLY_ID])?;
-        let mut entries_data = entries
-            .iter()
-            .map(|(name, data)| (*name, data.clone()))
-            .collect::<Vec<_>>();
-        entries_data.push(("Index/OpaqueInbound.iwa", compressed(vec![inbound])?));
-        entries = entries_data;
-    }
-    if matches!(corruption, Some(Corruption::MissingMetadata)) {
-        entries.retain(|(name, _)| *name != METADATA_MEMBER);
-    }
-    Ok(litchi_iwa_archive::package::to_bytes(
-        entries.iter().map(|(name, data)| (*name, data.as_slice())),
-        Limits::default(),
-    )?)
-}
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
@@ -1059,18 +141,25 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
         CellPosition::new(1, 0),
         "new root with generated author",
     )?;
+    let created = commit
+        .package()
+        .table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(1, 0),
+        )?
+        .ok_or_else(|| io::Error::other("generated root comment is missing"))?;
+    assert_eq!(created.text(), "new root with generated author");
     assert_eq!(
-        commit
-            .package()
-            .table_cell_comment(
-                SheetSelector::index(0),
-                TableSelector::index(0),
-                CellPosition::new(1, 0),
-            )?
-            .as_ref()
-            .map(|comment| comment.text()),
-        Some("new root with generated author"),
+        created.timestamp().map(|timestamp| timestamp.as_f64()),
+        Some(0.0),
+        "new root comments must retain the writer's zero-epoch timestamp"
     );
+    let author = created
+        .author()
+        .ok_or_else(|| io::Error::other("generated root author is missing"))?;
+    assert_eq!(author.display_name(), Some("litchi-iwa"));
+    assert_eq!(author.public_id(), None);
     let candidate = exact_bytes(commit.package())?;
     let archive = member_archive(&candidate, DOCUMENT_MEMBER)?;
     let authors = archive
@@ -1837,6 +926,65 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
 }
 
 #[test]
+fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> TestResult {
+    let source = fixture(FixtureMode::SingleRoot, None)?;
+    let package = load_package(&source)?;
+    let original = package.table_cell_comment_replies(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+    )?;
+    assert_eq!(original.len(), 1);
+    let original_reply = &original[0];
+    assert!(original_reply.timestamp().is_some());
+    assert!(original_reply.author().is_some());
+
+    let appended = package.add_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+        "metadata-preserving append",
+    )?;
+    let appended_replies = appended.package().table_cell_comment_replies(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+    )?;
+    assert_eq!(appended.patch().before(), original.as_ref());
+    assert_eq!(appended.patch().after(), appended_replies.as_ref());
+    assert_eq!(appended_replies[0], *original_reply);
+    assert_eq!(
+        appended_replies[1].timestamp(),
+        original_reply.timestamp(),
+        "an appended reply must inherit its source leaf timestamp"
+    );
+    assert_eq!(
+        appended_replies[1].author(),
+        original_reply.author(),
+        "an appended reply must inherit its source leaf author"
+    );
+
+    let replaced = package.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+        CommentReplyIndex::new(0),
+        "metadata-preserving replacement",
+    )?;
+    let replaced_reply = replaced.package().table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+        CommentReplyIndex::new(0),
+    )?;
+    assert_eq!(replaced.patch().before(), original.as_ref());
+    assert_eq!(replaced.patch().after()[0], replaced_reply);
+    assert_eq!(replaced_reply.timestamp(), original_reply.timestamp());
+    assert_eq!(replaced_reply.author(), original_reply.author());
+    Ok(())
+}
+
+#[test]
 fn direct_a1_read_and_collection_a1_edit_select_the_same_reply() -> TestResult {
     let source = fixture(FixtureMode::DuplicateText, None)?;
     let package = load_package(&source)?;
@@ -1969,5 +1117,17 @@ fn missing_comment_root_reports_a_typed_error_without_source_mutation() -> TestR
         .expect_err("a cell without a root comment must reject an ordinal read");
     assert!(!format!("{error:?}").is_empty());
     assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn export_comment_metadata_fuzz_fixture() -> TestResult {
+    let Some(path) = std::env::var_os("LITCHI_NUMBERS_COMMENT_METADATA_FUZZ_OUTPUT") else {
+        return Ok(());
+    };
+    let source = fixture(FixtureMode::DuplicateText, None)?;
+    let package = load_package(&source)?;
+    assert_eq!(read_all(&package, 0)?, ["duplicate"; 3]);
+    std::fs::write(path, source)?;
     Ok(())
 }
