@@ -29,6 +29,7 @@ quick-xml = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+soapberry-zip = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

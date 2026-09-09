@@ -147,6 +147,20 @@ impl Relationship {
         &self.target_ref
     }
 
+    /// Get the stored base URI used to resolve an internal target.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this relationship belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
+    }
+
     /// Return the path component of the original target URI reference.
     #[must_use]
     pub fn target_path(&self) -> &str {
@@ -339,6 +353,20 @@ impl Relationships {
     #[must_use]
     pub fn get(&self, r_id: &str) -> Option<&Relationship> {
         self.rels.get(r_id)
+    }
+
+    /// Get the stored base URI used by this relationship collection.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this collection belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
     }
 
     /// Get or add a relationship to a target part.

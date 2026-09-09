@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "b5f85536cf4b6f61bb6e3de4271425e16f6fda30",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-opc/src/rel.rs": "3fec373a3b73d774215aa17d8f4d71df557994a2d6f9523994ac9423fe6a2c6d",
+    "crates/litchi-xlsb/Cargo.toml": "6d9c70dfd7102b86cd68d3d7d91f4c944fcb54b5b7c112148837510a20a01f86",
+    "crates/litchi-xlsb/src/calculation_chain/mod.rs": "cf689daf63e2a5190c04b0029865218ea2253e1f86218504177b0a32b7f2e8fa",
+    "crates/litchi-xlsb/src/calculation_chain/model.rs": "8bfded4226a6fdea36199a4e862310853bae3f2f48cc9f4306d9db19da1ebf71",
+    "crates/litchi-xlsb/src/calculation_chain/package.rs": "3d153505b3567df22e909349976090afe997f7cb4fb41cc0b2999b310e087fdf",
+    "crates/litchi-xlsb/src/calculation_chain/patch.rs": "90d77fd4f308067d1d4aeb53977393f150959753d7f250e901dd88f19f46f93c",
+    "crates/litchi-xlsb/src/calculation_chain/snapshot.rs": "1485df2d792b88f0b1a83d8fab7a4280ea33a823dbecd585829135f99be01430",
+    "crates/litchi-xlsb/src/calculation_chain/tests.rs": "2df47df175bf7c3b97949c09ff0d114b86bbefe82769cf8c142b883040ee49bd",
+    "crates/litchi-xlsb/src/calculation_chain/transaction.rs": "1f28fd3b6ecb13d41bc990ef794368ea77a0acc3a46c9f4d0329cfa7ef7aa31f",
+    "crates/litchi-xlsb/src/calculation_chain/workbook.rs": "6f81b957e779aff196cc31aa73801a769bda8497ad062aa0cce8eb2c58f7b4ce",
+    "crates/litchi-xlsb/src/lib.rs": "9c793a36c40f02f2ede98fc7e4fe9ade4657eff1f94355832df8beaec4d98e33",
+    "crates/litchi-xlsb/docs/FEATURE_MATRIX.md": "7dda88f1953153d2ccc3e23f83adc1bbc952d9b9f32ab48c884f6570b69cda1a",
+    "crates/litchi-xlsb/src/cell_values/drawing_transfer.rs": "429b1dfac309277bb81cd2d966edd548a5d497e85494ec57e8a506a0b29c2ede"
+  },
+  "scope": "Opaque Calculation Chain inventory, OPC ownership/source closure, bounded modeled metadata admission before cloning, removal/inverse publication, and chart transfer refusal. No normative payload grammar, evaluation, refresh, total-memory measurement or throughput claim.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-xlsb --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 778,
+      "tests_ignored": 1,
+      "doctests_passed": 9,
+      "doctests_ignored": 11
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-xlsb -p litchi-opc --all-features --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-xlsb --all-features --lib calculation_chain::tests::native_calculation_chain_fixtures_are_opaque_inventory_cases -- --ignored",
+      "exit_code": 0,
+      "log": "native.log.gz",
+      "tests_passed": 1
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "85a7570cc839dc551a563107b1d168b1ca3de952decf1af99e9afb23c8152dad",
+      "uncompressed_sha256": "294c3c50ad3476f5eaa1a53e279bca97150a44f7ec0069bec7b148034d9bed63"
+    },
+    "clippy.log.gz": {
+      "sha256": "6e278d28bad6e24d3ac048d0266372a991cdba72f5c7b56b6ad7125662b902ca",
+      "uncompressed_sha256": "7848960b88bf733d9cb741e666c2db2ccd3d2b6175ee8bb03ed5bd947edbde66"
+    },
+    "native.log.gz": {
+      "sha256": "cdc92de502a34cbd9656ed6eaaf42f87894a02b7bb4fcac66215e46d27ac1229",
+      "uncompressed_sha256": "a222efec21def6f97d2e265136820fe7d33b78c81803ece20943088148aeab58"
+    }
+  },
+  "native_inputs": {
+    "3rdparty/poi/test-data/spreadsheet/sample.xlsb": {
+      "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b",
+      "bytes": 10843
+    },
+    "3rdparty/poi/test-data/spreadsheet/testVarious.xlsb": {
+      "sha256": "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc",
+      "bytes": 22715
+    },
+    "3rdparty/poi/test-data/spreadsheet/bug66682.xlsb": {
+      "sha256": "490f0430a6bd44bdf697c7a41a898bce632ce2b775797c3b8c1517764c0900b3",
+      "bytes": 9580
+    },
+    "3rdparty/poi/test-data/spreadsheet/62815.xlsb": {
+      "sha256": "2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565",
+      "bytes": 10665
+    },
+    "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb": {
+      "sha256": "b7fed651b265af036afd36a294fb1d8fcb6229f4e5213732610d146a970386a6",
+      "bytes": 8129
+    },
+    "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb": {
+      "sha256": "8e6f1e9e571d92c2f50ee63a7ad23a382b990ccf3efc36fa18f19ca2d652be58",
+      "bytes": 9702
+    },
+    "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/universal-content.xlsb": {
+      "sha256": "3d425c433c4f0688d4d2f2c84bbcfc25494641d0d38cbe96d6a954d820536170",
+      "bytes": 11087
+    },
+    "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb": {
+      "sha256": "e06ae79ed345495eee0bf5e7fd7a32638af0b646c5819f7d83a4f6fb97a151a3",
+      "bytes": 7651
+    }
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}
