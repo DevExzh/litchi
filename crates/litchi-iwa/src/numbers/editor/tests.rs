@@ -277,6 +277,111 @@ fn focused_test_cell_value(editor: &NumbersEditor, row: usize, column: usize) ->
         .cloned()
 }
 
+#[derive(Clone, Copy)]
+enum FocusedCommentReadPath {
+    Exact,
+    Compatibility,
+}
+
+fn focused_cell_comment_from_path(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    path: FocusedCommentReadPath,
+) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    let position = CellPosition::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
+    })?;
+    let bytes = editor.to_bytes()?;
+    let comment = match path {
+        FocusedCommentReadPath::Exact => {
+            let source = FocusedNumbersPackage::from_bytes(&bytes).map_err(|error| {
+                Error::InvalidFormat(format!("focused Numbers comment read failed: {error}"))
+            })?;
+            source.table_cell_comment(sheet, table, position)
+        },
+        FocusedCommentReadPath::Compatibility => {
+            FocusedNumbersPackage::__table_cell_comment_from_bytes_for_compatibility(
+                &bytes, sheet, table, position,
+            )
+        },
+    };
+    comment.map_err(|error| {
+        Error::InvalidFormat(format!("focused Numbers comment read failed: {error}"))
+    })
+}
+
+fn focused_cell_comment(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+    focused_cell_comment_from_path(editor, table_id, row, column, FocusedCommentReadPath::Exact)
+}
+
+fn focused_compatibility_cell_comment(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+    focused_cell_comment_from_path(
+        editor,
+        table_id,
+        row,
+        column,
+        FocusedCommentReadPath::Compatibility,
+    )
+}
+
+fn focused_cell_comment_replies_from_path(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    path: FocusedCommentReadPath,
+) -> crate::Result<Box<[litchi_numbers::TableCellCommentReply]>> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    let position = CellPosition::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
+    })?;
+    let bytes = editor.to_bytes()?;
+    let replies = match path {
+        FocusedCommentReadPath::Exact => {
+            let source = FocusedNumbersPackage::from_bytes(&bytes).map_err(|error| {
+                Error::InvalidFormat(format!("focused Numbers comment read failed: {error}"))
+            })?;
+            source.table_cell_comment_replies(sheet, table, position)
+        },
+        FocusedCommentReadPath::Compatibility => {
+            FocusedNumbersPackage::__table_cell_comment_replies_from_bytes_for_compatibility(
+                &bytes, sheet, table, position,
+            )
+        },
+    };
+    replies.map_err(|error| {
+        Error::InvalidFormat(format!("focused Numbers comment read failed: {error}"))
+    })
+}
+
+fn focused_compatibility_cell_comment_replies(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> crate::Result<Box<[litchi_numbers::TableCellCommentReply]>> {
+    focused_cell_comment_replies_from_path(
+        editor,
+        table_id,
+        row,
+        column,
+        FocusedCommentReadPath::Compatibility,
+    )
+}
+
 fn cached_number(value: f64) -> FormulaCachedValue {
     FormulaCachedValue::number(value).expect("finite cached test number")
 }
@@ -2528,37 +2633,69 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
 #[test]
 fn cell_comment_crud_preserves_value_and_comment_metadata() {
     let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
-    let original = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_eq!(original.comment.text, "Original comment");
-    assert_eq!(original.comment.creation_date_seconds, Some(123.5));
+    let original = focused_compatibility_cell_comment(&editor, 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let original_witness = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(original.text(), "Original comment");
     assert_eq!(
-        original.comment.reply_ids.as_ref(),
+        original.timestamp().map(|timestamp| timestamp.as_f64()),
+        Some(123.5)
+    );
+    assert_eq!(
+        original_witness.comment.reply_ids.as_ref(),
         [StorageId::new(70).unwrap()]
     );
-    assert_eq!(original.comment.storage_uuid.unwrap().lower(), 61);
+    assert_eq!(original_witness.comment.storage_uuid.unwrap().lower(), 61);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let reader_comment = reopened.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_eq!(reader_comment.comment, original.comment);
+    let reader_comment = focused_compatibility_cell_comment(&reopened, 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(reader_comment, original);
 
     editor
         .set_cell_comment(10, 0, 1, "Updated comment")
         .unwrap();
-    let updated = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_eq!(updated.storage_id, original.storage_id);
-    assert_eq!(updated.comment.text, "Updated comment");
-    assert_eq!(updated.comment.creation_date_seconds, Some(123.5));
-    assert_eq!(updated.comment.storage_uuid, original.comment.storage_uuid);
+    let updated = focused_compatibility_cell_comment(&editor, 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let updated_witness = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated_witness.storage_id, original_witness.storage_id);
+    assert_eq!(updated.text(), "Updated comment");
+    assert_eq!(
+        updated.timestamp().map(|timestamp| timestamp.as_f64()),
+        Some(123.5)
+    );
+    assert_eq!(
+        updated_witness.comment.storage_uuid,
+        original_witness.comment.storage_uuid
+    );
 
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(8.5)).unwrap();
     assert_eq!(
-        editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .unwrap()
+            .text(),
         "Updated comment"
     );
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, CellValue::Empty).unwrap();
-    assert!(editor.cell_comment(10, 0, 1).unwrap().is_some());
+    assert!(
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .is_some()
+    );
 
     clear_cell_comment_in_package(&mut editor.package, 10, 0, 1).unwrap();
-    assert!(editor.cell_comment(10, 0, 1).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .is_none()
+    );
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     assert!(archive.object(61).is_none());
     assert!(archive.object(70).is_none());
@@ -2570,7 +2707,11 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 1), Some(&CellValue::Empty));
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert!(reopened.cell_comment(10, 0, 1).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&reopened, 10, 0, 1)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -2581,26 +2722,33 @@ fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
     ));
     let original = NumbersEditor::from_bytes(source).unwrap();
     let table_id = original.tables().unwrap()[0].native_id();
-    let original_comment = original.cell_comment(table_id, 1, 1).unwrap().unwrap();
+    let original_comment = cell_comment_in_package(original.package(), table_id, 1, 1)
+        .unwrap()
+        .unwrap();
     let mut editor = original;
 
     editor
         .set_cell_comment(table_id, 1, 1, "Focused replacement")
         .unwrap();
 
-    let updated = editor.cell_comment(table_id, 1, 1).unwrap().unwrap();
-    assert_eq!(updated.storage_id, original_comment.storage_id);
-    assert_eq!(updated.comment.text, "Focused replacement");
+    let updated = focused_cell_comment(&editor, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let updated_witness = cell_comment_in_package(editor.package(), table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated_witness.storage_id, original_comment.storage_id);
+    assert_eq!(updated.text(), "Focused replacement");
     assert_eq!(
-        updated.comment.creation_date_seconds,
+        updated.timestamp().map(|timestamp| timestamp.as_f64()),
         original_comment.comment.creation_date_seconds
     );
     assert_eq!(
-        updated.comment.storage_uuid,
+        updated_witness.comment.storage_uuid,
         original_comment.comment.storage_uuid
     );
     assert_eq!(
-        updated.comment.reply_ids,
+        updated_witness.comment.reply_ids,
         original_comment.comment.reply_ids
     );
     for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
@@ -2624,10 +2772,18 @@ fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
         .unwrap();
 
     assert_eq!(
-        editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .unwrap()
+            .text(),
         "Legacy reply replacement"
     );
-    assert_eq!(editor.cell_comment_replies(10, 0, 1).unwrap().len(), 1);
+    assert_eq!(
+        focused_compatibility_cell_comment_replies(&editor, 10, 0, 1)
+            .unwrap()
+            .len(),
+        1
+    );
     for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert_eq!(editor.package().entry(preview), Some(preview.as_bytes()));
     }
@@ -2636,15 +2792,25 @@ fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
 #[test]
 fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
-    let original_root = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    let original_replies = editor.cell_comment_replies(10, 0, 1).unwrap();
+    let original_root = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let original_semantic = focused_compatibility_cell_comment(&editor, 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let original_replies = focused_compatibility_cell_comment_replies(&editor, 10, 0, 1).unwrap();
     assert_eq!(original_replies.len(), 1);
-    assert_eq!(original_replies[0].comment.text, "Reply");
+    assert_eq!(original_replies[0].text(), "Reply");
 
     let added_id = editor
         .add_cell_comment_reply(10, 0, 1, "Second reply")
         .unwrap();
-    let after_add = editor.cell_comment(10, 0, 1).unwrap().unwrap();
+    let after_add = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let after_add_semantic = focused_compatibility_cell_comment(&editor, 10, 0, 1)
+        .unwrap()
+        .unwrap();
     assert_ne!(after_add.storage_id, original_root.storage_id);
     assert_eq!(
         after_add.comment.storage_uuid,
@@ -2657,10 +2823,12 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
             StorageId::new(added_id).unwrap()
         ]
     );
-    let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
-    assert_eq!(replies[1].comment.text, "Second reply");
-    assert!(replies[1].comment.creation_date_seconds.is_some());
-    assert!(replies[1].comment.storage_uuid.is_some());
+    assert_eq!(after_add_semantic.text(), original_semantic.text());
+    let reply_witnesses = cell_comment_replies_in_package(editor.package(), 10, 0, 1).unwrap();
+    let replies = focused_compatibility_cell_comment_replies(&editor, 10, 0, 1).unwrap();
+    assert_eq!(replies[1].text(), "Second reply");
+    assert!(replies[1].timestamp().is_some());
+    assert!(reply_witnesses[1].comment.storage_uuid.is_some());
 
     let stable = editor.to_bytes().unwrap();
     assert_eq!(
@@ -2675,15 +2843,16 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
         .set_cell_comment_reply(10, 0, 1, added_id, "Updated reply")
         .unwrap();
     assert_ne!(updated_id, added_id);
-    let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
+    let reply_witnesses = cell_comment_replies_in_package(editor.package(), 10, 0, 1).unwrap();
+    let replies = focused_compatibility_cell_comment_replies(&editor, 10, 0, 1).unwrap();
     assert_eq!(
-        replies
+        reply_witnesses
             .iter()
             .map(|reply| reply.storage_id.get())
             .collect::<Vec<_>>(),
         [70, updated_id]
     );
-    assert_eq!(replies[1].comment.text, "Updated reply");
+    assert_eq!(replies[1].text(), "Updated reply");
     assert!(
         editor
             .package()
@@ -2696,11 +2865,15 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     editor
         .remove_cell_comment_reply(10, 0, 1, updated_id)
         .unwrap();
-    let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
+    let reply_witnesses = cell_comment_replies_in_package(editor.package(), 10, 0, 1).unwrap();
+    let replies = focused_compatibility_cell_comment_replies(&editor, 10, 0, 1).unwrap();
     assert_eq!(replies.len(), 1);
-    assert_eq!(replies[0].storage_id.get(), 70);
+    assert_eq!(reply_witnesses[0].storage_id.get(), 70);
     assert_eq!(
-        editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .unwrap()
+            .text(),
         "Original comment"
     );
 
@@ -2710,9 +2883,7 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
 
     let reparsed = NumbersEditor::from_bytes(&before).unwrap();
     assert_eq!(
-        reparsed.cell_comment_replies(10, 0, 1).unwrap()[0]
-            .comment
-            .text,
+        focused_compatibility_cell_comment_replies(&reparsed, 10, 0, 1).unwrap()[0].text(),
         "Reply"
     );
 }
@@ -2722,8 +2893,7 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
     let mut package = test_package_with_comments(true);
     move_table_data_list_entries_to_segment(&mut package, 60, 62);
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    let original_storage = editor
-        .cell_comment(10, 0, 1)
+    let original_storage = cell_comment_in_package(editor.package(), 10, 0, 1)
         .unwrap()
         .unwrap()
         .storage_id
@@ -2732,12 +2902,22 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
     editor
         .set_cell_comment(10, 0, 1, "Independent comment")
         .unwrap();
-    let first = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    let second = editor.cell_comment(10, 0, 2).unwrap().unwrap();
+    let first = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let second = cell_comment_in_package(editor.package(), 10, 0, 2)
+        .unwrap()
+        .unwrap();
+    let first_semantic = focused_compatibility_cell_comment(&editor, 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    let second_semantic = focused_compatibility_cell_comment(&editor, 10, 0, 2)
+        .unwrap()
+        .unwrap();
     assert_ne!(first.storage_id.get(), original_storage);
     assert_eq!(second.storage_id.get(), original_storage);
-    assert_eq!(first.comment.text, "Independent comment");
-    assert_eq!(second.comment.text, "Original comment");
+    assert_eq!(first_semantic.text(), "Independent comment");
+    assert_eq!(second_semantic.text(), "Original comment");
 
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let segment =
@@ -2757,7 +2937,10 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
     assert!(archive.object(original_storage).is_none());
     assert!(archive.object(70).is_some());
     assert_eq!(
-        editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .unwrap()
+            .text(),
         "Independent comment"
     );
 }
@@ -2781,7 +2964,16 @@ fn comment_updates_and_copy_on_write_preserve_unknown_storage_fields() {
     add_unknown_comment_storage_field(&mut package, 61);
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_cell_comment(10, 0, 1, "Wire-safe copy").unwrap();
-    let cloned = editor.cell_comment(10, 0, 1).unwrap().unwrap();
+    let cloned = cell_comment_in_package(editor.package(), 10, 0, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        focused_compatibility_cell_comment(&editor, 10, 0, 1)
+            .unwrap()
+            .unwrap()
+            .text(),
+        "Wire-safe copy"
+    );
     assert_ne!(cloned.storage_id.get(), 61);
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     assert!(
@@ -2802,8 +2994,16 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     editor
         .set_cell_comment(10, 1, 2, "Created comment")
         .unwrap();
-    let info = editor.cell_comment(10, 1, 2).unwrap().unwrap();
-    assert_eq!(info.comment.text, "Created comment");
+    let info = cell_comment_in_package(editor.package(), 10, 1, 2)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        focused_compatibility_cell_comment(&editor, 10, 1, 2)
+            .unwrap()
+            .unwrap()
+            .text(),
+        "Created comment"
+    );
     assert_eq!(info.list_id.get(), 2);
     assert!(info.comment.creation_date_seconds.is_some());
     assert!(info.comment.storage_uuid.is_some());
@@ -2813,18 +3013,20 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     assert_eq!(table.get_cell(1, 2), Some(&CellValue::Empty));
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened
-            .cell_comment(10, 1, 2)
+        focused_compatibility_cell_comment(&reopened, 10, 1, 2)
             .unwrap()
             .unwrap()
-            .comment
-            .text,
+            .text(),
         "Created comment"
     );
 
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 2, cell_number(42.0)).unwrap();
     clear_cell_comment_in_package(&mut editor.package, 10, 1, 2).unwrap();
-    assert!(editor.cell_comment(10, 1, 2).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&editor, 10, 1, 2)
+            .unwrap()
+            .is_none()
+    );
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         document.sheets()[0]
@@ -2865,8 +3067,16 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
     editor
         .set_cell_comment(10, 1, 2, "Generated local author")
         .unwrap();
-    let comment = editor.cell_comment(10, 1, 2).unwrap().unwrap();
-    assert_eq!(comment.comment.text, "Generated local author");
+    let comment = cell_comment_in_package(editor.package(), 10, 1, 2)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        focused_compatibility_cell_comment(&editor, 10, 1, 2)
+            .unwrap()
+            .unwrap()
+            .text(),
+        "Generated local author"
+    );
     assert!(comment.comment.author_id.is_some());
 
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
@@ -7156,7 +7366,11 @@ fn table_axis_delete_releases_comment_graphs() {
             TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
         assert!(list.entries.is_empty());
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert!(reopened.cell_comment(10, 0, 1).unwrap().is_none());
+        assert!(
+            focused_compatibility_cell_comment(&reopened, 10, 0, 1)
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
@@ -7692,12 +7906,10 @@ fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
         .unwrap();
 
     assert_eq!(
-        editor
-            .cell_comment(table_id, 256, 1)
+        focused_compatibility_cell_comment(&editor, table_id, 256, 1)
             .unwrap()
             .unwrap()
-            .comment
-            .text,
+            .text(),
         "Boundary comment"
     );
     let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
@@ -7716,16 +7928,18 @@ fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
     let bytes = editor.to_bytes().unwrap();
     let mut reopened = NumbersEditor::from_bytes(&bytes).unwrap();
     assert_eq!(
-        reopened
-            .cell_comment(table_id, 256, 1)
+        focused_compatibility_cell_comment(&reopened, table_id, 256, 1)
             .unwrap()
             .unwrap()
-            .comment
-            .text,
+            .text(),
         "Boundary comment"
     );
     clear_cell_comment_in_package(&mut reopened.package, table_id, 256, 1).unwrap();
-    assert!(reopened.cell_comment(table_id, 256, 1).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&reopened, table_id, 256, 1)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -7849,8 +8063,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     let reply_id = editor
         .add_cell_comment_reply(table_id, 2, 1, "Selected South reply")
         .unwrap();
-    let comment_id = editor
-        .cell_comment(table_id, 2, 1)
+    let comment_id = cell_comment_in_package(editor.package(), table_id, 2, 1)
         .unwrap()
         .unwrap()
         .storage_id
@@ -7915,10 +8128,13 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         table.get_cell(5, 0),
         Some(&CellValue::Text("Total".to_owned()))
     );
-    assert!(editor.cell_comment(table_id, 2, 1).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&editor, table_id, 2, 1)
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(
-        editor
-            .cell_comment(table_id, 4, 1)
+        cell_comment_in_package(editor.package(), table_id, 4, 1)
             .unwrap()
             .unwrap()
             .storage_id
@@ -7926,7 +8142,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         comment_id
     );
     assert_eq!(
-        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0]
+        cell_comment_replies_in_package(editor.package(), table_id, 4, 1).unwrap()[0]
             .storage_id
             .get(),
         reply_id
@@ -8631,8 +8847,16 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     let reply_id = editor
         .add_cell_comment_reply(table_id, 2, 1, "Reply follows row too")
         .unwrap();
-    let original_comment = editor.cell_comment(table_id, 2, 1).unwrap().unwrap();
-    let original_reply = editor.cell_comment_replies(table_id, 2, 1).unwrap()[0].clone();
+    let original_comment = cell_comment_in_package(editor.package(), table_id, 2, 1)
+        .unwrap()
+        .unwrap();
+    let original_semantic = focused_compatibility_cell_comment(&editor, table_id, 2, 1)
+        .unwrap()
+        .unwrap();
+    let original_reply =
+        cell_comment_replies_in_package(editor.package(), table_id, 2, 1).unwrap()[0].clone();
+    let original_reply_semantic =
+        focused_compatibility_cell_comment_replies(&editor, table_id, 2, 1).unwrap()[0].clone();
     assert_eq!(original_reply.storage_id.get(), reply_id);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
@@ -8676,13 +8900,27 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         Some(&CellValue::Text("Total".to_owned()))
     );
     assert_eq!(table.get_cell(4, 1), Some(&cell_number(323.0)));
-    assert!(editor.cell_comment(table_id, 2, 1).unwrap().is_none());
-    let moved_comment = editor.cell_comment(table_id, 1, 1).unwrap().unwrap();
+    assert!(
+        focused_compatibility_cell_comment(&editor, table_id, 2, 1)
+            .unwrap()
+            .is_none()
+    );
+    let moved_comment = cell_comment_in_package(editor.package(), table_id, 1, 1)
+        .unwrap()
+        .unwrap();
     assert_eq!(moved_comment.row, 1);
     assert_eq!(moved_comment.column, original_comment.column);
     assert_eq!(moved_comment.storage_id, original_comment.storage_id);
     assert_eq!(moved_comment.comment, original_comment.comment);
-    let moved_replies = editor.cell_comment_replies(table_id, 1, 1).unwrap();
+    assert_eq!(
+        focused_compatibility_cell_comment(&editor, table_id, 1, 1)
+            .unwrap()
+            .unwrap(),
+        original_semantic
+    );
+    let moved_replies = cell_comment_replies_in_package(editor.package(), table_id, 1, 1).unwrap();
+    let moved_replies_semantic =
+        focused_compatibility_cell_comment_replies(&editor, table_id, 1, 1).unwrap();
     assert_eq!(moved_replies.len(), 1);
     assert_eq!(
         moved_replies[0].root_storage_id,
@@ -8690,25 +8928,33 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     );
     assert_eq!(moved_replies[0].storage_id, original_reply.storage_id);
     assert_eq!(moved_replies[0].comment, original_reply.comment);
+    assert_eq!(moved_replies_semantic[0], original_reply_semantic);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_sort_order(&reopened, TableSelector::index(0)).unwrap(),
         Some(order)
     );
-    assert!(reopened.cell_comment(table_id, 2, 1).unwrap().is_none());
+    assert!(
+        focused_compatibility_cell_comment(&reopened, table_id, 2, 1)
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(
-        reopened
-            .cell_comment(table_id, 1, 1)
+        cell_comment_in_package(reopened.package(), table_id, 1, 1)
             .unwrap()
             .unwrap()
             .storage_id,
         original_comment.storage_id
     );
     assert_eq!(
-        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0]
+        cell_comment_replies_in_package(reopened.package(), table_id, 1, 1).unwrap()[0]
             .storage_id
             .get(),
         reply_id
+    );
+    assert_eq!(
+        focused_compatibility_cell_comment_replies(&reopened, table_id, 1, 1).unwrap()[0],
+        original_reply_semantic
     );
 }
 

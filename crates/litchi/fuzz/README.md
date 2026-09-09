@@ -407,6 +407,11 @@ valid reply-bearing package can be supplied as a fuzz input when available.
 The target uses only `SheetSelector`, `TableSelector`, `CellPosition`, and
 `CommentReplyIndex`; native IDs, comment-storage payloads, archive names, and
 generated types do not cross the fuzz boundary.
+The same bounded input also reaches the explicit compatibility root/reply
+readers, even when strict native table projection rejects it. Compact
+source-built legacy root and shared-root seeds exercise that admission path;
+they are generated graph fixtures, not native application save evidence.
+Both adapters receive finite caller-selected archive and semantic limits.
 
 `numbers_table_sort_order` is the focused selector-first persisted table-sort
 configuration target. It offers arbitrary bytes to bounded Numbers ingress

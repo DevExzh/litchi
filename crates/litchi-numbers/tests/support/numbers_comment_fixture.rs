@@ -1065,6 +1065,267 @@ pub(crate) fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> Test
     )?)
 }
 
+/// Build the compact source-built graph used by the legacy migration host.
+///
+/// The host's historical builder emits a type-6003 `TableInfoArchive` that
+/// points at a legacy type-6000 table model.  Its model intentionally omits
+/// the modern style-reference envelope and keeps the cell lists in their
+/// original physical objects.  The strict focused document projection rejects
+/// that shape at table-storage admission, while the compatibility comment
+/// reader must still resolve the rooted cell and preserve the source bytes.
+///
+/// Start from the ordinary comment graph so the independent semantic values
+/// and malformed-graph variants remain shared with the focused reader tests,
+/// then change only the table discovery envelope and cell/list key that make
+/// this a faithful legacy source-built snapshot.
+#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
+pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> {
+    let mode = if shared {
+        FixtureMode::SharedRoot
+    } else {
+        FixtureMode::SingleRoot
+    };
+    let source = fixture(mode, None)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(stream.as_bytes())?;
+
+    let table_info = document
+        .object_mut(TABLE_INFO_ID)
+        .ok_or_else(|| io::Error::other("comment fixture table info is missing"))?;
+    for message in &mut table_info.messages {
+        if message.type_ == TABLE_INFO_TYPE {
+            message.type_ = 6_003;
+        }
+    }
+    for info in &mut table_info.archive_info.message_infos {
+        if info.type_ == TABLE_INFO_TYPE {
+            info.type_ = 6_003;
+        }
+    }
+
+    let table_model = document
+        .object_mut(TABLE_MODEL_ID)
+        .ok_or_else(|| io::Error::other("comment fixture table model is missing"))?;
+    for message in &mut table_model.messages {
+        if message.type_ != TABLE_MODEL_TYPE {
+            continue;
+        }
+        let mut model = tst::TableModelArchive::decode(message.data.as_slice())?;
+        // Legacy source-built models carry only the string/formula/tile and
+        // comment stores.  Zero/default references are meaningful here: the
+        // physical compatibility resolver must not invent style objects.
+        model.table_style = Default::default();
+        model.body_text_style = Default::default();
+        model.header_row_text_style = Default::default();
+        model.header_column_text_style = Default::default();
+        model.footer_row_text_style = Default::default();
+        model.body_cell_style = Default::default();
+        model.header_row_style = Default::default();
+        model.header_column_style = Default::default();
+        model.footer_row_style = Default::default();
+        model.base_data_store.column_headers = Default::default();
+        model.base_data_store.style_table = Default::default();
+        model.base_data_store.format_table_pre_bnc = Default::default();
+        model.base_data_store.format_table = None;
+        model.base_data_store.formula_error_table = None;
+        model.base_data_store.rich_text_table = None;
+        message.type_ = 6_000;
+        message.data = model.encode_to_vec();
+    }
+    for info in &mut table_model.archive_info.message_infos {
+        if info.type_ == TABLE_MODEL_TYPE {
+            info.type_ = 6_000;
+        }
+    }
+
+    let sidecar = document
+        .object_mut(SIDECAR_ID)
+        .ok_or_else(|| io::Error::other("comment fixture sidecar is missing"))?;
+    for message in &mut sidecar.messages {
+        if message.type_ != TABLE_DATA_LIST_TYPE {
+            continue;
+        }
+        let mut list = tst::TableDataList::decode(message.data.as_slice())?;
+        if list.list_type == tst::table_data_list::ListType::CommentStorage as i32 {
+            for entry in &mut list.entries {
+                entry.key = 4;
+            }
+            message.data = list.encode_to_vec();
+        }
+    }
+
+    let tile = document
+        .object_mut(TILE_ID)
+        .ok_or_else(|| io::Error::other("comment fixture tile is missing"))?;
+    for message in &mut tile.messages {
+        if message.type_ != TILE_TYPE {
+            continue;
+        }
+        let mut decoded = tst::Tile::decode(message.data.as_slice())?;
+        for row in &mut decoded.row_infos {
+            let Some(buffer) = row.cell_storage_buffer.as_mut() else {
+                continue;
+            };
+            let mut cell = BncCell::parse(buffer.as_slice())?;
+            if cell.comment_identifier().is_some() {
+                cell.set_comment_identifier(Some(4));
+                *buffer = cell.encode();
+            }
+            if !row.cell_storage_buffer_pre_bnc.is_empty() {
+                let pre_bnc = &mut row.cell_storage_buffer_pre_bnc;
+                let mut cell = BncCell::parse(pre_bnc.as_slice())?;
+                if cell.comment_identifier().is_some() {
+                    cell.set_comment_identifier(Some(4));
+                    *pre_bnc = cell.encode();
+                }
+            }
+        }
+        message.data = decoded.encode_to_vec();
+    }
+
+    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
+        Limits::default(),
+    )?)
+}
+
+/// Keep the legacy type-6000 model's table-style edge while leaving its
+/// remaining modern style and data-store references absent. A nonzero field
+/// two is ambiguous at the wire level: it is a table-model style reference in
+/// this legacy envelope, while the native table-info envelope uses a similar
+/// reference slot for its model edge. The compatibility resolver must inspect
+/// the payload and retain the legacy model interpretation.
+#[allow(
+    dead_code,
+    reason = "used by the compatibility reader regression suite"
+)]
+pub(crate) fn source_built_comment_fixture_with_table_style(shared: bool) -> TestResult<Vec<u8>> {
+    let source = source_built_comment_fixture(shared)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(stream.as_bytes())?;
+    let table_model = document
+        .object_mut(TABLE_MODEL_ID)
+        .ok_or_else(|| io::Error::other("comment fixture table model is missing"))?;
+    let message_index = table_model
+        .messages
+        .iter()
+        .position(|message| message.type_ == TABLE_INFO_TYPE)
+        .ok_or_else(|| io::Error::other("legacy table model payload is missing"))?;
+    let mut model =
+        tst::TableModelArchive::decode(table_model.messages[message_index].data.as_slice())?;
+    model.table_style = reference(SIDECAR_ID);
+    table_model.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: TABLE_INFO_TYPE,
+            data: model.encode_to_vec(),
+        },
+    )?;
+    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
+        Limits::default(),
+    )?)
+}
+
+/// Wrap the source-built sheet in the form-based Numbers envelope.  The
+/// nested `SheetArchive` has the same drawable ownership and name as the
+/// standard fixture; only the physical sheet message variant changes.
+#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
+pub(crate) fn form_based_source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> {
+    let source = source_built_comment_fixture(shared)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(stream.as_bytes())?;
+    let sheet = document
+        .object_mut(SHEET_ID)
+        .ok_or_else(|| io::Error::other("comment fixture sheet is missing"))?;
+    let message_index = sheet
+        .messages
+        .iter()
+        .position(|message| message.type_ == SHEET_TYPE)
+        .ok_or_else(|| io::Error::other("comment fixture standard sheet is missing"))?;
+    let nested = tn::SheetArchive::decode(sheet.messages[message_index].data.as_slice())?;
+    sheet.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: 3,
+            data: tn::FormBasedSheetArchive {
+                super_: nested,
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        },
+    )?;
+    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
+        Limits::default(),
+    )?)
+}
+
+/// Remove the metadata member from a source-built comment package while
+/// leaving every selected document component byte-for-byte unchanged.
+#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
+pub(crate) fn source_built_comment_fixture_without_metadata(shared: bool) -> TestResult<Vec<u8>> {
+    let source = source_built_comment_fixture(shared)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let entries = catalog
+        .iter()
+        .filter(|entry| entry.name() != METADATA_MEMBER)
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+/// Replace the present metadata payload with a caller-selected wire value.
+/// This distinguishes a genuinely absent metadata member from a malformed or
+/// schema-incomplete metadata archive in the compatibility reader contract.
+#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
+pub(crate) fn source_built_comment_fixture_with_metadata_payload(
+    payload: &[u8],
+) -> TestResult<Vec<u8>> {
+    let source = source_built_comment_fixture(false)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let metadata_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
+    let stream = SnappyStream::decompress(metadata_entry.data())?;
+    let mut metadata_archive = Archive::parse(stream.as_bytes())?;
+    let metadata = metadata_archive
+        .object_mut(METADATA_OBJECT_ID)
+        .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
+    let message = metadata
+        .messages
+        .first_mut()
+        .ok_or_else(|| io::Error::other("comment fixture metadata payload is missing"))?;
+    message.data = payload.to_vec();
+    let compressed = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
+        Limits::default(),
+    )?)
+}
+
 /// Extend the ordinary fixture with a second independent table whose first
 /// cell deliberately reuses key `1`. Numbers list keys are local to a table's
 /// comment-storage list; this source proves that a reader does not use the
@@ -1252,6 +1513,47 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
             EntryEdit::new(DOCUMENT_MEMBER, compressed_document.as_slice()),
             EntryEdit::new(METADATA_MEMBER, compressed_metadata.as_slice()),
         ],
+        Limits::default(),
+    )?)
+}
+
+/// Make the second table's display name equal to the first table's name.
+/// Index selectors remain unambiguous, while a name selector must reject the
+/// duplicate after scanning the complete bounded table sequence.
+#[allow(
+    dead_code,
+    reason = "used by the focused cross-crate compatibility selector suite"
+)]
+pub(crate) fn multitable_duplicate_name_fixture() -> TestResult<Vec<u8>> {
+    let source = multitable_same_key_fixture()?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let document_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
+    let stream = SnappyStream::decompress(document_entry.data())?;
+    let mut document = Archive::parse(stream.as_bytes())?;
+    let model = document
+        .object_mut(SECOND_TABLE_MODEL_ID)
+        .ok_or_else(|| io::Error::other("second table model is missing"))?;
+    let message_index = model
+        .messages
+        .iter()
+        .position(|message| message.type_ == TABLE_MODEL_TYPE)
+        .ok_or_else(|| io::Error::other("second table model payload is missing"))?;
+    let mut archive =
+        tst::TableModelArchive::decode(model.messages[message_index].data.as_slice())?;
+    archive.table_name = TABLE_NAME.to_owned();
+    model.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: TABLE_MODEL_TYPE,
+            data: archive.encode_to_vec(),
+        },
+    )?;
+    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
         Limits::default(),
     )?)
 }

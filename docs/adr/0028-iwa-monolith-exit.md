@@ -10672,3 +10672,88 @@ reuse bounded comment decoding and graph validation, keep the incomplete
 physical context private, and retain strict native ingress. The eight legacy
 compatibility cases must pass without rewriting their source graphs before
 retiring the host readers.
+
+## 2026-09-09 Focused Numbers compatibility comment reads
+
+The focused owner now has explicit selector-first root and direct-reply read
+handoffs for legacy source-built snapshots. These hidden APIs are available
+only with `internal-iwork-source`; each has a caller-configurable read-options
+variant. A private physical context owns bounded archive and index state,
+resolves rooted sheet/table selectors, and reuses the lazy comment codecs.
+It never exposes an incomplete semantic `Package` to callers. Strict native
+package construction remains unchanged, and the handoff neither rewrites
+source bytes nor relaxes mutation ownership policy.
+
+Host test fixtures select exact or compatibility admission explicitly. This
+choice remains explicit even after serializing and reopening a known legacy
+fixture; serialized source provenance alone cannot distinguish the strict
+native schema profile. Native fixtures continue through strict construction,
+and native identity/UUID assertions remain private test witnesses.
+
+Computer Use opened a disposable copy of the prior native-created fixture in
+Numbers 14.4, entered `Native compatibility sentinel` in B3, and added
+`Native second root`. After saving, actual document-window close to the
+template chooser, and exact-file reopen, both B2's original `Native root
+comment` and B3's new comment were visually verified with author `Ryker Zhu`
+and their cell values. The permanent multi-root fixture and adjacent receipt
+are `test-data/iwork/numbers/comment-compat-native-multiroot.numbers` and
+`comment-compat-native-multiroot-receipt.json`. Reply creation remains
+unverified: the visible Reply control did not open an editor through Computer
+Use. This lifecycle establishes root-comment preservation only.
+
+All 34 host root-reader callers and ten reply-reader callers now use semantic
+selectors for value assertions. The public `NumbersEditor::cell_comment`
+method is removed; private identity witnesses remain for UUID, sharing,
+copy-on-write, and sort assertions. `cell_comment_replies` remains until native
+direct-reply creation/save/reopen evidence is established. The boundary ratchet
+checks the compatibility adapter and its evidence before enforcing root-reader
+retirement. This surface reduction does not close any of the eleven ordered
+migration debts or remove the monolithic crate.
+
+Compatibility admission tries native table/storage decoding first and permits
+legacy defaults only through the explicit internal handoff. Resource failures
+never trigger a permissive retry. The overloaded `6000` archive tag is checked
+against model payload shape before treating it as a native table-info object.
+Table ceilings count actual models, and rooted drawable/reference work is
+bounded before allocation. Name selectors scan drawable references linearly.
+A wholly absent legacy package-metadata sidecar is admissible for compatibility
+reply reads; an empty, malformed, or misplaced sidecar is not treated as absent.
+
+The final focused gates pass 166 migrated host editor tests, seventeen
+independent wire-oracle read tests, 27 reply lifecycle tests, and five native
+metadata tests with the internal compatibility feature enabled. The new native
+multi-root test compares the original B2 metadata against its source fixture,
+checks B3 independently, compares strict and compatibility projections, and
+verifies exact write-through of the application-saved bytes. The receipt hash
+and size match the permanent fixture.
+
+The dedicated compatibility suite passes twelve tests, including a legacy
+`6000` model with a nonzero style reference, FormBased sheets, duplicate table
+names, exact object/reference/text/input limit failures, source preservation,
+absent versus malformed metadata, and a native single-table package admitted
+at `max_tables = 1`. Its two exported legacy graphs are retained as compact
+command-prefixed sanitizer corpus seeds.
+
+The final nightly AddressSanitizer build passes. Bounded replay covers twelve
+checked-in corpus inputs in thirteen executions including initialization, with
+no sanitizer failure (287 MiB reported resident memory). The target now offers
+arbitrary package input to both compatibility readers even when strict
+projection fails. This bounded replay is regression evidence, not exhaustive
+fuzzing or native direct-reply validation.
+
+The boundary suite passes 1,014 tests, and the full scanner accepts 64 packages
+and 238 internal dependency declarations with eleven explicit migration debts.
+The hidden byte-input exception matches exactly four method signatures,
+requires both private feature-gated module wiring and hidden method attributes,
+and rejects ordinary public byte APIs or incorrectly gated copies.
+All-feature workspace library/integration tests and documentation tests pass.
+Scoped `cargo clean` removed 2,237 sanitizer build files (2.2 GiB); disposable
+native copies, exported fixtures, the replay directory, and the generated fuzz
+lockfile were removed. Permanent native fixtures, receipts, and corpus seeds
+remain in the repository.
+
+Normal commit hooks pass formatting, strict all-feature workspace Clippy,
+all-feature workspace library/integration tests, and documentation tests.
+No Cargo manifest changed. The remaining validation logs and Python cache
+were removed after recording the results; the unrelated preexisting `.codex`
+worktree content was preserved.

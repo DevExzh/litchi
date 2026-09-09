@@ -60,12 +60,44 @@ fuzz_target!(|data: &[u8]| {
     // bytes, while the command stream chooses bounded selectors/text.
     let (command, package_input) = command_prefix(data);
     exercise_native_metadata(data, command);
+    exercise_compatibility_reads(package_input, command);
     match Package::from_bytes_with_options(package_input, options()) {
         Ok(package) => exercise_package(&package, package_input, command),
         Err(error) => observe_error(error),
     }
     exercise_input_limit();
 });
+
+// The compatibility handoff is a separate bounded admission path. Exercise it
+// even when strict native document projection rejects the source, because
+// legacy builder snapshots intentionally omit unrelated native envelopes.
+fn exercise_compatibility_reads(bytes: &[u8], command: u8) {
+    let position = CellPosition::new(u32::from(command % 4), u32::from((command / 4) % 4));
+    match Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
+        bytes,
+        options(),
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        position,
+    ) {
+        Ok(comment) => {
+            black_box(comment);
+        },
+        Err(error) => observe_error(error),
+    }
+    match Package::__table_cell_comment_replies_from_bytes_for_compatibility_with_options(
+        bytes,
+        options(),
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        position,
+    ) {
+        Ok(replies) => {
+            black_box(replies);
+        },
+        Err(error) => observe_error(error),
+    }
+}
 
 fn command_prefix(data: &[u8]) -> (u8, &[u8]) {
     if data.starts_with(ZIP_LOCAL_HEADER) {

@@ -1,0 +1,34 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "native_file": "comment-compat-native-multiroot.numbers",
+  "sha256": "71a94f51443150b3c5565a24ae2a599d632e00fb0be51192353cb12615980bde",
+  "size": 138691,
+  "source_file": "comment-reader-native-created.numbers",
+  "sheet": "Sheet 1",
+  "table": "Table 1",
+  "cells": [
+    {
+      "address": "B2",
+      "value": "Native comment parity",
+      "root_text": "Native root comment"
+    },
+    {
+      "address": "B3",
+      "value": "Native compatibility sentinel",
+      "root_text": "Native second root"
+    }
+  ],
+  "author_display_name": "Ryker Zhu",
+  "lifecycle": [
+    "opened disposable copy of native-created source",
+    "entered B3 sentinel and added native root comment",
+    "saved comment with Command-Return and workbook",
+    "closed actual document window to template chooser",
+    "reopened exact saved file path without repair warning",
+    "visually verified both root texts, author, and sentinels",
+    "closed document window to template chooser"
+  ],
+  "reply_creation": "Not established: native Reply control did not open an editor through Computer Use."
+}
