@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi/target/release/examples/append_plain_paragraph",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/accepted/plain/source.docx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/accepted/plain/candidate.docx",
+    "Independent consumer append <&> caf\u00e9"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T03:51:29.707663+00:00",
+  "started_utc": "2026-09-09T03:51:29.700135+00:00",
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 42,
+    "sha256": "b3cd4a3d37d086bd3257281c270a4621cc22e563ca66624dbbc02300bfe6169f"
+  },
+  "timed_out": false
+}

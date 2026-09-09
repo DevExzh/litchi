@@ -1,0 +1,4 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 16.21s
+     Running tests/source_part_splice.rs (target/release/deps/source_part_splice-7c65ce7e5a160464)

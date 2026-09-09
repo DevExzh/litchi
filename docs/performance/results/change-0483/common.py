@@ -18,7 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[3]
-TEMP = Path("/tmp/litchi-goal-0483")
+TEMP = Path("/home/zhuhe/.cache/litchi-goal-0483")
 ENV = dict(
     os.environ,
     RUSTUP_TOOLCHAIN="1.98.1",
@@ -51,10 +51,17 @@ DRIVER_SCRIPTS = (
     "capture.py",
     "analyze.py",
     "verify.py",
+    "write-plans.py",
     "test_evidence.py",
     "fuzz.py",
     "fuzz-seeds.py",
     "consumer-probe.py",
+    "profile.py",
+    "check-non-iwork-examples.py",
+    "fuzz-parse.py",
+    "test_custody.py",
+    "seal.py",
+    "test_seal.py",
 )
 
 

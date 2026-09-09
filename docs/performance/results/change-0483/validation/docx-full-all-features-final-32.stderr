@@ -1,0 +1,4 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5m 33s
+     Running unittests src/lib.rs (target/release/deps/litchi_docx-3277e99e8da2ed85)
+error: test failed, to rerun pass `-p litchi-docx --lib`

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "/usr/bin/libreoffice",
+    "--headless",
+    "-env:UserInstallation=file:///home/zhuhe/.cache/litchi-goal-0483/consumer-utf8/profile-plain",
+    "--convert-to",
+    "txt:Text (encoded):UTF8",
+    "--outdir",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/text",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/source.docx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/candidate.docx"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T03:52:20.404824+00:00",
+  "started_utc": "2026-09-09T03:52:19.890437+00:00",
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 520,
+    "sha256": "d77dd3d8be3ed2870b044817604bfacc09816ecc72dbc2aab41afd7404c7625a"
+  },
+  "timed_out": false
+}

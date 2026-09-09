@@ -1,0 +1,25 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0425]: cannot find value `token_window` in this scope
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2056:28
+     |
+2056 |         .try_reserve_exact(token_window)
+     |                            ^^^^^^^^^^^^ not found in this scope
+
+error[E0599]: no method named `as_ref` found for struct `litchi_ooxml_common::mce::Output<'a>` in the current scope
+   --> crates/litchi-docx/src/mail_merge/codec.rs:179:51
+    |
+179 |     parse_settings_mail_merge_processed(processed.as_ref())
+    |                                                   ^^^^^^ method not found in `litchi_ooxml_common::mce::Output<'_>`
+
+error: unused variable: `declared`
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1169:13
+     |
+1169 |         let declared = checked_declared_size(
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_declared`
+     |
+     = note: `-D unused-variables` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_variables)]`
+
+Some errors have detailed explanations: E0425, E0599.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `litchi-docx` (lib) due to 3 previous errors

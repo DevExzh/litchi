@@ -1,0 +1,45 @@
+
+running 26 tests
+test authored_fragment_cannot_transfer_a_foreign_package_budget ... ok
+test authored_fragment_refusals_release_memory_and_preserve_typed_limits ... ok
+test authored_fragment_zero_fill_checks_cancellation_between_work_chunks ... ok
+test candidate_limit_is_refused_without_output ... ok
+test exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit ... ok
+test cancellation_is_observed_before_plan_and_write ... ok
+test exact_noop_copies_malformed_and_signed_source_byte_for_byte ... ok
+test mismatched_proof_fields_are_refused_before_publication ... ok
+test accounting_reports_two_fresh_decoded_reader_passes ... ok
+test malformed_source_or_candidate_is_rejected_before_output ... ok
+test partial_and_flush_sink_failures_preserve_typed_progress ... ok
+test binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs ... ok
+test source_mutation_after_the_first_sink_write_wins_over_publication ... ok
+test signed_non_noop_refuses_before_output ... ok
+test authored_fragment_transfers_one_reservation_and_publishes_reversibly ... ok
+test raw_record_oracle_includes_descriptor_mode_compressed_payload ... FAILED
+test splice_memory_quotas_are_typed_and_release_after_success_or_failure ... ok
+test publication_inverse_observes_candidate_cancellation_during_write_and_flush ... ok
+test source_version_mutation_is_refused_before_output ... ok
+test publication_inverse_rechecks_candidate_freshness_during_write_and_flush ... ok
+test publication_inverse_shared_context_charges_retained_archive_once ... ok
+test publication_inverse_requires_the_authenticated_candidate_artifact ... ok
+test publication_inverse_uses_current_candidate_output_budget ... ok
+test store_and_deflate_splices_preserve_opaque_members_without_caching_target ... ok
+test large_binary_fragment_refuses_scoped_work_before_preparation_succeeds ... ok
+test large_binary_fragment_observes_managed_cancellation_between_work_chunks ... ok
+
+failures:
+
+---- raw_record_oracle_includes_descriptor_mode_compressed_payload stdout ----
+
+thread 'raw_record_oracle_includes_descriptor_mode_compressed_payload' (3219226) panicked at crates/litchi-opc/tests/source_part_splice.rs:286:5:
+assertion `left == right` failed: fixture uses deferred local sizes
+  left: 58
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    raw_record_oracle_includes_descriptor_mode_compressed_payload
+
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

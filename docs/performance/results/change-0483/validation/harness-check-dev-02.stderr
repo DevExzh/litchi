@@ -1,0 +1,44 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0505]: cannot move out of `output_members` because it is borrowed
+    --> src/docx_bounded_tail_append_compare.rs:1141:9
+     |
+1106 |     let output_members = member_identities(output)?;
+     |         -------------- binding `output_members` declared here
+...
+1129 |     let output_main = find_member(&output_members, MAIN_PATH)?;
+     |                                   --------------- borrow of `output_members` occurs here
+...
+1141 |         output_members,
+     |         ^^^^^^^^^^^^^^ move out of `output_members` occurs here
+...
+1146 |         output_main_compressed_equal_source: output_main.compressed_sha256
+     |                                              ----------------------------- borrow later used here
+     |
+help: consider cloning the value if the performance cost is acceptable
+     |
+1129 |     let output_main = find_member(&output_members.clone(), MAIN_PATH)?;
+     |                                                  ++++++++
+
+error[E0382]: borrow of moved value: `append_text`
+    --> src/docx_bounded_tail_append_compare.rs:1282:26
+     |
+1158 |     let append_text = append_text(count);
+     |         ----------- move occurs because `append_text` has type `std::string::String`, which does not implement the `Copy` trait
+...
+1272 |         append_text,
+     |         ----------- value moved here
+...
+1282 |             append_text: append_text.clone(),
+     |                          ^^^^^^^^^^^ value borrowed here after move
+     |
+help: consider cloning the value if the performance cost is acceptable
+     |
+1272 |         append_text: append_text.clone(),
+     |                    +++++++++++++++++++++
+
+Some errors have detailed explanations: E0382, E0505.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `litchi-perf-baseline` (lib) due to 2 previous errors

@@ -1,0 +1,3 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.66s
+     Running tests/source_part_splice.rs (target/release/deps/source_part_splice-7c65ce7e5a160464)

@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "artifacts": {
+    "docx-clippy-dev-15.stderr": {
+      "bytes": 5441,
+      "sha256": "5fa3c9ca9098bf1334161719d7370422f831194050b9822ac13bcc0fac283049"
+    },
+    "docx-clippy-dev-15.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "6d6030ffb9ab1d45db18059f2df5b8bcb613600b09b65274504c33da47ef4049",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-09T02:20:16.198300+00:00",
+  "label": "docx-clippy-dev-15",
+  "schema": "docx-tail-append-gate-v1",
+  "source_after": {
+    "files": 7139,
+    "path": "validation-sources/9f5ddf82acbd2cd7d1661f5d73b4d57443ad951b43faf21ca9e6b92f04bbc68e.json",
+    "sha256": "9f5ddf82acbd2cd7d1661f5d73b4d57443ad951b43faf21ca9e6b92f04bbc68e"
+  },
+  "source_before": {
+    "files": 7139,
+    "path": "validation-sources/9f5ddf82acbd2cd7d1661f5d73b4d57443ad951b43faf21ca9e6b92f04bbc68e.json",
+    "sha256": "9f5ddf82acbd2cd7d1661f5d73b4d57443ad951b43faf21ca9e6b92f04bbc68e"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-09T02:20:03.635584+00:00"
+}

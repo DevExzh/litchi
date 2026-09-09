@@ -1,0 +1,60 @@
+{
+  "example": {
+    "bytes": 10856920,
+    "path": "/home/zhuhe/code/litchi/target/release/examples/append_plain_paragraph",
+    "sha256": "5daa7e53f2aae0b7330104dbac1479ad723c2a0f803da554589915c506a74d0e"
+  },
+  "finished_utc": "2026-09-09T03:52:20.927910+00:00",
+  "rows": [
+    {
+      "candidate": {
+        "bytes": 1234,
+        "sha256": "4140940ece4c52b184d27a548447e4c3633e2244543aea68a74212e381aadc91"
+      },
+      "candidate_text": {
+        "bytes": 55,
+        "sha256": "59ede4faffb8861d48000f584f09c9216755b2d4dccbfa5f1e70239e111b6bb7"
+      },
+      "case": "plain",
+      "decoded_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+      "decoded_source_text": " seed & text \n",
+      "expected_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+      "expected_source_text": " seed & text \n",
+      "source": {
+        "bytes": 1188,
+        "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+      },
+      "source_text": {
+        "bytes": 17,
+        "sha256": "72402f8efe5fa37f89c414138f64fa019b8f0e580189bfddf0ae5def8786e52d"
+      },
+      "verified": true
+    },
+    {
+      "candidate": {
+        "bytes": 1282,
+        "sha256": "ae1250305ebe6b0d70a0321cdcc484e82af0505ba5b803573c54a3f79593d251"
+      },
+      "candidate_text": {
+        "bytes": 55,
+        "sha256": "59ede4faffb8861d48000f584f09c9216755b2d4dccbfa5f1e70239e111b6bb7"
+      },
+      "case": "section",
+      "decoded_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+      "decoded_source_text": " seed & text \n",
+      "expected_candidate_text": " seed & text \nIndependent consumer append <&> caf\u00e9\n",
+      "expected_source_text": " seed & text \n",
+      "source": {
+        "bytes": 1236,
+        "sha256": "31c3100192e655b9afc324403dabe82138289ca6d80b59b4b7f2bfac7ab54e96"
+      },
+      "source_text": {
+        "bytes": 17,
+        "sha256": "72402f8efe5fa37f89c414138f64fa019b8f0e580189bfddf0ae5def8786e52d"
+      },
+      "verified": true
+    }
+  ],
+  "scope": "LibreOffice synthetic DOCX open and TXT export; no native Microsoft Office claim",
+  "status": "pass"
+}

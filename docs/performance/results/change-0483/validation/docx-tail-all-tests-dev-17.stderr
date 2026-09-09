@@ -1,0 +1,86 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0603]: module `extensions` is private
+  --> crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs:19:22
+   |
+19 | use crate::settings::extensions::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
+   |                      ^^^^^^^^^^ private module
+   |
+help: consider importing this constant through its public re-export instead:
+      crate::settings::WORD_2010_NAMESPACE
+  --> crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs:19:35
+   |
+19 | use crate::settings::extensions::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
+   |                                   ^^^^^^^^^^^^^^^^^^^
+note: the module `extensions` is defined here
+  --> crates/litchi-docx/src/settings/mod.rs:20:1
+   |
+20 | mod extensions;
+   | ^^^^^^^^^^^^^^^
+
+error[E0603]: module `extensions` is private
+  --> crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs:19:22
+   |
+19 | use crate::settings::extensions::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
+   |                      ^^^^^^^^^^ private module
+   |
+help: consider importing this constant through its public re-export instead:
+      crate::settings::WORD_2012_NAMESPACE
+  --> crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs:19:56
+   |
+19 | use crate::settings::extensions::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
+   |                                                        ^^^^^^^^^^^^^^^^^^^
+note: the module `extensions` is defined here
+  --> crates/litchi-docx/src/settings/mod.rs:20:1
+   |
+20 | mod extensions;
+   | ^^^^^^^^^^^^^^^
+
+error[E0499]: cannot borrow `reader` as mutable more than once at a time
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1899:23
+     |
+1881 |         let (namespace, event) = reader
+     |                                  ------ first mutable borrow occurs here
+...
+1899 |         let raw_len = reader.get_mut().captured().len();
+     |                       ^^^^^^ second mutable borrow occurs here
+...
+2076 |                     settings_event_owned_bytes(namespace, &start, reader.resolver())?;
+     |                                                --------- first borrow later used here
+
+error[E0502]: cannot borrow `reader` as immutable because it is also borrowed as mutable
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1901:23
+     |
+1881 |         let (namespace, event) = reader
+     |                                  ------ mutable borrow occurs here
+...
+1901 |         let decoder = reader.decoder();
+     |                       ^^^^^^ immutable borrow occurs here
+...
+2076 |                     settings_event_owned_bytes(namespace, &start, reader.resolver())?;
+     |                                                --------- mutable borrow later used here
+
+error[E0502]: cannot borrow `reader` as immutable because it is also borrowed as mutable
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1977:67
+     |
+1881 |         let (namespace, event) = reader
+     |                                  ------ mutable borrow occurs here
+...
+1977 |                     settings_event_owned_bytes(namespace, &start, reader.resolver())?;
+     |                     --------------------------                    ^^^^^^ immutable borrow occurs here
+     |                     |
+     |                     mutable borrow later used by call
+
+error[E0502]: cannot borrow `reader` as immutable because it is also borrowed as mutable
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2076:67
+     |
+1881 |         let (namespace, event) = reader
+     |                                  ------ mutable borrow occurs here
+...
+2076 |                     settings_event_owned_bytes(namespace, &start, reader.resolver())?;
+     |                     --------------------------                    ^^^^^^ immutable borrow occurs here
+     |                     |
+     |                     mutable borrow later used by call
+
+Some errors have detailed explanations: E0499, E0502, E0603.
+For more information about an error, try `rustc --explain E0499`.
+error: could not compile `litchi-docx` (lib) due to 6 previous errors

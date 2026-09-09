@@ -1,0 +1,4 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 12.42s
+     Running tests/source_part_splice.rs (target/release/deps/source_part_splice-7c65ce7e5a160464)
+error: test failed, to rerun pass `-p litchi-opc --test source_part_splice`

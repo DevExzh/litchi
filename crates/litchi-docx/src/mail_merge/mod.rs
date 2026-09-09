@@ -15,9 +15,12 @@ mod tests;
 
 pub(crate) use adapter::{
     extract_recipients, is_mail_merge_relationship_type, is_settings_relationship, map_docx_error,
-    validate_mail_merge_relationships,
+    validate_mail_merge_relationships, validate_mail_merge_relationships_in,
 };
 pub use codec::parse_settings_mail_merge;
+pub(crate) use codec::{
+    parse_settings_mail_merge_processed, parse_settings_mail_merge_with_mce_limits,
+};
 pub use model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
     MainDocumentType, Recipient, Recipients, RelationshipId, Settings,

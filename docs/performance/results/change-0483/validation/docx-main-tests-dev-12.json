@@ -1,0 +1,56 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--test",
+    "source_backed_tail_append",
+    "--",
+    "--skip",
+    "settings",
+    "--skip",
+    "topology_refusals"
+  ],
+  "artifacts": {
+    "docx-main-tests-dev-12.stderr": {
+      "bytes": 2584,
+      "sha256": "2529988a66a045ba1bffa84c1bc15e685d419b066b404503afee1c556ae0f1b7"
+    },
+    "docx-main-tests-dev-12.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "6d6030ffb9ab1d45db18059f2df5b8bcb613600b09b65274504c33da47ef4049",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-09T02:14:47.905040+00:00",
+  "label": "docx-main-tests-dev-12",
+  "schema": "docx-tail-append-gate-v1",
+  "source_after": {
+    "files": 7139,
+    "path": "validation-sources/71ef905971bccbc5a86f2aeed4537f740ff9d5950cdb49027b73ef606b77f567.json",
+    "sha256": "71ef905971bccbc5a86f2aeed4537f740ff9d5950cdb49027b73ef606b77f567"
+  },
+  "source_before": {
+    "files": 7139,
+    "path": "validation-sources/c34e681dd035037b95adf3ac0f624004ca61c6d3f0c01f4d02e6e75b22e8f743.json",
+    "sha256": "c34e681dd035037b95adf3ac0f624004ca61c6d3f0c01f4d02e6e75b22e8f743"
+  },
+  "source_unchanged": false,
+  "started_utc": "2026-09-09T02:14:36.266026+00:00"
+}

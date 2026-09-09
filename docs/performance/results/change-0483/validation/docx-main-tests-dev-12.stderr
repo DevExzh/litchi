@@ -1,0 +1,58 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0599]: no method named `windows` found for type `usize` in the current scope
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1160:10
+     |
+1159 |       let mail_merge_nodes = if source_bytes
+     |  _______________________________-
+1160 | |         .windows(b"mailMerge".len())
+     | |         -^^^^^^^ method not found in `usize`
+     | |_________|
+     |
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:1686:42
+     |
+1686 |                 validate_xml_declaration(declaration).map_err(map_scan_error)?;
+     |                 ------------------------ ^^^^^^^^^^^ expected `&BytesDecl<'_>`, found `BytesDecl<'_>`
+     |                 |
+     |                 arguments to this function are incorrect
+     |
+note: function defined here
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2841:4
+     |
+2841 | fn validate_xml_declaration(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+2842 |     declaration: &BytesDecl<'_>,
+     |     ---------------------------
+help: consider borrowing here
+     |
+1686 |                 validate_xml_declaration(&declaration).map_err(map_scan_error)?;
+     |                                          +
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2777:42
+     |
+2777 |                 validate_xml_declaration(declaration)?;
+     |                 ------------------------ ^^^^^^^^^^^ expected `&BytesDecl<'_>`, found `BytesDecl<'_>`
+     |                 |
+     |                 arguments to this function are incorrect
+     |
+note: function defined here
+    --> crates/litchi-docx/src/source_backed/tail_append.rs:2841:4
+     |
+2841 | fn validate_xml_declaration(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+2842 |     declaration: &BytesDecl<'_>,
+     |     ---------------------------
+help: consider borrowing here
+     |
+2777 |                 validate_xml_declaration(&declaration)?;
+     |                                          +
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-docx` (lib) due to 3 previous errors

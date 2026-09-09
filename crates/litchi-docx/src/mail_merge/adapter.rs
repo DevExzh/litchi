@@ -11,6 +11,7 @@
 
 use super::{Recipients, Settings};
 use crate::error::{Error, Result};
+use litchi_opc::Relationships;
 use litchi_opc::part::Part;
 
 pub(crate) fn map_docx_error(error: Error) -> Error {
@@ -30,9 +31,15 @@ pub(crate) fn validate_mail_merge_relationships(
     part: &dyn Part,
     value: Option<&Settings>,
 ) -> Result<()> {
+    validate_mail_merge_relationships_in(part.rels(), value)
+}
+
+pub(crate) fn validate_mail_merge_relationships_in(
+    relationships: &Relationships,
+    value: Option<&Settings>,
+) -> Result<()> {
     let mut recipient_relationship = None;
-    for relationship in part
-        .rels()
+    for relationship in relationships
         .iter()
         .filter(|rel| reltype_is(rel.reltype(), "recipientData"))
     {
@@ -56,28 +63,28 @@ pub(crate) fn validate_mail_merge_relationships(
         return Ok(());
     };
 
-    validate_optional_relationship(
-        part,
+    validate_optional_relationship_in(
+        relationships,
         value.data_source_relationship_id(),
         "mailMergeSource",
         true,
     )?;
-    validate_optional_relationship(
-        part,
+    validate_optional_relationship_in(
+        relationships,
         value.header_source_relationship_id(),
         "mailMergeHeaderSource",
         true,
     )?;
 
     let recipient_id = if let Some(odso) = value.odso() {
-        validate_optional_relationship(
-            part,
+        validate_optional_relationship_in(
+            relationships,
             odso.source_relationship_id(),
             "mailMergeSource",
             true,
         )?;
-        validate_optional_relationship(
-            part,
+        validate_optional_relationship_in(
+            relationships,
             odso.recipient_data_relationship_id(),
             "recipientData",
             false,
@@ -105,8 +112,8 @@ pub(crate) fn validate_mail_merge_relationships(
     Ok(())
 }
 
-fn validate_optional_relationship(
-    part: &dyn Part,
+fn validate_optional_relationship_in(
+    relationships: &Relationships,
     id: Option<&str>,
     suffix: &str,
     allow_external: bool,
@@ -114,8 +121,7 @@ fn validate_optional_relationship(
     let Some(id) = id else {
         return Ok(());
     };
-    let relationship = part
-        .rels()
+    let relationship = relationships
         .get(id)
         .ok_or_else(|| invalid(format!("mail-merge relationship '{id}' is missing")))?;
     if !reltype_is(relationship.reltype(), suffix) {

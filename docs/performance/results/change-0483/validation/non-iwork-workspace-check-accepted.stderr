@@ -1,0 +1,6 @@
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-keynote v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-keynote)
+    Checking litchi-iwa-structured v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-structured)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-py v0.0.1 (/home/zhuhe/code/litchi/crates/pyo3-litchi)
+    Finished `release` profile [optimized + debuginfo] target(s) in 16.81s

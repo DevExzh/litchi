@@ -1,0 +1,4 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 39.28s
+     Running tests/source_backed_tail_append.rs (target/release/deps/source_backed_tail_append-6a8a9dfcfbc512bd)
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_tail_append`

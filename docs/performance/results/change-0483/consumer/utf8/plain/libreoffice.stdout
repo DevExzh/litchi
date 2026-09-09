@@ -1,0 +1,2 @@
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/source.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/text/source.txt using filter : Text (encoded):UTF8
+convert /home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/candidate.docx as a Writer document -> /home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer/utf8/plain/text/candidate.txt using filter : Text (encoded):UTF8

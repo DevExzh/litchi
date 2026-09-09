@@ -1,0 +1,515 @@
+{
+  "corpus_before": {
+    "comment-deflate.docx": {
+      "bytes": 1198,
+      "sha256": "4bf9429b0449cc1ebf5b03e608b50d304a35ae2c0402ab2d858240377d9ef377"
+    },
+    "comment-stored.docx": {
+      "bytes": 1528,
+      "sha256": "7a572bedb39a766be31f3acc7f702b00412a8a1b8088bef032b41a206a772aaa"
+    },
+    "default-namespace-deflate.docx": {
+      "bytes": 1157,
+      "sha256": "c07b5d08fd183f1306302daa085dbd2ac7d027e24e5176ec65dda01d2e7d64af"
+    },
+    "default-namespace-stored.docx": {
+      "bytes": 1459,
+      "sha256": "f941631a8cc417cff162fcea50cc5bef47565b3b5e8dafd020328c98a5580f4a"
+    },
+    "empty-body-deflate.docx": {
+      "bytes": 1147,
+      "sha256": "5bee8138f43257e329f3767bbe2f3ee3b9d049cadc5516e9043db1b25517f62e"
+    },
+    "empty-body-stored.docx": {
+      "bytes": 1444,
+      "sha256": "85bb9e887110877f47aa91c131e22b491fd3344c824ea824bbdeca9462acb158"
+    },
+    "empty-paragraph-deflate.docx": {
+      "bytes": 1150,
+      "sha256": "a1aa08c8f10d565b4693dc4f85f2f0db7ff294835076ac0385a140486becad7e"
+    },
+    "empty-paragraph-stored.docx": {
+      "bytes": 1450,
+      "sha256": "48c3c79e5e642140e99ba945d201dbba235e909282baf9cb84bade4d1c3e0676"
+    },
+    "local-prefix-deflate.docx": {
+      "bytes": 1173,
+      "sha256": "257921d439d28d5a17b90f743cdbbf54c347ab1636d8fd94b6a6217876571c35"
+    },
+    "local-prefix-stored.docx": {
+      "bytes": 1552,
+      "sha256": "20d09b155357f40245790fbaf8be997be68cf83da3c3d1e4661d13c7ad8c0c02"
+    },
+    "long-token-deflate.docx": {
+      "bytes": 1191,
+      "sha256": "a233e9e908188f142b99c057dbbead79e9de89d940f54dd9decce4f46a5234f1"
+    },
+    "long-token-stored.docx": {
+      "bytes": 9670,
+      "sha256": "b4da23fb54ca65ed93d136f2757cd14ca68d68213c1c425261d38c46b87495be"
+    },
+    "malformed-deflate.docx": {
+      "bytes": 1187,
+      "sha256": "b4368357fc45c6f88e1c293717ba55af803e049e6b907389a56fdd1f949a7aee"
+    },
+    "malformed-stored.docx": {
+      "bytes": 1511,
+      "sha256": "14897beb324137568e4d52062b1cf1cd0314db9c5183388b24b8fc1932c2d76b"
+    },
+    "only-section-deflate.docx": {
+      "bytes": 1198,
+      "sha256": "1562604b36c8517bbaa10bc90682bb11653aa016dbf7ee0061fe6296524f9c51"
+    },
+    "only-section-stored.docx": {
+      "bytes": 1522,
+      "sha256": "4fde0ea69ed9c9efe7ea65ded9e269be82102c31ace2248f8da98ed6f62cdaed"
+    },
+    "plain-deflate.docx": {
+      "bytes": 1188,
+      "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+    },
+    "plain-stored.docx": {
+      "bytes": 1515,
+      "sha256": "031400401d43db54f8329435ea0ccec86b01fbd30ac8d3ba1da706ee72cbbdaa"
+    },
+    "section-deflate.docx": {
+      "bytes": 1236,
+      "sha256": "31c3100192e655b9afc324403dabe82138289ca6d80b59b4b7f2bfac7ab54e96"
+    },
+    "section-duplicate-deflate.docx": {
+      "bytes": 1202,
+      "sha256": "a2f56f1547e3d3f0b33c86ca2bc37e1c4d78131229d72635579fc0051e29e29b"
+    },
+    "section-duplicate-stored.docx": {
+      "bytes": 1600,
+      "sha256": "ceba24e9074f7ceeef72ed1be9c4f8229eb7d6ae386c268ea3e3fe1c09513280"
+    },
+    "section-nested-deflate.docx": {
+      "bytes": 1203,
+      "sha256": "b6d15f33ea727852ffe2b646777bbb5371a65fa0438b29aa148b6888c59ce3bb"
+    },
+    "section-nested-stored.docx": {
+      "bytes": 1533,
+      "sha256": "2d3d797d6101b5094957e81c39b40c3b4f299f8d5747e394edc2b86940d8f3ab"
+    },
+    "section-nonfinal-deflate.docx": {
+      "bytes": 1237,
+      "sha256": "37ce494880988074e2580d1a9c187fc1672a859fd54312a4f716ce9e424890d1"
+    },
+    "section-nonfinal-stored.docx": {
+      "bytes": 1593,
+      "sha256": "de1d0f717904f5ad56380b86a8d1a854b0c0ca323037f133b7e555aad67e3b2a"
+    },
+    "section-stored.docx": {
+      "bytes": 1593,
+      "sha256": "3de3456c64ae2f2dc304f23d2aa8ac96f440b1e4c25cd8260c199d62de7c77c2"
+    },
+    "settings-directive-amplification-strict-deflate.docx": {
+      "bytes": 1588,
+      "sha256": "48463ad6b8f4f3040839395a9428f59d8354f5976a8a6cdfbe0eb4b3bcd5fbcd"
+    },
+    "settings-directive-amplification-strict-stored.docx": {
+      "bytes": 2615,
+      "sha256": "047c750f773338f9d4888a1a02c51525b240a357724cbff72fe25c72241544cd"
+    },
+    "settings-directive-amplification-word-deflate.docx": {
+      "bytes": 1581,
+      "sha256": "fbce91c58e8b10ecdfd20938a1fea82472fe4f05f195936e85300eb54bf5ca28"
+    },
+    "settings-directive-amplification-word-stored.docx": {
+      "bytes": 2663,
+      "sha256": "bed86e0b51cbe94f764bd31a26a508668495d3e212bc7beba0ec0507749b81ea"
+    },
+    "settings-duplicate-flags-strict-deflate.docx": {
+      "bytes": 1563,
+      "sha256": "1e67436b19c6622a4a29c6a896e4e9872c421cfd4d091d7fc4a064118d1dc870"
+    },
+    "settings-duplicate-flags-strict-stored.docx": {
+      "bytes": 2405,
+      "sha256": "56955d4a07be3cff0b54ad78b99f6e08cc0547346d0442f3824b0bc835c4c0c3"
+    },
+    "settings-duplicate-flags-word-deflate.docx": {
+      "bytes": 1556,
+      "sha256": "f87c2ec9f8c6fa3880e8de0dbce97c671ec384df518e0c771aece49274aa36eb"
+    },
+    "settings-duplicate-flags-word-stored.docx": {
+      "bytes": 2453,
+      "sha256": "f3c13351fe10199deca3f0fb48518ef0ec4cbd0ad2f8252133d10e2300fbae38"
+    },
+    "settings-empty-settings-strict-deflate.docx": {
+      "bytes": 1477,
+      "sha256": "9cf0923fbe4ac4c328cb498c1753e683cea32cf5478b94a2b1c217f66a1110ab"
+    },
+    "settings-empty-settings-strict-stored.docx": {
+      "bytes": 2137,
+      "sha256": "930db6f82a796ff7a86159ae2c8a36e4f9a256cdb85bc21c14e61dd46c5dd38d"
+    },
+    "settings-empty-settings-word-deflate.docx": {
+      "bytes": 1471,
+      "sha256": "ef6e373869055970eaa0f609e9ef1ee5d685cbf0f24b7db547f52643e40ec6a6"
+    },
+    "settings-empty-settings-word-stored.docx": {
+      "bytes": 2185,
+      "sha256": "4b3f7923f0d09761619b57105db59494e1a58ae21297c551a25add0a57d574fc"
+    },
+    "settings-inherited-namespace-strict-deflate.docx": {
+      "bytes": 1549,
+      "sha256": "90af9b0af9a675f4564b9f9b0803dfeb8c04f244fa867b16bf9fc5e2c37f256a"
+    },
+    "settings-inherited-namespace-strict-stored.docx": {
+      "bytes": 2283,
+      "sha256": "c279d96be0f20de915ff48fa1c335ec76bb1ff108c04d826679613f321cf6fa9"
+    },
+    "settings-inherited-namespace-word-deflate.docx": {
+      "bytes": 1544,
+      "sha256": "ed3dc76d7b7b0201d7d781cb0360ded590902c66f6d379315a2baba3d6debcf9"
+    },
+    "settings-inherited-namespace-word-stored.docx": {
+      "bytes": 2331,
+      "sha256": "f4b2022b56bc96c57963830198ada0b4104e19821bd8dae387cd627707b55234"
+    },
+    "settings-mce-fallback-strict-deflate.docx": {
+      "bytes": 1599,
+      "sha256": "f2421e621f987754eebe12598964e6ea5fb48aa36bbd0547dfd957dbe5e3b86c"
+    },
+    "settings-mce-fallback-strict-stored.docx": {
+      "bytes": 2388,
+      "sha256": "7195ab821aa6be812d9ae62962620bf5959ce4be1b06e8b83c7dc6f6a2bc0657"
+    },
+    "settings-mce-fallback-word-deflate.docx": {
+      "bytes": 1593,
+      "sha256": "295bd7906ea4a8249ecb4d20eddbf9e9200a074c4829d233bbde9b6ab92ad737"
+    },
+    "settings-mce-fallback-word-stored.docx": {
+      "bytes": 2436,
+      "sha256": "7e1e967d3d4eac2c526b695885f4d7fd71bfcaeef60c5e956558ac2a029729e3"
+    },
+    "settings-must-understand-strict-deflate.docx": {
+      "bytes": 1530,
+      "sha256": "32c5336055402db72b9672b42627b4443a3c9040fc823f4f6b4c18868bb40de3"
+    },
+    "settings-must-understand-strict-stored.docx": {
+      "bytes": 2224,
+      "sha256": "3ce63b3e381581d2b917f51da5f3e59991e4b75b7449f12eb280e7c55e29a13c"
+    },
+    "settings-must-understand-word-deflate.docx": {
+      "bytes": 1521,
+      "sha256": "1106d5d927d23a04ccc2a6dffe72126b12d465c745af4d78d03ee4b3f3738d98"
+    },
+    "settings-must-understand-word-stored.docx": {
+      "bytes": 2272,
+      "sha256": "1158efce73524b1ca497b8e24bdbf3783f8e958f316509f71d55d93f7f8a352c"
+    },
+    "settings-protection-disabled-strict-deflate.docx": {
+      "bytes": 1518,
+      "sha256": "e4c38323875363bb0a27c08b6af116b3e7e8f6dbc9458cfedbcb930fc9b103b5"
+    },
+    "settings-protection-disabled-strict-stored.docx": {
+      "bytes": 2196,
+      "sha256": "c87c221a0bb81b7eedad2acc52bae2c74e920b9323cad41db67bb142dbfe391a"
+    },
+    "settings-protection-disabled-word-deflate.docx": {
+      "bytes": 1513,
+      "sha256": "484e1a0bf4177b204320cc7a36791dc70c789731e752af711e2b3a92011469ae"
+    },
+    "settings-protection-disabled-word-stored.docx": {
+      "bytes": 2244,
+      "sha256": "e0a194ede2ae1424cf3e5821a01884e978ca80c4e2aaa29abe7f33656d12f29f"
+    },
+    "settings-protection-enabled-strict-deflate.docx": {
+      "bytes": 1555,
+      "sha256": "522a4d728465363d20d57e9a19ab47d739b1a62079297da5a77af642cef209f8"
+    },
+    "settings-protection-enabled-strict-stored.docx": {
+      "bytes": 2255,
+      "sha256": "76613eed2f675a990fa01ac3214621d4d7d015ea919e06278d37e33e2251898d"
+    },
+    "settings-protection-enabled-word-deflate.docx": {
+      "bytes": 1549,
+      "sha256": "3fae5f06ba4bcbeff4ec06ac787d3e76d30a2e616b9499461ab98d43fcd9283d"
+    },
+    "settings-protection-enabled-word-stored.docx": {
+      "bytes": 2303,
+      "sha256": "bfc378982cc376b7db6828f8384f772cf6318e1bccecd3dee18f8c14ee511770"
+    },
+    "strict-deflate.docx": {
+      "bytes": 1185,
+      "sha256": "fb4b0438bb04e84f2bc4e0a0d2726003417ac995d8a910de3d1fd1f665c89d30"
+    },
+    "strict-stored.docx": {
+      "bytes": 1491,
+      "sha256": "7b8b9326abf576dec2193904b0a2909f29189fe7c1b03fddc105ca44b2bc6b86"
+    },
+    "table-deflate.docx": {
+      "bytes": 1155,
+      "sha256": "8b3e98fdb4472a6ebcf50454360e4793618b36597742c1583355a9b4a3126156"
+    },
+    "table-stored.docx": {
+      "bytes": 1452,
+      "sha256": "d3dd6fb197c345f89c96da58bdc50c1fffb6b8748f02b10c0254d56383d389ff"
+    }
+  },
+  "lock": {
+    "bytes": 31912,
+    "sha256": "fe7079e6754677ba32cd5b40a82b1edf21c9dbe62c0018008631f6fcd88df90d"
+  },
+  "manifest": {
+    "bytes": 683,
+    "sha256": "e17c99338980fda967d87bbd37b9f9dee5e730972af0e5eb7e07c12c7e230f0c"
+  },
+  "prepared_utc": "2026-09-09T03:52:21.604655+00:00",
+  "seeds": {
+    "comment-deflate.docx": {
+      "bytes": 1198,
+      "sha256": "4bf9429b0449cc1ebf5b03e608b50d304a35ae2c0402ab2d858240377d9ef377"
+    },
+    "comment-stored.docx": {
+      "bytes": 1528,
+      "sha256": "7a572bedb39a766be31f3acc7f702b00412a8a1b8088bef032b41a206a772aaa"
+    },
+    "default-namespace-deflate.docx": {
+      "bytes": 1157,
+      "sha256": "c07b5d08fd183f1306302daa085dbd2ac7d027e24e5176ec65dda01d2e7d64af"
+    },
+    "default-namespace-stored.docx": {
+      "bytes": 1459,
+      "sha256": "f941631a8cc417cff162fcea50cc5bef47565b3b5e8dafd020328c98a5580f4a"
+    },
+    "empty-body-deflate.docx": {
+      "bytes": 1147,
+      "sha256": "5bee8138f43257e329f3767bbe2f3ee3b9d049cadc5516e9043db1b25517f62e"
+    },
+    "empty-body-stored.docx": {
+      "bytes": 1444,
+      "sha256": "85bb9e887110877f47aa91c131e22b491fd3344c824ea824bbdeca9462acb158"
+    },
+    "empty-paragraph-deflate.docx": {
+      "bytes": 1150,
+      "sha256": "a1aa08c8f10d565b4693dc4f85f2f0db7ff294835076ac0385a140486becad7e"
+    },
+    "empty-paragraph-stored.docx": {
+      "bytes": 1450,
+      "sha256": "48c3c79e5e642140e99ba945d201dbba235e909282baf9cb84bade4d1c3e0676"
+    },
+    "local-prefix-deflate.docx": {
+      "bytes": 1173,
+      "sha256": "257921d439d28d5a17b90f743cdbbf54c347ab1636d8fd94b6a6217876571c35"
+    },
+    "local-prefix-stored.docx": {
+      "bytes": 1552,
+      "sha256": "20d09b155357f40245790fbaf8be997be68cf83da3c3d1e4661d13c7ad8c0c02"
+    },
+    "long-token-deflate.docx": {
+      "bytes": 1191,
+      "sha256": "a233e9e908188f142b99c057dbbead79e9de89d940f54dd9decce4f46a5234f1"
+    },
+    "long-token-stored.docx": {
+      "bytes": 9670,
+      "sha256": "b4da23fb54ca65ed93d136f2757cd14ca68d68213c1c425261d38c46b87495be"
+    },
+    "malformed-deflate.docx": {
+      "bytes": 1187,
+      "sha256": "b4368357fc45c6f88e1c293717ba55af803e049e6b907389a56fdd1f949a7aee"
+    },
+    "malformed-stored.docx": {
+      "bytes": 1511,
+      "sha256": "14897beb324137568e4d52062b1cf1cd0314db9c5183388b24b8fc1932c2d76b"
+    },
+    "only-section-deflate.docx": {
+      "bytes": 1198,
+      "sha256": "1562604b36c8517bbaa10bc90682bb11653aa016dbf7ee0061fe6296524f9c51"
+    },
+    "only-section-stored.docx": {
+      "bytes": 1522,
+      "sha256": "4fde0ea69ed9c9efe7ea65ded9e269be82102c31ace2248f8da98ed6f62cdaed"
+    },
+    "plain-deflate.docx": {
+      "bytes": 1188,
+      "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+    },
+    "plain-stored.docx": {
+      "bytes": 1515,
+      "sha256": "031400401d43db54f8329435ea0ccec86b01fbd30ac8d3ba1da706ee72cbbdaa"
+    },
+    "section-deflate.docx": {
+      "bytes": 1236,
+      "sha256": "31c3100192e655b9afc324403dabe82138289ca6d80b59b4b7f2bfac7ab54e96"
+    },
+    "section-duplicate-deflate.docx": {
+      "bytes": 1202,
+      "sha256": "a2f56f1547e3d3f0b33c86ca2bc37e1c4d78131229d72635579fc0051e29e29b"
+    },
+    "section-duplicate-stored.docx": {
+      "bytes": 1600,
+      "sha256": "ceba24e9074f7ceeef72ed1be9c4f8229eb7d6ae386c268ea3e3fe1c09513280"
+    },
+    "section-nested-deflate.docx": {
+      "bytes": 1203,
+      "sha256": "b6d15f33ea727852ffe2b646777bbb5371a65fa0438b29aa148b6888c59ce3bb"
+    },
+    "section-nested-stored.docx": {
+      "bytes": 1533,
+      "sha256": "2d3d797d6101b5094957e81c39b40c3b4f299f8d5747e394edc2b86940d8f3ab"
+    },
+    "section-nonfinal-deflate.docx": {
+      "bytes": 1237,
+      "sha256": "37ce494880988074e2580d1a9c187fc1672a859fd54312a4f716ce9e424890d1"
+    },
+    "section-nonfinal-stored.docx": {
+      "bytes": 1593,
+      "sha256": "de1d0f717904f5ad56380b86a8d1a854b0c0ca323037f133b7e555aad67e3b2a"
+    },
+    "section-stored.docx": {
+      "bytes": 1593,
+      "sha256": "3de3456c64ae2f2dc304f23d2aa8ac96f440b1e4c25cd8260c199d62de7c77c2"
+    },
+    "settings-directive-amplification-strict-deflate.docx": {
+      "bytes": 1588,
+      "sha256": "48463ad6b8f4f3040839395a9428f59d8354f5976a8a6cdfbe0eb4b3bcd5fbcd"
+    },
+    "settings-directive-amplification-strict-stored.docx": {
+      "bytes": 2615,
+      "sha256": "047c750f773338f9d4888a1a02c51525b240a357724cbff72fe25c72241544cd"
+    },
+    "settings-directive-amplification-word-deflate.docx": {
+      "bytes": 1581,
+      "sha256": "fbce91c58e8b10ecdfd20938a1fea82472fe4f05f195936e85300eb54bf5ca28"
+    },
+    "settings-directive-amplification-word-stored.docx": {
+      "bytes": 2663,
+      "sha256": "bed86e0b51cbe94f764bd31a26a508668495d3e212bc7beba0ec0507749b81ea"
+    },
+    "settings-duplicate-flags-strict-deflate.docx": {
+      "bytes": 1563,
+      "sha256": "1e67436b19c6622a4a29c6a896e4e9872c421cfd4d091d7fc4a064118d1dc870"
+    },
+    "settings-duplicate-flags-strict-stored.docx": {
+      "bytes": 2405,
+      "sha256": "56955d4a07be3cff0b54ad78b99f6e08cc0547346d0442f3824b0bc835c4c0c3"
+    },
+    "settings-duplicate-flags-word-deflate.docx": {
+      "bytes": 1556,
+      "sha256": "f87c2ec9f8c6fa3880e8de0dbce97c671ec384df518e0c771aece49274aa36eb"
+    },
+    "settings-duplicate-flags-word-stored.docx": {
+      "bytes": 2453,
+      "sha256": "f3c13351fe10199deca3f0fb48518ef0ec4cbd0ad2f8252133d10e2300fbae38"
+    },
+    "settings-empty-settings-strict-deflate.docx": {
+      "bytes": 1477,
+      "sha256": "9cf0923fbe4ac4c328cb498c1753e683cea32cf5478b94a2b1c217f66a1110ab"
+    },
+    "settings-empty-settings-strict-stored.docx": {
+      "bytes": 2137,
+      "sha256": "930db6f82a796ff7a86159ae2c8a36e4f9a256cdb85bc21c14e61dd46c5dd38d"
+    },
+    "settings-empty-settings-word-deflate.docx": {
+      "bytes": 1471,
+      "sha256": "ef6e373869055970eaa0f609e9ef1ee5d685cbf0f24b7db547f52643e40ec6a6"
+    },
+    "settings-empty-settings-word-stored.docx": {
+      "bytes": 2185,
+      "sha256": "4b3f7923f0d09761619b57105db59494e1a58ae21297c551a25add0a57d574fc"
+    },
+    "settings-inherited-namespace-strict-deflate.docx": {
+      "bytes": 1549,
+      "sha256": "90af9b0af9a675f4564b9f9b0803dfeb8c04f244fa867b16bf9fc5e2c37f256a"
+    },
+    "settings-inherited-namespace-strict-stored.docx": {
+      "bytes": 2283,
+      "sha256": "c279d96be0f20de915ff48fa1c335ec76bb1ff108c04d826679613f321cf6fa9"
+    },
+    "settings-inherited-namespace-word-deflate.docx": {
+      "bytes": 1544,
+      "sha256": "ed3dc76d7b7b0201d7d781cb0360ded590902c66f6d379315a2baba3d6debcf9"
+    },
+    "settings-inherited-namespace-word-stored.docx": {
+      "bytes": 2331,
+      "sha256": "f4b2022b56bc96c57963830198ada0b4104e19821bd8dae387cd627707b55234"
+    },
+    "settings-mce-fallback-strict-deflate.docx": {
+      "bytes": 1599,
+      "sha256": "f2421e621f987754eebe12598964e6ea5fb48aa36bbd0547dfd957dbe5e3b86c"
+    },
+    "settings-mce-fallback-strict-stored.docx": {
+      "bytes": 2388,
+      "sha256": "7195ab821aa6be812d9ae62962620bf5959ce4be1b06e8b83c7dc6f6a2bc0657"
+    },
+    "settings-mce-fallback-word-deflate.docx": {
+      "bytes": 1593,
+      "sha256": "295bd7906ea4a8249ecb4d20eddbf9e9200a074c4829d233bbde9b6ab92ad737"
+    },
+    "settings-mce-fallback-word-stored.docx": {
+      "bytes": 2436,
+      "sha256": "7e1e967d3d4eac2c526b695885f4d7fd71bfcaeef60c5e956558ac2a029729e3"
+    },
+    "settings-must-understand-strict-deflate.docx": {
+      "bytes": 1530,
+      "sha256": "32c5336055402db72b9672b42627b4443a3c9040fc823f4f6b4c18868bb40de3"
+    },
+    "settings-must-understand-strict-stored.docx": {
+      "bytes": 2224,
+      "sha256": "3ce63b3e381581d2b917f51da5f3e59991e4b75b7449f12eb280e7c55e29a13c"
+    },
+    "settings-must-understand-word-deflate.docx": {
+      "bytes": 1521,
+      "sha256": "1106d5d927d23a04ccc2a6dffe72126b12d465c745af4d78d03ee4b3f3738d98"
+    },
+    "settings-must-understand-word-stored.docx": {
+      "bytes": 2272,
+      "sha256": "1158efce73524b1ca497b8e24bdbf3783f8e958f316509f71d55d93f7f8a352c"
+    },
+    "settings-protection-disabled-strict-deflate.docx": {
+      "bytes": 1518,
+      "sha256": "e4c38323875363bb0a27c08b6af116b3e7e8f6dbc9458cfedbcb930fc9b103b5"
+    },
+    "settings-protection-disabled-strict-stored.docx": {
+      "bytes": 2196,
+      "sha256": "c87c221a0bb81b7eedad2acc52bae2c74e920b9323cad41db67bb142dbfe391a"
+    },
+    "settings-protection-disabled-word-deflate.docx": {
+      "bytes": 1513,
+      "sha256": "484e1a0bf4177b204320cc7a36791dc70c789731e752af711e2b3a92011469ae"
+    },
+    "settings-protection-disabled-word-stored.docx": {
+      "bytes": 2244,
+      "sha256": "e0a194ede2ae1424cf3e5821a01884e978ca80c4e2aaa29abe7f33656d12f29f"
+    },
+    "settings-protection-enabled-strict-deflate.docx": {
+      "bytes": 1555,
+      "sha256": "522a4d728465363d20d57e9a19ab47d739b1a62079297da5a77af642cef209f8"
+    },
+    "settings-protection-enabled-strict-stored.docx": {
+      "bytes": 2255,
+      "sha256": "76613eed2f675a990fa01ac3214621d4d7d015ea919e06278d37e33e2251898d"
+    },
+    "settings-protection-enabled-word-deflate.docx": {
+      "bytes": 1549,
+      "sha256": "3fae5f06ba4bcbeff4ec06ac787d3e76d30a2e616b9499461ab98d43fcd9283d"
+    },
+    "settings-protection-enabled-word-stored.docx": {
+      "bytes": 2303,
+      "sha256": "bfc378982cc376b7db6828f8384f772cf6318e1bccecd3dee18f8c14ee511770"
+    },
+    "strict-deflate.docx": {
+      "bytes": 1185,
+      "sha256": "fb4b0438bb04e84f2bc4e0a0d2726003417ac995d8a910de3d1fd1f665c89d30"
+    },
+    "strict-stored.docx": {
+      "bytes": 1491,
+      "sha256": "7b8b9326abf576dec2193904b0a2909f29189fe7c1b03fddc105ca44b2bc6b86"
+    },
+    "table-deflate.docx": {
+      "bytes": 1155,
+      "sha256": "8b3e98fdb4472a6ebcf50454360e4793618b36597742c1583355a9b4a3126156"
+    },
+    "table-stored.docx": {
+      "bytes": 1452,
+      "sha256": "d3dd6fb197c345f89c96da58bdc50c1fffb6b8748f02b10c0254d56383d389ff"
+    }
+  },
+  "target_source": {
+    "bytes": 2999,
+    "sha256": "e86671e6f8cfea2be602420fd45cddcb009047a99de1e9535517d3acd57d06eb"
+  }
+}

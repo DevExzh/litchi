@@ -1,0 +1,24 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0599]: no method named `matches` found for struct `Vec<u8>` in the current scope
+    --> src/docx_bounded_tail_append_compare.rs:1552:24
+     |
+1552 |         assert_eq!(xml.matches("<w:p>").count(), 64);
+     |                        ^^^^^^^ method not found in `Vec<u8>`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `litchi-perf-baseline` (lib test) due to 1 previous error

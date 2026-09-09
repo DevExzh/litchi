@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "crates/litchi-docx/examples/append_plain_paragraph.rs",
+    "crates/litchi-docx/fuzz/fuzz_targets/tail_append.rs",
+    "crates/litchi-docx/src/mail_merge/adapter.rs",
+    "crates/litchi-docx/src/mail_merge/codec.rs",
+    "crates/litchi-docx/src/mail_merge/mod.rs",
+    "crates/litchi-docx/src/package/codec.rs",
+    "crates/litchi-docx/src/package/model.rs",
+    "crates/litchi-docx/src/settings/document/codec.rs",
+    "crates/litchi-docx/src/settings/document/package.rs",
+    "crates/litchi-docx/src/settings/extensions/mod.rs",
+    "crates/litchi-docx/src/settings/extensions/package.rs",
+    "crates/litchi-docx/src/source_backed.rs",
+    "crates/litchi-docx/src/source_backed/tail_append.rs",
+    "crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs",
+    "crates/litchi-docx/src/source_backed/tail_append/settings_workspace.rs",
+    "crates/litchi-docx/src/streaming.rs",
+    "crates/litchi-docx/src/writer/hyperlink.rs",
+    "crates/litchi-docx/src/writer/run.rs",
+    "crates/litchi-docx/tests/source_backed_tail_append.rs",
+    "tools/perf-baseline/src/bin/docx_bounded_tail_append_compare.rs",
+    "tools/perf-baseline/src/docx_bounded_tail_append_compare.rs",
+    "tools/perf-baseline/src/lib.rs"
+  ],
+  "attempt": null,
+  "common_sha256": "cfee534b23ba63c9486d82987f18fb5370ae6789a31db79b8c12365544e05b98",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e4d59e80d874e3ba39250ddb1c4bac4793767265429b847c9d18e1487c0cd800",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "docx-owned-format-dev-22",
+  "schema": "docx-tail-append-gate-v1",
+  "source_before": {
+    "files": 7141,
+    "path": "validation-sources/089985aa38aaffc6f4237ebdacc0ff9605abb241daf873df247284aae22774f1.json",
+    "sha256": "089985aa38aaffc6f4237ebdacc0ff9605abb241daf873df247284aae22774f1"
+  },
+  "started_utc": "2026-09-09T03:02:39.655043+00:00"
+}

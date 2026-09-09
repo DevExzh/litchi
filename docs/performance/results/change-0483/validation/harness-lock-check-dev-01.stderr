@@ -1,0 +1,40 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0425]: cannot find value `token_window` in this scope
+    --> /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:2056:28
+     |
+2056 |         .try_reserve_exact(token_window)
+     |                            ^^^^^^^^^^^^ not found in this scope
+
+error: unused import: `validate_mail_merge_relationships_in`
+  --> /home/zhuhe/code/litchi/crates/litchi-docx/src/mail_merge/mod.rs:19:5
+   |
+19 |     validate_mail_merge_relationships_in,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+error: unused variable: `declared`
+    --> /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append.rs:1169:13
+     |
+1169 |         let declared = checked_declared_size(
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_declared`
+     |
+     = note: `-D unused-variables` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_variables)]`
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `litchi-docx` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

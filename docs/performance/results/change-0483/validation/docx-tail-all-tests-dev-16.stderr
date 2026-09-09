@@ -1,0 +1,32 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: unused import: `NAMESPACE as MCE_NAMESPACE`
+  --> crates/litchi-docx/src/source_backed/tail_append.rs:39:53
+   |
+39 | use litchi_ooxml_common::mce::{Limits as MceLimits, NAMESPACE as MCE_NAMESPACE};
+   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: constant `INITIAL_QUICK_XML_NAMESPACE_BYTES` is never used
+  --> crates/litchi-docx/src/source_backed/tail_append.rs:57:7
+   |
+57 | const INITIAL_QUICK_XML_NAMESPACE_BYTES: usize = 73;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D unused`
+   = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: constant `QUICK_XML_NAMESPACE_BINDING_BYTES` is never used
+  --> crates/litchi-docx/src/source_backed/tail_append.rs:58:7
+   |
+58 | const QUICK_XML_NAMESPACE_BINDING_BYTES: usize = size_of::<usize>() * 4;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: struct `SettingsGuardFacts` is never constructed
+   --> crates/litchi-docx/src/source_backed/tail_append.rs:920:8
+    |
+920 | struct SettingsGuardFacts {
+    |        ^^^^^^^^^^^^^^^^^^
+
+error: could not compile `litchi-docx` (lib) due to 4 previous errors

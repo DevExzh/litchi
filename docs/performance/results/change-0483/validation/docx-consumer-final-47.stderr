@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer-probe.py", line 86, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0483/consumer-probe.py", line 67, in main
+    after = after_raw.decode('utf-8-sig').replace('\r\n', '\n')
+            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/encodings/utf_8_sig.py", line 23, in decode
+    (output, consumed) = codecs.utf_8_decode(input, errors, True)
+                         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe9 in position 49: invalid continuation byte
+decoding with 'utf-8-sig' codec failed

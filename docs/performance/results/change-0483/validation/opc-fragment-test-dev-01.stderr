@@ -1,0 +1,10 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 16.85s
+     Running tests/source_part_splice.rs (target/release/deps/source_part_splice-7c65ce7e5a160464)
+
+thread 'authored_fragment_refusals_release_memory_and_preserve_typed_limits' (3195062) panicked at crates/litchi-opc/tests/source_part_splice.rs:1497:5:
+assertion failed: matches!(error, OpcError::Execution(ExecutionError::Cancelled))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p litchi-opc --test source_part_splice`
