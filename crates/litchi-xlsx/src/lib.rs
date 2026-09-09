@@ -124,6 +124,7 @@ pub mod slicer;
 mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
+mod source_attributes;
 mod source_payload;
 /// Bounded, sequential creation of one-sheet XLSX workbooks.
 pub mod streaming;
@@ -296,10 +297,16 @@ pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
-    Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
-    Id as SurveyId, Part as SurveyPart, Position as SurveyPosition, Question as SurveyQuestion,
+    Binding as SurveyBinding, Commit as SurveyCommit, ElementProperties as SurveyElementProperties,
+    Guid as SurveyGuid, Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart,
+    Patch as SurveyPatch, Position as SurveyPosition, Question as SurveyQuestion,
     QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
-    Questions as SurveyQuestions, Survey, load as load_surveys, parse as parse_survey,
+    Questions as SurveyQuestions, Snapshot as SurveySnapshot, Survey,
+    Transaction as SurveyTransaction, load as load_surveys,
+    load_with_limits as load_surveys_with_limits, parse as parse_survey,
+    parse_with_limits as parse_survey_with_limits, validate as validate_survey,
+    validate_with_limits as validate_surveys_with_limits, write as write_survey,
+    write_with_limits as write_survey_with_limits,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
