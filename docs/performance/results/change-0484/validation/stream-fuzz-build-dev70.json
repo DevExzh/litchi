@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0484/fuzz-stream.py",
+    "build",
+    "candidate2"
+  ],
+  "artifacts": {
+    "stream-fuzz-build-dev70.stderr": {
+      "bytes": 255,
+      "sha256": "9b53247713f8034848df44d7e0e5567b6aef51728ce3c5f5b4a670f61bea3018"
+    },
+    "stream-fuzz-build-dev70.stdout": {
+      "bytes": 572,
+      "sha256": "244d83a17337241a09b26b3612ab1829fc449a50679cd52f0ea3ddc1947939d6"
+    }
+  },
+  "attempt": "dev70",
+  "common_sha256": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T08:41:49.775671+00:00",
+  "label": "stream-fuzz-build-dev70",
+  "schema": "docx-stream-append-gate-v1",
+  "source_after": {
+    "files": 7152,
+    "path": "validation-sources/dc8714b3929251373e62312ea9ccaeebe49430327b30bf4b984331d5f9fa7a76.json",
+    "sha256": "dc8714b3929251373e62312ea9ccaeebe49430327b30bf4b984331d5f9fa7a76"
+  },
+  "source_before": {
+    "files": 7152,
+    "path": "validation-sources/dc8714b3929251373e62312ea9ccaeebe49430327b30bf4b984331d5f9fa7a76.json",
+    "sha256": "dc8714b3929251373e62312ea9ccaeebe49430327b30bf4b984331d5f9fa7a76"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-09T08:39:06.559760+00:00"
+}

@@ -1,0 +1,631 @@
+{
+  "attempt": "dev56",
+  "cases": [
+    {
+      "authored_text_bytes": 3932160,
+      "candidate_docx": {
+        "bytes": 44588,
+        "sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262"
+      },
+      "candidate_expected": {
+        "contains_entity_text": true,
+        "non_ascii_codepoints": 0,
+        "paragraph_count": 128,
+        "text_bytes": 3933248,
+        "text_sha256": "6a694d1453f1f11bab4297e6151eb3fb2fc35a90aaaa2f12576d3e1d144e0c89",
+        "xml_bytes": 6751703,
+        "xml_sha256": "f6ba733345f9adb7fd99a65b144bf8d26002ddda48dca637417284949bed50c3"
+      },
+      "candidate_output": {
+        "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+        "suffix": " near<&> plain near<&> plain near<&> plain near<&> plain near<&> plain near<&> plain near<&> plain near<&> plain near<&> plain \n",
+        "text_bytes": 3933248,
+        "text_sha256": "6a694d1453f1f11bab4297e6151eb3fb2fc35a90aaaa2f12576d3e1d144e0c89"
+      },
+      "candidate_txt": {
+        "bytes": 3933251,
+        "sha256": "b45ec7df4aa1d96664f7fe825f5cd131896c308a61912c0c951fa61198fb11f0"
+      },
+      "contains_entity_text": true,
+      "source_docx": {
+        "bytes": 2106,
+        "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+      },
+      "source_expected": {
+        "contains_entity_text": false,
+        "non_ascii_codepoints": 0,
+        "paragraph_count": 64,
+        "text_bytes": 1024,
+        "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7",
+        "xml_bytes": 3223,
+        "xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+      },
+      "source_output": {
+        "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+        "suffix": "source-00000056\nsource-00000057\nsource-00000058\nsource-00000059\nsource-00000060\nsource-00000061\nsource-00000062\nsource-00000063\n",
+        "text_bytes": 1024,
+        "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7"
+      },
+      "source_txt": {
+        "bytes": 1027,
+        "sha256": "5bfbb1bcc7267b5cb0179fb07b2231901090d15856bf2d1ce0c6eaccdf49756e"
+      },
+      "text_mode": "near_limit",
+      "verified": true
+    },
+    {
+      "authored_text_bytes": 1344,
+      "candidate_docx": {
+        "bytes": 2336,
+        "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+      },
+      "candidate_expected": {
+        "contains_entity_text": true,
+        "non_ascii_codepoints": 0,
+        "paragraph_count": 128,
+        "text_bytes": 2432,
+        "text_sha256": "19d0f485431760de719c49dbd3ae3143b36651bfeefab49390488e96ed505cf0",
+        "xml_bytes": 13207,
+        "xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124"
+      },
+      "candidate_output": {
+        "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+        "suffix": "ored-00000058 <&>\nauthored-00000059 <&>\nauthored-00000060 <&>\nauthored-00000061 <&>\nauthored-00000062 <&>\nauthored-00000063 <&>\n",
+        "text_bytes": 2432,
+        "text_sha256": "19d0f485431760de719c49dbd3ae3143b36651bfeefab49390488e96ed505cf0"
+      },
+      "candidate_txt": {
+        "bytes": 2435,
+        "sha256": "2efc405b519df254e679934aa07ba31b973a886671c53b762e1f2420ee6368bc"
+      },
+      "contains_entity_text": true,
+      "source_docx": {
+        "bytes": 2106,
+        "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+      },
+      "source_expected": {
+        "contains_entity_text": false,
+        "non_ascii_codepoints": 0,
+        "paragraph_count": 64,
+        "text_bytes": 1024,
+        "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7",
+        "xml_bytes": 3223,
+        "xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+      },
+      "source_output": {
+        "preview": "source-00000000\nsource-00000001\nsource-00000002\nsource-00000003\nsource-00000004\nsource-00000005\nsource-00000006\nsource-00000007\n",
+        "suffix": "source-00000056\nsource-00000057\nsource-00000058\nsource-00000059\nsource-00000060\nsource-00000061\nsource-00000062\nsource-00000063\n",
+        "text_bytes": 1024,
+        "text_sha256": "03b0d06ab6f1154943eb766cf6fee6269a21cf3a69a4b231e5deff46d0b4efb7"
+      },
+      "source_txt": {
+        "bytes": 1027,
+        "sha256": "5bfbb1bcc7267b5cb0179fb07b2231901090d15856bf2d1ce0c6eaccdf49756e"
+      },
+      "text_mode": "short",
+      "verified": true
+    }
+  ],
+  "finished_utc": "2026-09-09T07:47:50.890801+00:00",
+  "fixture_dir": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50",
+  "fixture_manifests": [
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-near-hashes.json",
+      "sha256": "7d87c2679ae9e3fd1c693fc533eba97b92d0cb4cd61f9d0768c73b9ca01e7210"
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-short-hashes.json",
+      "sha256": "da2b4f730c63e17770ddc0515ddbec1079f1c0d03d1003b76b33c4105f8bddb3"
+    }
+  ],
+  "inputs": [
+    {
+      "candidate": {
+        "bytes": 44588,
+        "sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262"
+      },
+      "copied_manifest": {
+        "bytes": 725,
+        "sha256": "7d87c2679ae9e3fd1c693fc533eba97b92d0cb4cd61f9d0768c73b9ca01e7210"
+      },
+      "fixture_manifest": {
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-near-hashes.json",
+        "sha256": "7d87c2679ae9e3fd1c693fc533eba97b92d0cb4cd61f9d0768c73b9ca01e7210"
+      },
+      "libreoffice": {
+        "argv": [
+          "/usr/bin/libreoffice",
+          "--headless",
+          "-env:UserInstallation=file:///home/zhuhe/.cache/litchi-goal-0484/consumer-0484-dev56/profile-near_limit",
+          "--convert-to",
+          "txt:Text (encoded):UTF8",
+          "--outdir",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/text",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/source.docx",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/near_limit/candidate.docx"
+        ],
+        "cwd": "/home/zhuhe/code/litchi",
+        "exit_code": 0,
+        "finished_utc": "2026-09-09T07:47:50.249404+00:00",
+        "started_utc": "2026-09-09T07:47:47.181609+00:00",
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 544,
+          "sha256": "bebdb0c338edfc29a1581902d162f382524246cb38a822c3663aebe4eb26f4ca"
+        },
+        "timed_out": false
+      },
+      "report_case": {
+        "authored": {
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "encoded_xml_bytes": 6748480,
+          "event_count": 61568,
+          "expected_encoded_sha256": "637eefa4edde376ea5a74c1e1fd289336aaeb5f059c0423211cf98536012a0f1",
+          "expected_event_sha256": "7e8cf64cf7461b40dd202c4ac6c180887281bd9a9b2aee9670b25600c14172a5",
+          "max_chunk_bytes": 64,
+          "max_encoded_paragraph_bytes": 105445,
+          "replay_window_bytes": 65536,
+          "text_bytes": 3932160,
+          "text_mode": "near_limit",
+          "xml_entity_reference_count": 842496
+        },
+        "authored_count": 64,
+        "chunk_mode": "fixed64",
+        "limits": {
+          "max_authored_chunk_bytes": 64,
+          "max_xml_depth": 16,
+          "parser_event_limit": 1686272,
+          "parser_token_bytes": 106469,
+          "parser_workspace_bytes": 21999667,
+          "replay_window_bytes": 65536
+        },
+        "oracle": {
+          "candidate_archive_bytes": 44588,
+          "candidate_archive_sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262",
+          "candidate_main_xml_bytes": 6751703,
+          "candidate_main_xml_sha256": "f6ba733345f9adb7fd99a65b144bf8d26002ddda48dca637417284949bed50c3",
+          "candidate_member_count": 4,
+          "candidate_semantic": {
+            "order_sha256": "09ced7ea89725686db90a742d01534503cbbff84a73c4298680c4b4045d7781c",
+            "paragraph_count": 128,
+            "text_bytes": 3933120,
+            "text_sha256": "29c8449d4d4d49997c8d7278aa3c70c5910c90362ac269eb7e1b48ef31b0648d"
+          },
+          "candidate_semantic_exact": true,
+          "candidate_xml_exact": true,
+          "inverse_exact": true,
+          "opaque_member_exact": true,
+          "physical_order_exact": true,
+          "source_unchanged": true,
+          "untouched_member_metadata_exact": true,
+          "untouched_raw_members_preserved": true
+        },
+        "proof": {
+          "authored": {
+            "authored_count": 64,
+            "chunk_mode": "fixed64",
+            "encoded_xml_bytes": 6748480,
+            "event_count": 61568,
+            "expected_encoded_sha256": "637eefa4edde376ea5a74c1e1fd289336aaeb5f059c0423211cf98536012a0f1",
+            "expected_event_sha256": "7e8cf64cf7461b40dd202c4ac6c180887281bd9a9b2aee9670b25600c14172a5",
+            "max_chunk_bytes": 64,
+            "max_encoded_paragraph_bytes": 105445,
+            "replay_window_bytes": 65536,
+            "text_bytes": 3932160,
+            "text_mode": "near_limit",
+            "xml_entity_reference_count": 842496
+          },
+          "candidate_event_count": 1124230,
+          "candidate_len": 6751703,
+          "candidate_paragraph_count": 128,
+          "candidate_sha256": "f6ba733345f9adb7fd99a65b144bf8d26002ddda48dca637417284949bed50c3",
+          "generated_offset": 3201,
+          "generated_once": true,
+          "insertion_offset": 3201,
+          "source_event_count": 454,
+          "source_len": 3223,
+          "source_paragraph_count": 64,
+          "source_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+        },
+        "samples": [
+          {
+            "allocation": null,
+            "authored": {
+              "events": 307840,
+              "opens": 5,
+              "text_bytes": 19660800,
+              "text_chunks": 307200
+            },
+            "authored_count": 64,
+            "chunk_mode": "fixed64",
+            "elapsed_ns": 11383107178,
+            "process": {
+              "cancelled_write_bytes": 0,
+              "clock_ticks_per_second": 100,
+              "major_faults": 0,
+              "minor_faults": 0,
+              "nonvoluntary_context_switches": 118,
+              "peak_rss_bytes": 41857024,
+              "rchar": 2000,
+              "read_bytes": 0,
+              "rss_bytes": 0,
+              "syscr": 18,
+              "syscw": 0,
+              "system_cpu_ticks": 0,
+              "user_cpu_ticks": 1138,
+              "voluntary_context_switches": 0,
+              "wchar": 0,
+              "write_bytes": 0
+            },
+            "sample": 0,
+            "sink": {
+              "accepted_bytes": 44588,
+              "histogram": {
+                "bytes_0": 0,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 16,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 12,
+                "bytes_over_65536": 0
+              },
+              "largest_write": 4096,
+              "sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262",
+              "write_calls": 28
+            },
+            "source_count": 64,
+            "source_reads": {
+              "calls": 60,
+              "request_histogram": {
+                "bytes_0": 8,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 50,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 2,
+                "bytes_over_65536": 0
+              },
+              "requested_bytes": 7651,
+              "returned_bytes": 7651,
+              "returned_histogram": {
+                "bytes_0": 8,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 50,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 2,
+                "bytes_over_65536": 0
+              }
+            },
+            "text_mode": "near_limit"
+          }
+        ],
+        "source": {
+          "archive_bytes": 2106,
+          "archive_sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+          "main_xml_bytes": 3223,
+          "main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+          "member_count": 4,
+          "members": [
+            {
+              "compressed_bytes": 267,
+              "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+              "compression_method": "Deflate",
+              "crc32": 2913692623,
+              "data_descriptor": true,
+              "decoded_bytes": 512,
+              "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+              "path": "[Content_Types].xml"
+            },
+            {
+              "compressed_bytes": 183,
+              "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+              "compression_method": "Deflate",
+              "crc32": 3929537947,
+              "data_descriptor": true,
+              "decoded_bytes": 297,
+              "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+              "path": "_rels/.rels"
+            },
+            {
+              "compressed_bytes": 321,
+              "compressed_sha256": "ce4c9abe647531fc5b8a2097ff58d3ddfb61de397b4f23827bcc25dfeac4ae5a",
+              "compression_method": "Deflate",
+              "crc32": 1416465303,
+              "data_descriptor": true,
+              "decoded_bytes": 3223,
+              "decoded_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+              "path": "word/document.xml"
+            },
+            {
+              "compressed_bytes": 811,
+              "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+              "compression_method": "Deflate",
+              "crc32": 528510375,
+              "data_descriptor": true,
+              "decoded_bytes": 32768,
+              "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+              "path": "word/perf-opaque.bin"
+            }
+          ],
+          "opaque_member_exact": true,
+          "semantic": {
+            "order_sha256": "4443ad3c2075effa0b9915bbcce9c6efde10a76cf4a01b8658a86c7a1ececc2c",
+            "paragraph_count": 64,
+            "text_bytes": 960,
+            "text_sha256": "4cba4274650a9adfc3968218866ce3276e1d7a7b317e5fa0e92776f642935060"
+          },
+          "unchanged_oracle": true
+        },
+        "source_count": 64,
+        "text_mode": "near_limit"
+      },
+      "source": {
+        "bytes": 2106,
+        "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+      },
+      "text_mode": "near_limit"
+    },
+    {
+      "candidate": {
+        "bytes": 2336,
+        "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010"
+      },
+      "copied_manifest": {
+        "bytes": 721,
+        "sha256": "da2b4f730c63e17770ddc0515ddbec1079f1c0d03d1003b76b33c4105f8bddb3"
+      },
+      "fixture_manifest": {
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/native-dev50/source64-authored64-64-short-hashes.json",
+        "sha256": "da2b4f730c63e17770ddc0515ddbec1079f1c0d03d1003b76b33c4105f8bddb3"
+      },
+      "libreoffice": {
+        "argv": [
+          "/usr/bin/libreoffice",
+          "--headless",
+          "-env:UserInstallation=file:///home/zhuhe/.cache/litchi-goal-0484/consumer-0484-dev56/profile-short",
+          "--convert-to",
+          "txt:Text (encoded):UTF8",
+          "--outdir",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/text",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/source.docx",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484/consumer/dev56/short/candidate.docx"
+        ],
+        "cwd": "/home/zhuhe/code/litchi",
+        "exit_code": 0,
+        "finished_utc": "2026-09-09T07:47:50.889609+00:00",
+        "started_utc": "2026-09-09T07:47:50.375102+00:00",
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 524,
+          "sha256": "80fb47730dce3b6a230ec40ad07fc34921f0ddd26fa74c802b21ff70c7e23e75"
+        },
+        "timed_out": false
+      },
+      "report_case": {
+        "authored": {
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "encoded_xml_bytes": 9984,
+          "event_count": 192,
+          "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75",
+          "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+          "max_chunk_bytes": 21,
+          "max_encoded_paragraph_bytes": 156,
+          "replay_window_bytes": 65536,
+          "text_bytes": 1344,
+          "text_mode": "short",
+          "xml_entity_reference_count": 192
+        },
+        "authored_count": 64,
+        "chunk_mode": "fixed64",
+        "limits": {
+          "max_authored_chunk_bytes": 21,
+          "max_xml_depth": 16,
+          "parser_event_limit": 1664,
+          "parser_token_bytes": 65536,
+          "parser_workspace_bytes": 13649335,
+          "replay_window_bytes": 65536
+        },
+        "oracle": {
+          "candidate_archive_bytes": 2336,
+          "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+          "candidate_main_xml_bytes": 13207,
+          "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+          "candidate_member_count": 4,
+          "candidate_semantic": {
+            "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+            "paragraph_count": 128,
+            "text_bytes": 2304,
+            "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c"
+          },
+          "candidate_semantic_exact": true,
+          "candidate_xml_exact": true,
+          "inverse_exact": true,
+          "opaque_member_exact": true,
+          "physical_order_exact": true,
+          "source_unchanged": true,
+          "untouched_member_metadata_exact": true,
+          "untouched_raw_members_preserved": true
+        },
+        "proof": {
+          "authored": {
+            "authored_count": 64,
+            "chunk_mode": "fixed64",
+            "encoded_xml_bytes": 9984,
+            "event_count": 192,
+            "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75",
+            "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+            "max_chunk_bytes": 21,
+            "max_encoded_paragraph_bytes": 156,
+            "replay_window_bytes": 65536,
+            "text_bytes": 1344,
+            "text_mode": "short",
+            "xml_entity_reference_count": 192
+          },
+          "candidate_event_count": 1094,
+          "candidate_len": 13207,
+          "candidate_paragraph_count": 128,
+          "candidate_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+          "generated_offset": 3201,
+          "generated_once": true,
+          "insertion_offset": 3201,
+          "source_event_count": 454,
+          "source_len": 3223,
+          "source_paragraph_count": 64,
+          "source_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+        },
+        "samples": [
+          {
+            "allocation": null,
+            "authored": {
+              "events": 960,
+              "opens": 5,
+              "text_bytes": 6720,
+              "text_chunks": 320
+            },
+            "authored_count": 64,
+            "chunk_mode": "fixed64",
+            "elapsed_ns": 19884124,
+            "process": {
+              "cancelled_write_bytes": 0,
+              "clock_ticks_per_second": 100,
+              "major_faults": 0,
+              "minor_faults": 0,
+              "nonvoluntary_context_switches": 0,
+              "peak_rss_bytes": 11489280,
+              "rchar": 1996,
+              "read_bytes": 0,
+              "rss_bytes": 0,
+              "syscr": 18,
+              "syscw": 0,
+              "system_cpu_ticks": 0,
+              "user_cpu_ticks": 2,
+              "voluntary_context_switches": 0,
+              "wchar": 0,
+              "write_bytes": 0
+            },
+            "sample": 0,
+            "sink": {
+              "accepted_bytes": 2336,
+              "histogram": {
+                "bytes_0": 0,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 16,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 2,
+                "bytes_over_65536": 0
+              },
+              "largest_write": 877,
+              "sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "write_calls": 18
+            },
+            "source_count": 64,
+            "source_reads": {
+              "calls": 60,
+              "request_histogram": {
+                "bytes_0": 8,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 50,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 2,
+                "bytes_over_65536": 0
+              },
+              "requested_bytes": 7651,
+              "returned_bytes": 7651,
+              "returned_histogram": {
+                "bytes_0": 8,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 50,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 2,
+                "bytes_over_65536": 0
+              }
+            },
+            "text_mode": "short"
+          }
+        ],
+        "source": {
+          "archive_bytes": 2106,
+          "archive_sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+          "main_xml_bytes": 3223,
+          "main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+          "member_count": 4,
+          "members": [
+            {
+              "compressed_bytes": 267,
+              "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664",
+              "compression_method": "Deflate",
+              "crc32": 2913692623,
+              "data_descriptor": true,
+              "decoded_bytes": 512,
+              "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+              "path": "[Content_Types].xml"
+            },
+            {
+              "compressed_bytes": 183,
+              "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327",
+              "compression_method": "Deflate",
+              "crc32": 3929537947,
+              "data_descriptor": true,
+              "decoded_bytes": 297,
+              "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+              "path": "_rels/.rels"
+            },
+            {
+              "compressed_bytes": 321,
+              "compressed_sha256": "ce4c9abe647531fc5b8a2097ff58d3ddfb61de397b4f23827bcc25dfeac4ae5a",
+              "compression_method": "Deflate",
+              "crc32": 1416465303,
+              "data_descriptor": true,
+              "decoded_bytes": 3223,
+              "decoded_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+              "path": "word/document.xml"
+            },
+            {
+              "compressed_bytes": 811,
+              "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2",
+              "compression_method": "Deflate",
+              "crc32": 528510375,
+              "data_descriptor": true,
+              "decoded_bytes": 32768,
+              "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+              "path": "word/perf-opaque.bin"
+            }
+          ],
+          "opaque_member_exact": true,
+          "semantic": {
+            "order_sha256": "4443ad3c2075effa0b9915bbcce9c6efde10a76cf4a01b8658a86c7a1ececc2c",
+            "paragraph_count": 64,
+            "text_bytes": 960,
+            "text_sha256": "4cba4274650a9adfc3968218866ce3276e1d7a7b317e5fa0e92776f642935060"
+          },
+          "unchanged_oracle": true
+        },
+        "source_count": 64,
+        "text_mode": "short"
+      },
+      "source": {
+        "bytes": 2106,
+        "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+      },
+      "text_mode": "short"
+    }
+  ],
+  "report": {
+    "copied": {
+      "bytes": 16373,
+      "sha256": "eb81e7a039943176e6fcdd453d28295f8ae52d63cc74083a30a30aaf2c7c190b"
+    },
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/cli-dev50.json",
+    "sha256": "eb81e7a039943176e6fcdd453d28295f8ae52d63cc74083a30a30aaf2c7c190b"
+  },
+  "schema": "docx-replayable-tail-append-consumer-probe-v1",
+  "scope": "independent Python DOCX ZIP/XML extraction and LibreOffice UTF-8 TXT export; synthetic consumer probe only; no Microsoft Office compatibility claim",
+  "status": "pass",
+  "version": 1
+}

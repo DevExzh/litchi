@@ -1,0 +1,11 @@
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: public documentation for `tail_append_stream` links to private item `encoder`
+ --> crates/litchi-docx/src/source_backed/tail_append_stream.rs:4:7
+  |
+4 | //! [`encoder`] owns the bounded WordprocessingML encoder and deterministic
+  |       ^^^^^^^ this item is private
+  |
+  = note: this link will resolve properly if you pass `--document-private-items`
+  = note: requested on the command line with `-D rustdoc::private-intra-doc-links`
+
+error: could not document `litchi-docx`

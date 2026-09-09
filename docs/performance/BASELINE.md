@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0484: replayable DOCX authored stream correctness checkpoint
+
+[0484](changes/0484-docx-replayable-tail-stream.md) extends logical tail append
+to borrowed paragraph events, deterministic replay or an explicit one-shot
+store, and durable forward/inverse patches. The retained tests, sanitizer fuzz
+smoke and LibreOffice readback establish the documented correctness scope.
+The deterministic measurement harness and report validator are implemented;
+formal normal/allocator captures and the required storage, input, sink and
+compression arms remain open. No new latency, allocation or RSS result is
+claimed. The 0483 measurements below retain their one-paragraph scope.
+
 ## 0483: bounded DOCX tail append route comparison
 
 [0483](changes/0483-docx-bounded-tail-append.md) measures one plain-paragraph

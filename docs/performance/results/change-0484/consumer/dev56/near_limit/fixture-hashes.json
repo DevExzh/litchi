@@ -1,0 +1,20 @@
+{
+  "schema": "docx-replayable-tail-append-fixture-v1",
+  "version": 1,
+  "source_count": 64,
+  "authored_count": 64,
+  "chunk_mode": "fixed64",
+  "text_mode": "near_limit",
+  "source": {
+    "file": "source64-authored64-64-near-source.docx",
+    "bytes": 2106,
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+  },
+  "candidate": {
+    "file": "source64-authored64-64-near-candidate.docx",
+    "bytes": 44588,
+    "sha256": "705f6131e240732fa1b725baaed8e0f4913ce4035667e90c3dc76e9a76ec7262"
+  },
+  "source_main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+  "candidate_main_xml_sha256": "f6ba733345f9adb7fd99a65b144bf8d26002ddda48dca637417284949bed50c3"
+}
