@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "temporary_root": "/home/zhuhe/.cache/litchi-goal-0490",
+  "scratch_files_remaining": 0,
+  "all_root_jobs_terminal": true,
+  "formal_file_store_directories_removed": 24,
+  "diagnostic_replay_directories_removed": 8,
+  "process_references": [],
+  "removed_empty_directories": [
+    "/home/zhuhe/.cache/litchi-goal-0490/replay/formal1",
+    "/home/zhuhe/.cache/litchi-goal-0490/replay",
+    "/home/zhuhe/.cache/litchi-goal-0490"
+  ],
+  "generated_bytecode_remaining": 0,
+  "no_builds": true,
+  "retained_executables_deleted": false,
+  "protected_worktree_excluded": "/home/zhuhe/code/litchi-spec-gaps and associated build/validation directories",
+  "completed_utc": "2026-09-09T16:35:16.070790+00:00"
+}

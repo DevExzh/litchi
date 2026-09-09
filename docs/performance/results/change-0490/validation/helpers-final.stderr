@@ -1,0 +1,25 @@
+test_failed_unfinished_and_wrong_kind_refused (test_sync_profiles.SyncAlignmentTests.test_failed_unfinished_and_wrong_kind_refused) ... ok
+test_foreign_path_and_changed_path_refused (test_sync_profiles.SyncAlignmentTests.test_foreign_path_and_changed_path_refused) ... ok
+test_missing_or_extra_sync_refuses_alignment (test_sync_profiles.SyncAlignmentTests.test_missing_or_extra_sync_refuses_alignment) ... ok
+test_one_preflight_and_warmups_are_excluded (test_sync_profiles.SyncAlignmentTests.test_one_preflight_and_warmups_are_excluded) ... ok
+test_out_of_order_sync_refused (test_sync_profiles.SyncAlignmentTests.test_out_of_order_sync_refused) ... ok
+test_phase_order_is_reversed_and_inventory_explicit (test_sync_profiles.SyncAlignmentTests.test_phase_order_is_reversed_and_inventory_explicit) ... ok
+test_summary_rejects_empty_malformed_irrelevant_and_bad_totals (test_sync_profiles.SyncAlignmentTests.test_summary_rejects_empty_malformed_irrelevant_and_bad_totals) ... ok
+test_summary_requires_sync_and_file_lifecycle_counts (test_sync_profiles.SyncAlignmentTests.test_summary_requires_sync_and_file_lifecycle_counts) ... ok
+test_actual_receipt_reordering_is_rejected (test_variance.VarianceProtocolTests.test_actual_receipt_reordering_is_rejected) ... ok
+test_binary_binding_helper_rejects_changed_executable (test_variance.VarianceProtocolTests.test_binary_binding_helper_rejects_changed_executable) ... ok
+test_block_bootstrap_is_deterministic_and_uses_six_blocks (test_variance.VarianceProtocolTests.test_block_bootstrap_is_deterministic_and_uses_six_blocks) ... ok
+test_build_gate_source_mismatch_is_rejected (test_variance.VarianceProtocolTests.test_build_gate_source_mismatch_is_rejected) ... ok
+test_formal_inventory_has_72_unique_children_and_4320_samples (test_variance.VarianceProtocolTests.test_formal_inventory_has_72_unique_children_and_4320_samples) ... ok
+test_inventory_validator_rejects_missing_or_extra_child (test_variance.VarianceProtocolTests.test_inventory_validator_rejects_missing_or_extra_child) ... ok
+test_oracle_and_sink_identity_mismatch_is_rejected (test_variance.VarianceProtocolTests.test_oracle_and_sink_identity_mismatch_is_rejected) ... ok
+test_phase_and_role_route_order_is_alternated (test_variance.VarianceProtocolTests.test_phase_and_role_route_order_is_alternated) ... ok
+test_sample_count_validator_rejects_retained_0489_thirty_sample_report (test_variance.VarianceProtocolTests.test_sample_count_validator_rejects_retained_0489_thirty_sample_report) ... ok
+test_stats_and_percentile_keep_all_sixty_samples (test_variance.VarianceProtocolTests.test_stats_and_percentile_keep_all_sixty_samples) ... ok
+test_terminal_exit_code_tampering_is_rejected (test_variance.VarianceProtocolTests.test_terminal_exit_code_tampering_is_rejected) ... ok
+test_terminal_timeout_tampering_is_rejected (test_variance.VarianceProtocolTests.test_terminal_timeout_tampering_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.042s
+
+OK

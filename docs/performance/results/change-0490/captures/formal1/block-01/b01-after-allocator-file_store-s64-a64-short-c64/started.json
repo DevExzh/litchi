@@ -1,0 +1,83 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-01/b01-after-allocator-file_store-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0489/after1/allocator/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "60",
+    "--warmups",
+    "5",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "data",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0490/captures/formal1/block-01/b01-after-allocator-file_store-s64-a64-short-c64/report.json",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0490/replay/formal1/b01-after-allocator-file_store-s64-a64-short-c64"
+  ],
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423369928,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0489/after1/allocator/docx_replayable_tail_append",
+    "sha256": "d9da9dc34291818509a49a9123fa8e59b48f7fcef7701411d5e5659bb0fef007"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "machine": {
+    "bytes": 16256,
+    "path": "machine.json",
+    "sha256": "09ed97660f8ec187ce1f0a27f0cc72bcef1b89136fb74e0312a0b90eec879352"
+  },
+  "protocol": {
+    "path": "variance-protocol.json",
+    "sha256": "609e0fab916ae9f3757abaaabc6074a8f01d2fdf011be9d1837cc4fa2bb5e36e"
+  },
+  "run": {
+    "block": 1,
+    "case": "s64-a64-short-c64",
+    "index": 12,
+    "label": "b01-after-allocator-file_store-s64-a64-short-c64",
+    "phase": "after",
+    "role": "allocator",
+    "route": "file_store"
+  },
+  "schema": "docx-opc-candidate-audit-variance-capture-v1",
+  "source": {
+    "files": 7157,
+    "sha256": "0f5d9a455d25146823a7a8eb3620712f6e8f199abe0d40c32678d100c3994afa"
+  },
+  "started_utc": "2026-09-09T16:27:16.254059+00:00",
+  "status": "running",
+  "version": 1
+}

@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0490: file-store synchronization dominates the tiny route
+
+[The controlled follow-up](changes/0490-file-store-variance-and-sync-attribution.md)
+retains six alternating blocks and all 4,320 samples. Normal file-store p50
+improves 6.73% on average, while tail intervals span both directions and
+individual adverse blocks remain. Operation heap decreases; procfs delta/high-
+water observations and every flagged quantile remain explicit in the review.
+
+Sync-only traces attribute about 79–82% of these traced operation medians to
+fdatasync. The sync policy and selected syscall counts are unchanged. Removing
+sync or freshness checks is not justified. The next priority is the
+[verified-cold/source-provider contract](results/change-0490/next-implementation.md)
+for an existing end-to-end DOCX selector, followed by bounded concurrency and
+independent native producer evidence. Prepared warm queries and copied slices
+must not be relabeled as cold or genuinely borrowed inputs. The goal remains open.
+
 ## 0489: candidate audit reuse; file-store tails and metadata remain
 
 [0489](changes/0489-opc-candidate-xml-audit-reuse.md) reuses a successful initial

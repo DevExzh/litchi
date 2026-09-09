@@ -1,0 +1,13 @@
+test_failed_unfinished_and_wrong_kind_refused (test_sync_profiles.SyncAlignmentTests.test_failed_unfinished_and_wrong_kind_refused) ... ok
+test_foreign_path_and_changed_path_refused (test_sync_profiles.SyncAlignmentTests.test_foreign_path_and_changed_path_refused) ... ok
+test_missing_or_extra_sync_refuses_alignment (test_sync_profiles.SyncAlignmentTests.test_missing_or_extra_sync_refuses_alignment) ... ok
+test_one_preflight_and_warmups_are_excluded (test_sync_profiles.SyncAlignmentTests.test_one_preflight_and_warmups_are_excluded) ... ok
+test_out_of_order_sync_refused (test_sync_profiles.SyncAlignmentTests.test_out_of_order_sync_refused) ... ok
+test_phase_order_is_reversed_and_inventory_explicit (test_sync_profiles.SyncAlignmentTests.test_phase_order_is_reversed_and_inventory_explicit) ... ok
+test_summary_rejects_empty_malformed_irrelevant_and_bad_totals (test_sync_profiles.SyncAlignmentTests.test_summary_rejects_empty_malformed_irrelevant_and_bad_totals) ... ok
+test_summary_requires_sync_and_file_lifecycle_counts (test_sync_profiles.SyncAlignmentTests.test_summary_requires_sync_and_file_lifecycle_counts) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.001s
+
+OK
