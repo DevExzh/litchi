@@ -47,6 +47,7 @@ pub mod geom;
 pub mod geometry;
 pub mod ink;
 pub mod model3d;
+pub mod svg_blip;
 pub mod text;
 pub mod theme;
 pub mod transform;
