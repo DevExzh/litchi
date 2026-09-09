@@ -529,6 +529,69 @@ impl OpcPackage {
             .is_some_and(|source| source.as_slice() == part.blob())
     }
 
+    /// Capture bounded XML provenance from this owned package. Noncompact XML
+    /// must match retained source bytes; new XML must pass the authored audit.
+    pub fn source_xml_part(&self, name: &PackURI) -> Result<crate::OwnedXmlPart> {
+        let part = self.get_part(name)?;
+        if !self.is_exact_source_xml(part)
+            && crate::authored_xml_requires_source_proof(name, part.content_type(), part.blob())?
+        {
+            return Err(OpcError::XmlError(
+                "noncompact owned XML has no retained source provenance".into(),
+            ));
+        }
+        let bytes = part.blob_arc();
+        if bytes.as_slice() != part.blob() {
+            return Err(OpcError::XmlError(
+                "part storage differs from its visible XML".into(),
+            ));
+        }
+        crate::OwnedXmlPart::capture(name.clone(), part.content_type().into(), bytes)
+    }
+
+    /// Replace one exact expected XML source with a validated provenance token.
+    /// This preserves untouched lexical XML without weakening authored output
+    /// validation. A stale source or content type fails before publication.
+    pub fn try_replace_owned_xml_part(
+        &mut self,
+        expected: &[u8],
+        replacement: crate::OwnedXmlPart,
+    ) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let current = self.get_part(&replacement.name)?;
+        if current.content_type() != replacement.content_type || current.blob() != expected {
+            return Err(OpcError::XmlError(
+                "stale owned XML part replacement".into(),
+            ));
+        }
+        self.source_xml_parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "owned XML provenance",
+                source,
+            })?;
+        self.get_part_mut(&replacement.name)?
+            .set_blob_shared(Arc::clone(&replacement.bytes));
+        self.source_xml_parts
+            .insert(replacement.name, replacement.bytes);
+        Ok(())
+    }
+
+    /// Add previously validated source XML, for exact restoration or transfer.
+    /// Relationships remain the responsibility of the format-owned graph edit.
+    pub fn try_add_owned_xml_part(&mut self, source: crate::OwnedXmlPart) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        self.try_add_source_part(Box::new(crate::BlobPart::new_shared(
+            source.name,
+            source.content_type,
+            source.bytes,
+        )))
+    }
+
     /// Get a reference to the main document part.
     ///
     /// For Word documents, this is the document.xml part.

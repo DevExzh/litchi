@@ -21,6 +21,11 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
+mod owned;
+pub use owned::{
+    OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart,
+};
+
 const MAX_FRAGMENT_BYTES: usize = 256 * 1024;
 const MAX_SOURCE_XML_ATTRIBUTES_PER_ELEMENT: usize = 4096;
 const MAX_SOURCE_XML_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
