@@ -11,6 +11,8 @@
     reason = "Formula-prefixed names keep the shared public vocabulary explicit at call sites"
 )]
 
+pub mod render;
+
 /// Failure returned when a floating-point semantic scalar is not finite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error("semantic scalar must be finite")]

@@ -1,0 +1,31 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-09",
+  "file": "formula-arena-native.numbers",
+  "size": 102550,
+  "sha256": "95261509e8cafec509bb12eab3b7b4a810a85774755886d065756fcd150cc852",
+  "source": "formula-budget-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 4,
+  "columns": 3,
+  "formulas": {
+    "C2": {
+      "input": "=SUM(1,2)*2",
+      "native_display": "6"
+    },
+    "C3": {
+      "input": "=IF(TRUE,\"北京\",\"Café\")",
+      "native_display": "北京"
+    }
+  },
+  "lifecycle": [
+    "Copied the native formula budget control to a disposable directory.",
+    "Entered nested arithmetic through the Numbers UI and pasted the Unicode conditional formula as text.",
+    "Saved and closed the actual document window.",
+    "Reopened the exact saved path with the exposed Open Finder item action; accessibility confirmed results 6 and 北京.",
+    "Closed to the template chooser."
+  ],
+  "scope": "Native nested expression and Unicode string rendering control. The fourth row is empty after committing the last cell."
+}

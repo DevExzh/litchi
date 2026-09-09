@@ -13353,6 +13353,111 @@ IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS = (
     "charge_formula_wire",
     "charge_formula_render_work",
 )
+# Wave107 moves the allocation-conscious expression arena out of both format
+# readers.  The readers retain their format-specific wire visitors and budget
+# adapters, while the archive-free common renderer owns the handles, nodes,
+# parts, and iterative output walk.  Keep this audit separate from the older
+# generated-free FormulaArchive ratchet above: a reader may still mention the
+# generated-free codec's FormulaNode event type without owning a second arena.
+IWA_COMMON_FORMULA_RENDER_SOURCE = Path(
+    "crates/litchi-iwa-common/src/formula/render.rs"
+)
+IWA_COMMON_FORMULA_RENDER_REQUIRED_DECLARATIONS = (
+    (
+        "FormulaRenderBudget trait",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?trait[ \t]+"
+            r"(?:r#)?FormulaRenderBudget\b"
+        ),
+    ),
+    (
+        "FormulaExpr handle",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?struct[ \t]+"
+            r"(?:r#)?FormulaExpr\b"
+        ),
+    ),
+    (
+        "FormulaRenderer arena",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?struct[ \t]+"
+            r"(?:r#)?FormulaRenderer\b"
+        ),
+    ),
+    (
+        "FormulaRenderer::render",
+        re.compile(
+            r"\b(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+(?:r#)?render\b"
+        ),
+    ),
+)
+IWA_COMMON_FORMULA_RENDER_IMPORT_STATEMENT = re.compile(
+    r"(?ms)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+    r"(?:use|extern[ \t]+crate)\b.*?;"
+)
+IWA_COMMON_FORMULA_RENDER_FORBIDDEN_IMPORT_ROOTS = (
+    "litchi_iwa",
+    "litchi_iwa_protos",
+    "litchi_iwa_core",
+    "litchi_iwa_archive",
+    "litchi_core",
+    "litchi_numbers",
+    "litchi_pages",
+    "litchi_keynote",
+    "prost",
+    "prost_types",
+    "buffa",
+    "tsce",
+    "tst",
+    "tn",
+    "tsp",
+    "tswp",
+    "numbers_formula_codec",
+    "raw",
+    "protobuf",
+    "proto",
+    "archive",
+    "wire",
+)
+IWA_COMMON_FORMULA_RENDER_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    + "|".join(
+        re.escape(root) for root in IWA_COMMON_FORMULA_RENDER_FORBIDDEN_IMPORT_ROOTS
+    )
+    + r")(?![A-Za-z0-9_])"
+)
+IWA_FORMULA_RENDER_READER_SOURCES = (
+    IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE,
+    NUMBERS_EXTRACTOR_SOURCE,
+)
+IWA_FORMULA_RENDER_COMMON_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*formula"
+    r"[ \t\r\n]*::[ \t\r\n]*render\b"
+)
+IWA_FORMULA_RENDER_LOCAL_ARENA_DECLARATIONS = (
+    (
+        "FormulaExpr",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?FormulaExpr\b"
+        ),
+    ),
+    (
+        "FormulaPart",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?(?:struct|enum|union)[ \t]+"
+            r"(?:r#)?FormulaPart\b"
+        ),
+    ),
+    (
+        "FormulaRenderer",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?(?:struct|enum|union)[ \t]+"
+            r"(?:r#)?FormulaRenderer\b"
+        ),
+    ),
+)
 IWA_NUMBERS_TABLE_EXTRACTOR_NO_EAGER_FORMULA_PATTERNS = (
     (
         "FormulaArchive::decode",
@@ -45005,6 +45110,74 @@ def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_common_formula_render_ownership(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the shared formula arena independent and singular.
+
+    Format readers retain their wire visitors and adapt their own budget/error
+    types through ``FormulaRenderBudget``.  The archive-free common module is
+    the only owner of the expression handles and renderer arena.  This audit
+    deliberately checks declarations and import boundaries rather than
+    private field names, so a storage optimization can evolve without
+    weakening the ownership rule.
+    """
+
+    violations: list[str] = []
+    common_path = root / IWA_COMMON_FORMULA_RENDER_SOURCE
+    if not common_path.is_file():
+        return [
+            "shared formula renderer owner is missing: "
+            f"{IWA_COMMON_FORMULA_RENDER_SOURCE}"
+        ]
+
+    common_raw = common_path.read_text(encoding="utf-8")
+    common_code = _mask_rust_non_code(common_raw)
+    for label, declaration in IWA_COMMON_FORMULA_RENDER_REQUIRED_DECLARATIONS:
+        if declaration.search(common_code) is None:
+            violations.append(
+                "shared formula renderer owner is missing "
+                f"{label}: {IWA_COMMON_FORMULA_RENDER_SOURCE}"
+            )
+
+    for statement in IWA_COMMON_FORMULA_RENDER_IMPORT_STATEMENT.finditer(common_code):
+        forbidden = IWA_COMMON_FORMULA_RENDER_FORBIDDEN_IMPORT.search(statement.group())
+        if forbidden is None:
+            continue
+        line_number = (
+            common_code.count("\n", 0, forbidden.start() + statement.start()) + 1
+        )
+        violations.append(
+            "shared formula renderer imports a format/protobuf owner "
+            f"{forbidden.group()}: {IWA_COMMON_FORMULA_RENDER_SOURCE}:{line_number}"
+        )
+
+    for relative in IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            # A retired reader is an accepted end state once its remaining
+            # format peer has moved to the common arena.  Keep auditing files
+            # that still exist so reintroduced local arenas cannot bypass the
+            # ownership ratchet.
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+        if IWA_FORMULA_RENDER_COMMON_IMPORT.search(production_code) is None:
+            violations.append(
+                "formula renderer reader is missing the shared arena import: "
+                f"{relative}"
+            )
+        for label, declaration in IWA_FORMULA_RENDER_LOCAL_ARENA_DECLARATIONS:
+            for match in declaration.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "formula renderer reader redeclares shared arena "
+                    f"{label}: {relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_model_storage_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -68926,6 +69099,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
+        + audit_iwa_common_formula_render_ownership()
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_shared_image_adjustments_source_topology()

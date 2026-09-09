@@ -842,6 +842,40 @@ def add_iwa_numbers_formula_renderer_scaffold(
     )
 
 
+def add_iwa_common_formula_render_ownership_scaffold(
+    root: Path,
+    *,
+    common_source: str | None = None,
+    reader_suffix: str = "",
+) -> None:
+    """Install the shared formula arena and both migrated reader imports."""
+
+    common = root / boundaries.IWA_COMMON_FORMULA_RENDER_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text(
+        common_source
+        if common_source is not None
+        else (
+            "use std::ops::Range;\n"
+            "pub trait FormulaRenderBudget {}\n"
+            "pub struct FormulaExpr;\n"
+            "pub struct FormulaRenderer;\n"
+            "impl FormulaRenderer { pub fn render() {} }\n"
+        ),
+        encoding="utf-8",
+    )
+    reader = (
+        "use litchi_iwa_common::formula::render::{"
+        "FormulaExpr, FormulaRenderBudget, FormulaRenderer};\n"
+        "fn render_route() {}\n"
+        + reader_suffix
+    )
+    for relative in boundaries.IWA_FORMULA_RENDER_READER_SOURCES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reader, encoding="utf-8")
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -27010,6 +27044,74 @@ fn rewrite_movie_title_operation(
                 ),
                 [],
             )
+
+    def test_iwa_common_formula_render_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_common_formula_render_ownership_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_common_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_common_formula_render_ownership_rejects_reader_arena_copy(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_common_formula_render_ownership_scaffold(
+                root,
+                reader_suffix="struct FormulaRenderer;\n",
+            )
+            violations = boundaries.audit_iwa_common_formula_render_ownership(root)
+            self.assertEqual(len(violations), 2)
+            self.assertTrue(
+                all(
+                    "redeclares shared arena FormulaRenderer" in item
+                    for item in violations
+                )
+            )
+
+    def test_iwa_common_formula_render_ownership_allows_retired_reader_source(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_common_formula_render_ownership_scaffold(root)
+            (root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_iwa_common_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_common_formula_render_ownership_rejects_format_import(
+        self,
+    ) -> None:
+        for import_path in (
+            "litchi_iwa_protos::tsce::FormulaArchive",
+            "litchi_iwa_core::archive::Archive",
+            "litchi_iwa_archive::package::Catalog",
+            "raw::FormulaArchive",
+            "protobuf::FormulaArchive",
+        ):
+            with self.subTest(import_path=import_path):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_common_formula_render_ownership_scaffold(
+                        root,
+                        common_source=(
+                            "pub trait FormulaRenderBudget {}\n"
+                            "pub struct FormulaExpr;\n"
+                            "pub struct FormulaRenderer;\n"
+                            "impl FormulaRenderer { pub fn render() {} }\n"
+                            f"use {import_path};\n"
+                        ),
+                    )
+                    violations = boundaries.audit_iwa_common_formula_render_ownership(root)
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn("format/protobuf owner", violations[0])
 
     def test_iwa_numbers_formula_table_requires_real_adapter_use(
         self,
