@@ -1,0 +1,22 @@
+{
+  "accepted": false,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0482/actual-replay-webipneh/checkout/docs/performance/results/change-0482/verify.py"
+  ],
+  "case": "tampered-fuzz-record",
+  "cwd": "/tmp/litchi-goal-0482/actual-replay-webipneh/checkout/docs/performance/results/change-0482",
+  "exit_code": 1,
+  "expected_acceptance": false,
+  "finished_utc": "2026-09-09T00:33:17.124746+00:00",
+  "started_utc": "2026-09-09T00:33:17.062118+00:00",
+  "stderr": {
+    "bytes": 67,
+    "sha256": "6958adfc07ac2a87565785b22291645b912eb9873f40e040e62b5827eae8f8ff"
+  },
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

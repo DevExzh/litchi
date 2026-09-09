@@ -1,0 +1,840 @@
+{
+  "schema": "litchi.xml-stream-audit.v1",
+  "benchmark": "litchi-xml-repetitive-root-items-v1",
+  "binary": {
+    "binary": "litchi-perf-baseline",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "modes": [
+    "streaming"
+  ],
+  "sizes": [
+    65536
+  ],
+  "samples": 30,
+  "warmups": 3,
+  "timed_scope": "generator_create_read_materialize_or_stream_audit_and_drop",
+  "corpus_scope": "deterministic_generator_hash_and_layout_are_precomputed_outside_timed_regions",
+  "cases": [
+    {
+      "mode": "streaming",
+      "size_bytes": 65536,
+      "source": {
+        "requested_bytes": 65536,
+        "generated_bytes": 65536,
+        "sha256": "2a01e49ced5867dee167dfbe60b795604e00e7ed094adc2aa805636a81e0aa1f",
+        "actual_generator_bytes": 65536,
+        "actual_generator_sha256": "2a01e49ced5867dee167dfbe60b795604e00e7ed094adc2aa805636a81e0aa1f",
+        "actual_generator_oracle_verified": true,
+        "generator": "litchi-xml-repetitive-root-items-v1",
+        "chunk_bytes": 16384,
+        "source_materialization": "materialized_leg_only",
+        "layout": {
+          "prefix_bytes": 6,
+          "suffix_bytes": 7,
+          "full_record_bytes": 1024,
+          "full_record_count": 63,
+          "tail_record_bytes": 1011,
+          "record_count": 64,
+          "text_bytes": 64691,
+          "item_open_bytes": 6,
+          "item_close_bytes": 7
+        }
+      },
+      "limits": {
+        "max_bytes": 65536,
+        "max_depth": 8,
+        "max_events": 4000000,
+        "max_attributes": 16,
+        "max_token_bytes": 16384,
+        "max_text_bytes": 65536,
+        "streaming_memory_upper_bound": 394570
+      },
+      "warmups": 3,
+      "samples": [
+        {
+          "sample": 0,
+          "elapsed_ns": 93390,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 1,
+          "elapsed_ns": 88101,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 2,
+          "elapsed_ns": 88220,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 3,
+          "elapsed_ns": 88240,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 4,
+          "elapsed_ns": 88181,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 5,
+          "elapsed_ns": 88070,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 6,
+          "elapsed_ns": 88051,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 7,
+          "elapsed_ns": 87870,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 8,
+          "elapsed_ns": 87980,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 9,
+          "elapsed_ns": 88041,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 10,
+          "elapsed_ns": 94690,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 11,
+          "elapsed_ns": 87911,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 12,
+          "elapsed_ns": 87860,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 13,
+          "elapsed_ns": 87880,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 14,
+          "elapsed_ns": 87921,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 15,
+          "elapsed_ns": 88040,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 16,
+          "elapsed_ns": 87821,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 17,
+          "elapsed_ns": 87940,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 18,
+          "elapsed_ns": 88080,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 19,
+          "elapsed_ns": 87831,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 20,
+          "elapsed_ns": 88020,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 21,
+          "elapsed_ns": 98071,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 22,
+          "elapsed_ns": 88210,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 23,
+          "elapsed_ns": 88170,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 24,
+          "elapsed_ns": 88151,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 25,
+          "elapsed_ns": 88250,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 26,
+          "elapsed_ns": 88290,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 27,
+          "elapsed_ns": 88131,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 28,
+          "elapsed_ns": 88210,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        },
+        {
+          "sample": 29,
+          "elapsed_ns": 88351,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        }
+      ]
+    }
+  ]
+}

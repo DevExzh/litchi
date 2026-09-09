@@ -1,0 +1,22 @@
+{
+  "accepted": false,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0482/actual-replay-nh93278x/checkout/docs/performance/results/change-0482/verify.py"
+  ],
+  "case": "missing-capture",
+  "cwd": "/tmp/litchi-goal-0482/actual-replay-nh93278x/checkout/docs/performance/results/change-0482",
+  "exit_code": 1,
+  "expected_acceptance": false,
+  "finished_utc": "2026-09-09T00:33:15.048623+00:00",
+  "started_utc": "2026-09-09T00:33:13.625601+00:00",
+  "stderr": {
+    "bytes": 190,
+    "sha256": "9115e308ca529b004b45e4341db5c391fa29002bf1616b817179bf424d218fc2"
+  },
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

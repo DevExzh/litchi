@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0482: prerequisites for bounded DOCX publication implemented
+
+[0482](changes/0482-bounded-xml-opc-splice.md) adds the finite XML reader audit and decoded OPC insertion path selected
+by the 0481 window contract. It avoids retaining complete source/candidate XML
+inside these primitives, with separate fragment, parser, ZIP and source/sink
+ownership. The next measured bottleneck remains the public DOCX scanner's
+materialized XML and paragraph index. Integrating the new path, a replayable
+paragraph producer and durable patches remains necessary before claiming
+bounded end-to-end append memory.
+
+The XML comparison confirms bounded operation heap for the tested reader
+profile: 65,587 bytes at all three input sizes. Timing remains a tradeoff:
+the 8 MiB normal case is 3.6–4.1% slower, while the 128 MiB case is
+10.6–10.8% faster than materialization with a growing `Vec`. Public DOCX
+profiling must establish whether those observations transfer to its denser XML.
+
 ## 0481: per-event DOCX name copies removed
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) removes temporary local-name

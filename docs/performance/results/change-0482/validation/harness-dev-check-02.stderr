@@ -1,0 +1,36 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0599]: the method `write_fmt` exists for mutable reference `&mut std::string::String`, but its trait bounds were not satisfied
+   --> src/xml_stream_audit.rs:823:24
+    |
+823 |         let _ = write!(&mut output, "{byte:02x}");
+    |                        ^^^^^^^^^^^
+    |
+note: must implement `io::Write`, `fmt::Write`, or have a `write_fmt` method
+   --> src/xml_stream_audit.rs:823:24
+    |
+823 |         let _ = write!(&mut output, "{byte:02x}");
+    |                        ^^^^^^^^^^^
+    = note: the following trait bounds were not satisfied:
+            `std::string::String: std::io::Write`
+            which is required by `&mut std::string::String: std::io::Write`
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Write` which provides `write_fmt` is implemented but not in scope; perhaps you want to import it
+    |
+ 10 + use std::fmt::Write;
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error

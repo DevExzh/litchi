@@ -60,7 +60,7 @@ pub mod xml_splice;
 // Re-export commonly used types
 pub use accounting::OpcOperationAccounting;
 pub use content_type::ContentType;
-pub use error::{OpcError, Result};
+pub use error::{OpcError, Result, SpliceResource};
 pub use execution::OpenSession;
 pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
@@ -77,7 +77,9 @@ pub use source_backed::{
     AuthorizedPrecompressedPart, PartData, PartView, RetainedPrecompressedPart, SourceArtifact,
     SourceArtifactFingerprint, SourceBackedPackage, SourceCacheCounterDelta,
     SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
-    SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, VerifiedDecodedReaderError,
+    SourceLineage, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSplicePublication, SourceRelationshipTarget, SourceTopologyPlan,
+    VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};

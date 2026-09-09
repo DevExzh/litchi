@@ -1,0 +1,10 @@
+{
+  "recorded_utc": "2026-09-09T00:05:42.442178+00:00",
+  "kind": "pilot-report-validation",
+  "result": "failed",
+  "analyzer_sha256": "10bfee5f2ea5dd5122f7175436743869da312fd4f60dbf628a18fe4482517792",
+  "pilot_processes": "all 12 exited successfully; this is a subsequent independent analyzer failure",
+  "failed_report": "pilot-allocator-a1-materialized-134217728",
+  "error": "analyze.AnalysisError: pilot-allocator-a1-materialized-134217728: source digest does not match the independent generator pattern",
+  "cause": "Python used record % 26; Rust generator and its oracle use (record as u8) % 26. No formal captures or frozen protocol exist."
+}

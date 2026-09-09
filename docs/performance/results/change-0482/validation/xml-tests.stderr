@@ -1,0 +1,11 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.46s
+     Running unittests src/lib.rs (target/release/deps/xml_minifier-8c9cf7528f840540)
+     Running tests/audit.rs (target/release/deps/audit-c438ba12ff3ab9f5)
+     Running tests/ooxml_assets.rs (target/release/deps/ooxml_assets-93c553ae6dab3d47)
+     Running tests/stream_audit.rs (target/release/deps/stream_audit-263cf3d3335c0035)
+   Doc-tests xml_minifier

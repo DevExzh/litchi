@@ -1,0 +1,31 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "xml_stream_audit",
+    "--features",
+    "allocator-metrics"
+  ],
+  "common_sha256": "7f9e771b9acb2afd1db5f6eb558360b7153c7c07cba640f923fc1c9bbc5866ca",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "fdcf72e824c98821df9cfeeb3b6e8602087027382a82b94ea30cb9f99ff7fefc",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "source_before": {
+    "files": 7130,
+    "path": "validation-sources/c0df9b21c1774213b99b07b573019b80defa18edf83a847cbcf6e4c0ebe844cf.json",
+    "sha256": "c0df9b21c1774213b99b07b573019b80defa18edf83a847cbcf6e4c0ebe844cf"
+  },
+  "started_utc": "2026-09-08T19:51:12.777496+00:00"
+}

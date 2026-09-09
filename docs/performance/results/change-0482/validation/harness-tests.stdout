@@ -1,0 +1,9 @@
+
+running 4 tests
+test xml_stream_audit::tests::generator_tail_borrows_a_record_when_remainder_is_short ... ok
+test xml_stream_audit::tests::generator_short_remainders_match_independent_reference_and_reader ... ok
+test xml_stream_audit::tests::materialized_and_streaming_reports_match ... ok
+test xml_stream_audit::tests::generator_is_exact_and_auditable_at_small_size ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 385 filtered out; finished in 0.00s
+

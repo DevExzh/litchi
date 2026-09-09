@@ -1,0 +1,54 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "xml_stream_audit",
+    "--features",
+    "allocator-metrics",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "artifacts": {
+    "harness-dev-clippy-01.stderr": {
+      "bytes": 1367,
+      "sha256": "65081a228c0e5bc44395efab2e16db1aca783e3dd05ac919957bfef96d7cf5d4"
+    },
+    "harness-dev-clippy-01.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "common_sha256": "7f9e771b9acb2afd1db5f6eb558360b7153c7c07cba640f923fc1c9bbc5866ca",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "fdcf72e824c98821df9cfeeb3b6e8602087027382a82b94ea30cb9f99ff7fefc",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-08T20:01:45.923054+00:00",
+  "source_after": {
+    "files": 7130,
+    "path": "validation-sources/4c5475d4df5feaf1d1aadd7ffa9a527c686f01291fa7cb396f1c8fb8da693f7b.json",
+    "sha256": "4c5475d4df5feaf1d1aadd7ffa9a527c686f01291fa7cb396f1c8fb8da693f7b"
+  },
+  "source_before": {
+    "files": 7130,
+    "path": "validation-sources/4c5475d4df5feaf1d1aadd7ffa9a527c686f01291fa7cb396f1c8fb8da693f7b.json",
+    "sha256": "4c5475d4df5feaf1d1aadd7ffa9a527c686f01291fa7cb396f1c8fb8da693f7b"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-08T20:01:24.117482+00:00"
+}

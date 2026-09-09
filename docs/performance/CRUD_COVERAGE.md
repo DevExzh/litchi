@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 0482: shared support for existing-document logical insertion
+
+[0482](changes/0482-bounded-xml-opc-splice.md) measures generic XML audit routes and tests the low-level decoded OPC
+insertion primitive. This supports category 15 package/Part operations and is
+a prerequisite for category 6 existing-document logical append. It does not
+add a completed public DOCX append scenario or combine logical append with
+streaming creation, new-Part addition or arbitrary repackaging. Durable patch
+serialization, native Office append checks and source-provider matrices remain
+follow-up work.
+
 ## 0481: existing DOCX tail-copy scanner comparison
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) measures the existing

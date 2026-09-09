@@ -26,12 +26,48 @@ use flate2::{Compress, Compression, FlushCompress, Status};
 use sha2_legacy::{Digest, Sha256};
 use std::fmt;
 use std::io::{self, Write};
+use std::mem::size_of;
 
 const DEFAULT_MAX_DECODED_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_COMPRESSED_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const REPLAY_INPUT_WINDOW_SIZE: usize = 64 * 1024;
 const REPLAY_COMPRESS_BUFFER_SIZE: usize = 64 * 1024;
+
+// The locked flate2 1.1.10 + zlib-rs 0.6.7 backend allocates the Deflate
+// state described by zlib-rs's `DeflateAllocOffsets`: a 64 KiB second window,
+// 64 KiB previous-position table, 128 KiB hash table, 64 KiB pending buffer,
+// and 48 KiB symbol buffer, plus private state and 64-byte alignment.  The
+// resulting source/layout envelope is below 512 KiB on supported targets.
+// Keep this as a conservative backend bound rather than publishing the
+// allocator's measured size on one platform; update it if the locked backend
+// or its allocation formula changes.
+const ZLIB_RS_DEFLATE_STATE_UPPER_BOUND_BYTES: usize = 512 * 1024;
+
+/// Return the scalar workspace upper bound for one replay callback.
+///
+/// This includes the fixed state of one replay payload writer instantiated
+/// with its sink-adapter pointer, the adapter's progress state, preservation's
+/// fixed source-copy window, and the locked backend allocation envelope.
+/// Caller sink storage is separate. Measuring the private writer
+/// layout keeps the bound in the owner that allocates it instead of making
+/// the OPC layer guess at compressor fields. The verified source reader and
+/// its decoder workspace are charged by
+/// `IndexedArchive::verified_entry_reader_memory_upper_bound`.
+/// `None` indicates checked arithmetic overflow.
+pub fn replay_memory_upper_bound() -> Option<u64> {
+    [
+        REPLAY_COMPRESS_BUFFER_SIZE,
+        super::COPY_CHUNK_SIZE,
+        size_of::<ReplayPayloadWriter<'static, &'static mut ReplaySink<io::Sink>>>(),
+        size_of::<ReplaySink<io::Sink>>(),
+        ZLIB_RS_DEFLATE_STATE_UPPER_BOUND_BYTES,
+    ]
+    .into_iter()
+    .try_fold(0u64, |total, value| {
+        total.checked_add(u64::try_from(value).ok()?)
+    })
+}
 
 /// Finite ceilings for one replayable member publication.
 ///
@@ -1600,4 +1636,49 @@ fn clone_io_error(source: Option<&io::Error>) -> Option<io::Error> {
 
 fn unsupported(reason: &'static str) -> Error {
     ErrorKind::UnsupportedPreservation { reason }.into()
+}
+
+#[cfg(test)]
+mod memory_bound_tests {
+    use super::*;
+
+    #[test]
+    fn replay_bound_covers_private_writer_and_locked_fixed_windows() {
+        let writer_state =
+            size_of::<ReplayPayloadWriter<'static, &'static mut ReplaySink<io::Sink>>>();
+        let bound = replay_memory_upper_bound().expect("replay bound must not overflow");
+        let fixed_lower_bound = u64::try_from(
+            writer_state
+                .checked_add(size_of::<ReplaySink<io::Sink>>())
+                .and_then(|size| size.checked_add(REPLAY_COMPRESS_BUFFER_SIZE))
+                .and_then(|size| size.checked_add(super::super::COPY_CHUNK_SIZE))
+                .and_then(|size| size.checked_add(ZLIB_RS_DEFLATE_STATE_UPPER_BOUND_BYTES))
+                .expect("test bound arithmetic must fit usize"),
+        )
+        .expect("test bound must fit u64");
+        assert!(bound >= fixed_lower_bound);
+
+        let mut store = ReplayPayloadWriter::new(
+            CompressionMethod::Store,
+            ReplayLimits::default(),
+            io::sink(),
+        );
+        store
+            .write_all(b"store replay evidence")
+            .expect("Store replay writer must accept bounded input");
+        let store_measurement = store.finish().expect("Store replay must finish");
+        assert_eq!(store_measurement.decoded_size(), 21);
+
+        let mut deflate = ReplayPayloadWriter::new(
+            CompressionMethod::Deflate,
+            ReplayLimits::default(),
+            io::sink(),
+        );
+        let payload = vec![b'x'; REPLAY_INPUT_WINDOW_SIZE * 2 + 17];
+        deflate
+            .write_all(&payload)
+            .expect("Deflate replay writer must accept fixed-window input");
+        let deflate_measurement = deflate.finish().expect("Deflate replay must finish");
+        assert_eq!(deflate_measurement.decoded_size(), payload.len() as u64);
+    }
 }

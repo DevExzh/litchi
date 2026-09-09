@@ -1,0 +1,86 @@
+{
+  "schema": "litchi.xml-stream-audit.v1",
+  "benchmark": "litchi-xml-repetitive-root-items-v1",
+  "binary": {
+    "binary": "litchi-perf-baseline",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "modes": [
+    "streaming"
+  ],
+  "sizes": [
+    134217728
+  ],
+  "samples": 1,
+  "warmups": 1,
+  "timed_scope": "generator_create_read_materialize_or_stream_audit_and_drop",
+  "corpus_scope": "deterministic_generator_hash_and_layout_are_precomputed_outside_timed_regions",
+  "cases": [
+    {
+      "mode": "streaming",
+      "size_bytes": 134217728,
+      "source": {
+        "requested_bytes": 134217728,
+        "generated_bytes": 134217728,
+        "sha256": "834a81788afe1eca89aeef88e943c320e20be43bb9e93b46c012f792d3d4ec0b",
+        "actual_generator_bytes": 134217728,
+        "actual_generator_sha256": "834a81788afe1eca89aeef88e943c320e20be43bb9e93b46c012f792d3d4ec0b",
+        "actual_generator_oracle_verified": true,
+        "generator": "litchi-xml-repetitive-root-items-v1",
+        "chunk_bytes": 16384,
+        "source_materialization": "materialized_leg_only",
+        "layout": {
+          "prefix_bytes": 6,
+          "suffix_bytes": 7,
+          "full_record_bytes": 1024,
+          "full_record_count": 131071,
+          "tail_record_bytes": 1011,
+          "record_count": 131072,
+          "text_bytes": 132513779,
+          "item_open_bytes": 6,
+          "item_close_bytes": 7
+        }
+      },
+      "limits": {
+        "max_bytes": 134217728,
+        "max_depth": 8,
+        "max_events": 4000000,
+        "max_attributes": 16,
+        "max_token_bytes": 16384,
+        "max_text_bytes": 134217728,
+        "streaming_memory_upper_bound": 394570
+      },
+      "warmups": 1,
+      "samples": [
+        {
+          "sample": 0,
+          "elapsed_ns": 182098885,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": null,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        }
+      ]
+    }
+  ]
+}

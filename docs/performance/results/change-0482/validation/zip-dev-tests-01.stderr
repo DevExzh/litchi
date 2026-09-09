@@ -1,0 +1,4 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `release` profile [optimized + debuginfo] target(s) in 40.29s
+     Running unittests src/lib.rs (target/release/deps/soapberry_zip-7938a0cdeab585a5)
+error: test failed, to rerun pass `-p soapberry-zip --lib`

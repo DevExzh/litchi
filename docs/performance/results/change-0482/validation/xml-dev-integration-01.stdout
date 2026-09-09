@@ -1,0 +1,37 @@
+
+running 6 tests
+test update_checked_in_assets ... ignored, explicit checked-in asset regeneration
+test registry_covers_every_checked_in_generated_xml_asset ... ok
+test explicitly_registered_compact_assets_are_compact ... ok
+test checked_in_assets_match_minifier_output ... ok
+test production_xml_includes_are_registered_compact_assets ... ok
+test streaming_audits_match_registered_producer_assets ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+
+running 9 tests
+test streaming_memory_bound_is_finite_and_monotonic ... ok
+test accumulated_text_and_entity_bytes_match ... ok
+test oversized_token_is_rejected_at_bounded_lookahead ... ok
+test bom_policy_and_offsets_match_slice_for_all_prefix_chunkings ... FAILED
+test interrupted_input_retries_and_permanent_input_error_is_typed ... ok
+test exact_resource_boundaries_match_and_one_under_fails ... ok
+test malformed_inputs_keep_typed_category_and_absolute_offset ... ok
+test authored_space_and_entity_state_survive_every_chunk_boundary ... ok
+test successful_reports_match_slice_for_arbitrary_tiny_chunks ... ok
+
+failures:
+
+---- bom_policy_and_offsets_match_slice_for_all_prefix_chunkings stdout ----
+
+thread 'bom_policy_and_offsets_match_slice_for_all_prefix_chunkings' (2542450) panicked at crates/xml-minifier/tests/stream_audit.rs:145:22:
+BOM result differs for chunks [1]: Ok(Report { attributes: 0, bytes: 7, events: 2, max_depth: 1, text_bytes: 0 })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    bom_policy_and_offsets_match_slice_for_all_prefix_chunkings
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

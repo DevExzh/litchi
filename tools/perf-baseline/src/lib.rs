@@ -36,6 +36,7 @@ mod process_metrics;
 #[cfg(test)]
 mod security_corpus;
 mod xls_numeric;
+pub mod xml_stream_audit;
 pub mod zip_directory_spool;
 
 use std::{

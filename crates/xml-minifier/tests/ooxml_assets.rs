@@ -411,6 +411,38 @@ fn explicitly_registered_compact_assets_are_compact() {
 }
 
 #[test]
+fn streaming_audits_match_registered_producer_assets() {
+    let mut paths = registered_compact_crate_assets();
+    paths.extend(assets().into_iter().map(generated_path));
+    for path in paths {
+        let xml = fs::read(&path).unwrap();
+        let limits = audit::Limits::default().narrow(audit::Resource::TokenBytes, xml.len());
+        for capacity in [1, 7, 4096] {
+            for authored in [false, true] {
+                let source = std::io::BufReader::with_capacity(capacity, xml.as_slice());
+                let (expected, actual) = if authored {
+                    (
+                        audit::verify_authored(&xml, limits),
+                        audit::verify_authored_reader(source, limits),
+                    )
+                } else {
+                    (
+                        audit::verify(&xml, limits),
+                        audit::verify_reader(source, limits),
+                    )
+                };
+                assert_eq!(
+                    expected.map_err(|error| error.to_string()),
+                    actual.map_err(|error| error.to_string()),
+                    "reader audit differs for {} with chunk {capacity}, authored={authored}",
+                    path.display(),
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn production_xml_includes_are_registered_compact_assets() {
     let mut registered = generated_asset_paths();
     registered.extend(registered_compact_crate_assets());

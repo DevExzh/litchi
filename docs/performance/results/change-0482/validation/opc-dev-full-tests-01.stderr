@@ -1,0 +1,4 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 19s
+     Running unittests src/lib.rs (target/release/deps/litchi_opc-4740bcf1f2b3bcbc)
+error: test failed, to rerun pass `-p litchi-opc --lib`

@@ -1,0 +1,1260 @@
+{
+  "schema": "litchi.xml-stream-audit.v1",
+  "benchmark": "litchi-xml-repetitive-root-items-v1",
+  "binary": {
+    "binary": "litchi-perf-baseline-alloc",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  },
+  "modes": [
+    "materialized"
+  ],
+  "sizes": [
+    134217728
+  ],
+  "samples": 30,
+  "warmups": 3,
+  "timed_scope": "generator_create_read_materialize_or_stream_audit_and_drop",
+  "corpus_scope": "deterministic_generator_hash_and_layout_are_precomputed_outside_timed_regions",
+  "cases": [
+    {
+      "mode": "materialized",
+      "size_bytes": 134217728,
+      "source": {
+        "requested_bytes": 134217728,
+        "generated_bytes": 134217728,
+        "sha256": "834a81788afe1eca89aeef88e943c320e20be43bb9e93b46c012f792d3d4ec0b",
+        "actual_generator_bytes": 134217728,
+        "actual_generator_sha256": "834a81788afe1eca89aeef88e943c320e20be43bb9e93b46c012f792d3d4ec0b",
+        "actual_generator_oracle_verified": true,
+        "generator": "litchi-xml-repetitive-root-items-v1",
+        "chunk_bytes": 16384,
+        "source_materialization": "materialized_leg_only",
+        "layout": {
+          "prefix_bytes": 6,
+          "suffix_bytes": 7,
+          "full_record_bytes": 1024,
+          "full_record_count": 131071,
+          "tail_record_bytes": 1011,
+          "record_count": 131072,
+          "text_bytes": 132513779,
+          "item_open_bytes": 6,
+          "item_close_bytes": 7
+        }
+      },
+      "limits": {
+        "max_bytes": 134217728,
+        "max_depth": 8,
+        "max_events": 4000000,
+        "max_attributes": 16,
+        "max_token_bytes": 16384,
+        "max_text_bytes": 134217728,
+        "streaming_memory_upper_bound": 394570
+      },
+      "warmups": 3,
+      "samples": [
+        {
+          "sample": 0,
+          "elapsed_ns": 204146082,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268452714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 1,
+          "elapsed_ns": 204321782,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 2,
+          "elapsed_ns": 203445658,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 3,
+          "elapsed_ns": 202745585,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 4,
+          "elapsed_ns": 204808114,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 5,
+          "elapsed_ns": 204448783,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 6,
+          "elapsed_ns": 204420622,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 7,
+          "elapsed_ns": 204587020,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 8,
+          "elapsed_ns": 203629502,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 9,
+          "elapsed_ns": 203018529,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 10,
+          "elapsed_ns": 204358825,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 11,
+          "elapsed_ns": 205734250,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 12,
+          "elapsed_ns": 203750822,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 13,
+          "elapsed_ns": 203719371,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 14,
+          "elapsed_ns": 204587965,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 15,
+          "elapsed_ns": 203286431,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 16,
+          "elapsed_ns": 203065099,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 17,
+          "elapsed_ns": 204240614,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 18,
+          "elapsed_ns": 203997644,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 19,
+          "elapsed_ns": 204287834,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 20,
+          "elapsed_ns": 204050714,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 21,
+          "elapsed_ns": 203500321,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 22,
+          "elapsed_ns": 203872822,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 23,
+          "elapsed_ns": 202302536,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 24,
+          "elapsed_ns": 202515197,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 25,
+          "elapsed_ns": 201777164,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 26,
+          "elapsed_ns": 202795178,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 27,
+          "elapsed_ns": 204366495,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 28,
+          "elapsed_ns": 202669698,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        },
+        {
+          "sample": 29,
+          "elapsed_ns": 202766518,
+          "actual_bytes": 134217728,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 134217728,
+              "events": 393219,
+              "max_depth": 2,
+              "text_bytes": 132513779
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 28,
+            "deallocation_calls": 5,
+            "reallocation_calls": 23,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 536887312,
+            "deallocated_bytes": 536887312,
+            "live_bytes_before": 12826,
+            "live_bytes_after": 12826,
+            "peak_live_bytes_before": 268464714,
+            "peak_live_bytes_after": 268464714,
+            "region_peak_live_bytes": 268464714
+          },
+          "operation": {
+            "source_materialization_bytes": 134217728,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 134217728,
+            "entry_live_bytes": 12826,
+            "exit_live_bytes": 12826,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        }
+      ]
+    }
+  ]
+}

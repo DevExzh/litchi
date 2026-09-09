@@ -1,0 +1,76 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> crates/xml-minifier/tests/stream_audit.rs:42:63
+   |
+42 |             audit::verify_authored_reader(Chunked::new(input, &chunks), limits_for(input))
+   |                                                               ^^^^^^^ help: change this to: `chunks`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+   = note: `-D clippy::needless-borrow` implied by `-D clippy::all`
+   = help: to override `-D clippy::all` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> crates/xml-minifier/tests/stream_audit.rs:44:54
+   |
+44 |             audit::verify_reader(Chunked::new(input, &chunks), limits_for(input))
+   |                                                      ^^^^^^^ help: change this to: `chunks`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/xml-minifier/tests/stream_audit.rs:308:67
+    |
+308 |             audit::verify_authored_reader(Chunked::new(ambiguous, &chunks), limits_for(ambiguous))
+    |                                                                   ^^^^^^^ help: change this to: `chunks`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/xml-minifier/tests/stream_audit.rs:331:54
+    |
+331 |         let actual = stream_report(Chunked::new(xml, &chunks), limits_for(xml), false).unwrap();
+    |                                                      ^^^^^^^ help: change this to: `chunks`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/xml-minifier/tests/stream_audit.rs:347:45
+    |
+347 |             stream_report(Chunked::new(xml, &chunks), limits_for(xml), false).unwrap(),
+    |                                             ^^^^^^^ help: change this to: `chunks`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/xml-minifier/tests/stream_audit.rs:528:53
+    |
+528 |         let error = stream_report(Chunked::new(xml, &chunks), limits, false).unwrap_err();
+    |                                                     ^^^^^^^ help: change this to: `chunks`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/xml-minifier/tests/stream_audit.rs:616:65
+    |
+616 |             let actual = audit::verify_reader(Chunked::new(xml, &chunks), limits_for(xml));
+    |                                                                 ^^^^^^^ help: change this to: `chunks`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this can be `std::io::Error::other(_)`
+   --> crates/xml-minifier/tests/stream_audit.rs:774:25
+    |
+774 |             return Some(io::Error::new(io::ErrorKind::Other, "injected"));
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+    = note: `-D clippy::io-other-error` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+    |
+774 -             return Some(io::Error::new(io::ErrorKind::Other, "injected"));
+774 +             return Some(io::Error::other("injected"));
+    |
+
+error: could not compile `xml-minifier` (test "stream_audit") due to 8 previous errors
+warning: build failed, waiting for other jobs to finish...

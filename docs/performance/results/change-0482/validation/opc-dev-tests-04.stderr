@@ -1,0 +1,12 @@
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling sha1 v0.10.7
+   Compiling zerocopy-derive v0.8.56
+   Compiling fixedbitset v0.5.7
+   Compiling rsa v0.9.10
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 20.75s
+     Running tests/source_part_splice.rs (target/release/deps/source_part_splice-7c7b412d985daaae)

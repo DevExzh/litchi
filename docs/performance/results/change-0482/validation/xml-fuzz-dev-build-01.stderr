@@ -1,0 +1,7 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling syn v2.0.119
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling xml-minifier-fuzz v0.0.0 (/tmp/litchi-goal-0482/fuzz-xml)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.68s

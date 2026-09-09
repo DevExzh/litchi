@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## 0482: bounded XML audit and decoded OPC insertion
+
+[0482](changes/0482-bounded-xml-opc-splice.md) implements a caller-reader XML audit and source-checked OPC insertion
+publication with exact no-ops, opaque-member preservation and authenticated
+inverse restoration. The accompanying comparison measures XML audit routes;
+its individual normal/allocator results and regression flags are retained in
+the evidence bundle. The change adds no parallelism and establishes no DOCX
+transaction speedup. Public DOCX integration and the full non-iWork goal remain
+open.
+
+The 720-sample comparison records a 65,587-byte streaming operation heap
+increment for the tested generator/profile. Normal mean latency falls about
+10.6–10.8% at 128 MiB and rises about 3.6–4.1% at 8 MiB. The small allocator
+R1 timing regression and process RSS repeat variation remain in the
+[complete tables](results/change-0482/measurements.md).
+
 ## 0481: measured DOCX scanner name borrowing
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) removes three event-name

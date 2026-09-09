@@ -1,0 +1,19 @@
+ Documenting xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: unresolved link to `Input`
+   --> crates/xml-minifier/src/audit.rs:545:35
+    |
+545 | /// A source failure remains an [`Input`] error so callers can distinguish a
+    |                                   ^^^^^ no item named `Input` in scope
+    |
+    = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+    = note: requested on the command line with `-D rustdoc::broken-intra-doc-links`
+
+error: unresolved link to `Audit`
+   --> crates/xml-minifier/src/audit.rs:548:7
+    |
+548 | /// [`Audit`] errors. Streaming validation reports the first failure observed
+    |       ^^^^^ no item named `Audit` in scope
+    |
+    = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+error: could not document `xml-minifier`

@@ -52,6 +52,7 @@ use flate2::{Decompress, FlushDecompress, Status};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, Cursor, Read, Write};
+use std::mem::size_of;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -1126,6 +1127,14 @@ impl Metadata {
 /// retain only the bytes returned for the current `fill_buf` call, and the
 /// lifetime of those bytes is scoped to the callback invocation.
 pub const VERIFIED_ENTRY_READER_BUFFER_SIZE: usize = 16 * 1024;
+
+// flate2 1.1.10's read decoder allocates a 32 KiB compressed-input
+// BufReader.  The locked zlib-rs 0.6.7 inflate allocator lays out one
+// 32 KiB window plus its private state and 64-byte alignment padding.  A
+// 64 KiB state envelope is intentionally conservative across supported target
+// layouts; it is a bound, not the measured size of one particular machine.
+const FLATE2_DEFLATE_INPUT_BUFFER_SIZE: usize = 32 * 1024;
+const ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES: usize = 64 * 1024;
 
 // Precompressed transfer captures are source reads rather than callback
 // decoder buffers. Keep their requests bounded to one 64 KiB range so a
@@ -3385,6 +3394,70 @@ where
         self.archive
             .end_offset()
             .saturating_sub(self.archive.directory_offset())
+    }
+
+    /// Conservative additional ownership required by one raw-preservation
+    /// replacement replay. The value is a scalar so callers do not acquire
+    /// ZIP implementation types. `None` indicates checked arithmetic overflow.
+    /// The caller's metadata scratch buffer is separate and is not included.
+    #[must_use]
+    pub fn preservation_memory_upper_bound(&self) -> Option<u64> {
+        crate::preserve::preservation_memory_upper_bound(
+            self.preservation_entry_count(),
+            self.preservation_metadata_bytes(),
+        )
+    }
+
+    /// Memory upper bound for one callback-scoped verified reader.
+    ///
+    /// Store readers own the fixed verification state, callback buffer, and
+    /// one strict positional source counter/reader. Deflated readers
+    /// additionally own flate2's fixed compressed-input window and decoder
+    /// value plus the locked zlib-rs inflate allocation envelope. The
+    /// zero-sized type parameters below preserve the actual pointer/layout
+    /// widths without exposing the source type. This method reports a scalar
+    /// budget and keeps backend types private.
+    pub fn verified_entry_reader_memory_upper_bound(
+        &self,
+        entry_id: EntryId,
+    ) -> Result<u64, Error> {
+        let entry = self.indexed_entry(entry_id)?;
+        let fixed_state = size_of::<VerifiedEntryBufReader<'static, &'static mut ()>>()
+            .checked_add(size_of::<CountingReader<ZipReader<&'static ()>>>())
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "verified reader fixed state size overflows usize".to_string(),
+                })
+            })?;
+        let mut amount = u64::try_from(fixed_state).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "verified reader fixed state size exceeds u64".to_string(),
+            })
+        })?;
+        if entry.info.compression_method == CompressionMethod::Deflate {
+            amount = amount
+                .checked_add(
+                    u64::try_from(FLATE2_DEFLATE_INPUT_BUFFER_SIZE).map_err(|_| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "Deflate input buffer size exceeds u64".to_string(),
+                        })
+                    })?,
+                )
+                .and_then(|value| {
+                    value.checked_add(
+                        u64::try_from(size_of::<DeflateDecoder<&'static mut ()>>()).ok()?,
+                    )
+                })
+                .and_then(|value| {
+                    value.checked_add(u64::try_from(ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES).ok()?)
+                })
+                .ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "verified Deflate reader memory bound overflows u64".to_string(),
+                    })
+                })?;
+        }
+        Ok(amount)
     }
 
     /// Whether any central-directory entry declares traditional ZIP
@@ -13329,6 +13402,45 @@ mod tests {
                 assert_eq!(accounting.deflate_bytes_accepted(), payload.len() as u64);
                 assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
             }
+        }
+    }
+
+    #[test]
+    fn verified_reader_bound_matches_private_fixed_layouts_and_dispatches_both_methods() {
+        let payload = b"fixed verified-reader bound evidence";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        writer.write_deflated("deflated.bin", payload).unwrap();
+        let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
+        let stored_id = indexed.entry_id("stored.bin").unwrap();
+        let deflated_id = indexed.entry_id("deflated.bin").unwrap();
+
+        let fixed_reader_and_source = size_of::<VerifiedEntryBufReader<'static, &'static mut ()>>()
+            .checked_add(size_of::<CountingReader<ZipReader<&'static ()>>>())
+            .unwrap();
+        let stored_bound = indexed
+            .verified_entry_reader_memory_upper_bound(stored_id)
+            .unwrap();
+        assert_eq!(stored_bound, fixed_reader_and_source as u64);
+
+        let deflated_fixed = fixed_reader_and_source
+            .checked_add(FLATE2_DEFLATE_INPUT_BUFFER_SIZE)
+            .and_then(|size| size.checked_add(size_of::<DeflateDecoder<&'static mut ()>>()))
+            .and_then(|size| size.checked_add(ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES))
+            .unwrap();
+        let deflated_bound = indexed
+            .verified_entry_reader_memory_upper_bound(deflated_id)
+            .unwrap();
+        assert_eq!(deflated_bound, deflated_fixed as u64);
+        assert!(deflated_bound > stored_bound);
+
+        for entry_id in [stored_id, deflated_id] {
+            indexed
+                .with_verified_entry_reader(entry_id, |reader| {
+                    let mut decoded = Vec::new();
+                    reader.read_to_end(&mut decoded).map(|_| decoded)
+                })
+                .unwrap();
         }
     }
 

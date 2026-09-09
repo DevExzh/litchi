@@ -1,0 +1,157 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error[E0503]: cannot use `self.token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1027:16
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+1026 |         if available.is_empty() {
+1027 |             if self.token > self.max_token {
+     |                ^^^^^^^^^^ use of borrowed `*self`
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+
+error[E0503]: cannot use `self.max_token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1027:29
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+1026 |         if available.is_empty() {
+1027 |             if self.token > self.max_token {
+     |                             ^^^^^^^^^^^^^^ use of borrowed `*self`
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+
+error[E0503]: cannot use `self.token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1028:47
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1028 |                 return Err(window_token_error(self.token.saturating_add(1), self.max_token));
+     |                                               ^^^^^^^^^^ use of borrowed `*self`
+1029 |             }
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+
+error[E0503]: cannot use `self.max_token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1028:77
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1028 |                 return Err(window_token_error(self.token.saturating_add(1), self.max_token));
+     |                                                                             ^^^^^^^^^^^^^^ use of borrowed `*self`
+1029 |             }
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+
+error[E0503]: cannot use `self.token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1037:17
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1037 |                 self.token.saturating_add(1),
+     |                 ^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.max_token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1038:17
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1038 |                 self.max_token,
+     |                 ^^^^^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.total` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1045:21
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1045 |                     self.total.saturating_add(1),
+     |                     ^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.max_total` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1046:21
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1046 |                     self.max_total,
+     |                     ^^^^^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1050:17
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1050 |                 self.token.saturating_add(1),
+     |                 ^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.max_token` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1051:17
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1025 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1030 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1051 |                 self.max_token,
+     |                 ^^^^^^^^^^^^^^ use of borrowed `*self`
+
+For more information about this error, try `rustc --explain E0503`.
+error: could not compile `xml-minifier` (lib) due to 10 previous errors

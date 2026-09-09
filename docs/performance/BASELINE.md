@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0482: XML audit route comparison and decoded OPC insertion
+
+[0482](changes/0482-bounded-xml-opc-splice.md) compares the existing materialized slice audit with a bounded reader
+using the same deterministic XML generator and build. The formal matrix uses
+64 KiB, 8 MiB and 128 MiB inputs, 30 samples after three warmups, two process
+repeats and separate normal/allocator binaries on CPU 2. Machine metadata,
+source and executable hashes, raw reports, uncertainty and every review flag
+are retained in the [bundle](results/change-0482/README.md). This is primitive
+comparison evidence; the public DOCX lifecycle retains its 0481 baseline.
+
+All 720 samples pass. The tested streaming route has a 65,587-byte operation
+heap increment at every size, versus 268,451,888 bytes for the largest
+materialized case. Normal 128 MiB means decrease 10.809% / 10.592%; 8 MiB means
+increase 3.587% / 4.092%. [Individual tables](results/change-0482/measurements.md)
+retain intervals, tails, RSS and the allocator outlier. The materialized route
+includes `read_to_end` capacity growth, so these are not DOCX allocation deltas.
+
 ## 0481: DOCX scanner name ownership comparison
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) retains 1,440 samples in

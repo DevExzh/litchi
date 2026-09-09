@@ -1,0 +1,8 @@
+    Blocking waiting for file lock on package cache
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.44s
+     Running unittests src/lib.rs (target/debug/deps/xml_minifier-9a2a71925a99547d)
+     Running tests/audit.rs (target/debug/deps/audit-d7b16fd56bd3df9b)
+     Running tests/ooxml_assets.rs (target/debug/deps/ooxml_assets-22cc77499e822e7f)
+     Running tests/stream_audit.rs (target/debug/deps/stream_audit-05b4526e3e61ce1a)
+error: test failed, to rerun pass `-p xml-minifier --test stream_audit`

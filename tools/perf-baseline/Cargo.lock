@@ -1235,6 +1235,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "soapberry-zip",
+ "xml-minifier",
 ]
 
 [[package]]

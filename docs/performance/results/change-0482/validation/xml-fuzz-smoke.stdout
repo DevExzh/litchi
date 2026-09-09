@@ -1,0 +1,1 @@
+["/tmp/litchi-goal-0482/fuzz-xml-final/minify_xml", "/tmp/litchi-goal-0482/fuzz-xml-final/corpus", "-runs=10000", "-seed=482", "-max_len=65536", "-timeout=10", "-artifact_prefix=/tmp/litchi-goal-0482/fuzz-xml-final/artifacts/"]

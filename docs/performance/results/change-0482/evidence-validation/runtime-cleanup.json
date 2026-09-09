@@ -1,0 +1,11 @@
+{
+  "cleaned_utc": "2026-09-09T00:33:11.569558+00:00",
+  "temporary_root": "/tmp/litchi-goal-0482",
+  "removed_files": 1387,
+  "preserved_caches": [
+    "target",
+    "tools/perf-baseline/target",
+    "target/fuzz-asan"
+  ],
+  "live_verification": "evidence-validation/live.json"
+}
