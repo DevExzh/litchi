@@ -1,0 +1,9 @@
+axis-input-file-s64-a64-short-c64: PASS
+axis-input-short-read-s64-a64-short-c64: PASS
+axis-input-latency-s64-a64-short-c64: PASS
+axis-sink-512-s64-a64-short-c64: PASS
+axis-sink-4096-s64-a64-short-c64: PASS
+axis-sink-65536-s64-a64-short-c64: PASS
+axis-compression-current-s64-a64-short-c64: PASS
+axis-compression-store-s64-a64-short-c64: PASS
+axis-compression-deflate-s64-a64-short-c64: PASS

@@ -1,0 +1,12 @@
+ Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: public documentation for `xml_stream_audit` links to private item `XmlGenerator`
+ --> src/xml_stream_audit.rs:3:61
+  |
+3 | //! The materialized leg first consumes the deterministic [`XmlGenerator`] into
+  |                                                             ^^^^^^^^^^^^ this item is private
+  |
+  = note: this link will resolve properly if you pass `--document-private-items`
+  = note: `-D rustdoc::private-intra-doc-links` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(rustdoc::private_intra_doc_links)]`
+
+error: could not document `litchi-perf-baseline`

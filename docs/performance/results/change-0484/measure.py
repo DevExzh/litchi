@@ -674,6 +674,7 @@ def _check_authored_identity(authored: dict[str, Any], case: dict[str, Any], pat
 
 def _check_limits(
     limits: dict[str, Any], authored: dict[str, Any], case: dict[str, Any], path: str,
+    *, expected_max_replay_bytes: int | None = None,
 ) -> None:
     event_limit = _positive_int(limits.get("parser_event_limit"), f"{path}.parser_event_limit")
     token_limit = _positive_int(limits.get("parser_token_bytes"), f"{path}.parser_token_bytes")
@@ -699,6 +700,12 @@ def _check_limits(
     require(replay_window <= MAX_SELECTED_REPLAY_WINDOW_BYTES, f"{path}.replay_window_bytes: exceeds selected bound")
     require(token_limit <= MAX_SELECTED_XML_TOKEN_BYTES, f"{path}.parser_token_bytes: exceeds selected bound")
     require(workspace_limit <= MAX_SELECTED_PARSER_WORKSPACE_BYTES, f"{path}.parser_workspace_bytes: exceeds selected bound")
+    if expected_max_replay_bytes is not None:
+        ceiling = _positive_int(expected_max_replay_bytes, "expected max replay bytes")
+        require(
+            authored["encoded_xml_bytes"] <= ceiling,
+            f"{path}.authored.encoded_xml_bytes: exceeds configured replay ceiling",
+        )
 
 
 def _check_oracle_and_proof(
@@ -804,6 +811,7 @@ def _check_process_sample(process: Any, path: str) -> None:
 def _check_sample(
     sample: Any, index: int, role: str, case: dict[str, Any], oracle: dict[str, Any],
     authored: dict[str, Any], *, sink_write_bytes: int, path: str,
+    expected_authored_opens: int = EXPECTED_AUTHORED_OPENS,
 ) -> None:
     item = _object(sample, path)
     sample_index = _int_field(item.get("sample"), f"{path}.sample")
@@ -834,10 +842,15 @@ def _check_sample(
     )
     authored_observation = _object(item.get("authored"), f"{path}.authored")
     opens = _int_field(authored_observation.get("opens"), f"{path}.authored.opens")
-    require(opens == EXPECTED_AUTHORED_OPENS, f"{path}.authored.opens: expected {EXPECTED_AUTHORED_OPENS}")
-    expected_events = authored["event_count"] * opens
-    expected_text_chunks = (authored["event_count"] - 2 * authored["authored_count"]) * opens
-    expected_text_bytes = authored["text_bytes"] * opens
+    require(opens == expected_authored_opens, f"{path}.authored.opens: expected {expected_authored_opens}")
+    # Store-backed routes deliberately report zero cursor opens: the producer
+    # stream is emitted directly into the store, while the deterministic route
+    # opens its replayable cursor once per event pass.  Both routes still emit
+    # one producer event pass, so zero opens must not be treated as zero work.
+    event_passes = 1 if expected_authored_opens == 0 else expected_authored_opens
+    expected_events = authored["event_count"] * event_passes
+    expected_text_chunks = (authored["event_count"] - 2 * authored["authored_count"]) * event_passes
+    expected_text_bytes = authored["text_bytes"] * event_passes
     require(authored_observation.get("events") == expected_events, f"{path}.authored.events: differs from sealed multiple")
     require(authored_observation.get("text_chunks") == expected_text_chunks, f"{path}.authored.text_chunks: differs from sealed multiple")
     require(authored_observation.get("text_bytes") == expected_text_bytes, f"{path}.authored.text_bytes: differs from sealed multiple")
@@ -873,7 +886,16 @@ def _check_report_shell(
     warmups: int,
     binary: dict[str, Any],
     argv: list[str],
+    expected_sink_write_bytes: int = SINK_WRITE_BYTES,
+    expected_authored_opens: int = EXPECTED_AUTHORED_OPENS,
+    expected_authored_provider: str = AUTHORED_PROVIDER,
+    expected_source_contract: str = SOURCE_CONTRACT,
+    expected_max_replay_bytes: int | None = None,
 ) -> dict[str, Any]:
+    _positive_int(expected_sink_write_bytes, "expected sink write bytes")
+    _int_field(expected_authored_opens, "expected authored opens")
+    require(isinstance(expected_authored_provider, str) and expected_authored_provider, "expected authored provider is invalid")
+    require(isinstance(expected_source_contract, str) and expected_source_contract, "expected source contract is invalid")
     value = read(report)
     _check_finite_json(value)
     require(isinstance(value, dict) and value.get("schema") == REPORT_SCHEMA and value.get("version") == 1, f"{report}: report schema differs")
@@ -892,11 +914,11 @@ def _check_report_shell(
     require(config.get("text_modes") == [REPORT_TEXT_MODES[case["text_mode"]]], f"{report}: text mode differs")
     require(_positive_int(config.get("samples"), f"{report}.config.samples") == samples, f"{report}: sample contract differs")
     require(_positive_int(config.get("warmups"), f"{report}.config.warmups") == warmups, f"{report}: warmup contract differs")
-    require(_positive_int(config.get("sink_write_bytes"), f"{report}.config.sink_write_bytes") == SINK_WRITE_BYTES, f"{report}: sink bound differs")
-    require(_positive_int(config.get("expected_authored_opens"), f"{report}.config.expected_authored_opens") == EXPECTED_AUTHORED_OPENS, f"{report}: authored-open contract differs")
+    require(_positive_int(config.get("sink_write_bytes"), f"{report}.config.sink_write_bytes") == expected_sink_write_bytes, f"{report}: sink bound differs")
+    require(_int_field(config.get("expected_authored_opens"), f"{report}.config.expected_authored_opens") == expected_authored_opens, f"{report}: authored-open contract differs")
     require(config.get("lifecycle") == LIFECYCLE, f"{report}: lifecycle differs")
-    require(config.get("source") == SOURCE_CONTRACT, f"{report}: source contract differs")
-    require(config.get("authored_provider") == AUTHORED_PROVIDER, f"{report}: authored provider differs")
+    require(config.get("source") == expected_source_contract, f"{report}: source contract differs")
+    require(config.get("authored_provider") == expected_authored_provider, f"{report}: authored provider differs")
     require(config.get("sink") == SINK_CONTRACT, f"{report}: sink contract differs")
     require(config.get("fixture_dir") is None, f"{report}: fixture export must remain outside formal capture")
     cases = value.get("cases")
@@ -922,7 +944,13 @@ def _check_report_shell(
     require(isinstance(proof, dict), f"{report}: lifecycle proof metadata is missing")
     _check_source_identity(source, case, f"{report}.cases[0].source")
     _check_authored_identity(authored, case, f"{report}.cases[0].authored")
-    _check_limits(limits, authored, case, f"{report}.cases[0].limits")
+    _check_limits(
+        limits,
+        authored,
+        case,
+        f"{report}.cases[0].limits",
+        expected_max_replay_bytes=expected_max_replay_bytes,
+    )
     _check_oracle_and_proof(
         source,
         authored,
@@ -942,12 +970,18 @@ def _check_report_shell(
             case,
             oracle,
             authored,
-            sink_write_bytes=SINK_WRITE_BYTES,
+            sink_write_bytes=expected_sink_write_bytes,
+            expected_authored_opens=expected_authored_opens,
             path=f"{report}.cases[0].samples[{index}]",
         )
     require(SHA256.fullmatch(binary.get("sha256", "")) is not None, f"{report}: binary metadata is malformed")
     require(len(argv) > 7 and argv[7] == binary.get("path"), f"{report}: argv binary binding differs")
     return value
+
+
+# Public spelling for opt-in measurement lanes.  Keep the historical private
+# name above because retained callers and the deterministic driver use it.
+check_report_shell = _check_report_shell
 
 
 def capture_one(

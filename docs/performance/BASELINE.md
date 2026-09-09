@@ -6,9 +6,10 @@
 to borrowed paragraph events, deterministic replay or an explicit one-shot
 store, and durable forward/inverse patches. The retained tests, sanitizer fuzz
 smoke and LibreOffice readback establish the documented correctness scope.
-The deterministic measurement harness and report validator are implemented;
-formal normal/allocator captures and the required storage, input, sink and
-compression arms remain open. No new latency, allocation or RSS result is
+The [extended harness](results/change-0484/route-harness-checkpoint.md) and
+validators cover deterministic, memory-store and file-store routes, with
+separate input, sink and compression inventories. Formal normal/allocator
+captures and profiles remain open. No new latency, allocation or RSS result is
 claimed. The 0483 measurements below retain their one-paragraph scope.
 
 ## 0483: bounded DOCX tail append route comparison

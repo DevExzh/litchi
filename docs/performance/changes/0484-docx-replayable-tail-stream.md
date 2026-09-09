@@ -35,6 +35,13 @@ The [measurement review](../results/change-0484/measurement-plan-review.md)
 and [store extension plan](../results/change-0484/store-measurement-plan.md)
 record the remaining work.
 
+The [route harness checkpoint](../results/change-0484/route-harness-checkpoint.md)
+adds production-memory-store and explicit-file-store measurements, positional
+file/short-read/latency input profiles, sink-size choices, and selected-member
+Store/Deflate fixtures. Full route diagnostics validate emitted reports in
+normal and allocator executables; these single-operation diagnostics do not
+provide statistical performance evidence.
+
 Formal captures, before/after comparisons, phase profiles, and storage/input/
 sink/compression measurement arms are still required. No speedup, constant
 memory, RSS reduction or concurrency improvement is claimed. The measured

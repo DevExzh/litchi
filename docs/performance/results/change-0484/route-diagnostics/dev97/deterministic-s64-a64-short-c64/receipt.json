@@ -1,0 +1,96 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/deterministic-s64-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev96-normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/deterministic-s64-a64-short-c64/report.json"
+  ],
+  "artifacts": {
+    "report.json": {
+      "bytes": 9329,
+      "sha256": "73bc942bd4a25a3071cdab95f66a0f0fec45192315c9e1109da6fe00e97e942b"
+    },
+    "resource.txt": {
+      "bytes": 1182,
+      "sha256": "48a757041e7be604519cfee89bd0508f101d91ac0fa7ad7fbff96fb09d8cb933"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "case": {
+    "authored_count": 64,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "64",
+      "--authored-counts",
+      "64",
+      "--chunks",
+      "64",
+      "--text",
+      "short",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "label": "s64-a64-short-c64",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 64,
+    "text_bytes": null,
+    "text_mode": "short"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "error": null,
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T10:04:46.907435+00:00",
+  "label": "deterministic-s64-a64-short-c64",
+  "passed": true,
+  "route": "deterministic",
+  "started_utc": "2026-09-09T10:04:46.900036+00:00"
+}

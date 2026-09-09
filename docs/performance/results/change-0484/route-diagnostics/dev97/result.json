@@ -1,0 +1,87 @@
+{
+  "attempt": "dev97",
+  "binary": {
+    "bytes": 423332912,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev96-normal/docx_replayable_tail_append",
+    "sha256": "7950a3a8bd59bfdf8720a2c2f5143fe5ab56a7beb1523a09d7be4e85c1bc2e2b"
+  },
+  "binary_unchanged": true,
+  "diagnostic_only": true,
+  "driver": {
+    "bytes": 4990,
+    "sha256": "a3ace3b6634ca34cc83386b5e2aa430f133fa91fb85644c6b0003e7bb2e59c6f"
+  },
+  "failures": [
+    {
+      "error": "RouteMeasureError: /home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/memory_store-s64-a64-short-c64/report.json.cases[0].samples[0].authored.events: differs from sealed multiple",
+      "label": "memory_store-s64-a64-short-c64"
+    },
+    {
+      "error": "RouteMeasureError: /home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/file_store-s64-a64-short-c64/report.json.cases[0].samples[0].authored.events: differs from sealed multiple",
+      "label": "file_store-s64-a64-short-c64"
+    },
+    {
+      "error": "RouteMeasureError: /home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/memory_store-s64-a64-near-c64/report.json.cases[0].samples[0].authored.events: differs from sealed multiple",
+      "label": "memory_store-s64-a64-near-c64"
+    },
+    {
+      "error": "RouteMeasureError: /home/zhuhe/code/litchi/docs/performance/results/change-0484/route-diagnostics/dev97/file_store-s64-a64-near-c64/report.json.cases[0].samples[0].authored.events: differs from sealed multiple",
+      "label": "file_store-s64-a64-near-c64"
+    },
+    {
+      "error": "diagnostic scratch is not empty; files retained",
+      "label": "scratch"
+    }
+  ],
+  "finished_utc": "2026-09-09T10:04:52.269463+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "passed": false,
+  "receipts": [
+    {
+      "bytes": 2506,
+      "label": "deterministic-s64-a64-short-c64",
+      "sha256": "8190b2440f9a99ba544a0737778fbc91404f23b8534640f2f44a98b32a8a35e3"
+    },
+    {
+      "bytes": 2719,
+      "label": "memory_store-s64-a64-short-c64",
+      "sha256": "0eafa67705b1d600242138208f8fafcbae3788234ff379af06bc9f793f21f0ab"
+    },
+    {
+      "bytes": 2823,
+      "label": "file_store-s64-a64-short-c64",
+      "sha256": "1024b1e238e79ba8c5b5799b8abbf51ff4363c729d42f296b57387e34d9caf15"
+    },
+    {
+      "bytes": 2500,
+      "label": "deterministic-s64-a64-near-c64",
+      "sha256": "34bfccd8a1913d6f0e4910e978b419540a1278f37dbe21d205ea30c666d67317"
+    },
+    {
+      "bytes": 2712,
+      "label": "memory_store-s64-a64-near-c64",
+      "sha256": "a89267a22cdf0a67d4bdc15cfb8d6868158edacc8086c9c1ff20f28f5ac3bd7d"
+    },
+    {
+      "bytes": 2815,
+      "label": "file_store-s64-a64-near-c64",
+      "sha256": "7eda1ae2178aa5239fbb22bd334da556c2712c9786d3e054bb8d91ca8e4913c1"
+    }
+  ],
+  "role": "normal",
+  "samples": 1,
+  "scratch_removed": false,
+  "validators": {
+    "common.py": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+    "corpus_oracle.py": "40d3fc1bcdc95bada7f4d5eb1722df9406cddda480ea650b0a74bf5f57971779",
+    "gate.py": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+    "measure.py": "fd58091e64418038357cc30b05a56a5414d042f36950566c7091410ab3ddfddb",
+    "measure_routes.py": "51af21d89a910165511ddee2ab938a215ac37f31ea310255eb20a5ac5100e4c0",
+    "record_environment.py": "4436acf24304f3494dcf7d01f6dc9b023421215aa4e20090d68ffb2dd5b05736"
+  },
+  "warmups": 1
+}

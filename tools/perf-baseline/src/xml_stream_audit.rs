@@ -1,6 +1,6 @@
 //! A bounded XML-audit comparison harness.
 //!
-//! The materialized leg first consumes the deterministic [`XmlGenerator`] into
+//! The materialized leg first consumes the deterministic `XmlGenerator` into
 //! a `Vec<u8>` and then calls the existing slice auditor.  The streaming leg
 //! gives the same generator directly to the bounded reader auditor.  Corpus
 //! construction and the independent source digest oracle happen before each

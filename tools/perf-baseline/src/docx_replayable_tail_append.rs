@@ -14,12 +14,12 @@ use std::{
     ffi::OsString,
     fmt::Write as FmtWrite,
     fs::OpenOptions,
-    io::{self, Cursor, Write},
+    io::{self, Cursor, Read, Write},
     mem::size_of,
     ops::Range,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
     time::Instant,
@@ -28,18 +28,35 @@ use std::{
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_docx::source_backed::tail_append::Limits as TailAppendLimits;
 use litchi_docx::source_backed::tail_append_stream::{
-    AuthoredStreamProof, ParagraphCursor, ParagraphStreamLimits, PlainParagraphEvent,
-    ReplayableParagraphSource,
+    AuthoredPassProof, AuthoredReplayError, AuthoredReplayHandle, AuthoredReplayReader,
+    AuthoredReplayReference, AuthoredReplayStore, AuthoredStreamProof, MemoryReplayHandle,
+    MemoryReplayStore, OneShotParagraphProducer, ParagraphCursor, ParagraphEventSink,
+    ParagraphStreamLimits, PlainParagraphEvent, ReplayableParagraphSource,
 };
 use litchi_docx::{Package as OwnedDocxPackage, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::ZipArchive;
 use soapberry_zip::office::ArchiveReader;
 
+use file_store::{
+    FileReplayHandle, FileReplayMonitor, FileReplayObservation, FileReplayStore, FileSyncPolicy,
+};
+use input_profiles::{InputMode, InputProfile, InputSourceCapability};
+
+use compression_profiles::CompressionProfile;
+
 use super::{allocation_metrics, process_metrics};
+
+mod compression_profiles;
+mod file_store;
+mod input_profiles;
+#[cfg(test)]
+mod route_failure_tests;
+#[cfg(test)]
+mod route_smoke_tests;
 
 const SCHEMA: &str = "docx-replayable-tail-append-v1";
 const DEFAULT_SOURCE_COUNTS: [usize; 3] = [64, 8_192, 131_072];
@@ -47,6 +64,7 @@ const DEFAULT_AUTHORED_COUNTS: [usize; 4] = [64, 256, 4_096, 16_384];
 const DEFAULT_CHUNK_BYTES: [usize; 3] = [0, 64, 8 * 1024];
 const DEFAULT_SAMPLES: usize = 15;
 const DEFAULT_WARMUPS: usize = 3;
+const SINK_WRITE_BYTES: [usize; 3] = [512, 4 * 1024, 65_536];
 const OPAQUE_PATH: &str = "word/perf-opaque.bin";
 const OPAQUE_BYTES: usize = 32 * 1024;
 const MAIN_PATH: &str = "word/document.xml";
@@ -55,6 +73,7 @@ const HASH_SINK_MAX_WRITE: usize = 4 * 1024;
 const MAX_CURSOR_TEXT_BYTES: usize = 60 * 1024;
 const MAX_STREAM_XML_DEPTH: u64 = 16;
 const EXPECTED_AUTHORED_OPENS: u64 = 5;
+const EXPECTED_STORE_REPLAY_OPENS: u64 = 4;
 
 type BenchResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -107,6 +126,71 @@ pub enum TextMode {
     NearLimit,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+enum AuthoredProvider {
+    Deterministic,
+    MemoryStore,
+    FileStore,
+}
+
+impl AuthoredProvider {
+    fn parse(value: &str) -> BenchResult<Self> {
+        match value {
+            "deterministic" | "cursor" => Ok(Self::Deterministic),
+            "memory-store" | "memory_store" | "memory" => Ok(Self::MemoryStore),
+            "file-store" | "file_store" | "file" => Ok(Self::FileStore),
+            _ => Err(format!(
+                "invalid authored provider {value:?}; expected deterministic, memory-store, or file-store"
+            )
+            .into()),
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Deterministic => "deterministic_replayable_bounded_cursor",
+            Self::MemoryStore => "memory_explicit_replay_store",
+            Self::FileStore => "file_explicit_replay_store",
+        }
+    }
+
+    const fn authored_opens(self) -> u64 {
+        match self {
+            Self::Deterministic => EXPECTED_AUTHORED_OPENS,
+            Self::MemoryStore | Self::FileStore => 0,
+        }
+    }
+
+    const fn replay_opens(self) -> u64 {
+        match self {
+            Self::Deterministic => 0,
+            Self::MemoryStore | Self::FileStore => EXPECTED_STORE_REPLAY_OPENS,
+        }
+    }
+
+    const fn is_store(self) -> bool {
+        !matches!(self, Self::Deterministic)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+enum ReplaySync {
+    None,
+    Data,
+}
+
+impl ReplaySync {
+    fn parse(value: &str) -> BenchResult<Self> {
+        match value {
+            "none" => Ok(Self::None),
+            "data" => Ok(Self::Data),
+            _ => Err(format!("invalid replay sync {value:?}; expected none or data").into()),
+        }
+    }
+}
+
 impl TextMode {
     fn parse(value: &str) -> BenchResult<Self> {
         match value {
@@ -137,6 +221,17 @@ struct Config {
     sink_write_bytes: usize,
     json_path: Option<PathBuf>,
     fixture_dir: Option<PathBuf>,
+    authored_provider: AuthoredProvider,
+    replay_dir: Option<PathBuf>,
+    replay_max_bytes: Option<u64>,
+    replay_sync: ReplaySync,
+    compression: CompressionProfile,
+    input_mode: Option<InputMode>,
+    input_file: Option<PathBuf>,
+    input_max_range_bytes: Option<usize>,
+    input_delay_us: u64,
+    input_overhead_us: u64,
+    input_bytes_per_second: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -158,8 +253,21 @@ struct ConfigRecord {
     sink_write_bytes: usize,
     lifecycle: [&'static str; 4],
     expected_authored_opens: u64,
+    expected_replay_opens: u64,
     source: &'static str,
     authored_provider: &'static str,
+    provider: AuthoredProvider,
+    replay_max_bytes: Option<u64>,
+    replay_dir: Option<String>,
+    replay_sync: ReplaySync,
+    compression: CompressionProfile,
+    input_mode: &'static str,
+    input_storage_kind: &'static str,
+    input_identity_validation: &'static str,
+    input_max_range_bytes: Option<usize>,
+    input_delay_us: u64,
+    input_overhead_us: u64,
+    input_bytes_per_second: Option<u64>,
     sink: &'static str,
     fixture_dir: Option<String>,
 }
@@ -209,6 +317,7 @@ struct AuthoredRecord {
     text_bytes: u64,
     encoded_xml_bytes: u64,
     event_count: u64,
+    text_chunk_count: u64,
     expected_event_sha256: String,
     expected_encoded_sha256: String,
 }
@@ -267,6 +376,7 @@ struct Sample {
     elapsed_ns: u64,
     source_reads: ReadObservation,
     authored: AuthoredObservation,
+    replay: Option<ReplayObservation>,
     sink: SinkRecord,
     allocation: Option<allocation_metrics::Sample>,
     process: Option<process_metrics::Delta>,
@@ -278,6 +388,13 @@ struct CaseRecord {
     authored_count: usize,
     chunk_mode: ChunkMode,
     text_mode: TextMode,
+    provider: AuthoredProvider,
+    replay_max_bytes: Option<u64>,
+    compression: CompressionProfile,
+    input_mode: &'static str,
+    input_storage_kind: &'static str,
+    input_identity_validation: &'static str,
+    sink_write_bytes: usize,
     source: SourceRecord,
     authored: AuthoredRecord,
     limits: StreamLimitRecord,
@@ -390,6 +507,7 @@ impl MeasureSource {
         }
     }
 
+    #[cfg(test)]
     fn observation(&self) -> ReadObservation {
         self.counters.snapshot()
     }
@@ -434,6 +552,51 @@ impl ReadAt for MeasureSource {
     }
 }
 
+struct ProfiledMeasureSource {
+    inner: Arc<dyn ReadAt>,
+    counters: Arc<SourceCounters>,
+}
+
+impl ProfiledMeasureSource {
+    fn new(inner: Arc<dyn ReadAt>, counters: Arc<SourceCounters>) -> Self {
+        Self { inner, counters }
+    }
+}
+
+impl ReadAt for ProfiledMeasureSource {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.counters.read_calls.fetch_add(1, Ordering::Relaxed);
+        self.counters.requested_bytes.fetch_add(
+            u64::try_from(output.len())
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "request overflow"))?,
+            Ordering::Relaxed,
+        );
+        self.counters.request_histogram.record(output.len());
+        let returned = self.inner.read_at(offset, output)?;
+        if returned > output.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "profiled source returned more bytes than requested",
+            ));
+        }
+        self.counters.returned_bytes.fetch_add(
+            u64::try_from(returned)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "read overflow"))?,
+            Ordering::Relaxed,
+        );
+        self.counters.returned_histogram.record(returned);
+        Ok(returned)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.inner.version()
+    }
+}
+
 #[derive(Debug, Default)]
 struct AuthoredCounters {
     opens: AtomicU64,
@@ -450,6 +613,123 @@ struct AuthoredObservation {
     text_bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, PartialEq, Eq)]
+struct ReplayObservation {
+    route: Option<AuthoredProvider>,
+    producer_invocations: u64,
+    #[serde(rename = "store_prepare_calls")]
+    prepare_calls: u64,
+    #[serde(rename = "store_append_calls")]
+    append_calls: u64,
+    #[serde(rename = "store_appended_bytes")]
+    appended_bytes: u64,
+    store_finish_calls: u64,
+    replay_opens: u64,
+    replay_read_calls: u64,
+    replay_requested_bytes: u64,
+    replay_returned_bytes: u64,
+    replay_finish_calls: u64,
+    replay_sha256_checks: u64,
+    request_histogram: RequestHistogram,
+    returned_histogram: RequestHistogram,
+    retained_logical_bytes: Option<u64>,
+    retained_capacity_bytes: Option<u64>,
+    retained_capacity_provenance: Option<&'static str>,
+    file_logical_bytes: Option<u64>,
+    file_allocated_bytes: Option<u64>,
+    file_write_calls: Option<u64>,
+    file_sync_calls: Option<u64>,
+    file_cleanup_verified: Option<bool>,
+    seal_sha256_checks: Option<u64>,
+    cleanup_sha256_checks: Option<u64>,
+    durable_reference_kind: Option<&'static str>,
+    durable_reference_bytes: u64,
+    #[serde(serialize_with = "serialize_optional_digest")]
+    durable_reference_sha256: Option<[u8; 32]>,
+    /// Kept for internal post-timer validation; the public report uses the
+    /// fixed-size flattened fields above.
+    #[serde(skip_serializing)]
+    file: Option<FileStoreObservation>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, PartialEq, Eq)]
+struct FileStoreObservation {
+    write_calls: u64,
+    sync_calls: u64,
+    read_calls: u64,
+    returned_bytes: u64,
+    replay_sha256_checks: u64,
+    seal_sha256_checks: u64,
+    cleanup_sha256_checks: u64,
+    logical_bytes: Option<u64>,
+    allocated_bytes: Option<u64>,
+    cleanup_verified: bool,
+}
+
+#[derive(Debug, Default)]
+struct ReplayCounters {
+    producer_invocations: AtomicU64,
+    prepare_calls: AtomicU64,
+    append_calls: AtomicU64,
+    appended_bytes: AtomicU64,
+    store_finish_calls: AtomicU64,
+    replay_opens: AtomicU64,
+    replay_read_calls: AtomicU64,
+    replay_requested_bytes: AtomicU64,
+    replay_returned_bytes: AtomicU64,
+    replay_finish_calls: AtomicU64,
+    replay_sha256_checks: AtomicU64,
+    request_histogram: AtomicRequestHistogram,
+    returned_histogram: AtomicRequestHistogram,
+    durable_reference: Mutex<Option<DurableReferenceObservation>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DurableReferenceObservation {
+    bytes: u64,
+    sha256: [u8; 32],
+}
+
+fn serialize_optional_digest<S>(digest: &Option<[u8; 32]>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match digest {
+        Some(digest) => serializer.serialize_some(&hex_digest(digest)),
+        None => serializer.serialize_none(),
+    }
+}
+
+impl ReplayCounters {
+    fn snapshot(&self) -> ReplayObservation {
+        let durable_reference = self
+            .durable_reference
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        ReplayObservation {
+            producer_invocations: self.producer_invocations.load(Ordering::Relaxed),
+            prepare_calls: self.prepare_calls.load(Ordering::Relaxed),
+            append_calls: self.append_calls.load(Ordering::Relaxed),
+            appended_bytes: self.appended_bytes.load(Ordering::Relaxed),
+            store_finish_calls: self.store_finish_calls.load(Ordering::Relaxed),
+            replay_opens: self.replay_opens.load(Ordering::Relaxed),
+            replay_read_calls: self.replay_read_calls.load(Ordering::Relaxed),
+            replay_requested_bytes: self.replay_requested_bytes.load(Ordering::Relaxed),
+            replay_returned_bytes: self.replay_returned_bytes.load(Ordering::Relaxed),
+            replay_finish_calls: self.replay_finish_calls.load(Ordering::Relaxed),
+            replay_sha256_checks: self.replay_sha256_checks.load(Ordering::Relaxed),
+            request_histogram: self.request_histogram.snapshot(),
+            returned_histogram: self.returned_histogram.snapshot(),
+            durable_reference_bytes: durable_reference
+                .as_ref()
+                .map_or(0, |reference| reference.bytes),
+            durable_reference_sha256: durable_reference.as_ref().map(|reference| reference.sha256),
+            file: None,
+            ..ReplayObservation::default()
+        }
+    }
+}
+
 impl AuthoredCounters {
     fn snapshot(&self) -> AuthoredObservation {
         AuthoredObservation {
@@ -461,11 +741,321 @@ impl AuthoredCounters {
     }
 }
 
+/// Count the explicit replay-store lifecycle without retaining authored output
+/// in the harness.  The wrapper deliberately forwards both operation hooks so
+/// a managed provider can charge the current package context on every reopen.
+struct CountingReplayStore<R> {
+    inner: R,
+    counters: Arc<ReplayCounters>,
+}
+
+impl<R> CountingReplayStore<R> {
+    fn new(inner: R, counters: Arc<ReplayCounters>) -> Self {
+        Self { inner, counters }
+    }
+}
+
+struct CountingReplayHandle<H> {
+    inner: H,
+    counters: Arc<ReplayCounters>,
+}
+
+struct CountingReplayReader<'a> {
+    inner: Box<dyn AuthoredReplayReader + 'a>,
+    counters: Arc<ReplayCounters>,
+}
+
+impl<R> AuthoredReplayStore for CountingReplayStore<R>
+where
+    R: AuthoredReplayStore,
+    R::Handle: 'static,
+{
+    type Handle = CountingReplayHandle<R::Handle>;
+
+    fn prepare_for_operation(
+        &mut self,
+        limits: ParagraphStreamLimits,
+        context: Option<&litchi_core::ExecutionContext>,
+        cancellation: Option<&litchi_core::CancellationToken>,
+    ) -> Result<(), AuthoredReplayError> {
+        self.counters.prepare_calls.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .prepare_for_operation(limits, context, cancellation)
+    }
+
+    fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+        self.counters.append_calls.fetch_add(1, Ordering::Relaxed);
+        self.counters.appended_bytes.fetch_add(
+            u64::try_from(chunk.len()).unwrap_or(u64::MAX),
+            Ordering::Relaxed,
+        );
+        self.inner.append(chunk)
+    }
+
+    fn finish(self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
+        self.counters
+            .store_finish_calls
+            .fetch_add(1, Ordering::Relaxed);
+        let inner = self.inner.finish(proof)?;
+        if let Some(reference) = inner.durable_reference() {
+            let bytes = u64::try_from(reference.len()).map_err(|_| {
+                AuthoredReplayError::Store("durable replay reference length overflow")
+            })?;
+            let digest: [u8; 32] = Sha256::digest(reference.as_bytes()).into();
+            *self
+                .counters
+                .durable_reference
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                Some(DurableReferenceObservation {
+                    bytes,
+                    sha256: digest,
+                });
+        }
+        Ok(CountingReplayHandle {
+            inner,
+            counters: self.counters,
+        })
+    }
+}
+
+impl<H> AuthoredReplayHandle for CountingReplayHandle<H>
+where
+    H: AuthoredReplayHandle,
+{
+    fn proof(&self) -> AuthoredStreamProof {
+        self.inner.proof()
+    }
+
+    fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+        self.counters.replay_opens.fetch_add(1, Ordering::Relaxed);
+        let inner = self.inner.open()?;
+        Ok(Box::new(CountingReplayReader {
+            inner,
+            counters: Arc::clone(&self.counters),
+        }))
+    }
+
+    fn open_for_package<'a>(
+        &'a self,
+        context: Option<&'a litchi_core::ExecutionContext>,
+        cancellation: Option<&'a litchi_core::CancellationToken>,
+    ) -> Result<Box<dyn AuthoredReplayReader + 'a>, AuthoredReplayError> {
+        self.counters.replay_opens.fetch_add(1, Ordering::Relaxed);
+        let inner = self.inner.open_for_package(context, cancellation)?;
+        Ok(Box::new(CountingReplayReader {
+            inner,
+            counters: Arc::clone(&self.counters),
+        }))
+    }
+
+    fn durable_reference(&self) -> Option<AuthoredReplayReference> {
+        self.inner.durable_reference()
+    }
+}
+
+impl Read for CountingReplayReader<'_> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        self.counters
+            .replay_read_calls
+            .fetch_add(1, Ordering::Relaxed);
+        self.counters.replay_requested_bytes.fetch_add(
+            u64::try_from(output.len()).unwrap_or(u64::MAX),
+            Ordering::Relaxed,
+        );
+        self.counters.request_histogram.record(output.len());
+        let count = self.inner.read(output)?;
+        self.counters
+            .replay_returned_bytes
+            .fetch_add(u64::try_from(count).unwrap_or(u64::MAX), Ordering::Relaxed);
+        self.counters.returned_histogram.record(count);
+        Ok(count)
+    }
+}
+
+impl AuthoredReplayReader for CountingReplayReader<'_> {
+    fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
+        let CountingReplayReader { inner, counters } = *self;
+        counters.replay_finish_calls.fetch_add(1, Ordering::Relaxed);
+        let result = inner.finish();
+        if result.is_ok() {
+            counters
+                .replay_sha256_checks
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        result
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FileReplayCleanupRecord {
+    observation: FileReplayObservation,
+}
+
+struct FileReplayRouteStore {
+    inner: FileReplayStore,
+    cleanup: Arc<Mutex<Option<FileReplayCleanupRecord>>>,
+}
+
+impl FileReplayRouteStore {
+    fn new(
+        path: PathBuf,
+        maximum: u64,
+        sync_policy: FileSyncPolicy,
+        cleanup: Arc<Mutex<Option<FileReplayCleanupRecord>>>,
+        monitor: &FileReplayMonitor,
+    ) -> BenchResult<Self> {
+        Ok(Self {
+            inner: FileReplayStore::new_with_monitor(path, maximum, sync_policy, monitor)?,
+            cleanup,
+        })
+    }
+}
+
+impl AuthoredReplayStore for FileReplayRouteStore {
+    type Handle = FileReplayHandle;
+
+    fn prepare_for_operation(
+        &mut self,
+        limits: ParagraphStreamLimits,
+        context: Option<&litchi_core::ExecutionContext>,
+        cancellation: Option<&litchi_core::CancellationToken>,
+    ) -> Result<(), AuthoredReplayError> {
+        self.inner
+            .prepare_for_operation(limits, context, cancellation)
+    }
+
+    fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+        self.inner.append(chunk)
+    }
+
+    fn finish(self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
+        let Self { inner, cleanup } = self;
+        let handle = inner.finish(proof)?;
+        let observation = handle.observation();
+        *cleanup
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+            Some(FileReplayCleanupRecord { observation });
+        Ok(handle)
+    }
+}
+
+enum ReplayRouteStore {
+    Memory(CountingReplayStore<MemoryReplayStore>),
+    File(CountingReplayStore<FileReplayRouteStore>),
+}
+
+enum ReplayRouteHandle {
+    Memory(CountingReplayHandle<MemoryReplayHandle>),
+    File(CountingReplayHandle<FileReplayHandle>),
+}
+
+impl AuthoredReplayStore for ReplayRouteStore {
+    type Handle = ReplayRouteHandle;
+
+    fn prepare_for_operation(
+        &mut self,
+        limits: ParagraphStreamLimits,
+        context: Option<&litchi_core::ExecutionContext>,
+        cancellation: Option<&litchi_core::CancellationToken>,
+    ) -> Result<(), AuthoredReplayError> {
+        match self {
+            Self::Memory(store) => store.prepare_for_operation(limits, context, cancellation),
+            Self::File(store) => store.prepare_for_operation(limits, context, cancellation),
+        }
+    }
+
+    fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+        match self {
+            Self::Memory(store) => store.append(chunk),
+            Self::File(store) => store.append(chunk),
+        }
+    }
+
+    fn finish(self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
+        match self {
+            Self::Memory(store) => Ok(ReplayRouteHandle::Memory(store.finish(proof)?)),
+            Self::File(store) => Ok(ReplayRouteHandle::File(store.finish(proof)?)),
+        }
+    }
+}
+
+impl AuthoredReplayHandle for ReplayRouteHandle {
+    fn proof(&self) -> AuthoredStreamProof {
+        match self {
+            Self::Memory(handle) => handle.proof(),
+            Self::File(handle) => handle.proof(),
+        }
+    }
+
+    fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+        match self {
+            Self::Memory(handle) => handle.open(),
+            Self::File(handle) => handle.open(),
+        }
+    }
+
+    fn open_for_package<'a>(
+        &'a self,
+        context: Option<&'a litchi_core::ExecutionContext>,
+        cancellation: Option<&'a litchi_core::CancellationToken>,
+    ) -> Result<Box<dyn AuthoredReplayReader + 'a>, AuthoredReplayError> {
+        match self {
+            Self::Memory(handle) => handle.open_for_package(context, cancellation),
+            Self::File(handle) => handle.open_for_package(context, cancellation),
+        }
+    }
+
+    fn durable_reference(&self) -> Option<AuthoredReplayReference> {
+        match self {
+            Self::Memory(handle) => handle.durable_reference(),
+            Self::File(handle) => handle.durable_reference(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct AuthoredSpec {
     count: usize,
     chunk_mode: ChunkMode,
     text_mode: TextMode,
+}
+
+struct GeneratedParagraphProducer {
+    spec: AuthoredSpec,
+    counters: Arc<AuthoredCounters>,
+    replay_counters: Arc<ReplayCounters>,
+}
+
+impl GeneratedParagraphProducer {
+    fn new(
+        spec: AuthoredSpec,
+        counters: Arc<AuthoredCounters>,
+        replay_counters: Arc<ReplayCounters>,
+    ) -> Self {
+        Self {
+            spec,
+            counters,
+            replay_counters,
+        }
+    }
+}
+
+impl OneShotParagraphProducer for GeneratedParagraphProducer {
+    fn produce(&mut self, sink: &mut dyn ParagraphEventSink) -> Result<(), AuthoredReplayError> {
+        self.replay_counters
+            .producer_invocations
+            .fetch_add(1, Ordering::Relaxed);
+        let mut cursor = GeneratedCursor::new(self.spec, Arc::clone(&self.counters));
+        while let Some(event) = cursor
+            .next()
+            .map_err(|error| AuthoredReplayError::Provider(Box::new(error)))?
+        {
+            sink.push(event)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -516,11 +1106,17 @@ impl ReplayableParagraphSource for GeneratedParagraphSource {
 
     fn open<'source>(&'source self) -> Result<Self::Cursor<'source>, Self::Error> {
         self.counters.opens.fetch_add(1, Ordering::Relaxed);
-        Ok(GeneratedCursor {
-            spec: self.spec,
-            counters: Arc::clone(&self.counters),
+        Ok(GeneratedCursor::new(self.spec, Arc::clone(&self.counters)))
+    }
+}
+
+impl GeneratedCursor {
+    fn new(spec: AuthoredSpec, counters: Arc<AuthoredCounters>) -> Self {
+        Self {
+            spec,
+            counters,
             paragraph: 0,
-            phase: if self.spec.count == 0 {
+            phase: if spec.count == 0 {
                 CursorPhase::Done
             } else {
                 CursorPhase::Start
@@ -528,7 +1124,7 @@ impl ReplayableParagraphSource for GeneratedParagraphSource {
             text_offset: 0,
             text_length: 0,
             text: [0; MAX_CURSOR_TEXT_BYTES],
-        })
+        }
     }
 }
 
@@ -712,6 +1308,7 @@ fn authored_record(spec: AuthoredSpec) -> BenchResult<AuthoredRecord> {
     let mut max_encoded_paragraph_bytes = 0_u64;
     let mut xml_entity_reference_count = 0_u64;
     let mut event_count = 0_u64;
+    let mut text_chunk_count = 0_u64;
     let mut event_hash = Sha256::new();
     let mut encoded_hash = Sha256::new();
     for index in 0..spec.count {
@@ -747,6 +1344,9 @@ fn authored_record(spec: AuthoredSpec) -> BenchResult<AuthoredRecord> {
                 event_count = event_count
                     .checked_add(1)
                     .ok_or("authored event overflow")?;
+                text_chunk_count = text_chunk_count
+                    .checked_add(1)
+                    .ok_or("authored text-chunk overflow")?;
                 event_hash.update([1_u8]);
                 event_hash.update(u64::try_from(part.len())?.to_le_bytes());
                 event_hash.update(part);
@@ -779,6 +1379,7 @@ fn authored_record(spec: AuthoredSpec) -> BenchResult<AuthoredRecord> {
         text_bytes: total_text_bytes,
         encoded_xml_bytes,
         event_count,
+        text_chunk_count,
         expected_event_sha256: hex_digest(&event_hash.finalize()),
         expected_encoded_sha256: hex_digest(&encoded_hash.finalize()),
     })
@@ -901,6 +1502,15 @@ fn source_archive(main_xml: &[u8], opaque_variant: u8) -> BenchResult<Vec<u8>> {
     )))?;
     package.relate_to(MAIN_PATH, rt::OFFICE_DOCUMENT);
     Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn source_archive_with_compression(
+    main_xml: &[u8],
+    opaque_variant: u8,
+    compression: CompressionProfile,
+) -> BenchResult<Vec<u8>> {
+    let archive = source_archive(main_xml, opaque_variant)?;
+    Ok(compression_profiles::apply(archive, compression)?)
 }
 
 /// Mirror the source-backed scanner's checked owner envelope for one parser
@@ -1440,6 +2050,7 @@ struct SinkRecord {
 #[derive(Clone, Debug)]
 struct Fixture {
     authored: AuthoredSpec,
+    compression: CompressionProfile,
     authored_record: AuthoredRecord,
     limits: ParagraphStreamLimits,
     limit_record: StreamLimitRecord,
@@ -1448,6 +2059,11 @@ struct Fixture {
     source_record: SourceRecord,
     oracle: OracleRecord,
     proof: ProofRecord,
+}
+
+struct PreparedInput {
+    profile: InputProfile,
+    capability: InputSourceCapability,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1465,6 +2081,8 @@ struct FixtureManifest {
     authored_count: usize,
     chunk_mode: ChunkMode,
     text_mode: TextMode,
+    provider: AuthoredProvider,
+    compression: CompressionProfile,
     source: FixtureArtifactRecord,
     candidate: FixtureArtifactRecord,
     source_main_xml_sha256: String,
@@ -1476,12 +2094,18 @@ fn fixture_stem(
     authored_count: usize,
     chunk_mode: ChunkMode,
     text_mode: TextMode,
+    compression: CompressionProfile,
 ) -> String {
-    format!(
+    let mut stem = format!(
         "source{source_count}-authored{authored_count}-{}-{}",
         chunk_mode.name(),
         text_mode.name()
-    )
+    );
+    if compression != CompressionProfile::Current {
+        stem.push('-');
+        stem.push_str(compression.name());
+    }
+    stem
 }
 
 fn write_fixture_file(path: &Path, bytes: &[u8]) -> BenchResult<()> {
@@ -1491,15 +2115,25 @@ fn write_fixture_file(path: &Path, bytes: &[u8]) -> BenchResult<()> {
     Ok(())
 }
 
-fn export_fixture(dir: &Path, fixture: &Fixture) -> BenchResult<()> {
+fn export_fixture(
+    dir: &Path,
+    fixture: &Fixture,
+    provider: AuthoredProvider,
+    candidate_override: Option<&[u8]>,
+) -> BenchResult<()> {
     std::fs::create_dir_all(dir)?;
     let source_count = fixture.source_record.semantic.paragraph_count;
-    let stem = fixture_stem(
+    let mut stem = fixture_stem(
         source_count,
         fixture.authored.count,
         fixture.authored.chunk_mode,
         fixture.authored.text_mode,
+        fixture.compression,
     );
+    if provider != AuthoredProvider::Deterministic {
+        stem.push('-');
+        stem.push_str(provider.name());
+    }
     let source_file = format!("{stem}-source.docx");
     let candidate_file = format!("{stem}-candidate.docx");
     let manifest_file = format!("{stem}-hashes.json");
@@ -1507,14 +2141,17 @@ fn export_fixture(dir: &Path, fixture: &Fixture) -> BenchResult<()> {
     let candidate_path = dir.join(&candidate_file);
     let manifest_path = dir.join(&manifest_file);
     let source_sha256 = sha256_hex(fixture.source_archive.as_ref());
-    let candidate_sha256 = sha256_hex(fixture.candidate_archive.as_ref());
+    let candidate = candidate_override.unwrap_or(fixture.candidate_archive.as_ref());
+    let candidate_sha256 = sha256_hex(candidate);
     if source_sha256 != fixture.source_record.archive_sha256
         || candidate_sha256 != fixture.oracle.candidate_archive_sha256
     {
         return Err("fixture export archive hash disagrees with its oracle".into());
     }
     write_fixture_file(&source_path, fixture.source_archive.as_ref())?;
-    write_fixture_file(&candidate_path, fixture.candidate_archive.as_ref())?;
+    write_fixture_file(&candidate_path, candidate)?;
+    let candidate_reader = ArchiveReader::new(candidate)?;
+    let candidate_main = candidate_reader.read(MAIN_PATH)?;
     let manifest = FixtureManifest {
         schema: "docx-replayable-tail-append-fixture-v1",
         version: 1,
@@ -1522,6 +2159,8 @@ fn export_fixture(dir: &Path, fixture: &Fixture) -> BenchResult<()> {
         authored_count: fixture.authored.count,
         chunk_mode: fixture.authored.chunk_mode,
         text_mode: fixture.authored.text_mode,
+        provider,
+        compression: fixture.compression,
         source: FixtureArtifactRecord {
             file: source_file,
             bytes: fixture.source_archive.len(),
@@ -1529,11 +2168,11 @@ fn export_fixture(dir: &Path, fixture: &Fixture) -> BenchResult<()> {
         },
         candidate: FixtureArtifactRecord {
             file: candidate_file,
-            bytes: fixture.candidate_archive.len(),
+            bytes: candidate.len(),
             sha256: candidate_sha256,
         },
         source_main_xml_sha256: fixture.source_record.main_xml_sha256.clone(),
-        candidate_main_xml_sha256: fixture.oracle.candidate_main_xml_sha256.clone(),
+        candidate_main_xml_sha256: sha256_hex(&candidate_main),
     };
     let mut output = OpenOptions::new()
         .write(true)
@@ -1576,6 +2215,7 @@ fn proof_record(
             text_bytes: authored.text_bytes,
             encoded_xml_bytes: authored.encoded_xml_bytes,
             event_count: authored.event_count,
+            text_chunk_count: expected_authored.text_chunk_count,
             expected_event_sha256: hex_digest(&authored.event_sha256),
             expected_encoded_sha256: hex_digest(&authored.encoded_sha256),
         },
@@ -1615,6 +2255,7 @@ fn verify_proof(
         || proof.authored.max_encoded_paragraph_bytes != authored.max_encoded_paragraph_bytes
         || proof.authored.xml_entity_reference_count != authored.xml_entity_reference_count
         || proof.authored.event_count != authored.event_count
+        || proof.authored.text_chunk_count != authored.text_chunk_count
         || proof.authored.text_bytes != authored.text_bytes
         || proof.authored.encoded_xml_bytes != authored.encoded_xml_bytes
         || proof.authored.expected_event_sha256 != authored.expected_event_sha256
@@ -1711,9 +2352,13 @@ fn verify_candidate_oracles(
     })
 }
 
-fn build_fixture(source_count: usize, authored: AuthoredSpec) -> BenchResult<Fixture> {
+fn build_fixture(
+    source_count: usize,
+    authored: AuthoredSpec,
+    compression: CompressionProfile,
+) -> BenchResult<Fixture> {
     let source_xml = source_main_xml(source_count)?;
-    let source_archive = source_archive(&source_xml, 0)?;
+    let source_archive = source_archive_with_compression(&source_xml, 0, compression)?;
     let authored_record = authored_record(authored)?;
     let limits = stream_limits(source_xml.len(), source_count, &authored_record)?;
     let limit_record = StreamLimitRecord {
@@ -1776,6 +2421,7 @@ fn build_fixture(source_count: usize, authored: AuthoredSpec) -> BenchResult<Fix
     }
     Ok(Fixture {
         authored,
+        compression,
         authored_record,
         limits,
         limit_record,
@@ -1787,6 +2433,279 @@ fn build_fixture(source_count: usize, authored: AuthoredSpec) -> BenchResult<Fix
     })
 }
 
+fn prepare_input(fixture: &Fixture, config: &Config) -> BenchResult<Option<PreparedInput>> {
+    let Some(mode) = config.input_mode else {
+        return Ok(None);
+    };
+    let capability = if matches!(mode, InputMode::File) {
+        let path = config
+            .input_file
+            .as_ref()
+            .ok_or("file input mode requires --input-file")?;
+        InputSourceCapability::prepare_file(path)?
+    } else {
+        InputSourceCapability::owned(Arc::clone(&fixture.source_archive))
+    };
+    capability.verify_fingerprint()?;
+    let fingerprint = capability.fingerprint();
+    if fingerprint.len() != fixture.source_archive.len() as u64
+        || fingerprint.sha256_hex() != fixture.source_record.archive_sha256
+    {
+        return Err("input capability does not match the generated source archive".into());
+    }
+    let profile = match mode {
+        InputMode::Owned => InputProfile::owned(),
+        InputMode::File => InputProfile::file(),
+        InputMode::ShortRead => InputProfile::try_new(
+            mode,
+            config.input_max_range_bytes,
+            std::time::Duration::ZERO,
+            std::time::Duration::ZERO,
+            None,
+        )?,
+        InputMode::Latency => InputProfile::latency(
+            config
+                .input_max_range_bytes
+                .ok_or("latency input mode requires --input-max-range")?,
+            std::time::Duration::from_micros(config.input_delay_us),
+            std::time::Duration::from_micros(config.input_overhead_us),
+            config.input_bytes_per_second,
+        )?,
+    };
+    Ok(Some(PreparedInput {
+        profile,
+        capability,
+    }))
+}
+
+fn input_mode_name(input: Option<&PreparedInput>) -> &'static str {
+    input.map_or("native_owned", |prepared| prepared.profile.mode().as_str())
+}
+
+fn input_storage_kind(input: Option<&PreparedInput>) -> &'static str {
+    input.map_or("owned", |prepared| {
+        prepared.capability.storage_kind().as_str()
+    })
+}
+
+fn input_identity_validation(input: Option<&PreparedInput>) -> &'static str {
+    match input {
+        None => "native_source_archive_oracle",
+        Some(prepared) if prepared.capability.is_file() => {
+            "setup_and_post_sample_fingerprint_outside_timing"
+        },
+        Some(_) => "setup_fingerprint_outside_timing",
+    }
+}
+
+fn source_description(input_mode: Option<InputMode>) -> &'static str {
+    match input_mode {
+        None => "caller_owned_arc_positional_read_at_requested_returned_fixed_histograms",
+        Some(InputMode::Owned) => {
+            "profile_owned_positional_read_at_requested_returned_fixed_histograms"
+        },
+        Some(InputMode::File) => {
+            "profile_file_source_positional_read_at_requested_returned_fixed_histograms"
+        },
+        Some(InputMode::ShortRead) => {
+            "profile_short_read_positional_read_at_requested_returned_fixed_histograms"
+        },
+        Some(InputMode::Latency) => {
+            "profile_latency_positional_read_at_requested_returned_fixed_histograms"
+        },
+    }
+}
+
+fn limits_for_provider(fixture: &Fixture, config: &Config) -> BenchResult<ParagraphStreamLimits> {
+    if !config.authored_provider.is_store() {
+        return Ok(fixture.limits);
+    }
+    let maximum = config
+        .replay_max_bytes
+        .ok_or("store provider requires --replay-max-bytes")?;
+    let mut limits = fixture.limits;
+    limits.max_replay_bytes = maximum;
+    limits.validate()?;
+    if maximum < fixture.authored_record.encoded_xml_bytes {
+        return Err(format!(
+            "--replay-max-bytes {maximum} is below authored XML bytes {}",
+            fixture.authored_record.encoded_xml_bytes
+        )
+        .into());
+    }
+    Ok(limits)
+}
+
+fn file_replay_path(fixture: &Fixture, config: &Config) -> BenchResult<PathBuf> {
+    let directory = config
+        .replay_dir
+        .as_ref()
+        .ok_or("file-store provider requires --replay-dir")?;
+    Ok(directory.join(format!(
+        "{}.replay",
+        fixture_stem(
+            fixture.source_record.semantic.paragraph_count,
+            fixture.authored.count,
+            fixture.authored.chunk_mode,
+            fixture.authored.text_mode,
+            fixture.compression,
+        )
+    )))
+}
+
+fn cleanup_file_route(
+    cleanup: Arc<Mutex<Option<FileReplayCleanupRecord>>>,
+    path: &Path,
+    monitor: &FileReplayMonitor,
+) -> BenchResult<Option<FileStoreObservation>> {
+    let record = cleanup
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take();
+    let Some(record) = record else {
+        return Ok(None);
+    };
+    let cleanup_stats = FileReplayStore::cleanup(path, record.observation)?;
+    let stats = monitor.stats();
+    Ok(Some(FileStoreObservation {
+        write_calls: stats.write_calls,
+        sync_calls: stats.sync_calls,
+        read_calls: stats.replay_read_calls,
+        returned_bytes: stats.replay_returned_bytes,
+        replay_sha256_checks: stats.replay_sha256_checks,
+        seal_sha256_checks: stats.seal_sha256_checks,
+        cleanup_sha256_checks: cleanup_stats.cleanup_sha256_checks,
+        logical_bytes: cleanup_stats.file_logical_bytes,
+        allocated_bytes: cleanup_stats.file_allocated_bytes,
+        cleanup_verified: cleanup_stats.file_cleanup_verified,
+    }))
+}
+
+fn verify_store_preflight(
+    fixture: &Fixture,
+    config: &Config,
+    limits: ParagraphStreamLimits,
+) -> BenchResult<Vec<u8>> {
+    let replay_counters = Arc::new(ReplayCounters::default());
+    if matches!(config.authored_provider, AuthoredProvider::MemoryStore) {
+        let store = ReplayRouteStore::Memory(CountingReplayStore::new(
+            MemoryReplayStore::new(limits.max_replay_bytes)?,
+            Arc::clone(&replay_counters),
+        ));
+        return verify_store_preflight_with_store(fixture, config, limits, store, replay_counters);
+    }
+    let directory = config
+        .replay_dir
+        .as_ref()
+        .ok_or("file-store provider requires --replay-dir")?;
+    std::fs::create_dir_all(directory)?;
+    let cleanup = Arc::new(Mutex::new(None));
+    let monitor = FileReplayMonitor::new();
+    let store = FileReplayRouteStore::new(
+        file_replay_path(fixture, config)?,
+        limits.max_replay_bytes,
+        match config.replay_sync {
+            ReplaySync::None => FileSyncPolicy::None,
+            ReplaySync::Data => FileSyncPolicy::Data,
+        },
+        Arc::clone(&cleanup),
+        &monitor,
+    )?;
+    let counted = ReplayRouteStore::File(CountingReplayStore::new(
+        store,
+        Arc::clone(&replay_counters),
+    ));
+    let result =
+        verify_store_preflight_with_store(fixture, config, limits, counted, replay_counters);
+    let cleanup_result = cleanup_file_route(cleanup, &file_replay_path(fixture, config)?, &monitor);
+    let candidate = result?;
+    cleanup_result?.ok_or("file-store preflight did not produce a cleanup record")?;
+    Ok(candidate)
+}
+
+fn verify_store_preflight_with_store<R>(
+    fixture: &Fixture,
+    config: &Config,
+    limits: ParagraphStreamLimits,
+    store: R,
+    replay_counters: Arc<ReplayCounters>,
+) -> BenchResult<Vec<u8>>
+where
+    R: AuthoredReplayStore + 'static,
+    R::Handle: 'static,
+{
+    let source_counters = Arc::new(SourceCounters::default());
+    let authored_counters = Arc::new(AuthoredCounters::default());
+    let (candidate_archive, inverse, proof) = {
+        let source = Arc::new(MeasureSource::new(
+            Arc::clone(&fixture.source_archive),
+            Arc::clone(&source_counters),
+        ));
+        let package = source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
+        let producer = GeneratedParagraphProducer::new(
+            fixture.authored,
+            Arc::clone(&authored_counters),
+            Arc::clone(&replay_counters),
+        );
+        let edit = package.tail_append_plain_paragraphs_from_producer(producer, store, limits)?;
+        let plan = edit.prepare()?;
+        let proof = proof_record(
+            plan.source_proof(),
+            plan.candidate_proof(),
+            plan.authored_proof(),
+            fixture.authored,
+            &fixture.authored_record,
+        );
+        let mut output = Vec::new();
+        let publication = plan.write_to_stream(&mut output)?;
+        let candidate_bytes: Arc<[u8]> = Arc::from(output.clone());
+        let candidate_source = Arc::new(MeasureSource::new(
+            Arc::clone(&candidate_bytes),
+            Arc::new(SourceCounters::default()),
+        ));
+        let candidate_package =
+            source_backed::Package::from_read_at(Arc::clone(&candidate_source) as Arc<dyn ReadAt>)?;
+        let mut inverse = Vec::new();
+        publication.write_inverse_to_stream(&candidate_package, &mut inverse)?;
+        (output, inverse, proof)
+    };
+    let candidate_reader = ArchiveReader::new(&candidate_archive)?;
+    let candidate_xml = candidate_reader.read(MAIN_PATH)?;
+    let expected_candidate_xml = independent_candidate_xml(
+        &source_main_xml(fixture.source_record.semantic.paragraph_count)?,
+        fixture.authored,
+    )?;
+    let oracle = verify_candidate_oracles(
+        fixture.source_archive.as_ref(),
+        &source_main_xml(fixture.source_record.semantic.paragraph_count)?,
+        &candidate_archive,
+        &expected_candidate_xml,
+        fixture.source_record.semantic.paragraph_count,
+        fixture.authored,
+        &inverse,
+    )?;
+    verify_proof(
+        &proof,
+        &source_main_xml(fixture.source_record.semantic.paragraph_count)?,
+        &candidate_xml,
+        &fixture.authored_record,
+    )?;
+    if candidate_archive.as_slice() != fixture.candidate_archive.as_ref()
+        || oracle.candidate_archive_sha256 != fixture.oracle.candidate_archive_sha256
+    {
+        return Err("explicit replay-store preflight differs from deterministic candidate".into());
+    }
+    let authored = authored_counters.snapshot();
+    let replay = replay_counters.snapshot();
+    check_authored_counters(
+        &fixture.authored_record,
+        authored,
+        config.authored_provider.authored_opens(),
+    )?;
+    check_replay_counters(&fixture.authored_record, replay, config.authored_provider)?;
+    Ok(candidate_archive)
+}
+
 fn elapsed_ns(start: Instant) -> BenchResult<u64> {
     u64::try_from(start.elapsed().as_nanos())
         .map_err(|_| "DOCX replay elapsed time overflows u64 nanoseconds".into())
@@ -1794,79 +2713,296 @@ fn elapsed_ns(start: Instant) -> BenchResult<u64> {
 
 fn run_iteration(
     fixture: &Fixture,
+    config: &Config,
+    input: Option<&PreparedInput>,
     sink_write_bytes: usize,
 ) -> BenchResult<(
     u64,
     SinkObservation,
     ReadObservation,
     AuthoredObservation,
+    Option<ReplayObservation>,
     Option<allocation_metrics::Sample>,
     Option<process_metrics::Delta>,
 )> {
     let source_counters = Arc::new(SourceCounters::default());
     let authored_counters = Arc::new(AuthoredCounters::default());
+    let replay_counters = Arc::new(ReplayCounters::default());
+    let limits = limits_for_provider(fixture, config)?;
+    let file_path = if matches!(config.authored_provider, AuthoredProvider::FileStore) {
+        Some(file_replay_path(fixture, config)?)
+    } else {
+        None
+    };
+    let file_cleanup = file_path
+        .as_ref()
+        .map(|_| Arc::new(Mutex::new(None::<FileReplayCleanupRecord>)));
+    let file_monitor = file_path.as_ref().map(|_| FileReplayMonitor::new());
     let process_before = process_metrics::Snapshot::read().ok();
     let region = allocation_metrics::begin();
     let start = Instant::now();
-    let (sink, reads, authored) = {
-        let source = Arc::new(MeasureSource::new(
-            Arc::clone(&fixture.source_archive),
-            Arc::clone(&source_counters),
-        ));
-        let package = source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-        let generated =
-            GeneratedParagraphSource::new(fixture.authored, Arc::clone(&authored_counters));
-        let edit = package.tail_append_plain_paragraphs(generated, fixture.limits);
-        let plan = edit.prepare()?;
+    let (sink, reads, authored, replay) = {
+        let opened_input = input
+            .map(|prepared| prepared.profile.open(&prepared.capability))
+            .transpose()?;
+        let source: Arc<dyn ReadAt> = if let Some(opened) = opened_input.as_ref() {
+            Arc::new(ProfiledMeasureSource::new(
+                Arc::clone(opened),
+                Arc::clone(&source_counters),
+            ))
+        } else {
+            Arc::new(MeasureSource::new(
+                Arc::clone(&fixture.source_archive),
+                Arc::clone(&source_counters),
+            ))
+        };
+        let package = source_backed::Package::from_read_at(Arc::clone(&source))?;
         let mut output = HashingSink::new(sink_write_bytes)?;
-        let _publication = plan.write_to_stream(&mut output)?;
+        let replay = if matches!(config.authored_provider, AuthoredProvider::Deterministic) {
+            let generated =
+                GeneratedParagraphSource::new(fixture.authored, Arc::clone(&authored_counters));
+            let edit = package.tail_append_plain_paragraphs(generated, limits);
+            let plan = edit.prepare()?;
+            let _publication = plan.write_to_stream(&mut output)?;
+            None
+        } else {
+            let producer = GeneratedParagraphProducer::new(
+                fixture.authored,
+                Arc::clone(&authored_counters),
+                Arc::clone(&replay_counters),
+            );
+            let store = match config.authored_provider {
+                AuthoredProvider::MemoryStore => {
+                    ReplayRouteStore::Memory(CountingReplayStore::new(
+                        MemoryReplayStore::new(limits.max_replay_bytes)?,
+                        Arc::clone(&replay_counters),
+                    ))
+                },
+                AuthoredProvider::FileStore => {
+                    let cleanup = file_cleanup
+                        .as_ref()
+                        .ok_or("file-store route has no cleanup owner")?;
+                    let path = file_path
+                        .as_ref()
+                        .ok_or("file-store route has no replay path")?;
+                    let monitor = file_monitor
+                        .as_ref()
+                        .ok_or("file-store route has no monitor")?;
+                    ReplayRouteStore::File(CountingReplayStore::new(
+                        FileReplayRouteStore::new(
+                            path.clone(),
+                            limits.max_replay_bytes,
+                            match config.replay_sync {
+                                ReplaySync::None => FileSyncPolicy::None,
+                                ReplaySync::Data => FileSyncPolicy::Data,
+                            },
+                            Arc::clone(cleanup),
+                            monitor,
+                        )?,
+                        Arc::clone(&replay_counters),
+                    ))
+                },
+                AuthoredProvider::Deterministic => {
+                    return Err("deterministic provider selected an explicit store route".into());
+                },
+            };
+            let edit =
+                package.tail_append_plain_paragraphs_from_producer(producer, store, limits)?;
+            let plan = edit.prepare()?;
+            let _publication = plan.write_to_stream(&mut output)?;
+            Some(replay_counters.snapshot())
+        };
         let sink = output.finish();
-        let reads = source.observation();
+        let reads = source_counters.snapshot();
         let authored = authored_counters.snapshot();
-        (sink, reads, authored)
+        (sink, reads, authored, replay)
     };
     let elapsed = elapsed_ns(start)?;
     let allocation = region.finish();
     let process = process_before
         .zip(process_metrics::Snapshot::read().ok())
         .map(|(before, after)| after.delta(before));
-    Ok((elapsed, sink, reads, authored, allocation, process))
+    let replay = match (replay, file_cleanup) {
+        (Some(mut replay), Some(cleanup)) => {
+            let file = cleanup_file_route(
+                cleanup,
+                file_path
+                    .as_ref()
+                    .ok_or("file-store route has no replay path")?,
+                file_monitor
+                    .as_ref()
+                    .ok_or("file-store route has no monitor")?,
+            )?
+            .ok_or("file-store route did not produce a cleanup record")?;
+            replay.route = Some(config.authored_provider);
+            replay.file_logical_bytes = file.logical_bytes;
+            replay.file_allocated_bytes = file.allocated_bytes;
+            replay.file_write_calls = Some(file.write_calls);
+            replay.file_sync_calls = Some(file.sync_calls);
+            replay.file_cleanup_verified = Some(file.cleanup_verified);
+            replay.seal_sha256_checks = Some(file.seal_sha256_checks);
+            replay.cleanup_sha256_checks = Some(file.cleanup_sha256_checks);
+            replay.durable_reference_kind = Some("file");
+            replay.file = Some(file);
+            Some(replay)
+        },
+        (Some(mut replay), None) => {
+            replay.route = Some(config.authored_provider);
+            replay.retained_logical_bytes = Some(fixture.authored_record.encoded_xml_bytes);
+            replay.retained_capacity_bytes = Some(limits.max_replay_bytes);
+            replay.retained_capacity_provenance = Some("exact_reserve_equal_to_ceiling");
+            replay.durable_reference_kind = Some("none");
+            replay.seal_sha256_checks = Some(0);
+            replay.cleanup_sha256_checks = Some(0);
+            Some(replay)
+        },
+        (None, None) => None,
+        (None, Some(cleanup)) => {
+            let _ = cleanup_file_route(
+                cleanup,
+                file_path
+                    .as_ref()
+                    .ok_or("file-store route has no replay path")?,
+                file_monitor
+                    .as_ref()
+                    .ok_or("file-store route has no monitor")?,
+            )?;
+            None
+        },
+    };
+    Ok((elapsed, sink, reads, authored, replay, allocation, process))
 }
 
 fn check_authored_counters(
     expected: &AuthoredRecord,
     authored: AuthoredObservation,
+    expected_opens: u64,
 ) -> BenchResult<()> {
-    if authored.opens != EXPECTED_AUTHORED_OPENS {
+    if authored.opens != expected_opens {
         return Err(format!(
-            "DOCX replay authored-provider opened {} passes; expected {EXPECTED_AUTHORED_OPENS}",
-            authored.opens
+            "DOCX replay authored-provider opened {} passes; expected {expected_opens}",
+            authored.opens,
         )
         .into());
     }
+    // A one-shot producer emits one pass without opening a replay cursor.
+    let event_passes = if expected_opens == 0 {
+        1
+    } else {
+        expected_opens
+    };
     let expected_events = expected
         .event_count
-        .checked_mul(authored.opens)
+        .checked_mul(event_passes)
         .ok_or("DOCX replay authored event counter overflow")?;
     let expected_text_bytes = expected
         .text_bytes
-        .checked_mul(authored.opens)
+        .checked_mul(event_passes)
         .ok_or("DOCX replay authored text counter overflow")?;
-    if authored.events != expected_events || authored.text_bytes != expected_text_bytes {
+    let expected_text_chunks = expected
+        .text_chunk_count
+        .checked_mul(event_passes)
+        .ok_or("DOCX replay authored text-chunk counter overflow")?;
+    if authored.events != expected_events
+        || authored.text_chunks != expected_text_chunks
+        || authored.text_bytes != expected_text_bytes
+    {
         return Err(format!(
-            "DOCX replay authored-provider counters disagree with proof: events {} != {expected_events} or text {} != {expected_text_bytes}",
-            authored.events, authored.text_bytes
+            "DOCX replay authored-provider counters disagree with proof: events {} != {expected_events}, chunks {} != {expected_text_chunks}, or text {} != {expected_text_bytes}",
+            authored.events, authored.text_chunks, authored.text_bytes
         )
         .into());
     }
     Ok(())
 }
 
+fn check_replay_counters(
+    expected: &AuthoredRecord,
+    replay: ReplayObservation,
+    provider: AuthoredProvider,
+) -> BenchResult<()> {
+    check_replay_counters_with_file(expected, replay, provider, false)
+}
+
+fn check_replay_counters_with_file(
+    expected: &AuthoredRecord,
+    replay: ReplayObservation,
+    provider: AuthoredProvider,
+    require_file_observation: bool,
+) -> BenchResult<()> {
+    if !provider.is_store() {
+        return Ok(());
+    }
+    let expected_replayed_bytes = expected
+        .encoded_xml_bytes
+        .checked_mul(provider.replay_opens())
+        .ok_or("DOCX replay returned-byte counter overflow")?;
+    if replay.producer_invocations != 1
+        || replay.prepare_calls != 1
+        || replay.append_calls == 0
+        || replay.appended_bytes != expected.encoded_xml_bytes
+        || replay.store_finish_calls != 1
+        || replay.replay_opens != provider.replay_opens()
+        || replay.replay_read_calls == 0
+        || replay.replay_returned_bytes != expected_replayed_bytes
+        || replay.replay_finish_calls != provider.replay_opens()
+        || replay.replay_sha256_checks != provider.replay_opens()
+    {
+        return Err(format!(
+            "DOCX replay store counters disagree with proof: producer {}, prepare {}, appended {}, finish {}, opens {}, reads {}, returned {}, reader_finish {}, hash_checks {}; expected appended {}, opens {}, returned {}, reader_finish {}, hash_checks {}",
+            replay.producer_invocations,
+            replay.prepare_calls,
+            replay.appended_bytes,
+            replay.store_finish_calls,
+            replay.replay_opens,
+            replay.replay_read_calls,
+            replay.replay_returned_bytes,
+            replay.replay_finish_calls,
+            replay.replay_sha256_checks,
+            expected.encoded_xml_bytes,
+            provider.replay_opens(),
+            expected_replayed_bytes,
+            provider.replay_opens(),
+            provider.replay_opens(),
+        )
+        .into());
+    }
+    match provider {
+        AuthoredProvider::FileStore => {
+            if require_file_observation {
+                let Some(file) = replay.file else {
+                    return Err("file-store route omitted file observations".into());
+                };
+                if file.write_calls == 0
+                    || file.read_calls == 0
+                    || file.returned_bytes != expected_replayed_bytes
+                    || file.replay_sha256_checks != provider.replay_opens()
+                    || file.seal_sha256_checks != 1
+                    || file.cleanup_sha256_checks != 1
+                    || file.logical_bytes != Some(expected.encoded_xml_bytes)
+                    || !file.cleanup_verified
+                {
+                    return Err("file-store retention or cleanup observations failed".into());
+                }
+            }
+        },
+        AuthoredProvider::MemoryStore => {
+            if replay.file.is_some() {
+                return Err("memory-store route reported file observations".into());
+            }
+        },
+        AuthoredProvider::Deterministic => {},
+    }
+    Ok(())
+}
+
 fn check_runtime(
     fixture: &Fixture,
+    provider: AuthoredProvider,
     sink: SinkObservation,
     reads: ReadObservation,
     authored: AuthoredObservation,
+    replay: Option<ReplayObservation>,
 ) -> BenchResult<()> {
     if sink.accepted_bytes != u64::try_from(fixture.oracle.candidate_archive_bytes)?
         || sink.digest.as_slice() != Sha256::digest(fixture.candidate_archive.as_ref()).as_slice()
@@ -1876,7 +3012,21 @@ fn check_runtime(
     if reads.calls == 0 || reads.returned_bytes == 0 {
         return Err("DOCX replay lifecycle performed no positional source reads".into());
     }
-    check_authored_counters(&fixture.authored_record, authored)?;
+    check_authored_counters(
+        &fixture.authored_record,
+        authored,
+        provider.authored_opens(),
+    )?;
+    if provider.is_store() {
+        check_replay_counters_with_file(
+            &fixture.authored_record,
+            replay.ok_or("store route did not report replay counters")?,
+            provider,
+            true,
+        )?;
+    } else if replay.is_some() {
+        return Err("deterministic route unexpectedly reported replay counters".into());
+    }
     Ok(())
 }
 
@@ -1892,18 +3042,55 @@ fn run_case(
         chunk_mode,
         text_mode,
     };
-    let fixture = build_fixture(source_count, authored_spec)?;
+    let fixture = build_fixture(source_count, authored_spec, config.compression)?;
+    let limits = limits_for_provider(&fixture, config)?;
+    let preflight_candidate = if config.authored_provider.is_store() {
+        // Execute one complete route with a materialized output and inverse
+        // before timing.  This keeps all semantic/raw ZIP checks outside the
+        // measurement while proving that the selected store has equivalent
+        // candidate bytes and authenticated replay facts.
+        Some(verify_store_preflight(&fixture, config, limits)?)
+    } else {
+        None
+    };
+    let prepared_input = prepare_input(&fixture, config)?;
     if let Some(dir) = config.fixture_dir.as_deref() {
         // Fixture export is deliberate, opt-in, and outside every timed
         // iteration.  The files are the same bytes used by the independent
         // archive/oracle checks above.
-        export_fixture(dir, &fixture)?;
+        export_fixture(
+            dir,
+            &fixture,
+            config.authored_provider,
+            preflight_candidate.as_deref(),
+        )?;
     }
+    drop(preflight_candidate);
     let mut samples = Vec::with_capacity(config.samples);
     for iteration in 0..config.warmups.saturating_add(config.samples) {
-        let (elapsed, sink, reads, authored, allocation, process) =
-            run_iteration(&fixture, config.sink_write_bytes)?;
-        check_runtime(&fixture, sink, reads, authored)?;
+        let (elapsed, sink, reads, authored, replay, allocation, process) = run_iteration(
+            &fixture,
+            config,
+            prepared_input.as_ref(),
+            config.sink_write_bytes,
+        )?;
+        if let Some(input) = prepared_input.as_ref()
+            && input.capability.is_file()
+        {
+            // Revalidate the pinned descriptor after the timed operation.  A
+            // full hash here is setup/post-sample evidence and is deliberately
+            // outside the timed lifecycle; native and owned input paths do not
+            // acquire this extra pass.
+            input.capability.verify_fingerprint()?;
+        }
+        check_runtime(
+            &fixture,
+            config.authored_provider,
+            sink,
+            reads,
+            authored,
+            replay,
+        )?;
         if iteration >= config.warmups {
             samples.push(Sample {
                 sample: iteration - config.warmups,
@@ -1914,6 +3101,7 @@ fn run_case(
                 elapsed_ns: elapsed,
                 source_reads: reads,
                 authored,
+                replay,
                 sink: sink.record(),
                 allocation,
                 process,
@@ -1925,6 +3113,13 @@ fn run_case(
         authored_count,
         chunk_mode,
         text_mode,
+        provider: config.authored_provider,
+        replay_max_bytes: config.replay_max_bytes,
+        compression: config.compression,
+        input_mode: input_mode_name(prepared_input.as_ref()),
+        input_storage_kind: input_storage_kind(prepared_input.as_ref()),
+        input_identity_validation: input_identity_validation(prepared_input.as_ref()),
+        sink_write_bytes: config.sink_write_bytes,
         source: fixture.source_record,
         authored: fixture.authored_record,
         limits: fixture.limit_record,
@@ -1945,6 +3140,27 @@ fn parse_positive(value: &OsString, flag: &str) -> BenchResult<usize> {
         return Err(format!("{flag} must be positive").into());
     }
     Ok(parsed)
+}
+
+fn parse_u64_positive(value: &OsString, flag: &str) -> BenchResult<u64> {
+    let text = value
+        .to_str()
+        .ok_or_else(|| format!("{flag} must be UTF-8"))?;
+    let parsed = text
+        .parse::<u64>()
+        .map_err(|error| format!("invalid {flag} value {text:?}: {error}"))?;
+    if parsed == 0 || parsed == u64::MAX {
+        return Err(format!("{flag} must be finite and positive").into());
+    }
+    Ok(parsed)
+}
+
+fn parse_u64_nonnegative(value: &OsString, flag: &str) -> BenchResult<u64> {
+    let text = value
+        .to_str()
+        .ok_or_else(|| format!("{flag} must be UTF-8"))?;
+    text.parse::<u64>()
+        .map_err(|error| format!("invalid {flag} value {text:?}: {error}").into())
 }
 
 fn parse_counts(
@@ -2017,6 +3233,17 @@ where
     let mut sink_write_bytes = HASH_SINK_MAX_WRITE;
     let mut json_path = None;
     let mut fixture_dir = None;
+    let mut authored_provider = AuthoredProvider::Deterministic;
+    let mut replay_dir = None;
+    let mut replay_max_bytes = None;
+    let mut replay_sync = ReplaySync::None;
+    let mut compression = CompressionProfile::Current;
+    let mut input_mode = None;
+    let mut input_file = None;
+    let mut input_max_range_bytes = None;
+    let mut input_delay_us = 0_u64;
+    let mut input_overhead_us = 0_u64;
+    let mut input_bytes_per_second = None;
     let mut values = args.into_iter();
     while let Some(argument) = values.next() {
         let flag = argument.to_string_lossy();
@@ -2057,11 +3284,81 @@ where
             },
             "--sink-write" => {
                 sink_write_bytes =
-                    parse_positive(&next_value(&mut values, "--sink-write")?, "--sink-write")?
+                    parse_positive(&next_value(&mut values, "--sink-write")?, "--sink-write")?;
+                if !SINK_WRITE_BYTES.contains(&sink_write_bytes) {
+                    return Err(format!(
+                        "unsupported --sink-write value {sink_write_bytes}; expected one of {SINK_WRITE_BYTES:?}"
+                    )
+                    .into());
+                }
             },
             "--json" => json_path = Some(PathBuf::from(next_value(&mut values, "--json")?)),
             "--fixture-dir" => {
                 fixture_dir = Some(PathBuf::from(next_value(&mut values, "--fixture-dir")?))
+            },
+            "--authored-provider" => {
+                authored_provider = AuthoredProvider::parse(
+                    next_value(&mut values, "--authored-provider")?
+                        .to_str()
+                        .ok_or("--authored-provider must be UTF-8")?,
+                )?
+            },
+            "--replay-dir" => {
+                replay_dir = Some(PathBuf::from(next_value(&mut values, "--replay-dir")?))
+            },
+            "--replay-max-bytes" => {
+                replay_max_bytes = Some(parse_u64_positive(
+                    &next_value(&mut values, "--replay-max-bytes")?,
+                    "--replay-max-bytes",
+                )?)
+            },
+            "--replay-sync" => {
+                replay_sync = ReplaySync::parse(
+                    next_value(&mut values, "--replay-sync")?
+                        .to_str()
+                        .ok_or("--replay-sync must be UTF-8")?,
+                )?
+            },
+            "--compression" | "--compression-mode" => {
+                compression = CompressionProfile::parse(
+                    next_value(&mut values, "--compression")?
+                        .to_str()
+                        .ok_or("--compression must be UTF-8")?,
+                )?
+            },
+            "--input-mode" => {
+                input_mode = Some(InputMode::parse(
+                    next_value(&mut values, "--input-mode")?
+                        .to_str()
+                        .ok_or("--input-mode must be UTF-8")?,
+                )?)
+            },
+            "--input-file" => {
+                input_file = Some(PathBuf::from(next_value(&mut values, "--input-file")?))
+            },
+            "--input-max-range" => {
+                input_max_range_bytes = Some(parse_positive(
+                    &next_value(&mut values, "--input-max-range")?,
+                    "--input-max-range",
+                )?)
+            },
+            "--input-delay-us" => {
+                input_delay_us = parse_u64_nonnegative(
+                    &next_value(&mut values, "--input-delay-us")?,
+                    "--input-delay-us",
+                )?
+            },
+            "--input-overhead-us" => {
+                input_overhead_us = parse_u64_nonnegative(
+                    &next_value(&mut values, "--input-overhead-us")?,
+                    "--input-overhead-us",
+                )?
+            },
+            "--input-bytes-per-second" => {
+                input_bytes_per_second = Some(parse_u64_positive(
+                    &next_value(&mut values, "--input-bytes-per-second")?,
+                    "--input-bytes-per-second",
+                )?)
             },
             "--help" | "-h" => return Err(usage().into()),
             unknown => return Err(format!("unknown argument {unknown}; {}", usage()).into()),
@@ -2074,6 +3371,45 @@ where
     {
         return Err("source/authored counts, chunk modes, and text modes must be nonempty".into());
     }
+    if authored_provider.is_store() && replay_max_bytes.is_none() {
+        return Err("store provider requires --replay-max-bytes".into());
+    }
+    if !matches!(authored_provider, AuthoredProvider::FileStore) && replay_dir.is_some() {
+        return Err("--replay-dir is only valid with --authored-provider file-store".into());
+    }
+    if !authored_provider.is_store() && !matches!(replay_sync, ReplaySync::None) {
+        return Err("--replay-sync is only valid with a store provider".into());
+    }
+    if input_mode.is_none()
+        && (input_file.is_some()
+            || input_max_range_bytes.is_some()
+            || input_delay_us != 0
+            || input_overhead_us != 0
+            || input_bytes_per_second.is_some())
+    {
+        return Err("input settings require --input-mode".into());
+    }
+    if !matches!(input_mode, Some(InputMode::File)) && input_file.is_some() {
+        return Err("--input-file is only valid with --input-mode file".into());
+    }
+    if !matches!(input_mode, Some(InputMode::ShortRead | InputMode::Latency))
+        && input_max_range_bytes.is_some()
+    {
+        return Err("--input-max-range is only valid with short-read or latency input".into());
+    }
+    if !matches!(input_mode, Some(InputMode::Latency))
+        && (input_delay_us != 0 || input_overhead_us != 0 || input_bytes_per_second.is_some())
+    {
+        return Err("latency settings require --input-mode latency".into());
+    }
+    if matches!(input_mode, Some(InputMode::File)) && input_file.is_none() {
+        return Err("file input mode requires --input-file".into());
+    }
+    if matches!(input_mode, Some(InputMode::ShortRead | InputMode::Latency))
+        && input_max_range_bytes.is_none()
+    {
+        return Err("short-read and latency input require --input-max-range".into());
+    }
     Ok(Config {
         source_counts,
         authored_counts,
@@ -2084,11 +3420,22 @@ where
         sink_write_bytes,
         json_path,
         fixture_dir,
+        authored_provider,
+        replay_dir,
+        replay_max_bytes,
+        replay_sync,
+        compression,
+        input_mode,
+        input_file,
+        input_max_range_bytes,
+        input_delay_us,
+        input_overhead_us,
+        input_bytes_per_second,
     })
 }
 
 fn usage() -> &'static str {
-    "usage: docx_replayable_tail_append [--source-counts 64,8192,131072] [--authored-counts 64,256,4096,16384] [--chunks one,64,window] [--text empty,short,near] [--samples N] [--warmups N] [--sink-write BYTES] [--json PATH] [--fixture-dir DIR]"
+    "usage: docx_replayable_tail_append [--source-counts 64,8192,131072] [--authored-counts 64,256,4096,16384] [--chunks one,64,window] [--text empty,short,near] [--samples N] [--warmups N] [--sink-write 512|4096|65536] [--authored-provider deterministic|memory-store|file-store] [--replay-dir DIR] [--replay-max-bytes BYTES] [--replay-sync none|data] [--compression-mode current|store|deflate] [--input-mode owned|file|short-read|latency] [--input-file PATH] [--input-max-range BYTES] [--input-delay-us N] [--input-overhead-us N] [--input-bytes-per-second N] [--json PATH] [--fixture-dir DIR]"
 }
 
 /// Run the replayable DOCX lifecycle benchmark using command-line arguments.
@@ -2138,9 +3485,36 @@ where
             warmups: config.warmups,
             sink_write_bytes: config.sink_write_bytes,
             lifecycle: ["source_admission", "prepare", "publish", "drop"],
-            expected_authored_opens: EXPECTED_AUTHORED_OPENS,
-            source: "caller_owned_arc_positional_read_at_requested_returned_fixed_histograms",
-            authored_provider: "deterministic_replayable_bounded_cursor",
+            expected_authored_opens: config.authored_provider.authored_opens(),
+            expected_replay_opens: config.authored_provider.replay_opens(),
+            source: source_description(config.input_mode),
+            authored_provider: config.authored_provider.name(),
+            provider: config.authored_provider,
+            replay_max_bytes: config.replay_max_bytes,
+            replay_dir: config
+                .replay_dir
+                .as_ref()
+                .map(|path| path.display().to_string()),
+            replay_sync: config.replay_sync,
+            compression: config.compression,
+            input_mode: config.input_mode.map_or("native_owned", InputMode::as_str),
+            input_storage_kind: config.input_mode.map_or("owned", |mode| match mode {
+                InputMode::File => "file",
+                InputMode::Owned | InputMode::ShortRead | InputMode::Latency => "owned",
+            }),
+            input_identity_validation: config.input_mode.map_or(
+                "native_source_archive_oracle",
+                |mode| match mode {
+                    InputMode::File => "setup_and_post_sample_fingerprint_outside_timing",
+                    InputMode::Owned | InputMode::ShortRead | InputMode::Latency => {
+                        "setup_fingerprint_outside_timing"
+                    },
+                },
+            ),
+            input_max_range_bytes: config.input_max_range_bytes,
+            input_delay_us: config.input_delay_us,
+            input_overhead_us: config.input_overhead_us,
+            input_bytes_per_second: config.input_bytes_per_second,
             sink: "non_seek_hashing_sha256_short_write_no_archive_retention",
             fixture_dir: config
                 .fixture_dir
@@ -2157,6 +3531,14 @@ where
     } else {
         serde_json::to_writer_pretty(io::stdout().lock(), &report)?;
         println!();
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn verify_candidate_xml_only(actual: &[u8], expected: &[u8]) -> BenchResult<()> {
+    if actual != expected {
+        return Err("candidate XML differs from independent oracle".into());
     }
     Ok(())
 }
@@ -2384,13 +3766,49 @@ mod tests {
             text_chunks: 0,
             text_bytes: 0,
         };
-        assert!(check_authored_counters(&expected, valid).is_ok());
+        assert!(check_authored_counters(&expected, valid, EXPECTED_AUTHORED_OPENS).is_ok());
         let mut partial = valid;
         partial.events -= 1;
-        assert!(check_authored_counters(&expected, partial).is_err());
+        assert!(check_authored_counters(&expected, partial, EXPECTED_AUTHORED_OPENS).is_err());
         let mut extra = valid;
         extra.events += 1;
-        assert!(check_authored_counters(&expected, extra).is_err());
+        assert!(check_authored_counters(&expected, extra, EXPECTED_AUTHORED_OPENS).is_err());
+    }
+
+    #[test]
+    fn replay_counter_oracle_rejects_partial_and_extra_empty_store_passes() {
+        let expected = authored_record(AuthoredSpec {
+            count: 2,
+            chunk_mode: ChunkMode::Fixed64,
+            text_mode: TextMode::Empty,
+        })
+        .expect("empty authored proof");
+        let valid = ReplayObservation {
+            producer_invocations: 1,
+            prepare_calls: 1,
+            append_calls: 1,
+            appended_bytes: expected.encoded_xml_bytes,
+            store_finish_calls: 1,
+            replay_opens: EXPECTED_STORE_REPLAY_OPENS,
+            replay_read_calls: 4,
+            replay_requested_bytes: expected.encoded_xml_bytes * 4,
+            replay_returned_bytes: expected.encoded_xml_bytes * 4,
+            replay_finish_calls: EXPECTED_STORE_REPLAY_OPENS,
+            replay_sha256_checks: EXPECTED_STORE_REPLAY_OPENS,
+            ..ReplayObservation::default()
+        };
+        assert!(check_replay_counters(&expected, valid, AuthoredProvider::MemoryStore).is_ok());
+        let mut partial = valid;
+        partial.replay_opens -= 1;
+        assert!(check_replay_counters(&expected, partial, AuthoredProvider::MemoryStore).is_err());
+        let mut extra = valid;
+        extra.replay_returned_bytes += 1;
+        assert!(check_replay_counters(&expected, extra, AuthoredProvider::MemoryStore).is_err());
+        let mut missing_proof = valid;
+        missing_proof.replay_sha256_checks -= 1;
+        assert!(
+            check_replay_counters(&expected, missing_proof, AuthoredProvider::MemoryStore).is_err()
+        );
     }
 
     #[test]
@@ -2402,6 +3820,7 @@ mod tests {
                 chunk_mode: ChunkMode::Fixed64,
                 text_mode: TextMode::Short,
             },
+            CompressionProfile::Current,
         )
         .expect("stream fixture");
         assert!(fixture.source_record.unchanged_oracle);
@@ -2432,6 +3851,7 @@ mod tests {
                 chunk_mode: ChunkMode::One,
                 text_mode: TextMode::NearLimit,
             },
+            CompressionProfile::Current,
         )
         .expect("near-limit stream fixture");
         assert_eq!(
@@ -2445,12 +3865,45 @@ mod tests {
         assert!(fixture.oracle.candidate_xml_exact);
         assert!(fixture.oracle.inverse_exact);
     }
-}
 
-#[cfg(test)]
-fn verify_candidate_xml_only(actual: &[u8], expected: &[u8]) -> BenchResult<()> {
-    if actual != expected {
-        return Err("candidate XML differs from independent oracle".into());
+    #[test]
+    fn explicit_store_and_deflate_profiles_preserve_archive_semantics() {
+        let xml = source_main_xml(2).expect("source XML");
+        let current = source_archive_with_compression(&xml, 0, CompressionProfile::Current)
+            .expect("current source archive");
+        let current_members = member_identities(&current).expect("current member identities");
+        let current_opaque = current_members
+            .iter()
+            .find(|member| member.path == OPAQUE_PATH)
+            .expect("current opaque member")
+            .clone();
+        for profile in [CompressionProfile::Store, CompressionProfile::Deflate] {
+            let archive =
+                source_archive_with_compression(&xml, 0, profile).expect("profiled source archive");
+            let reader = ArchiveReader::new(&archive).expect("archive reader");
+            assert_eq!(reader.read(MAIN_PATH).expect("main XML"), xml);
+            assert_eq!(
+                reader.read(OPAQUE_PATH).expect("opaque payload").len(),
+                OPAQUE_BYTES
+            );
+            let identities = member_identities(&archive).expect("member identities");
+            let main = identities
+                .iter()
+                .find(|member| member.path == MAIN_PATH)
+                .expect("profiled main member");
+            assert_eq!(
+                main.compression_method,
+                match profile {
+                    CompressionProfile::Store => "Store",
+                    CompressionProfile::Deflate => "Deflate",
+                    CompressionProfile::Current => unreachable!(),
+                }
+            );
+            let opaque = identities
+                .iter()
+                .find(|member| member.path == OPAQUE_PATH)
+                .expect("profiled opaque member");
+            assert_eq!(opaque, &current_opaque);
+        }
     }
-    Ok(())
 }

@@ -1,0 +1,40 @@
+{
+  "removed": [
+    {
+      "bytes": 7929,
+      "path": "__pycache__/common.cpython-314.pyc",
+      "sha256": "4e02b7d444ea07a769b8045adaf8f9dd01604d2b2c32ebe55a68fad5dcdf7577"
+    },
+    {
+      "bytes": 31428,
+      "path": "__pycache__/consumer-probe.cpython-314.pyc",
+      "sha256": "37ba2892b31140a35c94b9e92c85335f3e3aba71e4b155c693d7e103060af312"
+    },
+    {
+      "bytes": 13730,
+      "path": "__pycache__/corpus_oracle.cpython-314.pyc",
+      "sha256": "464c70b84458d4ad2ddc5e87b9d897fadd511ba485204d1bc6acf0968b901264"
+    },
+    {
+      "bytes": 85340,
+      "path": "__pycache__/measure.cpython-314.pyc",
+      "sha256": "6ae30b5cc0b9bb16c298963cb3c1a8111fb8ebcffdc6768db38a3c8a3f549d47"
+    },
+    {
+      "bytes": 94022,
+      "path": "__pycache__/measure_routes.cpython-314.pyc",
+      "sha256": "46be268794549ecf8a79bed793fb8ba9bf2a3073dffd205f09593115df7f0f30"
+    },
+    {
+      "bytes": 19245,
+      "path": "__pycache__/test_measure.cpython-314.pyc",
+      "sha256": "3b9a241b2f35efc28feaf1a996b9c0f7dab3f11e985c5842b4a3c4c1c38aaaf5"
+    },
+    {
+      "bytes": 20617,
+      "path": "__pycache__/test_measure_routes.cpython-314.pyc",
+      "sha256": "c9d3a7a426bdbd0d99630648191025adcd92b324675a7900f16921328510a15a"
+    }
+  ],
+  "removed_utc": "2026-09-09T10:12:06.728676+00:00"
+}

@@ -1,0 +1,128 @@
+{
+  "arms": [
+    "axis-input-file-s64-a64-short-c64",
+    "axis-input-short-read-s64-a64-short-c64",
+    "axis-input-latency-s64-a64-short-c64",
+    "axis-sink-512-s64-a64-short-c64",
+    "axis-sink-4096-s64-a64-short-c64",
+    "axis-sink-65536-s64-a64-short-c64",
+    "axis-compression-current-s64-a64-short-c64",
+    "axis-compression-store-s64-a64-short-c64",
+    "axis-compression-deflate-s64-a64-short-c64"
+  ],
+  "attempt": "dev109",
+  "binary": {
+    "bytes": 423341400,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev101-allocator/docx_replayable_tail_append",
+    "sha256": "e06480e110822ed0bfefde4d424cb3a8da1aae522522da490fd8693f65ffeb48"
+  },
+  "binary_unchanged": true,
+  "diagnostic_only": true,
+  "driver": {
+    "bytes": 15605,
+    "sha256": "1502fc0f52413d777ea735d3448e6f66259cd85857bc8cc22c30a69b5a425c62"
+  },
+  "failure_artifacts_retained": false,
+  "failures": [],
+  "finished_utc": "2026-09-09T10:13:54.843834+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9",
+    "status": "ready"
+  },
+  "passed": true,
+  "protocol_frozen": false,
+  "receipts": [
+    {
+      "bytes": 4335,
+      "label": "axis-input-file-s64-a64-short-c64",
+      "sha256": "9b43892f6c560f1f0dc9dfcbc28e3ece9bed52561e1a000d7d93d9d99f3c2baf"
+    },
+    {
+      "bytes": 3738,
+      "label": "axis-input-short-read-s64-a64-short-c64",
+      "sha256": "1857ce484c83beedb9c6a9c7952e569d423a953502af76b779e9850c18df3853"
+    },
+    {
+      "bytes": 3845,
+      "label": "axis-input-latency-s64-a64-short-c64",
+      "sha256": "5f6dc04bea62f91349f77078df48d967595d8e27342b9d91e31479bc5aded74b"
+    },
+    {
+      "bytes": 3634,
+      "label": "axis-sink-512-s64-a64-short-c64",
+      "sha256": "6e520309385bf75122be5116c90b4a62ce19277749e1c60b0077eded006bcc7d"
+    },
+    {
+      "bytes": 3641,
+      "label": "axis-sink-4096-s64-a64-short-c64",
+      "sha256": "7abfa7745bd4ab894b35021138356c82bea281ec482de6cfbb696593cdcf146c"
+    },
+    {
+      "bytes": 3648,
+      "label": "axis-sink-65536-s64-a64-short-c64",
+      "sha256": "d0b2b8478666fb4a837d068933ecdffbfc6ac6b0f27db0eb61a720e20b84cedd"
+    },
+    {
+      "bytes": 3693,
+      "label": "axis-compression-current-s64-a64-short-c64",
+      "sha256": "eb76028bd80285fece37e4be84045c9729e1a5ba7a1dd090bfe57b5f8f8e8326"
+    },
+    {
+      "bytes": 3677,
+      "label": "axis-compression-store-s64-a64-short-c64",
+      "sha256": "3171bab355c3ff2255fb4956ef5e35b04778f47df7ca84b18a47f390fa068252"
+    },
+    {
+      "bytes": 3693,
+      "label": "axis-compression-deflate-s64-a64-short-c64",
+      "sha256": "26e7769905f547d8220b663276dd4bc48d13a939e61b27e6b22d8de9c589d4b6"
+    }
+  ],
+  "role": "allocator",
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-axis-diagnostic-v1",
+  "scratch_removed": true,
+  "source": {
+    "bytes": 2106,
+    "identity_validation": "retained_rust_fixture_and_current_oracle_match",
+    "main_xml": {
+      "bytes": 3223,
+      "sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+    },
+    "retained_path": "consumer/dev56/short/source.docx",
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+    "staged_path": "/home/zhuhe/.cache/litchi-goal-0484/route-axis-diagnostics/dev109/input/source.docx"
+  },
+  "source_reference": {
+    "archive": {
+      "bytes": 2106,
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+    },
+    "current_oracle": {
+      "main_xml_bytes": 3223,
+      "main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+    },
+    "fixture_manifest": "consumer/dev56/short/fixture-hashes.json",
+    "main_xml": {
+      "bytes": 3223,
+      "sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee"
+    },
+    "retained_path": "consumer/dev56/short/source.docx",
+    "rust_fixture": {
+      "bytes": 2106,
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+    }
+  },
+  "validators": {
+    "common.py": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+    "corpus_oracle.py": "40d3fc1bcdc95bada7f4d5eb1722df9406cddda480ea650b0a74bf5f57971779",
+    "gate.py": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+    "measure.py": "622e6eb6675ee4304e9283de04c050ef1fde1fb115ee9ee24328b0a590245d44",
+    "measure_routes.py": "51af21d89a910165511ddee2ab938a215ac37f31ea310255eb20a5ac5100e4c0",
+    "record_environment.py": "4436acf24304f3494dcf7d01f6dc9b023421215aa4e20090d68ffb2dd5b05736"
+  },
+  "version": 1,
+  "warmups": 1,
+  "workload": "s64-a64-short-c64"
+}

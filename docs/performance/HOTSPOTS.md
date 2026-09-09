@@ -13,6 +13,10 @@ The next measurements must vary source size and authored size independently,
 then compare deterministic replay with the production memory store and a
 caller-supplied bounded file store. The [store measurement plan](results/change-0484/store-measurement-plan.md)
 retains source-adapter, sink-window and Store/Deflate cases as required work.
+The [harness checkpoint](results/change-0484/route-harness-checkpoint.md)
+implements those profiles and separate process inventories; formal captures
+remain outstanding. One-shot routes emit one authored pass with zero cursor
+opens, then authenticate four replay-reader passes.
 Only measured phase attribution can justify removing repeated validation work.
 
 ## 0483: bounded DOCX heap with repeated audit/replay CPU cost

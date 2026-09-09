@@ -1,0 +1,37 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0277]: the size for values of type `dyn std::error::Error + std::marker::Send + Sync` cannot be known at compilation time
+   --> src/docx_replayable_tail_append/route_failure_tests.rs:143:20
+    |
+143 |         error.is::<Box<dyn StdError + Send + Sync>>(),
+    |               --   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+    |               |
+    |               required by a bound introduced by this call
+    |
+    = help: the trait `Sized` is not implemented for `dyn std::error::Error + std::marker::Send + Sync`
+help: the trait `std::error::Error` is conditionally implemented for `std::boxed::Box<E>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/boxed.rs:2464:5
+    |
+    = note: unsatisfied requirement introduced here: `dyn std::error::Error + std::marker::Send + Sync: Sized`
+    = note: required for `std::boxed::Box<dyn std::error::Error + std::marker::Send + Sync>` to implement `std::error::Error`
+note: required by a bound in `<(dyn std::error::Error + 'static)>::is`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/error.rs:279:4
+
+error[E0277]: the size for values of type `dyn std::error::Error + std::marker::Send + Sync` cannot be known at compilation time
+   --> src/docx_replayable_tail_append/route_failure_tests.rs:167:47
+    |
+167 |     if let Some(boxed) = error.downcast_ref::<Box<dyn StdError + Send + Sync>>()
+    |                                ------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+    |                                |
+    |                                required by a bound introduced by this call
+    |
+    = help: the trait `Sized` is not implemented for `dyn std::error::Error + std::marker::Send + Sync`
+help: the trait `std::error::Error` is conditionally implemented for `std::boxed::Box<E>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/boxed.rs:2464:5
+    |
+    = note: unsatisfied requirement introduced here: `dyn std::error::Error + std::marker::Send + Sync: Sized`
+    = note: required for `std::boxed::Box<dyn std::error::Error + std::marker::Send + Sync>` to implement `std::error::Error`
+note: required by a bound in `<(dyn std::error::Error + 'static)>::downcast_ref`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/error.rs:294:4
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-perf-baseline` (lib test) due to 2 previous errors

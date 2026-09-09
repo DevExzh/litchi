@@ -1,0 +1,114 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+warning: type alias `SyncPolicy` is never used
+  --> src/docx_replayable_tail_append/file_store.rs:38:10
+   |
+38 | pub type SyncPolicy = FileSyncPolicy;
+   |          ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `name` is never used
+  --> src/docx_replayable_tail_append/file_store.rs:43:18
+   |
+40 | impl FileSyncPolicy {
+   | ------------------- method in this implementation
+...
+43 |     pub const fn name(self) -> &'static str {
+   |                  ^^^^
+
+warning: methods `path`, `maximum`, `sync_policy`, and `stats` are never used
+   --> src/docx_replayable_tail_append/file_store.rs:369:12
+    |
+322 | impl FileReplayStore {
+    | -------------------- methods in this implementation
+...
+369 |     pub fn path(&self) -> &Path {
+    |            ^^^^
+...
+375 |     pub const fn maximum(&self) -> u64 {
+    |                  ^^^^^^^
+...
+381 |     pub const fn sync_policy(&self) -> FileSyncPolicy {
+    |                  ^^^^^^^^^^^
+...
+387 |     pub fn stats(&self) -> FileReplayStats {
+    |            ^^^^^
+
+warning: fields `path` and `sync_policy` are never read
+   --> src/docx_replayable_tail_append/file_store.rs:708:5
+    |
+707 | struct FileReplayStorage {
+    |        ----------------- fields in this struct
+708 |     path: PathBuf,
+    |     ^^^^
+...
+711 |     sync_policy: FileSyncPolicy,
+    |     ^^^^^^^^^^^
+    |
+    = note: `FileReplayStorage` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: methods `stats`, `path`, and `sync_policy` are never used
+   --> src/docx_replayable_tail_append/file_store.rs:728:12
+    |
+725 | impl FileReplayHandle {
+    | --------------------- methods in this implementation
+...
+728 |     pub fn stats(&self) -> FileReplayStats {
+    |            ^^^^^
+...
+746 |     pub fn path(&self) -> &Path {
+    |            ^^^^
+...
+752 |     pub fn sync_policy(&self) -> FileSyncPolicy {
+    |            ^^^^^^^^^^^
+
+warning: methods `max_range_bytes`, `per_request_latency`, `request_overhead`, and `bytes_per_second` are never used
+   --> src/docx_replayable_tail_append/input_profiles.rs:332:18
+    |
+175 | impl InputProfile {
+    | ----------------- methods in this implementation
+...
+332 |     pub const fn max_range_bytes(self) -> Option<NonZeroUsize> {
+    |                  ^^^^^^^^^^^^^^^
+...
+338 |     pub const fn per_request_latency(self) -> Duration {
+    |                  ^^^^^^^^^^^^^^^^^^^
+...
+344 |     pub const fn request_overhead(self) -> Duration {
+    |                  ^^^^^^^^^^^^^^^^
+...
+350 |     pub const fn bytes_per_second(self) -> Option<NonZeroU64> {
+    |                  ^^^^^^^^^^^^^^^^
+
+warning: method `sha256` is never used
+   --> src/docx_replayable_tail_append/input_profiles.rs:457:18
+    |
+434 | impl SourceFingerprint {
+    | ---------------------- method in this implementation
+...
+457 |     pub const fn sha256(self) -> [u8; 32] {
+    |                  ^^^^^^
+
+warning: field `path` is never read
+   --> src/docx_replayable_tail_append/input_profiles.rs:477:5
+    |
+476 | pub struct SourceFileCapability {
+    |            -------------------- field in this struct
+477 |     path: PathBuf,
+    |     ^^^^
+    |
+    = note: `SourceFileCapability` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: method `path` is never used
+   --> src/docx_replayable_tail_append/input_profiles.rs:508:12
+    |
+483 | impl SourceFileCapability {
+    | ------------------------- method in this implementation
+...
+508 |     pub fn path(&self) -> &Path {
+    |            ^^^^
+
+warning: `litchi-perf-baseline` (lib test) generated 9 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.71s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-891237911b18d194)
+error: test failed, to rerun pass `--lib`

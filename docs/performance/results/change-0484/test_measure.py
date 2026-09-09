@@ -215,7 +215,16 @@ def _valid_report(*, role: str = "normal", samples: int = 2) -> tuple[dict, dict
 
 
 class ReportAcceptanceTests(unittest.TestCase):
-    def _check(self, report: dict, case: dict, binary: dict, *, role: str = "normal", samples: int = 2) -> None:
+    def _check(
+        self,
+        report: dict,
+        case: dict,
+        binary: dict,
+        *,
+        role: str = "normal",
+        samples: int = 2,
+        expected_max_replay_bytes: int | None = None,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             report_path = root / "report.json"
@@ -230,6 +239,7 @@ class ReportAcceptanceTests(unittest.TestCase):
                 warmups=1,
                 binary=runtime_binary,
                 argv=argv,
+                expected_max_replay_bytes=expected_max_replay_bytes,
             )
 
     def test_valid_normal_report_and_sample_cardinality(self) -> None:
@@ -239,11 +249,57 @@ class ReportAcceptanceTests(unittest.TestCase):
         with self.assertRaises(measure.MeasureError):
             self._check(report, case, {"path": "/tmp/fake-binary", "sha256": _sha("z"), "bytes": 1})
 
+    def test_shared_shell_requires_one_producer_pass_when_authored_opens_are_zero(self) -> None:
+        report, case, _ = _valid_report()
+        report["config"]["expected_authored_opens"] = 0
+        authored = report["cases"][0]["authored"]
+        for sample in report["cases"][0]["samples"]:
+            sample["authored"] = {
+                "opens": 0,
+                "events": authored["event_count"],
+                "text_chunks": authored["event_count"] - 2 * authored["authored_count"],
+                "text_bytes": authored["text_bytes"],
+            }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report_path = root / "report.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            runtime_binary = {"path": "/tmp/fake-binary", "sha256": _sha("z"), "bytes": 1}
+            argv = measure._argv(runtime_binary, case, samples=2, warmups=1, report=report_path, resource=root / "resource.txt")
+            measure.check_report_shell(
+                report_path,
+                "normal",
+                case,
+                samples=2,
+                warmups=1,
+                binary=runtime_binary,
+                argv=argv,
+                expected_authored_opens=0,
+            )
+
+            report["cases"][0]["samples"][0]["authored"]["events"] = 0
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaises(measure.MeasureError):
+                measure.check_report_shell(
+                    report_path,
+                    "normal",
+                    case,
+                    samples=2,
+                    warmups=1,
+                    binary=runtime_binary,
+                    argv=argv,
+                    expected_authored_opens=0,
+                )
+
     def test_proof_and_limit_identity_are_authenticated(self) -> None:
         report, case, binary = _valid_report()
         report["cases"][0]["proof"]["candidate_sha256"] = _sha("x")
         with self.assertRaises(measure.MeasureError):
             self._check(report, case, binary)
+
+        report, case, binary = _valid_report()
+        with self.assertRaises(measure.MeasureError):
+            self._check(report, case, binary, expected_max_replay_bytes=100)
         report, case, binary = _valid_report()
         report["cases"][0]["limits"]["replay_window_bytes"] = 8 * 1024 * 1024
         with self.assertRaises(measure.MeasureError):

@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 423332912,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/route-build-dev96-normal/docx_replayable_tail_append",
+    "sha256": "7950a3a8bd59bfdf8720a2c2f5143fe5ab56a7beb1523a09d7be4e85c1bc2e2b"
+  },
+  "build_receipt": {
+    "bytes": 1731,
+    "sha256": "a81c931c96e7eab7898754807af5d8ce7ba4334f9e69225079cdebc7b7bb245e"
+  },
+  "diagnostic_only": true,
+  "source": {
+    "files": 7156,
+    "path": "validation-sources/83c6ca750d50c55a389156672bd4f2cf81a4611cc2424801fe83e4f5bfb5d23f.json",
+    "sha256": "83c6ca750d50c55a389156672bd4f2cf81a4611cc2424801fe83e4f5bfb5d23f"
+  }
+}

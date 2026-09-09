@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "env",
+    "RUSTDOCFLAGS=-Dwarnings",
+    "cargo",
+    "doc",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--lib",
+    "--no-deps",
+    "--features",
+    "allocator-metrics"
+  ],
+  "attempt": "dev91",
+  "common_sha256": "55c8ff42ff4cfb0153f00f79e24b08da6a9962453d28b77a91681fc35cec218e",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7c62b33442ba78b82db3e096b5b667d733618c4fe05416d41ce92173c867ab87",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "stream-route-harness-rustdoc-dev91",
+  "schema": "docx-stream-append-gate-v1",
+  "source_before": {
+    "files": 7156,
+    "path": "validation-sources/8517f937af6638515ecf8a08da0d8faf0ec5f8f2a8157d838de2127f400d2673.json",
+    "sha256": "8517f937af6638515ecf8a08da0d8faf0ec5f8f2a8157d838de2127f400d2673"
+  },
+  "started_utc": "2026-09-09T09:55:20.788843+00:00"
+}
