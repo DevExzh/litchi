@@ -72,4 +72,5 @@ pub mod text;
 pub mod text_services;
 pub mod textbox;
 pub mod textbox_breaks;
+pub mod vba_signature;
 pub mod xml_schemas;

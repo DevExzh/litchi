@@ -295,6 +295,26 @@ impl Document {
         }
     }
 
+    /// Strictly access Word's inert VBA signature variables in `StwUser`.
+    ///
+    /// Parsing is deferred because this optional table is independent of the
+    /// main text. Signature and certificate-store bytes remain opaque; no
+    /// certificate trust is established and no VBA project is opened or
+    /// executed.
+    pub fn vba_signatures(&self) -> Result<Option<&DocumentVbaSignatures>> {
+        match self.vba_signatures.get_or_init(|| {
+            parse_deferred_source(
+                &self.vba_signatures_source,
+                DocumentVbaSignatures::parse_bytes,
+            )
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid VBA signature metadata: {error}"
+            ))),
+        }
+    }
+
     /// Strictly access the caption label and `AutoCaption` tables.
     ///
     /// Parsing is deferred so malformed optional metadata does not prevent the

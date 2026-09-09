@@ -172,6 +172,14 @@ pub mod vba;
 /// remain outside this crate.
 pub use litchi_crypto::spaces;
 
+/// Inert `[MS-OSHARED]` VBA digital-signature blob storage.
+///
+/// The package facade exposes this owner through [`Package::vba_signature`].
+/// PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus
+/// `SpcIndirectDataContentV2`), and certificate-store trust remain opaque:
+/// parsing and editing never establish trust or execute a VBA project.
+pub use litchi_ole_common::vba_signature;
+
 pub mod embedded_object;
 pub mod equation;
 pub use parts::annotation_bookmarks;
@@ -366,6 +374,7 @@ pub use parts::textbox::TextBox;
 pub use parts::textbox_breaks::{
     TextBoxBreak, TextBoxBreakEntry, TextBoxBreakKind, TextBoxBreakTable, TextBoxBreakTables,
 };
+pub use parts::vba_signature::{DocumentVbaSignatures, SignatureName, WordVbaSignature};
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,
