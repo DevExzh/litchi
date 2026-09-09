@@ -1,0 +1,19 @@
+{
+  "password": "Litchi synthetic crypto fixture 2026",
+  "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+  "provenance": "Synthetic interop vectors: msoffcrypto-tool==6.0.0, cryptography==50.0.1.\n\nThis is a component-built fixture, not output from a native Office application.\nRun beside clear.docx. Salt/verifier are deterministic test material only.\nNormative envelope: MS-OFFCRYPTO 2.3.4.5; key derivation: 2.3.4.7.\n\nmsoffcrypto-tool's CFB writer emits a zero EncryptionBlockSize in its advisory\nDataSpaces transform. The generator patches that field to the normative AES\nblock size (16) while leaving EncryptionInfo and EncryptedPackage untouched.\n",
+  "vectors": [
+    {
+      "file": "component-standard-aes192-sha1.docx",
+      "sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+      "bytes": 30208,
+      "profile": "Standard AES192 SHA1 50000 spins"
+    },
+    {
+      "file": "component-standard-aes256-sha1.docx",
+      "sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+      "bytes": 30208,
+      "profile": "Standard AES256 SHA1 50000 spins"
+    }
+  ]
+}

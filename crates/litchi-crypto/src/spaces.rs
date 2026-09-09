@@ -39,6 +39,11 @@ const MAX_ENTRIES: usize = 65_536;
 const MAX_COMPONENTS: usize = MAX_ENTRIES * 8;
 const MAX_STRING_BYTES: usize = 1_048_576;
 const MAX_XML_DEPTH: usize = 256;
+// Office 2007's StrongEncryptionTransform writes the first 0x6c bytes of
+// this fixed transform header as TransformLength. The canonical value is
+// 0x58, immediately before TransformName; keep this exact legacy shape local
+// to the OOXML compatibility reader.
+const LEGACY_MSO2007_TRANSFORM_LENGTH: usize = 0x6c;
 
 pub const STORAGE: &str = "\u{0006}DataSpaces";
 pub const PRIMARY: &str = "\u{0006}Primary";
@@ -1712,17 +1717,31 @@ pub fn write_definition(value: &Definition) -> Result<Vec<u8>, Error> {
 ///
 /// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_transform_header(data: &[u8]) -> Result<(Header, usize), Error> {
+    parse_transform_header_with_compat(data, false)
+}
+
+fn parse_transform_header_with_compat(
+    data: &[u8],
+    allow_encryption_compatibility: bool,
+) -> Result<(Header, usize), Error> {
     let mut reader = SliceReader::new(data)?;
     let transform_length = usize::try_from(reader.u32()?)
         .map_err(|_err| invalid("TransformLength overflows usize"))?;
     require_u32(reader.u32()?, TRANSFORM_TYPE, "TransformType")?;
     let transform_id = reader.unicode_lpp4()?;
-    if reader.position() != transform_length {
+    let transform_name_boundary = reader.position();
+    let transform_name = reader.unicode_lpp4()?;
+    let canonical_length = transform_name_boundary == transform_length;
+    let legacy_mso2007_length = allow_encryption_compatibility
+        && transform_length == LEGACY_MSO2007_TRANSFORM_LENGTH
+        && transform_id == ENCRYPTION_ID
+        && transform_name == ENCRYPTION_NAME;
+    if !canonical_length && !legacy_mso2007_length {
         return Err(invalid("TransformLength does not end before TransformName"));
     }
     let value = Header {
         transform_id,
-        transform_name: reader.unicode_lpp4()?,
+        transform_name,
         reader: reader.version()?,
         updater: reader.version()?,
         writer: reader.version()?,
@@ -1804,13 +1823,30 @@ pub fn write_irm_transform(value: &IrmTransform) -> Result<Vec<u8>, Error> {
 ///
 /// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransform, Error> {
-    let (header, consumed) = parse_transform_header(data)?;
+    parse_encryption_transform_with_compatibility(data, false)
+}
+
+fn parse_encryption_transform_with_compatibility(
+    data: &[u8],
+    allow_encryption_compatibility: bool,
+) -> Result<EncryptionTransform, Error> {
+    let (header, consumed) =
+        parse_transform_header_with_compat(data, allow_encryption_compatibility)?;
     validate_encryption_header(&header)?;
     let mut reader = SliceReader::at(data, consumed)?;
+    let encryption_name = reader.utf8_lpp4()?;
+    let mut encryption_block_size = reader.u32()?;
+    if allow_encryption_compatibility && encryption_block_size == 0 {
+        // [MS-OFFCRYPTO] makes EncryptionInfo authoritative over this
+        // advisory DataSpaces value. Some native producers wrote zero here;
+        // normalize that one field for OOXML reads after the full header has
+        // identified StrongEncryptionTransform.
+        encryption_block_size = 16;
+    }
     let value = EncryptionTransform {
         header,
-        encryption_name: reader.utf8_lpp4()?,
-        encryption_block_size: reader.u32()?,
+        encryption_name,
+        encryption_block_size,
         cipher_mode: reader.u32()?,
     };
     require_u32(reader.u32()?, 4, "EncryptionTransformInfo.Reserved")?;
@@ -1901,6 +1937,20 @@ pub fn write_license(value: &License) -> Result<Vec<u8>, Error> {
 ///
 /// Returns [`Error`] when the OLE container or a `DataSpaces` stream cannot be read or validated.
 pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
+    inspect_inner(ole, false)
+}
+
+/// Inspect an OOXML encryption DataSpaces graph with narrowly scoped native
+/// producer compatibility. Generic DataSpaces callers continue to use the
+/// strict [`inspect`] path.
+pub(crate) fn inspect_ooxml<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
+    inspect_inner(ole, true)
+}
+
+fn inspect_inner<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    allow_ooxml_encryption_compatibility: bool,
+) -> Result<Option<Graph>, Error> {
     let custom_xml_data_store = inspect_custom_xml(ole)
         .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
     if !ole.exists(&[STORAGE]) {
@@ -1963,7 +2013,10 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
             return Err(invalid("too many transform-storage entries"));
         }
         let bytes = read_stream(ole, &[STORAGE, "TransformInfo", &name, PRIMARY])?;
-        let (header, consumed) = parse_transform_header(&bytes)?;
+        let encryption_compatibility =
+            allow_ooxml_encryption_compatibility && name == "StrongEncryptionTransform";
+        let (header, consumed) =
+            parse_transform_header_with_compat(&bytes, encryption_compatibility)?;
         let irm = if header.transform_id == DRM_ID && header.transform_name == DRM_NAME {
             Some(parse_irm_transform(&bytes)?)
         } else {
@@ -1971,7 +2024,10 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
         };
         let encryption =
             if header.transform_id == ENCRYPTION_ID && header.transform_name == ENCRYPTION_NAME {
-                Some(parse_encryption_transform(&bytes)?)
+                Some(parse_encryption_transform_with_compatibility(
+                    &bytes,
+                    encryption_compatibility,
+                )?)
             } else {
                 None
             };
@@ -2653,6 +2709,14 @@ mod tests {
     }
 
     fn encryption_package() -> Vec<u8> {
+        encryption_package_with_quirks(false, false, false)
+    }
+
+    fn encryption_package_with_quirks(
+        zero_block_size: bool,
+        legacy_transform_length: bool,
+        invalid_reserved: bool,
+    ) -> Vec<u8> {
         let map = write_map(&Map {
             entries: vec![MapEntry {
                 references: vec![Reference {
@@ -2712,12 +2776,41 @@ mod tests {
                     "StrongEncryptionTransform",
                     PRIMARY,
                 ],
-                &write_encryption_transform(&encryption).unwrap(),
+                &mutated_encryption_transform(
+                    &encryption,
+                    zero_block_size,
+                    legacy_transform_length,
+                    invalid_reserved,
+                ),
             )
             .unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         bytes.into_inner()
+    }
+
+    fn mutated_encryption_transform(
+        encryption: &EncryptionTransform,
+        zero_block_size: bool,
+        legacy_transform_length: bool,
+        invalid_reserved: bool,
+    ) -> Vec<u8> {
+        let mut bytes = write_encryption_transform(encryption).unwrap();
+        let (_, consumed) = parse_transform_header(&bytes).unwrap();
+        let mut reader = SliceReader::at(&bytes, consumed).unwrap();
+        let _name = reader.utf8_lpp4().unwrap();
+        let block_size_offset = reader.position();
+        if zero_block_size {
+            bytes[block_size_offset..block_size_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+        }
+        if invalid_reserved {
+            let reserved_offset = block_size_offset + 8;
+            bytes[reserved_offset..reserved_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+        }
+        if legacy_transform_length {
+            bytes[..4].copy_from_slice(&(LEGACY_MSO2007_TRANSFORM_LENGTH as u32).to_le_bytes());
+        }
+        bytes
     }
 
     #[test]
@@ -2776,6 +2869,47 @@ mod tests {
             parse_encryption_transform(&write_encryption_transform(&transform).unwrap()).unwrap(),
             transform
         );
+    }
+
+    #[test]
+    fn ooxml_read_compatibility_accepts_native_header_quirks_only() {
+        let bytes = encryption_package_with_quirks(true, true, false);
+        let mut strict = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        assert!(inspect(&mut strict).is_err());
+
+        let mut compatible = OleFile::open(Cursor::new(bytes)).unwrap();
+        let graph = inspect_ooxml(&mut compatible).unwrap().unwrap();
+        assert_eq!(graph.transforms.len(), 1);
+        assert_eq!(
+            graph.transforms[0]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .encryption_block_size,
+            16
+        );
+    }
+
+    #[test]
+    fn ooxml_read_compatibility_does_not_skip_reserved_field_validation() {
+        let bytes = encryption_package_with_quirks(true, true, true);
+        let mut compatible = OleFile::open(Cursor::new(bytes)).unwrap();
+        assert!(inspect_ooxml(&mut compatible).is_err());
+    }
+
+    #[test]
+    fn ooxml_transform_length_compatibility_is_limited_to_strong_encryption() {
+        let mut bytes = write_transform_header(&drm_header()).unwrap();
+        let mut reader = SliceReader::new(&bytes).unwrap();
+        let _length = reader.u32().unwrap();
+        let _type = reader.u32().unwrap();
+        let _id = reader.unicode_lpp4().unwrap();
+        let _name = reader.unicode_lpp4().unwrap();
+        let length = u32::try_from(reader.position()).unwrap();
+        bytes[..4].copy_from_slice(&length.to_le_bytes());
+
+        assert!(parse_transform_header(&bytes).is_err());
+        assert!(parse_transform_header_with_compat(&bytes, true).is_err());
     }
 
     #[test]

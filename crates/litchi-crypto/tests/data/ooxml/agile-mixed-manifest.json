@@ -1,0 +1,9 @@
+{
+  "file": "component-agile-aes128-wrap-aes256-data-sha512.docx",
+  "sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+  "bytes": 31232,
+  "clear_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+  "password": "Litchi synthetic crypto fixture 2026",
+  "provenance": "Synthetic Agile interop: AES-128 password wrapping, AES-256 data, SHA-512.\n\nRequires msoffcrypto-tool==6.0.0 and cryptography==50.0.1. This component-built\nvector is not native Office output. MS-OFFCRYPTO 2.3.4.10 requires matching\ncipherAlgorithm/hashAlgorithm; keyBits is independently specified. Section\n2.3.4.13 sizes the wrapped intermediate key using KeyData.keyBits.\nAll deterministic salts/keys below are test material only.\n\nmsoffcrypto-tool's CFB writer emits a zero EncryptionBlockSize in its advisory\nDataSpaces transform. The generator patches that field to the normative AES\nblock size (16) while leaving EncryptionInfo and EncryptedPackage untouched.\n",
+  "verification": "msoffcrypto password+integrity+byte equality passed"
+}
