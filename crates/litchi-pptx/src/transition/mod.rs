@@ -26,13 +26,11 @@ mod reader;
 mod writer;
 
 pub use model::{
-    Axis, Corner, InOut, Kind, MAX_MS, Ms, Origin, Raw, Ripple, Shape, Side, Speed, Spokes,
-    TimeError, Transition,
+    Axis, Corner, InOut, Kind, MAX_MS, MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preset, Raw,
+    Ripple, Shape, Side, Speed, Spokes, TimeError, Transition,
 };
 pub use reader::{Limits, read, read_with};
 pub use writer::{write, write_to};
-
-pub(crate) use model::{preserved_effect_xml, semantic_clone};
 
 #[cfg(test)]
 #[allow(
@@ -109,6 +107,119 @@ mod tests {
         assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
         assert!(xml.contains("<p:fade/>"));
         assert!(parse_fragment(&xml).same_semantics(&value));
+    }
+
+    #[test]
+    fn morph_uses_powerpoint_2015_choice_and_round_trips() {
+        let value = Transition::new(Kind::Morph(Morph::ByWord))
+            .with_speed(Speed::Fast)
+            .with_duration(Ms::new(750).unwrap())
+            .with_click(false)
+            .with_after(Ms::new(1250).unwrap());
+
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"Requires="p14 p159""#));
+        assert!(xml.contains(r#"<p159:morph option="byWord"/>"#));
+        assert!(xml.contains("<p:fade/>"));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+    }
+
+    #[test]
+    fn preset_uses_powerpoint_2012_choice_and_preserves_inversion() {
+        let preset = Preset::with_options("wind", true, false).unwrap();
+        let value = Transition::new(Kind::Preset(preset.clone())).with_speed(Speed::Slow);
+
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"Requires="p15""#));
+        assert!(xml.contains(r#"<p15:prstTrans prst="wind" invX="1"/>"#));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+        assert_eq!(preset.name(), Some("wind"));
+        assert!(preset.invert_x());
+        assert!(!preset.invert_y());
+    }
+
+    #[test]
+    fn preset_escapes_xml_name_and_round_trips() {
+        let preset = Preset::new("wind&<\"\t\n\r").unwrap();
+        let value = Transition::new(Kind::Preset(preset));
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"prst="wind&amp;&lt;&quot;&#x9;&#xA;&#xD;""#));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+    }
+
+    #[test]
+    fn typed_extension_read_preserves_unknown_attributes_until_semantic_change() {
+        let xml = transition_xml(
+            r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byChar" future="keep"/>"#,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.kind(), &Kind::Morph(Morph::ByChar));
+        let preserved = write(&value).unwrap();
+        assert!(preserved.contains(r#"future="keep""#));
+        assert!(parse_fragment(&preserved).same_semantics(&value));
+
+        let mut changed = value.clone();
+        changed.set_kind(Kind::Morph(Morph::ByObject));
+        let changed = write(&changed).unwrap();
+        assert!(!changed.contains(r#"future="keep""#));
+        assert!(changed.contains(r#"option="byObject""#));
+    }
+
+    #[test]
+    fn preset_absent_optional_attributes_round_trip_without_normalization() {
+        let xml = transition_xml(
+            r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.kind(), &Kind::Preset(Preset::without_name()));
+        let output = write(&value).unwrap();
+        assert!(output.contains(r#"invX="false""#));
+        assert!(!output.contains(r#"invY=""#));
+    }
+
+    #[test]
+    fn preset_default_presence_is_semantic_noop_but_wire_distinct() {
+        let absent = read(
+            transition_xml(
+                r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"/>"#,
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+        .unwrap();
+        let explicit_false = read(
+            transition_xml(
+                r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert!(absent.same_semantics(&explicit_false));
+        assert_ne!(absent, explicit_false);
+        let absent_xml = write(&absent).unwrap();
+        let explicit_xml = write(&explicit_false).unwrap();
+        assert!(!absent_xml.contains(" invX="));
+        assert!(explicit_xml.contains(r#"invX="false""#));
+    }
+
+    #[test]
+    fn rejects_invalid_morph_option_and_bounded_preset_name() {
+        let invalid = transition_xml(
+            r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byShape"/>"#,
+        );
+        assert!(matches!(
+            read(invalid.as_bytes()),
+            Err(Error::Invalid(message)) if message.contains("morph transition option")
+        ));
+
+        let oversized = "x".repeat(MAX_PRESET_NAME_BYTES + 1);
+        assert!(matches!(
+            Preset::new(oversized),
+            Err(Error::Limit { resource, limit })
+                if resource == "preset transition name bytes" && limit == MAX_PRESET_NAME_BYTES
+        ));
     }
 
     #[test]

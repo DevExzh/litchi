@@ -167,7 +167,7 @@ pub use presentation::{
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
     SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit, SourceBackedSlideOrderPatch,
     SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage,
-    SourceImageDescriptor, SourceImageTarget, SourceSlide,
+    SourceImageDescriptor, SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
