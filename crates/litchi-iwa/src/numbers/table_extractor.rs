@@ -2390,68 +2390,14 @@ impl<'a> TableDataExtractor<'a> {
         column_count: usize,
         formula_budget: &mut ProjectionBudget,
     ) -> Result<ParsedCell> {
-        let version = data[0];
-        let header_length = if version <= 1 { 8 } else { 12 };
-        if data.len() < header_length {
-            return Err(Error::ParseError(
-                "Truncated Numbers pre-BNC cell header".to_string(),
-            ));
-        }
-        let cell_type = data[if version == 4 { 1 } else { 2 }];
-        let flags = if version <= 1 {
-            u32::from(u16::from_le_bytes([data[4], data[5]]))
-        } else {
-            read_u32_le(&data[4..8])?
-        };
-        let mut cursor = header_length;
-        let mut number: Option<FiniteF64> = None;
-        let mut date: Option<FiniteF64> = None;
-        let mut string_id = None;
-        let mut rich_text_id = None;
-        let mut formula_id = None;
-        let mut formula_error_id = None;
-        let mut comment_identifier = None;
+        let cell = litchi_numbers_wire::pre_bnc::PreBncCellView::parse(data).map_err(|error| {
+            Error::ParseError(format!(
+                "Numbers pre-BNC cell ({row}, {column}) is invalid: {error}"
+            ))
+        })?;
+        let comment_identifier = cell.comment_identifier();
 
-        for (flag, size) in [
-            (0x000002, 4),
-            (0x000080, 4),
-            (0x000400, 4),
-            (0x000800, 4),
-            (0x000004, 4),
-            (0x000008, 4),
-            (0x000100, 4),
-            (0x000200, 4),
-            (0x001000, 4),
-            (0x002000, 4),
-            (0x000010, 4),
-            (0x000020, 8),
-            (0x000040, 8),
-            (0x010000, 4),
-            (0x080000, 4),
-            (0x020000, 4),
-            (0x040000, 4),
-            (0x100000, 4),
-            (0x200000, 4),
-            (0x400000, 4),
-            (0x800000, 4),
-        ] {
-            if flags & flag == 0 {
-                continue;
-            }
-            let field = take_field(data, &mut cursor, size)?;
-            match flag {
-                0x000008 => formula_id = Some(read_u32_le(field)?),
-                0x000100 => formula_error_id = Some(read_u32_le(field)?),
-                0x001000 => comment_identifier = Some(read_u32_le(field)?),
-                0x000200 => rich_text_id = Some(read_u32_le(field)?),
-                0x000010 => string_id = Some(read_u32_le(field)?),
-                0x000020 => number = Some(read_f64_le(field)?),
-                0x000040 => date = Some(read_f64_le(field)?),
-                _ => {},
-            }
-        }
-
-        if let Some(identifier) = formula_id {
+        if let Some(identifier) = cell.formula_identifier() {
             let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
@@ -2478,21 +2424,40 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         let zero = finite_zero()?;
-        let value = match cell_type {
+        let value = match cell.cell_type() {
             0 => CellValue::Empty,
-            2 => CellValue::Number(number.unwrap_or(zero)),
-            3 => string_id
+            2 => CellValue::Number(
+                cell.number()
+                    .map(to_cell_finite)
+                    .transpose()?
+                    .unwrap_or(zero),
+            ),
+            3 => cell
+                .string_identifier()
                 .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(zero)),
-            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(zero)),
+            5 => CellValue::Date(cell.date().map(to_cell_finite).transpose()?.unwrap_or(zero)),
+            6 => CellValue::Boolean(
+                cell.number()
+                    .map(to_cell_finite)
+                    .transpose()?
+                    .unwrap_or(zero)
+                    .get()
+                    != 0.0,
+            ),
+            7 => CellValue::Duration(
+                cell.number()
+                    .map(to_cell_finite)
+                    .transpose()?
+                    .unwrap_or(zero),
+            ),
             8 => CellValue::Error(
-                formula_error_id
+                cell.formula_error_identifier()
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
-            9 => rich_text_id
+            9 => cell
+                .rich_text_identifier()
                 .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             other => {
@@ -3601,39 +3566,9 @@ fn pop_formula_arguments(
     Ok(stack.split_off(start))
 }
 
-fn take_field<'a>(data: &'a [u8], cursor: &mut usize, length: usize) -> Result<&'a [u8]> {
-    let end = cursor
-        .checked_add(length)
-        .ok_or_else(|| Error::ParseError("Numbers cell field offset overflow".to_string()))?;
-    let field = data.get(*cursor..end).ok_or_else(|| {
-        Error::ParseError(format!(
-            "Truncated Numbers cell field at offset {} (need {length} bytes)",
-            *cursor
-        ))
-    })?;
-    *cursor = end;
-    Ok(field)
-}
-
-fn read_u32_le(data: &[u8]) -> Result<u32> {
-    let bytes: [u8; 4] = data
-        .try_into()
-        .map_err(|_| Error::ParseError("Expected a four-byte Numbers field".to_string()))?;
-    Ok(u32::from_le_bytes(bytes))
-}
-
 fn to_cell_finite(value: CommonFiniteF64) -> Result<FiniteF64> {
     FiniteF64::new(value.get()).map_err(|_| {
         Error::ParseError("Numbers BNC cached scalar must contain a finite value".to_owned())
-    })
-}
-
-fn read_f64_le(data: &[u8]) -> Result<FiniteF64> {
-    let bytes: [u8; 8] = data
-        .try_into()
-        .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_string()))?;
-    FiniteF64::new(f64::from_le_bytes(bytes)).map_err(|_| {
-        Error::ParseError("Numbers scalar field must contain a finite value".to_string())
     })
 }
 
