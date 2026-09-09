@@ -30,7 +30,7 @@ pub use super::super::format::TableBorderStyle;
 use super::paragraph::MutableParagraph;
 use super::revision::{
     CellRevisionKind, ConflictKind, RevisionMetadata, RowRevisionKind, TableCellMergeRevisionState,
-    TableRevisionKind, conflict_element_name, write_conflict_attributes,
+    conflict_element_name, write_conflict_attributes,
 };
 
 const MAX_PROPERTY_CONFLICT_MARKERS: usize = 1_024;
@@ -171,7 +171,6 @@ pub struct MutableTable {
     pub(crate) rows: Vec<MutableRow>,
     /// Table properties
     pub(crate) properties: TableProperties,
-    revision: Option<(TableRevisionKind, RevisionMetadata)>,
     property_change: Option<PropertyChange<TableProperties>>,
 }
 
@@ -180,7 +179,6 @@ impl MutableTable {
         let mut table = Self {
             rows: Vec::with_capacity(rows),
             properties: TableProperties::default(),
-            revision: None,
             property_change: None,
         };
         for _ in 0..rows {
@@ -230,23 +228,68 @@ impl MutableTable {
         self.rows.get_mut(index)
     }
 
-    /// Mark this whole table as inserted or deleted.
+    /// Mark every existing table row as inserted or deleted.
+    ///
+    /// WordprocessingML has no whole-table insertion or deletion marker. This
+    /// operation therefore applies the supplied row revision kind to each
+    /// existing row. Exactly one metadata record is required for every row;
+    /// callers retain control of all revision IDs and can use distinct IDs
+    /// when the rows represent one logical table operation.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn set_revision(
+    /// Returns an error if the metadata count does not equal the row count, a
+    /// row already has an insertion/deletion marker, or any supplied ID
+    /// conflicts with another revision in this table subtree. Validation is
+    /// completed before any row is changed.
+    pub fn set_row_revisions(
         &mut self,
-        kind: TableRevisionKind,
-        metadata: RevisionMetadata,
+        kind: RowRevisionKind,
+        metadata: impl IntoIterator<Item = RevisionMetadata>,
     ) -> Result<&mut Self> {
-        if self.revision.is_some() {
-            return Err(Error::InvalidFormat(
-                "table insertion and deletion revisions conflict".into(),
-            ));
+        let expected = self.rows.len();
+        let mut candidates = Vec::new();
+        candidates
+            .try_reserve_exact(expected)
+            .map_err(|source| Error::Allocation {
+                resource: "table row revisions",
+                source,
+            })?;
+        for candidate in metadata {
+            if candidates.len() == expected {
+                return Err(Error::InvalidFormat(format!(
+                    "table row revision metadata count must equal row count {expected}"
+                )));
+            }
+            candidates.push(candidate);
         }
-        self.ensure_local_id_available(metadata.id())?;
-        self.revision = Some((kind, metadata));
+        if candidates.len() != expected {
+            return Err(Error::InvalidFormat(format!(
+                "table row revision metadata count must equal row count {expected}, got {}",
+                candidates.len()
+            )));
+        }
+
+        let mut ids = self.revision_ids()?;
+        for (index, row) in self.rows.iter().enumerate() {
+            if row.revision.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "table row {index} already has an insertion or deletion revision"
+                )));
+            }
+        }
+        for candidate in &candidates {
+            let id = i64::from(candidate.id());
+            if !ids.insert(id) {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate table subtree revision ID {id}"
+                )));
+            }
+        }
+
+        for (row, metadata) in self.rows.iter_mut().zip(candidates) {
+            row.revision = Some((kind, metadata));
+        }
         Ok(self)
     }
 
@@ -265,7 +308,7 @@ impl MutableTable {
                 "table property revision already exists".into(),
             ));
         }
-        if previous.revision.is_some() || previous.property_change.is_some() {
+        if previous.property_change.is_some() {
             return Err(Error::InvalidFormat(
                 "previous table properties must not contain revision metadata".into(),
             ));
@@ -276,28 +319,6 @@ impl MutableTable {
             previous: previous.properties.clone(),
         });
         Ok(self)
-    }
-
-    #[must_use]
-    pub fn revision_kind(&self) -> Option<TableRevisionKind> {
-        self.revision.as_ref().map(|(kind, _)| *kind)
-    }
-
-    fn ensure_local_id_available(&self, id: u32) -> Result<()> {
-        if self
-            .revision
-            .as_ref()
-            .is_some_and(|(_, value)| value.id() == id)
-            || self
-                .property_change
-                .as_ref()
-                .is_some_and(|value| value.metadata.id() == id)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "duplicate table revision ID {id}"
-            )));
-        }
-        Ok(())
     }
 
     fn write_border(xml: &mut String, name: &str, border: &TableBorder) -> Result<()> {
@@ -346,7 +367,7 @@ impl MutableTable {
         Self::write_borders(xml, "tblBorders", &properties.borders, true)
     }
 
-    fn validate_revision_ids(&self) -> Result<()> {
+    fn revision_ids(&self) -> Result<HashSet<i64>> {
         let mut ids = HashSet::new();
         let mut insert = |id: i64| {
             if ids.insert(id) {
@@ -357,9 +378,6 @@ impl MutableTable {
                 )))
             }
         };
-        if let Some((_, metadata)) = &self.revision {
-            insert(i64::from(metadata.id()))?;
-        }
         if let Some(change) = &self.property_change {
             insert(i64::from(change.metadata.id()))?;
         }
@@ -385,7 +403,20 @@ impl MutableTable {
                 }
             }
         }
+        Ok(ids)
+    }
+
+    fn ensure_local_id_available(&self, id: u32) -> Result<()> {
+        if self.revision_ids()?.contains(&i64::from(id)) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate table subtree revision ID {id}"
+            )));
+        }
         Ok(())
+    }
+
+    fn validate_revision_ids(&self) -> Result<()> {
+        self.revision_ids().map(|_| ())
     }
 
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
@@ -396,11 +427,6 @@ impl MutableTable {
         xml.push_str("<w:tblPr>");
 
         Self::write_property_values(xml, &self.properties)?;
-        if let Some((kind, metadata)) = &self.revision {
-            write!(xml, "<w:{}", kind.element())?;
-            metadata.write_attributes(xml)?;
-            xml.push_str("/>");
-        }
         if let Some(change) = &self.property_change {
             xml.push_str("<w:tblPrChange");
             change.metadata.write_attributes(xml)?;
@@ -1012,6 +1038,9 @@ mod revision_tests {
             .set_date(Some("2026-07-19T10:30:00+08:00"))
             .unwrap();
         metadata
+            .set_date_utc(Some("2026-07-19T02:30:00.123456Z"))
+            .unwrap();
+        metadata
     }
 
     #[test]
@@ -1021,19 +1050,17 @@ mod revision_tests {
         let mut table = MutableTable::new(2, 2);
         table.set_width_percent(80);
         table
-            .set_revision(TableRevisionKind::Insert, metadata("1"))
+            .set_row_revisions(RowRevisionKind::Insert, [metadata("1"), metadata("2")])
             .unwrap();
         table
-            .set_property_change(metadata("2"), &previous_table)
+            .set_property_change(metadata("10"), &previous_table)
             .unwrap();
 
         let mut previous_row = MutableRow::new(1);
         previous_row.set_division_id("17").unwrap();
         let row = table.row(0).unwrap();
         row.set_division_id("18").unwrap();
-        row.set_revision(RowRevisionKind::Insert, metadata("3"))
-            .unwrap();
-        row.set_property_change(metadata("4"), &previous_row)
+        row.set_property_change(metadata("11"), &previous_row)
             .unwrap();
 
         let mut previous_cell = MutableCell::new();
@@ -1056,11 +1083,6 @@ mod revision_tests {
             .unwrap();
 
         table
-            .row(1)
-            .unwrap()
-            .set_revision(RowRevisionKind::Delete, metadata("8"))
-            .unwrap();
-        table
             .cell(1, 0)
             .unwrap()
             .set_revision(CellRevisionKind::Delete, metadata("9"))
@@ -1069,9 +1091,8 @@ mod revision_tests {
         let mut xml = String::new();
         table.to_xml(&mut xml).unwrap();
 
-        assert!(xml.contains("<w:tblIns w:id=\"1\" w:author=\"表 &amp; &quot;作者&quot;\""));
-        assert!(xml.contains("<w:ins w:id=\"3\""));
-        assert!(xml.contains("<w:del w:id=\"8\""));
+        assert!(xml.contains("<w:ins w:id=\"1\" w:author=\"表 &amp; &quot;作者&quot;\""));
+        assert!(xml.contains("<w:ins w:id=\"2\""));
         assert!(xml.contains("<w:cellIns w:id=\"5\""));
         assert!(xml.contains("<w:cellDel w:id=\"9\""));
         assert!(xml.contains("<w:cellMerge w:id=\"6\""));
@@ -1099,10 +1120,8 @@ mod revision_tests {
             .map(|revision| revision.revision_type())
             .collect();
         for kind in [
-            RevisionType::TableInsert,
             RevisionType::TablePropertiesChange,
             RevisionType::RowInsert,
-            RevisionType::RowDelete,
             RevisionType::RowPropertiesChange,
             RevisionType::CellInsert,
             RevisionType::CellDelete,
@@ -1111,18 +1130,23 @@ mod revision_tests {
         ] {
             assert!(kinds.contains(&kind), "missing parsed revision {kind:?}");
         }
-        assert_eq!(parsed[0].author(), "表 & \"作者\"");
+        assert_eq!(parsed[0].author(), Some("表 & \"作者\""));
+        assert!(
+            parsed
+                .iter()
+                .all(|revision| revision.date_utc() == Some("2026-07-19T02:30:00.123456Z"))
+        );
     }
 
     #[test]
-    fn writes_table_delete_and_parses_strict_namespace() {
+    fn writes_table_row_deletions_and_parses_strict_namespace() {
         let mut table = MutableTable::new(1, 1);
         table
-            .set_revision(TableRevisionKind::Delete, metadata("10"))
+            .set_row_revisions(RowRevisionKind::Delete, [metadata("10")])
             .unwrap();
         let mut body = String::new();
         table.to_xml(&mut body).unwrap();
-        assert!(body.contains("<w:tblDel w:id=\"10\""));
+        assert!(body.contains("<w:del w:id=\"10\""));
 
         let strict = body.replacen(
             "<w:tbl>",
@@ -1131,76 +1155,89 @@ mod revision_tests {
         );
         let revisions = Table::new(strict.into_bytes()).revisions().unwrap();
         assert_eq!(revisions.len(), 1);
-        assert_eq!(revisions[0].revision_type(), RevisionType::TableDelete);
+        assert_eq!(revisions[0].revision_type(), RevisionType::RowDelete);
     }
 
     #[test]
-    fn rejects_conflicts_duplicates_nested_snapshots_and_noop_merges_atomically() {
-        let mut table = MutableTable::new(1, 1);
-        table
-            .set_revision(TableRevisionKind::Insert, metadata("20"))
-            .unwrap();
+    fn row_revision_batches_validate_count_ids_and_conflicts_atomically() {
+        let mut too_few = MutableTable::new(2, 1);
         assert!(
-            table
-                .set_revision(TableRevisionKind::Delete, metadata("21"))
+            too_few
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("20")])
                 .is_err()
         );
-        assert_eq!(table.revision_kind(), Some(TableRevisionKind::Insert));
+        assert_eq!(too_few.row(0).unwrap().revision_kind(), None);
+        assert_eq!(too_few.row(1).unwrap().revision_kind(), None);
 
-        let mut nested_previous = MutableTable::new(1, 1);
-        nested_previous
-            .set_revision(TableRevisionKind::Delete, metadata("22"))
-            .unwrap();
+        let mut too_many = MutableTable::new(1, 1);
         assert!(
-            table
-                .set_property_change(metadata("23"), &nested_previous)
+            too_many
+                .set_row_revisions(RowRevisionKind::Delete, [metadata("21"), metadata("22")])
                 .is_err()
         );
+        assert_eq!(too_many.row(0).unwrap().revision_kind(), None);
 
-        let row = table.row(0).unwrap();
-        row.set_revision(RowRevisionKind::Insert, metadata("24"))
-            .unwrap();
+        let mut duplicate = MutableTable::new(2, 1);
         assert!(
-            row.set_revision(RowRevisionKind::Delete, metadata("25"))
+            duplicate
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("30"), metadata("30")])
                 .is_err()
         );
-        assert_eq!(row.revision_kind(), Some(RowRevisionKind::Insert));
+        assert_eq!(duplicate.row(0).unwrap().revision_kind(), None);
+        assert_eq!(duplicate.row(1).unwrap().revision_kind(), None);
 
-        let cell = table.cell(0, 0).unwrap();
-        cell.set_revision(CellRevisionKind::Insert, metadata("26"))
-            .unwrap();
-        assert!(
-            cell.set_revision(CellRevisionKind::Delete, metadata("27"))
-                .is_err()
-        );
-        assert!(
-            cell.set_merge_revision(
-                metadata("28"),
-                TableCellMergeRevisionState::Rest,
-                TableCellMergeRevisionState::Rest,
-            )
-            .is_err()
-        );
-        assert_eq!(cell.revision_kind(), Some(CellRevisionKind::Insert));
-
-        let mut xml = String::new();
-        table.to_xml(&mut xml).unwrap();
-        assert!(xml.contains("<w:tblIns w:id=\"20\""));
-        assert!(!xml.contains("<w:tblDel"));
-        assert!(!xml.contains("<w:tblPrChange"));
-        assert!(!xml.contains("<w:cellMerge"));
-
-        let mut duplicate = MutableTable::new(1, 1);
-        duplicate
-            .set_revision(TableRevisionKind::Insert, metadata("30"))
-            .unwrap();
-        duplicate
+        let mut conflict = MutableTable::new(2, 1);
+        conflict
             .row(0)
             .unwrap()
-            .set_revision(RowRevisionKind::Insert, metadata("30"))
+            .set_revision(RowRevisionKind::Insert, metadata("40"))
             .unwrap();
-        let mut unchanged = String::from("sentinel");
-        assert!(duplicate.to_xml(&mut unchanged).is_err());
-        assert_eq!(unchanged, "sentinel");
+        assert!(
+            conflict
+                .set_row_revisions(RowRevisionKind::Delete, [metadata("41"), metadata("42")])
+                .is_err()
+        );
+        assert_eq!(
+            conflict.row(0).unwrap().revision_kind(),
+            Some(RowRevisionKind::Insert)
+        );
+        assert_eq!(conflict.row(1).unwrap().revision_kind(), None);
+
+        let mut previous = MutableTable::new(2, 1);
+        previous.set_width_percent(42);
+        let mut with_property = MutableTable::new(2, 1);
+        with_property
+            .set_property_change(metadata("50"), &previous)
+            .unwrap();
+        assert!(
+            with_property
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("50"), metadata("51")])
+                .is_err()
+        );
+        assert_eq!(with_property.row(0).unwrap().revision_kind(), None);
+        assert_eq!(with_property.row(1).unwrap().revision_kind(), None);
+
+        let mut with_history = MutableTable::new(1, 1);
+        with_history
+            .set_row_revisions(RowRevisionKind::Insert, [metadata("60")])
+            .unwrap();
+        with_history
+            .set_property_change(metadata("61"), &MutableTable::new(1, 1))
+            .unwrap();
+        let mut xml = String::new();
+        with_history.to_xml(&mut xml).unwrap();
+        assert!(xml.contains("<w:ins w:id=\"60\""));
+        assert!(xml.contains("<w:tblPrChange w:id=\"61\""));
+
+        let mut previous_with_history = MutableTable::new(1, 1);
+        previous_with_history
+            .set_property_change(metadata("70"), &MutableTable::new(1, 1))
+            .unwrap();
+        let mut target = MutableTable::new(1, 1);
+        assert!(
+            target
+                .set_property_change(metadata("71"), &previous_with_history)
+                .is_err()
+        );
     }
 }

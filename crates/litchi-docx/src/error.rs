@@ -127,6 +127,24 @@ pub enum Error {
         source: TryReserveError,
     },
 
+    /// A tracked-revision read exceeded a finite resource ceiling.
+    #[error("DOCX revision {resource} limit exceeded: {actual} > {maximum}")]
+    RevisionLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Observed value.
+        actual: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
+    /// A bounded revision collection could not reserve storage.
+    #[error("DOCX allocation failed for {resource}")]
+    RevisionAllocation {
+        /// Buffer or collection being reserved.
+        resource: &'static str,
+    },
+
     /// A bounded external hyperlink-wrapper detachment ceiling was exceeded.
     #[error("DOCX external hyperlink detachment {resource} limit exceeded: {actual} > {maximum}")]
     ExternalHyperlinkDetachmentLimit {
