@@ -1,0 +1,3 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling xml-minifier-fuzz v0.0.0 (/tmp/litchi-goal-0482/fuzz-xml-final)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.44s

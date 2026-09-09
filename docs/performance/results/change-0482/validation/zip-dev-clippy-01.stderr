@@ -1,0 +1,70 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error: items after a test module
+    --> crates/soapberry-zip/src/preserve/replay.rs:1470:1
+     |
+1470 |   mod memory_bound_tests {
+     |   ^^^^^^^^^^^^^^^^^^^^^^
+...
+1512 | / fn write_all_replay<W: Write>(
+1513 | |     sink: &mut W,
+1514 | |     mut bytes: &[u8],
+1515 | |     failure: &mut Option<ReplayWriterFailure>,
+1516 | |     accepted: &mut usize,
+1517 | | ) -> io::Result<usize> {
+     | |______________________^
+...
+1577 |   fn checked_delta(current: u64, previous: u64) -> Result<usize, ReplayWriterFailure> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1592 | / fn map_writer_failure<E>(
+1593 | |     pass: ReplayPass,
+1594 | |     failure: ReplayWriterFailure,
+1595 | |     callback_error: Option<E>,
+1596 | |     progress: ReplayProgress,
+1597 | | ) -> ReplayPublicationError<E> {
+     | |______________________________^
+...
+1626 |   fn failure_io(failure: &ReplayWriterFailure) -> io::Error {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1639 | / fn sink_error<E, W: Write>(
+1640 | |     pass: ReplayPass,
+1641 | |     fallback: io::Error,
+1642 | |     callback_error: Option<E>,
+1643 | |     sink: &mut ReplaySink<W>,
+1644 | | ) -> ReplayPublicationError<E> {
+     | |______________________________^
+...
+1653 | / fn map_emit_error<E, W: Write>(
+1654 | |     source: Error,
+1655 | |     sink: &mut ReplaySink<W>,
+1656 | | ) -> ReplayPublicationError<E> {
+     | |______________________________^
+...
+1674 |   fn clone_io_error(source: Option<&io::Error>) -> Option<io::Error> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1678 |   fn unsupported(reason: &'static str) -> Error {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#items_after_test_module
+     = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+     = help: move the items to before the test module was defined
+
+error: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/soapberry-zip/src/preserve.rs:5050:9
+     |
+5050 |         limits.max_member_name_bytes = name.len() as u64;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `office::ArchiveLimits { max_member_name_bytes: name.len() as u64, ..Default::default() }` and removing relevant reassignments
+    --> crates/soapberry-zip/src/preserve.rs:5049:9
+     |
+5049 |         let mut limits = ArchiveLimits::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+     = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `soapberry-zip` (lib test) due to 2 previous errors

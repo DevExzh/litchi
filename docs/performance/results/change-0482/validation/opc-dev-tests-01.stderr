@@ -1,0 +1,87 @@
+   Compiling zeroize v1.9.0
+   Compiling block-buffer v0.12.1
+   Compiling thiserror v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling smallvec v1.16.0
+   Compiling generic-array v0.14.9
+   Compiling der v0.7.10
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling digest v0.10.7
+   Compiling crypto-bigint v0.5.5
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling spki v0.7.3
+   Compiling rfc6979 v0.4.0
+   Compiling signature v2.2.0
+   Compiling pkcs8 v0.10.2
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling sec1 v0.7.3
+   Compiling tempfile v3.27.0
+   Compiling elliptic-curve v0.13.8
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling primeorder v0.13.6
+   Compiling ecdsa v0.16.9
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling p256 v0.13.2
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/source_part_splice.rs:779:64
+    |
+779 |     let package = SourceBackedPackage::from_read_at(Arc::clone(&source))
+    |                                                     ---------- ^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MutableSource>`
+    |                                                     |
+    |                                                     arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<MutableSource>`
+    = help: `MutableSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/source_part_splice.rs:813:64
+    |
+813 |     let package = SourceBackedPackage::from_read_at(Arc::clone(&source))
+    |                                                     ---------- ^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MutableSource>`
+    |                                                     |
+    |                                                     arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<MutableSource>`
+    = help: `MutableSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+    --> crates/litchi-opc/tests/source_part_splice.rs:1020:66
+     |
+1020 |     let candidate = SourceBackedPackage::from_read_at(Arc::clone(&candidate_source))
+     |                                                       ---------- ^^^^^^^^^^^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MutableSource>`
+     |                                                       |
+     |                                                       arguments to this function are incorrect
+     |
+     = note: expected reference `&Arc<dyn ReadAt>`
+                found reference `&Arc<MutableSource>`
+     = help: `MutableSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+    --> crates/litchi-opc/tests/source_part_splice.rs:1037:66
+     |
+1037 |     let candidate = SourceBackedPackage::from_read_at(Arc::clone(&candidate_source))
+     |                                                       ---------- ^^^^^^^^^^^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MutableSource>`
+     |                                                       |
+     |                                                       arguments to this function are incorrect
+     |
+     = note: expected reference `&Arc<dyn ReadAt>`
+                found reference `&Arc<MutableSource>`
+     = help: `MutableSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-opc` (test "source_part_splice") due to 4 previous errors

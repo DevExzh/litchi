@@ -1,0 +1,46 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error[E0499]: cannot borrow `*reader` as mutable more than once at a time
+   --> crates/xml-minifier/src/audit.rs:904:15
+    |
+902 | fn fill_buf_retry<R: BufRead>(reader: &mut R) -> io::Result<&[u8]> {
+    |                                       - let's call the lifetime of this reference `'1`
+903 |     loop {
+904 |         match reader.fill_buf() {
+    |               ^^^^^^ `*reader` was mutably borrowed here in the previous iteration of the loop
+905 |             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+906 |             result => return result,
+    |                              ------ returning this value requires that `*reader` is borrowed for `'1`
+
+error[E0503]: cannot use `self.total` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1050:21
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1033 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1038 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1050 |                     self.total.saturating_add(1),
+     |                     ^^^^^^^^^^ use of borrowed `*self`
+
+error[E0503]: cannot use `self.max_total` because it was mutably borrowed
+    --> crates/xml-minifier/src/audit.rs:1051:21
+     |
+1008 |     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+     |                 - let's call the lifetime of this reference `'1`
+...
+1033 |         let available = self.available_source()?;
+     |                         ---- `*self` is borrowed here
+...
+1038 |             return Ok(available);
+     |                    ------------- returning this value requires that `*self` is borrowed for `'1`
+...
+1051 |                     self.max_total,
+     |                     ^^^^^^^^^^^^^^ use of borrowed `*self`
+
+Some errors have detailed explanations: E0499, E0503.
+For more information about an error, try `rustc --explain E0499`.
+error: could not compile `xml-minifier` (lib) due to 3 previous errors

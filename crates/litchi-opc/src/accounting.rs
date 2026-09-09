@@ -283,6 +283,55 @@ impl OpcOperationAccounting {
         );
         first_error.map_or(Ok(()), Err)
     }
+
+    /// Merge another OPC-local report while retaining checked counter
+    /// semantics. This is used when one publication owns separate local
+    /// reports for fresh decoded-reader passes and the final preservation
+    /// writer; callers merge them only after both passes have returned.
+    pub(crate) fn merge_from(&mut self, source: &Self) -> Result<(), OpcError> {
+        let mut first_error = None;
+        macro_rules! merge {
+            ($field:ident, $name:literal) => {
+                if let Err(error) = checked_add(&mut self.$field, source.$field, $name) {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            };
+        }
+        merge!(
+            compressed_deflate_payload_bytes_read,
+            "compressed Deflate payload bytes read"
+        );
+        merge!(stored_payload_bytes_read, "stored payload bytes read");
+        merge!(
+            stored_payload_bytes_accepted,
+            "stored payload bytes accepted"
+        );
+        merge!(
+            deflate_bytes_produced,
+            "decompressed Deflate bytes produced"
+        );
+        merge!(
+            deflate_bytes_accepted,
+            "decompressed Deflate bytes accepted"
+        );
+        merge!(
+            generated_deflate_payload_bytes_emitted,
+            "generated Deflate payload bytes emitted"
+        );
+        merge!(stored_payload_bytes_emitted, "stored payload bytes emitted");
+        merge!(
+            precompressed_payload_bytes_emitted,
+            "precompressed payload bytes emitted"
+        );
+        merge!(
+            raw_unchanged_source_bytes_accepted,
+            "raw unchanged source bytes accepted"
+        );
+        merge!(output_bytes_accepted, "OPC output bytes accepted");
+        first_error.map_or(Ok(()), Err)
+    }
 }
 
 fn checked_add(counter: &mut u64, bytes: u64, counter_name: &'static str) -> Result<(), OpcError> {

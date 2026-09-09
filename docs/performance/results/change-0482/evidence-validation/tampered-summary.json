@@ -1,0 +1,22 @@
+{
+  "accepted": false,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0482/actual-replay-ppf7ffdl/checkout/docs/performance/results/change-0482/verify.py"
+  ],
+  "case": "tampered-summary",
+  "cwd": "/tmp/litchi-goal-0482/actual-replay-ppf7ffdl/checkout/docs/performance/results/change-0482",
+  "exit_code": 1,
+  "expected_acceptance": false,
+  "finished_utc": "2026-09-09T00:33:16.870736+00:00",
+  "started_utc": "2026-09-09T00:33:15.109973+00:00",
+  "stderr": {
+    "bytes": 67,
+    "sha256": "2d8656563e484ed3ccb5929a579b4b442f6a1c0c77ef36e5337aa44037a451b7"
+  },
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

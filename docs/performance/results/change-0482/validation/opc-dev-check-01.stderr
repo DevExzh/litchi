@@ -1,0 +1,126 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0603]: module `preserve` is private
+  --> crates/litchi-opc/src/source_backed/splice.rs:20:20
+   |
+20 | use soapberry_zip::preserve::{
+   |                    ^^^^^^^^ private module
+21 |     PreservationEntryId, ReplayLimits, ReplayPublicationError, ReplayResource,
+   |     ------------------- struct `PreservationEntryId` is not publicly re-exported
+   |
+note: the module `preserve` is defined here
+  --> crates/soapberry-zip/src/lib.rs:38:1
+   |
+38 | mod preserve;
+   | ^^^^^^^^^^^^
+
+error[E0603]: module `preserve` is private
+  --> crates/litchi-opc/src/source_backed/splice.rs:20:20
+   |
+20 | use soapberry_zip::preserve::{
+   |                    ^^^^^^^^ private module
+21 |     PreservationEntryId, ReplayLimits, ReplayPublicationError, ReplayResource,
+   |                          ------------ struct `ReplayLimits` is not publicly re-exported
+   |
+note: the module `preserve` is defined here
+  --> crates/soapberry-zip/src/lib.rs:38:1
+   |
+38 | mod preserve;
+   | ^^^^^^^^^^^^
+
+error[E0603]: module `preserve` is private
+  --> crates/litchi-opc/src/source_backed/splice.rs:20:20
+   |
+20 | use soapberry_zip::preserve::{
+   |                    ^^^^^^^^ private module
+21 |     PreservationEntryId, ReplayLimits, ReplayPublicationError, ReplayResource,
+   |                                        ---------------------- enum `ReplayPublicationError` is not publicly re-exported
+   |
+note: the module `preserve` is defined here
+  --> crates/soapberry-zip/src/lib.rs:38:1
+   |
+38 | mod preserve;
+   | ^^^^^^^^^^^^
+
+error[E0603]: module `preserve` is private
+  --> crates/litchi-opc/src/source_backed/splice.rs:20:20
+   |
+20 | use soapberry_zip::preserve::{
+   |                    ^^^^^^^^ private module
+21 |     PreservationEntryId, ReplayLimits, ReplayPublicationError, ReplayResource,
+   |                                                                -------------- enum `ReplayResource` is not publicly re-exported
+   |
+note: the module `preserve` is defined here
+  --> crates/soapberry-zip/src/lib.rs:38:1
+   |
+38 | mod preserve;
+   | ^^^^^^^^^^^^
+
+error: unused import: `soapberry_zip::office::EntryId`
+  --> crates/litchi-opc/src/source_backed/splice.rs:19:5
+   |
+19 | use soapberry_zip::office::EntryId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
+   --> crates/litchi-opc/src/source_backed/splice.rs:809:6
+    |
+809 | ) -> Result<W, ReplayPublicationError<OpcError>>
+    |      ^^^^^^  ---------------------------------- help: remove the unnecessary generic argument
+    |      |
+    |      expected 1 generic argument
+    |
+note: type alias defined here, with 1 generic parameter: `T`
+   --> crates/litchi-opc/src/error.rs:303:10
+    |
+303 | pub type Result<T> = std::result::Result<T, OpcError>;
+    |          ^^^^^^ -
+
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+   --> crates/litchi-opc/src/source_backed/splice.rs:609:20
+    |
+609 |       let observed = match observed {
+    |  ____________________^
+610 | |         Ok(observed) => observed,
+611 | |         Err(VerifiedDecodedReaderError::Opc { error, .. })
+612 | |         | Err(VerifiedDecodedReaderError::Callback(error)) => return Err(error),
+613 | |     }?;
+    | |______^ the `?` operator cannot be applied to type `(u64, [u8; 32])`
+    |
+    = help: the nightly-only, unstable trait `Try` is not implemented for `(u64, [u8; 32])`
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/src/source_backed/splice.rs:815:5
+    |
+809 |   ) -> Result<W, ReplayPublicationError<OpcError>>
+    |        ------------------------------------------- expected `std::result::Result<W, OpcError>` because of return type
+...
+815 | /     index.write_replacing_with_replay_with_accounting(
+816 | |         target,
+817 | |         compression,
+818 | |         limits,
+...   |
+821 | |         callback,
+822 | |     )
+    | |_____^ expected `Result<W, OpcError>`, found `Result<W, ReplayPublicationError<...>>`
+    |
+    = note: expected enum `std::result::Result<_, OpcError>`
+               found enum `std::result::Result<_, ReplayPublicationError<OpcError>>`
+
+error[E0499]: cannot borrow `*reader` as mutable more than once at a time
+   --> crates/litchi-opc/src/source_backed/splice.rs:636:9
+    |
+626 |         let bytes = reader.fill_buf().map_err(OpcError::IoError)?;
+    |                     ------ first mutable borrow occurs here
+...
+636 |         reader.consume(bytes.len());
+    |         ^^^^^^         ----- first borrow later used here
+    |         |
+    |         second mutable borrow occurs here
+
+Some errors have detailed explanations: E0107, E0277, E0308, E0499, E0603.
+For more information about an error, try `rustc --explain E0107`.
+error: could not compile `litchi-opc` (lib) due to 9 previous errors

@@ -1,0 +1,137 @@
+{
+  "argv": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/code/litchi/target/fuzz-asan",
+    "RUSTC_BOOTSTRAP=1",
+    "RUSTFLAGS=-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing",
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/tmp/litchi-goal-0482/fuzz-xml/Cargo.toml",
+    "--target",
+    "x86_64-unknown-linux-gnu",
+    "--bin",
+    "minify_xml"
+  ],
+  "binary": {
+    "bytes": 16314872,
+    "path": "/tmp/litchi-goal-0482/fuzz-xml/minify_xml",
+    "sha256": "4ade3e839e5b40fd2dee428876193117f2cf78c03d4b56fbebdbb66597f1d86d"
+  },
+  "finished_utc": "2026-09-08T20:17:26.779969+00:00",
+  "inputs": {
+    "corpus_before": {
+      "binary-invalid-utf8.bin": {
+        "bytes": 14,
+        "sha256": "071a3723ff3edc90ac0d95708a68573a31dd017e929561630a1cb7c0629d4983"
+      },
+      "binary-truncated-utf8.bin": {
+        "bytes": 15,
+        "sha256": "c9bd7caf4c2ad20b8429bde661d913d8455f9bcc2bfb76e48899ca202f91300a"
+      },
+      "xml-attributes-over.xml": {
+        "bytes": 8907,
+        "sha256": "0a11551ec4cee7e7c566c33cc68007f414e3104cca827b4808c47ccfdde7a758"
+      },
+      "xml-authored-space.xml": {
+        "bytes": 43,
+        "sha256": "c44965fa4ac29bc0243e378bc595e26537ceb0b37e42ceb3a32481842a70f06b"
+      },
+      "xml-bom-comment.xml": {
+        "bytes": 25,
+        "sha256": "35dca07947b582dfbedc4ccda2fa2f1708399abc84739130fa35dfd453a17d18"
+      },
+      "xml-depth-over.xml": {
+        "bytes": 231,
+        "sha256": "dd43137e040010a18917d4505a14df93575597ab2fa0356127a2115f69c13a3a"
+      },
+      "xml-end-tag-space.xml": {
+        "bytes": 15,
+        "sha256": "03b0eb352b8337e6d089e68ec18af4b77bb0800bc1eadc78a293ac1cc7b0c771"
+      },
+      "xml-malformed-reference.xml": {
+        "bytes": 21,
+        "sha256": "616ac7de6caf9c9aa85168929a74bab4db907c75f77665865f1821209b6fba4c"
+      },
+      "xml-token-over.xml": {
+        "bytes": 5013,
+        "sha256": "6c355f995981c46511ad27effd8e766e5da9746f3316f43e36af7dbd4fbb8934"
+      },
+      "xml-truncated.xml": {
+        "bytes": 25,
+        "sha256": "f50ddfbe0e65592ab4e255b2c0691f34be98bf646d9144d5e57f4e8f38b42175"
+      },
+      "xml-valid-mixed.xml": {
+        "bytes": 128,
+        "sha256": "99f98330191402c0c65cfe69e9b5e96857b14ccd15c2cfae4d7a654d5c362f8a"
+      }
+    },
+    "lock": {
+      "bytes": 3884,
+      "sha256": "4e629cb61956faed76b370ffdc982ece7fb5444da5805cb22afe64c8ff094cc4"
+    },
+    "manifest": {
+      "bytes": 533,
+      "sha256": "cb14665c37ad226b1826d9f81954a5ba7a3ffd5be7282f2c272ee18e38e48bc7"
+    },
+    "prepared_utc": "2026-09-08T20:15:09.490280+00:00",
+    "seeds": {
+      "binary/invalid-utf8.bin": {
+        "bytes": 14,
+        "sha256": "071a3723ff3edc90ac0d95708a68573a31dd017e929561630a1cb7c0629d4983"
+      },
+      "binary/truncated-utf8.bin": {
+        "bytes": 15,
+        "sha256": "c9bd7caf4c2ad20b8429bde661d913d8455f9bcc2bfb76e48899ca202f91300a"
+      },
+      "xml/attributes-over.xml": {
+        "bytes": 8907,
+        "sha256": "0a11551ec4cee7e7c566c33cc68007f414e3104cca827b4808c47ccfdde7a758"
+      },
+      "xml/authored-space.xml": {
+        "bytes": 43,
+        "sha256": "c44965fa4ac29bc0243e378bc595e26537ceb0b37e42ceb3a32481842a70f06b"
+      },
+      "xml/bom-comment.xml": {
+        "bytes": 25,
+        "sha256": "35dca07947b582dfbedc4ccda2fa2f1708399abc84739130fa35dfd453a17d18"
+      },
+      "xml/depth-over.xml": {
+        "bytes": 231,
+        "sha256": "dd43137e040010a18917d4505a14df93575597ab2fa0356127a2115f69c13a3a"
+      },
+      "xml/end-tag-space.xml": {
+        "bytes": 15,
+        "sha256": "03b0eb352b8337e6d089e68ec18af4b77bb0800bc1eadc78a293ac1cc7b0c771"
+      },
+      "xml/malformed-reference.xml": {
+        "bytes": 21,
+        "sha256": "616ac7de6caf9c9aa85168929a74bab4db907c75f77665865f1821209b6fba4c"
+      },
+      "xml/token-over.xml": {
+        "bytes": 5013,
+        "sha256": "6c355f995981c46511ad27effd8e766e5da9746f3316f43e36af7dbd4fbb8934"
+      },
+      "xml/truncated.xml": {
+        "bytes": 25,
+        "sha256": "f50ddfbe0e65592ab4e255b2c0691f34be98bf646d9144d5e57f4e8f38b42175"
+      },
+      "xml/valid-mixed.xml": {
+        "bytes": 128,
+        "sha256": "99f98330191402c0c65cfe69e9b5e96857b14ccd15c2cfae4d7a654d5c362f8a"
+      }
+    },
+    "target_source": {
+      "bytes": 7911,
+      "sha256": "503a38c889d671228538588f25a88d88209ed50efa4cf3f88cf385aa2c6ac262"
+    }
+  },
+  "source_snapshot": {
+    "files": 7131,
+    "path": "validation-sources/260451a86474ad6ac459ec0c53f91d62bb9f31f80f119436d2fd0fd90cd7ba43.json",
+    "sha256": "260451a86474ad6ac459ec0c53f91d62bb9f31f80f119436d2fd0fd90cd7ba43"
+  },
+  "started_utc": "2026-09-08T20:17:21.822608+00:00"
+}

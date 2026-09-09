@@ -1,0 +1,24 @@
+
+running 7 tests
+test audit::stream_tests::authored_reader_preserves_authored_whitespace_policy ... ok
+test audit::stream_tests::streaming_memory_bound_accounts_for_depth_and_token_windows ... ok
+test audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks ... FAILED
+test audit::stream_tests::streamed_encoding_offsets_include_markup_prefixes ... ok
+test audit::stream_tests::source_failures_are_distinguished_from_audit_failures ... ok
+test audit::stream_tests::token_window_fails_before_unbounded_parser_growth ... ok
+test audit::stream_tests::total_window_fails_with_audit_limit ... ok
+
+failures:
+
+---- audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks stdout ----
+
+thread 'audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks' (2541477) panicked at crates/xml-minifier/src/audit.rs:1914:49:
+slice XML is valid: Malformed { offset: 0, detail: "invalid XML declaration boundary" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

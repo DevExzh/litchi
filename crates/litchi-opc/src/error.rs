@@ -29,6 +29,31 @@ pub enum OpcError {
         maximum: u64,
     },
 
+    /// A decoded source-part splice exceeded one of its operation-local
+    /// workspace ceilings. This is kept distinct from package input bytes so
+    /// callers can report parser, preservation, and replay memory budgets
+    /// accurately.
+    #[error("OPC source-part splice limit exceeded for {resource}: {actual} > {maximum}")]
+    SourcePartSpliceLimit {
+        /// Workspace resource whose finite ceiling was exceeded.
+        resource: SpliceResource,
+        /// Observed or conservatively reserved bytes.
+        actual: u64,
+        /// Configured finite ceiling.
+        maximum: u64,
+    },
+
+    /// A source-part splice workspace ceiling was configured to an invalid
+    /// value. This remains distinct from the package input-byte limits so a
+    /// caller can identify the rejected operation-local quota.
+    #[error("invalid OPC source-part splice limit for {resource}: {value}")]
+    InvalidSourcePartSpliceLimit {
+        /// Workspace resource whose configured ceiling was invalid.
+        resource: SpliceResource,
+        /// Invalid configured value.
+        value: u64,
+    },
+
     #[error("Package not found: {0}")]
     PackageNotFound(String),
 
@@ -251,6 +276,30 @@ pub enum OpcError {
     ValidationReport(#[from] litchi_core::ValidationReportError),
 }
 
+/// Operation-local resource used by a bounded decoded source-part splice.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpliceResource {
+    /// Accepted publication output bytes.
+    OutputBytes,
+    /// XML parser state and the fixed logical candidate adapter buffer.
+    XmlWorkspaceBytes,
+    /// Preservation index and retained central-directory planning state.
+    PreservationMemoryBytes,
+    /// Replay payload windows and compressor state.
+    ReplayMemoryBytes,
+}
+
+impl std::fmt::Display for SpliceResource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::OutputBytes => "splice output bytes",
+            Self::XmlWorkspaceBytes => "XML splice workspace bytes",
+            Self::PreservationMemoryBytes => "preservation splice workspace bytes",
+            Self::ReplayMemoryBytes => "replay splice workspace bytes",
+        })
+    }
+}
+
 impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
         match err.into_kind() {
@@ -406,6 +455,24 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::Utf8Error(_)
             | OpcError::ParseIntError(_)
             | OpcError::AttrError(_) => litchi_core::Error::Other(err.to_string()),
+            OpcError::SourcePartSpliceLimit {
+                resource,
+                actual,
+                maximum,
+            } => litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: match resource {
+                    SpliceResource::OutputBytes => litchi_core::Resource::OutputBytes,
+                    SpliceResource::XmlWorkspaceBytes
+                    | SpliceResource::PreservationMemoryBytes
+                    | SpliceResource::ReplayMemoryBytes => litchi_core::Resource::Memory,
+                },
+                observed: actual,
+                limit: maximum,
+                scope: std::sync::Arc::from(format!("OPC source-part splice ({resource})")),
+            }),
+            error @ OpcError::InvalidSourcePartSpliceLimit { .. } => {
+                litchi_core::Error::Unsupported(error.to_string())
+            },
         }
     }
 }

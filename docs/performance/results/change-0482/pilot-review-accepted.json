@@ -1,0 +1,178 @@
+{
+  "analyzer": {
+    "bytes": 44164,
+    "sha256": "fb0176212357cd8d959419608e059756fc95f63bf363c60a397b711edceaaefb"
+  },
+  "reports": [
+    {
+      "label": "pilot-allocator-a1-materialized-134217728",
+      "report": {
+        "bytes": 3227,
+        "sha256": "93cb25f8d17dc3c9ef4a8ad6210ca9fc168cf0030f0aff7f0f253d369eb1d3b4"
+      }
+    },
+    {
+      "label": "pilot-allocator-a1-materialized-65536",
+      "report": {
+        "bytes": 3145,
+        "sha256": "a8119ee9cd2b69756410abf75f19410cde6968ecc3544ddb6b38a58093a4e030"
+      }
+    },
+    {
+      "label": "pilot-allocator-a1-materialized-8388608",
+      "report": {
+        "bytes": 3190,
+        "sha256": "f8ce0755274f9656ed44efc2ba3364292ef51ce28dda4bd3cb45c07e044b2a2f"
+      }
+    },
+    {
+      "label": "pilot-allocator-a1-streaming-134217728",
+      "report": {
+        "bytes": 3194,
+        "sha256": "bbee7baf2cc8f4265dcaec60816cef9f74a0f2765c7c00f90b91ac657e956a4a"
+      }
+    },
+    {
+      "label": "pilot-allocator-a1-streaming-65536",
+      "report": {
+        "bytes": 3132,
+        "sha256": "8f309225be03c331c3134d7344e97bb25ceac62916f039798a80f0acd6b275bd"
+      }
+    },
+    {
+      "label": "pilot-allocator-a1-streaming-8388608",
+      "report": {
+        "bytes": 3164,
+        "sha256": "07aaa138520f0ab8e70cf86d403bbea3dedadb7c320f779521104661f784b799"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-materialized-134217728",
+      "report": {
+        "bytes": 3227,
+        "sha256": "0ffc7f65476aabfb8f1e4b38f0c5522eb30dce608b35112c87367482bb2dfee2"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-materialized-65536",
+      "report": {
+        "bytes": 3146,
+        "sha256": "17957e141298a443860d317903942244951c0bb60b4ca6b3ba0dabd19daf258a"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-materialized-8388608",
+      "report": {
+        "bytes": 3190,
+        "sha256": "c4eac437b5eeccfa0a9b43387c28156b5760ad47bb34b8c6c819463828ad4eb4"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-streaming-134217728",
+      "report": {
+        "bytes": 3194,
+        "sha256": "799c2b365ee42dfe5db3024fc622f236edf30d4614bbb3977dcd312375d9d87f"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-streaming-65536",
+      "report": {
+        "bytes": 3131,
+        "sha256": "235c5d17222db23bd1aa9f18f89d76469a2c50d0d8e582d0457048cee966cb7e"
+      }
+    },
+    {
+      "label": "pilot-allocator-a2-streaming-8388608",
+      "report": {
+        "bytes": 3164,
+        "sha256": "17764c97b3e40bea66e9ef450ec5d5dc91dd58bbc790177689e06cd78c2c3998"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-materialized-134217728",
+      "report": {
+        "bytes": 2588,
+        "sha256": "cd17dac6925dd504726283d0169e4837d1bc752e6671edfe5e7d314020eed2e1"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-materialized-65536",
+      "report": {
+        "bytes": 2521,
+        "sha256": "82ce8f9445e91d24f91457b8b77ba2db8d543596e34747221d1b10d4858a0820"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-materialized-8388608",
+      "report": {
+        "bytes": 2556,
+        "sha256": "bff7f0e76b537b340a09916389a02560caac271a9b6b85bfc140a0b6ee3a625a"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-streaming-134217728",
+      "report": {
+        "bytes": 2577,
+        "sha256": "705621ae3463a478e691d46a58daf87ac1cbfeb014de4154ab15c239113ffffb"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-streaming-65536",
+      "report": {
+        "bytes": 2514,
+        "sha256": "179be2ea4ac87dc0f168e765b39d77792e07ed4179274f27672ddbdfd13e434c"
+      }
+    },
+    {
+      "label": "pilot-normal-a1-streaming-8388608",
+      "report": {
+        "bytes": 2547,
+        "sha256": "a0fc9b7916dca98ae00f2cd6a937568d58762cf0b412f82fceffeab13a955563"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-materialized-134217728",
+      "report": {
+        "bytes": 2588,
+        "sha256": "d567a03084af7e3f399ca6c669ee38c807ab15e34a31bfb0ec967c2da063e151"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-materialized-65536",
+      "report": {
+        "bytes": 2522,
+        "sha256": "55ffa7c426d4ceae6f480bd4715ed2fa400a095784180cbe6d280801ad0a78eb"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-materialized-8388608",
+      "report": {
+        "bytes": 2556,
+        "sha256": "eb2b5e1faa8bbb48bb418325a7708ee14f203cfeb966dc404260829c6eb07308"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-streaming-134217728",
+      "report": {
+        "bytes": 2577,
+        "sha256": "4034bc3f9799693eb935015a45bed04c9954a0c6c236e98902895c46d7eee77b"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-streaming-65536",
+      "report": {
+        "bytes": 2514,
+        "sha256": "b3561bed95c1ca1abe9691d181f64041655365316ff2b66029d6aea0ef8c7943"
+      }
+    },
+    {
+      "label": "pilot-normal-a2-streaming-8388608",
+      "report": {
+        "bytes": 2547,
+        "sha256": "f0d061ec46cda3cfe36042d032afeace2a30903b56da265607535024722412da"
+      }
+    }
+  ],
+  "status": "pass",
+  "validated_utc": "2026-09-09T00:26:19.473194+00:00"
+}

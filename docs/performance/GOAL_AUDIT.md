@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0482: shared primitives complete; end-to-end append remains open
+
+[0482](changes/0482-bounded-xml-opc-splice.md) implements bounded XML auditing and decoded OPC insertion publication.
+Focused tests cover source/candidate proof refusal, opaque ZIP preservation,
+no-ops, inverse restoration, partial output, cancellation and budgets. Primitive
+measurements cannot prove the program's bounded append requirement: public
+DOCX append still uses the materialized lifecycle, and generated fragments,
+package metadata and caller storage have distinct ownership. The
+[next work](results/change-0482/next-work.md) retains DOCX scanner integration,
+replayable paragraph generation, durable patches, provider variants and
+end-to-end scaling evidence. Broader CRUD and parallel scaling obligations
+remain in scope. The full goal is not achieved.
+
 ## 0481: scanner allocation progress; full goal still open
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) removes measured unnecessary

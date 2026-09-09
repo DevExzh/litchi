@@ -42,6 +42,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
+mod splice;
+pub use splice::{
+    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSplicePublication,
+};
+
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 /// Fixed part of the ZIP preservation writer's bounded generated-member
 /// capacity. The payload and target-name terms are charged separately using
@@ -3649,17 +3655,21 @@ impl SourceBackedPackage {
             work_result.map_err(opc_error)?;
         }
 
-        // The low-level reader owns its fixed 16 KiB byte buffer. This
-        // reservation accounts for that bounded callback-scoped working set
-        // without reserving the declared decoded payload or creating a cache
-        // entry. It is deliberately held through verification finalization.
+        // The low-level reader owns a fixed callback buffer. Deflated members
+        // additionally allocate flate2's compressed-input window and the
+        // backend inflater state. The ZIP owner supplies the scalar upper
+        // bound; no format layer guesses the backend object size. This
+        // reservation is held through verification finalization without
+        // reserving the declared decoded payload or creating a cache entry.
+        let reader_memory = self
+            .archive
+            .verified_entry_reader_memory_upper_bound(entry_id)
+            .map_err(map_preservation_error)
+            .map_err(opc_error)?;
         let _memory_reservation = match self.source.context.as_ref() {
             Some(context) => Some(
                 context
-                    .reserve(
-                        Resource::Memory,
-                        soapberry_zip::office::VERIFIED_ENTRY_READER_BUFFER_SIZE as u64,
-                    )
+                    .reserve(Resource::Memory, reader_memory)
                     .map_err(map_execution_error)
                     .map_err(opc_error)?,
             ),
@@ -18838,9 +18848,21 @@ mod callback_scoped_verified_reader_tests {
 
     #[test]
     fn verified_reader_managed_accounting_is_precise_and_not_cached() {
-        let (budget, _cancellation_source, context) = managed_context(16 * 1024);
+        let source_bytes = archive_bytes(PAYLOAD);
+        let probe =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+                .unwrap();
+        let probe_part = probe
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let reader_memory = probe
+            .archive
+            .verified_entry_reader_memory_upper_bound(probe.parts[probe_part.index].entry_id)
+            .unwrap();
+        drop(probe);
+        let (budget, _cancellation_source, context) = managed_context(reader_memory);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
-            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            Arc::new(OwnedSource::new(source_bytes)),
             ReadLimits::default(),
             context,
         )
@@ -18852,6 +18874,7 @@ mod callback_scoped_verified_reader_tests {
         let result = part
             .with_verified_decoded_reader_with_accounting(
                 |reader| {
+                    assert_eq!(budget.used(Resource::Memory), reader_memory);
                     let mut bytes = Vec::new();
                     reader.read_to_end(&mut bytes)?;
                     Ok::<_, io::Error>(bytes)

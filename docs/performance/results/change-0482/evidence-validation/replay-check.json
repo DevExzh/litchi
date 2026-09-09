@@ -1,0 +1,120 @@
+{
+  "cases": [
+    {
+      "accepted": true,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-goal-0482/actual-replay-o81bxg1k/checkout/docs/performance/results/change-0482/verify.py"
+      ],
+      "case": "portable-baseline",
+      "cwd": "/tmp/litchi-goal-0482/actual-replay-o81bxg1k/checkout/docs/performance/results/change-0482",
+      "exit_code": 0,
+      "expected_acceptance": true,
+      "finished_utc": "2026-09-09T00:33:13.566117+00:00",
+      "started_utc": "2026-09-09T00:33:11.753704+00:00",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 4153,
+        "sha256": "a8c52b4db36c85c7c85f6275f942e3a57b246f15377101595394afd4ba88a1b5"
+      }
+    },
+    {
+      "accepted": false,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-goal-0482/actual-replay-nh93278x/checkout/docs/performance/results/change-0482/verify.py"
+      ],
+      "case": "missing-capture",
+      "cwd": "/tmp/litchi-goal-0482/actual-replay-nh93278x/checkout/docs/performance/results/change-0482",
+      "exit_code": 1,
+      "expected_acceptance": false,
+      "finished_utc": "2026-09-09T00:33:15.048623+00:00",
+      "started_utc": "2026-09-09T00:33:13.625601+00:00",
+      "stderr": {
+        "bytes": 190,
+        "sha256": "9115e308ca529b004b45e4341db5c391fa29002bf1616b817179bf424d218fc2"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "accepted": false,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-goal-0482/actual-replay-ppf7ffdl/checkout/docs/performance/results/change-0482/verify.py"
+      ],
+      "case": "tampered-summary",
+      "cwd": "/tmp/litchi-goal-0482/actual-replay-ppf7ffdl/checkout/docs/performance/results/change-0482",
+      "exit_code": 1,
+      "expected_acceptance": false,
+      "finished_utc": "2026-09-09T00:33:16.870736+00:00",
+      "started_utc": "2026-09-09T00:33:15.109973+00:00",
+      "stderr": {
+        "bytes": 67,
+        "sha256": "2d8656563e484ed3ccb5929a579b4b442f6a1c0c77ef36e5337aa44037a451b7"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "accepted": false,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-goal-0482/actual-replay-ewsl738y/checkout/docs/performance/results/change-0482/verify.py"
+      ],
+      "case": "missing-required-gate",
+      "cwd": "/tmp/litchi-goal-0482/actual-replay-ewsl738y/checkout/docs/performance/results/change-0482",
+      "exit_code": 1,
+      "expected_acceptance": false,
+      "finished_utc": "2026-09-09T00:33:17.004006+00:00",
+      "started_utc": "2026-09-09T00:33:16.929957+00:00",
+      "stderr": {
+        "bytes": 90,
+        "sha256": "5d55395206e0079f468f501546457d9da2a1a5b6656b5598a41e4c9d098b139f"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "accepted": false,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-goal-0482/actual-replay-webipneh/checkout/docs/performance/results/change-0482/verify.py"
+      ],
+      "case": "tampered-fuzz-record",
+      "cwd": "/tmp/litchi-goal-0482/actual-replay-webipneh/checkout/docs/performance/results/change-0482",
+      "exit_code": 1,
+      "expected_acceptance": false,
+      "finished_utc": "2026-09-09T00:33:17.124746+00:00",
+      "started_utc": "2026-09-09T00:33:17.062118+00:00",
+      "stderr": {
+        "bytes": 67,
+        "sha256": "6958adfc07ac2a87565785b22291645b912eb9873f40e040e62b5827eae8f8ff"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "finished_utc": "2026-09-09T00:33:17.131951+00:00",
+  "helper": {
+    "bytes": 2606,
+    "sha256": "9781388072b66f35abdbed3beda97030831897b6a702fa502e9fd1ea76c39dee"
+  },
+  "status": "pass"
+}

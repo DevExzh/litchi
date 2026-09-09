@@ -15,6 +15,7 @@ use crate::{
     extra_fields::{ExtraFieldId, ExtraFields},
 };
 use std::io::Write;
+use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -24,7 +25,7 @@ mod replay_tests;
 
 pub use replay::{
     ReplayLimits, ReplayMeasurement, ReplayPass, ReplayProgress, ReplayPublicationError,
-    ReplayResource,
+    ReplayResource, replay_memory_upper_bound,
 };
 
 const COPY_CHUNK_SIZE: usize = 64 * 1024;
@@ -329,6 +330,63 @@ pub struct PreservationIndex<'source, R> {
     archive_comment: Vec<u8>,
     zip64_tail: Option<Zip64Tail>,
     archive_end_offset: u64,
+}
+
+/// Return the additional allocation upper bound for one replacement replay.
+///
+/// This is deliberately a scalar contract.  The ZIP representation remains
+/// private to this crate while format owners can reserve the ownership that
+/// this module will create before constructing an index.  `metadata_bytes`
+/// must include the complete central directory, ZIP64 tail, and archive
+/// comment, as returned by
+/// [`crate::office::IndexedArchive::preservation_metadata_bytes`].
+/// The four metadata terms cover the retained index bytes, generated target
+/// framing/central bytes, ZIP64 promotion copies, and the prepared tail.  The
+/// per-entry terms use the actual private layout sizes rather than a guessed
+/// object allowance; the twelve source ranges are the promotion capacity used
+/// by [`promote_central_record`].
+pub(crate) fn preservation_memory_upper_bound(
+    entry_count: usize,
+    metadata_bytes: u64,
+) -> Option<u64> {
+    let entries = u64::try_from(entry_count).ok()?;
+    let entries_with_target = entries.checked_add(1)?;
+    let size = |value: usize| u64::try_from(value).ok();
+    let per_entry = [
+        size(size_of::<PreservedEntry>())?,
+        size(size_of::<usize>())?,
+        size(size_of::<PreservationAction>())?,
+        size(size_of::<Option<PreparedEntry>>())?,
+        size(size_of::<PreparedEntry>())?,
+        size(size_of::<CentralOffsetPatch>())?,
+        size(size_of::<PromotedCentral>())?,
+    ]
+    .into_iter()
+    .try_fold(0u64, |total, value| total.checked_add(value))?;
+    let per_entry = entries.checked_mul(per_entry)?;
+    let prepared_and_layout = entries_with_target.checked_mul(
+        size(size_of::<PreparedEntry>())?
+            .checked_add(size(size_of::<u64>())?)?
+            .checked_add(size(size_of::<CentralOffsetPatch>())?)?,
+    )?;
+    let promotion_ranges = entries
+        .checked_mul(12)?
+        .checked_mul(size(size_of::<Range<usize>>())?)?;
+    let promotion_extra_bytes = entries.checked_mul(12)?;
+    let variable_bytes = metadata_bytes.checked_mul(4)?;
+    let fixed_bytes = size(size_of::<PreparedZip64Tail>())?
+        .checked_add(u64::try_from(COPY_CHUNK_SIZE).ok()?)?
+        // A replay target's local framing, central fixed header, and ZIP
+        // descriptor are bounded by its source central metadata plus this
+        // constant.  Its variable member name is already in metadata_bytes.
+        .checked_add(128)?;
+
+    per_entry
+        .checked_add(prepared_and_layout)?
+        .checked_add(promotion_ranges)?
+        .checked_add(promotion_extra_bytes)?
+        .checked_add(variable_bytes)?
+        .checked_add(fixed_bytes)
 }
 
 impl<'source, R> PreservationIndex<'source, R>
@@ -4977,6 +5035,58 @@ mod tests {
             crate::office::ArchiveReader::new(&output)
                 .unwrap()
                 .read("replacement.bin")
+                .unwrap(),
+            b"replacement"
+        );
+    }
+
+    #[test]
+    fn preservation_bound_covers_long_name_zip64_replacement_layout() {
+        let name = "n".repeat(60_000);
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer.write_stored_file(&name, b"source").unwrap();
+        let source = promote_to_zip64(writer.finish().unwrap());
+        let limits = ArchiveLimits {
+            max_member_name_bytes: name.len() as u64,
+            ..ArchiveLimits::default()
+        };
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new_with_limits_and_policy(
+            &archive,
+            &mut buffer,
+            limits,
+            PreservationPolicy::AllowZip64,
+        )
+        .expect("long-name ZIP64 source must be indexable");
+        assert!(archive.is_zip64());
+        let indexed_archive = crate::office::IndexedArchive::from_reader_with_limits(
+            Cursor::new(source.clone()),
+            source.len() as u64,
+            limits,
+        )
+        .expect("long-name ZIP64 source must be indexable by the owner");
+        let metadata_bytes = indexed_archive.preservation_metadata_bytes();
+        assert!(metadata_bytes >= name.len() as u64);
+        let bound = indexed_archive
+            .preservation_memory_upper_bound()
+            .expect("preservation bound must not overflow");
+        assert!(bound >= metadata_bytes.saturating_mul(4));
+
+        let id = index.entries()[0].id();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id,
+            entry: RegeneratedEntry::new(name.clone(), b"replacement".to_vec()),
+        };
+        let output = index
+            .write_to(&plan, Vec::new())
+            .expect("long-name ZIP64 replacement must fit the preservation path");
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(
+            crate::office::ArchiveReader::new_with_limits(&output, limits)
+                .unwrap()
+                .read(&name)
                 .unwrap(),
             b"replacement"
         );

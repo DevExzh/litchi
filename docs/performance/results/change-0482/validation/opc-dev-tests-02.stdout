@@ -1,0 +1,22 @@
+
+running 17 tests
+test candidate_limit_is_refused_without_output ... ok
+test exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit ... ok
+test signed_non_noop_refuses_before_output ... ok
+test source_version_mutation_is_refused_before_output ... ok
+test mismatched_proof_fields_are_refused_before_publication ... ok
+test cancellation_is_observed_before_plan_and_write ... ok
+test exact_noop_copies_malformed_and_signed_source_byte_for_byte ... ok
+test source_mutation_after_the_first_sink_write_wins_over_publication ... ok
+test malformed_source_or_candidate_is_rejected_before_output ... ok
+test splice_memory_quotas_are_typed_and_release_after_success_or_failure ... ok
+test accounting_reports_two_fresh_decoded_reader_passes ... ok
+test partial_and_flush_sink_failures_preserve_typed_progress ... ok
+test binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs ... ok
+test store_and_deflate_splices_preserve_opaque_members_without_caching_target ... ok
+test publication_inverse_requires_the_authenticated_candidate_artifact ... ok
+test publication_inverse_observes_candidate_cancellation_during_write_and_flush ... ok
+test publication_inverse_rechecks_candidate_freshness_during_write_and_flush ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0482: XML reader and source-backed OPC insertion
+
+[0482](changes/0482-bounded-xml-opc-splice.md) keeps lexical XML auditing in `xml-minifier`, physical package proof and
+publication in OPC, and private ZIP layout/decoder/compressor bounds in
+`soapberry-zip`. The [matrix](results/change-0482/adr-matrix.md) records snapshot,
+no-op, preservation, signature, source, budget, cancellation and partial-output
+obligations. Inverse publication charges the selected candidate context once,
+falling back to the retained context when needed, while checking both sources.
+No ambient provider, executor or archive type enters format-facing CRUD APIs.
+DOCX semantic publication and durable patch integration remain unproven.
+
 ## 0481: borrowed DOCX scanner names
 
 [0481](changes/0481-docx-borrowed-scanner-names.md) keeps event names borrowed

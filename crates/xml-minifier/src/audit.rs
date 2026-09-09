@@ -10,11 +10,12 @@
     reason = "semantic API types precede their streaming implementation and package submodule"
 )]
 
-use core::fmt;
+use core::{fmt, mem::size_of};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
+use std::io::{self, BufRead, Read};
 
 /// Finite resource budgets for one XML document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -185,6 +186,67 @@ impl Limits {
     #[must_use]
     pub const fn max_token_bytes(self) -> usize {
         self.token_bytes
+    }
+
+    /// Returns a checked upper bound for the streaming auditor's dynamic
+    /// parser buffers.
+    ///
+    /// The bound includes the reusable event buffer (`max_token_bytes + 1`),
+    /// quick-xml's retained open-element names (at most one token-sized name
+    /// per admitted depth, with geometric `Vec` capacity), its open-name
+    /// indexes, the bounded lexical capture and exposed source window, the
+    /// optional BOM-shifted lexical window, the geometric attribute-name
+    /// `Range<usize>` tracker and large-tag hash prefilter (including a
+    /// fourfold capacity/control-byte factor and an eight-entry minimum), two
+    /// transient token-sized decoded and normalized attribute-value buffers, and this
+    /// auditor's inherited `xml:space` stack. Counting the reusable event
+    /// buffer, these dynamic token windows are bounded by six token capacities.
+    /// The three BOM bookkeeping arrays (the 3-byte probe, 3-byte history, and
+    /// 6-byte history-combine scratch) add 12 bytes separately. The caller's
+    /// `BufRead` storage, other fixed-size parser values, allocator metadata,
+    /// and error strings are outside this bound.
+    /// `None` means the checked arithmetic could not represent the envelope in
+    /// `usize`. This is a size envelope; it does not make quick-xml's internal
+    /// allocations fallible.
+    #[must_use]
+    pub fn streaming_memory_upper_bound(self) -> Option<usize> {
+        let token = self.token_bytes.checked_add(1)?;
+        let levels = self.depth.checked_add(1)?;
+        let event_and_attribute_scratch = token.checked_mul(6)?;
+        let open_names = levels.checked_mul(token)?.checked_mul(2)?.max(8);
+        let open_indexes = self
+            .depth
+            .checked_add(1)?
+            .checked_mul(size_of::<usize>())?
+            .checked_mul(2)?
+            .max(4 * size_of::<usize>());
+        let spaces = self
+            .depth
+            .checked_add(1)?
+            .checked_mul(size_of::<Space>())?
+            .checked_mul(2)?
+            .max(8 * size_of::<Space>());
+        let attribute_range_size = size_of::<std::ops::Range<usize>>();
+        let attribute_ranges = self
+            .attributes
+            .checked_add(1)?
+            .checked_mul(attribute_range_size)?
+            .checked_mul(2)?
+            .max(4 * attribute_range_size);
+        let attribute_hash_entry = size_of::<u64>().checked_add(size_of::<u8>())?;
+        let attribute_hashes = self
+            .attributes
+            .checked_add(1)?
+            .checked_mul(attribute_hash_entry)?
+            .checked_mul(4)?
+            .max(attribute_hash_entry.checked_mul(8)?);
+        event_and_attribute_scratch
+            .checked_add(open_names)?
+            .checked_add(open_indexes)?
+            .checked_add(spaces)
+            .and_then(|total| total.checked_add(attribute_ranges))
+            .and_then(|total| total.checked_add(attribute_hashes))
+            .and_then(|total| total.checked_add(12))
     }
 }
 
@@ -427,7 +489,7 @@ pub enum Error {
         /// Zero-based byte offset of the declaration.
         offset: usize,
     },
-    /// The depth stack could not reserve one bounded entry.
+    /// A bounded audit buffer could not reserve its configured capacity.
     Allocation,
 }
 
@@ -477,6 +539,49 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Failure returned by the streaming XML auditor.
+///
+/// A source failure remains an [`Input`](StreamError::Input) error so callers
+/// can distinguish a
+/// transport or decompression failure from XML validation. Resource windows,
+/// parser failures, encoding failures, and compactness defects are returned as
+/// [`Audit`](StreamError::Audit) errors. Streaming validation reports the first
+/// failure observed
+/// while consuming the source; this can differ from the error ordering of the
+/// slice API when a later source byte has not yet been read.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum StreamError {
+    /// The supplied source returned an I/O failure.
+    Input(io::Error),
+    /// XML parsing, compactness, encoding, or finite-budget failure.
+    Audit(Error),
+}
+
+impl fmt::Display for StreamError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Input(source) => write!(formatter, "XML input stream failed: {source}"),
+            Self::Audit(source) => source.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for StreamError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Input(source) => Some(source),
+            Self::Audit(source) => Some(source),
+        }
+    }
+}
+
+impl From<Error> for StreamError {
+    fn from(source: Error) -> Self {
+        Self::Audit(source)
+    }
+}
 
 /// Accounting summary for a verified compact XML document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -586,6 +691,606 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// [`Kind::AmbiguousWhitespace`] when authored whitespace cannot be classified.
 pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
     verify_with_policy(input, limits, true)
+}
+
+/// Verifies one XML document from a caller-owned buffered source.
+///
+/// The source is consumed incrementally. The reusable parser event buffer is
+/// admitted at `max_token_bytes + 1` bytes, and the guarded source refuses to
+/// expose another byte before quick-xml can grow that buffer beyond the
+/// configured token window. The total input, event count, depth, attributes,
+/// and character-data budgets retain the same meanings as [`verify`].
+///
+/// `quick_xml` retains the names of open elements for end-tag matching. The
+/// checked [`Limits::streaming_memory_upper_bound`] helper accounts for that
+/// `(depth + 1) * (max_token_bytes + 1)` dynamic envelope in addition to the
+/// event buffer and this auditor's `xml:space` stack. The extra admitted name
+/// accounts for quick-xml recording a start tag before this auditor refuses an
+/// over-limit depth.
+///
+/// # Errors
+///
+/// Returns [`StreamError::Input`] for an I/O failure from `reader`, and
+/// [`StreamError::Audit`] for XML, compactness, encoding, or finite-budget
+/// failures. Unlike [`verify`], UTF-8 and other failures are observed in
+/// source order rather than after an upfront whole-input check.
+pub fn verify_reader<R: BufRead>(reader: R, limits: Limits) -> Result<Report, StreamError> {
+    verify_reader_with_policy(reader, limits, false)
+}
+
+/// Verifies authored XML from a caller-owned buffered source.
+///
+/// This has the same streaming and bounded-memory behavior as
+/// [`verify_reader`], while applying the stricter authored rule from
+/// [`verify_authored`]: whitespace-only text runs outside
+/// `xml:space="preserve"` are rejected as ambiguous.
+pub fn verify_authored_reader<R: BufRead>(
+    reader: R,
+    limits: Limits,
+) -> Result<Report, StreamError> {
+    verify_reader_with_policy(reader, limits, true)
+}
+
+fn verify_reader_with_policy<R: BufRead>(
+    reader: R,
+    limits: Limits,
+    reject_ambiguous_space: bool,
+) -> Result<Report, StreamError> {
+    let token_window = limits
+        .token_bytes
+        .checked_add(1)
+        .ok_or(StreamError::Audit(Error::Allocation))?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(token_window)
+        .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
+
+    let max_total = u64::try_from(limits.bytes).unwrap_or(u64::MAX);
+    let mut guarded =
+        GuardedBufRead::new(reader, max_total, limits.token_bytes).map_err(StreamError::Input)?;
+    guarded
+        .try_reserve_capture(token_window)
+        .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
+    let saw_bom = guarded.saw_bom();
+    let mut bom_raw = Vec::new();
+    if saw_bom {
+        bom_raw
+            .try_reserve_exact(token_window)
+            .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
+    }
+    let mut reader = Reader::from_reader(guarded);
+    reader.config_mut().trim_text(false);
+    let mut state = State::new();
+    let mut bom_history = [0; 3];
+    let mut bom_history_len = 0;
+
+    loop {
+        buffer.clear();
+        reader.get_mut().begin_token();
+        let start_u64 = reader.buffer_position();
+        let physical_start_u64 = reader.get_ref().position();
+        let start = usize::try_from(start_u64).unwrap_or(usize::MAX);
+        let physical_start = usize::try_from(physical_start_u64).unwrap_or(usize::MAX);
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| map_stream_reader_error(error, start))?;
+        let end_u64 = reader.buffer_position();
+        let token_bytes = end_u64
+            .checked_sub(start_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(|| {
+                StreamError::Audit(Error::malformed(
+                    start,
+                    "parser position moved backwards or exceeded addressable input",
+                ))
+            })?;
+
+        state.events = checked_add(state.events, 1, Resource::Events, limits.events, start)
+            .map_err(StreamError::Audit)?;
+        check_limit(Resource::TokenBytes, limits.token_bytes, token_bytes, start)
+            .map_err(StreamError::Audit)?;
+
+        let captured = reader.get_ref().captured();
+        let raw = if saw_bom {
+            bom_raw_for_slice(
+                captured,
+                &bom_history,
+                bom_history_len,
+                start,
+                token_bytes,
+                &mut bom_raw,
+            );
+            bom_raw.as_slice()
+        } else {
+            captured
+        };
+
+        // `read_event_into` borrows the reusable buffer. Checking UTF-8 here
+        // catches code points split across arbitrary source chunks after the
+        // parser has assembled the complete bounded event.
+        let event_bytes: &[u8] = &event;
+        std::str::from_utf8(event_bytes).map_err(|error| {
+            StreamError::Audit(Error::Encoding {
+                valid_up_to: event_encoding_offset(
+                    &event,
+                    physical_start,
+                    error.valid_up_to(),
+                    token_bytes,
+                ),
+            })
+        })?;
+
+        match event {
+            Event::Start(tag) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                check_start(raw, false, start).map_err(StreamError::Audit)?;
+                let space = inspect_attributes(
+                    &tag,
+                    reader.decoder(),
+                    state.current_space(),
+                    &mut state,
+                    limits,
+                    start,
+                )
+                .map_err(StreamError::Audit)?;
+                enter_element(&mut state, limits, start).map_err(StreamError::Audit)?;
+                state
+                    .spaces
+                    .try_reserve(1)
+                    .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
+                state.spaces.push(space);
+            },
+            Event::Empty(tag) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                check_start(raw, true, start).map_err(StreamError::Audit)?;
+                inspect_attributes(
+                    &tag,
+                    reader.decoder(),
+                    state.current_space(),
+                    &mut state,
+                    limits,
+                    start,
+                )
+                .map_err(StreamError::Audit)?;
+                enter_empty(&mut state, limits, start).map_err(StreamError::Audit)?;
+            },
+            Event::End(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                check_end(raw, start).map_err(StreamError::Audit)?;
+                if state.depth == 0 || state.spaces.pop().is_none() {
+                    return Err(StreamError::Audit(Error::malformed(
+                        start,
+                        "unexpected end element",
+                    )));
+                }
+                state.depth -= 1;
+            },
+            Event::Text(text) => {
+                let bytes = text.as_ref();
+                check_character_context(state.depth, bytes, start).map_err(StreamError::Audit)?;
+                charge_text(&mut state, limits, bytes.len(), start).map_err(StreamError::Audit)?;
+                let whitespace = is_xml_whitespace(bytes);
+                if (state.depth == 0 && whitespace)
+                    || (is_structural_whitespace(bytes) && state.current_space() != Space::Preserve)
+                {
+                    return Err(StreamError::Audit(Error::NotCompact(Violation {
+                        kind: Kind::FormattingWhitespace,
+                        offset: start,
+                    })));
+                }
+                if reject_ambiguous_space && state.current_space() != Space::Preserve {
+                    if whitespace && !state.text_run_has_explicit_content {
+                        state.ambiguous_space_offset.get_or_insert(start);
+                    } else if !whitespace {
+                        state.ambiguous_space_offset = None;
+                        state.text_run_has_explicit_content = true;
+                    }
+                }
+            },
+            Event::CData(data) => {
+                if state.depth == 0 {
+                    return Err(StreamError::Audit(Error::malformed(
+                        start,
+                        "CDATA outside the document element",
+                    )));
+                }
+                charge_text(&mut state, limits, data.as_ref().len(), start)
+                    .map_err(StreamError::Audit)?;
+                state.ambiguous_space_offset = None;
+                state.text_run_has_explicit_content = true;
+            },
+            Event::GeneralRef(reference) => {
+                check_character_context(state.depth, reference.as_ref(), start)
+                    .map_err(StreamError::Audit)?;
+                charge_text(&mut state, limits, raw.len(), start).map_err(StreamError::Audit)?;
+                state.ambiguous_space_offset = None;
+                state.text_run_has_explicit_content = true;
+            },
+            Event::Decl(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                check_declaration(raw, start).map_err(StreamError::Audit)?;
+            },
+            Event::Comment(_) | Event::PI(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+            },
+            Event::DocType(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                return Err(StreamError::Audit(Error::Doctype { offset: start }));
+            },
+            Event::Eof => {
+                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                break;
+            },
+        }
+
+        if saw_bom {
+            remember_bom_history(&mut bom_history, &mut bom_history_len, captured);
+        }
+    }
+
+    let final_offset = usize::try_from(reader.get_ref().position()).unwrap_or(usize::MAX);
+    if state.depth != 0 {
+        return Err(StreamError::Audit(Error::malformed(
+            final_offset,
+            "unclosed document element",
+        )));
+    }
+    if state.roots != 1 {
+        return Err(StreamError::Audit(Error::malformed(
+            final_offset,
+            "XML must contain exactly one document element",
+        )));
+    }
+
+    Ok(Report {
+        attributes: state.attributes,
+        bytes: final_offset,
+        events: state.events,
+        max_depth: state.max_depth,
+        text_bytes: state.text_bytes,
+    })
+}
+
+fn event_encoding_offset(
+    event: &Event<'_>,
+    start: usize,
+    event_offset: usize,
+    token_bytes: usize,
+) -> usize {
+    let prefix = match event {
+        Event::Start(_) | Event::Empty(_) => 1,
+        Event::End(_) | Event::Decl(_) | Event::PI(_) => 2,
+        Event::GeneralRef(_) => 1,
+        Event::Comment(_) => 4,
+        Event::CData(_) => 9,
+        Event::DocType(content) => token_bytes
+            .saturating_sub(content.as_ref().len())
+            .saturating_sub(1),
+        Event::Text(_) | Event::Eof => 0,
+    };
+    start.saturating_add(prefix).saturating_add(event_offset)
+}
+
+fn bom_raw_for_slice(
+    captured: &[u8],
+    history: &[u8; 3],
+    history_len: usize,
+    start: usize,
+    token_bytes: usize,
+    output: &mut Vec<u8>,
+) {
+    output.clear();
+    if start < 3 {
+        let prefix = (3 - start).min(token_bytes);
+        output.extend_from_slice(&[0xEF, 0xBB, 0xBF][start..start + prefix]);
+        output
+            .extend_from_slice(&captured[..token_bytes.saturating_sub(prefix).min(captured.len())]);
+    } else {
+        let prefix = history_len.min(3).min(token_bytes);
+        output.extend_from_slice(&history[..prefix]);
+        output
+            .extend_from_slice(&captured[..token_bytes.saturating_sub(prefix).min(captured.len())]);
+    }
+    output.truncate(token_bytes);
+}
+
+fn remember_bom_history(history: &mut [u8; 3], length: &mut usize, bytes: &[u8]) {
+    if bytes.is_empty() {
+        return;
+    }
+    if bytes.len() >= 3 {
+        history.copy_from_slice(&bytes[bytes.len() - 3..]);
+        *length = 3;
+        return;
+    }
+    let mut combined = [0; 6];
+    let old_length = (*length).min(3);
+    combined[..old_length].copy_from_slice(&history[..old_length]);
+    let copied = bytes.len();
+    combined[old_length..old_length + copied].copy_from_slice(&bytes[..copied]);
+    let total = old_length + copied;
+    let start = total.saturating_sub(3);
+    let retained = &combined[start..total];
+    history[..retained.len()].copy_from_slice(retained);
+    *length = retained.len();
+}
+
+/// A `BufRead` facade that exposes at most the remaining total and per-event
+/// windows. It retains only the current token's consumed bytes for raw lexical
+/// checks; the caller's reader remains the owner of the input stream.
+struct GuardedBufRead<R> {
+    inner: R,
+    // Holding this fixed prefix makes UTF-8 BOM handling independent of the
+    // source's chunk size without allocating a second input buffer.
+    prefix: [u8; 3],
+    prefix_len: usize,
+    prefix_pos: usize,
+    saw_bom: bool,
+    total: u64,
+    token: usize,
+    max_total: u64,
+    max_token: usize,
+    max_token_window: usize,
+    captured: Vec<u8>,
+    exposed: Vec<u8>,
+    exposed_pos: usize,
+    exposed_prefix: bool,
+}
+
+impl<R: BufRead> GuardedBufRead<R> {
+    fn new(inner: R, max_total: u64, max_token: usize) -> io::Result<Self> {
+        let max_token_window = max_token.checked_add(1).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "XML token window overflows usize",
+            )
+        })?;
+        let mut guarded = Self {
+            inner,
+            prefix: [0; 3],
+            prefix_len: 0,
+            prefix_pos: 0,
+            saw_bom: false,
+            total: 0,
+            token: 0,
+            max_total,
+            max_token,
+            max_token_window,
+            captured: Vec::new(),
+            exposed: Vec::new(),
+            exposed_pos: 0,
+            exposed_prefix: false,
+        };
+
+        // Read at most three bytes up front so a BOM split over arbitrary
+        // `BufRead` chunks is recognized consistently. Bytes that do not form
+        // a BOM remain pending source and are counted when the parser consumes
+        // them.
+        let prefix_limit = max_total.min(3) as usize;
+        while guarded.prefix_len < prefix_limit {
+            let available = loop {
+                match guarded.inner.fill_buf() {
+                    Ok(available) => break available,
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(error) => return Err(error),
+                }
+            };
+            if available.is_empty() {
+                break;
+            }
+            let count = available
+                .len()
+                .min(prefix_limit.saturating_sub(guarded.prefix_len));
+            guarded.prefix[guarded.prefix_len..guarded.prefix_len + count]
+                .copy_from_slice(&available[..count]);
+            guarded.inner.consume(count);
+            guarded.prefix_len += count;
+        }
+        if guarded.prefix_len == 3 && guarded.prefix == [0xEF, 0xBB, 0xBF] {
+            guarded.saw_bom = true;
+            guarded.prefix_pos = guarded.prefix_len;
+            guarded.total = 3;
+        }
+        Ok(guarded)
+    }
+
+    const fn saw_bom(&self) -> bool {
+        self.saw_bom
+    }
+
+    fn try_reserve_capture(&mut self, capacity: usize) -> Result<(), ()> {
+        self.captured.try_reserve_exact(capacity).map_err(|_| ())?;
+        self.exposed.try_reserve_exact(capacity).map_err(|_| ())
+    }
+
+    fn begin_token(&mut self) {
+        self.token = 0;
+        self.captured.clear();
+    }
+
+    const fn position(&self) -> u64 {
+        self.total
+    }
+
+    fn pending(&self) -> &[u8] {
+        &self.prefix[self.prefix_pos..self.prefix_len]
+    }
+
+    fn captured(&self) -> &[u8] {
+        &self.captured
+    }
+}
+
+impl<R: BufRead> Read for GuardedBufRead<R> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        let available = self.fill_buf()?;
+        let count = available.len().min(output.len());
+        output[..count].copy_from_slice(&available[..count]);
+        self.consume(count);
+        Ok(count)
+    }
+}
+
+impl<R: BufRead> BufRead for GuardedBufRead<R> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if self.exposed_pos < self.exposed.len() {
+            return Ok(&self.exposed[self.exposed_pos..]);
+        }
+        self.exposed.clear();
+        self.exposed_pos = 0;
+
+        if self.token > self.max_token {
+            return Err(window_token_error(self.token, self.max_token));
+        }
+        if self.total >= self.max_total {
+            if !self.pending().is_empty() {
+                return Err(window_total_error(
+                    self.total.saturating_add(1),
+                    self.max_total,
+                ));
+            }
+            let available = self.inner.fill_buf()?;
+            if available.is_empty() {
+                return Ok(available);
+            }
+            return Err(window_total_error(
+                self.total.saturating_add(1),
+                self.max_total,
+            ));
+        }
+
+        let total_remaining = usize::try_from(self.max_total - self.total).unwrap_or(usize::MAX);
+        let token = self.token;
+        let token_remaining = self.max_token_window.saturating_sub(token);
+        if token_remaining == 0 {
+            // The lookahead byte has already been consumed into quick-xml's
+            // event buffer. Returning it again would permit a zero-progress
+            // loop on malformed input.
+            return Err(window_token_error(token, self.max_token));
+        }
+
+        let pending = !self.pending().is_empty();
+        if pending {
+            let start = self.prefix_pos;
+            let available = &self.prefix[start..self.prefix_len];
+            if available.is_empty() {
+                return Ok(available);
+            }
+            let visible = available.len().min(total_remaining).min(token_remaining);
+            self.exposed.extend_from_slice(&available[..visible]);
+        } else {
+            let mut exposed = std::mem::take(&mut self.exposed);
+            let available = match self.inner.fill_buf() {
+                Ok(available) => available,
+                Err(error) => {
+                    self.exposed = exposed;
+                    return Err(error);
+                },
+            };
+            if available.is_empty() {
+                self.exposed = exposed;
+                return Ok(&self.exposed);
+            }
+            let visible = available.len().min(total_remaining).min(token_remaining);
+            exposed.extend_from_slice(&available[..visible]);
+            self.exposed = exposed;
+        }
+        self.exposed_prefix = pending;
+        Ok(&self.exposed)
+    }
+
+    fn consume(&mut self, amount: usize) {
+        // quick-xml consumes only bytes returned by `fill_buf`; saturating the
+        // accounting keeps a hostile/incorrect source from causing a panic.
+        let available = self.exposed.len().saturating_sub(self.exposed_pos);
+        let amount = amount
+            .min(available)
+            .min(self.max_token_window.saturating_sub(self.token));
+        if amount == 0 {
+            return;
+        }
+        self.captured
+            .extend_from_slice(&self.exposed[self.exposed_pos..self.exposed_pos + amount]);
+        if self.exposed_prefix {
+            self.prefix_pos = self.prefix_pos.saturating_add(amount);
+        } else {
+            self.inner.consume(amount);
+        }
+        self.exposed_pos += amount;
+        self.token = self.token.saturating_add(amount);
+        self.total = self.total.saturating_add(amount as u64);
+    }
+}
+
+#[derive(Debug)]
+enum WindowError {
+    Total { observed: u64, limit: u64 },
+    Token { observed: usize, limit: usize },
+}
+
+impl fmt::Display for WindowError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Total { observed, limit } => write!(
+                formatter,
+                "XML input byte window exceeded: observed {observed}, limit {limit}"
+            ),
+            Self::Token { observed, limit } => write!(
+                formatter,
+                "XML token window exceeded: observed {observed}, limit {limit}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for WindowError {}
+
+fn window_total_error(observed: u64, limit: u64) -> io::Error {
+    io::Error::other(WindowError::Total { observed, limit })
+}
+
+fn window_token_error(observed: usize, limit: usize) -> io::Error {
+    io::Error::other(WindowError::Token { observed, limit })
+}
+
+fn map_stream_reader_error(error: quick_xml::Error, offset: usize) -> StreamError {
+    match error {
+        quick_xml::Error::Io(source) => {
+            if let Some(window) = source
+                .get_ref()
+                .and_then(|inner| inner.downcast_ref::<WindowError>())
+            {
+                return StreamError::Audit(window.to_audit_error(offset));
+            }
+            StreamError::Input(io::Error::new(source.kind(), source))
+        },
+        quick_xml::Error::Encoding(_) => StreamError::Audit(Error::Encoding {
+            valid_up_to: offset,
+        }),
+        other => StreamError::Audit(Error::malformed(offset, other.to_string())),
+    }
+}
+
+impl WindowError {
+    fn to_audit_error(&self, offset: usize) -> Error {
+        match self {
+            Self::Total { observed, limit } => Error::Limit {
+                resource: Resource::Bytes,
+                limit: usize::try_from(*limit).unwrap_or(usize::MAX),
+                actual: usize::try_from(*observed).unwrap_or(usize::MAX),
+                offset,
+            },
+            Self::Token { observed, limit } => Error::Limit {
+                resource: Resource::TokenBytes,
+                limit: *limit,
+                actual: *observed,
+                offset,
+            },
+        }
+    }
 }
 
 fn verify_with_policy(
@@ -1265,5 +1970,173 @@ pub mod package {
             });
         }
         Ok(actual)
+    }
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+
+    struct Chunked<'a> {
+        input: &'a [u8],
+        position: usize,
+        chunk: usize,
+    }
+
+    impl<'a> Chunked<'a> {
+        fn new(input: &'a [u8], chunk: usize) -> Self {
+            Self {
+                input,
+                position: 0,
+                chunk: chunk.max(1),
+            }
+        }
+    }
+
+    impl Read for Chunked<'_> {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for Chunked<'_> {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            let end = self
+                .position
+                .saturating_add(self.chunk)
+                .min(self.input.len());
+            Ok(&self.input[self.position..end])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.input.len());
+        }
+    }
+
+    struct Failing;
+
+    impl Read for Failing {
+        fn read(&mut self, _output: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::other("test source failure"))
+        }
+    }
+
+    impl BufRead for Failing {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            Err(io::Error::other("test source failure"))
+        }
+
+        fn consume(&mut self, _amount: usize) {}
+    }
+
+    fn limits(input: &[u8]) -> Limits {
+        Limits::new(input.len(), 32, 256, 256, 256, input.len()).expect("finite test limits")
+    }
+
+    #[test]
+    fn reader_matches_slice_report_across_one_byte_chunks() {
+        let xml = b"<?xml version=\"1.0\"?><root xml:space=\"preserve\">\n<child>e\xC3\xA9</child><![CDATA[  ]]>&amp;&#32;<?keep x?></root>";
+        let expected = verify(xml, limits(xml)).expect("slice XML is valid");
+        let actual = verify_reader(Chunked::new(xml, 1), limits(xml))
+            .expect("one-byte chunks must preserve XML semantics");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn reader_matches_slice_bom_rejection() {
+        let xml = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><root/>";
+        let expected = verify(xml, limits(xml)).expect_err("slice XML must reject its BOM");
+        let actual = verify_reader(Chunked::new(xml, 1), limits(xml))
+            .expect_err("streaming XML must preserve the slice framing rule");
+        assert_eq!(actual.to_string(), expected.to_string());
+        assert!(matches!(
+            actual,
+            StreamError::Audit(Error::Malformed { offset: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn authored_reader_preserves_authored_whitespace_policy() {
+        let xml = b"<root> <child/></root>";
+        let error = verify_authored_reader(Chunked::new(xml, 2), limits(xml))
+            .expect_err("ambiguous authored whitespace must be refused");
+        assert!(matches!(
+            error,
+            StreamError::Audit(Error::NotCompact(violation))
+                if violation.kind() == Kind::AmbiguousWhitespace
+        ));
+
+        let preserved = b"<root xml:space=\"preserve\"> <child/></root>";
+        let _report = verify_authored_reader(Chunked::new(preserved, 1), limits(preserved))
+            .expect("explicit xml:space must preserve the text run");
+    }
+
+    #[test]
+    fn token_window_fails_before_unbounded_parser_growth() {
+        let xml = b"<root>12345678901234567</root>";
+        let profile = Limits::new(xml.len(), 8, 64, 64, 16, xml.len()).unwrap();
+        let error = verify_reader(Chunked::new(xml, 1), profile)
+            .expect_err("the text event exceeds the token window");
+        assert!(matches!(
+            error,
+            StreamError::Audit(Error::Limit {
+                resource: Resource::TokenBytes,
+                limit: 16,
+                actual: 17,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn total_window_fails_with_audit_limit() {
+        let xml = b"<root/>";
+        let profile = Limits::new(xml.len() - 1, 8, 64, 64, 64, 64).unwrap();
+        let error = verify_reader(Chunked::new(xml, 1), profile)
+            .expect_err("the final byte exceeds the total window");
+        assert!(matches!(
+            error,
+            StreamError::Audit(Error::Limit {
+                resource: Resource::Bytes,
+                limit,
+                actual,
+                ..
+            }) if limit == xml.len() - 1 && actual == xml.len()
+        ));
+    }
+
+    #[test]
+    fn source_failures_are_distinguished_from_audit_failures() {
+        let error = verify_reader(Failing, Limits::default())
+            .expect_err("the source error must be retained");
+        assert!(
+            matches!(error, StreamError::Input(source) if source.to_string() == "test source failure")
+        );
+    }
+
+    #[test]
+    fn streamed_encoding_offsets_include_markup_prefixes() {
+        let xml = b"<root a=\"\xFF\"/>";
+        let error = verify_reader(Chunked::new(xml, 1), limits(xml))
+            .expect_err("invalid UTF-8 in an attribute must be rejected");
+        assert!(matches!(
+            error,
+            StreamError::Audit(Error::Encoding { valid_up_to: 9 })
+        ));
+    }
+
+    #[test]
+    fn streaming_memory_bound_accounts_for_depth_and_token_windows() {
+        let limits = Limits::new(1024, 4, 32, 32, 16, 1024).unwrap();
+        let bound = limits
+            .streaming_memory_upper_bound()
+            .expect("finite profile must have a representable envelope");
+        assert!(bound >= (limits.max_token_bytes() + 1) * 2);
+        let deep = Limits::new(1024, 8, 32, 32, 16, 1024).unwrap();
+        assert!(deep.streaming_memory_upper_bound().unwrap() > bound);
     }
 }

@@ -1,0 +1,100 @@
+{
+  "schema": "litchi.xml-stream-audit.v1",
+  "benchmark": "litchi-xml-repetitive-root-items-v1",
+  "binary": {
+    "binary": "litchi-perf-baseline-alloc",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  },
+  "modes": [
+    "materialized"
+  ],
+  "sizes": [
+    65536
+  ],
+  "samples": 1,
+  "warmups": 1,
+  "timed_scope": "generator_create_read_materialize_or_stream_audit_and_drop",
+  "corpus_scope": "deterministic_generator_hash_and_layout_are_precomputed_outside_timed_regions",
+  "cases": [
+    {
+      "mode": "materialized",
+      "size_bytes": 65536,
+      "source": {
+        "requested_bytes": 65536,
+        "generated_bytes": 65536,
+        "sha256": "2a01e49ced5867dee167dfbe60b795604e00e7ed094adc2aa805636a81e0aa1f",
+        "actual_generator_bytes": 65536,
+        "actual_generator_sha256": "2a01e49ced5867dee167dfbe60b795604e00e7ed094adc2aa805636a81e0aa1f",
+        "actual_generator_oracle_verified": true,
+        "generator": "litchi-xml-repetitive-root-items-v1",
+        "chunk_bytes": 16384,
+        "source_materialization": "materialized_leg_only",
+        "layout": {
+          "prefix_bytes": 6,
+          "suffix_bytes": 7,
+          "full_record_bytes": 1024,
+          "full_record_count": 63,
+          "tail_record_bytes": 1011,
+          "record_count": 64,
+          "text_bytes": 64691,
+          "item_open_bytes": 6,
+          "item_close_bytes": 7
+        }
+      },
+      "limits": {
+        "max_bytes": 65536,
+        "max_depth": 8,
+        "max_events": 4000000,
+        "max_attributes": 16,
+        "max_token_bytes": 16384,
+        "max_text_bytes": 65536,
+        "streaming_memory_upper_bound": 394570
+      },
+      "warmups": 1,
+      "samples": [
+        {
+          "sample": 0,
+          "elapsed_ns": 99460,
+          "actual_bytes": 65536,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 65536,
+              "events": 195,
+              "max_depth": 2,
+              "text_bytes": 64691
+            }
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 17,
+            "deallocation_calls": 5,
+            "reallocation_calls": 12,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 278544,
+            "deallocated_bytes": 278544,
+            "live_bytes_before": 1226,
+            "live_bytes_after": 1226,
+            "peak_live_bytes_before": 148330,
+            "peak_live_bytes_after": 148730,
+            "region_peak_live_bytes": 148730
+          },
+          "operation": {
+            "source_materialization_bytes": 65536,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 65536,
+            "entry_live_bytes": 1226,
+            "exit_live_bytes": 1226,
+            "net_live_bytes": 0,
+            "zero_net_live": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+warning: unused `xml_minifier::audit::Report` that must be used
+   --> src/xml_stream_audit.rs:924:9
+    |
+924 |         audit::verify_authored(&bytes, limits(size)).unwrap();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+924 |         let _ = audit::verify_authored(&bytes, limits(size)).unwrap();
+    |         +++++++
+
+warning: `litchi-perf-baseline` (lib test) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 53.11s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-ab1ddc9cae390dc7)

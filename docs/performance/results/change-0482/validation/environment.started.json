@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "python3",
+    "-c",
+    "import json,os,platform,subprocess; print(json.dumps({\"platform\":platform.platform(),\"cpu\":subprocess.check_output([\"lscpu\"],text=True),\"memory\":open(\"/proc/meminfo\").read(),\"toolchain\":subprocess.check_output([\"rustc\",\"-Vv\"],text=True),\"affinity\":sorted(os.sched_getaffinity(0))},indent=2))"
+  ],
+  "common_sha256": "7f9e771b9acb2afd1db5f6eb558360b7153c7c07cba640f923fc1c9bbc5866ca",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "0a554386e18ff383822543b579aa27daeb6021b26e68bc9050876c57c9e9832f",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "source_before": {
+    "files": 7048,
+    "path": "validation-sources/bcec8208a7ce40c82eb59f20868afc090a0c314fb6431909f17a757132ee88b8.json",
+    "sha256": "bcec8208a7ce40c82eb59f20868afc090a0c314fb6431909f17a757132ee88b8"
+  },
+  "started_utc": "2026-09-08T19:06:59.209355+00:00"
+}

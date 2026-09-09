@@ -1,0 +1,79 @@
+{
+  "schema": "litchi.change-0482.reviewer-development-attempts.v1",
+  "purpose": "Reviewer development receipts only; these are not root acceptance gates or formal captures.",
+  "root_acceptance_gate": false,
+  "source_snapshots_captured": false,
+  "source_snapshot_note": "The reviewer did not capture source snapshots for these manual tool calls. Existing change-0482 validation receipts are separate and are not attributed to this reviewer.",
+  "environment": {
+    "cwd": "/home/zhuhe/code/litchi",
+    "date_utc": "2026-09-08",
+    "toolchain": "1.98.1",
+    "wall_clock_precision": "date-only; functions.exec results did not expose per-call UTC timestamps"
+  },
+  "rawlogs": {
+    "storage": "embedded in attempts[].output",
+    "note": "Where the complete tool output was not present in the retained transcript, the entry is explicitly marked transcript-excerpt rather than presenting an invented full log."
+  },
+  "attempts": [
+    {
+      "id": "reviewer-cargo-check-initial",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 cargo check -p litchi-opc -p xml-minifier",
+      "time_utc": null,
+      "status": "failed",
+      "root_gate": false,
+      "output_capture": "transcript-excerpt",
+      "output": "Initial XML seam borrow-check failures: E0499 from fill_buf_retry retaining a mutable borrow across the retry loop (audit.rs around line 904), and E0503 from GuardedBufRead::fill_buf reading self.total/self.max_total while available_source() was borrowed (audit.rs around lines 1050-1051).",
+      "interpretation": "Development failure observed before the later fixes; not a root gate."
+    },
+    {
+      "id": "reviewer-cargo-check-current",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 cargo check -p litchi-opc -p xml-minifier",
+      "time_utc": null,
+      "status": "passed",
+      "root_gate": false,
+      "output_capture": "exact-tool-result",
+      "output": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s",
+      "interpretation": "Package check was green at this reviewer checkpoint; this receipt is not a root acceptance gate."
+    },
+    {
+      "id": "reviewer-opc-integration-default-lints",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 cargo test -p litchi-opc --test source_part_splice",
+      "time_utc": null,
+      "status": "failed-to-compile",
+      "root_gate": false,
+      "output_capture": "exact-tool-result",
+      "output": "error: trivial cast: `Arc<MutableSource>` as `Arc<dyn ReadAt>`\n  crates/litchi-opc/tests/source_part_splice.rs:490:53\nerror: trivial cast: `Arc<MutableSource>` as `Arc<dyn ReadAt>`\n  crates/litchi-opc/tests/source_part_splice.rs:524:53\nerror: could not compile `litchi-opc` (test `source_part_splice`) due to 2 previous errors",
+      "interpretation": "The focused test is currently blocked by the test source's denied trivial casts."
+    },
+    {
+      "id": "reviewer-opc-integration-lint-override",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 RUSTFLAGS='-A trivial-casts' cargo test -p litchi-opc --test source_part_splice",
+      "time_utc": null,
+      "status": "failed-test",
+      "root_gate": false,
+      "output_capture": "test-summary-and-failure-excerpt",
+      "output": "running 11 tests\n10 tests passed; signed_non_noop_refuses_before_output failed.\n\nthread 'signed_non_noop_refuses_before_output' panicked at crates/litchi-opc/tests/source_part_splice.rs:157:10: source splice proof must prepare: SignedSourceRequiresExplicitPolicy\n\ntest result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out",
+      "interpretation": "Development-only lint override; the signed test expects refusal during write_to_stream while the implementation refuses during prepare_source_part_splice."
+    },
+    {
+      "id": "reviewer-xml-stream-audit",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 cargo test -p xml-minifier --test stream_audit",
+      "time_utc": null,
+      "status": "failed-test",
+      "root_gate": false,
+      "output_capture": "exact-test-summary-and-failure-excerpt",
+      "output": "running 13 tests\n10 tests passed; 3 failed.\n\nFailures: bom_raw_event_boundaries_match_slice_for_all_prefix_chunkings (expected offset 8, actual 0 for chunks [1]); resource_limit_offsets_are_absolute_across_chunks (expected offset 0, actual 14 for chunks [1]); raw_layout_cases_match_slice_for_arbitrary_tiny_chunks (slice NotCompact(WhitespaceBeforeClose, offset 6), stream success Report { attributes: 0, bytes: 8, events: 3, max_depth: 1, text_bytes: 0 }).\n\ntest result: FAILED. 10 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out",
+      "interpretation": "The byte-limit offset difference is a documented streaming-versus-slice policy mismatch; BOM and raw closing-whitespace behavior remain parity defects."
+    },
+    {
+      "id": "reviewer-xml-unit-tests",
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 cargo test -p xml-minifier --lib",
+      "time_utc": null,
+      "status": "passed",
+      "root_gate": false,
+      "output_capture": "exact-test-summary",
+      "output": "running 8 tests\n8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\ntest result: ok",
+      "interpretation": "Unit tests passed at this reviewer checkpoint; this is not a root acceptance gate."
+    }
+  ]
+}

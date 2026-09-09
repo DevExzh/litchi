@@ -1,0 +1,86 @@
+{
+  "schema": "litchi.xml-stream-audit.v1",
+  "benchmark": "litchi-xml-repetitive-root-items-v1",
+  "binary": {
+    "binary": "litchi-perf-baseline",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "modes": [
+    "materialized"
+  ],
+  "sizes": [
+    8388608
+  ],
+  "samples": 1,
+  "warmups": 1,
+  "timed_scope": "generator_create_read_materialize_or_stream_audit_and_drop",
+  "corpus_scope": "deterministic_generator_hash_and_layout_are_precomputed_outside_timed_regions",
+  "cases": [
+    {
+      "mode": "materialized",
+      "size_bytes": 8388608,
+      "source": {
+        "requested_bytes": 8388608,
+        "generated_bytes": 8388608,
+        "sha256": "d29f983b3678a7af5fcd03504676d1652d091695bc2ea5f1e3d3bae3001e4d8b",
+        "actual_generator_bytes": 8388608,
+        "actual_generator_sha256": "d29f983b3678a7af5fcd03504676d1652d091695bc2ea5f1e3d3bae3001e4d8b",
+        "actual_generator_oracle_verified": true,
+        "generator": "litchi-xml-repetitive-root-items-v1",
+        "chunk_bytes": 16384,
+        "source_materialization": "materialized_leg_only",
+        "layout": {
+          "prefix_bytes": 6,
+          "suffix_bytes": 7,
+          "full_record_bytes": 1024,
+          "full_record_count": 8191,
+          "tail_record_bytes": 1011,
+          "record_count": 8192,
+          "text_bytes": 8282099,
+          "item_open_bytes": 6,
+          "item_close_bytes": 7
+        }
+      },
+      "limits": {
+        "max_bytes": 8388608,
+        "max_depth": 8,
+        "max_events": 4000000,
+        "max_attributes": 16,
+        "max_token_bytes": 16384,
+        "max_text_bytes": 8388608,
+        "streaming_memory_upper_bound": 394570
+      },
+      "warmups": 1,
+      "samples": [
+        {
+          "sample": 0,
+          "elapsed_ns": 11862390,
+          "actual_bytes": 8388608,
+          "source_bytes_match": true,
+          "outcome": {
+            "status": "success",
+            "report": {
+              "attributes": 0,
+              "bytes": 8388608,
+              "events": 24579,
+              "max_depth": 2,
+              "text_bytes": 8282099
+            }
+          },
+          "allocation": null,
+          "operation": {
+            "source_materialization_bytes": 8388608,
+            "generator_buffer_bytes": 16384,
+            "generator_position": 8388608,
+            "entry_live_bytes": null,
+            "exit_live_bytes": null,
+            "net_live_bytes": null,
+            "zero_net_live": null
+          }
+        }
+      ]
+    }
+  ]
+}

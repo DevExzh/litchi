@@ -1,0 +1,4 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/lib.rs (target/debug/deps/xml_minifier-9a2a71925a99547d)
+error: test failed, to rerun pass `-p xml-minifier --lib`

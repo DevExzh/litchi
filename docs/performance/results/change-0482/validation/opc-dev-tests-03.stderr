@@ -1,0 +1,140 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:906:14
+    |
+906 |     source: &super::SourceSnapshot,
+    |              ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+906 -     source: &super::SourceSnapshot,
+906 +     source: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:907:16
+    |
+907 |     retained: &super::SourceSnapshot,
+    |                ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+907 -     retained: &super::SourceSnapshot,
+907 +     retained: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:933:16
+    |
+933 |     retained: &super::SourceSnapshot,
+    |                ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+933 -     retained: &super::SourceSnapshot,
+933 +     retained: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:950:16
+    |
+950 |     snapshot: &super::SourceSnapshot,
+    |                ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+950 -     snapshot: &super::SourceSnapshot,
+950 +     snapshot: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:951:16
+    |
+951 |     retained: &super::SourceSnapshot,
+    |                ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+951 -     retained: &super::SourceSnapshot,
+951 +     retained: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:969:42
+    |
+969 |             return Err(OpcError::IoError(std::io::Error::new(
+    |                                          ^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+969 -             return Err(OpcError::IoError(std::io::Error::new(
+969 +             return Err(OpcError::IoError(io::Error::new(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:970:17
+    |
+970 |                 std::io::ErrorKind::UnexpectedEof,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+970 -                 std::io::ErrorKind::UnexpectedEof,
+970 +                 io::ErrorKind::UnexpectedEof,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/source_backed/splice.rs:986:16
+    |
+986 |     retained: &super::SourceSnapshot,
+    |                ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+986 -     retained: &super::SourceSnapshot,
+986 +     retained: &SourceSnapshot,
+    |
+
+error: unnecessary qualification
+    --> crates/litchi-opc/src/source_backed/splice.rs:1004:42
+     |
+1004 |             return Err(OpcError::IoError(std::io::Error::new(
+     |                                          ^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1004 -             return Err(OpcError::IoError(std::io::Error::new(
+1004 +             return Err(OpcError::IoError(io::Error::new(
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-opc/src/source_backed/splice.rs:1005:17
+     |
+1005 |                 std::io::ErrorKind::UnexpectedEof,
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1005 -                 std::io::ErrorKind::UnexpectedEof,
+1005 +                 io::ErrorKind::UnexpectedEof,
+     |
+
+error[E0505]: cannot move out of `source_snapshot` because it is borrowed
+   --> crates/litchi-opc/src/source_backed/splice.rs:491:27
+    |
+407 |         let mut callback = |output: &mut dyn Write| -> Result<()> {
+    |                            -------------------------------------- borrow of `source_snapshot` occurs here
+...
+418 |                         &source_snapshot,
+    |                          --------------- borrow occurs due to use in closure
+...
+491 |                 snapshot: source_snapshot,
+    |                           ^^^^^^^^^^^^^^^ move out of `source_snapshot` occurs here
+...
+504 |                 &mut callback,
+    |                 ------------- borrow later used here
+
+For more information about this error, try `rustc --explain E0505`.
+error: could not compile `litchi-opc` (lib) due to 11 previous errors

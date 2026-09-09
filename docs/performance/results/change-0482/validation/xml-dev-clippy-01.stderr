@@ -1,0 +1,24 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: unnecessary closure used to substitute value for `Option::None`
+   --> crates/xml-minifier/src/audit.rs:715:24
+    |
+715 |       let token_window = limits
+    |  ________________________^
+716 | |         .token_bytes
+717 | |         .checked_add(1)
+718 | |         .ok_or_else(|| StreamError::Audit(Error::Allocation))?;
+    | |_____________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+    = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `ok_or` instead
+    |
+718 -         .ok_or_else(|| StreamError::Audit(Error::Allocation))?;
+718 +         .ok_or(StreamError::Audit(Error::Allocation))?;
+    |
+
+error: could not compile `xml-minifier` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `xml-minifier` (lib test) due to 1 previous error

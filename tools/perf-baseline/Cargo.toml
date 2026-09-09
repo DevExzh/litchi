@@ -49,6 +49,7 @@ litchi-sign = { path = "../../crates/litchi-sign" }
 litchi-xls = { path = "../../crates/litchi-xls" }
 litchi-xlsb = { path = "../../crates/litchi-xlsb" }
 litchi-xlsx = { path = "../../crates/litchi-xlsx" }
+xml-minifier = { path = "../../crates/xml-minifier" }
 quick-xml = "0.41"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
