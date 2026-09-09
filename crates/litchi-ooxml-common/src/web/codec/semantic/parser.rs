@@ -61,7 +61,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
         WEB_EXTENSION_NAMESPACE,
         "reference",
     )?;
-    let reference = parse_store_reference(reference_node, &document)?;
+    let reference = parse_store_reference(reference_node, &document, limits)?;
 
     let alternate_references = if is_next(
         &children,
@@ -77,7 +77,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
         refs.into_iter()
             .map(|child| {
                 require_name(child, WEB_EXTENSION_NAMESPACE, "reference")?;
-                parse_store_reference(child, &document)
+                parse_store_reference(child, &document, limits)
             })
             .collect::<Result<Vec<_>>>()?
     } else {
@@ -109,7 +109,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
     enforce_count_with("binding", binding_nodes.len(), limits)?;
     let bindings = binding_nodes
         .into_iter()
-        .map(|node| parse_binding(node, &document))
+        .map(|node| parse_binding(node, &document, limits))
         .collect::<Result<Vec<_>>>()?;
 
     let snapshot = if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "snapshot") {
@@ -139,7 +139,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
                 if index + 1 != snapshot_children.len() {
                     return invalid("snapshot extLst must be the final child".into());
                 }
-                extension_list = Some(ExtList::from_node(child, &document)?);
+                extension_list = Some(ExtList::from_node_with_limits(child, &document, limits)?);
                 continue;
             }
             effects.push(Effect::from_node(child)?);
@@ -156,7 +156,7 @@ pub(in crate::web) fn parse_add_in_with_budget(
     };
 
     let extension_list = if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "extLst") {
-        let value = ExtList::from_node(children[position], &document)?;
+        let value = ExtList::from_node_with_limits(children[position], &document, limits)?;
         position += 1;
         Some(value)
     } else {
@@ -217,7 +217,7 @@ pub(in crate::web) fn parse_panes_with_budget(
     enforce_count_with("task pane", children.len(), limits)?;
     children
         .into_iter()
-        .map(|node| parse_task_pane(node, &document))
+        .map(|node| parse_task_pane(node, &document, limits))
         .collect()
 }
 
@@ -231,7 +231,11 @@ pub(in crate::web) struct ParsedPane {
     pub(in crate::web) relationship_id: String,
     pub(in crate::web) extension_list: Option<ExtList>,
 }
-pub(in crate::web) fn parse_task_pane(node: &Node, document: &XmlDocument) -> Result<ParsedPane> {
+pub(in crate::web) fn parse_task_pane(
+    node: &Node,
+    document: &XmlDocument,
+    limits: &Limits,
+) -> Result<ParsedPane> {
     require_name(node, TASK_PANES_NAMESPACE, "taskpane")?;
     reject_unknown_attributes(
         node,
@@ -280,7 +284,7 @@ pub(in crate::web) fn parse_task_pane(node: &Node, document: &XmlDocument) -> Re
     }
     let extension_list = children
         .get(1)
-        .map(|node| ExtList::from_node(node, document))
+        .map(|node| ExtList::from_node_with_limits(node, document, limits))
         .transpose()?;
     Ok(ParsedPane {
         dock_state,
@@ -296,6 +300,7 @@ pub(in crate::web) fn parse_task_pane(node: &Node, document: &XmlDocument) -> Re
 pub(in crate::web) fn parse_store_reference(
     node: &Node,
     document: &XmlDocument,
+    limits: &Limits,
 ) -> Result<Reference> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "reference")?;
     reject_unknown_attributes(
@@ -325,7 +330,7 @@ pub(in crate::web) fn parse_store_reference(
             .unwrap_or_default(),
         extension_list: children
             .first()
-            .map(|node| ExtList::from_node(node, document))
+            .map(|node| ExtList::from_node_with_limits(node, document, limits))
             .transpose()?,
     };
     validate_store_reference(&reference)?;
@@ -344,7 +349,11 @@ pub(in crate::web) fn parse_property(node: &Node) -> Result<Property> {
     })
 }
 
-pub(in crate::web) fn parse_binding(node: &Node, document: &XmlDocument) -> Result<Binding> {
+pub(in crate::web) fn parse_binding(
+    node: &Node,
+    document: &XmlDocument,
+    limits: &Limits,
+) -> Result<Binding> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "binding")?;
     reject_unknown_attributes(node, &[("", "id"), ("", "type"), ("", "appref")])?;
     let children = element_children(node);
@@ -361,7 +370,7 @@ pub(in crate::web) fn parse_binding(node: &Node, document: &XmlDocument) -> Resu
         app_ref: required_attr(node, "", "appref")?.to_owned(),
         extension_list: children
             .first()
-            .map(|node| ExtList::from_node(node, document))
+            .map(|node| ExtList::from_node_with_limits(node, document, limits))
             .transpose()?,
     })
 }

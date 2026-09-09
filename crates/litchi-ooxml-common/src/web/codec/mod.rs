@@ -45,8 +45,8 @@ pub(in crate::web) use relationship::relationship_attr;
 pub(in crate::web) use semantic::{
     ParsedPane, enforce_count_with, escape_attr, format_f64, invalid, limit, parse_add_in_with,
     parse_add_in_with_budget, parse_binding, parse_panes_with, parse_panes_with_budget,
-    parse_property, parse_store_reference, parse_task_pane, require_nonempty, write_add_in_with,
-    write_panes_with, write_store_reference,
+    parse_property, parse_store_reference, parse_task_pane, require_nonempty,
+    splice_add_in_extension_list_with, write_add_in_with, write_panes_with, write_store_reference,
 };
 #[allow(
     unused_imports,

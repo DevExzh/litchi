@@ -1,11 +1,16 @@
 use super::super::codec::{invalid, limit};
-use super::super::model::{Limits, OperationBudget};
+use super::super::model::{Limits, OperationBudget, Panes};
 use super::super::{Arc, BTreeSet, Error, HashMap, HashSet, OpcPackage, PackURI, Result, VecDeque};
 use super::fold_part_name;
 #[derive(Debug)]
 pub(in crate::web) struct ExistingAddInGraph {
     pub(in crate::web) root_relationship_id: String,
     pub(in crate::web) task_panes_name: PackURI,
+    /// The bounded semantic graph that was read while resolving the owned
+    /// parts. Keeping it here lets planning compare a caller's model before
+    /// invoking a canonical writer, which is essential for exact source
+    /// preserving no-op patches.
+    pub(in crate::web) panes: Panes,
     pub(in crate::web) extensions_by_relationship: HashMap<String, PackURI>,
     pub(in crate::web) owned_parts: Vec<PackURI>,
 }
