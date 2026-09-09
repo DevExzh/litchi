@@ -303,7 +303,7 @@ fn commit_exposes_snapshot_and_reversible_patch() {
 fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
     let original = write_cfb(|writer| {
         writer.set_root_state_bits(0x1020_3040);
-        writer.set_root_creation_time(0x0102_0304_0506_0708);
+        writer.set_root_creation_time_from_source(0x0102_0304_0506_0708);
         writer.set_root_modified_time(0x1112_1314_1516_1718);
         writer.create_storage(&["ObjectPool"]).unwrap();
         writer

@@ -123,6 +123,28 @@ fn test_directory_state_and_filetimes_round_trip_without_clock_access() {
 }
 
 #[test]
+fn fresh_root_creation_time_is_checked_and_source_replay_is_explicit() {
+    let mut fresh = OleWriter::new();
+    assert!(fresh.set_root_creation_time(1).is_err());
+    fresh.create_stream(&["Payload"], b"payload").unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    fresh.write_to(&mut output).unwrap();
+    let fresh_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(fresh_file.root_entry().unwrap().creation_time, 0);
+
+    let expected = 0x0102_0304_0506_0708;
+    let mut replay = OleWriter::new();
+    replay.set_root_creation_time_from_source(expected);
+    assert!(replay.set_root_creation_time(1).is_err());
+    replay.create_stream(&["Payload"], b"payload").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    replay.write_to(&mut output).unwrap();
+    let replay_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(replay_file.root_entry().unwrap().creation_time, expected);
+}
+
+#[test]
 fn known_legacy_fixture_directory_metadata_round_trips_exactly() {
     const FIXTURE: &[u8] =
         include_bytes!("../../../../test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc");
@@ -135,7 +157,7 @@ fn known_legacy_fixture_directory_metadata_round_trips_exactly() {
     assert!(!paths.is_empty());
     let mut writer = OleWriter::new();
     writer.set_root_state_bits(root.state_bits);
-    writer.set_root_creation_time(root.creation_time);
+    writer.set_root_creation_time_from_source(root.creation_time);
     writer.set_root_modified_time(root.modified_time);
     for path in paths {
         assert_eq!(path.len(), 1, "fixture should contain root streams only");
