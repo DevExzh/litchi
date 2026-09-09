@@ -1,0 +1,253 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "131072",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/report.json"
+  ],
+  "artifacts": {
+    "perf.data": {
+      "bytes": 2584768,
+      "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+      "present": true,
+      "sha256": "eff6f9d511db000767228cc71182ea31040ec2ad3a89a90e8e7af51b317e47e8"
+    },
+    "report.json": {
+      "bytes": 11003,
+      "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/report.json",
+      "present": true,
+      "sha256": "d303a239c8b7de70130e1ec8669943f2afbd0284095c7fb11b0a9f2206be77bf"
+    },
+    "resource.txt": {
+      "bytes": 1213,
+      "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/resource.txt",
+      "present": true,
+      "sha256": "1d16c141a72a323b5e53b02031d27499004edc244101310d30e10d288a0384f8"
+    },
+    "stderr.txt": {
+      "bytes": 877,
+      "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/stderr.txt",
+      "present": true,
+      "sha256": "669378e69a1c67b14662702f3836eacc6d62995d4e8ba0377741c4a6beb95029"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/stdout.txt",
+      "present": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "case": {
+    "authored_count": 64,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "131072",
+      "--authored-counts",
+      "64",
+      "--chunks",
+      "64",
+      "--text",
+      "short",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_backing": "owned",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": null,
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "owned",
+    "input_overhead_us": 0,
+    "label": "s131072-a64-short-c64",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "source_count": 131072,
+    "text_bytes": null,
+    "text_mode": "short"
+  },
+  "command": [
+    "/usr/bin/perf",
+    "record",
+    "-F",
+    "99",
+    "--call-graph",
+    "dwarf",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "131072",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--sink-write",
+    "4096",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--authored-provider",
+    "memory-store",
+    "--replay-max-bytes",
+    "8388608",
+    "--replay-sync",
+    "none",
+    "--input-mode",
+    "owned",
+    "--compression",
+    "current",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-09T11:01:51.773121+00:00",
+  "label": "perf-record-memory_store-s131072-a64-short-c64",
+  "passed": true,
+  "performance_claim": "none",
+  "process": {
+    "returncode": 0,
+    "route_started": true,
+    "timed_out": false
+  },
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_only": true,
+  "profiler": {
+    "counter_status": "not_measured",
+    "name": "perf-record",
+    "sampling_artifacts": [
+      {
+        "bytes": 2584768,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+        "present": true,
+        "sha256": "eff6f9d511db000767228cc71182ea31040ec2ad3a89a90e8e7af51b317e47e8"
+      }
+    ],
+    "scope": "whole child process; profiler overhead included"
+  },
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "replay": {
+    "cleanup": "successful_empty_directory_only",
+    "directory": null,
+    "max_bytes": 8388608,
+    "route": "memory_store",
+    "sync": "none"
+  },
+  "route": {
+    "cli_provider": "memory-store",
+    "name": "memory_store",
+    "replay_max_bytes": 8388608,
+    "replay_sync": "none",
+    "report_provider": "memory_explicit_replay_store"
+  },
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-route-profile-run-v1",
+  "scratch_cleaned": false,
+  "started_utc": "2026-09-09T11:01:48.852637+00:00",
+  "status": "ok",
+  "timed_out": false,
+  "tool": {
+    "executable": "perf",
+    "name": "perf-record",
+    "path": "/usr/bin/perf",
+    "status": "available"
+  },
+  "validation_status": "ok",
+  "version": 1,
+  "warmups": 1
+}

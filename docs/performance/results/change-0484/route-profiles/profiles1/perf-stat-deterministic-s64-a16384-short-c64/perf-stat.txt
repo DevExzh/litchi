@@ -1,0 +1,13 @@
+# started on Wed Sep  9 11:01:38 2026
+
+1989294630,,cycles,285708470,62.00,,
+6918479836,,instructions,286705771,62.00,,
+1382188309,,branches,287643079,62.00,,
+2972533,,branch-misses,288079080,62.00,,
+0,,cache-references,287956640,62.00,,
+428649,,cache-misses,287350259,62.00,,
+0,,L1-dcache-loads,286369081,62.00,,
+0,,L1-dcache-load-misses,285485440,62.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,
+4110,,page-faults,459059564,100.00,,

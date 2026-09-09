@@ -1,0 +1,145 @@
+{
+  "attempt": "formal1",
+  "builds": {
+    "allocator": {
+      "bytes": 1976,
+      "path": "route-attempts/formal1/build-allocator.json",
+      "sha256": "6fad06ac7ea99b5a547594391975b0a2d36096d556bebd0d4cd52ea6c1296bf5"
+    },
+    "normal": {
+      "bytes": 1924,
+      "path": "route-attempts/formal1/build-normal.json",
+      "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+    }
+  },
+  "cold_cache_claim": false,
+  "driver_sha256": "30d9b9542a4129adcbc069f3175bf4abb95cfb37b3522d8622711e0e49e03fc1",
+  "file_inputs": [
+    {
+      "absolute_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s131072-a64-short-c64-source.docx",
+      "bytes": 343935,
+      "device": 66305,
+      "inode": 35374136,
+      "origin": "axis-input-origin/formal1/source-131072/source131072-authored64-64-short-source.docx",
+      "path": "axis-input/s131072-a64-short-c64-source.docx",
+      "sha256": "656d113c10e54280a24b80f7d69bb0a605ec3503f337301f70196071d21b9c69"
+    },
+    {
+      "absolute_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a16384-short-c64-source.docx",
+      "bytes": 2106,
+      "device": 66305,
+      "inode": 35374137,
+      "origin": "axis-input-origin/formal1/source-64/source64-authored64-64-short-source.docx",
+      "path": "axis-input/s64-a16384-short-c64-source.docx",
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+    },
+    {
+      "absolute_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a64-short-c64-source.docx",
+      "bytes": 2106,
+      "device": 66305,
+      "inode": 35374138,
+      "origin": "axis-input-origin/formal1/source-64/source64-authored64-64-short-source.docx",
+      "path": "axis-input/s64-a64-short-c64-source.docx",
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+    }
+  ],
+  "filesystems": {
+    "evidence": {
+      "device": 66305,
+      "mount": {
+        "argv": [
+          "findmnt",
+          "--json",
+          "--target",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0484",
+          "--output",
+          "TARGET,SOURCE,FSTYPE,OPTIONS"
+        ],
+        "executable": "/usr/bin/findmnt",
+        "exit_code": 0,
+        "finished_utc": "2026-09-09T10:31:20.372294+00:00",
+        "started_utc": "2026-09-09T10:31:20.370730+00:00",
+        "status": "pass",
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "{\n   \"filesystems\": [\n      {\n         \"target\": \"/\",\n         \"source\": \"/dev/nvme0n1p1\",\n         \"fstype\": \"ext4\",\n         \"options\": \"rw,relatime,discard,errors=remount-ro,commit=30\"\n      }\n   ]\n}\n",
+        "stdout_sha256": "c8f4a8d8fe0603abb9a3239cdb1c7a7de12cd832c05250a2757306e0dda6af78"
+      },
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484"
+    },
+    "scratch": {
+      "device": 66305,
+      "mount": {
+        "argv": [
+          "findmnt",
+          "--json",
+          "--target",
+          "/home/zhuhe/.cache/litchi-goal-0484",
+          "--output",
+          "TARGET,SOURCE,FSTYPE,OPTIONS"
+        ],
+        "executable": "/usr/bin/findmnt",
+        "exit_code": 0,
+        "finished_utc": "2026-09-09T10:31:20.374099+00:00",
+        "started_utc": "2026-09-09T10:31:20.372436+00:00",
+        "status": "pass",
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "{\n   \"filesystems\": [\n      {\n         \"target\": \"/\",\n         \"source\": \"/dev/nvme0n1p1\",\n         \"fstype\": \"ext4\",\n         \"options\": \"rw,relatime,discard,errors=remount-ro,commit=30\"\n      }\n   ]\n}\n",
+        "stdout_sha256": "c8f4a8d8fe0603abb9a3239cdb1c7a7de12cd832c05250a2757306e0dda6af78"
+      },
+      "path": "/home/zhuhe/.cache/litchi-goal-0484"
+    },
+    "workspace": {
+      "device": 66305,
+      "mount": {
+        "argv": [
+          "findmnt",
+          "--json",
+          "--target",
+          "/home/zhuhe/code/litchi",
+          "--output",
+          "TARGET,SOURCE,FSTYPE,OPTIONS"
+        ],
+        "executable": "/usr/bin/findmnt",
+        "exit_code": 0,
+        "finished_utc": "2026-09-09T10:31:20.370677+00:00",
+        "started_utc": "2026-09-09T10:31:20.367786+00:00",
+        "status": "pass",
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "{\n   \"filesystems\": [\n      {\n         \"target\": \"/\",\n         \"source\": \"/dev/nvme0n1p1\",\n         \"fstype\": \"ext4\",\n         \"options\": \"rw,relatime,discard,errors=remount-ro,commit=30\"\n      }\n   ]\n}\n",
+        "stdout_sha256": "c8f4a8d8fe0603abb9a3239cdb1c7a7de12cd832c05250a2757306e0dda6af78"
+      },
+      "path": "/home/zhuhe/code/litchi"
+    }
+  },
+  "machine": {
+    "bytes": 16007,
+    "path": "machine.json",
+    "sha256": "4545f3283429620b5833bed4df3eaa6349fb813a84ad9966fdeee73136006ab9"
+  },
+  "preparation": {
+    "bytes": 5628,
+    "path": "axis-input-origin/formal1/receipt.json",
+    "sha256": "c0ba0fa06dc53a4f4c59a62797c193ba27a881d519b1bbf2bcd0153411aaae54"
+  },
+  "protocol": {
+    "bytes": 524214,
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "recorded_utc": "2026-09-09T10:31:20.374188+00:00",
+  "replay_directory_roots": [
+    "route-pilots/formal1",
+    "route-captures/formal1"
+  ],
+  "replay_filesystem": "evidence",
+  "schema": "docx-route-execution-inputs-v1",
+  "source": {
+    "files": 7157,
+    "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+    "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+  },
+  "source_custody_scope": "matched build inputs and execution snapshot; the workload protocol has no separate Rust-source freeze field"
+}

@@ -1,0 +1,19 @@
+{
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "path": "route-attempts/formal1/build-normal.json",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+  },
+  "driver_sha256": "8bfe652c263504334a6a117675b090d5f5fa1c3e6274b8352520b07b0f76c879",
+  "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+  "schema": "docx-axis-input-preparation-v1",
+  "scope": "excluded corpus setup; no formal timing samples",
+  "started_utc": "2026-09-09T10:26:53.750469+00:00",
+  "status": "running"
+}

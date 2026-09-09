@@ -1,0 +1,728 @@
+{
+  "instructions": "Run each pending command, then rerun this summarizer to hash and bind the export.",
+  "performance_claim": "none",
+  "records": [
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "5641ab16b2bc semantic_record+0x4fc (inlined)",
+              "5641ab16b578 semantic_record+0x7b8 (inlined)",
+              "5641ab16b5a8 semantic_record+0x7e8 (inlined)",
+              "5641ab16b739 semantic_record+0x979 (inlined)",
+              "5641ab16bc48 semantic_record+0xe88 (inlined)",
+              "5641ab16f204 verify_candidate_oracles+0x304 (inlined)",
+              "5641ab16f2d1 verify_candidate_oracles+0x3d1 (inlined)",
+              "5641ab16fa3f verify_candidate_oracles+0xb3f (inlined)",
+              "5641ab16fb40 all<core::iter::adapters::enumerate::Enumerate<core::slice::iter::Iter<alloc::string::String>>, litchi_perf_baseline::docx_replayable_tail_append::verify_candidate_oracles::{closure_env#4}>+0xc40 (inlined)",
+              "5641ab16fb40 try_fold<core::slice::iter::Iter<alloc::string::String>, (), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<(usize, &alloc::string::String), litchi_perf_baseline::docx_replayable_tail_append::verify_candidate_oracles::{closure_env#4}>, core::ops::control_flow::ControlFlow<(), ()>>+0xc40 (inlined)",
+              "5641ab16fb40 verify_candidate_oracles+0xc40 (inlined)",
+              "5641ab1712de build_fixture+0x61e (inlined)",
+              "5641ab172910 build_fixture+0x1c50 (inlined)",
+              "5641ab172abb build_fixture+0x1dfb (inlined)",
+              "5641ab1bf2c4 scan_document+0x264 (inlined)",
+              "5641ab1bf2cf scan_document+0x26f (inlined)",
+              "5641ab1bf2d6 scan_document+0x276 (inlined)",
+              "5641ab1bf2ed map_err<quick_xml::events::Event, quick_xml::errors::Error, litchi_docx::error::Error, litchi_docx::document::transaction::scan_document::{closure_env#1}>+0x28d (inlined)",
+              "5641ab1bf2ed scan_document+0x28d (inlined)",
+              "5641ab1bf48d scan_document+0x42d (inlined)"
+            ],
+            "inclusive_samples": 130,
+            "share_of_whole_child": 0.6074766355140186,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [
+              "5641ab1712de run_case+0x61e (inlined)",
+              "5641ab172910 run_case+0x1c50 (inlined)",
+              "5641ab172abb run_case+0x1dfb (inlined)"
+            ],
+            "inclusive_samples": 14,
+            "share_of_whole_child": 0.06542056074766354,
+            "status": "observed"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "5641ab14f28d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "5641ab151fd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "5641ab28f6bd stream_splice+0xad (inlined)"
+            ],
+            "inclusive_samples": 56,
+            "share_of_whole_child": 0.2616822429906542,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 0,
+          "auditor+replay": 31,
+          "lifecycle+auditor": 14,
+          "lifecycle+replay": 0
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 214
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "01d986538bdf19618dae5d3ad762a3b3df88fca223dfa2a9140eccbd273142c7",
+        "profile_label": "perf-record-deterministic-s131072-a64-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "b855a968d0786d2caf9e9e670060e85e961b34c72cb3e7260ea7e20548c934e2"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-deterministic-s131072-a64-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 1874024,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s131072-a64-short-c64/perf.data",
+        "sha256": "01d986538bdf19618dae5d3ad762a3b3df88fca223dfa2a9140eccbd273142c7"
+      },
+      "input_receipt_artifact": {
+        "bytes": 1874024,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s131072-a64-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "01d986538bdf19618dae5d3ad762a3b3df88fca223dfa2a9140eccbd273142c7",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s131072-a64-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s131072-a64-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-deterministic-s131072-a64-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 222593,
+        "path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s131072-a64-short-c64/perf-script.txt",
+        "sha256": "b855a968d0786d2caf9e9e670060e85e961b34c72cb3e7260ea7e20548c934e2"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    },
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "5fb72a7ca2bc semantic_record+0x4fc (inlined)",
+              "5fb72a7ca5a8 semantic_record+0x7e8 (inlined)",
+              "5fb72a7ce204 verify_candidate_oracles+0x304 (inlined)",
+              "5fb72a81e4bc scan_document+0x45c (inlined)",
+              "5fb72a8edf4b audit_splice+0x59b (inlined)",
+              "5fb72a93927c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0x5ac (inlined)",
+              "5fb72a9392a0 map_err<quick_xml::events::Event, quick_xml::errors::Error, xml_minifier::audit::StreamError, xml_minifier::audit::verify_reader_with_policy::{closure_env#3}<&mut litchi_opc::source_backed::splice::SpliceAuditReader>>+0x5d0 (inlined)",
+              "5fb72a9392a0 verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0x5d0 (inlined)",
+              "5fb72a939a1c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0xd4c (inlined)"
+            ],
+            "inclusive_samples": 15,
+            "share_of_whole_child": 0.25,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [],
+            "inclusive_samples": 0,
+            "share_of_whole_child": 0.0,
+            "status": "unavailable"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "5fb72a7ae28d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "5fb72a7b0fd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "5fb72a8ee6bd stream_splice+0xad (inlined)",
+              "5fb72a8ffd94 read_with_accounting<litchi_opc::source_backed::SourceReader>+0x254 (inlined)"
+            ],
+            "inclusive_samples": 12,
+            "share_of_whole_child": 0.2,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 0,
+          "auditor+replay": 8,
+          "lifecycle+auditor": 0,
+          "lifecycle+replay": 0
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 60
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "f8f04a494a89b693102014825daf22ce81f4f53db1cb222df28bd8e05ab5c1bc",
+        "profile_label": "perf-record-deterministic-s64-a16384-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "695b5bcaf8c188fb6e17ec1d31eb3aea27712f9eb1a07aace2f22158795385eb"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-deterministic-s64-a16384-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 570432,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s64-a16384-short-c64/perf.data",
+        "sha256": "f8f04a494a89b693102014825daf22ce81f4f53db1cb222df28bd8e05ab5c1bc"
+      },
+      "input_receipt_artifact": {
+        "bytes": 570432,
+        "path": "route-profiles/profiles1/perf-record-deterministic-s64-a16384-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "f8f04a494a89b693102014825daf22ce81f4f53db1cb222df28bd8e05ab5c1bc",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s64-a16384-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s64-a16384-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-deterministic-s64-a16384-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 62825,
+        "path": "route-profiles/profiles1-perf-script/perf-record-deterministic-s64-a16384-short-c64/perf-script.txt",
+        "sha256": "695b5bcaf8c188fb6e17ec1d31eb3aea27712f9eb1a07aace2f22158795385eb"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    },
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "5be2abaa72bc semantic_record+0x4fc (inlined)",
+              "5be2abaa756f semantic_record+0x7af (inlined)",
+              "5be2abaa75a8 semantic_record+0x7e8 (inlined)",
+              "5be2abaa7679 semantic_record+0x8b9 (inlined)",
+              "5be2abaab1bf verify_candidate_oracles+0x2bf (inlined)",
+              "5be2abaab204 verify_candidate_oracles+0x304 (inlined)",
+              "5be2abaab2d1 verify_candidate_oracles+0x3d1 (inlined)",
+              "5be2abaaba3f verify_candidate_oracles+0xb3f (inlined)",
+              "5be2abaad2de build_fixture+0x61e (inlined)",
+              "5be2abaaeabb build_fixture+0x1dfb (inlined)",
+              "5be2abafb2c4 scan_document+0x264 (inlined)",
+              "5be2abafb2d6 scan_document+0x276 (inlined)",
+              "5be2abafb2ed map_err<quick_xml::events::Event, quick_xml::errors::Error, litchi_docx::error::Error, litchi_docx::document::transaction::scan_document::{closure_env#1}>+0x28d (inlined)",
+              "5be2abafb2ed scan_document+0x28d (inlined)",
+              "5be2abafb36b scan_document+0x30b (inlined)",
+              "5be2abafb48d scan_document+0x42d (inlined)",
+              "5be2abafb4bc scan_document+0x45c (inlined)",
+              "5be2abafb4f2 scan_document+0x492 (inlined)",
+              "5be2abafb504 scan_document+0x4a4 (inlined)",
+              "5be2abafb540 scan_document+0x4e0 (inlined)"
+            ],
+            "inclusive_samples": 170,
+            "share_of_whole_child": 0.6115107913669064,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [
+              "5be2abaad2de run_case+0x61e (inlined)",
+              "5be2abaaeabb run_case+0x1dfb (inlined)"
+            ],
+            "inclusive_samples": 14,
+            "share_of_whole_child": 0.050359712230215826,
+            "status": "observed"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "5be2aba8b28d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "5be2aba8dfd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "5be2abbcb6bd stream_splice+0xad (inlined)",
+              "5be2abc29f19 read_with_accounting+0x5a9 (inlined)"
+            ],
+            "inclusive_samples": 62,
+            "share_of_whole_child": 0.22302158273381295,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 1,
+          "auditor+replay": 30,
+          "lifecycle+auditor": 14,
+          "lifecycle+replay": 1
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 278
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "eff6f9d511db000767228cc71182ea31040ec2ad3a89a90e8e7af51b317e47e8",
+        "profile_label": "perf-record-memory_store-s131072-a64-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "8f3ffd7fb0a9f9ecbd61e499e37eb58837e21a3fee60799b6a58ba2a6950d28b"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 2584768,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+        "sha256": "eff6f9d511db000767228cc71182ea31040ec2ad3a89a90e8e7af51b317e47e8"
+      },
+      "input_receipt_artifact": {
+        "bytes": 2584768,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s131072-a64-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "eff6f9d511db000767228cc71182ea31040ec2ad3a89a90e8e7af51b317e47e8",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s131072-a64-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s131072-a64-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-memory_store-s131072-a64-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 286529,
+        "path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s131072-a64-short-c64/perf-script.txt",
+        "sha256": "8f3ffd7fb0a9f9ecbd61e499e37eb58837e21a3fee60799b6a58ba2a6950d28b"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    },
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "589992b67514 verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x1124 (inlined)",
+              "589992b762bc semantic_record+0x4fc (inlined)",
+              "589992b765a8 semantic_record+0x7e8 (inlined)",
+              "589992b7a204 verify_candidate_oracles+0x304 (inlined)",
+              "589992bca2c4 scan_document+0x264 (inlined)",
+              "589992bca2d6 scan_document+0x276 (inlined)",
+              "589992c99f4b audit_splice+0x59b (inlined)",
+              "589992ce527c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0x5ac (inlined)",
+              "589992ce52a0 map_err<quick_xml::events::Event, quick_xml::errors::Error, xml_minifier::audit::StreamError, xml_minifier::audit::verify_reader_with_policy::{closure_env#3}<&mut litchi_opc::source_backed::splice::SpliceAuditReader>>+0x5d0 (inlined)",
+              "589992ce52a0 verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0x5d0 (inlined)",
+              "589992ce5a1c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0xd4c (inlined)",
+              "589992ce5a47 verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0xd77 (inlined)"
+            ],
+            "inclusive_samples": 23,
+            "share_of_whole_child": 0.323943661971831,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [
+              "589992b10c09 run_from_args<core::iter::adapters::skip::Skip<std::env::ArgsOs>>+0xf99 (inlined)"
+            ],
+            "inclusive_samples": 1,
+            "share_of_whole_child": 0.014084507042253521,
+            "status": "observed"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "589992b5a28d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "589992b5cfd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "589992b67514 verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x1124 (inlined)",
+              "589992b87be5 read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x75 (inlined)",
+              "589992bb8c99 emit<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x289 (inlined)",
+              "589992bb8c99 push<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x289 (inlined)",
+              "589992bb8c99 push_event<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x289 (inlined)",
+              "589992bb8c9a emit<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x28a (inlined)",
+              "589992bb8c9a push<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x28a (inlined)",
+              "589992bb8c9a push_event<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x28a (inlined)",
+              "589992c0f754 read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x214 (inlined)",
+              "589992c0fdcd read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x17d (inlined)",
+              "589992c9a6bd stream_splice+0xad (inlined)",
+              "589992cf8f19 read_with_accounting+0x5a9 (inlined)"
+            ],
+            "inclusive_samples": 23,
+            "share_of_whole_child": 0.323943661971831,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 0,
+          "auditor+replay": 14,
+          "lifecycle+auditor": 0,
+          "lifecycle+replay": 0
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 71
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "87cda7a2935668a7f4cf4cbb7b95d88811b4798d11129b7e79b23d5816c2713f",
+        "profile_label": "perf-record-memory_store-s64-a16384-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "937b7cf1d2238246f8e256e41abb335f8ba587ca33680b4ca72c8716850795f9"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-memory_store-s64-a16384-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 664312,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s64-a16384-short-c64/perf.data",
+        "sha256": "87cda7a2935668a7f4cf4cbb7b95d88811b4798d11129b7e79b23d5816c2713f"
+      },
+      "input_receipt_artifact": {
+        "bytes": 664312,
+        "path": "route-profiles/profiles1/perf-record-memory_store-s64-a16384-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "87cda7a2935668a7f4cf4cbb7b95d88811b4798d11129b7e79b23d5816c2713f",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s64-a16384-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s64-a16384-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-memory_store-s64-a16384-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 74643,
+        "path": "route-profiles/profiles1-perf-script/perf-record-memory_store-s64-a16384-short-c64/perf-script.txt",
+        "sha256": "937b7cf1d2238246f8e256e41abb335f8ba587ca33680b4ca72c8716850795f9"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    },
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "5818a0e6059c verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x11ac (inlined)",
+              "5818a0e6077d verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x138d (inlined)",
+              "5818a0e6f2bc semantic_record+0x4fc (inlined)",
+              "5818a0e6f578 semantic_record+0x7b8 (inlined)",
+              "5818a0e6f5a8 semantic_record+0x7e8 (inlined)",
+              "5818a0e6f947 semantic_record+0xb87 (inlined)",
+              "5818a0e72f5c verify_candidate_oracles+0x5c (inlined)",
+              "5818a0e72fa3 verify_candidate_oracles+0xa3 (inlined)",
+              "5818a0e731bf verify_candidate_oracles+0x2bf (inlined)",
+              "5818a0e73204 verify_candidate_oracles+0x304 (inlined)",
+              "5818a0e732d1 verify_candidate_oracles+0x3d1 (inlined)",
+              "5818a0e735c4 verify_candidate_oracles+0x6c4 (inlined)",
+              "5818a0e73a3f verify_candidate_oracles+0xb3f (inlined)",
+              "5818a0e73b40 all<core::iter::adapters::enumerate::Enumerate<core::slice::iter::Iter<alloc::string::String>>, litchi_perf_baseline::docx_replayable_tail_append::verify_candidate_oracles::{closure_env#4}>+0xc40 (inlined)",
+              "5818a0e73b40 try_fold<core::slice::iter::Iter<alloc::string::String>, (), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<(usize, &alloc::string::String), litchi_perf_baseline::docx_replayable_tail_append::verify_candidate_oracles::{closure_env#4}>, core::ops::control_flow::ControlFlow<(), ()>>+0xc40 (inlined)",
+              "5818a0e73b40 verify_candidate_oracles+0xc40 (inlined)",
+              "5818a0e752de build_fixture+0x61e (inlined)",
+              "5818a0e76910 build_fixture+0x1c50 (inlined)",
+              "5818a0e76abb build_fixture+0x1dfb (inlined)",
+              "5818a0e77d9f verify_store_preflight+0x30df (inlined)"
+            ],
+            "inclusive_samples": 158,
+            "share_of_whole_child": 0.6556016597510373,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [
+              "5818a0e752de run_case+0x61e (inlined)",
+              "5818a0e76910 run_case+0x1c50 (inlined)",
+              "5818a0e76abb run_case+0x1dfb (inlined)",
+              "5818a0e77d9f run_case+0x30df (inlined)"
+            ],
+            "inclusive_samples": 15,
+            "share_of_whole_child": 0.06224066390041494,
+            "status": "observed"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "5818a0e5328d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "5818a0e55fd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "5818a0e6059c verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x11ac (inlined)",
+              "5818a0e6077d verify_store_preflight_with_store<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>+0x138d (inlined)",
+              "5818a0f936bd stream_splice+0xad (inlined)",
+              "5818a0ff1f19 read_with_accounting+0x5a9 (inlined)",
+              "5818a0ff3698 read_with_accounting+0x5f8 (inlined)"
+            ],
+            "inclusive_samples": 54,
+            "share_of_whole_child": 0.22406639004149378,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 1,
+          "auditor+replay": 26,
+          "lifecycle+auditor": 15,
+          "lifecycle+replay": 1
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 241
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "b9e56587a17b61e08ece71b23b66b7151b38708b74707ef2ff5088bf9ad86626",
+        "profile_label": "perf-record-file_store-s131072-a64-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "aa521f2be28497498c1c3a7f1453870bb9c1a5a195e877974c3cadfa8c19187c"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-file_store-s131072-a64-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 2583352,
+        "path": "route-profiles/profiles1/perf-record-file_store-s131072-a64-short-c64/perf.data",
+        "sha256": "b9e56587a17b61e08ece71b23b66b7151b38708b74707ef2ff5088bf9ad86626"
+      },
+      "input_receipt_artifact": {
+        "bytes": 2583352,
+        "path": "route-profiles/profiles1/perf-record-file_store-s131072-a64-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "b9e56587a17b61e08ece71b23b66b7151b38708b74707ef2ff5088bf9ad86626",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-file_store-s131072-a64-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-file_store-s131072-a64-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-file_store-s131072-a64-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 264848,
+        "path": "route-profiles/profiles1-perf-script/perf-record-file_store-s131072-a64-short-c64/perf-script.txt",
+        "sha256": "aa521f2be28497498c1c3a7f1453870bb9c1a5a195e877974c3cadfa8c19187c"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    },
+    {
+      "analysis": {
+        "binary_command_match": true,
+        "binary_command_match_note": "A perf script text header is only a name/path check; the sidecar binding retains the source perf.data and build binary hashes.",
+        "marker_status": "observed",
+        "markers": {
+          "auditor": {
+            "actual_matching_frames": [
+              "64336d7cf2bc semantic_record+0x4fc (inlined)",
+              "64336d7cf5a8 semantic_record+0x7e8 (inlined)",
+              "64336d7d3204 verify_candidate_oracles+0x304 (inlined)",
+              "64336d7d3be4 verify_candidate_oracles+0xce4 (inlined)",
+              "64336d82336b scan_document+0x30b (inlined)",
+              "64336d8f2f4b audit_splice+0x59b (inlined)",
+              "64336d93e27c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0x5ac (inlined)",
+              "64336d93e8f4 verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0xc24 (inlined)",
+              "64336d93ea1c verify_reader_with_policy<&mut litchi_opc::source_backed::splice::SpliceAuditReader>+0xd4c (inlined)"
+            ],
+            "inclusive_samples": 23,
+            "share_of_whole_child": 0.32857142857142857,
+            "status": "observed"
+          },
+          "lifecycle": {
+            "actual_matching_frames": [],
+            "inclusive_samples": 0,
+            "share_of_whole_child": 0.0,
+            "status": "unavailable"
+          },
+          "replay": {
+            "actual_matching_frames": [
+              "64336d7b328d with_verified_entry_reader_with_accounting_mode<litchi_opc::source_backed::SourceReader, litchi_docx::source_backed::tail_append::ScanFacts, litchi_docx::source_backed::tail_append_stream::CandidateError, litchi_docx::source_backed::tail_append_stream::prepare_stream::{closure_env#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>>+0x3cd (inlined)",
+              "64336d7b5fd3 {closure#5}<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteHandle>+0x273 (inlined)",
+              "64336d7e0be5 read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x75 (inlined)",
+              "64336d811ba4 push<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x194 (inlined)",
+              "64336d811ba4 push_event<litchi_docx::source_backed::tail_append_stream::StoreChunkSink<litchi_perf_baseline::docx_replayable_tail_append::ReplayRouteStore>>+0x194 (inlined)",
+              "64336d868754 read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x214 (inlined)",
+              "64336d868dcd read<dyn litchi_docx::source_backed::tail_append_stream::AuthoredReplayReader>+0x17d (inlined)",
+              "64336d8f36bd stream_splice+0xad (inlined)"
+            ],
+            "inclusive_samples": 20,
+            "share_of_whole_child": 0.2857142857142857,
+            "status": "observed"
+          }
+        },
+        "overlap_note": "Group shares are inclusive and overlap; they are not additive.",
+        "overlap_samples": {
+          "all_three": 0,
+          "auditor+replay": 13,
+          "lifecycle+auditor": 0,
+          "lifecycle+replay": 0
+        },
+        "scope": "whole child process; perf-record sampling overhead included",
+        "status": "observed",
+        "whole_child_samples": 70
+      },
+      "binary": {
+        "bytes": 423332888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+        "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+      },
+      "binding": {
+        "binary_sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34",
+        "perf_data_sha256": "46bd9a2b39d37d63b8b5384494e1034b62a42213c9f102bf8fe4a92b8b3b92d8",
+        "profile_label": "perf-record-file_store-s64-a16384-short-c64",
+        "protocol_sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891",
+        "schema": "docx-replayable-tail-append-perf-script-v1",
+        "script_sha256": "aa653ab7b6dd610c394406d79f723680bd3d36d3c5343e8aafb2620d556a1d5c"
+      },
+      "build": {
+        "path": "route-attempts/formal1/build-normal.json",
+        "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e"
+      },
+      "command": [
+        "perf",
+        "script",
+        "--header",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-profiles/profiles1/perf-record-file_store-s64-a16384-short-c64/perf.data",
+        "--demangle"
+      ],
+      "input_perf_data": {
+        "bytes": 655464,
+        "path": "route-profiles/profiles1/perf-record-file_store-s64-a16384-short-c64/perf.data",
+        "sha256": "46bd9a2b39d37d63b8b5384494e1034b62a42213c9f102bf8fe4a92b8b3b92d8"
+      },
+      "input_receipt_artifact": {
+        "bytes": 655464,
+        "path": "route-profiles/profiles1/perf-record-file_store-s64-a16384-short-c64/perf.data",
+        "present": true,
+        "reason": null,
+        "required": true,
+        "sha256": "46bd9a2b39d37d63b8b5384494e1034b62a42213c9f102bf8fe4a92b8b3b92d8",
+        "verified": true
+      },
+      "output": {
+        "binding_path": "route-profiles/profiles1-perf-script/perf-record-file_store-s64-a16384-short-c64/binding.json",
+        "path": "route-profiles/profiles1-perf-script/perf-record-file_store-s64-a16384-short-c64/perf-script.txt"
+      },
+      "profile_label": "perf-record-file_store-s64-a16384-short-c64",
+      "protocol": {
+        "path": "route-protocol.json",
+        "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+      },
+      "schema": "docx-replayable-tail-append-perf-script-v1",
+      "script_artifact": {
+        "bytes": 68137,
+        "path": "route-profiles/profiles1-perf-script/perf-record-file_store-s64-a16384-short-c64/perf-script.txt",
+        "sha256": "aa653ab7b6dd610c394406d79f723680bd3d36d3c5343e8aafb2620d556a1d5c"
+      },
+      "status": "observed",
+      "working_directory": "/home/zhuhe/code/litchi"
+    }
+  ],
+  "schema": "docx-replayable-tail-append-perf-script-v1",
+  "version": 1
+}

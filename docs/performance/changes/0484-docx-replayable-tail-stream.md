@@ -42,8 +42,11 @@ Store/Deflate fixtures. Full route diagnostics validate emitted reports in
 normal and allocator executables; these single-operation diagnostics do not
 provide statistical performance evidence.
 
-Formal captures, before/after comparisons, phase profiles, and storage/input/
-sink/compression measurement arms are still required. No speedup, constant
-memory, RSS reduction or concurrency improvement is claimed. The measured
-0483 memory/latency tradeoff remains unchanged, and the full performance/CRUD
-goal remains open.
+The [formal bundle](../results/change-0484/README.md) now retains all 228
+route/input/sink/compression processes, 6,840 measured operations, separate
+external profiles, and matched normal/allocator builds. Its tables retain
+individual repeats, latency tails, operation heap increments, whole-process
+RSS and logical I/O. This is contemporaneous route characterization, not a
+historical speedup or global constant-memory claim. Broader before/after
+comparisons, phase attribution, missing workload intersections and the full
+performance/CRUD goal remain open.

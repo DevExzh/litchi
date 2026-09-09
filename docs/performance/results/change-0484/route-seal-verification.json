@@ -1,0 +1,21 @@
+{
+  "analyzer": {
+    "bytes": 81400,
+    "sha256": "745dd9c7d842578b635e9e2a6bdee442240f8674301dc2b49048ae554b704a7c"
+  },
+  "external_profiles": 30,
+  "files": 4404,
+  "formal_processes": 228,
+  "formal_samples": 6840,
+  "manifest": {
+    "bytes": 863754,
+    "sha256": "146fb1cad05c13282013444fa32d9956c18342678cb367e18106f989a037e03f"
+  },
+  "schema": "docx-route-seal-verification-v1",
+  "status": "pass",
+  "verified_utc": "2026-09-09T11:26:03.919562+00:00",
+  "verifier": {
+    "bytes": 5144,
+    "sha256": "0aeb47ea16fba6a3c754622f72eb8763233cc4a30a239c35f5cf5695459f2c3c"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--fixture-dir",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input-origin/formal1/source-64",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input-origin/formal1/source-64/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-09T10:26:53.750615+00:00"
+}

@@ -1,0 +1,30 @@
+{
+  "artifacts": {
+    "measurements.csv": {
+      "bytes": 18381,
+      "sha256": "7969535fb91b3949c3fec928eddf2dfcec8b31a5d6cfbae82b97d87c9d771343"
+    },
+    "measurements.md": {
+      "bytes": 16094,
+      "sha256": "ee8d6858c8753048a0b76f610da84d36f5596dd44b5d217031f10fcd2936c7d1"
+    },
+    "route-scaling.png": {
+      "bytes": 209195,
+      "sha256": "21feb8c08cd6efdd654c5fdfe53e664b1ab43a108b21cf0f51c9a520ee105301"
+    }
+  },
+  "axis_rows": 54,
+  "driver_sha256": "747accf3bd77ab37153c93bffaf5ace15e3f18334642f7c52a8acad0d30123c5",
+  "plotting": {
+    "backend": "Agg",
+    "dpi": 180,
+    "matplotlib": "3.10.7+dfsg1"
+  },
+  "route_rows": 60,
+  "schema": "docx-route-render-v1",
+  "summary": {
+    "bytes": 4888125,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/route-summary.json",
+    "sha256": "117fa5ca153bf794b1dbdab270a1d8938bd479d811f53099dc0b5012cb649637"
+  }
+}

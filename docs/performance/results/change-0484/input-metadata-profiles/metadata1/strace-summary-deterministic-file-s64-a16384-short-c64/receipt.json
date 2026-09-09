@@ -1,0 +1,276 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "file",
+    "--input-file",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a16384-short-c64-source.docx",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/report.json"
+  ],
+  "artifacts": {
+    "stderr.txt": {
+      "bytes": 45,
+      "path": "input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/stderr.txt",
+      "present": true,
+      "sha256": "2e83078f83bf622d24173699e975fec5c44107ee37cd571e40ad0850635a6872"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/stdout.txt",
+      "present": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "metadata1",
+  "axis": {
+    "axis": "input",
+    "cli_provider": "deterministic",
+    "compression": "current",
+    "compression_profile": {
+      "name": "current",
+      "source_raw_members_preserved": true
+    },
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "input_backing": "file",
+    "input_bytes_per_second": null,
+    "input_delay_us": 0,
+    "input_file": "axis-input/s64-a16384-short-c64-source.docx",
+    "input_identity_validation": "setup_and_post_sample_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_mode": "file",
+    "input_overhead_us": 0,
+    "input_profile": {
+      "backing": "file",
+      "bytes_per_second": null,
+      "delay_us": 0,
+      "file": "axis-input/s64-a16384-short-c64-source.docx",
+      "max_range_bytes": null,
+      "mode": "file",
+      "overhead_us": 0
+    },
+    "label": "input-file-s64-a16384-short-c64",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_sync": "none",
+    "report_provider": "deterministic_replayable_bounded_cursor",
+    "sink_write_bytes": 4096,
+    "source_contract": "profile_file_source_positional_read_at_requested_returned_fixed_histograms",
+    "storage_profile": {
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "replay_store": "none",
+      "replay_sync": "none"
+    },
+    "value": "file",
+    "workload": "s64-a16384-short-c64"
+  },
+  "binary": {
+    "bytes": 423332888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+  },
+  "build": {
+    "attempt": "formal1",
+    "binary": {
+      "bytes": 423332888,
+      "executable": true,
+      "path": "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+      "sha256": "a1bc957c67871e9997507d9741ab954354cbdd4f67dcce5755d5ef128e99be34"
+    },
+    "path": "route-attempts/formal1/build-normal.json",
+    "protocol": {
+      "path": "route-protocol.json",
+      "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+    },
+    "role": "normal",
+    "sha256": "6c245a5fad0087b2218a3e3252e7e1350b256b05235491d7241bf2d47b7d6d1e",
+    "source_after": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    },
+    "source_before": {
+      "files": 7157,
+      "path": "validation-sources/5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae.json",
+      "sha256": "5a86d19865374a7e914ebb2f168273800b4e04de5ae287bd7ecc4fe37c29b0ae"
+    }
+  },
+  "build_attempt": "formal1",
+  "case": {
+    "authored_count": 16384,
+    "chunk_bytes": 64,
+    "chunk_mode": "64",
+    "cli": [
+      "--source-counts",
+      "64",
+      "--authored-counts",
+      "16384",
+      "--chunks",
+      "64",
+      "--text",
+      "short",
+      "--sink-write",
+      "4096"
+    ],
+    "compression": "current",
+    "input_mode": "file",
+    "label": "s64-a16384-short-c64",
+    "sink_write_bytes": 4096,
+    "source_count": 64,
+    "text_bytes": null,
+    "text_mode": "short"
+  },
+  "command": [
+    "/usr/bin/strace",
+    "-f",
+    "-c",
+    "-e",
+    "trace=fstat,fstat64,newfstatat,statx,pread,pread64,read,write,open,openat,close,lseek,sync,fsync,fdatasync",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/strace-summary.txt",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0484/0484/routes/formal1/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "file",
+    "--input-file",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a16384-short-c64-source.docx",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0484/input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 21647,
+    "path": "profile_input_metadata.py",
+    "sha256": "e37487fc3d23931a4a9ae536e31afb195a0b40fc8a654826341cf477c5787ee0"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "error": "strace exited 1: failed",
+  "execution": {
+    "cpu": 2,
+    "cpu_lock_required": true,
+    "gate_required": true,
+    "timeout_seconds": 300.0
+  },
+  "exit_code": 1,
+  "failure_class": "failed",
+  "finished_utc": "2026-09-09T11:21:40.509027+00:00",
+  "input": {
+    "absolute_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a16384-short-c64-source.docx",
+    "backing": "file",
+    "bytes": 2106,
+    "identity": "prepared_file_capability_fingerprint_must_match_report_source_archive",
+    "mode": "file",
+    "path": "axis-input/s64-a16384-short-c64-source.docx",
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+    "source_contract": "profile_file_source_positional_read_at_requested_returned_fixed_histograms"
+  },
+  "label": "strace-summary-deterministic-file-s64-a16384-short-c64",
+  "passed": false,
+  "performance_claim": "none",
+  "process": {
+    "returncode": 1,
+    "route_started": true,
+    "timed_out": false
+  },
+  "profile_artifact": {
+    "path": "input-metadata-profiles/metadata1/strace-summary-deterministic-file-s64-a16384-short-c64/strace-summary.txt",
+    "present": false
+  },
+  "profile_driver": {
+    "bytes": 38423,
+    "path": "profile_routes.py",
+    "sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511"
+  },
+  "profile_driver_sha256": "bcbce9dd293ad7456f572aa6ef8ac864cbb3761da5cc6cd6e00ae84facd19511",
+  "profile_kind": "summary",
+  "profile_only": true,
+  "protocol": {
+    "path": "route-protocol.json",
+    "sha256": "7681fd369f34e4a237e2b6facfc432b4f001467a03ee1cab59acc1083e25c891"
+  },
+  "role": "normal",
+  "route": {
+    "cli_provider": "deterministic",
+    "name": "deterministic",
+    "provider": "deterministic",
+    "report_provider": "deterministic_replayable_bounded_cursor"
+  },
+  "route_driver_sha256": "a4abd79b072621e251eae56557bda85759fca2babe2537029c0d283ab33be557",
+  "samples": 1,
+  "schema": "docx-replayable-tail-append-input-metadata-profile-run-v1",
+  "started_utc": "2026-09-09T11:21:40.507599+00:00",
+  "status": "failed",
+  "timed_out": false,
+  "validation_status": "not_run",
+  "version": 1,
+  "warmups": 1
+}

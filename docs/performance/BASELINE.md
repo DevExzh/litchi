@@ -1,6 +1,6 @@
 # ZIP, OPC, and CFB substrate baseline
 
-## 0484: replayable DOCX authored stream correctness checkpoint
+## 0484: replayable DOCX authored stream measurements
 
 [0484](changes/0484-docx-replayable-tail-stream.md) extends logical tail append
 to borrowed paragraph events, deterministic replay or an explicit one-shot
@@ -8,9 +8,16 @@ store, and durable forward/inverse patches. The retained tests, sanitizer fuzz
 smoke and LibreOffice readback establish the documented correctness scope.
 The [extended harness](results/change-0484/route-harness-checkpoint.md) and
 validators cover deterministic, memory-store and file-store routes, with
-separate input, sink and compression inventories. Formal normal/allocator
-captures and profiles remain open. No new latency, allocation or RSS result is
-claimed. The 0483 measurements below retain their one-paragraph scope.
+separate input, sink and compression inventories. The
+[formal bundle](results/change-0484/README.md) retains 228 normal/allocator
+processes, 6,840 samples, and separate external profiles. At 64 existing and
+16,384 authored short paragraphs, deterministic p50 is 118.783/116.986 ms,
+memory-store p50 is 90.297/90.194 ms, and file-store p50 is 96.711/97.078 ms
+across the two repeats. Operation peak increments are 989,190 / 9,184,134 /
+795,759 bytes respectively. Full tables retain tails, RSS, I/O, repeat spread
+and adverse small-file-store results. These are route characterizations;
+broader before/after work remains open. The 0483 measurements below retain
+their one-paragraph scope.
 
 ## 0483: bounded DOCX tail append route comparison
 

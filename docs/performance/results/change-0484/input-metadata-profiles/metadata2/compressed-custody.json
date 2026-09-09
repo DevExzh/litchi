@@ -1,0 +1,58 @@
+{
+  "driver": {
+    "bytes": 3824,
+    "sha256": "2497896821b76ab5aff5ad61015d6b052d148fbb82d80e1299ec7c6283cd25a1"
+  },
+  "entries": [
+    {
+      "compressed": {
+        "bytes": 18564,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-owned-s64-a16384-short-c64/strace-raw.log.gz",
+        "present": true,
+        "sha256": "20e65f85828ae9b939effacb0292addd5ad27541b77fbe597f036c36a99022e4"
+      },
+      "exact_source_descriptor_statx_calls": 0,
+      "lossless_verified": true,
+      "raw": {
+        "bytes": 634906,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-owned-s64-a16384-short-c64/strace-raw.log",
+        "sha256": "5a73211f337df9c10738f66cca5f2e37c1dafce0de5107426c6a81b48b8976e0"
+      },
+      "raw_removed": true,
+      "raw_statx_calls": 12,
+      "receipt": {
+        "bytes": 10312,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-owned-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "33ff6243278b0ee0e6e133fe871f2e6f356812fff4e4452fe76f960d54a8fd39"
+      }
+    },
+    {
+      "compressed": {
+        "bytes": 14991096,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-file-s64-a16384-short-c64/strace-raw.log.gz",
+        "present": true,
+        "sha256": "4fc8f10841328fddaaa269444cb7f2cb0a2fd433d4f7373a3477f2f2b553600c"
+      },
+      "exact_source_descriptor_statx_calls": 3735927,
+      "lossless_verified": true,
+      "raw": {
+        "bytes": 1132643120,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-file-s64-a16384-short-c64/strace-raw.log",
+        "sha256": "68e359edeec827ddedc6f76522927d0bc3e4c9727079fe9c2fb430633fc02665"
+      },
+      "raw_removed": true,
+      "raw_statx_calls": 3735939,
+      "receipt": {
+        "bytes": 10892,
+        "path": "input-metadata-profiles/metadata2/strace-raw-metadata-deterministic-file-s64-a16384-short-c64/receipt.json",
+        "present": true,
+        "sha256": "daa169b01c5df7c5d5744afaa25c12f8decb3acfa7b9b3efb2563469ac9d5494"
+      }
+    }
+  ],
+  "finished_utc": "2026-09-09T11:24:30.096276+00:00",
+  "schema": "docx-input-metadata-compressed-custody-v1",
+  "scope": "Whole diagnostic child including one warmup, one sample and setup; exact descriptor annotation attribution.",
+  "status": "pass"
+}

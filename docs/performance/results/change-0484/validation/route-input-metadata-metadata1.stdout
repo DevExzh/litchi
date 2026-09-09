@@ -1,0 +1,4 @@
+strace-summary-deterministic-owned-s131072-a64-short-c64: failed
+strace-summary-deterministic-file-s131072-a64-short-c64: failed
+strace-summary-deterministic-owned-s64-a16384-short-c64: failed
+strace-summary-deterministic-file-s64-a16384-short-c64: failed
