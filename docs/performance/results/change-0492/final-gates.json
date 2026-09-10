@@ -1,0 +1,128 @@
+{
+  "gates": [
+    "clippy3",
+    "build-normal2",
+    "build-allocator1",
+    "test-allocation1",
+    "rustdoc1",
+    "fmt1",
+    "doc-test1",
+    "boundary1",
+    "test-lib2",
+    "python2"
+  ],
+  "commands": {
+    "clippy3": [
+      "cargo",
+      "clippy",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all-targets",
+      "--features",
+      "allocator-metrics",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "build-normal2": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "build-allocator1": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc"
+    ],
+    "test-allocation1": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--features",
+      "allocator-metrics",
+      "allocation_metrics::tests",
+      "--",
+      "--test-threads=1"
+    ],
+    "rustdoc1": [
+      "env",
+      "RUSTDOCFLAGS=-D warnings",
+      "cargo",
+      "doc",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--no-deps",
+      "--lib",
+      "--features",
+      "allocator-metrics"
+    ],
+    "fmt1": [
+      "rustfmt",
+      "+1.98.1",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "--check",
+      "tools/perf-baseline/src/docx_read_ahead.rs",
+      "tools/perf-baseline/src/docx_provider_lifecycle.rs",
+      "tools/perf-baseline/src/docx_story_hyperlink_publication.rs",
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "doc-test1": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--doc"
+    ],
+    "boundary1": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "test-lib2": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib"
+    ],
+    "python2": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "docs/performance/results/change-0492",
+      "-p",
+      "test_*.py",
+      "-v"
+    ]
+  }
+}

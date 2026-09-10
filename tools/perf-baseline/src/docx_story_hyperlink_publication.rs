@@ -1656,6 +1656,9 @@ mod tests {
 
     #[test]
     fn publication_failure_is_captured_after_the_region_and_before_error_propagation() {
+        // Allocator unit tests toggle the process-global observer under this
+        // lock. Keep this disabled-observer assertion in the same test domain.
+        let _allocation_test_lock = crate::allocation_metrics::TEST_LOCK.lock().unwrap();
         let corpus = build_corpus().expect("DOCX story publication corpus");
         let package = source_package(corpus.archive.clone()).expect("source package");
         let plan = package

@@ -1,0 +1,52 @@
+{
+  "attempt": "pilot2",
+  "pilot": true,
+  "protocol_sha256": "9c0d7364d44eb97ca6905b1b9b4592acdb1001e58005098dc237a414691af0e2",
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-normal-baseline-65536-0us",
+      "report_sha256": "46a39b3fe7fbef127db8d01a6bc54613f697770e11e908cd5cb1a761cc8377ff",
+      "terminal_sha256": "3058fcc7966a94102c5e46a8fedcd6c72a89f4d75aa17e8d26ee4b7a1939d61c"
+    },
+    {
+      "label": "pilot-r1-normal-candidate-4096-0us",
+      "report_sha256": "56fc9bf7c53bc9d6ee449673a1655ffebbd0af900354b0d2f819ca4f3b81432c",
+      "terminal_sha256": "3df7578143fdabbc3e11794a45cd6b9ab14ef80c8f74987ee5a0e4f5088865ad"
+    },
+    {
+      "label": "pilot-r1-normal-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "e94d22cc8a3375991cb0e1c93a3939c1f78fe678ec5e6e9aa831ff4d197e752e",
+      "terminal_sha256": "3afcbf2e57c4e91cf8edccd95b6a3e603f4ae87bac96ab6ee3b7562a4cb21fe2"
+    },
+    {
+      "label": "pilot-r1-normal-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "6e1ec71148498df6e29267dffa4a155843138bbe7b072349d937cc87a5e1521a",
+      "terminal_sha256": "c0d810634ac928725f67e6b9e845f4c056297bf3b6ae091c7ecffec0a7ba8b3b"
+    },
+    {
+      "label": "pilot-r1-allocator-baseline-65536-0us",
+      "report_sha256": "58eff3373d6820a86c64eb2f75181ed01fa67cdce4b4672768114edcd0147088",
+      "terminal_sha256": "64176cba5254c41bf83282d83754be799f9a5f75c5a75e8c2c420345f110aca5"
+    },
+    {
+      "label": "pilot-r1-allocator-candidate-4096-0us",
+      "report_sha256": "457959ea73e3d06390e73082f111f370e8ac45377da82ca85916ddd78fddf74c",
+      "terminal_sha256": "d80db2bcf87f1f6e393112f1253bc99fe5cb8a6c9c0c7732bd53e930f93bdae3"
+    },
+    {
+      "label": "pilot-r1-allocator-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "dbee43a300020494758a32b1690e920607f16669902f06f827b7730a08e62de4",
+      "terminal_sha256": "354d618ec0c1f36bca3f6cdf96834aa85ad5ba3f95d672aad8ab3d28fd40ecbe"
+    },
+    {
+      "label": "pilot-r1-allocator-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "67e35060c1baeb86b15332408a5e568a43ead733d7a03a98a111e94d4ff24450",
+      "terminal_sha256": "fa21ed501332463f1943f79b97e4683b0e05af49e0608a4af5cfb7bdff7a9f3c"
+    }
+  ],
+  "schema": "docx-read-ahead-verification-v1",
+  "status": "pass",
+  "summary_sha256": "dde59529be24489c8e668534562528ece77e73987b9346428d1e614d5094247d",
+  "verified_utc": "2026-09-10T04:10:56.766185+00:00",
+  "version": 1
+}

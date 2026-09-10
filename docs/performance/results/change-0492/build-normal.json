@@ -1,0 +1,56 @@
+{
+  "attempt": "final2",
+  "binary": {
+    "bytes": 473393448,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0492/final2/normal/litchi-perf-baseline",
+    "sha256": "8659d4f40f6e11376da186818187488a5ea43c37f19a1cc996307e8618ed5440"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "copied_utc": "2026-09-10T04:04:00.637069+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0492",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0492/validation/build-normal2.json",
+    "sha256": "98699829128d7e546c316765956a0363f5bad21c2b1e798fe1af70e5dce642f3"
+  },
+  "git_revision": "e44a23396146d504ffc738e0989de896635f02a3",
+  "original_binary": {
+    "bytes": 473393448,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-build-0492/release/litchi-perf-baseline",
+    "sha256": "8659d4f40f6e11376da186818187488a5ea43c37f19a1cc996307e8618ed5440"
+  },
+  "retainer_sha256": "4c1ab6583251d0d61a41bf0c9027537bd29077f5988466d0ea12bf59dc5c2b48",
+  "role": "normal",
+  "schema": "docx-provider-lifecycle-build-v1",
+  "source_after": {
+    "files": 7159,
+    "path": "validation-sources/18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b.json",
+    "sha256": "18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b"
+  },
+  "source_before": {
+    "files": 7159,
+    "path": "validation-sources/18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b.json",
+    "sha256": "18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

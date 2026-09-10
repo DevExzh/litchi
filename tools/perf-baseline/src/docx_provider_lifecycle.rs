@@ -38,12 +38,16 @@ use litchi_opc::{ReadLimits, SourceCacheLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::docx_read_ahead::{ReadAheadReadAt, ReadAheadSnapshot};
 use crate::pptx_range_source::{
     PPTX_RANGE_REQUEST_SIZE_BUCKETS, PptxRangeSource, PptxRangeSourceConfig,
     PptxRangeSourceSnapshot, TransferDelayPolicy, request_size_bucket,
 };
 
 const SCHEMA: &str = "docx_provider_lifecycle_v1";
+const TRACE_SCHEMA: &str = "docx_provider_lifecycle_v2";
+const TRACE_TIMING_SCOPE: &str = "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside";
+const TRACE_SETUP_SCOPE: &str = "all v1 setup plus fresh bounded read-ahead buffer and wrapper construction outside the clock; fixed window capacity is reported separately; unmanaged benchmark pilot only";
 const CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const CORPUS_VERSION: &str = "0188-media-v1";
 const CORPUS_ARCHIVE_SHA256: &str =
@@ -94,6 +98,8 @@ impl ProviderKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Config {
     provider: ProviderKind,
+    read_ahead_window_bytes: Option<usize>,
+    trace_ranges: bool,
     max_range_bytes: Option<usize>,
     delay_us: Option<u64>,
     transfer_bytes_per_second: Option<NonZeroU64>,
@@ -204,6 +210,8 @@ impl LimitsRecord {
 
 #[derive(Clone, Copy, Debug, Serialize)]
 struct ProviderConfigRecord {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    read_ahead_window_bytes: Option<usize>,
     provider: &'static str,
     max_range_bytes: Option<usize>,
     delay_us: Option<u64>,
@@ -217,6 +225,7 @@ struct ProviderConfigRecord {
 impl Config {
     fn record(&self) -> ProviderConfigRecord {
         ProviderConfigRecord {
+            read_ahead_window_bytes: self.read_ahead_window_bytes,
             provider: self.provider.name(),
             max_range_bytes: self.max_range_bytes,
             delay_us: self.delay_us,
@@ -327,13 +336,35 @@ impl MediaRangeProof {
 
 #[derive(Clone, Debug, Serialize)]
 struct ReadEvidence {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    read_ahead: Option<ReadAheadSnapshot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_wrapper: Option<CounterRecord>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_ranges: Option<Vec<ObservedRange>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    physical_ranges: Option<Vec<ObservedRange>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_media_range_proof: Option<MediaRangeProof>,
     wrapper: CounterRecord,
     range_adapter: Option<CounterRecord>,
     media_range_proof: MediaRangeProof,
 }
 
+#[derive(Clone, Copy, Debug, Serialize)]
+struct CacheRecord {
+    open_successful_loads: u64,
+    successful_loads: u64,
+    failed_loads: u64,
+    retained_bytes: usize,
+    retained_entries: usize,
+    budget_managed: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct SampleRecord {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache: Option<CacheRecord>,
     sample_index: usize,
     latency_ns: u64,
     actual_text_verified: bool,
@@ -349,6 +380,8 @@ struct SampleRecord {
 
 #[derive(Debug, Serialize)]
 struct Report {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    media_ranges: Option<Vec<Range<u64>>>,
     schema: &'static str,
     provider_scope: &'static str,
     timing_scope: &'static str,
@@ -365,7 +398,7 @@ struct Report {
     rows: Vec<SampleRecord>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct ObservedRange {
     offset: u64,
     requested: u64,
@@ -547,6 +580,9 @@ impl ReadAt for CountingReadAt {
 }
 
 struct Provider {
+    read_ahead: Option<Arc<ReadAheadReadAt>>,
+    logical_counting: Option<Arc<CountingState>>,
+    trace_ranges: bool,
     source: Arc<dyn ReadAt>,
     counting: Option<Arc<CountingState>>,
     range: Option<Arc<PptxRangeSource>>,
@@ -599,8 +635,21 @@ fn provider(
             (source, Some(state), Some(adapter))
         },
     };
+    let (source, read_ahead, logical_counting) =
+        if let Some(window_bytes) = config.read_ahead_window_bytes {
+            let adapter = Arc::new(ReadAheadReadAt::new(source, window_bytes)?);
+            let logical = Arc::new(CountingState::default());
+            let source: Arc<dyn ReadAt> =
+                Arc::new(CountingReadAt::new(adapter.clone(), Arc::clone(&logical)));
+            (source, Some(adapter), Some(logical))
+        } else {
+            (source, None, None)
+        };
     let version = source.version()?;
     Ok(Provider {
+        read_ahead,
+        logical_counting,
+        trace_ranges: config.trace_ranges,
         source,
         counting,
         range,
@@ -676,7 +725,7 @@ fn evidence(
         .as_ref()
         .map(|state| state.snapshot())
         .transpose()?;
-    let wrapper = counted
+    let mut wrapper = counted
         .as_ref()
         .map(CounterRecord::from_counted)
         .unwrap_or_else(CounterRecord::unavailable);
@@ -685,7 +734,40 @@ fn evidence(
         .as_ref()
         .map(|adapter| adapter.snapshot().map(CounterRecord::from_range))
         .transpose()?;
+    let logical = provider
+        .logical_counting
+        .as_ref()
+        .map(|state| state.snapshot())
+        .transpose()?;
+    let logical = logical.as_ref().or(counted.as_ref());
+    if provider.trace_ranges {
+        wrapper.scope = "physical adapter calls below read-ahead; synthetic transport observations, not disk/network I/O";
+    }
     Ok(ReadEvidence {
+        read_ahead: provider
+            .read_ahead
+            .as_ref()
+            .map(|adapter| adapter.snapshot())
+            .transpose()?,
+        logical_wrapper: provider.trace_ranges.then(|| {
+            let mut counter = logical
+                .map(CounterRecord::from_counted)
+                .unwrap_or_else(CounterRecord::unavailable);
+            counter.scope = "package logical ReadAt calls above read-ahead";
+            counter
+        }),
+        logical_ranges: provider
+            .trace_ranges
+            .then(|| logical.map(|s| s.ranges.clone()).unwrap_or_default()),
+        physical_ranges: provider.trace_ranges.then(|| {
+            counted
+                .as_ref()
+                .map(|s| s.ranges.clone())
+                .unwrap_or_default()
+        }),
+        logical_media_range_proof: provider
+            .trace_ranges
+            .then(|| media_proof(logical, media_ranges)),
         wrapper,
         range_adapter,
         media_range_proof: media_proof(counted.as_ref(), media_ranges),
@@ -704,18 +786,30 @@ fn run_sample(
     let before = provider.version;
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
-    let actual_text = {
+    let (actual_text, cache_record) = {
         let package = SourcePackage::from_read_at_with_limits_and_cache_limits(
             Arc::clone(&provider.source),
             limits,
             cache,
         )?;
+        let open_cache = config.trace_ranges.then(|| package.cache_diagnostics());
         let document = package.document()?;
         let text = document.extract_text()?;
+        let cache_record = open_cache.map(|open| {
+            let after = package.cache_diagnostics();
+            CacheRecord {
+                open_successful_loads: open.successful_loads,
+                successful_loads: after.successful_loads,
+                failed_loads: after.failed_loads,
+                retained_bytes: after.retained_bytes,
+                retained_entries: after.retained_entries,
+                budget_managed: after.budget_managed,
+            }
+        });
         std::hint::black_box(&text);
         // `package` and `document` both drop before this block ends, so their
         // ownership cost remains inside the lifecycle clock. `text` escapes.
-        text
+        (text, cache_record)
     };
     let elapsed = started.elapsed();
     let allocation = allocation_region.finish();
@@ -733,6 +827,7 @@ fn run_sample(
     }
     let reads = evidence(&provider, &corpus.media_ranges)?;
     Ok(SampleRecord {
+        cache: cache_record,
         sample_index,
         latency_ns,
         actual_text_verified: true,
@@ -879,6 +974,8 @@ fn need_value(args: &[OsString], index: &mut usize, flag: &str) -> Result<String
 
 fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     let mut provider = None;
+    let mut read_ahead_window_bytes = None;
+    let mut trace_ranges = false;
     let mut max_range_bytes = None;
     let mut delay_us = None;
     let mut transfer_bytes_per_second = None;
@@ -891,6 +988,22 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     while index < args.len() {
         let flag = args[index].to_str().ok_or("argument must be valid UTF-8")?;
         match flag {
+            "--trace-ranges" => {
+                if trace_ranges {
+                    return Err("--trace-ranges was specified more than once".into());
+                }
+                trace_ranges = true;
+            },
+            "--read-ahead" => {
+                if read_ahead_window_bytes.is_some() {
+                    return Err("--read-ahead was specified more than once".into());
+                }
+                let value = parse_usize(&need_value(args, &mut index, flag)?, flag)?;
+                if !(1..=65_536).contains(&value) {
+                    return Err("--read-ahead must be in 1..=65536".into());
+                }
+                read_ahead_window_bytes = Some(value);
+            },
             "--provider" => {
                 if provider.is_some() {
                     return Err("--provider was specified more than once".into());
@@ -1018,7 +1131,18 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     {
         return Err("--transfer-delay-policy requires --transfer-bytes-per-second".into());
     }
+    if read_ahead_window_bytes.is_some() && (provider != ProviderKind::Range || !trace_ranges) {
+        return Err(
+            "--read-ahead requires --provider range and --trace-ranges (unmanaged pilot only)"
+                .into(),
+        );
+    }
+    if trace_ranges && provider == ProviderKind::Bytes {
+        return Err("--trace-ranges requires an instrumented provider".into());
+    }
     Ok(Config {
+        read_ahead_window_bytes,
+        trace_ranges,
         provider,
         max_range_bytes,
         delay_us,
@@ -1032,7 +1156,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "docx-provider-lifecycle --provider <bytes|file|instrumented-bytes|range> [--max-range N --delay-us N [--transfer-bytes-per-second N --transfer-delay-policy separate-sleeps|minimum-service]] --samples N --warmup N --source-revision <40 hex chars> --output PATH"
+    "docx-provider-lifecycle --provider <bytes|file|instrumented-bytes|range> [--max-range N --delay-us N [--transfer-bytes-per-second N --transfer-delay-policy separate-sleeps|minimum-service]] [--trace-ranges [--read-ahead N]] --samples N --warmup N --source-revision <40 hex chars> --output PATH"
 }
 
 /// Runs the benchmark from the arguments following the subcommand.
@@ -1066,11 +1190,28 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
         }
     }
     let report = Report {
-        schema: SCHEMA,
+        media_ranges: config.trace_ranges.then(|| corpus.media_ranges.clone()),
+        schema: if config.trace_ranges {
+            TRACE_SCHEMA
+        } else {
+            SCHEMA
+        },
         provider_scope: PROVIDER_SCOPE,
-        timing_scope: TIMING_SCOPE,
-        setup_scope: SETUP_SCOPE,
-        allocation_scope: ALLOCATION_SCOPE,
+        timing_scope: if config.trace_ranges {
+            TRACE_TIMING_SCOPE
+        } else {
+            TIMING_SCOPE
+        },
+        setup_scope: if config.trace_ranges {
+            TRACE_SETUP_SCOPE
+        } else {
+            SETUP_SCOPE
+        },
+        allocation_scope: if config.trace_ranges {
+            "operation-scoped allocator region; allocation field omitted for normal binary; fresh read-ahead window allocated during setup and reported separately"
+        } else {
+            ALLOCATION_SCOPE
+        },
         source_bytes: corpus.bytes.len(),
         source_sha256: sha256_hex(&corpus.bytes),
         requested_source_revision: config.source_revision.clone(),
@@ -1156,6 +1297,112 @@ mod tests {
             ])
             .is_err()
         );
+    }
+
+    fn trace_config(extra: &[&str]) -> Config {
+        let mut args: Vec<OsString> = [
+            "--provider",
+            "range",
+            "--max-range",
+            "65536",
+            "--delay-us",
+            "0",
+            "--trace-ranges",
+            "--samples",
+            "1",
+            "--source-revision",
+            "e44a23396146d504ffc738e0989de896635f02a3",
+            "--output",
+            "unused.json",
+        ]
+        .into_iter()
+        .map(OsString::from)
+        .collect();
+        args.extend(extra.iter().map(OsString::from));
+        parse_config(&args).expect("finite traced configuration")
+    }
+
+    #[test]
+    fn read_ahead_requires_traced_range_provider_and_finite_window() {
+        let base = trace_config(&["--read-ahead", "4096"]);
+        assert_eq!(base.read_ahead_window_bytes, Some(4096));
+        for window in ["0", "65537"] {
+            let args: Vec<OsString> = ["--read-ahead", window]
+                .into_iter()
+                .map(OsString::from)
+                .collect();
+            assert!(parse_config(&args).is_err());
+        }
+        let args: Vec<OsString> = [
+            "--provider",
+            "instrumented-bytes",
+            "--trace-ranges",
+            "--read-ahead",
+            "4096",
+            "--samples",
+            "1",
+            "--source-revision",
+            "e44a23396146d504ffc738e0989de896635f02a3",
+            "--output",
+            "unused.json",
+        ]
+        .into_iter()
+        .map(OsString::from)
+        .collect();
+        assert!(parse_config(&args).is_err());
+    }
+
+    #[test]
+    fn read_ahead_lifecycle_preserves_text_and_reports_physical_overfetch() {
+        let corpus = build_corpus().expect("accepted corpus");
+        let limits = ReadLimits::default();
+        let cache = SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).expect("cache");
+        let baseline =
+            run_sample(&trace_config(&[]), &corpus, None, 0, limits, cache).expect("baseline");
+        let config = trace_config(&["--read-ahead", "4096"]);
+        let candidate = run_sample(&config, &corpus, None, 0, limits, cache).expect("candidate");
+        assert_eq!(baseline.actual_text_sha256, candidate.actual_text_sha256);
+        assert_eq!(candidate.actual_text_bytes, 10_000);
+        for row in [&baseline, &candidate] {
+            let diagnostics = row.cache.expect("cache diagnostics");
+            assert_eq!(diagnostics.open_successful_loads, 0);
+            assert_eq!(diagnostics.successful_loads, 1);
+            assert!(!diagnostics.budget_managed);
+            assert_eq!(
+                row.reads
+                    .logical_media_range_proof
+                    .as_ref()
+                    .expect("logical media")
+                    .returned_overlap_bytes,
+                Some(0)
+            );
+        }
+        let baseline_calls = baseline
+            .reads
+            .wrapper
+            .logical_calls
+            .expect("baseline calls");
+        let candidate_calls = candidate
+            .reads
+            .wrapper
+            .logical_calls
+            .expect("candidate calls");
+        assert!(candidate_calls < baseline_calls);
+        assert!(candidate.reads.wrapper.returned_bytes > baseline.reads.wrapper.returned_bytes);
+        assert!(
+            candidate
+                .reads
+                .media_range_proof
+                .returned_overlap_bytes
+                .expect("physical media")
+                > 0
+        );
+        // A transport cap smaller than the window must still reconstruct text.
+        let mut short_config = config;
+        short_config.max_range_bytes = Some(64);
+        let short =
+            run_sample(&short_config, &corpus, None, 0, limits, cache).expect("short fills");
+        assert_eq!(short.actual_text_sha256, baseline.actual_text_sha256);
     }
 
     #[test]
