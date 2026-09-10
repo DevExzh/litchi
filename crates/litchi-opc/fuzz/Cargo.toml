@@ -12,10 +12,18 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-opc = { path = ".." }
+soapberry-zip = { path = "../../soapberry-zip" }
 
 [[bin]]
 name = "parse_opc"
 path = "fuzz_targets/parse_opc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_opc"
+path = "fuzz_targets/smoke_opc.rs"
 test = false
 doc = false
 bench = false
