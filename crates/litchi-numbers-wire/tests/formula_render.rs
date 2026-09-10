@@ -157,6 +157,7 @@ struct Resolver;
 
 const fn known_table_id() -> FormulaRenderCfuuid {
     FormulaRenderCfuuid {
+        has_uuid_bytes: false,
         word0: Some(7),
         word1: Some(8),
         word2: Some(9),

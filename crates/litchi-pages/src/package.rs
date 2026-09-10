@@ -11,6 +11,7 @@ mod body_table_catalog;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
+mod body_table_merges;
 pub(crate) mod body_table_name;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_title;
@@ -93,6 +94,7 @@ pub use body_table_hidden_axes::{
     BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
     BodyTableHiddenAxesPath,
 };
+pub use body_table_merges::{BodyTableMergesError, BodyTableMergesLimitKind};
 pub use body_table_name::{
     BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
     BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,

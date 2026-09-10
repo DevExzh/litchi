@@ -1,0 +1,27 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "slide-table-merges-native.key",
+  "size": 534674,
+  "sha256": "71c854d627294447196b61b4265a528cefe3657af62dc9b848fc3f682aa1f3bd",
+  "source": "table-discovery.key",
+  "table": "Table 1",
+  "table_rows": 5,
+  "table_columns": 4,
+  "merged_range": "B4:C5",
+  "zero_based_region": {
+    "row": 3,
+    "column": 1,
+    "rows": 2,
+    "columns": 2
+  },
+  "lifecycle": [
+    "Copied the existing table control to a disposable directory.",
+    "Selected blank cells in the native application and used Format > Table > Merge Cells.",
+    "Saved and closed the document.",
+    "Reopened the exact saved path with Open Finder item and verified the merged rectangle visually.",
+    "Closed the verified document."
+  ],
+  "scope": "Native merged-cell readback control; accessibility span-count text was inconsistent, so selected coordinates and the visible merged rectangle establish native verification. Synthetic tests cover wire corruption, overlap, identity, and limits."
+}

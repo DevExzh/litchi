@@ -10,6 +10,8 @@ pub mod headers;
 pub mod hidden_axes;
 /// Interactive lock state for a body-attached table.
 pub mod lock;
+/// Archive-free merged-cell geometry and topology algebra.
+pub mod merge;
 /// Validated, archive-free names for Pages body tables.
 pub mod name;
 /// Persisted row-order rules for a body-attached table.

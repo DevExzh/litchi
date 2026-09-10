@@ -7744,7 +7744,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 239)
+        self.assertEqual(len(all_policy_edges), 240)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
@@ -46913,6 +46913,167 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_slide_drawable_comment_source_topology()",
             main_source,
         )
+
+    def test_table_merge_boundaries_accept_checked_in_owners(self) -> None:
+        self.assertEqual(boundaries.audit_iwa_common_table_merge_source_topology(), [])
+        self.assertEqual(
+            boundaries.audit_iwa_numbers_wire_table_merges_source_topology(), []
+        )
+        self.assertEqual(boundaries.audit_pages_table_merge_source_topology(), [])
+        self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(), [])
+
+    def test_common_table_merge_boundary_rejects_peer_import_and_duplicate_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_COMMON_TABLE_MERGE_SOURCE,
+                boundaries.NEUTRAL_TABLE_MODULE_SOURCE,
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            common = root / boundaries.IWA_COMMON_TABLE_MERGE_SOURCE
+            common.write_text(
+                common.read_text(encoding="utf-8")
+                + "\nuse litchi_numbers::table::merge::Region;\n",
+                encoding="utf-8",
+            )
+            compatibility = root / Path("crates/litchi-numbers/src/table/merge.rs")
+            compatibility.write_text(
+                compatibility.read_text(encoding="utf-8") + "\npub struct Region;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_common_table_merge_source_topology(root)
+            self.assertTrue(any("format/archive/wire owner" in item for item in violations), violations)
+            self.assertTrue(any("redeclares common type" in item for item in violations), violations)
+
+    def test_numbers_wire_table_merge_boundary_rejects_concrete_format_import(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE,
+                Path("crates/litchi-numbers-wire/src/lib.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\nuse litchi_pages::Package;\n"
+                + "pub struct MergeRead;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merges_source_topology(root)
+            self.assertTrue(any("concrete format owner" in item for item in violations), violations)
+            self.assertTrue(any("redeclares shared type MergeRead" in item for item in violations), violations)
+
+    def test_focused_table_merge_boundaries_allow_host_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = (
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-pages/src/table/mod.rs"),
+                Path("crates/litchi-pages/src/table/merge.rs"),
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-keynote/src/slide/table.rs"),
+                Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+            )
+            for relative in paths:
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            self.assertEqual(boundaries.audit_pages_table_merge_source_topology(root), [])
+            self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(root), [])
+
+    def test_focused_table_merge_boundaries_reject_raw_bytes_and_generated_ast(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-pages/src/table/mod.rs"),
+                Path("crates/litchi-pages/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.PAGES_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\npub fn raw_table_id(table_id: u64, bytes: &[u8]) {}\n"
+                + "fn generated_projection(_: FormulaArchive) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_merge_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(any("generated AST projection" in item for item in violations), violations)
+
+    def test_focused_table_merge_boundaries_reject_public_module_and_peer_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-keynote/src/slide/table.rs"),
+                Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            package = root / boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "pub(crate) mod slide_table_merges;",
+                    "pub mod slide_table_merges;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::table_merges",
+                    "use litchi_keynote::table_merges",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_table_merge_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+            self.assertTrue(
+                any("format/archive or generated AST import" in item for item in violations),
+                violations,
+            )
+
+    def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_iwa_common_table_merge_source_topology",
+            "audit_iwa_numbers_wire_table_merges_source_topology",
+            "audit_pages_table_merge_source_topology",
+            "audit_keynote_table_merge_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
 
 if __name__ == "__main__":
     unittest.main()

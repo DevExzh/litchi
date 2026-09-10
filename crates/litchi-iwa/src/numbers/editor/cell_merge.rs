@@ -5,6 +5,7 @@ use prost::Message;
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 use litchi_numbers::table::merge::{self, Deletion as MergeDeletion, Region};
+use litchi_numbers_wire::table_merges::{self, ReadLimits};
 
 mod formula;
 mod wire;
@@ -31,8 +32,79 @@ struct MergeFormulaMutation {
 }
 
 pub(crate) fn regions_in_package(package: &IWorkPackage, table_id: u64) -> Result<Vec<Region>> {
-    let descriptor = model::attached_table_descriptor(package, table_id)?;
-    parse_regions(&descriptor.model)
+    with_attached_table_model_source(package, table_id, |source| {
+        table_merges::read_table_merges(source, ReadLimits::default())
+            .map(|read| read.regions)
+            .map_err(|error| Error::IwaCommon(error.error().clone()))
+    })
+}
+
+/// Run a read-only projection against the selected table-model wire payload.
+///
+/// The mutation paths below still use [`model::attached_table_descriptor`]
+/// because they need the owned generated model.  Merge reads need only the
+/// source bytes, so keep candidate selection and table-info ownership checks
+/// on the bounded generated-free projections and never decode a
+/// `TableModelArchive` here.
+fn with_attached_table_model_source<T>(
+    package: &IWorkPackage,
+    table_id: u64,
+    read: impl FnOnce(&[u8]) -> Result<T>,
+) -> Result<T> {
+    let locations = super::object_locations(package)?;
+    let model_archive_name = locations.get(&table_id).ok_or_else(|| {
+        Error::ParseError(format!("iWork table model object {table_id} not found"))
+    })?;
+
+    let mut table_info_id = None;
+    for archive_name in package.iwa_entry_names() {
+        package.with_parsed_archive(archive_name, |archive| {
+            for object in &archive.objects {
+                let Some(identifier) = object.archive_info.identifier else {
+                    continue;
+                };
+                if identifier == table_id {
+                    continue;
+                }
+                let owns_model = object.messages.iter().try_fold(false, |owns, message| {
+                    if owns {
+                        return Ok(true);
+                    }
+                    model::attached_table_info_model_identifier(object, message)
+                        .map(|candidate| candidate == Some(table_id))
+                })?;
+                if owns_model && table_info_id.replace(identifier).is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork table model {table_id} has multiple table-info owners"
+                    )));
+                }
+            }
+            Ok(())
+        })?;
+    }
+    if table_info_id.is_none() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table model {table_id} has no table-info owner"
+        )));
+    }
+
+    package.with_parsed_archive(model_archive_name, |archive| {
+        let model_object = archive.object(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+        })?;
+        let mut budget = table_model_projection::ProbeBudget::new();
+        let model_message_index = table_model_projection::select_candidate(
+            model_object.messages.as_slice(),
+            &mut budget,
+            |reason| Error::InvalidFormat(format!("iWork table model {table_id} {reason}")),
+        )?
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table model {table_id} must contain exactly one table-model payload"
+            ))
+        })?;
+        read(model_object.messages[model_message_index].data.as_slice())
+    })
 }
 
 /// Move or expand native merged-cell ranges after a physical table-axis

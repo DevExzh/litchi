@@ -10,6 +10,8 @@ pub mod dimension;
 /// Lossless, archive-free table header and footer settings.
 pub mod headers;
 pub mod lock;
+/// Compact merged-cell geometry and topology algebra.
+pub mod merge;
 /// Shared sparse cell values, table extents, builders, and bounded views.
 pub mod model;
 /// Checked, archive-free table sort semantics.

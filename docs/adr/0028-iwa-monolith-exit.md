@@ -11410,3 +11410,39 @@ shared-envelope tests passes. The full crate-boundary audit and all 1,039
 Python boundary tests pass, including acceptance of future reader deletion.
 The new `formula_envelope` fuzz target also completes 1,000 AddressSanitizer
 runs without crashes.
+
+## 2026-09-10 Focused table merge reads
+
+Merged-cell geometry is format-neutral and now has one implementation in
+`litchi-iwa-common::table::merge`. The Numbers module preserves its previous
+public types and functions through reexports. Focused Pages body tables and
+Keynote slide tables gain selector-based merge readback returning checked
+rectangles, without exposing native object IDs.
+
+The shared `litchi-numbers-wire::table_merges` decoder reads the selected
+model's native merge-owner/formula-store path through borrowed wire fields
+and the Buffa formula event codec. It validates formula indexes, canonical
+merge shape, table identity, absolute coordinates, bounds, and non-overlap.
+Format adapters retain root/attachment ownership checks and cumulative
+operation budgets. The host's read-only merge route uses the same decoder;
+its mutation-only generated representation remains a separate migration task.
+
+The native Pages control merges C4:D4 in Table 1. The native Keynote control
+merges B4:C5 in Table 1 on the first slide. Both copies were edited with the
+native Merge Cells command, saved, closed, and reopened at their exact paths
+in version 14.4. Visual inspection confirmed the horizontal and rectangular
+merges; receipts record the files and verification scope.
+
+Cross-facade integration tests verify the native geometry and byte-for-byte
+source preservation. The existing 18 host merge regressions also pass,
+including insertion/deletion and formula-anchor relocation. The dependency
+audit classifies Pages' shared table-wire edge without adding migration debt;
+all 1,046 boundary regression tests pass.
+
+The strict projection retains CFUUID byte-field presence, validates known
+cross-table names as UTF-8, and checks the nested owner UUID. Fourteen
+handwritten-wire tests cover these refusal paths, geometry, canonical framing,
+and inclusive budgets; all 37 formula-codec tests and seven shared renderer
+tests pass. Two-pass store admission reserves bounded pair/index/region
+vectors once, and Keynote includes the scratch vectors in its operation
+budget. The merge fuzz target completes 1,000 AddressSanitizer runs.

@@ -18,6 +18,8 @@ pub mod formula;
 pub mod headers;
 /// Interactive lock state for a table.
 pub mod lock;
+/// Compact, archive-free merged-cell geometry and topology algebra.
+pub mod merge;
 /// Validated display names for a table.
 pub mod name;
 /// Decimal number display formats for existing table cells.

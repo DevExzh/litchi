@@ -213,6 +213,7 @@ impl<'source> Cursor<'source> {
 
 fn complete_uuid() -> FormulaRenderCfuuid {
     FormulaRenderCfuuid {
+        has_uuid_bytes: false,
         word0: Some(1),
         word1: Some(2),
         word2: Some(3),

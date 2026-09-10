@@ -531,6 +531,7 @@ pub use package::{
     SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
     SlideTableCellNumberFormatPath,
 };
+pub use package::{SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath};
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
 };
@@ -547,6 +548,7 @@ pub use slide::movie::creation::{
     SlideMovieCreationLimitKind, SlideMovieCreationPatch,
 };
 pub use slide::table::TableSelector;
+pub use slide::table::merge::Region;
 pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
 pub use slide::table::number_format::{
     CellPosition, CellPositionError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number,
