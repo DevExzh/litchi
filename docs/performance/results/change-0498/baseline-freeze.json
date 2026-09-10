@@ -1,0 +1,27 @@
+{
+  "revision": "56e8ddbcaee534b1dc1f8e864d0394fec100348f",
+  "production_diff_empty": true,
+  "binary": "/home/zhuhe/.cache/litchi-goal-0498/retained/source_backed_batch_perf-before",
+  "binary_sha256": "95d8854f11a339be26e16c88d03e54cd556d57c8cba9ccb8d0c05024067f1592",
+  "harness": "docs/performance/results/change-0498/baseline-harness.rs",
+  "harness_sha256": "e331f0f90eb64ac905aa2d9349bb4bcf47bcd41aaf9319db07a8b24db9d24dca",
+  "controls": [
+    {
+      "path": "baseline-owned-few-large-corrected.csv",
+      "measured_samples": 60,
+      "warmup_samples": 6,
+      "measured_filter": "record=sample and index>=3",
+      "sha256": "fd4fb78bed69af28de47d658af57988b7d58ca0240effd923c34a88cd2e57caf",
+      "digest": "16173577900612779498"
+    },
+    {
+      "path": "baseline-owned-few-large-managed-corrected.csv",
+      "measured_samples": 60,
+      "warmup_samples": 6,
+      "measured_filter": "record=sample and index>=3",
+      "sha256": "698d3711446cd760dfbfead69c12ca0220ab260cbff1bf6c1e3dd56fa152723d",
+      "digest": "16173577900612779498"
+    }
+  ],
+  "scope": "Corrected serial collection retained through observation; digest verification outside timed interval. Controls before any OPC production edit."
+}

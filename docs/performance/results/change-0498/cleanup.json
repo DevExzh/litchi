@@ -1,0 +1,71 @@
+{
+  "scope": "dedicated 0498 scratch only; shared target and unrelated work untouched",
+  "same_user_processes_scanned": 65,
+  "inaccessible_or_exited_processes": 4,
+  "active_matching_processes": [],
+  "retained": [
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/retained/source_backed_batch_perf-before",
+      "sha256": "95d8854f11a339be26e16c88d03e54cd556d57c8cba9ccb8d0c05024067f1592",
+      "bytes": 1199256
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/retained/source_backed_batch_perf-after",
+      "sha256": "4521702894bc28584573313bb10b2cf9d6901bae1ec6ed0c2240a80f5c952c39",
+      "bytes": 1245752
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/captures",
+      "allocated_bytes": 106496,
+      "files": 52
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/target",
+      "allocated_bytes": 1363566592,
+      "files": 7132
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf-final",
+      "allocated_bytes": 1249280,
+      "files": 1
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/final-corpora",
+      "allocated_bytes": 4096,
+      "files": 0
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf.before",
+      "allocated_bytes": 1200128,
+      "files": 1
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/profile-corpora",
+      "allocated_bytes": 4096,
+      "files": 0
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf.after",
+      "allocated_bytes": 1253376,
+      "files": 1
+    },
+    {
+      "path": "/tmp/change-0498-analysis-rerun.txt",
+      "allocated_bytes": 4096,
+      "files": 1
+    },
+    {
+      "path": "/tmp/litchi-change-0498-final-build.log",
+      "allocated_bytes": 4096,
+      "files": 1
+    },
+    {
+      "path": "/tmp/litchi-change-0498-machine.txt",
+      "allocated_bytes": 4096,
+      "files": 1
+    }
+  ],
+  "removed_allocated_bytes": 1367396352
+}

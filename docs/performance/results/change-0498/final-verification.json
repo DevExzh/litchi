@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "children": 30,
+  "measured_samples": 1800,
+  "warmup_samples": 180,
+  "source_counter_and_budget_work_equality": true,
+  "byte_oracles_and_released_budgets": true,
+  "candidate_source_and_raw_hashes": true
+}

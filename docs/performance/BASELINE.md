@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0498: frozen serial controls and matched production batch matrix
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) retains hashed before
+and after executables and raw samples. The corrected historical baseline moves
+digest work outside the timer, but enables optional serial accounting; its
+before/after scope is descriptive. The final 30-child matrix uses the same
+executable with plain serial data reads and production batch widths 1/2/4/8.
+There are 1,800 measured samples plus 180 warmups, with two repeats. Whole-child
+RSS and perf counters include setup and verification. All adverse flags and
+the many-small local regressions remain visible.
+
 ## 0497: atomic DOCX publication capability; descriptive capture verified
 
 [0497](changes/0497-docx-atomic-publication.md) adds consuming filesystem

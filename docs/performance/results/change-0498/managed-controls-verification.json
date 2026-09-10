@@ -1,0 +1,50 @@
+[
+  {
+    "file": "baseline-file-few-large-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "few-large",
+    "source": "file",
+    "logical_bytes": 4194304,
+    "digest": "16173577900612779498"
+  },
+  {
+    "file": "baseline-file-many-small-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "many-small",
+    "source": "file",
+    "logical_bytes": 1048576,
+    "digest": "5127889801814376281"
+  },
+  {
+    "file": "baseline-owned-few-large-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "few-large",
+    "source": "owned",
+    "logical_bytes": 4194304,
+    "digest": "16173577900612779498"
+  },
+  {
+    "file": "baseline-owned-many-small-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "many-small",
+    "source": "owned",
+    "logical_bytes": 1048576,
+    "digest": "5127889801814376281"
+  },
+  {
+    "file": "baseline-short-delay-few-large-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "few-large",
+    "source": "instrumented-short-delay",
+    "logical_bytes": 4194304,
+    "digest": "16173577900612779498"
+  },
+  {
+    "file": "baseline-short-delay-many-small-managed-corrected.csv",
+    "measured_samples": 60,
+    "corpus": "many-small",
+    "source": "instrumented-short-delay",
+    "logical_bytes": 1048576,
+    "digest": "5127889801814376281"
+  }
+]

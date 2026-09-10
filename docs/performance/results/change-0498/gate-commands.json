@@ -1,0 +1,113 @@
+{
+  "focused": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--test",
+    "source_backed_batch",
+    "--",
+    "--test-threads=1"
+  ],
+  "opc-default": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-targets",
+    "--",
+    "--test-threads=1"
+  ],
+  "opc-features": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "--test-threads=1"
+  ],
+  "opc-doctests": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--doc",
+    "--",
+    "--test-threads=1"
+  ],
+  "opc-clippy": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "opc-rustdoc": [
+    "cargo",
+    "doc",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--no-deps"
+  ],
+  "opc-fmt": [
+    "cargo",
+    "fmt",
+    "-p",
+    "litchi-opc",
+    "--",
+    "--check"
+  ],
+  "downstream-check": [
+    "cargo",
+    "check",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-xlsb",
+    "--all-targets"
+  ],
+  "benchmark-build": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--example",
+    "source_backed_batch_perf"
+  ]
+}

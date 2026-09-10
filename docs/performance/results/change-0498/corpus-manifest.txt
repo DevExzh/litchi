@@ -1,0 +1,19 @@
+Change 0498 deterministic corpus manifest
+=========================================
+
+The example generates each corpus from fixed XML manifests and a deterministic
+byte recurrence. ZIP members are stored (no compression), so selected-load
+physical bytes are directly auditable. The generated files are temporary and
+are not committed.
+
+name       parts  payload/part  generated ZIP bytes  SHA-256
+few-large  4      1 MiB         4,195,662           9ecde1242af0bc1b8bca9aa6fde2f610cd53465b89c33b80435dbe03dbd253f2
+many-small 512    16 KiB        8,453,983           61fcfc3c237a006e8556b9644682d041ccb8a1c3573284b59581dbcc69986090
+
+Selected loads per sample are 4 evenly spaced Parts for few-large and 64
+evenly spaced Parts for many-small. The package is opened and selected URIs
+are parsed before timing. Each timed serial operation resolves each URI and
+calls PartView::data into a retained Vec<PartData>; byte and digest validation
+occurs after the timer stops. A fresh package is used for every sample, so
+selected payloads are cold and the source observer is reset after package
+setup.

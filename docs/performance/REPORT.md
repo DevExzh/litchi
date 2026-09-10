@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0498: bounded source-backed Part reads with measured workload tradeoffs
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) introduces explicit
+`read_parts_ordered` and a budget-owning `PartBatch`. The matched matrix covers
+30 children and 1,800 measured samples. Delayed many-small reads show about
+7.06x median speedup at eight workers versus serial, while many-small memory
+and file reads become slower. The report retains those regressions, whole-child
+RSS costs, and unresolved superlinear few-large observations. Historical
+before controls have an accounting-path difference; same-executable ordinary
+serial controls are the primary scaling reference. The full goal stays open.
+
 ## 0497: atomic DOCX publication capability; descriptive formal analysis verified
 
 [0497](changes/0497-docx-atomic-publication.md) adds consuming

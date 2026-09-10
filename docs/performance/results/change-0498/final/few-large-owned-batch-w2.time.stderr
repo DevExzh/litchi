@@ -1,0 +1,24 @@
+completed corpus=few-large source=owned api=read-parts-ordered capability=managed-after-only workers=2 samples=60 p50=136us p95=147us p99=172us
+	Command being timed: "/home/zhuhe/.cache/litchi-goal-0498/retained/source_backed_batch_perf-after --corpus few-large --source owned --api batch --capability managed --workers 2 --warmups 3 --samples 30 --repeats 2 --artifact-dir /home/zhuhe/.cache/litchi-goal-0498/final-corpora/few-large-owned-batch-w2 --output /home/zhuhe/code/litchi/docs/performance/results/change-0498/final/few-large-owned-batch-w2.csv"
+	User time (seconds): 0.27
+	System time (seconds): 0.01
+	Percent of CPU this job got: 102%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.27
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 23252
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 5529
+	Voluntary context switches: 262
+	Involuntary context switches: 5
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 24760
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

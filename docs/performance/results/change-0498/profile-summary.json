@@ -1,0 +1,62 @@
+[
+  {
+    "child": "few-large-instrumented-batch-w1",
+    "counters": {
+      "cycles": 1867236702.0,
+      "instructions": 2253044949.0,
+      "branches": 250441408.0,
+      "branch-misses": 2763892.0,
+      "cache-misses": 3695492.0
+    }
+  },
+  {
+    "child": "few-large-instrumented-batch-w4",
+    "counters": {
+      "cycles": 1749324935.0,
+      "instructions": 1982776751.0,
+      "branches": 204220218.0,
+      "branch-misses": 2907081.0,
+      "cache-misses": 8200189.0
+    }
+  },
+  {
+    "child": "few-large-instrumented-serial-w1",
+    "counters": {
+      "cycles": 1874877501.0,
+      "instructions": 2249527443.0,
+      "branches": 249855061.0,
+      "branch-misses": 2878452.0,
+      "cache-misses": 3739126.0
+    }
+  },
+  {
+    "child": "few-large-owned-batch-w1",
+    "counters": {
+      "cycles": 1397061239.0,
+      "instructions": 1665580744.0,
+      "branches": 144695844.0,
+      "branch-misses": 386550.0,
+      "cache-misses": 2437256.0
+    }
+  },
+  {
+    "child": "few-large-owned-batch-w4",
+    "counters": {
+      "cycles": 1282731133.0,
+      "instructions": 1372692063.0,
+      "branches": 94578095.0,
+      "branch-misses": 147307.0,
+      "cache-misses": 2923249.0
+    }
+  },
+  {
+    "child": "few-large-owned-serial-w1",
+    "counters": {
+      "cycles": 1393709279.0,
+      "instructions": 1665190689.0,
+      "branches": 144153668.0,
+      "branch-misses": 371875.0,
+      "cache-misses": 2492467.0
+    }
+  }
+]

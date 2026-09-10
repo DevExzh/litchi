@@ -1,0 +1,27 @@
+completed corpus=many-small source=instrumented-short-delay api=read-parts-ordered capability=managed-after-only workers=1 samples=60 p50=29593us p95=29961us p99=30077us
+completed corpus=many-small source=instrumented-short-delay api=read-parts-ordered capability=managed-after-only workers=2 samples=60 p50=16039us p95=16063us p99=16205us
+completed corpus=many-small source=instrumented-short-delay api=read-parts-ordered capability=managed-after-only workers=4 samples=60 p50=8036us p95=8075us p99=8186us
+completed corpus=many-small source=instrumented-short-delay api=read-parts-ordered capability=managed-after-only workers=8 samples=60 p50=4240us p95=4310us p99=5346us
+	Command being timed: "/home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf.after --corpus many-small --source instrumented --api batch --capability managed --workers 1,2,4,8 --warmups 3 --samples 30 --repeats 2 --artifact-dir /tmp/litchi-change-0498-batch-managed-short-many-small --output docs/performance/results/change-0498/batch-managed-short-many-small.csv --short-read 4096 --delay-us 25"
+	User time (seconds): 0.81
+	System time (seconds): 0.27
+	Percent of CPU this job got: 23%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:04.62
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 17820
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 4451
+	Voluntary context switches: 114709
+	Involuntary context switches: 187
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 176
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

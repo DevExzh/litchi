@@ -1,0 +1,118 @@
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.4
+   Compiling zeroize v1.9.0
+   Compiling libc v0.2.189
+   Compiling generic-array v0.14.9
+   Compiling subtle v2.6.1
+   Compiling const-oid v0.9.6
+   Compiling getrandom v0.2.17
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling base64ct v1.6.0
+   Compiling digest v0.10.7
+   Compiling rand_core v0.6.4
+   Compiling pem-rfc7468 v0.7.0
+   Compiling crossbeam-utils v0.8.22
+   Compiling der v0.7.10
+   Compiling hybrid-array v0.4.14
+   Compiling crossbeam-epoch v0.9.20
+   Compiling serde_core v1.0.229
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling ff v0.13.1
+   Compiling base16ct v0.2.0
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.3.1
+   Compiling rand_core v0.10.1
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling crossbeam-deque v0.8.7
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling crypto-bigint v0.5.5
+   Compiling const-oid v0.10.2
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling digest v0.11.3
+   Compiling elliptic-curve v0.13.8
+   Compiling num-traits v0.2.19
+   Compiling rayon-core v1.13.0
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling zmij v1.0.19
+   Compiling chacha20 v0.10.2
+   Compiling hmac v0.12.1
+   Compiling zlib-rs v0.6.7
+   Compiling itoa v1.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling linux-raw-sys v0.12.1
+   Compiling bitflags v2.13.1
+   Compiling either v1.18.0
+   Compiling once_cell v1.21.4
+   Compiling rayon v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling rustix v1.1.4
+   Compiling chrono v0.4.45
+   Compiling serde_json v1.0.149
+   Compiling rfc6979 v0.4.0
+   Compiling rand v0.10.2
+   Compiling thiserror v2.0.18
+   Compiling sha2 v0.11.0
+   Compiling crc32fast v1.5.1
+   Compiling zerocopy v0.8.56
+   Compiling getrandom v0.3.4
+   Compiling quick-xml v0.41.0
+   Compiling signature v2.2.0
+   Compiling smallvec v1.16.0
+   Compiling debug_unsafe v0.1.4
+   Compiling fastrand v2.5.0
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling tempfile v3.27.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling atoi_simd v0.18.1
+   Compiling ecdsa v0.16.9
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling primeorder v0.13.6
+   Compiling p256 v0.13.2
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unused import: `ExecutionError`
+  --> crates/litchi-opc/tests/source_backed_batch.rs:27:51
+   |
+27 |     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
+   |                                                   ^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/source_backed_batch.rs:866:51
+    |
+866 |     let package = package_with_context(Arc::clone(&probe), context);
+    |                                        ---------- ^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<MemberWaveProbe>`
+    |                                        |
+    |                                        arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<MemberWaveProbe>`
+    = help: `MemberWaveProbe` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+    --> crates/litchi-opc/tests/source_backed_batch.rs:1113:51
+     |
+1113 |     let package = package_with_context(Arc::clone(&probe), context);
+     |                                        ---------- ^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<OrderedFailureProbe>`
+     |                                        |
+     |                                        arguments to this function are incorrect
+     |
+     = note: expected reference `&Arc<dyn ReadAt>`
+                found reference `&Arc<OrderedFailureProbe>`
+     = help: `OrderedFailureProbe` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-opc` (test "source_backed_batch") due to 3 previous errors

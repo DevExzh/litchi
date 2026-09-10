@@ -1,0 +1,29 @@
+completed corpus=few-large source=owned api=serial-part-data capability=managed-after-only workers=1 samples=60 p50=575us p95=586us p99=597us
+1388555926,,cycles,342901658,100.00,,
+1671191109,,instructions,342901658,100.00,,
+145580618,,branches,342901658,100.00,,
+341668,,branch-misses,342901658,100.00,,
+2457906,,cache-misses,342901658,100.00,,
+	Command being timed: "perf stat -x, -e cycles,instructions,branches,branch-misses,cache-misses -- /home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf-final --corpus few-large --source owned --api serial --capability managed --workers 1 --warmups 3 --samples 30 --repeats 2 --artifact-dir /tmp/litchi-change-0498-perfstat-final-serial-managed-owned-w1-few-large --output /home/zhuhe/code/litchi/docs/performance/results/change-0498/perfstat-final-serial-managed-owned-w1-few-large.csv"
+	User time (seconds): 0.31
+	System time (seconds): 0.04
+	Percent of CPU this job got: 97%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.36
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 60440
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 69504
+	Voluntary context switches: 5
+	Involuntary context switches: 1
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,55 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking ff v0.13.1
+    Checking sec1 v0.7.3
+    Checking group v0.13.0
+    Checking ppv-lite86 v0.2.21
+    Checking crypto-bigint v0.5.5
+    Checking elliptic-curve v0.13.8
+    Checking rand_chacha v0.3.1
+    Checking sha2 v0.10.9
+    Checking num-integer v0.1.47
+    Checking signature v2.2.0
+    Checking hmac v0.12.1
+    Checking spin v0.9.9
+    Checking lazy_static v1.5.0
+    Checking chrono v0.4.45
+    Checking rfc6979 v0.4.0
+    Checking num-iter v0.1.46
+    Checking rand v0.8.8
+    Checking thiserror v2.0.18
+    Checking num-bigint-dig v0.8.6
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking sha1 v0.10.7
+    Checking pkcs1 v0.7.5
+    Checking fixedbitset v0.5.7
+    Checking rsa v0.9.10
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking p256 v0.13.2
+    Checking x509-cert v0.2.5
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/litchi-opc/examples/source_backed_batch_perf.rs:475:8
+    |
+475 |     if config.workers.iter().any(|workers| *workers == 0) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `config.workers.contains(&0)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+    = note: `-D clippy::manual-contains` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_contains)]`
+
+error: redundant closure
+   --> crates/litchi-opc/examples/source_backed_batch_perf.rs:647:14
+    |
+647 |         .map(|name| PackURI::new(name))
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `PackURI::new`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::redundant_closure)]`
+
+error: could not compile `litchi-opc` (example "source_backed_batch_perf") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

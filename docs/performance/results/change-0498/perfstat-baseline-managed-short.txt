@@ -1,0 +1,6 @@
+completed corpus=few-large source=instrumented-short-delay capability=managed-after-only workers=1 samples=60 p50=103215us p95=103400us p99=103712us
+1866080945,,cycles,2373700265,100.00,,
+2247099603,,instructions,2373700265,100.00,,
+249579561,,branches,2373700265,100.00,,
+2841607,,branch-misses,2373700265,100.00,,
+3816781,,cache-misses,2373700265,100.00,,

@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0498: Part-read concurrency helps delayed providers; small local reads remain serial candidates
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) measures explicit
+production Part batches. Delayed reads benefit from overlap, but per-Part
+worker waves regress on small owned/file reads. Thread creation is a plausible
+cost, not isolated attribution. Few-large local observations are superlinear
+and do not support a simple Amdahl fit. No global pool or automatic facade
+parallelism was added; future work should measure task grouping or reuse before
+expanding the scheduler. Warm file and synthetic-delay results do not close the
+cold-cache or real remote-provider requirements.
+
 ## 0497: atomic publication capture is descriptive; hotspot attribution remains limited
 
 [0497](changes/0497-docx-atomic-publication.md) moves the bounded DOCX

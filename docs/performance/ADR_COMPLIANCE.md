@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0498: explicit managed Part-read waves
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) retains the accepted
+ADR set verified in its refresh receipt. Parallelism requires an explicit
+execution context and uses operation-local scoped workers. Returned collection
+and payload reservations stay with their owners; actual cumulative accounting
+is monotonic; all admitted workers join; typed failures and source/cancellation
+fences remain authoritative. Unmanaged reads remain serial. No unsafe code,
+global executor, runtime dependency, or facade/archive dependency was added.
+The request occurrence cap is documented separately from package byte limits.
+
 ## 0497: atomic DOCX publication preserves ownership; formal analysis is verified
 
 [0497](changes/0497-docx-atomic-publication.md) adds only the scoped
