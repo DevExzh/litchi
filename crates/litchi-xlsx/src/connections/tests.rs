@@ -2,12 +2,18 @@
 
 use super::codec::BoundedXml;
 use super::model::{
-    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, CORE_NAMESPACE, MAX_STRING_BYTES,
-    MAX_XML_BYTES, STRICT_NAMESPACE,
+    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, CORE_NAMESPACE, Conformance,
+    MAX_STRING_BYTES, MAX_XML_BYTES, STRICT_NAMESPACE,
 };
 use super::*;
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+
+const TEST_QUERY_TABLE_RELATIONSHIP: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
+const TEST_WORKSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+
 fn f(b: &[u8]) -> Connections {
     let p = OpcPackage::from_bytes(b).unwrap();
     load_from_package(&p).unwrap().unwrap()
@@ -139,6 +145,25 @@ fn rejects_malformed_and_unsafe() {
             "accepted {xml}"
         );
     }
+}
+
+#[test]
+fn accepts_processing_instructions_while_still_validating_connections() {
+    let xml = format!(
+        r#"<?before?><connections xmlns="{CORE_NAMESPACE}"><?inside?><connection id="1" refreshedVersion="0"/><?between?></connections><?after?>"#
+    );
+    assert_eq!(
+        Connections::parse(xml.as_bytes())
+            .unwrap()
+            .connections
+            .len(),
+        1
+    );
+
+    let malformed = format!(
+        r#"<?keep?><connections xmlns="{CORE_NAMESPACE}"><connection id="1"/></connections>"#
+    );
+    assert!(Connections::parse(malformed.as_bytes()).is_err());
 }
 
 #[test]
@@ -298,6 +323,17 @@ fn transaction_package(with_connection: bool) -> OpcPackage {
     package
 }
 
+fn many_connections_source(count: u32) -> Vec<u8> {
+    let mut source = format!(r#"<connections xmlns="{CORE_NAMESPACE}">"#);
+    for id in 1..=count {
+        source.push_str(&format!(
+            r#"<connection id="{id}" refreshedVersion="7" name="n{id}"/>"#
+        ));
+    }
+    source.push_str("</connections>");
+    source.into_bytes()
+}
+
 #[test]
 fn typed_transaction_preserves_opaque_connection_xml_and_inverse() {
     let mut package = transaction_package(true);
@@ -329,6 +365,251 @@ fn typed_transaction_preserves_opaque_connection_xml_and_inverse() {
     );
     commit.patch().inverse().apply(&mut package).unwrap();
     assert_eq!(Snapshot::load(&package).unwrap(), before);
+}
+
+#[test]
+fn extension_owner_transaction_projection_handles_compact_pi_mce_and_foreign_contexts() {
+    let mce = litchi_ooxml_common::mce::NAMESPACE;
+    let cases = [
+        (
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><extLst/></connection></connections>"#
+            ),
+            format!(r#"<extLst xmlns="{CORE_NAMESPACE}"><ext uri="u"/></extLst>"#),
+            None,
+        ),
+        (
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><extLst><?old?><ext uri="old"/></extLst><?outside?></connection></connections>"#
+            ),
+            format!(r#"<extLst xmlns="{CORE_NAMESPACE}"><?new?><ext uri="pi"/></extLst>"#),
+            Some("pi"),
+        ),
+        (
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{mce}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><extLst><mc:AlternateContent><mc:Choice Requires="u"><u:old/></mc:Choice><mc:Fallback><ext uri="old"/></mc:Fallback></mc:AlternateContent></extLst></connection></connections>"#
+            ),
+            format!(
+                r#"<extLst xmlns="{CORE_NAMESPACE}" xmlns:mc="{mce}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><u:inactive/></mc:Choice><mc:Fallback><ext uri="mce"/></mc:Fallback></mc:AlternateContent></extLst>"#
+            ),
+            Some("mce"),
+        ),
+        (
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{mce}" xmlns:u="urn:ignored" mc:Ignorable="u"><connection id="1" refreshedVersion="7"><extLst/></connection></connections>"#
+            ),
+            format!(
+                r#"<extLst xmlns="{CORE_NAMESPACE}" xmlns:u="urn:ignored"><u:ignored/></extLst>"#
+            ),
+            Some("ignored"),
+        ),
+        (
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{mce}" xmlns:u="urn:process" mc:Ignorable="u" mc:ProcessContent="u:wrap"><connection id="1" refreshedVersion="7"><extLst/></connection></connections>"#
+            ),
+            format!(
+                r#"<extLst xmlns="{CORE_NAMESPACE}" xmlns:u="urn:process"><u:wrap><ext uri="process"/></u:wrap></extLst>"#
+            ),
+            Some("process"),
+        ),
+        (
+            format!(
+                r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns="urn:foreign" xmlns:f="urn:foreign"><p:connection id="1" refreshedVersion="7"><p:extLst/></p:connection></p:connections>"#
+            ),
+            format!(r#"<extLst xmlns="{CORE_NAMESPACE}"><ext uri="foreign"/></extLst>"#),
+            Some("foreign"),
+        ),
+        (
+            format!(
+                r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns="urn:foreign"><p:connection id="1" refreshedVersion="7"><p:extLst/></p:connection></p:connections>"#
+            ),
+            format!(r#"<p:extLst xmlns:p="{CORE_NAMESPACE}"><p:ext uri="prefixed"/></p:extLst>"#),
+            Some("prefixed"),
+        ),
+    ];
+
+    for (source, replacement, marker) in cases {
+        let mut package = transaction_package(true);
+        package
+            .get_part_mut(&PackURI::new("/xl/connections.xml").unwrap())
+            .unwrap()
+            .set_blob(source.into_bytes());
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        assert!(
+            transaction
+                .edit(1, |connection| {
+                    connection.extension_xml = Some(replacement.into_bytes());
+                    Ok(())
+                })
+                .unwrap()
+        );
+        let commit = transaction
+            .commit()
+            .unwrap_or_else(|error| panic!("extension owner case {marker:?}: {error}"));
+        assert!(commit.changed());
+
+        let source = package
+            .get_part(&PackURI::new("/xl/connections.xml").unwrap())
+            .unwrap()
+            .blob();
+        let reopened = Snapshot::load(&package).unwrap();
+        let extension = reopened.connections().unwrap().connections[0]
+            .extension_xml
+            .as_deref()
+            .unwrap();
+        if marker != Some("ignored") {
+            assert!(std::str::from_utf8(extension).unwrap().contains("uri="));
+        }
+        if marker == Some("pi") {
+            assert!(
+                source
+                    .windows(b"<?new?>".len())
+                    .any(|window| window == b"<?new?>")
+            );
+            assert!(
+                !extension
+                    .windows(b"<?new?>".len())
+                    .any(|window| window == b"<?new?>")
+            );
+            assert!(
+                source
+                    .windows(b"<?outside?>".len())
+                    .any(|window| window == b"<?outside?>")
+            );
+        }
+        if marker == Some("mce") {
+            assert!(
+                source
+                    .windows(b"mc:Choice".len())
+                    .any(|window| window == b"mc:Choice")
+            );
+            assert!(
+                std::str::from_utf8(extension)
+                    .unwrap()
+                    .contains(r#"uri="mce""#)
+            );
+        }
+        if marker == Some("ignored") {
+            let source = std::str::from_utf8(source).unwrap();
+            let extension = std::str::from_utf8(extension).unwrap();
+            assert!(source.contains("u:ignored"));
+            assert!(!extension.contains("u:ignored"));
+        }
+        if marker == Some("process") {
+            let source = std::str::from_utf8(source).unwrap();
+            let extension = std::str::from_utf8(extension).unwrap();
+            assert!(source.contains("u:wrap"));
+            assert!(!extension.contains("u:wrap"));
+            assert!(extension.contains(r#"uri="process""#));
+        }
+        if marker == Some("foreign") {
+            assert!(
+                std::str::from_utf8(source)
+                    .unwrap()
+                    .contains(r#"xmlns:f="urn:foreign""#)
+            );
+            assert!(
+                std::str::from_utf8(extension)
+                    .unwrap()
+                    .contains(r#"xmlns:f="urn:foreign""#)
+            );
+        }
+        if marker == Some("prefixed") {
+            let source = std::str::from_utf8(source).unwrap();
+            let extension = std::str::from_utf8(extension).unwrap();
+            assert!(source.contains("p:extLst"));
+            assert!(
+                source.contains(
+                    r#"xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main""#
+                )
+            );
+            assert!(extension.contains("p:extLst"));
+            assert!(extension.contains(r#"uri="prefixed""#));
+        }
+    }
+}
+
+#[test]
+fn extension_projection_uses_a_bounded_id_index_for_many_connections() {
+    const COUNT: usize = 8_192;
+    let mut actual = Connections {
+        connections: Vec::new(),
+    };
+    actual.connections.try_reserve_exact(COUNT).unwrap();
+    for id in 0..COUNT as u32 {
+        let mut connection = transaction_connection(id, "actual");
+        connection.extension_xml = Some(
+            format!(r#"<extLst xmlns="{CORE_NAMESPACE}"><ext uri="{id}"/></extLst>"#).into_bytes(),
+        );
+        actual.connections.push(connection);
+    }
+    let mut staged = actual.clone();
+    for connection in &mut staged.connections {
+        connection.extension_xml = Some(
+            format!(
+                r#"<extLst xmlns="{CORE_NAMESPACE}"><ext uri="staged-{}"/></extLst>"#,
+                connection.id
+            )
+            .into_bytes(),
+        );
+    }
+    codec::normalize_connections_source_projection(&actual, &mut staged).unwrap();
+    assert_eq!(staged, actual);
+}
+
+#[test]
+fn large_transaction_scalar_commit_reopens_with_stable_ids() {
+    const COUNT: u32 = 8_192;
+    let mut package = transaction_package(true);
+    package
+        .get_part_mut(&PackURI::new("/xl/connections.xml").unwrap())
+        .unwrap()
+        .set_blob(many_connections_source(COUNT));
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(
+        transaction
+            .edit(COUNT, |connection| {
+                connection.name = Some("updated".into());
+                Ok(())
+            })
+            .unwrap()
+    );
+    assert!(transaction.commit().unwrap().changed());
+    let reopened = Snapshot::load(&package).unwrap();
+    assert_eq!(
+        reopened.connections().unwrap().connections.len(),
+        COUNT as usize
+    );
+    assert_eq!(
+        reopened
+            .connections()
+            .unwrap()
+            .connections
+            .last()
+            .unwrap()
+            .name
+            .as_deref(),
+        Some("updated")
+    );
+}
+
+#[test]
+fn large_transaction_reorder_publishes_the_requested_order() {
+    const COUNT: u32 = 8_192;
+    let mut package = transaction_package(true);
+    package
+        .get_part_mut(&PackURI::new("/xl/connections.xml").unwrap())
+        .unwrap()
+        .set_blob(many_connections_source(COUNT));
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut reordered = transaction.connections().unwrap().clone();
+    reordered.connections.reverse();
+    assert!(transaction.replace(Some(reordered)).unwrap());
+    assert!(transaction.commit().unwrap().changed());
+    let reopened = Snapshot::load(&package).unwrap();
+    let connections = &reopened.connections().unwrap().connections;
+    assert_eq!(connections.first().unwrap().id, COUNT);
+    assert_eq!(connections.last().unwrap().id, 1);
 }
 
 #[test]
@@ -385,5 +666,139 @@ fn transaction_creates_and_removes_the_connections_owner() {
         package
             .get_part(&PackURI::new("/xl/connections.xml").unwrap())
             .is_err()
+    );
+}
+
+fn query_table_package(
+    source_content_type: &str,
+    target: &str,
+    target_external: bool,
+    query_content_type: &str,
+) -> OpcPackage {
+    let mut package = transaction_package(true);
+    let worksheet_name = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let mut worksheet = BlobPart::new(
+        worksheet_name.clone(),
+        source_content_type.into(),
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            .to_vec(),
+    );
+    worksheet.rels_mut().add_relationship(
+        TEST_QUERY_TABLE_RELATIONSHIP.into(),
+        target.into(),
+        "rIdQueryTable".into(),
+        target_external,
+    );
+    package.add_part(Box::new(worksheet));
+    package.add_part(Box::new(BlobPart::new(
+        PackURI::new("/xl/queryTables/queryTable1.xml").unwrap(),
+        query_content_type.into(),
+        format!(r#"<?query?><queryTable xmlns="{CORE_NAMESPACE}" name="query" connectionId="1"/>"#)
+            .into_bytes(),
+    )));
+    package
+}
+
+#[test]
+fn query_table_validation_accepts_processing_instructions() {
+    let package = query_table_package(
+        TEST_WORKSHEET_CONTENT_TYPE,
+        "../queryTables/queryTable1.xml",
+        false,
+        QUERY_TABLE_CONTENT_TYPE,
+    );
+    let snapshot = Snapshot::load(&package).unwrap();
+    assert_eq!(snapshot.query_table_parts().count(), 1);
+}
+
+#[test]
+fn graph_closure_rejects_foreign_connections_and_invalid_query_table_edges() {
+    let mut foreign = transaction_package(true);
+    let mut other = BlobPart::new(
+        PackURI::new("/xl/other.xml").unwrap(),
+        "application/xml".into(),
+        b"<other/>".to_vec(),
+    );
+    other.relate_to("connections.xml", CONNECTIONS_RELATIONSHIP);
+    foreign.add_part(Box::new(other));
+    assert!(validate_graph(&foreign).is_err());
+
+    let wrong_target = query_table_package(
+        TEST_WORKSHEET_CONTENT_TYPE,
+        "../other.xml",
+        false,
+        QUERY_TABLE_CONTENT_TYPE,
+    );
+    assert!(validate_graph(&wrong_target).is_err());
+
+    let wrong_source = query_table_package(
+        "application/xml",
+        "../queryTables/queryTable1.xml",
+        false,
+        QUERY_TABLE_CONTENT_TYPE,
+    );
+    assert!(validate_graph(&wrong_source).is_err());
+
+    let mut wrong_workbook = transaction_package(true);
+    wrong_workbook
+        .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .set_content_type("application/xml".into())
+        .unwrap();
+    assert!(validate_graph(&wrong_workbook).is_err());
+}
+
+#[test]
+fn recognized_owner_targets_reject_query_and_fragment_components() {
+    let mut package = transaction_package(true);
+    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
+    package
+        .get_part_mut(&workbook)
+        .unwrap()
+        .rels_mut()
+        .remove("rIdConnections");
+    package
+        .get_part_mut(&workbook)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            CONNECTIONS_RELATIONSHIP.into(),
+            "connections.xml#part".into(),
+            "rIdConnections".into(),
+            false,
+        );
+    assert!(validate_graph(&package).is_err());
+}
+
+#[test]
+fn conformance_uses_the_root_namespace_only() {
+    let mut package = transaction_package(true);
+    let connection = PackURI::new("/xl/connections.xml").unwrap();
+    package
+        .get_part_mut(&connection)
+        .unwrap()
+        .set_blob(
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><x:future xmlns:x="urn:future" marker="{STRICT_NAMESPACE}"/></connection></connections>"#
+            )
+            .into_bytes(),
+        );
+    assert_eq!(
+        Snapshot::load(&package).unwrap().conformance(),
+        Conformance::Transitional
+    );
+
+    package
+        .get_part_mut(&connection)
+        .unwrap()
+        .set_blob(
+            format!(
+                r#"<connections xmlns="{STRICT_NAMESPACE}"><connection id="1" refreshedVersion="7"/></connections>"#
+            )
+            .into_bytes(),
+        );
+    assert_eq!(
+        Snapshot::load(&package).unwrap().conformance(),
+        Conformance::Strict
     );
 }

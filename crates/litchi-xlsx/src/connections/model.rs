@@ -191,6 +191,17 @@ pub struct Connection {
     pub web: Option<WebQueryProperties>,
     pub text: Option<TextImportProperties>,
     pub parameters: Option<Vec<ConnectionParameter>>,
+    /// Complete serialized `extLst` owner XML, including its attributes and
+    /// descendants.
+    ///
+    /// In a source-bound edit, changing this value is an explicit whole-owner
+    /// replacement: `Some` owns every attribute and child of the `extLst`
+    /// element, while `None` removes that element and its descendants. The
+    /// previous owner is not merged into replacement XML. Leaving the value
+    /// unchanged preserves the original source span byte-for-byte. After a
+    /// commit, the reopened typed projection may be normalized with inherited
+    /// namespace declarations and without processing instructions, while the
+    /// published source retains the requested owner bytes.
     pub extension_xml: Option<Vec<u8>>,
 }
 #[derive(Clone, Debug, PartialEq)]

@@ -1,16 +1,26 @@
 //! Workbook package integration for the `SpreadsheetML` connections owner.
 
-use super::codec::patch_connections_source;
+use super::codec::{normalize_connections_source_projection, patch_connections_source};
 use super::model::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, Conformance, Connection, Connections,
     QUERY_TABLE_CONTENT_TYPE, STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
 };
 use super::{codec, invalid};
 use litchi_core::sheet::Result;
-use std::collections::HashSet;
+use quick_xml::{Reader, events::Event, name::ResolveResult, reader::NsReader};
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
+
+const WORKSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+const QUERY_TABLE_RELATIONSHIP: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
+const STRICT_QUERY_TABLE_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
 
 pub fn store_in_package(package: &mut OpcPackage, value: &Connections, strict: bool) -> Result<()> {
     store_in_package_with_query_table_validator(package, value, strict, query_table_connection_id)
@@ -30,6 +40,11 @@ where
 {
     let xml = value.to_xml(strict)?;
     validate_query_table_connection_ids(package, value, query_table_connection_id)?;
+    // Validate the existing graph after the caller-supplied query-table
+    // callback has established the value-level reference invariant. This
+    // preserves the callback's diagnostic precedence while rejecting foreign
+    // recognized edges and orphan/wrong-content-type parts before mutation.
+    validate_graph(package)?;
     let workbook_name = package.main_document_part()?.partname().clone();
     let existing = {
         let workbook = package.get_part(&workbook_name)?;
@@ -42,8 +57,10 @@ where
         let first = found
             .next()
             .map(|relationship| {
-                if relationship.is_external() {
-                    return Err(invalid("connections relationship cannot be external"));
+                if relationship.is_external() || target_has_suffix(relationship) {
+                    return Err(invalid(
+                        "connections relationship must target an internal part URI",
+                    ));
                 }
                 Ok((
                     relationship.r_id().to_string(),
@@ -92,6 +109,10 @@ where
 }
 
 pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+    // Refuse to repair or partially remove an invalid graph. In particular,
+    // this keeps orphan query-table parts and foreign recognized edges from
+    // being hidden by deleting only the workbook owner.
+    validate_graph(package)?;
     if package
         .iter_parts()
         .any(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
@@ -112,9 +133,14 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
             )
         })
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|part_name| (relationship.r_id().to_string(), part_name))
+                .map(|part_name| (relationship.r_id().to_string(), part_name))?)
         })
         .transpose()?;
     let Some((relationship_id, part_name)) = relationship else {
@@ -164,7 +190,12 @@ fn query_table_connection_id(xml: &[u8]) -> Result<u32> {
     if xml.len() > 8 * 1024 * 1024 {
         return Err(invalid("query-table part exceeds 8 MiB"));
     }
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    // The MCE processor intentionally handles schema-bearing markup and
+    // rejects processing instructions. PIs are legal inert query-table XML;
+    // remove only those events for validation while the source snapshot keeps
+    // the original bytes for publication.
+    let without_pi = strip_processing_instructions(xml)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(without_pi.as_ref())?;
     if processed.len() > 8 * 1024 * 1024 {
         return Err(invalid("processed query-table part exceeds 8 MiB"));
     }
@@ -203,6 +234,44 @@ fn query_table_connection_id(xml: &[u8]) -> Result<u32> {
     Ok(connection_id)
 }
 
+fn strip_processing_instructions<'a>(xml: &'a [u8]) -> Result<Cow<'a, [u8]>> {
+    let mut reader = Reader::from_reader(xml);
+    let mut output: Option<Vec<u8>> = None;
+    let mut cursor = 0usize;
+    loop {
+        let start = reader.buffer_position() as usize;
+        match reader.read_event() {
+            Ok(Event::PI(_)) => {
+                let end = reader.buffer_position() as usize;
+                if start < cursor || end < start || end > xml.len() {
+                    return Err(invalid("invalid query-table processing-instruction span"));
+                }
+                if output.is_none() {
+                    let mut bytes = Vec::new();
+                    bytes
+                        .try_reserve_exact(xml.len() - (end - start))
+                        .map_err(|_| invalid("query-table PI-filter output allocation failed"))?;
+                    output = Some(bytes);
+                }
+                if let Some(bytes) = output.as_mut() {
+                    bytes.extend_from_slice(&xml[cursor..start]);
+                }
+                cursor = end;
+            },
+            Ok(Event::Eof) => break,
+            Ok(_) => {},
+            Err(error) => return Err(invalid(error.to_string())),
+        }
+    }
+    match output {
+        Some(mut bytes) => {
+            bytes.extend_from_slice(&xml[cursor..]);
+            Ok(Cow::Owned(bytes))
+        },
+        None => Ok(Cow::Borrowed(xml)),
+    }
+}
+
 fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 0..=65_536u32 {
         let name = if suffix == 0 {
@@ -235,17 +304,18 @@ fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
             !relationship.is_external()
                 && relationship
                     .target_partname()
-                    .is_ok_and(|name| name == *target)
+                    .is_ok_and(|name| name.is_equivalent_to(target))
         })
     }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
             && relationship
                 .target_partname()
-                .is_ok_and(|name| name == *target)
+                .is_ok_and(|name| name.is_equivalent_to(target))
     })
 }
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {
     let workbook = package.main_document_part()?;
+    require_workbook_content_type(workbook)?;
     let mut found = workbook.rels().iter().filter(|x| {
         matches!(
             x.reltype(),
@@ -258,8 +328,10 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {
     if found.next().is_some() {
         return Err(invalid("workbook has multiple connections relationships"));
     }
-    if rel.is_external() {
-        return Err(invalid("connections relationship cannot be external"));
+    if rel.is_external() || target_has_suffix(rel) {
+        return Err(invalid(
+            "connections relationship must target an internal part URI",
+        ));
     }
     let uri: PackURI = rel.target_partname()?;
     let part = package.get_part(&uri)?;
@@ -289,6 +361,21 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         ));
     }
     let workbook = package.main_document_part()?;
+    require_workbook_content_type(workbook)?;
+    for part in package
+        .iter_parts()
+        .filter(|part| !part.partname().is_equivalent_to(workbook.partname()))
+    {
+        if part
+            .rels()
+            .iter()
+            .any(|relationship| is_connections_relationship(relationship.reltype()))
+        {
+            return Err(invalid(
+                "only the workbook may source a connections relationship",
+            ));
+        }
+    }
     let owners = workbook
         .rels()
         .iter()
@@ -300,8 +387,10 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
     let owner_target = owners
         .first()
         .map(|relationship| {
-            if relationship.is_external() {
-                return Err(invalid("connections relationship cannot be external"));
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
             }
             Ok(relationship.target_partname()?)
         })
@@ -319,7 +408,10 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         .iter_parts()
         .filter(|part| part.content_type() == CONNECTIONS_CONTENT_TYPE)
     {
-        if owner_target.as_ref() != Some(part.partname()) {
+        if !owner_target
+            .as_ref()
+            .is_some_and(|target| target.is_equivalent_to(part.partname()))
+        {
             return Err(invalid(format!(
                 "connections part '{}' has no workbook owner",
                 part.partname()
@@ -331,6 +423,44 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         .iter_parts()
         .filter(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
         .collect::<Vec<_>>();
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| is_query_table_relationship(relationship.reltype()))
+    {
+        return Err(invalid(
+            "package root cannot source a query-table relationship",
+        ));
+    }
+    let mut query_owner_counts = HashMap::<String, usize>::new();
+    query_owner_counts
+        .try_reserve(query_parts.len())
+        .map_err(|_| invalid("query-table owner allocation failed"))?;
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if !is_query_table_relationship(relationship.reltype()) {
+                continue;
+            }
+            if source.content_type() != WORKSHEET_CONTENT_TYPE {
+                return Err(invalid(
+                    "only worksheet parts may source a query-table relationship",
+                ));
+            }
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "query-table relationship must target an internal part URI",
+                ));
+            }
+            let target = relationship.target_partname()?;
+            let target_part = package.get_part(&target)?;
+            if target_part.content_type() != QUERY_TABLE_CONTENT_TYPE {
+                return Err(invalid("query-table relationship targets an invalid part"));
+            }
+            let key = target.as_str().to_ascii_lowercase();
+            let count = query_owner_counts.entry(key).or_insert(0);
+            *count += 1;
+        }
+    }
     let values = if owner_target.is_some() {
         Some(load_from_package(package)?.ok_or_else(|| invalid("connections owner disappeared"))?)
     } else {
@@ -348,18 +478,10 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         if part.rels().iter().next().is_some() {
             return Err(invalid("query-table parts must not have relationships"));
         }
-        let mut owners = 0usize;
-        for candidate in package.iter_parts() {
-            for relationship in candidate.rels().iter() {
-                if relationship.is_external()
-                    || !is_query_table_relationship(relationship.reltype())
-                    || relationship.target_partname().ok().as_ref() != Some(part.partname())
-                {
-                    continue;
-                }
-                owners += 1;
-            }
-        }
+        let owners = query_owner_counts
+            .get(&part.partname().as_str().to_ascii_lowercase())
+            .copied()
+            .unwrap_or(0);
         if owners != 1 {
             return Err(invalid(format!(
                 "query-table part '{}' must have exactly one worksheet owner",
@@ -380,9 +502,29 @@ fn is_connections_relationship(value: &str) -> bool {
 fn is_query_table_relationship(value: &str) -> bool {
     matches!(
         value,
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
-            | "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable"
+        QUERY_TABLE_RELATIONSHIP | STRICT_QUERY_TABLE_RELATIONSHIP
     )
+}
+
+fn target_has_suffix(relationship: &litchi_opc::Relationship) -> bool {
+    relationship.target_query().is_some() || relationship.target_fragment().is_some()
+}
+
+fn require_workbook_content_type(workbook: &dyn Part) -> Result<()> {
+    if matches!(
+        workbook.content_type(),
+        ct::SML_SHEET_MAIN
+            | ct::SML_TEMPLATE_MAIN
+            | ct::SML_SHEET_MACRO_MAIN
+            | ct::SML_TEMPLATE_MACRO_MAIN
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "main document part '{}' is not an XML workbook",
+            workbook.partname()
+        )))
+    }
 }
 
 /// Immutable source snapshot used by connection transactions and patches.
@@ -431,7 +573,7 @@ impl Snapshot {
         self.source
             .query_tables
             .iter()
-            .find(|part| part.part_uri == *part_uri)
+            .find(|part| part.part_uri.is_equivalent_to(part_uri))
             .map(SourcePart::bytes)
     }
 
@@ -568,13 +710,24 @@ impl SourceRelationship {
 }
 
 fn detect_conformance(xml: &[u8]) -> Conformance {
-    if xml
-        .windows(STRICT_NAMESPACE.len())
-        .any(|window| window == STRICT_NAMESPACE.as_bytes())
-    {
-        Conformance::Strict
-    } else {
-        Conformance::Transitional
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+                let strict = match reader.resolver().resolve_element(element.name()).0 {
+                    ResolveResult::Bound(namespace) => std::str::from_utf8(namespace.0)
+                        .is_ok_and(|value| value == STRICT_NAMESPACE),
+                    ResolveResult::Unbound | ResolveResult::Unknown(_) => false,
+                };
+                return if strict {
+                    Conformance::Strict
+                } else {
+                    Conformance::Transitional
+                };
+            },
+            Ok(Event::Eof) | Err(_) => return Conformance::Transitional,
+            Ok(_) => {},
+        }
     }
 }
 
@@ -709,7 +862,11 @@ impl<'a> Transaction<'a> {
             self.strict,
         )?;
         let snapshot = Snapshot::load(&candidate)?;
-        if snapshot.connections.as_ref() != self.draft.as_ref() {
+        let mut staged = self.draft.clone();
+        if let (Some(actual), Some(staged)) = (snapshot.connections.as_ref(), staged.as_mut()) {
+            normalize_connections_source_projection(actual, staged)?;
+        }
+        if snapshot.connections.as_ref() != staged.as_ref() {
             return Err(invalid("connection publication changed the staged model"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
@@ -838,9 +995,14 @@ fn apply_connections(
         .iter()
         .find(|relationship| is_connections_relationship(relationship.reltype()))
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|target| (relationship.r_id().to_owned(), target))
+                .map(|target| (relationship.r_id().to_owned(), target))?)
         })
         .transpose()?;
     match (owner, after) {
@@ -903,9 +1065,14 @@ fn restore_snapshot(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()>
         .iter()
         .find(|relationship| is_connections_relationship(relationship.reltype()))
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|target| (relationship.r_id().to_owned(), target))
+                .map(|target| (relationship.r_id().to_owned(), target))?)
         })
         .transpose()?;
     if let Some((relationship_id, part_name)) = existing {
