@@ -1,0 +1,13 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 226.58270263671875,
+  "log_sha256": "6141948b1724bb5582ee484fa594adea74ba9ce03c955c1d774de43b424c6d56"
+}

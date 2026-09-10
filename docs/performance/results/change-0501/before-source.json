@@ -1,0 +1,12 @@
+{
+  "revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "files": {
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "1278b07c926f5d1f430aff2454e2a41081983a9b352cfa1756fbe619e992e7af",
+    "crates/litchi-opc/src/source_backed.rs": "6dda2f0ebb73c8d598d15a94c840d069ab8f524ced990bae37f2587eec51f952",
+    "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "dbc1f21b873e8a1081e58d53dd0f51db49901145726366967bd9986eeb785153",
+    "tools/perf-baseline/src/pptx_range_source.rs": "f4b0d6171ef9a318e1d29affa0e593e6c5114f972c76dace13e572611a074921",
+    "tools/perf-baseline/src/lib.rs": "1920c807f2efd30dc39625beaa83a8186f153563c6b88967b308d3528eb82cb8",
+    "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+    "Cargo.lock": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+  }
+}

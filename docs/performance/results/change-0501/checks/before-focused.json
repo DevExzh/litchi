@@ -1,0 +1,21 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--test",
+    "source_backed_cross_copy",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 76.79301571846008,
+  "log_sha256": "e22780178c1dc71ee1596eddac7beca5ceb5efa67f77eb658792206688bae611"
+}

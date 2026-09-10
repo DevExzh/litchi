@@ -1,0 +1,61 @@
+{
+  "scope": "Fresh before measurements; medians over recorded30samples; no targeted CPU attribution",
+  "rows": [
+    {
+      "name": "media-rich-file-warm-r1.report.json",
+      "samples": 30,
+      "api_p50_ms": 28.588466,
+      "plan_p50_ms": 12.979474,
+      "publication_p50_ms": 14.9183605
+    },
+    {
+      "name": "media-rich-file-warm-r2.report.json",
+      "samples": 30,
+      "api_p50_ms": 28.9095485,
+      "plan_p50_ms": 12.984019,
+      "publication_p50_ms": 15.2499665
+    },
+    {
+      "name": "media-rich-owned-r1.report.json",
+      "samples": 30,
+      "api_p50_ms": 24.296981,
+      "plan_p50_ms": 11.867315,
+      "publication_p50_ms": 11.747769
+    },
+    {
+      "name": "media-rich-owned-r2.report.json",
+      "samples": 30,
+      "api_p50_ms": 24.3371525,
+      "plan_p50_ms": 11.84812,
+      "publication_p50_ms": 11.799265
+    },
+    {
+      "name": "plain-file-warm-r1.report.json",
+      "samples": 30,
+      "api_p50_ms": 2.5623485,
+      "plan_p50_ms": 0.821623,
+      "publication_p50_ms": 1.263169
+    },
+    {
+      "name": "plain-file-warm-r2.report.json",
+      "samples": 30,
+      "api_p50_ms": 2.5606335,
+      "plan_p50_ms": 0.821078,
+      "publication_p50_ms": 1.260039
+    },
+    {
+      "name": "plain-owned-r1.report.json",
+      "samples": 30,
+      "api_p50_ms": 2.2737825,
+      "plan_p50_ms": 0.7968675,
+      "publication_p50_ms": 1.0320085
+    },
+    {
+      "name": "plain-owned-r2.report.json",
+      "samples": 30,
+      "api_p50_ms": 2.260403,
+      "plan_p50_ms": 0.7902675,
+      "publication_p50_ms": 1.0265485
+    }
+  ]
+}

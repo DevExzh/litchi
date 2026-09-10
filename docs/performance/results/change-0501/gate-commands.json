@@ -1,0 +1,143 @@
+{
+  "before-focused": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--test",
+    "source_backed_cross_copy",
+    "--",
+    "--test-threads=1"
+  ],
+  "focused": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--test",
+    "source_backed_cross_copy",
+    "--",
+    "--test-threads=1"
+  ],
+  "payload-guards": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--lib",
+    "presentation::source_cross_copy",
+    "--",
+    "--test-threads=1"
+  ],
+  "pptx-default": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--all-targets",
+    "--",
+    "--test-threads=1"
+  ],
+  "pptx-features": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--lib",
+    "--",
+    "--test-threads=1"
+  ],
+  "doctests": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--doc"
+  ],
+  "clippy": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "fmt": [
+    "cargo",
+    "fmt",
+    "-p",
+    "litchi-pptx",
+    "--",
+    "--check"
+  ],
+  "rustdoc": [
+    "cargo",
+    "doc",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-pptx",
+    "--no-deps"
+  ],
+  "downstream": [
+    "cargo",
+    "check",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi",
+    "--no-default-features",
+    "--features",
+    "pptx",
+    "--lib"
+  ],
+  "boundaries": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "crud-index-tests": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "tools.test_crud_coverage_index"
+  ],
+  "benchmark-build": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ]
+}

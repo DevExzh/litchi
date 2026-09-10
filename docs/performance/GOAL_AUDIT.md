@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0501 scopes PPTX payload hashing; the full goal remains open
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) removes redundant
+private image/chart payload hashing while retaining exact payload comparisons,
+candidate reread, graph and source proofs, cancellation, budgets, and partial
+publication behavior. The fresh before phase has eight reports and 240 measured
+samples, and the matched after phase has the same eight reports and 240
+measured samples. The supplementary whole-child
+SHA-256 profile reports 31.01% owned and 30.08% warm-file, with incomplete
+caller recovery, so it does not establish touched-digest attribution or a
+timer-local causal speedup. Same-data export recovery and two subsequent owned
+profiling workload reruns are recorded separately and do not alter the formal
+matrix. The comparison retains all 208 rows, passes every lifecycle oracle, and
+retains 52 favorable timing/throughput flags with no adverse change above five
+percent. The separate default CRUD refresh
+passes two serial 201-row lanes, totaling 6,030 samples across 37 cases and 31
+corpora; both generated report/catalog validators and 38 static coverage tests
+pass. It closes the timing-report baseline gate only. The scoped production
+gates also pass: default all-targets 848, all-features library 552, doctests 6
+with 2 ignored, focused 58, private guards 5, Clippy, fmt, rustdoc, downstream,
+boundaries, and 38 CRUD static tests. Independent strict verification passes.
+Final cleanup removed 2,154,708,992 unique-inode allocated bytes and
+retained eight replay files in local tmpfs: two binaries and six raw perf files,
+including two failed attempts. Historical 15.5–16.1%
+touched-digest attribution is from 0449. Native producer notes/chart closure,
+cold and physical-I/O behavior, exhaustive CRUD promotion, and other goal
+areas remain open.
+
 ## Current audit: 0500 targets managed paragraph batching; the full goal remains open
 
 [0500](changes/0500-managed-paragraph-batches.md) targets the managed refusal

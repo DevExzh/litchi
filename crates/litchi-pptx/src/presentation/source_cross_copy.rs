@@ -5651,7 +5651,7 @@ fn digest_touched(
         }
         digest.update(image.declared_size.to_le_bytes());
         digest.update((image.bytes.len() as u64).to_le_bytes());
-        digest_bytes(&mut digest, image.bytes.as_slice(), execution_context)?;
+        check_payload_cancellation(image.bytes.as_slice(), execution_context)?;
     }
     digest.update((image_relationships.len() as u64).to_le_bytes());
     for relationship in image_relationships {
@@ -5679,7 +5679,7 @@ fn digest_touched(
         }
         digest.update(chart.declared_size.to_le_bytes());
         digest.update((chart.bytes.len() as u64).to_le_bytes());
-        digest_bytes(&mut digest, chart.bytes.as_slice(), execution_context)?;
+        check_payload_cancellation(chart.bytes.as_slice(), execution_context)?;
     }
     digest.update((chart_relationships.len() as u64).to_le_bytes());
     for relationship in chart_relationships {
@@ -5900,6 +5900,19 @@ fn extend_bytes_checked(
             .try_reserve(chunk.len())
             .map_err(|source| Error::Allocation { resource, source })?;
         output.extend_from_slice(chunk);
+    }
+    Ok(())
+}
+
+// Payload bytes are compared exactly by Prepared::matches and reread by
+// verify_candidate. Hashing them again adds no acceptance proof. Keep the
+// cancellation checkpoints previously supplied by the hash traversal.
+fn check_payload_cancellation(
+    bytes: &[u8],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    for _ in bytes.chunks(64 * 1024) {
+        check_execution(execution_context)?;
     }
     Ok(())
 }
@@ -6351,3 +6364,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "source_cross_copy/payload_guard_tests.rs"]
+mod payload_guard_tests;

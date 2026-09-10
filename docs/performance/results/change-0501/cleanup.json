@@ -1,0 +1,63 @@
+{
+  "scope": "dedicated 0501 scratch only; shared target and unrelated work untouched",
+  "allocation_accounting": "unique device/inode block counts across removed paths",
+  "retention_scope": "frozen binaries and all successful/failed raw perf recordings remain in local tmpfs for replay; committed source archives and text exports are portable",
+  "same_user_processes_scanned": 63,
+  "inaccessible_or_exited_processes": 4,
+  "active_matching_processes": [],
+  "retained": [
+    {
+      "path": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+      "sha256": "c5cfc74102df903e4ab469c100659294e0674350f2d2ef4a6ecb4bd13e6d1d39",
+      "bytes": 60940344
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-after",
+      "sha256": "53b6601f11573940c4818eacd767986ded0f51c0c9960252a036de0e154efc58",
+      "bytes": 60940672
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/after/media-rich-file-warm/perf.data",
+      "sha256": "5a52c3c936ababecfac7ae0ab2b68e7ad98892503bd92dbbc8f056b5351a3c57",
+      "bytes": 3984280
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/after/media-rich-owned/perf.data",
+      "sha256": "6ec6829e61d0bc90e90a73b7b88c4605137ad82fad30d576af3e903d9e6b1fcd",
+      "bytes": 3816352
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/before/media-rich-file-warm/perf.data",
+      "sha256": "bf5f6e4ab528223a7fdd569b92e5bb60d9d507aaf2b016893b816ca5c7ca7cb7",
+      "bytes": 3909400
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+      "sha256": "f111e15ac210803c44026225458416e0e0ae2ce64fe8741aaf1af430185cc543",
+      "bytes": 3909368
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned-attempt-1/perf.data",
+      "sha256": "e85ff42983107149b6abb533a80e059456384fa9c3a6ff14591b81335607c53c",
+      "bytes": 3875512
+    },
+    {
+      "path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned-attempt-2/perf.data",
+      "sha256": "19092ecd13b15fc991f695b6d0ee56cdd4cff36e34d9946e647f4e8aed9b4f05",
+      "bytes": 4202608
+    }
+  ],
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0501/corpora",
+      "allocated_bytes": 0,
+      "files": 0
+    },
+    {
+      "path": "/tmp/litchi-goal-0501-target",
+      "allocated_bytes": 2154708992,
+      "files": 8448
+    }
+  ],
+  "removed_allocated_bytes": 2154708992
+}

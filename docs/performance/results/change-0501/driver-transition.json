@@ -1,0 +1,110 @@
+{
+  "change": 501,
+  "kind": "measurement-driver-provenance",
+  "formal_before_freeze": {
+    "path": "before-freeze.json",
+    "protocol_sha256": "f3bb97e9a6d8c9d073c3cb760275d53c769b00e3017be0c47a638fce2a732fb2",
+    "binary_sha256": "c5cfc74102df903e4ab469c100659294e0674350f2d2ef4a6ecb4bd13e6d1d39",
+    "source_manifest_sha256": "8065a58dc51fbde6d5f26c5f27a223e23255e5ee96c6d66d61224cfe85763d18",
+    "formal_capture": {
+      "children": 8,
+      "samples_per_child": 30,
+      "warmups_per_child": 3,
+      "retained_samples": 240,
+      "status": "pass"
+    }
+  },
+  "bound_driver_hashes_at_before_freeze": {
+    "profile.py": "047ef39a34233ae94204c6100a76882bbeb5f98d24b70851634dab595bf4612a",
+    "verify-report.py": "979fbab4cbb0f81fbb03e482b5269420be4f5bb5d1dda066e3eed7234cd21f44"
+  },
+  "archived_before_helpers": {
+    "profile.py": {
+      "path": "source-archives/before/profile.py",
+      "bytes": 10498,
+      "sha256": "047ef39a34233ae94204c6100a76882bbeb5f98d24b70851634dab595bf4612a",
+      "custody": "Exact bytes reconstructed from the current helper by removing only the later supplementary-dimension verifier arguments and the later explicit DEBUGINFOD_URLS environment block; the resulting bytes match the before-freeze bound hash."
+    },
+    "verify-report.py": {
+      "path": "interrupted/profile-attempt-2/verify-report-before-dimension-fix.py",
+      "bytes": 21702,
+      "sha256": "979fbab4cbb0f81fbb03e482b5269420be4f5bb5d1dda066e3eed7234cd21f44",
+      "custody": "Exact pre-dimension-fix bytes copied before the supplementary profile verifier change."
+    }
+  },
+  "current_driver_hashes": {
+    "profile.py": "347081ab40fbdb8862bc1e891a1433dfc21e8ec69c71e8e4bd6229118cd32d15",
+    "verify-report.py": "7c0202ac1c6372176e7899240722ec534a1f808381d6525c86c78271232e0b38"
+  },
+  "driver_changes": [
+    {
+      "path": "verify-report.py",
+      "before_freeze_sha256": "979fbab4cbb0f81fbb03e482b5269420be4f5bb5d1dda066e3eed7234cd21f44",
+      "current_sha256": "7c0202ac1c6372176e7899240722ec534a1f808381d6525c86c78271232e0b38",
+      "reason": "Profile reports intentionally use 8 measured samples and 1 warmup, while formal reports use 30 measured samples and 3 warmups. The verifier now accepts explicit expected_samples and expected_warmup values for supplementary profiles; the original frozen verifier is retained at interrupted/profile-attempt-2/verify-report-before-dimension-fix.py."
+    },
+    {
+      "path": "profile.py",
+      "before_freeze_sha256": "047ef39a34233ae94204c6100a76882bbeb5f98d24b70851634dab595bf4612a",
+      "current_sha256": "347081ab40fbdb8862bc1e891a1433dfc21e8ec69c71e8e4bd6229118cd32d15",
+      "reason": "The profile driver now clears DEBUGINFOD_URLS in its child environment so perf report cannot block on a remote symbol server. The before profiles were invoked with DEBUGINFOD_URLS='' already; this current driver change makes that property explicit for after."
+    }
+  ],
+  "profile_dimensions": {
+    "lanes": [
+      "media-rich-owned",
+      "media-rich-file-warm"
+    ],
+    "samples_per_child": 8,
+    "warmups_per_child": 1,
+    "frequency_hz": 99,
+    "callgraph": "dwarf,8192",
+    "raw_perf_max_bytes": 67108864,
+    "profile_is_supplementary": true
+  },
+  "export_recovery": {
+    "first_attempt": {
+      "receipt": "interrupted/profile-attempt-1/media-rich-owned.receipt.json",
+      "report_partial": "interrupted/profile-attempt-1/media-rich-owned.perf-report.debuginfod-interrupted.txt",
+      "raw_perf_relocated_to": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned-attempt-1/perf.data",
+      "report_pid": 3333894,
+      "inherited_debuginfod_urls": "https://debuginfod.ubuntu.com",
+      "observed": "perf record completed and the raw perf.data was retained; perf report then slept waiting for remote symbol lookup and was terminated as an owned export subprocess."
+    },
+    "same_data_recovery": {
+      "raw_perf_was_rerecorded": false,
+      "reexport_environment": {
+        "DEBUGINFOD_URLS": "",
+        "PERF_BUILDID_DIR": "/tmp/litchi-goal-0501/perf-buildid"
+      },
+      "source_raw_perf": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned-attempt-1/perf.data",
+      "source_raw_perf_bytes": 3875512,
+      "source_raw_perf_sha256": "e85ff42983107149b6abb533a80e059456384fa9c3a6ff14591b81335607c53c",
+      "local_report_exports": [
+        "interrupted/profile-attempt-1/media-rich-owned.perf-report.txt",
+        "interrupted/profile-attempt-1/media-rich-owned.perf-report-children.txt"
+      ],
+      "reported_samples": 450,
+      "result": "The same attempt-1 perf.data was exported locally after the remote report subprocess was terminated."
+    },
+    "profile_rerun_after_recovery": {
+      "raw_perf_was_rerecorded": true,
+      "raw_perf_path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned-attempt-2/perf.data",
+      "raw_perf_bytes": 4202608,
+      "raw_perf_sha256": "19092ecd13b15fc991f695b6d0ee56cdd4cff36e34d9946e647f4e8aed9b4f05",
+      "receipt": "interrupted/profile-attempt-2/media-rich-owned.receipt.json",
+      "reported_samples": 486,
+      "result": "The profile driver reran both perf stat and perf record for the owned lane with local symbol lookup. Report export completed, then the old formal verifier rejected the intentional 8/1 supplementary profile dimensions. That receipt and the pre-dimension-fix verifier are retained."
+    },
+    "final_before_profiles": {
+      "invocation": "DEBUGINFOD_URLS='' PERF_BUILDID_DIR=/tmp/litchi-goal-0501/perf-buildid python3 -B docs/performance/results/change-0501/profile.py before",
+      "summary": "profiles/before/summary.json",
+      "status": "pass",
+      "raw_paths": [
+        "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+        "/tmp/litchi-goal-0501/profiles/before/media-rich-file-warm/perf.data"
+      ]
+    }
+  },
+  "source_edit_boundary": "The formal before reports and the successful before profiles were captured before the candidate production edit. This manifest records driver provenance only; it does not replace the historical before freeze or assert current source equality."
+}

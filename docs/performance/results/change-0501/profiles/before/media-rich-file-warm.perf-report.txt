@@ -1,0 +1,94 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 454  of event 'cycles:u'
+# Event count (approx.): 19027366847
+#
+# Overhead  Command          Shared Object                Symbol                                                                                                                                                                                                                                                                                                 
+# ........  ...............  ...........................  .......................................................................................................................................................................................................................................................................................................
+#
+    35.06%  litchi-perf-bas  litchi-perf-baseline-before  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+    30.08%  litchi-perf-bas  litchi-perf-baseline-before  [.] sha2::sha256::x86_sha::compress
+            |          
+             --0.47%--sha2::sha256::x86_sha::compress
+                       |          
+                        --0.23%--anon.ed1e3b1efa6e5d65d68746a9c127c0ae.173.llvm.16665085901957276353
+
+    14.27%  litchi-perf-bas  litchi-perf-baseline-before  [.] zlib_rs::deflate::longest_match::longest_match
+     4.86%  litchi-perf-bas  libc.so.6                    [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+     2.91%  litchi-perf-bas  litchi-perf-baseline-before  [.] litchi_perf_baseline::payload_bytes
+            |          
+             --0.62%--litchi_perf_baseline::payload_bytes
+
+     2.81%  litchi-perf-bas  litchi-perf-baseline-before  [.] <zlib_rs::deflate::Heap>::pqdownheap
+     2.33%  litchi-perf-bas  litchi-perf-baseline-before  [.] crc32fast::specialized::pclmulqdq::calculate
+     1.42%  litchi-perf-bas  libc.so.6                    [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     1.19%  litchi-perf-bas  [unknown]                    [k] 0xffffffff8cfed2d9
+            |
+            ---0xffffffff8cfed2d9
+               0xffffffff8cc1a307
+               0xffffffff8df1c2e3
+               0xffffffff8c800bb7
+               |          
+               |--1.06%--__memmove_avx512_unaligned_erms
+               |          
+                --0.13%--__memset_avx512_unaligned_erms
+
+     0.93%  litchi-perf-bas  [unknown]                    [k] 0xffffffff8c800b90
+            |
+            ---0xffffffff8c800b90
+               |          
+               |--0.50%--__memset_avx512_unaligned_erms
+               |          
+                --0.43%--__memmove_avx512_unaligned_erms
+
+     0.84%  litchi-perf-bas  libc.so.6                    [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.44%  litchi-perf-bas  [unknown]                    [k] 0xffffffff8c800ef0
+            |
+            ---0xffffffff8c800ef0
+               |          
+                --0.23%--mmap_set_chunk (inlined)
+                          sysmalloc_mmap
+
+     0.23%  litchi-perf-bas  litchi-perf-baseline-before  [.] <zlib_rs::deflate::Heap>::construct_huffman_tree
+     0.23%  litchi-perf-bas  litchi-perf-baseline-before  [.] <core::iter::adapters::skip::Skip<core::str::iter::Split<char>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&str, <litchi_opc::packuri::PackURI>::new<&str>::{closure#1}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>
+     0.22%  litchi-perf-bas  litchi-perf-baseline-before  [.] zlib_rs::inflate::inftrees::inflate_table
+     0.22%  litchi-perf-bas  litchi-perf-baseline-before  [.] zlib_rs::inflate::inflate
+     0.22%  litchi-perf-bas  litchi-perf-baseline-before  [.] zlib_rs::deflate::gen_codes
+     0.21%  litchi-perf-bas  litchi-perf-baseline-before  [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+     0.21%  litchi-perf-bas  litchi-perf-baseline-before  [.] <litchi_opc::packuri::PackURI>::validate_percent_encoding
+     0.20%  litchi-perf-bas  litchi-perf-baseline-before  [.] <quick_xml::reader::state::ReaderState>::emit_start
+     0.20%  litchi-perf-bas  litchi-perf-baseline-before  [.] <memchr::arch::x86_64::avx2::memchr::One>::find_raw
+     0.20%  litchi-perf-bas  litchi-perf-baseline-before  [.] <quick_xml::events::attributes::IterState>::next
+     0.20%  litchi-perf-bas  libc.so.6                    [.] _int_malloc
+            |
+            ---_int_malloc
+               __libc_malloc2
+
+     0.18%  litchi-perf-bas  litchi-perf-baseline-before  [.] litchi_opc::rel::append_relationship_xml_escaped
+     0.17%  litchi-perf-bas  litchi-perf-baseline-before  [.] litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy
+     0.15%  litchi-perf-bas  [unknown]                    [k] 0xffffffff8dee4c00
+            |
+            ---0xffffffff8dee4c00
+               0xffffffff8cfed28f
+               0xffffffff8cc1a307
+               0xffffffff8df1c2e3
+               0xffffffff8c800bb7
+               __memmove_avx512_unaligned_erms
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

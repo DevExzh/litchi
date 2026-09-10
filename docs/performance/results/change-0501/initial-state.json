@@ -1,0 +1,6 @@
+{
+  "revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "previous_turn": "progress",
+  "reason": "0500 committed managed DOCX batching with verified measurements, tests and cleanup",
+  "scope_decision": "Inspect authoritative full-run baseline and native PPTX closure gaps before implementation"
+}

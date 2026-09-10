@@ -1,0 +1,11 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: unused import: `Part`
+ --> crates/litchi-pptx/src/presentation/source_cross_copy/payload_guard_tests.rs:7:64
+  |
+7 | use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
+  |                                                                ^^^^
+  |
+  = note: `-D unused-imports` implied by `-D unused`
+  = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: could not compile `litchi-pptx` (lib test) due to 1 previous error

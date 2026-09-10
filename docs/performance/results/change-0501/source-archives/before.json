@@ -1,0 +1,12 @@
+{
+  "crates/litchi-pptx/src/presentation/source_cross_copy.rs": {
+    "archive": "source-archives/before/source_cross_copy.rs.txt",
+    "sha256": "1278b07c926f5d1f430aff2454e2a41081983a9b352cfa1756fbe619e992e7af",
+    "bytes": 244167
+  },
+  "crates/litchi-pptx/src/presentation/source_cross_copy/payload_guard_tests.rs": {
+    "archive": "source-archives/before/payload_guard_tests.rs.txt",
+    "sha256": "e6cac5ed2bfa1ef37f78d16ef0b8c0a1a4c4659b0ffa08b7323e9a40104cde8b",
+    "bytes": 7940
+  }
+}

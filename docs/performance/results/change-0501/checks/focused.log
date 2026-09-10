@@ -1,0 +1,66 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `release` profile [optimized] target(s) in 51.96s
+     Running tests/source_backed_cross_copy.rs (/tmp/litchi-goal-0501-target/release/deps/source_backed_cross_copy-cf280127afcb46ec)
+
+running 58 tests
+test source_backed_cross_copy_accepts_missing_name_and_refuses_duplicate_ids ... ok
+test source_backed_cross_copy_accepts_picture_on_destination_anchor_and_preserves_anchor_closure ... ok
+test source_backed_cross_copy_aggregates_image_reservation_before_payload_reads ... ok
+test source_backed_cross_copy_allocates_case_equivalent_media_collision ... ok
+test source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collisions ... ok
+test source_backed_cross_copy_chart_cancellation_is_fallible ... ok
+test source_backed_cross_copy_chart_limits_fail_before_materialization ... ok
+test source_backed_cross_copy_chart_publication_is_deterministic_and_source_immutable ... ok
+test source_backed_cross_copy_chart_source_version_changes_are_refused ... ok
+test source_backed_cross_copy_copies_charts_alongside_images ... ok
+test source_backed_cross_copy_copies_multiple_embedded_images_in_source_order ... ok
+test source_backed_cross_copy_copies_one_embedded_picture_closure ... ok
+test source_backed_cross_copy_copies_shared_image_once_with_coherent_relationships ... ok
+test source_backed_cross_copy_deduplicates_shared_chart_physical_members ... ok
+test source_backed_cross_copy_keeps_inserted_namespace_bindings_self_contained ... ok
+test source_backed_cross_copy_keeps_source_immutable_and_is_deterministic ... ok
+test source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusal ... ok
+test source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded ... ok
+test source_backed_cross_copy_observes_post_entry_planning_cancellation ... ok
+test source_backed_cross_copy_preserves_absent_and_empty_slide_names ... ok
+test source_backed_cross_copy_preserves_media_read_errors ... ok
+test source_backed_cross_copy_preserves_multiple_chart_source_order ... ok
+test source_backed_cross_copy_preserves_noncompact_source_xml_with_checked_splices ... ok
+test source_backed_cross_copy_preserves_typed_cancellation_during_output ... ok
+test source_backed_cross_copy_preserves_untouched_destination_zip_records ... ok
+test source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_blips ... ok
+test source_backed_cross_copy_refuses_lexical_embed_without_relationship_namespace ... ok
+test source_backed_cross_copy_refuses_limits_and_cancellation_before_output ... ok
+test source_backed_cross_copy_refuses_mismatched_presentation_end_name ... ok
+test source_backed_cross_copy_refuses_mismatched_relationship_end_name ... ok
+test source_backed_cross_copy_refuses_mismatched_slide_end_name_before_planning ... ok
+test source_backed_cross_copy_refuses_name_and_layout_mismatch ... ok
+test source_backed_cross_copy_refuses_picture_inventory_when_r_is_rebound ... ok
+test source_backed_cross_copy_refuses_protection_opaque_and_trailing_data ... ok
+test source_backed_cross_copy_refuses_stale_foreign_and_same_source_plans ... ok
+test source_backed_cross_copy_refuses_unbound_foreign_slide_attribute ... ok
+test source_backed_cross_copy_refuses_unsupported_picture_media_closures ... ok
+test source_backed_cross_copy_refuses_unsupported_relationships_and_markup ... ok
+test source_backed_cross_copy_refuses_wrong_type_on_non_anchor_destination_slide_binding ... ok
+test source_backed_cross_copy_refuses_wrong_type_on_non_selected_source_slide_binding ... ok
+test source_backed_cross_copy_rejects_actual_source_size_mismatch ... ok
+test source_backed_cross_copy_rejects_chart_outbound_resource_relationships ... ok
+test source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants ... ok
+test source_backed_cross_copy_relationship_id_rewrite_is_source_order_deterministic ... ok
+test source_backed_cross_copy_reopens_through_source_and_eager_facades ... ok
+test source_backed_cross_copy_reports_partial_short_and_zero_sink_progress ... ok
+test source_backed_cross_copy_reports_source_change_during_output_with_exact_progress ... ok
+test source_backed_cross_copy_reserves_before_reading_picture_media ... ok
+test source_backed_cross_copy_retains_verified_image_and_chart_captures ... ok
+test source_backed_cross_copy_retargets_layout_to_destination_graph ... ok
+test source_backed_cross_copy_rewrites_image_layout_relationship_id_collision ... ok
+test source_backed_cross_copy_rewrites_only_namespace_resolved_picture_embed ... ok
+test source_backed_cross_copy_shared_image_has_exact_physical_media_closure ... ok
+test source_backed_cross_copy_skips_and_preserves_an_orphan_slide_relationship_member ... ok
+test source_backed_cross_copy_supports_middle_and_append_positions ... ok
+test source_backed_cross_copy_supports_one_relationship_free_chart_leaf ... ok
+test source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data ... ok
+test source_backed_cross_copy_unnamed_slides_keep_nonempty_name_conflicts ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "exit_code": 0,
+  "log_sha256": "db31fcc3ab1909659307fd6a66ab659cf3bfae7526b0eaa9b199dee22d2329a0",
+  "profile": "release",
+  "rust_toolchain": "1.98.1",
+  "debug": 0,
+  "incremental": false,
+  "jobs": 2,
+  "affinity": "16-31",
+  "target": "/tmp/litchi-goal-0501-target",
+  "source_receipt_sha256": "c864989cf77a86871f4e51908ea0a950019a9dd259661a237f9ccebfe073fd67",
+  "retained_binary": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+  "binary_sha256": "c5cfc74102df903e4ab469c100659294e0674350f2d2ef4a6ecb4bd13e6d1d39"
+}

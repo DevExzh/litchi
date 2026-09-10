@@ -1,5 +1,27 @@
 # Performance CRUD coverage
 
+## 0501: PPTX payload preparation only; no coverage promotion
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) measures a scoped
+source-backed PPTX cross-copy preparation change. Its matched after comparison
+has eight reports and 240 measured samples; all lifecycle oracles pass, with
+52 favorable timing/throughput flags and no adverse change above five percent.
+It adds no CRUD selector and does not close native notes or chart dependency
+closure. Existing synthetic source-backed lifecycle evidence from 0424, 0431,
+and 0448 remains real retained evidence. The current checked index has 15
+categories, 33 mapped selectors, and 48 measured rows; the completed two-matrix
+refresh covers 201 rows at 15 samples each (6,030 samples), and both generated
+report/catalog validators plus 38 static coverage tests pass. It closes the
+current timing-report baseline gate but cannot promote correctness-only
+mappings or establish native-producer coverage. The scoped 0501 gates pass:
+default all-targets 848, all-features library 552, doctests 6 with 2 ignored,
+focused 58, private guards 5, and the Clippy, fmt, rustdoc, downstream,
+boundary, and 38-test static checks. Independent strict verification passes.
+Final cleanup removed 2,154,708,992 unique-inode allocated bytes and retained
+eight replay files in local tmpfs: two binaries and six raw perf files,
+including two failed attempts. This evidence does not promote correctness-only
+mappings or establish native-producer coverage.
+
 ## 0500: managed paragraph batch capability; no index promotion
 
 [0500](changes/0500-managed-paragraph-batches.md) exercises a new managed

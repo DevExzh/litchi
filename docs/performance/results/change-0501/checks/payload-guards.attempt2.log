@@ -1,0 +1,27 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `release` profile [optimized] target(s) in 1m 23s
+     Running unittests src/lib.rs (/tmp/litchi-goal-0501-target/release/deps/litchi_pptx-9a99f30630ec9b15)
+
+running 5 tests
+test presentation::source_cross_copy::payload_guard_tests::candidate_readback_rejects_same_length_image_and_chart_payloads ... FAILED
+test presentation::source_cross_copy::payload_guard_tests::same_length_tampered_plan_payloads_reject_before_output ... FAILED
+test presentation::source_cross_copy::tests::precompressed_fallback_is_limited_to_memory_admission_refusal ... ok
+test presentation::source_cross_copy::tests::prepared_payload_reuse_requires_exact_metadata_and_bytes ... ok
+test presentation::source_cross_copy::tests::shared_payload_pins_managed_bytes_across_cache_bypass_and_lazy_fallback ... ok
+
+failures:
+
+---- presentation::source_cross_copy::payload_guard_tests::candidate_readback_rejects_same_length_image_and_chart_payloads stdout ----
+Error: SlideCopyPlan { kind: AmbiguousTopology, detail: "source slide name collides with a destination slide name" }
+
+---- presentation::source_cross_copy::payload_guard_tests::same_length_tampered_plan_payloads_reject_before_output stdout ----
+Error: SlideCopyPlan { kind: AmbiguousTopology, detail: "source slide name collides with a destination slide name" }
+
+
+failures:
+    presentation::source_cross_copy::payload_guard_tests::candidate_readback_rejects_same_length_image_and_chart_payloads
+    presentation::source_cross_copy::payload_guard_tests::same_length_tampered_plan_payloads_reject_before_output
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 545 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p litchi-pptx --lib`
