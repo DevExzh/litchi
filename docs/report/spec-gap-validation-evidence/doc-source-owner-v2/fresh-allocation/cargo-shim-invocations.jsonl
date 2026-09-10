@@ -1,0 +1,2 @@
+{"argv": ["/home/zhuhe/.cargo/bin/cargo", "+1.95.0", "build", "--jobs", "4", "--release", "--locked", "--features", "candidate", "--manifest-path", "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control/Cargo.toml"], "jobs": "4", "toolchain": "+1.95.0"}
+{"argv": ["/home/zhuhe/.cargo/bin/cargo", "+1.95.0", "build", "--jobs", "4", "--release", "--locked", "--features", "candidate", "--manifest-path", "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate/Cargo.toml"], "jobs": "4", "toolchain": "+1.95.0"}

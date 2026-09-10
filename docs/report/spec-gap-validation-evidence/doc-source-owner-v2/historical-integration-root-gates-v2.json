@@ -1,0 +1,44 @@
+{
+  "base_commit": "6da91778c4003b6c9819e5c25168cfe9a847359e",
+  "measured_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+  "measured_freeze": "/var/tmp/litchi-doc-source-owner-final-source-v1.json",
+  "sources": {
+    "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs": "2c96f296758c0e0f080ee70c68affe4e3ebc436d21501b91b571035695a44b4d",
+    "crates/litchi-doc/src/embedded_object/transaction/edit.rs": "033316ae4ae2e0a2e1729c80b468c5aa5d83dccecfdeed78085d27a4ded7682d",
+    "crates/litchi-doc/src/embedded_object/transaction/patch.rs": "6783119c2628b3f3843752986d07dc6794f40a217515779e562309a3d9f5072b",
+    "crates/litchi-doc/src/embedded_object/tests.rs": "ba8ae340fbfbe7e3663c548e75ce0682d7cf63815e8b6585da2a1fe5b56347f0"
+  },
+  "purpose": "Final correctness integration with committed CFB/OLEPS/policy context; no timing attribution to this different base",
+  "dedicated_target": "/var/tmp/litchi-doc-source-owner-integration-root-target-195",
+  "toolchain": "1.95.0",
+  "tests": {
+    "passed": 1204,
+    "ignored": 2,
+    "failed": 0
+  },
+  "doctests": {
+    "passed": 14,
+    "ignored": 12,
+    "failed": 0
+  },
+  "clippy": "pass all targets/all features -D warnings",
+  "rustdoc": "pass all features/no deps -D warnings",
+  "format": "pass pinned",
+  "whitespace": "pass",
+  "independent_code_review": "opc_capture_review cleared exact four-file delta",
+  "performance_scope": "Measured c4aa pair remains separate; this6da integration gate has identical four changed source blobs",
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-doc-source-owner-integration-tests-v2.log",
+      "sha256": "b663ad06051217fac69583e02b2fbeb4e1937ec6c2193e5f1cc36a8a047280c2"
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-doc-source-owner-integration-clippy-v2.log",
+      "sha256": "7706cb5ec95a48da782578360a1a01bbd9dbe3474cf147d08658b0800c9520f9"
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-doc-source-owner-integration-rustdoc-v2.log",
+      "sha256": "b452dbd37a13506e559796fd9519930a84f1588ee95894e9acb60fef0fd3cd82"
+    }
+  }
+}

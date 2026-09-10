@@ -65,7 +65,8 @@ impl Patch {
     /// Returns a conflict when the source snapshot bytes do not exactly match
     /// the patch base, or a validation error when the replacement is invalid.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
-        if source.fingerprint() != self.before_fingerprint || source.bytes() != self.before.as_ref()
+        if source.fingerprint() != self.before_fingerprint
+            || source.source_bytes() != self.before.as_ref()
         {
             return Err(TransactionError::Conflict);
         }

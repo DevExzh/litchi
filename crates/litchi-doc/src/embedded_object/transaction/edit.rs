@@ -46,7 +46,7 @@ impl Transaction {
             .clone()
             .finish()
             .map_err(TransactionError::Invalid)?;
-        if bytes == self.source.bytes() {
+        if bytes == self.source.source_bytes() {
             return Ok(self.source.clone());
         }
         Snapshot::open(bytes, self.source.limits()).map_err(TransactionError::Invalid)
@@ -349,7 +349,7 @@ impl Transaction {
         self.editor
             .clone()
             .finish()
-            .map(|bytes| bytes != self.source.bytes())
+            .map(|bytes| bytes != self.source.source_bytes())
             .map_err(TransactionError::Invalid)
     }
 
@@ -368,7 +368,7 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, TransactionError> {
         let before = self.source;
         let after = self.editor.finish().map_err(TransactionError::Invalid)?;
-        let patch = Patch::new(before.bytes().to_vec(), after.clone());
+        let patch = Patch::new(before.source_bytes().to_vec(), after.clone());
         let snapshot = if patch.is_noop() {
             before
         } else {

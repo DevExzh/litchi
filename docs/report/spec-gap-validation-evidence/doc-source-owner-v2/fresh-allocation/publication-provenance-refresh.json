@@ -1,0 +1,68 @@
+{
+  "format": "litchi-doc-source-owner-publication-provenance-refresh/1",
+  "publication": "/var/tmp/litchi-doc-source-owner-portable-publication-20260909",
+  "changed_publication_paths": [
+    "reports/publication-provenance.json",
+    "archive-manifest.json"
+  ],
+  "corrected_published_entries": {
+    "evidence/focused-repeat/focused-diagnosis.md": {
+      "previous": {
+        "bytes": 3205,
+        "sha256": "e2f22f685d1cae772642659e9bf3763cdabfd4b2dd351d31d6b125cbc086f631"
+      },
+      "current": {
+        "bytes": 3384,
+        "sha256": "32273727cfb941eecc75c84b7fc9b39424bded8aec12209e8079cab5e61206d9"
+      }
+    },
+    "reports/final-evidence-v1.md": {
+      "previous": {
+        "bytes": 4788,
+        "sha256": "a45d955c47770b59214c2c552c16290169350f29c47847a579ac8c78327ffec9"
+      },
+      "current": {
+        "bytes": 5360,
+        "sha256": "fc3c847e4ab9deb98bcd588fef6a5638f9f3ee5c6c70b238c2ef528b2070dfbd"
+      }
+    },
+    "reports/final-evidence-v2.md": {
+      "previous": {
+        "bytes": 6016,
+        "sha256": "c2d87a3580e8ec38b086d603a2d4ac6880491a12e43e6d7792c443ae94753282"
+      },
+      "current": {
+        "bytes": 6588,
+        "sha256": "406898c3b6d1e71b4e299ea3e58b790e99dc93089ef37a9272ca3158c2e5029c"
+      }
+    },
+    "diagnostics/perf-stat/experiment.md": {
+      "previous": {
+        "bytes": 3690,
+        "sha256": "73753ac81e57af9d6a797013ee82de425556a24b833618390e0958795c714b88"
+      },
+      "current": {
+        "bytes": 3748,
+        "sha256": "d259b9291b66b69521e638419502cce2f648c855c76364efa120aa47fb9cd045"
+      }
+    }
+  },
+  "archive_manifest": {
+    "before": {
+      "bytes": 17925,
+      "sha256": "59e14daebfaaa2ff41aee71a116a0fe4c5df6fa9f491ba4aaa7e3af4ed0cfc5b"
+    },
+    "after": {
+      "bytes": 17925,
+      "sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83",
+      "members_checked": 100
+    }
+  },
+  "publication_provenance": {
+    "before_sha256": "03e746aa366d5192d9b69668ef52c9fd4c247c265d31e4889e11f8033f19b442",
+    "after_sha256": "dbdc07d3f08f1d19aea04eb1668d4922422653dce08552bb22e2375dbb9bfbbc"
+  },
+  "source_and_measurement_inputs_changed": false,
+  "manifest_member_order_preserved": true,
+  "verification": "all archive members present and hashes match after refresh"
+}
