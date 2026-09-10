@@ -522,6 +522,9 @@ pub mod revision_records;
 /// BIFF8 shared-workbook `Revision Log` stream (MS-XLS 2.1.7.14).
 pub mod revision_log;
 
+/// BIFF8 shared-workbook `User Names` stream (MS-XLS 2.1.7.17).
+pub mod user_names;
+
 /// BIFF8 `WebPub` record: typed, inert Web publishing metadata.
 mod web_pub;
 
@@ -733,6 +736,13 @@ pub use table_styles::{
 };
 pub use theme::Theme;
 pub use toolbar::{Control, Toolbar, ToolbarSet, VisualData, Wrapper};
+pub use user_names::{
+    Commit as UserNamesCommit, Limits as UserNamesLimits, PackageCommit as UserNamesPackageCommit,
+    PackagePatch as UserNamesPackagePatch, PackageSnapshot as UserNamesPackageSnapshot,
+    PackageTransaction as UserNamesPackageTransaction, Patch as UserNamesPatch,
+    Snapshot as UserNamesSnapshot, Transaction as UserNamesTransaction, USER_NAMES_STREAM_NAME,
+    UserCheck, UserEntry, UserGuid, UserNames,
+};
 pub use user_routing::{CUsr, CbUsr, DocRoute, RecipName, RoutingDelivery, UsrInfo};
 pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};

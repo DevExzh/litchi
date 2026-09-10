@@ -1,7 +1,10 @@
 use super::*;
 
 use crate::revision_log::Revision;
-use crate::revision_records::{EOF_RECORD_TYPE, RR_AUTO_FMT_RECORD_TYPE, RRD_INFO_RECORD_TYPE};
+use crate::revision_records::{
+    EOF_RECORD_TYPE, FILE_LOCK_RECORD_TYPE, RR_AUTO_FMT_RECORD_TYPE, RR_TAB_ID_RECORD_TYPE,
+    RRD_INFO_RECORD_TYPE, USR_EXCL_RECORD_TYPE,
+};
 
 fn record(record_type: u16, payload: &[u8]) -> Vec<u8> {
     let mut result = Vec::with_capacity(RECORD_HEADER_LEN + payload.len());
@@ -54,6 +57,27 @@ fn revision_header(user_name: &str) -> Vec<u8> {
     record(RRD_HEAD_RECORD_TYPE, &payload)
 }
 
+fn file_lock() -> Vec<u8> {
+    let mut payload = vec![0u8; 162];
+    payload[0..4].copy_from_slice(&0x0001_0001u32.to_le_bytes());
+    payload[4..6].copy_from_slice(&3u16.to_le_bytes());
+    payload[7..10].copy_from_slice(b"Bob");
+    record(FILE_LOCK_RECORD_TYPE, &payload)
+}
+
+fn usr_excl() -> Vec<u8> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&1u32.to_le_bytes());
+    payload.extend_from_slice(&short_dtr());
+    payload.extend_from_slice(&3u16.to_le_bytes());
+    payload.extend_from_slice(&fixed_string(148, "Bob"));
+    record(USR_EXCL_RECORD_TYPE, &payload)
+}
+
+fn rr_tab_id() -> Vec<u8> {
+    record(RR_TAB_ID_RECORD_TYPE, &1u16.to_le_bytes())
+}
+
 fn rename_sheet() -> Vec<u8> {
     let mut payload = Vec::with_capacity(528);
     payload.extend_from_slice(&rrd(0x0009, 21, 1));
@@ -66,7 +90,10 @@ fn rename_sheet() -> Vec<u8> {
 
 fn source_stream() -> Vec<u8> {
     let mut stream = revision_info();
+    stream.extend_from_slice(&file_lock());
+    stream.extend_from_slice(&usr_excl());
     stream.extend_from_slice(&revision_header("Alice"));
+    stream.extend_from_slice(&rr_tab_id());
     stream.extend_from_slice(&rename_sheet());
     // An opaque revision remains byte-identical through a flag edit.
     stream.extend_from_slice(&record(RR_AUTO_FMT_RECORD_TYPE, &[0xA1, 0xB2, 0xC3]));

@@ -13,6 +13,8 @@ const RRD_INFO_RECORD_TYPE: u16 = 0x0196;
 const RRD_HEAD_RECORD_TYPE: u16 = 0x0138;
 const RR_TAB_ID_RECORD_TYPE: u16 = 0x013D;
 const RRD_REN_SHEET_RECORD_TYPE: u16 = 0x013E;
+const FILE_LOCK_RECORD_TYPE: u16 = 0x0195;
+const USR_EXCL_RECORD_TYPE: u16 = 0x0194;
 
 // MS-XLS 2.5.212 RevisionType values used by the fixture.
 const REVT_RENAME_SHEET: u16 = 0x0009;
@@ -85,6 +87,23 @@ fn rr_tab_id() -> Vec<u8> {
     record(RR_TAB_ID_RECORD_TYPE, &data)
 }
 
+fn file_lock() -> Vec<u8> {
+    let mut data = vec![0u8; 162];
+    data[0..4].copy_from_slice(&0x0001_0001u32.to_le_bytes());
+    data[4..6].copy_from_slice(&3u16.to_le_bytes());
+    data[7..10].copy_from_slice(b"Bob");
+    record(FILE_LOCK_RECORD_TYPE, &data)
+}
+
+fn usr_excl() -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1u32.to_le_bytes());
+    data.extend_from_slice(&[0xE7, 0x07, 6, 30, 9, 15, 0, 5]);
+    data.extend_from_slice(&3u16.to_le_bytes());
+    data.extend_from_slice(&string_field(148, "Bob"));
+    record(USR_EXCL_RECORD_TYPE, &data)
+}
+
 fn rrd_ren_sheet() -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&rrd(REVT_RENAME_SHEET, 41, 1));
@@ -98,6 +117,8 @@ fn rrd_ren_sheet() -> Vec<u8> {
 fn revision_log_stream() -> Vec<u8> {
     let mut stream = Vec::new();
     stream.extend_from_slice(&rrd_info());
+    stream.extend_from_slice(&file_lock());
+    stream.extend_from_slice(&usr_excl());
     stream.extend_from_slice(&rrd_head());
     stream.extend_from_slice(&rr_tab_id());
     stream.extend_from_slice(&rrd_ren_sheet());
@@ -110,6 +131,7 @@ fn revision_log_stream() -> Vec<u8> {
 fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.add_worksheet("Sheet2").unwrap();
     writer.write_string(sheet, 0, 0, "shared").unwrap();
     let mut workbook_bytes = Cursor::new(Vec::new());
     writer.write_to(&mut workbook_bytes).unwrap();
@@ -151,8 +173,8 @@ fn workbook_exposes_revision_log_stream() {
     assert!(log.info().track_revisions());
     assert_eq!(log.info().revision_id(), 41);
     assert_eq!(log.info().history_interval_days(), HISTORY_INTERVAL_DAYS);
-    assert!(log.file_lock().is_none());
-    assert!(log.exclusive_lock().is_none());
+    assert_eq!(log.file_lock().unwrap().user_name(), "Bob");
+    assert!(log.exclusive_lock().unwrap().is_exclusive());
 
     assert_eq!(log.headers().len(), 1);
     let header = &log.headers()[0];
