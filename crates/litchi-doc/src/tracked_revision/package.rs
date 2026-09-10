@@ -16,6 +16,9 @@ use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, Re
 use crate::package::{Error as PackageError, Result};
 use crate::parts::dofr::{DofrArray, DofrPatch};
 use crate::parts::fib::FileInformationBlock;
+use crate::parts::saved_selection::{
+    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
+};
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
     SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
@@ -1077,6 +1080,19 @@ impl RevisionEditor {
         &self.authors
     }
 
+    /// Parses the optional saved-selection cache from this exact editor state.
+    ///
+    /// The FIB and table stream remain owned by the DOC editor; callers only
+    /// receive the inert, source-retaining semantic value.
+    pub(crate) fn saved_selection(&self) -> Result<Option<SavedSelection>> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        let selection = SavedSelection::parse(&fib, &self.table)?;
+        if let Some(selection) = &selection {
+            selection.validate_main_story_bound(self.main_ccp)?;
+        }
+        Ok(selection)
+    }
+
     /// Parses the optional frame-set/list record array from this exact editor
     /// state without exposing raw FIB offsets or mutable streams.
     pub(crate) fn dofr_records(&self) -> Result<Option<DofrArray>> {
@@ -1099,6 +1115,39 @@ impl RevisionEditor {
     #[must_use]
     pub(crate) const fn dofr_source_is_signed(&self) -> bool {
         self.signed
+    }
+
+    /// Validate a saved-selection patch against this exact editor state before
+    /// cloning the table stream. Exact byte no-ops are accepted even when the
+    /// source carries a binary signature.
+    pub(crate) fn preflight_saved_selection_patch(
+        &self,
+        patch: &SavedSelectionPatch,
+    ) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        patch.validate_main_story_bound(self.main_ccp)?;
+        Ok(patch.changed())
+    }
+
+    /// Applies a source-checked, same-length saved-selection patch and
+    /// publishes it through the existing failure-atomic package owner.
+    pub(crate) fn apply_saved_selection_patch(
+        &mut self,
+        patch: &SavedSelectionPatch,
+    ) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        patch.validate_main_story_bound(self.main_ccp)?;
+        if !patch.changed() {
+            return Ok(false);
+        }
+        if self.signed {
+            return Err(corrupted("signed DOC cannot accept a changed Selsf patch"));
+        }
+        let mut table = self.table.clone();
+        patch.apply_to_table_stream(&fib, &mut table)?;
+        self.replace_table_stream(table)
     }
 
     /// Applies a source-checked, same-length `RgDofr` patch through the DOC
@@ -1355,7 +1404,15 @@ impl RevisionEditor {
         if units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("body replacement exceeds text resource limit"));
         }
-        if units.len() != (end - start) as usize && !self.unmodeled_cp_tables.is_empty() {
+        let length_changed = units.len() != (end - start) as usize;
+        let added = u32::try_from(units.len())
+            .map_err(|_error| corrupted("body replacement length exceeds u32"))?;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, added)?
+        } else {
+            None
+        };
+        if length_changed && !self.unmodeled_cp_tables.is_empty() {
             return Err(corrupted(
                 "length-changing body replacement has unmodeled CP-indexed dependencies",
             ));
@@ -1364,8 +1421,6 @@ impl RevisionEditor {
         let mut candidate = self.clone();
         let removed = end - start;
         delete_piece_range(&mut candidate.pieces, start, end)?;
-        let added = u32::try_from(units.len())
-            .map_err(|_error| corrupted("body replacement length exceeds u32"))?;
         if added != 0 {
             let fc = align2(candidate.word.len())?;
             candidate.word.resize(fc, 0);
@@ -1395,6 +1450,9 @@ impl RevisionEditor {
         candidate.rewrite_chpx()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -1895,7 +1953,13 @@ impl RevisionEditor {
             .first()
             .ok_or_else(|| corrupted("picture placeholder has no character formatting"))?
             .to_vec();
-        if !self.unmodeled_cp_tables.is_empty() && end - start != 1 {
+        let length_changed = end - start != 1;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, 1)?
+        } else {
+            None
+        };
+        if !self.unmodeled_cp_tables.is_empty() && length_changed {
             return Err(corrupted(
                 "picture insertion changes length with unmodeled CP dependencies",
             ));
@@ -1960,6 +2024,9 @@ impl RevisionEditor {
             )?;
         }
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         let mut installed = graph.clone();
@@ -2027,7 +2094,15 @@ impl RevisionEditor {
         if units.is_empty() || units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("restored picture text length is invalid"));
         }
-        if units.len() != 1 && !self.unmodeled_cp_tables.is_empty() {
+        let length_changed = units.len() != 1;
+        let added = u32::try_from(units.len())
+            .map_err(|error| corrupted(format!("restored text length exceeds u32: {error}")))?;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, added)?
+        } else {
+            None
+        };
+        if length_changed && !self.unmodeled_cp_tables.is_empty() {
             return Err(corrupted(
                 "picture reversal changes length with unmodeled CP dependencies",
             ));
@@ -2037,8 +2112,6 @@ impl RevisionEditor {
         candidate.data.truncate(data_start);
         candidate.data_changed = true;
         delete_piece_range(&mut candidate.pieces, start, end)?;
-        let added = u32::try_from(units.len())
-            .map_err(|error| corrupted(format!("restored text length exceeds u32: {error}")))?;
         let fc = align2(candidate.word.len())?;
         candidate.word.resize(fc, 0);
         for unit in units {
@@ -2067,6 +2140,9 @@ impl RevisionEditor {
         candidate.rewrite_chpx()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -2076,6 +2152,72 @@ impl RevisionEditor {
     #[must_use]
     pub(crate) const fn main_story_cp_len(&self) -> u32 {
         self.main_ccp
+    }
+
+    /// Prepare the passive `Selsf` record for one main-story splice before a
+    /// candidate is cloned. The record is remapped when each CP has a proven
+    /// boundary mapping; interior positions are returned as an ambiguity so
+    /// the body facade can expose its typed dependency refusal.
+    pub(crate) fn saved_selection_splice(
+        &self,
+        start: u32,
+        end: u32,
+        added: u32,
+    ) -> std::result::Result<
+        Option<[u8; crate::parts::saved_selection::SELSF_SIZE]>,
+        SavedSelectionSpliceError,
+    > {
+        let fib =
+            FileInformationBlock::parse(&self.word).map_err(SavedSelectionSpliceError::Invalid)?;
+        let selection =
+            SavedSelection::parse(&fib, &self.table).map_err(SavedSelectionSpliceError::Invalid)?;
+        let Some(selection) = selection else {
+            return Ok(None);
+        };
+        selection
+            .validate_main_story_bound(self.main_ccp)
+            .map_err(SavedSelectionSpliceError::Invalid)?;
+        let removed = end.checked_sub(start).ok_or_else(|| {
+            SavedSelectionSpliceError::Invalid(corrupted("Selsf splice range is reversed"))
+        })?;
+        let new_ccp = self
+            .main_ccp
+            .checked_sub(removed)
+            .and_then(|value| value.checked_add(added))
+            .ok_or_else(|| {
+                SavedSelectionSpliceError::Invalid(corrupted("Selsf splice CP count overflows"))
+            })?;
+        let replacement = selection.remap_for_splice(start, end, added, new_ccp)?;
+        if replacement == selection.bytes() {
+            Ok(None)
+        } else {
+            Ok(Some(replacement))
+        }
+    }
+
+    fn prepared_saved_selection_splice(
+        &self,
+        start: u32,
+        end: u32,
+        added: u32,
+    ) -> Result<Option<[u8; crate::parts::saved_selection::SELSF_SIZE]>> {
+        self.saved_selection_splice(start, end, added)
+            .map_err(|error| match error {
+                SavedSelectionSpliceError::Invalid(error) => error,
+                SavedSelectionSpliceError::Ambiguous => {
+                    corrupted("length-changing edit intersects an ambiguous Selsf CP")
+                },
+            })
+    }
+
+    fn apply_saved_selection_splice(
+        &mut self,
+        replacement: [u8; crate::parts::saved_selection::SELSF_SIZE],
+    ) -> Result<()> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        let (start, end) = table_range(&fib, self.table.len())?;
+        self.table[start..end].copy_from_slice(&replacement);
+        Ok(())
     }
 
     fn character_groups(&self, start: u32, end: u32) -> Result<Vec<&[u8]>> {
@@ -2235,6 +2377,9 @@ impl RevisionEditor {
             return Err(corrupted("tracked insertion CP exceeds main story"));
         }
         validate_metadata(kind, &metadata)?;
+        let length =
+            u32::try_from(units.len()).map_err(|_| corrupted("tracked text length exceeds u32"))?;
+        let saved_selection = self.prepared_saved_selection_splice(cp, cp, length)?;
         let mut candidate = self.clone();
         let author = candidate.author_index(&metadata.author)?;
         let fc = align2(candidate.word.len())?;
@@ -2242,8 +2387,6 @@ impl RevisionEditor {
         for unit in &units {
             candidate.word.extend_from_slice(&unit.to_le_bytes());
         }
-        let length =
-            u32::try_from(units.len()).map_err(|_| corrupted("tracked text length exceeds u32"))?;
         insert_piece(
             &mut candidate.pieces,
             cp,
@@ -2268,6 +2411,9 @@ impl RevisionEditor {
         candidate.enable_tracking()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         self.find_exact(cp, cp + length, kind)
@@ -2397,6 +2543,8 @@ impl RevisionEditor {
 
     fn delete_revision_text(&mut self, revision: &Revision) -> Result<()> {
         self.reject_destructive_interactions(revision.start_cp, revision.end_cp)?;
+        let saved_selection =
+            self.prepared_saved_selection_splice(revision.start_cp, revision.end_cp, 0)?;
         let mut candidate = self.clone();
         delete_piece_range(&mut candidate.pieces, revision.start_cp, revision.end_cp)?;
         let removed = revision.end_cp - revision.start_cp;
@@ -2407,6 +2555,9 @@ impl RevisionEditor {
             .ok_or_else(|| corrupted("main story CP underflow"))?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())

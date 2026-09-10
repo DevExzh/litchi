@@ -26,6 +26,10 @@ pub mod source;
 use crate::DateTime;
 use crate::package::Error as PackageError;
 use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::saved_selection::{
+    FIB_INDEX_WSS, SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError,
+    SavedSelectionTransaction,
+};
 use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_core::Position;
 use litchi_core::patch::{
@@ -807,6 +811,18 @@ impl Snapshot {
         self.editor()?.revisions().map_err(Error::Invalid)
     }
 
+    /// Reads the optional inert `Selsf` cache through the strict DOC owner.
+    ///
+    /// The public value exposes only the fixed record bytes, while its private
+    /// owner handle keeps source-bound edits tied to this immutable snapshot.
+    /// No selection is applied to document or host UI state.
+    pub fn saved_selection(&self) -> Result<Option<SavedSelection>> {
+        self.editor()?
+            .saved_selection()
+            .map(|selection| selection.map(|selection| selection.with_owner(self.bytes_shared())))
+            .map_err(Error::Invalid)
+    }
+
     /// Reads the optional bounded `RgDofr` frame-set/list records through the
     /// strict DOC owner. Frame names and paths remain inert bytes.
     pub fn dofr_records(&self) -> Result<Option<DofrArray>> {
@@ -1187,9 +1203,9 @@ impl Snapshot {
 
     /// Non-mutating three-way plan for two patches based on this exact source.
     ///
-    /// Opaque `RgDofr` auxiliary-table changes are refused because this plan
-    /// merges semantic body changes and cannot combine those byte ranges
-    /// without silently dropping one side.
+    /// Opaque `RgDofr` and `Selsf` auxiliary-table changes are refused because
+    /// this plan merges semantic body changes and cannot combine those byte
+    /// ranges without silently dropping one side.
     pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before != *self || right.before != *self {
             return Err(Error::Conflict);
@@ -1278,10 +1294,84 @@ impl Edit {
         Ok(bytes)
     }
 
+    fn prepare_saved_selection_length_change(
+        &self,
+        start: u32,
+        end: u32,
+        added: usize,
+    ) -> Result<()> {
+        let added = u32::try_from(added).map_err(|_error| {
+            Error::Invalid(PackageError::Corrupted(
+                "Selsf splice length exceeds u32".to_string(),
+            ))
+        })?;
+        match self.editor.saved_selection_splice(start, end, added) {
+            Ok(Some(_)) | Ok(None) => Ok(()),
+            Err(SavedSelectionSpliceError::Invalid(error)) => Err(Error::Invalid(error)),
+            Err(SavedSelectionSpliceError::Ambiguous) => {
+                Err(Error::Refused(Refusal::PositionDependency {
+                    fib_index: FIB_INDEX_WSS,
+                }))
+            },
+        }
+    }
+
     /// Immutable source snapshot that authorizes this transaction.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
+    }
+
+    /// Applies a source-checked same-length `Selsf` patch to this staged DOC
+    /// edit through the normal package owner. A changed patch must have been
+    /// produced from this exact immutable snapshot; the component patch also
+    /// checks the FIB-selected record before cloning the table stream.
+    pub fn apply_saved_selection_patch(&mut self, patch: &SavedSelectionPatch) -> Result<bool> {
+        let changed = self
+            .editor
+            .preflight_saved_selection_patch(patch)
+            .map_err(Error::Invalid)?;
+        if !changed {
+            return Ok(false);
+        }
+        let owner = self.source.bytes_shared();
+        if !patch.owner_matches(&owner) {
+            return Err(Error::Conflict);
+        }
+        if self.signed {
+            return Err(Error::Refused(Refusal::SignedSource));
+        }
+        self.ensure_operation_capacity()?;
+        let changed = self
+            .editor
+            .apply_saved_selection_patch(patch)
+            .map_err(Error::Invalid)?;
+        self.auxiliary_changed |= changed;
+        if changed {
+            self.auxiliary_operations = self.auxiliary_operations.saturating_add(1);
+        }
+        Ok(changed)
+    }
+
+    /// Runs a checked same-length edit over the optional `Selsf` record.
+    ///
+    /// The closure receives the typed transaction and returns the package
+    /// error produced by its field setters. A document without `Selsf` is
+    /// reported as a missing semantic target.
+    pub fn edit_saved_selection(
+        &mut self,
+        edit: impl FnOnce(&mut SavedSelectionTransaction) -> crate::package::Result<()>,
+    ) -> Result<bool> {
+        let source = self
+            .editor
+            .saved_selection()
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::TargetNotFound))?
+            .with_owner(self.source.bytes_shared());
+        let mut transaction = source.transaction();
+        edit(&mut transaction).map_err(Error::Invalid)?;
+        let commit = transaction.commit().map_err(Error::Invalid)?;
+        self.apply_saved_selection_patch(commit.patch())
     }
 
     /// Applies a source-checked same-length `RgDofr` patch to this staged DOC
@@ -1370,8 +1460,10 @@ impl Edit {
     }
 
     /// Replaces one checked ordinary paragraph, simple table-cell value, or
-    /// simple field cached result. Main-story targets may change length;
-    /// non-main story paragraphs require equal UTF-16 length.
+    /// simple field cached result. Main-story targets may change length when
+    /// every `Selsf` CP has a deterministic splice-boundary mapping; an
+    /// interior or insertion-point ambiguity is refused. Non-main story
+    /// paragraphs require equal UTF-16 length.
     pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
         let span = resolve_target(&self.editor, target)?;
         if let Some(dependency) = drawing_dependency(&span.text) {
@@ -1407,6 +1499,9 @@ impl Edit {
         }
         if story != Story::Main && !self.editor.is_unicode_range(span.start_cp, span.end_cp) {
             return Err(Error::Refused(Refusal::CompressedPiece));
+        }
+        if story == Story::Main && actual != expected {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
         }
         if actual != expected
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
@@ -1525,7 +1620,6 @@ impl Edit {
         }
         let actual = 1;
         self.ensure_replacement_capacity(actual)?;
-        self.ensure_operation_capacity()?;
         if !self
             .editor
             .has_uniform_character_format(span.start_cp, span.end_cp)
@@ -1534,11 +1628,15 @@ impl Edit {
             return Err(Error::Refused(Refusal::FormattingDependency));
         }
         let expected = span.text.encode_utf16().count();
+        if expected != actual {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
+        }
         if expected != actual
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
         {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
+        self.ensure_operation_capacity()?;
         let before = PictureSlot::Text(span.text);
         let installed = self
             .editor
@@ -1583,12 +1681,15 @@ impl Edit {
         }
         let actual = replacement.encode_utf16().count();
         self.ensure_replacement_capacity(actual)?;
-        self.ensure_operation_capacity()?;
+        if actual != 1 {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
+        }
         if actual != 1
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
         {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
+        self.ensure_operation_capacity()?;
         self.editor
             .replace_picture_graph_with_text(span.start_cp, span.end_cp, &graph, &replacement)
             .map_err(Error::Invalid)?;
@@ -1801,16 +1902,16 @@ impl Edit {
     /// strict-owner and public-reader validation failures, while the phase
     /// helper test locks the finish-error event contract.
     /// The ordinary commit path is unchanged and the observer cannot alter the
-    /// returned document semantics. Auxiliary `RgDofr` changes remain outside
-    /// the semantic three-way merge boundary and are refused by
+    /// returned document semantics. Auxiliary `RgDofr` and `Selsf` changes
+    /// remain outside the semantic three-way merge boundary and are refused by
     /// [`Snapshot::plan_three_way`].
     ///
     /// # Errors
     ///
     /// Returns the same error as [`Self::commit`], including
     /// `Error::Refused(Refusal::SignedSource)`. A failed phase is closed
-    /// before the error is returned. Auxiliary `RgDofr` changes remain outside
-    /// the semantic three-way merge boundary and are refused by
+    /// before the error is returned. Auxiliary `RgDofr` and `Selsf` changes
+    /// remain outside the semantic three-way merge boundary and are refused by
     /// [`Snapshot::plan_three_way`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
@@ -1837,8 +1938,9 @@ impl Edit {
     /// Returns the same error as [`Self::commit`], including
     /// `Error::Refused(Refusal::SignedSource)`. Failed phases and physical
     /// parses close their respective observer events before the error is
-    /// returned. Auxiliary `RgDofr` changes remain outside the semantic
-    /// three-way merge boundary and are refused by [`Snapshot::plan_three_way`].
+    /// returned. Auxiliary `RgDofr` and `Selsf` changes remain outside the
+    /// semantic three-way merge boundary and are refused by
+    /// [`Snapshot::plan_three_way`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled_with_cfb_observer(
         self,
