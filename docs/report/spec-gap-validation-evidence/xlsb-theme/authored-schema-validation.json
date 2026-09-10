@@ -1,0 +1,125 @@
+{
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/xlsb-theme/authored-theme.xml",
+      "part": null,
+      "bytes": 2129,
+      "sha256": "d51f6f8b5ddc9fca6173bebcac93399770bb41a6edd586d8090db65bcd143d0c",
+      "valid": true,
+      "semantic": {
+        "name": "Office",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Office",
+        "major_latin": "Aptos",
+        "minor_latin": "Aptos"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    }
+  ]
+}

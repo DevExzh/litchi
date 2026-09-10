@@ -1,0 +1,18 @@
+{
+  "removed_owned_build_target": "/tmp/litchi-xlsb-theme-target-20260910",
+  "removed_logical_file_bytes": 2672862167,
+  "removed_root_verification_stdout": "/tmp/litchi-xlsb-theme-root-verification-20260910.json",
+  "preserved_preexisting_targets": [
+    "target",
+    "/var/tmp/litchi-xlsb-drawing-current-target-20260910"
+  ],
+  "profiler_owned_preliminary_and_probe_directories": "removed by profiler before final handoff",
+  "removed_empty_profile_stderr_logs": 54,
+  "terminal_whitespace_normalized_for_git_diff_check": [
+    "gates/theme-all-features-all-targets-incremental0.log",
+    "gates/theme-generated-schema-fixtures.log",
+    "gates/theme-pptx-consumer-integration.log",
+    "gates/theme-pptx-consumer-unit.log",
+    "performance/raw/final-release/release-build-command.txt"
+  ]
+}

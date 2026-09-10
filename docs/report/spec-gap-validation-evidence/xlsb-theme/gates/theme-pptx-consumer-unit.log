@@ -1,0 +1,13 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx)
+    Finished `test` profile [unoptimized] target(s) in 17.18s
+     Running unittests src/lib.rs (/tmp/litchi-xlsb-theme-target-20260910/debug/deps/litchi_pptx-83b324c2fbb55527)
+
+running 3 tests
+test shape::theme::part::tests::parses_aliased_theme_fonts_and_colors ... ok
+test shape::theme::part::tests::parses_strict_theme_and_rejects_invalid_colors_or_xml ... ok
+test shape::theme::package::tests::add_and_load_theme_uses_direct_opc_graph ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 623 filtered out; finished in 0.00s

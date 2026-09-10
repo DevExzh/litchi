@@ -1,0 +1,8 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+ Documenting litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized] target(s) in 6.21s
+   Generated /tmp/litchi-xlsb-theme-target-20260910/doc/litchi_drawingml/index.html and 1 other file

@@ -56,6 +56,105 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
 }
 
 impl Workbook {
+    /// Read the optional workbook Theme part with conservative finite limits.
+    pub fn theme(&self) -> Result<Option<crate::theme::Snapshot>> {
+        self.theme_with_limits(crate::theme::Limits::DEFAULT)
+    }
+
+    /// Read the optional workbook Theme part with an explicit XML policy.
+    pub fn theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<Option<crate::theme::Snapshot>> {
+        crate::theme::read(&self.package, limits)
+    }
+
+    /// Start a detached edit of the workbook Theme part.
+    pub fn edit_theme(&self) -> Result<crate::theme::Transaction> {
+        let snapshot = self
+            .theme_with_limits(crate::theme::Limits::DEFAULT)?
+            .ok_or_else(|| {
+                crate::package::error::Error::UnsupportedFeature(
+                    "cannot edit an absent Theme part through a present-only snapshot".to_string(),
+                )
+            })?;
+        Ok(snapshot.edit())
+    }
+
+    /// Start a detached Theme edit with explicit finite limits.
+    pub fn edit_theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::Transaction> {
+        let snapshot = self.theme_with_limits(limits)?.ok_or_else(|| {
+            crate::package::error::Error::UnsupportedFeature(
+                "cannot edit an absent Theme part through a present-only snapshot".to_string(),
+            )
+        })?;
+        Ok(snapshot.edit())
+    }
+
+    /// Apply an atomic, source-checked Theme commit and return its read-back
+    /// snapshot.
+    pub fn apply_theme(&mut self, commit: &crate::theme::Commit) -> Result<crate::theme::Snapshot> {
+        self.apply_theme_patch(commit.patch())
+    }
+
+    /// Apply a source-checked theme patch, including an exact inverse.
+    ///
+    /// A stale source or invalid theme graph is refused before publication.
+    pub fn apply_theme_patch(
+        &mut self,
+        patch: &crate::theme::Patch,
+    ) -> Result<crate::theme::Snapshot> {
+        patch.apply(&mut self.package)
+    }
+
+    /// Read the optional Theme owner together with the package graph needed by
+    /// create/remove publication.  Use [`Self::theme`] when a present-only
+    /// typed snapshot is sufficient.
+    pub fn theme_owner(&self) -> Result<crate::theme::OwnerSnapshot> {
+        self.theme_owner_with_limits(crate::theme::Limits::DEFAULT)
+    }
+
+    /// Read the optional Theme owner with an explicit finite XML policy.
+    pub fn theme_owner_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        crate::theme::read_owner(&self.package, limits)
+    }
+
+    /// Start a detached Theme owner transaction.  The transaction can create,
+    /// replace, or remove the Workbook-owned Theme part.
+    pub fn edit_theme_owner(&self) -> Result<crate::theme::OwnerTransaction> {
+        Ok(self.theme_owner()?.edit())
+    }
+
+    /// Start a detached Theme owner transaction with explicit finite limits.
+    pub fn edit_theme_owner_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::OwnerTransaction> {
+        Ok(self.theme_owner_with_limits(limits)?.edit())
+    }
+
+    /// Apply a source-checked Theme owner commit atomically.
+    pub fn apply_theme_owner(
+        &mut self,
+        commit: &crate::theme::OwnerCommit,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        commit.patch().apply(&mut self.package)
+    }
+
+    /// Apply a source-checked Theme owner patch atomically.
+    pub fn apply_theme_owner_patch(
+        &mut self,
+        patch: &crate::theme::OwnerPatch,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        patch.apply(&mut self.package)
+    }
+
     /// Read and bind the Worksheet Binary Index attached to one worksheet.
     /// Offsets are validated against the worksheet bytes during this call;
     /// the returned metadata owns the parsed index bytes but does not retain a
