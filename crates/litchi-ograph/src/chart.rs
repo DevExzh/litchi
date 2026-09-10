@@ -22,9 +22,9 @@ use crate::limits::as_u64;
 use crate::{Error, Limits, Result};
 
 pub use model::{
-    Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, Group, GroupId,
-    Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
-    ValueRef, XlValue,
+    Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, GraphFamily, Group,
+    GroupId, Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source,
+    Value, ValueRef, XlValue,
 };
 pub use transaction::{CacheValue, Change, Commit, Editor, Identity, Patch};
 

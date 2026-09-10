@@ -1,17 +1,16 @@
-//! Planned native chart authoring model for PPT slides.
+//! Standalone Graph chart authoring model for PPT slides.
 //!
 //! A native chart is placed on a slide as an OfficeArt picture-frame shape
 //! (MSOSPT 75) whose `ClientData` record carries an `ExObjRefAtom` pointing
 //! at an `ExOleEmbedContainer` in the document's `ExObjList` ([MS-PPT] 2.10).
-//! The container declares the `Excel.Chart.8` ProgID and references a
-//! persisted `ExOleObjStg` record whose payload is a BIFF8 chart workbook.
+//! The container declares the `MSGraph.Chart` ProgID and references a
+//! persisted `ExOleObjStg` record whose payload is a bounded standalone
+//! MS-OGRAPH compound file.
 //!
 //! Everything stays inert: chart data links are never evaluated, no external
-//! workbook is opened, and the embedded payload is never activated. Public
-//! chart creation currently returns
-//! [`litchi_ograph::Error::UnsupportedAuthoring`] through
-//! [`WriteError::Graph`] before mutating the presentation; the complete
-//! Office-compatible BIFF chart grammar must land before emission is enabled.
+//! workbook is opened, and the embedded payload is never activated. The
+//! authoring profile is deliberately limited to one primary Graph group with
+//! bounded literal datasheet caches.
 //!
 //! # Example
 //!
@@ -25,19 +24,18 @@
 //! chart.set_title("Quarterly sales");
 //! chart.set_categories(["Q1", "Q2", "Q3", "Q4"]);
 //! chart.add_series(Some("2024"), vec![1.5, 2.0, 2.5, 3.0])?;
-//! let error = writer
-//!     .add_chart(slide, 50, 50, 400, 300, chart)
-//!     .expect_err("binary chart authoring is not enabled yet");
-//! assert!(matches!(
-//!     error,
-//!     litchi_ppt::writer::WriteError::Graph(
-//!         litchi_ograph::Error::UnsupportedAuthoring { .. }
-//!     )
-//! ));
+//! writer.add_chart(slide, 50, 50, 400, 300, chart)?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+use std::sync::Arc;
+
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
+use litchi_ograph::chart::{
+    Ai, Binding, Cache, Chart as GraphChart, Count, DataKind, GraphFamily, Link, Owner, Role,
+    RowCol, Series, Source, Value,
+};
+use litchi_ograph::{Limits as GraphLimits, Package as GraphPackage};
 use zerocopy::IntoBytes;
 
 use super::core::WriteError;
@@ -56,7 +54,7 @@ const MSOSPT_PICTURE_FRAME: u16 = 75;
 /// `RT_ExternalObjectRefAtom` ([MS-PPT] 2.13).
 const EX_OBJ_REF_ATOM: u16 = 3009;
 /// `ProgID` declared for authored chart objects.
-const EXCEL_CHART_PROG_ID: &str = "Excel.Chart.8";
+const GRAPH_CHART_PROG_ID: &str = "MSGraph.Chart";
 /// Maximum categories or values per series (BIFF8 `SERIES` count bound).
 const MAX_DATA_POINT_COUNT: usize = 32_767;
 /// Maximum generated value columns after the shared category column.
@@ -177,6 +175,9 @@ impl Chart {
         if self.series.len() > MAX_SERIES_COUNT {
             return Err(invalid(format!("chart exceeds {MAX_SERIES_COUNT} series")));
         }
+        if self.categories.is_empty() {
+            return Err(invalid("chart must contain at least one category"));
+        }
         if self.categories.len() > MAX_DATA_POINT_COUNT {
             return Err(invalid(format!(
                 "chart exceeds {MAX_DATA_POINT_COUNT} categories"
@@ -185,10 +186,138 @@ impl Chart {
         for category in &self.categories {
             check_string_units(category, "chart category")?;
         }
+        for series in &self.series {
+            if series.values.len() != self.categories.len() {
+                return Err(invalid(
+                    "every chart series must contain one value per category",
+                ));
+            }
+        }
         if let Some(title) = &self.title {
             check_string_units(title, "chart title")?;
         }
         Ok(())
+    }
+
+    /// Materializes the checked request as a standalone Graph package.
+    pub(crate) fn to_graph_package(&self) -> Result<Vec<u8>, WriteError> {
+        self.validate()?;
+        let limits = GraphLimits::default();
+        let data_values = self
+            .series
+            .len()
+            .checked_mul(
+                self.categories
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("chart cache count overflows the checked range"))?,
+            )
+            .and_then(|value| value.checked_add(self.categories.len()))
+            .ok_or_else(|| invalid("chart cache count overflows the checked range"))?;
+        if data_values > limits.max_cached_values {
+            let observed = u64::try_from(data_values).unwrap_or(u64::MAX);
+            let maximum = u64::try_from(limits.max_cached_values).unwrap_or(u64::MAX);
+            return Err(litchi_ograph::Error::LimitExceeded {
+                resource: "cached value count",
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        let family = match self.kind {
+            ChartKind::Bar => GraphFamily::Bar,
+            ChartKind::Line => GraphFamily::Line,
+            ChartKind::Pie => GraphFamily::Pie,
+        };
+        let mut graph = GraphChart::new_graph_authoring(family, limits)?;
+        graph.set_title(self.title.clone());
+        let category_count = Count::new(
+            u16::try_from(self.categories.len())
+                .map_err(|_| invalid("chart category count exceeds the Graph range"))?,
+        )
+        .ok_or_else(|| invalid("chart category count exceeds the Graph range"))?;
+        for (series_index, requested) in self.series.iter().enumerate() {
+            let row = RowCol::new(
+                u16::try_from(series_index + 1)
+                    .map_err(|_| invalid("chart series row exceeds the Graph range"))?,
+            )
+            .ok_or_else(|| invalid("chart series row exceeds the Graph range"))?;
+            let series = Series {
+                category_kind: DataKind::Text,
+                category_count,
+                value_count: category_count,
+                bubble_count: Count::ZERO,
+                owner: Owner::PRIMARY,
+                ai: Ai::new(
+                    Binding::new(
+                        Link::graph(Role::Name, Source::Literal, row),
+                        requested.name.clone(),
+                    ),
+                    Binding::new(Link::graph(Role::Values, Source::Literal, row), None),
+                    Binding::new(
+                        Link::graph(Role::Categories, Source::Literal, RowCol::ZERO),
+                        None,
+                    ),
+                    Binding::new(
+                        Link::graph(Role::Bubbles, Source::Automatic, RowCol::ZERO),
+                        None,
+                    ),
+                )?,
+            };
+            graph.add_series(series)?;
+        }
+        for (series_index, requested) in self.series.iter().enumerate() {
+            let row = RowCol::new(
+                u16::try_from(series_index + 1)
+                    .map_err(|_| invalid("chart series row exceeds the Graph range"))?,
+            )
+            .ok_or_else(|| invalid("chart series row exceeds the Graph range"))?;
+            graph.add_cache(Cache::graph(
+                row,
+                RowCol::ZERO,
+                litchi_ograph::chart::cache::Ifmt::new(0),
+                requested
+                    .name
+                    .as_ref()
+                    .map_or(Value::Blank, |name| Value::Text(name.clone())),
+            ))?;
+        }
+        for (column, category) in self.categories.iter().enumerate() {
+            let column = RowCol::new(
+                u16::try_from(column + 1)
+                    .map_err(|_| invalid("chart category column exceeds the Graph range"))?,
+            )
+            .ok_or_else(|| invalid("chart category column exceeds the Graph range"))?;
+            graph.add_cache(Cache::graph(
+                RowCol::ZERO,
+                column,
+                litchi_ograph::chart::cache::Ifmt::new(0),
+                Value::Text(category.clone()),
+            ))?;
+        }
+        for (series_index, requested) in self.series.iter().enumerate() {
+            let row = RowCol::new(
+                u16::try_from(series_index + 1)
+                    .map_err(|_| invalid("chart series row exceeds the Graph range"))?,
+            )
+            .ok_or_else(|| invalid("chart series row exceeds the Graph range"))?;
+            for (column, value) in requested.values.iter().enumerate() {
+                let column = RowCol::new(
+                    u16::try_from(column + 1)
+                        .map_err(|_| invalid("chart value column exceeds the Graph range"))?,
+                )
+                .ok_or_else(|| invalid("chart value column exceeds the Graph range"))?;
+                graph.add_cache(Cache::graph(
+                    row,
+                    column,
+                    litchi_ograph::chart::cache::Ifmt::new(0),
+                    Value::Number(*value),
+                ))?;
+            }
+        }
+        Ok(GraphPackage::from_chart_with_limits(graph, limits)?
+            .finish()
+            .into_bytes())
     }
 }
 
@@ -203,8 +332,8 @@ pub(crate) struct PositionedChart {
     pub width: i32,
     /// Height in EMUs.
     pub height: i32,
-    /// Generated BIFF8 chart workbook (the `ExOleObjStg` payload).
-    pub workbook: Vec<u8>,
+    /// Generated standalone Graph package (the `ExOleObjStg` payload).
+    pub workbook: Arc<[u8]>,
 }
 
 /// Save-time identifiers assigned to one positioned chart.
@@ -235,12 +364,12 @@ impl ChartPlan {
                 draw_aspect: DrawAspect::Content,
                 object_type: ObjectType::Embedded,
                 id: self.ex_obj_id,
-                subtype: ObjectSubtype::ExcelChart,
+                subtype: ObjectSubtype::Graph,
                 persist_id: self.persist_id,
                 unused: [0; 4],
             },
             menu_name: None,
-            program_id: Some(EXCEL_CHART_PROG_ID.to_string()),
+            program_id: Some(GRAPH_CHART_PROG_ID.to_string()),
             clipboard_name: None,
             metafile: None,
         }
@@ -443,8 +572,8 @@ mod tests {
         };
         assert_eq!(definition.object.id, 1);
         assert_eq!(definition.object.persist_id, 7);
-        assert_eq!(definition.object.subtype, ObjectSubtype::ExcelChart);
-        assert_eq!(definition.program_id.as_deref(), Some(EXCEL_CHART_PROG_ID));
+        assert_eq!(definition.object.subtype, ObjectSubtype::Graph);
+        assert_eq!(definition.program_id.as_deref(), Some(GRAPH_CHART_PROG_ID));
     }
 
     #[test]

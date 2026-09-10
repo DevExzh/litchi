@@ -7,5 +7,5 @@
 mod model;
 mod records;
 
-pub(crate) use records::{PLOT_AREA, SHT_PROPS, valid_props};
+pub(crate) use records::{PLOT_AREA, SHT_PROPS, valid_props, validate_chart};
 pub(super) use records::{encode, parse, patch};

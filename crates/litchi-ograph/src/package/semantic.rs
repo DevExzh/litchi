@@ -1,3 +1,8 @@
+use std::io::Cursor;
+
+use litchi_biff::{Encoder, Records};
+use litchi_cfb::OleWriter;
+
 use crate::chart;
 use crate::{Limits, Result};
 
@@ -113,6 +118,40 @@ pub struct Package {
 }
 
 impl Package {
+    /// Builds a bounded standalone Graph package from a fresh, fully proven
+    /// chart model.
+    ///
+    /// The package contains the required `Workbook` stream with workbook
+    /// globals followed by one Graph chart sheet. The CFB container and the
+    /// Workbook stream are revalidated before this method returns, so callers
+    /// never receive a self-consistent but unowned chart payload.
+    pub fn from_chart(chart: chart::Chart) -> Result<Self> {
+        Self::from_chart_with_limits(chart, Limits::default())
+    }
+
+    /// Builds a standalone Graph package under explicit resource bounds.
+    pub fn from_chart_with_limits(chart: chart::Chart, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let chart = chart.finish_graph_authoring()?;
+        let chart_stream = chart.encode_with(limits)?.into_bytes();
+        let mut workbook = Encoder::with_limits(limits.biff)?;
+        workbook.push(validation::BOF, &bof(validation::GLOBALS))?;
+        workbook.push(validation::EOF, &[])?;
+        for record in Records::with_limits(&chart_stream, limits.biff)? {
+            workbook.push_ref(record?)?;
+        }
+        let workbook = workbook.finish();
+        validation::check_limit("Workbook bytes", workbook.len(), limits.max_workbook_bytes)?;
+
+        let mut writer = OleWriter::new();
+        writer.create_stream(&[codec::WORKBOOK], &workbook)?;
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output)?;
+        let output = output.into_inner();
+        validation::check_limit("package bytes", output.len(), limits.max_package_bytes)?;
+        Self::with_limits(output, limits)
+    }
+
     /// Takes ownership and validates without copying the input allocation.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
         Self::with_limits(bytes, Limits::default())
@@ -183,6 +222,18 @@ impl Package {
             limits: self.limits,
         }
     }
+}
+
+fn bof(doc_type: u16) -> [u8; validation::BOF_BYTES] {
+    let mut payload = [0; validation::BOF_BYTES];
+    payload[0..2].copy_from_slice(&validation::OGRAPH_VERSION.to_le_bytes());
+    payload[2..4].copy_from_slice(&doc_type.to_le_bytes());
+    payload[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
+    payload[6..8].copy_from_slice(&validation::OGRAPH_YEAR_1997.to_le_bytes());
+    payload[8..12]
+        .copy_from_slice(&(validation::REQUIRED_PLATFORM_FLAGS | (6 << 14)).to_le_bytes());
+    payload[12..16].copy_from_slice(&(0x06_u32 | (6 << 8)).to_le_bytes());
+    payload
 }
 
 /// Opaque standalone `OGraph` bytes with validated CFB topology and BIFF framing.

@@ -7,7 +7,7 @@ mod groups;
 mod inventory;
 mod series;
 
-pub use aggregate::Chart;
+pub use aggregate::{Chart, GraphFamily};
 pub use cache::{Cache, Value, ValueRef, XlValue};
 pub use context::{Context, Count, GroupId, Order, Props, Rect};
 pub use groups::{Family, Group};

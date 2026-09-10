@@ -73,7 +73,7 @@ pub mod slide_timing;
 /// Table authoring (OfficeArt table groups with text cells)
 pub mod table;
 
-/// Native chart request model; binary emission is currently refused safely.
+/// Bounded standalone Graph chart authoring and inert PPT object emission.
 pub mod chart;
 
 /// PowerPoint 11 smart-tag authoring.
