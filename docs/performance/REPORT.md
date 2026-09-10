@@ -2340,6 +2340,26 @@ allocation, RSS, decompression, physical-I/O, or producer claim.
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
 
+## Verified-cold per-file before/after observations (change 0496)
+
+[Change 0496](changes/0496-cold-verified-cache-post-observation.md) extends
+the existing opt-in `cold-verified` harness path. Each fresh child keeps the
+pre-operation `fincore` admission proof, then records one strict post-operation
+per-file observation immediately after the timed interval and process-I/O
+snapshot; both external probes remain outside timing. The additive
+`fincore_post` object retains size, resident, dirty, writeback, and
+privacy-preserving tool provenance. Post residency is observational and is not
+required to be zero. Missing, malformed, size-mismatched, or changed
+provenance post evidence is `ineligible_post_fincore` with no fallback to
+`cold-requested` or `warm`.
+
+The review-host private-file probe confirmed the existing ext4,
+`posix_fadvise(DONTNEED)`, and util-linux `fincore` path without global cache
+eviction. Focused harness tests, 90 strict Python validator tests, formatting,
+`cargo check --lib`, and warning-denied Clippy pass on the isolated candidate
+based at `fcb03ce72`. This is harness capability evidence only: no workload,
+cold-cache speedup, physical-I/O, or program-completion claim follows.
+
 ## DOCX source-backed selected-story text lifecycle (change 0352)
 
 Change 0352 records a source-backed DOCX correctness/CRUD closure only

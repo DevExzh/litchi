@@ -1,0 +1,9 @@
+# Verified-cold cache observations before and after operations
+
+The opt-in filesystem harness retains the existing pre-operation cache proof and records a second fincore observation after the operation, outside its timed interval. Size, path and tool provenance must match; unavailable, malformed or mismatched post observations make the run ineligible, with no implicit cache-mode fallback. Fresh-child isolation and default provider selection are retained. This is per-file page-cache/process-I/O evidence, not proof of physical-media reads or device-cache state.
+
+Independent review of the exact code delta passed, including a private ext4 probe with zero pre-residency and 8,192 post-resident bytes, matching size and zero dirty/writeback. Root reconstructed a clean archive of dee29f5b2 with all eleven reviewed paths and verified preimages against the current primary. Root passed 16 focused Rust tests, 90 Python validator tests, warnings-denied library Clippy/rustdoc and scoped formatting under Rust 1.95. Source/lock hashes remained unchanged. A setup filename typo was corrected before any gates; its receipt is retained, and the same constructed candidate was used.
+
+The benchmark lock reconciliation updates only local dependency arrays for litchi-crypto, litchi-doc and litchi-xls after the shared RC4 consolidation. All 205 registry package records, versions, sources and checksums are unchanged. Before/after locks and the exact delta are retained. Unrelated pending xlsb_crud.rs changes were excluded.
+
+No timed workload capture or CPU2 measurement was performed. Existing baseline captures remain bound to their historical source/binary identities. This change enables stronger future cold-cache evidence; it establishes no speedup, complete CRUD coverage, native-producer validation or completion of docs/GOAL.md.
