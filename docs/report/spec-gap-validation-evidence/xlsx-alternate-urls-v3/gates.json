@@ -1,0 +1,65 @@
+[
+  {
+    "name": "test",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 65.48420643806458,
+    "log_sha256": "d05567c5b203f409b0dbd3cf84a38896bb2dc4e07b31972c66ee49ea85a37fb4"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-xlsx",
+      "--all-targets",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 31.170273065567017,
+    "log_sha256": "d2f3208c6c7b173acd79e2eea68a505827915b9285177a4c3ef44c1c36bcb302"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--no-deps",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 11.30090618133545,
+    "log_sha256": "9e115e249bee538428a610df3471e12e25d5241aed24178b9d4c5cea92d73b83"
+  }
+]

@@ -206,9 +206,9 @@ pub use error::{
     Result, RowEditBlock, TabEditBlock,
 };
 pub use external_links::{
-    CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, Entry, ItemSource,
-    Link, Ole, OleItem, SheetData, Target, build_external_link_part,
-    build_external_link_part_with_conformance, load_external_link,
+    AlternateUrl, AlternateUrls, CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues,
+    DefinedName, Entry, ItemSource, Link, Ole, OleItem, SheetData, Target,
+    build_external_link_part, build_external_link_part_with_conformance, load_external_link,
 };
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
