@@ -2,7 +2,7 @@
 
 mod parser;
 mod writer;
-mod xml;
+pub(crate) mod xml;
 
 pub use parser::{
     parse_arrays, parse_data, parse_dxf_complement, parse_feature_property_bags,

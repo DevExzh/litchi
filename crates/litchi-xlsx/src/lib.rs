@@ -280,6 +280,13 @@ pub use revisions::{
 };
 pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
 pub use rich_values::package::load as load_rich_values;
+pub use rich_values::refresh_intervals::{
+    Commit as RichValueRefreshCommit, Patch as RichValueRefreshPatch, REFRESH_INTERVALS_NAMESPACE,
+    RefreshInterval, RefreshIntervals, Snapshot as RichValueRefreshSnapshot,
+    Transaction as RichValueRefreshTransaction, TypeRefreshIntervals,
+    apply_patch as apply_rich_value_refresh_patch, edit as edit_rich_value_refresh,
+    load as load_rich_value_refresh, parse_refresh_intervals, write_refresh_intervals,
+};
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
     CellReference, InputCell, Scenario, UnknownAttribute, UnknownElement,

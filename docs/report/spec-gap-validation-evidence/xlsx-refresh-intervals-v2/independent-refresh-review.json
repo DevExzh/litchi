@@ -1,0 +1,94 @@
+{
+  "review": "independent-refreshIntervals-v2",
+  "review_date": "2026-09-10",
+  "verdict": "CLEAR",
+  "scope": "V1 malformed owner/context/cardinality blockers, read/write closure, opaque preservation, nested targeted payload refusal, no-op/inverse/atomicity regression",
+  "candidate": "/var/tmp/litchi-xlsx-refresh-intervals-v2-validation-20260910",
+  "candidate_base_commit": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "candidate_receipt_sha256": "1e1d71a05b4bc5ca41f0ccf97c28ebb2c2274137fce5b0033eee7c159fe90f6d",
+  "spec_evidence": [
+    {
+      "path": "3rdparty/specs/[MS-XLSX]/2 Structures/2.6 Complex Types.md",
+      "sections": [
+        "2.6.182 CT_RichValueType",
+        "2.6.186 CT_RichValueTypes",
+        "2.6.187 CT_RichValueTypesInfo",
+        "2.6.221 CT_RichValueRefreshInterval",
+        "2.6.222 CT_RichValueRefreshIntervals"
+      ],
+      "checked": "types maxOccurs=1 in rvTypesInfo; type records belong to CT_RichValueTypes; extLst maxOccurs=1 per type; refresh interval ID/interval grammar."
+    },
+    {
+      "path": "3rdparty/specs/[MS-XLSX]/2 Structures/2.4 Global Elements.md",
+      "sections": [
+        "2.4.92 refreshIntervals"
+      ],
+      "checked": "richvaluerefresh namespace and CT_RichValueRefreshIntervals owner semantics."
+    },
+    {
+      "path": "3rdparty/specs/[MS-XLSX]/5 Appendix A - Full XML Schema/5.31 ...richvaluerefresh Schema.md",
+      "sections": [
+        "refreshIntervals schema"
+      ],
+      "checked": "namespace, element, and attribute declarations."
+    }
+  ],
+  "independent_adversarial_probe": {
+    "source": "/tmp/litchi-refresh-probe-v2",
+    "results": {
+      "duplicate_types": "rejected: rich-value types has duplicate types containers",
+      "duplicate_extlst": "rejected: rich-value type 'a' has duplicate extLst containers",
+      "nested_types_with_targeted_payload": "rejected: rich-value refresh payload is outside its type ext owner",
+      "stray_refresh_payload": "rejected: rich-value refresh payload is outside its type ext owner",
+      "duplicate_refresh_payload": "rejected: rich-value type 'a' has duplicate refreshIntervals payloads"
+    },
+    "valid_profile": "opaque vendor extension bytes preserved; no-op source Arc shared; add commit succeeded; inverse restored exact original owner bytes."
+  },
+  "validation": {
+    "focused_tests": {
+      "command": "taskset -c 8-31 cargo test -p litchi-xlsx --test rich_value_refresh_intervals -- --nocapture",
+      "result": "6 passed, 0 failed",
+      "log": "/var/tmp/litchi-xlsx-refresh-intervals-v2-validation-20260910-focused.log",
+      "sha256": "0669e6df413dad98e9313e32652434380a6df8923d5d5772a731c863e7c8f889"
+    },
+    "library_tests": {
+      "command": "taskset -c 8-31 cargo test -p litchi-xlsx --lib --quiet",
+      "result": "1066 passed, 0 failed",
+      "log": "/var/tmp/litchi-xlsx-refresh-intervals-v2-validation-20260910-lib.log",
+      "sha256": "903908b0b2cc0bb485bc54a1114632c101b52fb3a688c05938d5f65fd18ed184"
+    },
+    "candidate_receipt_gates": {
+      "clippy": "taskset -c 8-31 cargo +stable clippy -p litchi-xlsx --test rich_value_refresh_intervals --all-targets -- -D warnings",
+      "clippy_log": "/var/tmp/litchi-xlsx-refresh-intervals-v2-validation-20260910-clippy.log",
+      "clippy_log_sha256": "a5f4c585ee974ca44916ac30a98bbc189e067a7e0a6bc6d2e8d6bc525be724af",
+      "rustdoc": "taskset -c 8-31 env RUSTDOCFLAGS='-D warnings' cargo +stable doc -p litchi-xlsx --no-deps",
+      "rustdoc_log": "/var/tmp/litchi-xlsx-refresh-intervals-v2-validation-20260910-rustdoc.log",
+      "rustdoc_log_sha256": "c91ceba161dccd11eadb7f9174b959aae273e82695dbe81a4f39b611ea7128fb"
+    },
+    "changed_file_rustfmt": "pass",
+    "workspace_fmt_note": "cargo fmt --all --check reports unrelated existing crates/litchi-keynote/src/document.rs formatting; direct changed-file rustfmt check passes."
+  },
+  "source_manifest": {
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "f5df2a79d8621543147667037c18effb87b5da8ff8a6d867de3617ffd4364d1a",
+    "crates/litchi-xlsx/src/lib.rs": "0610463c8705f04118c667f166efd8459286fd29800a95750772d987f349248e",
+    "crates/litchi-xlsx/src/rich_values/codec/mod.rs": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+    "crates/litchi-xlsx/src/rich_values/mod.rs": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+    "crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+    "crates/litchi-xlsx/src/rich_values/refresh_intervals/model.rs": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+    "crates/litchi-xlsx/src/rich_values/refresh_intervals/mod.rs": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+    "crates/litchi-xlsx/src/rich_values/refresh_intervals/package.rs": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+    "crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8"
+  },
+  "working_tree": [
+    " M crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    " M crates/litchi-xlsx/src/lib.rs",
+    " M crates/litchi-xlsx/src/rich_values/codec/mod.rs",
+    " M crates/litchi-xlsx/src/rich_values/mod.rs",
+    "?? crates/litchi-xlsx/src/rich_values/refresh_intervals/",
+    "?? crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs"
+  ],
+  "index_touched": false,
+  "committed": false,
+  "candidate_edited_by_reviewer": false,
+  "primary_edited_by_reviewer": false
+}

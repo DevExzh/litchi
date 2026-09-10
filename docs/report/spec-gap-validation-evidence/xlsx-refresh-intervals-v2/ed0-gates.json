@@ -1,0 +1,42 @@
+[
+  {
+    "gate": "focused",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--test",
+      "rich_value_refresh_intervals"
+    ],
+    "log": "/var/tmp/litchi-xlsx-refresh-root-ed0-20260910-focused.log",
+    "sha256": "dfd49676689191d3587d70be319d71a90b10e9b6c7542c80625b4b277391f0b1"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-xlsx-refresh-root-ed0-20260910-clippy.log",
+    "sha256": "bc78f7c02866ee505cd6de2eaf41e954817ed4137559e04eaf94a6aecbb7b731"
+  }
+]
