@@ -1,0 +1,47 @@
+{
+  "integration_parent": "9a45284ac952e5164bc82b6f4f32589dd8f9e53a",
+  "validated_candidate_base": "bfdc911c0577c6a3304b4a70b8b70e2661721355",
+  "measured_source_base": "fccbe6595f3a29561a8bfc6c192d8fa5e874ad05",
+  "source_patch_sha256": "0aaf3ee77c772b4ed603a2a07cb61cec51939e66c7b79acb6bec9892b9dada50",
+  "candidate_source_hashes": {
+    "tools/perf-baseline/README.md": "75c0e644177a04f609ef2689a97ad5318155f1aec6a45a6ca3e110f9e1c2b54c",
+    "tools/perf-baseline/src/lib.rs": "6437a6706436588fb6e3ae9259a70e61b1a3501761e800904d99962ea1f596c8",
+    "tools/perf-baseline/src/operation_metrics.rs": "c9ef485afbf70556ac91cbcb156f6f0988846ef927613d034b9556cd20408658",
+    "docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md": "aae0fca88bcb785be548d57fca8a7fc41e2dd7ab962a89c8ae9728c726a8ffa4"
+  },
+  "primary_preimages": {
+    "tools/perf-baseline/README.md": "8bb7093e5aa0e726e9a117ba5b3e274c6e585f78742914c905798cbdc7e2dc87",
+    "tools/perf-baseline/src/lib.rs": "523ba6ebf21f143730810dba0749e82403a1d8da38ba09cb39fe597b34298ffd",
+    "tools/perf-baseline/src/operation_metrics.rs": "9ad3786448e8b977d2c718dac2f3a77409ea679e5b3376f684142b0a304f60f4",
+    "docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md": null
+  },
+  "root_tests": {
+    "passed": 360,
+    "ignored": 1,
+    "failed": 0
+  },
+  "root_commands": [
+    "cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml -p litchi-perf-baseline --lib",
+    "cargo +1.95.0 clippy --manifest-path tools/perf-baseline/Cargo.toml -p litchi-perf-baseline --all-targets -- -D warnings"
+  ],
+  "environment": {
+    "affinity": "8-31",
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-allocator-publication-root-target-195",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "logs": {
+    "tests": {
+      "sha256": "3fd4beee7d0ad1d8d886416e86da61642a065507e2af7d796b421c632091ec4b",
+      "exit_code": 0
+    },
+    "clippy": {
+      "sha256": "e0d9f3fc7b14cf0b23080acf79b43e0da1602fe0aa87572b32741ee7fa8b5000",
+      "exit_code": 0
+    }
+  },
+  "independent_capture_review": "xlsx_current_review: clear",
+  "independent_publication_review": "cfb_boundary_tests: clear",
+  "portable_verifier": "passed: 201 rows, approved digest f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670"
+}
