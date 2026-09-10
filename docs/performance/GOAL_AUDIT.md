@@ -19,6 +19,17 @@ historical base `995bdaf09`. Region peak increased by four bytes. The separate
 retains descriptive fixed-work and simulated-range evidence without a common
 Amdahl or production-wide scaling claim.
 
+The [sparse verification scanner](../report/spec-gap-validation-evidence/xlsx-scanner-v8/README.md)
+is committed in `6f281e386`. Its separate historical matched pair shares base
+`21d5fb0be`: 40 normal samples per side show 8.460474% lower median, 7.868794%
+lower nearest-rank p95 and 7.515784% lower p99. Operation-scoped allocator calls
+fall 20.897961% and allocated bytes 32.814253%; reallocations rise 0.315610%.
+These observations are not a combined gain with the earlier optimization and do
+not measure the later integration head. The exact delta passed 1,437 tests and
+strict gates on integration base `de80c3824`. A portable bundle retains all 31
+raw outputs and independently recomputes the historical statistics without
+executing the measured binaries; root verified a fresh extraction unchanged.
+
 The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
 is committed with four opt-in axes and unchanged default selection. The
 [verified capture](results/provider-sinks-capture-v3-20260910/README.md), published
