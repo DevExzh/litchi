@@ -1,0 +1,47 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "cell-value-native.numbers",
+  "size": 125316,
+  "sha256": "3e6160615830289adfa03bbc19d9349413e1fe9b31947cf5ae85f7b986953e12",
+  "source": "shared-model-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 8,
+  "columns": 3,
+  "native_display": {
+    "B2": "42.5",
+    "B3": "TRUE",
+    "B4": "2026-09-10",
+    "B5": "1h 2m 3s",
+    "B6": "43.5",
+    "B7": "Formula error: Numbers cannot divide by zero",
+    "B8": "blank"
+  },
+  "formulas": {
+    "B6": "=B2+1",
+    "B7": "=1/0"
+  },
+  "comment": {
+    "cell": "B6",
+    "text": "Shared cell value control — 北京"
+  },
+  "lifecycle": [
+    "Copied the native shared-model control into a disposable directory.",
+    "Extended the table through Numbers UI and entered date, duration, formula, error, and empty-cell controls.",
+    "Added a Unicode comment to B6, saved, and closed the document.",
+    "Reopened the exact saved path and verified all cell displays through accessibility and the comment text visually.",
+    "Closed to the template chooser."
+  ],
+  "scope": "Native mixed-value and formula-precedence readback control. Typed archive interpretation is asserted by integration tests; synthetic wire tests cover legacy versions and malformed input. Numbers retained the imported date/duration-looking entries as text; cached formula results do not replace formula source.",
+  "typed_readback": {
+    "B2": "Number",
+    "B3": "Boolean",
+    "B4": "Text",
+    "B5": "Text",
+    "B6": "Formula",
+    "B7": "Formula",
+    "B8": "Missing"
+  }
+}

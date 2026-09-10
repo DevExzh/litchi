@@ -4485,3 +4485,18 @@ The format adapters prove table ownership and supply their remaining read
 budgets. The host merge read path also uses the shared decoder, while its
 existing mutation code remains until focused write parity is complete.
 The broader host table-value/comment reader dependencies remain tracked.
+
+## 2026-09-10 Shared cell-value interpretation
+
+The native value envelope now has one interpreter in
+`litchi-numbers-wire::cell_value`. It projects BNC and pre-BNC payloads into
+finite scalars or unresolved typed value sources without allocating on
+successful reads. Both the focused Numbers extractor and migration host
+delegate version dispatch, defaults, formula precedence, and comment
+references to this implementation.
+
+Concrete adapters retain sidecar lookup, text retention, formula rendering,
+comment materialization, and their existing error categories. The shared
+projection is a building block for selected-table readers; format graph
+selection and table traversal remain owner-local. The Pages and Keynote host
+table readers are still migration debt.
