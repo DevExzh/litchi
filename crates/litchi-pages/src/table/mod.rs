@@ -12,6 +12,10 @@ pub mod hidden_axes;
 pub mod lock;
 /// Archive-free merged-cell geometry and topology algebra.
 pub mod merge;
+/// Archive-free table values together with sparse cell comments.
+pub mod read {
+    pub use litchi_iwa_common::table::read::*;
+}
 /// Validated, archive-free names for Pages body tables.
 pub mod name;
 /// Persisted row-order rules for a body-attached table.

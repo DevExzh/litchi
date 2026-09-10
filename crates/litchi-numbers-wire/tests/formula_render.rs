@@ -7,9 +7,11 @@
 
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
 use litchi_iwa_protos::numbers_formula_codec::{
-    BinaryOperator, FormulaNode, FormulaRenderCategoryReference, FormulaRenderCfuuid,
-    FormulaRenderCrossTableCellReference, FormulaRenderEvent, FormulaRenderUuid,
-    FormulaRenderVisitor,
+    BinaryOperator, FormulaNode, FormulaRenderAxis, FormulaRenderCategoryReference,
+    FormulaRenderCellReference, FormulaRenderCfuuid, FormulaRenderColonTract,
+    FormulaRenderCoordinatePair, FormulaRenderCrossTableCellReference,
+    FormulaRenderCrossTableExtra, FormulaRenderEvent, FormulaRenderRangeSummary,
+    FormulaRenderStickyBits, FormulaRenderUuid, FormulaRenderVisitor,
 };
 use litchi_numbers_wire::formula_render::{
     CompatibilityFormulaVisitor, FormulaCategoryId, FormulaEventRenderBudget,
@@ -186,16 +188,72 @@ impl ReferenceResolver for Resolver {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TableOnlyResolver;
+
+impl ReferenceResolver for TableOnlyResolver {
+    fn table_prefix(&self, _id: &FormulaRenderCfuuid) -> Option<FormulaTablePrefix<'_>> {
+        None
+    }
+
+    fn table_only_name(&self, id: &FormulaRenderCfuuid) -> Option<&str> {
+        (*id == known_table_id()).then_some("Body")
+    }
+
+    fn category_name(&self, _id: FormulaCategoryId) -> Option<&str> {
+        None
+    }
+
+    fn function_name(&self, _index: u32) -> Option<&str> {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ConflictingTableResolver;
+
+impl ReferenceResolver for ConflictingTableResolver {
+    fn table_prefix(&self, id: &FormulaRenderCfuuid) -> Option<FormulaTablePrefix<'_>> {
+        (*id == known_table_id()).then_some(FormulaTablePrefix {
+            sheet: "Invented sheet",
+            table: "Body",
+        })
+    }
+
+    fn table_only_name(&self, id: &FormulaRenderCfuuid) -> Option<&str> {
+        (*id == known_table_id()).then_some("Body")
+    }
+
+    fn category_name(&self, _id: FormulaCategoryId) -> Option<&str> {
+        None
+    }
+
+    fn function_name(&self, _index: u32) -> Option<&str> {
+        None
+    }
+}
+
+fn render_events_with_resolver<R>(
+    events: impl IntoIterator<Item = FormulaRenderEvent<'static>>,
+    resolver: &R,
+    budget: &mut RenderBudget,
+) -> Result<String, RenderError>
+where
+    R: ReferenceResolver,
+{
+    let mut visitor = CompatibilityFormulaVisitor::new(0, 0, resolver, budget);
+    for event in events {
+        visitor.visit_event(event)?;
+    }
+    visitor.finish()
+}
+
 fn render_events(
     events: impl IntoIterator<Item = FormulaRenderEvent<'static>>,
     budget: &mut RenderBudget,
 ) -> Result<String, RenderError> {
     let resolver = Resolver;
-    let mut visitor = CompatibilityFormulaVisitor::new(0, 0, &resolver, budget);
-    for event in events {
-        visitor.visit_event(event)?;
-    }
-    visitor.finish()
+    render_events_with_resolver(events, &resolver, budget)
 }
 
 fn category_event() -> FormulaRenderEvent<'static> {
@@ -274,6 +332,135 @@ fn events_render_values_strings_operators_and_references() -> Result<(), RenderE
             &mut budget
         )?,
         "=#CATEGORY![North\\]\\\\Region]"
+    );
+    Ok(())
+}
+
+#[test]
+fn table_only_names_render_cross_cell_coordinate_and_range_references() -> Result<(), RenderError> {
+    let resolver = TableOnlyResolver;
+    let mut budget = RenderBudget::unlimited();
+    assert_eq!(
+        render_events_with_resolver(
+            [
+                FormulaRenderEvent::BeginArray { depth: 1 },
+                FormulaRenderEvent::CrossTableCellReference(Some(
+                    FormulaRenderCrossTableCellReference {
+                        row_handle: 2,
+                        column_handle: 2,
+                        row_is_sticky: 0,
+                        column_is_sticky: 0,
+                        table_id: known_table_id(),
+                    },
+                )),
+                FormulaRenderEvent::EndArray,
+            ],
+            &resolver,
+            &mut budget,
+        )?,
+        "=Body::C3"
+    );
+
+    let mut budget = RenderBudget::unlimited();
+    assert_eq!(
+        render_events_with_resolver(
+            [
+                FormulaRenderEvent::BeginArray { depth: 1 },
+                FormulaRenderEvent::CellReference(FormulaRenderCellReference {
+                    coordinates: Some(FormulaRenderCoordinatePair {
+                        column: FormulaRenderAxis {
+                            coordinate: 0,
+                            absolute: false,
+                        },
+                        row: FormulaRenderAxis {
+                            coordinate: 0,
+                            absolute: false,
+                        },
+                    }),
+                    local: None,
+                    cross_table: None,
+                    cross_table_extra: Some(FormulaRenderCrossTableExtra {
+                        table_id: known_table_id(),
+                    }),
+                }),
+                FormulaRenderEvent::EndArray,
+            ],
+            &resolver,
+            &mut budget,
+        )?,
+        "=Body::A1"
+    );
+
+    let mut budget = RenderBudget::unlimited();
+    assert_eq!(
+        render_events_with_resolver(
+            [
+                FormulaRenderEvent::BeginArray { depth: 1 },
+                FormulaRenderEvent::ColonTract(FormulaRenderColonTract {
+                    relative_column: FormulaRenderRangeSummary {
+                        count: 1,
+                        first_begin: Some(0),
+                        first_end: Some(2),
+                    },
+                    relative_row: FormulaRenderRangeSummary {
+                        count: 1,
+                        first_begin: Some(0),
+                        first_end: Some(2),
+                    },
+                    absolute_column: FormulaRenderRangeSummary {
+                        count: 0,
+                        first_begin: None,
+                        first_end: None,
+                    },
+                    absolute_row: FormulaRenderRangeSummary {
+                        count: 0,
+                        first_begin: None,
+                        first_end: None,
+                    },
+                    preserve_rectangular: true,
+                    sticky: FormulaRenderStickyBits {
+                        begin_row_is_absolute: false,
+                        begin_column_is_absolute: false,
+                        end_row_is_absolute: false,
+                        end_column_is_absolute: false,
+                    },
+                    cross_table_extra: Some(FormulaRenderCrossTableExtra {
+                        table_id: known_table_id(),
+                    }),
+                }),
+                FormulaRenderEvent::EndArray,
+            ],
+            &resolver,
+            &mut budget,
+        )?,
+        "=Body::A1:C3"
+    );
+    Ok(())
+}
+
+#[test]
+fn table_only_name_takes_precedence_over_sheet_table_prefix() -> Result<(), RenderError> {
+    let resolver = ConflictingTableResolver;
+    let mut budget = RenderBudget::unlimited();
+    assert_eq!(
+        render_events_with_resolver(
+            [
+                FormulaRenderEvent::BeginArray { depth: 1 },
+                FormulaRenderEvent::CrossTableCellReference(Some(
+                    FormulaRenderCrossTableCellReference {
+                        row_handle: 0,
+                        column_handle: 0,
+                        row_is_sticky: 0,
+                        column_is_sticky: 0,
+                        table_id: known_table_id(),
+                    },
+                )),
+                FormulaRenderEvent::EndArray,
+            ],
+            &resolver,
+            &mut budget,
+        )?,
+        "=Body::A1"
     );
     Ok(())
 }

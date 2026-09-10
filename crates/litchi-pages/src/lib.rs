@@ -121,6 +121,7 @@ pub use package::{
 pub use package::{
     BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
 };
+pub use package::{BodyTableCellsError, BodyTableCellsLimitKind};
 pub use package::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
     BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,

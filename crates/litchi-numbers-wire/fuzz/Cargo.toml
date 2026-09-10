@@ -9,9 +9,7 @@ license = "Apache-2.0"
 [package.metadata]
 cargo-fuzz = true
 
-[dependencies]
-libfuzzer-sys = "0.4"
-litchi-numbers-wire = { path = ".." }
+[workspace]
 
 [[bin]]
 name = "pre_bnc_cell"
@@ -20,9 +18,19 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "table_cells"
+path = "fuzz_targets/table_cells.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
+litchi-numbers-wire = { path = ".." }
+
 [profile.release]
 debug = 1
 codegen-units = 1
 lto = "thin"
-
-[workspace]

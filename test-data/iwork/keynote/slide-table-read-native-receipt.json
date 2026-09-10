@@ -1,0 +1,36 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "slide-table-read-native.key",
+  "size": 540001,
+  "sha256": "3343d0e3b66e1996433f5dadf93b685141f1f3d84571b15ee8e2e0408280239a",
+  "source": "slide-table-merges-native.key",
+  "lifecycle": [
+    "Copied existing native control to a disposable directory.",
+    "Added native cell controls and a Unicode comment through the application UI.",
+    "Saved, closed, and reopened the exact saved path.",
+    "Verified cell displays through accessibility and saved comment text visually.",
+    "Closed the verified document."
+  ],
+  "slide": 1,
+  "table": "Table 1",
+  "rows": 5,
+  "columns": 4,
+  "values": {
+    "A1": "Buffa discovery",
+    "A2": "Café 北京",
+    "B2": "12.5",
+    "C2": "TRUE",
+    "D2": "13.5"
+  },
+  "formula": {
+    "D2": "=B2+1"
+  },
+  "comment": {
+    "cell": "D2",
+    "text": "Focused Keynote table read — Café 北京"
+  },
+  "merged_range": "B4:C5",
+  "scope": "Mixed cell controls and formula comment with the existing B4:C5 merge preserved. Native accessibility reports inconsistent merge spans; the visible rectangle and prior receipt establish the merge. Existing slide text overlays the table and remains unchanged."
+}

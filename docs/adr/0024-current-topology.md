@@ -4515,3 +4515,26 @@ the focused reader preserves its existing single callback pass. An explicit
 range-overflow policy preserves the readers' historical error precedence.
 This shared coordinator prepares selected-table readback without moving
 format graph traversal or concrete package state into the wire crate.
+
+## 2026-09-10 Focused table values and comments
+
+Pages `body_table_cells` and Keynote `slide_table_cells` resolve semantic
+table selectors into an archive-free `litchi-iwa-common::table::read::TableRead`.
+The result combines the shared sparse table model with positioned comments,
+finite timestamps, author display metadata, and resolved replies. Owned
+handoff constructors let bounded readers transfer retained comment storage
+without rebuilding it.
+
+`litchi-numbers-wire::table_cells` owns borrowed tile and row traversal and
+delegates cell classification to `cell_value`. `table_sidecars` owns the five
+native list kinds, strict formula envelopes, formula rendering, and comment
+storage projection. `formula_names` projects formula-owner identity edges
+and category labels without constructing a generated archive or formula AST.
+The list coordinator accepts a resolver sharing the decoder's existing
+ledger, so nested segment reads do not create independent budgets.
+
+Concrete packages retain table ownership proofs, object lookup, reference
+resolution, cumulative limits, and public format-specific errors. These
+focused APIs add no dependency on the migration host. The host full-table
+callers remain until their complete compatibility and mutation surfaces can
+be retired; the monolithic crate is not yet removed.

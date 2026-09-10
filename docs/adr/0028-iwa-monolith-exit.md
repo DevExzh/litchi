@@ -11509,3 +11509,41 @@ The focused extractor suite passes 101 tests and the host suite passes 45.
 The remaining Pages and Keynote full-table host callers still require focused
 value and comment readers. This change removes duplicated list coordination,
 not the remaining host package traversal or mutation paths.
+
+## 2026-09-10 Focused Pages and Keynote table reads
+
+Pages and Keynote now expose selected-table values and comments through
+`body_table_cells` and `slide_table_cells`. Both return the neutral sparse
+`TableRead` model using semantic selectors and typed cell positions. The
+model preserves stored empty cells, formula source, positioned comments,
+finite timestamps, author display fields, and resolved reply lists.
+
+The shared wire layer separates borrowed tile traversal (`table_cells`),
+strict list and comment storage (`table_sidecars`), and formula owner/category
+projections (`formula_names`). Formula bytes are preflighted before retention
+and decoded at use through Buffa-backed visitors. Segment callbacks receive
+the same mutable decoder ledger; rejected values do not hide later malformed
+segment topology. Tile accounting is cumulative across tiles and admits
+declared row cell counts before traversing sparse offsets.
+
+The native Pages and Keynote table-read controls were edited, saved, closed,
+and reopened in their applications. They cover Unicode strings, scalar
+values, formulas, and Unicode comments; the Keynote control also retains its
+existing B4:C5 merge. A separate Pages cross-reference control places
+`Table 1::B2+1` in Table 2 A3. The native formula editor showed that table
+reference and the reopened document displayed 13.5. Adjacent receipts record
+the exact files and verification scope. Shared rendering now accepts a
+table-only prefix without changing existing Numbers sheet/table rendering.
+
+The migration host remains available for full compatibility and mutation
+paths. Its Pages/Keynote full-table callers are not removed merely because
+focused read APIs exist; their eventual retirement still requires complete
+call-site and behavior coverage.
+
+Validation includes native host/focused value and comment parity, exact
+source-byte preservation, a saved Pages direct-reply control, selected-table
+budget refusal, cumulative tile admission, malformed later segments, and
+table-only formula references. Category formatting measures its output before
+retention, including subnormal floating-point labels longer than 300 bytes.
+The shared tile fuzz target completed 1,000 AddressSanitizer runs without a
+failure; its temporary build and corpus were cleaned afterward.

@@ -531,6 +531,7 @@ pub use package::{
     SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
     SlideTableCellNumberFormatPath,
 };
+pub use package::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
 pub use package::{SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath};
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,

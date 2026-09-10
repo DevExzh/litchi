@@ -266,6 +266,36 @@ where
     Resolve: FnMut(u64) -> Result<Option<Segments>, Decoder::Error>,
     Decoder: ListDecoder<'source>,
 {
+    read_list_with_decoder(
+        object_id,
+        expected_type,
+        root_messages,
+        |segment_id, _decoder| resolve_segment(segment_id),
+        decoder,
+        policy,
+    )
+}
+
+/// Coordinate a list while letting segment resolution use the decoder's
+/// existing operation state. This keeps nested object lookup and envelope
+/// decoding on one adapter-owned budget without interior mutability.
+///
+/// The resolver may update the decoder's resource ledger before returning
+/// borrowed messages. All selection and publication rules match [`read_list`].
+pub fn read_list_with_decoder<'source, Root, Segments, Resolve, Decoder>(
+    object_id: u64,
+    expected_type: i32,
+    root_messages: Root,
+    mut resolve_segment: Resolve,
+    decoder: &mut Decoder,
+    policy: ListReadPolicy,
+) -> Result<Vec<(u32, Decoder::Value)>, Decoder::Error>
+where
+    Root: IntoIterator<Item = Message<'source>>,
+    Segments: IntoIterator<Item = Message<'source>>,
+    Resolve: FnMut(u64, &mut Decoder) -> Result<Option<Segments>, Decoder::Error>,
+    Decoder: ListDecoder<'source>,
+{
     let mut selected = None;
     let mut structural_error = None;
     let mut semantic_error = None;
@@ -332,7 +362,7 @@ where
     };
 
     for segment_id in segment_refs.drain(..) {
-        let Some(segment_messages) = (match resolve_segment(segment_id) {
+        let Some(segment_messages) = (match resolve_segment(segment_id, decoder) {
             Ok(messages) => messages,
             Err(error) => {
                 record_error(&mut structural_error, error);

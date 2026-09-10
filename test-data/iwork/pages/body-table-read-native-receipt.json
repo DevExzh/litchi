@@ -1,0 +1,40 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "body-table-read-native.pages",
+  "size": 139146,
+  "sha256": "5510b5e22aa71144ca3dbb45cd91711e28fc1d4ab9e7d3a2321bda941dbd3181",
+  "source": "body-table-cells-native.pages",
+  "lifecycle": [
+    "Copied existing native control to a disposable directory.",
+    "Added native cell controls and a Unicode comment through the application UI.",
+    "Saved, closed, and reopened the exact saved path.",
+    "Verified cell displays through accessibility and saved comment text visually.",
+    "Closed the verified document."
+  ],
+  "tables": [
+    {
+      "name": "Table 1",
+      "rows": 5,
+      "columns": 4
+    },
+    {
+      "name": "Table 2",
+      "rows": 3,
+      "columns": 2
+    }
+  ],
+  "comment": {
+    "table": "Table 1",
+    "cell": "B4",
+    "text": "Focused Pages table read — Café 北京"
+  },
+  "formula": {
+    "table": "Table 1",
+    "cell": "B4",
+    "source": "=SUM(B2:B3)",
+    "display": "5.5"
+  },
+  "scope": "Preserves all mixed cell controls from body-table-cells-native.pages and adds a formula-cell comment. Native display alone does not distinguish stored-empty from missing cells or date-looking text from Date scalars."
+}

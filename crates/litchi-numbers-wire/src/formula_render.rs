@@ -48,6 +48,15 @@ pub trait ReferenceResolver {
         id: &numbers_formula_codec::FormulaRenderCfuuid,
     ) -> Option<FormulaTablePrefix<'_>>;
 
+    /// Resolve a complete native table UUID to a table-only display name.
+    ///
+    /// Pages and Keynote can address a table without a Numbers sheet name.
+    /// Adapters that do not have this form of reference keep the historical
+    /// behavior by inheriting the empty default.
+    fn table_only_name(&self, _id: &numbers_formula_codec::FormulaRenderCfuuid) -> Option<&str> {
+        None
+    }
+
     /// Resolve a category UUID to its borrowed display name.
     fn category_name(&self, id: FormulaCategoryId) -> Option<&str>;
 
@@ -942,14 +951,27 @@ where
     Ok(retained)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolvedTablePrefix<'a> {
+    SheetTable(FormulaTablePrefix<'a>),
+    TableOnly(&'a str),
+}
+
 fn formula_render_prefix_parts<'a, R>(
     owner: &numbers_formula_codec::FormulaRenderCfuuid,
     resolver: &'a R,
-) -> Option<FormulaTablePrefix<'a>>
+) -> Option<ResolvedTablePrefix<'a>>
 where
     R: ReferenceResolver,
 {
-    resolver.table_prefix(owner)
+    resolver
+        .table_only_name(owner)
+        .map(ResolvedTablePrefix::TableOnly)
+        .or_else(|| {
+            resolver
+                .table_prefix(owner)
+                .map(ResolvedTablePrefix::SheetTable)
+        })
 }
 
 fn render_category_label_checked<B>(
@@ -1142,12 +1164,14 @@ where
 
 fn write_formula_reference_prefix(
     output: &mut dyn std::fmt::Write,
-    prefix: Option<FormulaTablePrefix<'_>>,
+    prefix: Option<ResolvedTablePrefix<'_>>,
 ) -> std::fmt::Result {
-    if let Some(name) = prefix {
-        write!(output, "{}::{}::", name.sheet, name.table)
-    } else {
-        output.write_str("Table::")
+    match prefix {
+        Some(ResolvedTablePrefix::SheetTable(name)) => {
+            write!(output, "{}::{}::", name.sheet, name.table)
+        },
+        Some(ResolvedTablePrefix::TableOnly(name)) => write!(output, "{name}::"),
+        None => output.write_str("Table::"),
     }
 }
 

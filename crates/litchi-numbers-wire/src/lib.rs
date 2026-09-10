@@ -20,7 +20,15 @@ pub mod cell_value;
 /// Shared root/segment coordinator for Numbers table-data-list projections.
 pub mod table_data_list;
 
+/// Shared selected-table tile, row, and source-cell reader.
+pub mod table_cells;
+
+/// Shared bounded table-data-list sidecar readers and semantic conversion.
+pub mod table_sidecars;
+
 pub mod formula_envelope;
+/// Shared bounded formula-owner and category-name projections.
+pub mod formula_names;
 /// Shared generated-free Numbers formula event renderer.
 pub mod formula_render;
 
