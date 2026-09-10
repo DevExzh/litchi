@@ -10,7 +10,7 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::super::X14;
-use super::super::wire::{column_range, is_mce_name, position, tag};
+use super::super::wire::{cell_tag, column_range, is_mce_name, position, tag};
 use super::model::{
     CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout, MergeCellsSlot,
     MergeSlot, RootSlot, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
@@ -50,7 +50,7 @@ struct PendingCell {
     address: Address,
     start: usize,
     tag_end: usize,
-    tag: Tag,
+    tag: Option<Tag>,
     primary: Vec<Span>,
     mce_payload: bool,
     formula_index: Option<usize>,
@@ -653,6 +653,7 @@ impl Scanner {
         if parent == Some(FrameKind::Row) && is_spreadsheetml_name(namespace, element.name(), b"c")
         {
             let address = self.cell_address(element, decoder)?;
+            let tag = cell_tag(element, decoder)?;
             self.row
                 .as_mut()
                 .ok_or_else(|| invalid("empty cell outside row"))?
@@ -662,7 +663,7 @@ impl Scanner {
                     span,
                     tag_end: span.end,
                     close_start: span.end,
-                    tag: tag(element, decoder)?,
+                    tag,
                     primary: Box::new([]),
                     mce_payload: false,
                     empty: true,
@@ -956,11 +957,12 @@ impl Scanner {
         end: usize,
     ) -> Result<()> {
         let address = self.cell_address(element, decoder)?;
+        let tag = cell_tag(element, decoder)?;
         self.cell = Some(PendingCell {
             address,
             start,
             tag_end: end,
-            tag: tag(element, decoder)?,
+            tag,
             primary: Vec::new(),
             mce_payload: false,
             formula_index: None,
@@ -1470,12 +1472,11 @@ fn shared_formula_groups(
                 if cell.mce_payload {
                     continue 'group;
                 }
-                if cell
-                    .tag
-                    .attributes
-                    .iter()
-                    .any(|attribute| matches!(attribute.name.as_ref(), "cm" | "vm"))
-                {
+                if cell.tag.as_ref().is_some_and(|tag| {
+                    tag.attributes
+                        .iter()
+                        .any(|attribute| matches!(attribute.name.as_ref(), "cm" | "vm"))
+                }) {
                     continue 'group;
                 }
                 members.push(address);
