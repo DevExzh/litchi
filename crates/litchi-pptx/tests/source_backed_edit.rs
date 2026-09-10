@@ -26,6 +26,7 @@ const SLIDE: &str = "/ppt/slides/slide1.xml";
 const SLIDE_THREE: &str = "/ppt/slides/slide3.xml";
 const UNUSED: &str = "/ppt/media/unused.bin";
 const SVG_MEDIA: &str = "/ppt/media/vector.svg";
+const SVG_EXTENSION_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 struct VersionedSource {
     bytes: Vec<u8>,
@@ -173,7 +174,7 @@ fn fixture_with_presentation_namespace(
 fn svg_transition_fixture() -> Vec<u8> {
     let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="future" xmlns:future="urn:litchi:future" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p159"><p:transition spd="fast"><p159:morph option="byWord"/></p:transition><!--inactive-owner-comment--></mc:Choice><mc:Choice Requires="p159" future:branch="keep"><future:unknown/></mc:Choice><mc:Fallback future:data="keep"><p:transition><p:fade/></p:transition><!--fallback-comment--></mc:Fallback></mc:AlternateContent>"#;
     let slide = format!(
-        r#"<p:sld xmlns:p="{PML}" xmlns:a="{DRAWINGML}" xmlns:r="{REL}" xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="42" name="SVG Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdRaster"><a:extLst><a:ext uri="http://schemas.microsoft.com/office/drawing/2016/SVG/main"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr/>{morph}</p:sld>"#
+        r#"<p:sld xmlns:p="{PML}" xmlns:a="{DRAWINGML}" xmlns:r="{REL}" xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="42" name="SVG Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdRaster"><a:extLst><a:ext uri="{SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr/>{morph}</p:sld>"#
     );
     let source = fixture("", slide, false);
     let mut package = OpcPackage::from_bytes(&source).unwrap();

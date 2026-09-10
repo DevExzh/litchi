@@ -2657,6 +2657,8 @@ enum PictureNode {
     FillRectangle,
     BlipExtensionList,
     BlipExtension,
+    OpaqueBlipExtension,
+    SvgBlipExtension,
     SvgBlip,
     Other,
 }
@@ -2666,6 +2668,7 @@ const STRICT_MCE_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatib
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const SVG_BLIP_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
+const SVG_BLIP_EXTENSION_URI: &[u8] = b"{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
     let mut reader = NsReader::from_reader(xml);
@@ -2692,7 +2695,13 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let parent = stack.last().map(|(node, _)| *node);
-                let node = picture_node(&namespace, element.name());
+                let raw_node = picture_node(&namespace, element.name());
+                let opaque_parent = parent == Some(PictureNode::OpaqueBlipExtension);
+                let mut node = if opaque_parent {
+                    PictureNode::OpaqueBlipExtension
+                } else {
+                    raw_node
+                };
                 if stack.is_empty() && node != PictureNode::Picture {
                     return Err(Error::Invalid(
                         "picture descriptor XML does not have a p:pic root".into(),
@@ -2706,10 +2715,27 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                     }
                     root_seen = true;
                 }
-                if node == PictureNode::Picture && !stack.is_empty() {
+                if !opaque_parent && node == PictureNode::Picture && !stack.is_empty() {
                     return Err(Error::Invalid(
                         "picture descriptor contains a nested p:pic".into(),
                     ));
+                }
+
+                // `a:blip/extLst` can carry producer extensions unrelated to
+                // the typed SVG descriptor.  Their payload is opaque to this
+                // inventory, while the SVG URI selects the strict typed
+                // child grammar below.
+                if parent == Some(PictureNode::BlipExtensionList) {
+                    if raw_node != PictureNode::BlipExtension {
+                        return Err(Error::Invalid(
+                            "picture a:blip extLst children must be a:ext".into(),
+                        ));
+                    }
+                    node = if validate_blip_extension_attributes(&element, reader.decoder())? {
+                        PictureNode::SvgBlipExtension
+                    } else {
+                        PictureNode::OpaqueBlipExtension
+                    };
                 }
 
                 match parent {
@@ -2816,14 +2842,11 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                         saw_blip_extension_list = true;
                     },
                     Some(PictureNode::BlipExtensionList) => {
-                        if node != PictureNode::BlipExtension {
-                            return Err(Error::Invalid(
-                                "picture a:blip extLst children must be a:ext".into(),
-                            ));
-                        }
-                        validate_blip_extension_attributes(&element, reader.decoder())?;
+                        // The extension node was validated and classified
+                        // above.  Keep this arm explicit to document the
+                        // finite parent grammar.
                     },
-                    Some(PictureNode::BlipExtension) => {
+                    Some(PictureNode::SvgBlipExtension) => {
                         if node != PictureNode::SvgBlip || saw_svg_blip {
                             return Err(Error::Invalid(
                                 "picture a:blip extension contains an unsupported or duplicate svgBlip".into(),
@@ -2838,6 +2861,12 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                             })?;
                             attach_svg_relationship(&mut relationship, fragment)?;
                         }
+                    },
+                    Some(PictureNode::OpaqueBlipExtension) => {},
+                    Some(PictureNode::BlipExtension) => {
+                        return Err(Error::Invalid(
+                            "picture a:blip extension classification is unavailable".into(),
+                        ));
                     },
                     Some(PictureNode::SvgBlip) => {},
                     Some(
@@ -2910,12 +2939,14 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                             | PictureNode::FillRectangle
                             | PictureNode::BlipExtensionList
                             | PictureNode::BlipExtension
+                            | PictureNode::SvgBlipExtension
                     )
                 );
                 if finite_parent
                     && (parent == Some(PictureNode::Blip)
                         || parent == Some(PictureNode::BlipExtensionList)
                         || parent == Some(PictureNode::BlipExtension)
+                        || parent == Some(PictureNode::SvgBlipExtension)
                         || !text.as_ref().iter().all(u8::is_ascii_whitespace))
                 {
                     return Err(Error::Invalid(
@@ -2937,6 +2968,7 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                             | PictureNode::FillRectangle
                             | PictureNode::BlipExtensionList
                             | PictureNode::BlipExtension
+                            | PictureNode::SvgBlipExtension
                     )
                 }) =>
             {
@@ -2987,8 +3019,9 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
 fn validate_blip_extension_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<()> {
+) -> Result<bool> {
     let mut uri_seen = false;
+    let mut svg_uri = false;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
@@ -3013,13 +3046,14 @@ fn validate_blip_extension_attributes(
                 "picture a:ext uri attribute is empty".into(),
             ));
         }
+        svg_uri = value.as_bytes() == SVG_BLIP_EXTENSION_URI;
     }
     if !uri_seen {
         return Err(Error::Invalid(
             "picture a:ext is missing its uri attribute".into(),
         ));
     }
-    Ok(())
+    Ok(svg_uri)
 }
 
 fn attach_svg_relationship(
@@ -3858,6 +3892,9 @@ mod tests {
     const CORE_MARKER: &[u8] = b"source-backed-core-properties-payload";
     const COLD_SLIDE_MARKER: &[u8] = b"source-backed-core-cold-slide-payload";
     const COLD_MEDIA_MARKER: &[u8] = b"source-backed-core-cold-media-payload";
+    const NATIVE_SVG_EXTENSION_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
+    const SVG_NAMESPACE_URI: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
+    const OPAQUE_EXTENSION_URI: &str = "{28A0092B-C50C-407e-A947-70E740481C1C}";
 
     struct CountingSource {
         bytes: Vec<u8>,
@@ -4309,9 +4346,15 @@ mod tests {
     }
 
     fn svg_picture_pptx() -> Vec<u8> {
+        svg_picture_pptx_with_extension(&format!(
+            r#"<a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
+        ))
+    }
+
+    fn svg_picture_pptx_with_extension(extension_list: &str) -> Vec<u8> {
         const SVG_NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
         let slide = picture_slide(&format!(
-            r#"<a:blip r:embed="rIdImage"><a:extLst><a:ext uri="{SVG_NAMESPACE}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></a:extLst></a:blip>"#
+            r#"<a:blip r:embed="rIdImage"><a:extLst>{extension_list}</a:extLst></a:blip>"#
         ));
         let slide = String::from_utf8(slide)
             .unwrap()
@@ -4919,7 +4962,7 @@ mod tests {
     }
 
     #[test]
-    fn svg_picture_inventory_resolves_typed_extension_and_defers_payload() {
+    fn native_guid_svg_picture_inventory_resolves_typed_extension_and_defers_payload() {
         let source = Arc::new(PictureCountingSource::new(svg_picture_pptx()));
         let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
         let slide = presentation.slide(0).unwrap();
@@ -4938,6 +4981,62 @@ mod tests {
         let svg_image = slide.read_svg_image(0).unwrap();
         assert!(svg_image.bytes().starts_with(b"<svg "));
         assert_eq!(svg_image.descriptor().relationship_id(), "rIdSvg");
+    }
+
+    #[test]
+    fn native_guid_svg_extension_rejects_malformed_svg_blip() {
+        let source = Arc::new(PictureCountingSource::new(svg_picture_pptx_with_extension(
+            &format!(r#"<a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip/></a:ext>"#),
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().images();
+        assert!(matches!(
+            result,
+            Err(Error::Relationship(message)) if message.contains("svgBlip is missing")
+        ));
+    }
+
+    #[test]
+    fn native_guid_svg_extension_rejects_duplicate_svg_blips() {
+        let extension_list = format!(
+            r#"<a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext><a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
+        );
+        let source = Arc::new(PictureCountingSource::new(svg_picture_pptx_with_extension(
+            &extension_list,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().images();
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(message)) if message.contains("unsupported or duplicate svgBlip")
+        ));
+    }
+
+    #[test]
+    fn synthetic_svg_namespace_uri_is_opaque_without_native_guid() {
+        let source = Arc::new(PictureCountingSource::new(svg_picture_pptx_with_extension(
+            &format!(
+                r#"<a:ext uri="{SVG_NAMESPACE_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
+            ),
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let images = presentation.slide(0).unwrap().images().unwrap();
+        assert_eq!(images.len(), 1);
+        assert!(images[0].svg().is_none());
+    }
+
+    #[test]
+    fn opaque_extension_keeps_typed_looking_descendants_opaque() {
+        let extension_list = format!(
+            r#"<a:ext uri="{OPAQUE_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdIgnored"><a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdDeep"/></a:ext></asvg:svgBlip></a:ext>"#
+        );
+        let source = Arc::new(PictureCountingSource::new(svg_picture_pptx_with_extension(
+            &extension_list,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let images = presentation.slide(0).unwrap().images().unwrap();
+        assert_eq!(images.len(), 1);
+        assert!(images[0].svg().is_none());
     }
 
     #[test]
