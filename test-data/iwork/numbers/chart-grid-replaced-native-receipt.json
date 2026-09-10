@@ -1,0 +1,41 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_completed": "2026-09-11",
+  "file": "chart-grid-replaced-native.numbers",
+  "size": 61042,
+  "sha256": "9116b73e41bb959cc12d817dd57b8e421c1dc8897d0d3ae1e286e88f32426584",
+  "source": "Disposable host authoring probe using the shared bounded grid creation codec",
+  "lifecycle": [
+    "Authored a standalone 2D column chart with a 2x3 grid and title Grid authoring proof.",
+    "Replaced the complete grid with new category labels and a 2x4 grid, retaining the title.",
+    "Opened in the native application and verified chart kind, title, category labels, series labels, and displayed values.",
+    "Saved, closed, and reopened the exact path; verified the same chart content; closed the document."
+  ],
+  "row_labels": [
+    "North",
+    "South"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      27.5,
+      null,
+      53,
+      96
+    ],
+    [
+      55,
+      12.75,
+      70,
+      58
+    ]
+  ],
+  "title": "Grid authoring proof",
+  "scope": "Native fresh grid authoring and complete replacement compatibility bridge; broader chart graph creation remains host-owned. Fractional 12.75 displays as 12.8 in chart accessibility; focused golden tests verify exact bits and missing-cell presence."
+}

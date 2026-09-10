@@ -35,6 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
+    println!("cargo:rerun-if-changed=src/chart_grid_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
@@ -2282,6 +2283,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_build_creation_codec.rs",
             "crate::buffa_keynote_build_creation_generated::",
             "mod buffa_keynote_build_creation_generated {",
+        ),
+        (
+            "src/chart_grid_creation_codec.rs",
+            "crate::buffa_chart_data_generated::",
+            "mod buffa_chart_data_generated {",
         ),
         (
             "src/annotation_author_codec.rs",

@@ -164,6 +164,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "chart_grid_creation_codec"
+path = "fuzz_targets/chart_grid_creation_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_legend_codec"
 path = "fuzz_targets/keynote_chart_legend_codec.rs"
 test = false

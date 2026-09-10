@@ -27,6 +27,7 @@ generated libFuzzer output part of the repository.
 | `comment_storage_reply_codec` | `fuzz_targets/comment_storage_reply_codec.rs` | `corpus/comment_storage_reply_codec/` |
 | `keynote_chart_title` | `fuzz_targets/keynote_chart_title.rs` | `corpus/keynote_chart_title/` |
 | `chart_data_codec` | `fuzz_targets/chart_data_codec.rs` | `corpus/chart_data_codec/` |
+| `chart_grid_creation_codec` | `fuzz_targets/chart_grid_creation_codec.rs` | `corpus/chart_grid_creation_codec/` |
 | `keynote_chart_legend_codec` | `fuzz_targets/keynote_chart_legend_codec.rs` | `corpus/keynote_chart_legend_codec/` |
 | `keynote_chart_axis_title_codec` | `fuzz_targets/keynote_chart_axis_title_codec.rs` | `corpus/keynote_chart_axis_title/` |
 | `keynote_chart_axis_value_settings_codec` | `fuzz_targets/keynote_chart_axis_value_settings_codec.rs` | `corpus/keynote_chart_axis_value_settings_codec/` |

@@ -7,7 +7,9 @@
 use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::varint::{encode_varint_to_buffer, encoded_len};
 use litchi_iwa_common::wire::parse_wire_fields_with_limits;
+use litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput;
 use prost::{Message, bytes::Buf};
 
 use crate::protobuf::{tsch, tsp};
@@ -293,6 +295,26 @@ impl IWorkChartArchive {
         })
     }
 
+    /// Rewrite a chart's complete grid through a scoped grid-only bridge.
+    ///
+    /// The compatibility archive is decoded without its repeated generated
+    /// grid, the caller may update scalar chart metadata, and the result is
+    /// immediately encoded with the supplied grid payload. The intermediate
+    /// archive never exposes a general encoder, which prevents a mutation
+    /// path from accidentally publishing a chart whose grid was skipped.
+    pub(crate) fn rewrite_chart_grid(
+        data: &[u8],
+        encoded_grid: &EncodeOutput,
+        update: impl FnOnce(&mut tsch::ChartArchive) -> Result<()>,
+    ) -> Result<Vec<u8>> {
+        let mut archive = Self::decode_with_chart_grid(data, false)?;
+        let chart = archive.chart.as_mut().ok_or_else(|| {
+            Error::InvalidFormat("cannot rewrite a chart without a chart payload".to_owned())
+        })?;
+        update(chart)?;
+        archive.encode_with_chart_grid(encoded_grid)
+    }
+
     fn decode_with_chart_grid(data: &[u8], include_chart_grid: bool) -> Result<Self> {
         let fields = parse_wire_fields(data)?;
         let chart_field = unique_field(&fields, CHART_EXTENSION_FIELD)?;
@@ -345,9 +367,39 @@ impl IWorkChartArchive {
 
     /// Encode the drawable, chart extension, and untouched future fields.
     pub fn encode(&self) -> Result<Vec<u8>> {
+        self.encode_chart_with_grid(None)
+    }
+
+    /// Encode the drawable with a caller-provided encoded chart grid.
+    ///
+    /// The chart's generated `grid` must be absent. This checked invariant is
+    /// what keeps the one-shot replacement unambiguous when the compatibility
+    /// message exposes its public fields: a caller cannot accidentally publish
+    /// both the generated grid and the encoded replacement. All other typed
+    /// and opaque chart fields use the normal archive encoder and remain in
+    /// their existing order.
+    pub(crate) fn encode_with_chart_grid(&self, encoded_grid: &EncodeOutput) -> Result<Vec<u8>> {
+        let Some(chart) = self.chart.as_ref() else {
+            return Err(Error::InvalidFormat(
+                "cannot encode a chart grid without a chart payload".to_owned(),
+            ));
+        };
+        if chart.grid.is_some() {
+            return Err(Error::InvalidFormat(
+                "encoded chart grid replacement requires the generated grid to be absent"
+                    .to_owned(),
+            ));
+        }
+        self.encode_chart_with_grid(Some(encoded_grid.bytes()))
+    }
+
+    fn encode_chart_with_grid(&self, encoded_grid: Option<&[u8]>) -> Result<Vec<u8>> {
         let mut output = self.drawable.encode_to_vec();
         if let Some(chart) = &self.chart {
             let mut chart_data = chart.encode_to_vec();
+            if let Some(encoded_grid) = encoded_grid {
+                insert_length_delimited_field(&mut chart_data, CHART_GRID_FIELD, encoded_grid)?;
+            }
             for field in &self.chart_opaque_fields {
                 chart_data.extend_from_slice(field);
             }
@@ -358,6 +410,65 @@ impl IWorkChartArchive {
         }
         Ok(output)
     }
+}
+
+/// Insert a generated replacement field alongside the generated protobuf
+/// fields, retaining their tag order without materializing the repeated grid.
+fn insert_length_delimited_field(
+    output: &mut Vec<u8>,
+    field_number: u32,
+    payload: &[u8],
+) -> Result<()> {
+    let insertion = parse_wire_fields(output)?
+        .into_iter()
+        .find(|field| field.number() > field_number)
+        .map_or(output.len(), WireField::start);
+    if field_number == 0 || field_number > 0x1fff_ffff {
+        return Err(Error::InvalidFormat(format!(
+            "invalid protobuf field number {field_number}"
+        )));
+    }
+    let payload_length = u64::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("chart grid payload exceeds u64".to_owned()))?;
+    let key = (u64::from(field_number) << 3) | 2;
+    let prefix_length = encoded_len(key)
+        .checked_add(encoded_len(payload_length))
+        .ok_or_else(|| Error::InvalidFormat("chart grid field prefix overflow".to_owned()))?;
+    let additional = prefix_length
+        .checked_add(payload.len())
+        .ok_or_else(|| Error::InvalidFormat("chart grid field size overflow".to_owned()))?;
+    let requested = output
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::InvalidFormat("chart archive output size overflow".to_owned()))?;
+    let limits = WireLimits::default();
+    if requested > limits.max_output_bytes() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::OutputBytes,
+            observed: requested,
+            limit: limits.max_output_bytes(),
+        }));
+    }
+    output.try_reserve(additional).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "chart archive output",
+            amount: requested,
+        })
+    })?;
+    let original_length = output.len();
+    output.resize(requested, 0);
+    output.copy_within(insertion..original_length, insertion + additional);
+
+    let mut key_buffer = [0_u8; litchi_iwa_common::varint::MAX_BYTES];
+    let encoded_key = encode_varint_to_buffer(key, &mut key_buffer);
+    let key_end = insertion + encoded_key.len();
+    output[insertion..key_end].copy_from_slice(encoded_key);
+    let mut length_buffer = [0_u8; litchi_iwa_common::varint::MAX_BYTES];
+    let encoded_length = encode_varint_to_buffer(payload_length, &mut length_buffer);
+    let length_end = key_end + encoded_length.len();
+    output[key_end..length_end].copy_from_slice(encoded_length);
+    output[length_end..length_end + payload.len()].copy_from_slice(payload);
+    Ok(())
 }
 
 /// A zero-copy `Buf` view of a chart payload with the repeated grid field
@@ -1360,6 +1471,88 @@ mod tests {
         let graph =
             IWorkChartArchive::decode_without_chart_grid(&archive.encode().unwrap()).unwrap();
         assert!(graph.chart().unwrap().grid.is_none());
+    }
+
+    #[test]
+    fn scoped_grid_rewrite_replaces_without_materializing_the_old_grid() {
+        let original_grid = tsch::ChartGridArchive {
+            row_name: vec!["old-row".to_owned()],
+            column_name: vec!["old-column".to_owned()],
+            grid_row: vec![tsch::GridRow {
+                value: vec![tsch::GridValue {
+                    numeric_value: Some(1.0),
+                    ..Default::default()
+                }],
+            }],
+            ..Default::default()
+        };
+        let row_names = ["new-row".to_owned()];
+        let column_names = ["new-column".to_owned()];
+        let values = [vec![Some(2.0)]];
+        let request = litchi_iwa_protos::chart_grid_creation_codec::ChartGridCreationRequest::new(
+            &row_names,
+            &column_names,
+            &values,
+            17,
+        );
+        let options =
+            litchi_iwa_protos::chart_grid_creation_codec::EncodeOptions::for_request(&request);
+        let replacement_grid =
+            litchi_iwa_protos::chart_grid_creation_codec::encode_chart_grid(request, options)
+                .unwrap();
+        let source = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive {
+                grid: Some(original_grid),
+                ..Default::default()
+            },
+        )
+        .encode()
+        .unwrap();
+
+        let rewritten =
+            IWorkChartArchive::rewrite_chart_grid(&source, &replacement_grid, |chart| {
+                assert!(chart.grid.is_none());
+                chart.is_dirty = Some(false);
+                Ok(())
+            })
+            .unwrap();
+        let decoded = IWorkChartArchive::decode(&rewritten).unwrap();
+        let chart = decoded.chart.unwrap();
+        assert_eq!(
+            chart.grid,
+            Some(tsch::ChartGridArchive::decode(replacement_grid.bytes()).unwrap())
+        );
+        assert_eq!(chart.is_dirty, Some(false));
+    }
+
+    #[test]
+    fn scoped_grid_rewrite_rejects_a_public_generated_grid() {
+        let row_names = ["row".to_owned()];
+        let column_names = ["column".to_owned()];
+        let values = [vec![Some(1.0)]];
+        let request = litchi_iwa_protos::chart_grid_creation_codec::ChartGridCreationRequest::new(
+            &row_names,
+            &column_names,
+            &values,
+            19,
+        );
+        let options =
+            litchi_iwa_protos::chart_grid_creation_codec::EncodeOptions::for_request(&request);
+        let encoded_grid =
+            litchi_iwa_protos::chart_grid_creation_codec::encode_chart_grid(request, options)
+                .unwrap();
+        let archive = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive {
+                grid: Some(tsch::ChartGridArchive::default()),
+                ..Default::default()
+            },
+        );
+        let error = archive
+            .encode_with_chart_grid(&encoded_grid)
+            .expect_err("generated and encoded grids must not coexist");
+        assert!(error.to_string().contains("generated grid to be absent"));
     }
 
     #[test]

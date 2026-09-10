@@ -11,56 +11,26 @@ const MAX_CHART_DATA_LABEL_COUNT: usize = 1_000_000;
 const MAX_CHART_DATA_TEXT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_CHART_DATA_RETAINED_BYTES: usize = WireLimits::MAX_OUTPUT_BYTES;
 
-#[derive(Debug, Clone, Copy)]
-enum GridAxis {
-    Row,
-    Column,
-}
-
-impl GridAxis {
-    const fn label(self) -> &'static str {
-        match self {
-            Self::Row => "row",
-            Self::Column => "column",
-        }
-    }
-
-    const fn identifier_offset(self) -> u64 {
-        match self {
-            Self::Row => 0,
-            Self::Column => 1_u64 << 47,
-        }
-    }
-}
-
-pub(crate) fn chart_grid(seed: u64, data: ChartData) -> Result<tsch::ChartGridArchive> {
-    let (row_names, column_names, values) = data.into_parts();
-    let row_id_map = (0..row_names.len())
-        .map(|index| grid_id_entry(seed, index, GridAxis::Row))
-        .collect::<Result<_>>()?;
-    let column_id_map = (0..column_names.len())
-        .map(|index| grid_id_entry(seed, index, GridAxis::Column))
-        .collect::<Result<_>>()?;
-    Ok(tsch::ChartGridArchive {
-        row_name: row_names,
-        column_name: column_names,
-        grid_row: values
-            .into_iter()
-            .map(|row| tsch::GridRow {
-                value: row
-                    .into_iter()
-                    .map(|numeric_value| tsch::GridValue {
-                        numeric_value,
-                        ..Default::default()
-                    })
-                    .collect(),
-            })
-            .collect(),
-        id_map: Some(tsch::chart_grid_archive::ChartGridRowColumnIdMap {
-            row_id_map,
-            column_id_map,
-        }),
-    })
+/// Encode one fresh grid through the shared bounded Buffa writer.
+///
+/// The host keeps `ChartData` as its compatibility model, while the wire
+/// owner emits labels, repeated rows, scalar values, and deterministic ID-map
+/// entries directly into one bounded output allocation. No generated
+/// `ChartGridArchive`, `GridRow`, or `GridValue` tree is materialized here.
+pub(crate) fn chart_grid_bytes(
+    seed: u64,
+    data: &ChartData,
+) -> Result<litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput> {
+    let request = litchi_iwa_protos::chart_grid_creation_codec::ChartGridCreationRequest::new(
+        data.row_names(),
+        data.column_names(),
+        data.values(),
+        seed,
+    );
+    let options =
+        litchi_iwa_protos::chart_grid_creation_codec::EncodeOptions::for_request(&request);
+    litchi_iwa_protos::chart_grid_creation_codec::encode_chart_grid(request, options)
+        .map_err(|error| Error::InvalidFormat(format!("chart grid encoding failed: {error}")))
 }
 
 /// Decode one modern chart's inline grid through the shared bounded borrowed
@@ -366,24 +336,4 @@ pub(crate) fn reference(identifier: u64) -> tsp::Reference {
         identifier,
         ..Default::default()
     }
-}
-
-fn grid_id_entry(
-    seed: u64,
-    index: usize,
-    axis: GridAxis,
-) -> Result<tsch::chart_grid_archive::chart_grid_row_column_id_map::Entry> {
-    let index_u32 = u32::try_from(index)
-        .map_err(|_| Error::ParseError(format!("chart {} index exceeds u32", axis.label())))?;
-    let offset = u64::try_from(index)
-        .map_err(|_| Error::ParseError(format!("chart {} index exceeds u64", axis.label())))?;
-    Ok(
-        tsch::chart_grid_archive::chart_grid_row_column_id_map::Entry {
-            unique_id: deterministic_uuid(
-                seed.wrapping_add(axis.identifier_offset())
-                    .wrapping_add(offset),
-            ),
-            index: index_u32,
-        },
-    )
 }

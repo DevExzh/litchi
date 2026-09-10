@@ -2188,6 +2188,16 @@ pub mod chart_metadata_codec;
 #[doc(hidden)]
 pub mod chart_data_codec;
 
+/// Internal bounded Buffa authoring for fresh inline chart grids. Generated
+/// scalar views remain private; repeated rows, values, labels, and identifier
+/// entries are streamed into one caller-owned output buffer.
+#[doc(hidden)]
+pub mod chart_grid_creation_codec;
+
+#[cfg(test)]
+#[path = "chart_grid_creation_codec/tests.rs"]
+mod chart_grid_creation_codec_tests;
+
 /// Internal strict Keynote chart-axis-title generated-extension projection.
 /// Generated types remain private and caller-owned source bytes remain the
 /// preservation authority.

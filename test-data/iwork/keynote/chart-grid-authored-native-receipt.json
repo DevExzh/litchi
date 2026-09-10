@@ -1,0 +1,37 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "verification_completed": "2026-09-11",
+  "file": "chart-grid-authored-native.key",
+  "size": 76323,
+  "sha256": "3e3f6adf51ebe22e873f888c229e22bde2f5f7fb20d14a16e12cbc65b83df322",
+  "source": "Disposable host authoring probe using the shared bounded grid creation codec",
+  "lifecycle": [
+    "Authored a standalone 2D column chart with a 2x3 grid and title Grid authoring proof.",
+    "Opened in the native application and verified chart kind, title, category labels, series labels, and displayed values.",
+    "Saved, closed, and reopened the exact path; verified the same chart content; closed the document."
+  ],
+  "row_labels": [
+    "North",
+    "South"
+  ],
+  "column_labels": [
+    "Q1",
+    "Q2",
+    "Q3"
+  ],
+  "numeric_values": [
+    [
+      12,
+      18,
+      24
+    ],
+    [
+      9,
+      21,
+      27
+    ]
+  ],
+  "title": "Grid authoring proof",
+  "scope": "Native fresh grid authoring and complete replacement compatibility bridge; broader chart graph creation remains host-owned. Fractional 12.75 displays as 12.8 in chart accessibility; focused golden tests verify exact bits and missing-cell presence."
+}

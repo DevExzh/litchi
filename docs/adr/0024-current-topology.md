@@ -4612,3 +4612,17 @@ changes, preserving the previous API while its broader identity and topology
 semantics are migrated. Fresh chart authoring also remains host debt. This
 slice does not retire the complete chart mutation graph or change the
 monolith deletion gate.
+
+## 2026-09-11 Shared chart grid authoring
+
+`litchi-iwa-protos::chart_grid_creation_codec` owns fresh inline-grid
+serialization from borrowed semantic slices. Private Buffa scalar views and
+streamed repeated framing replace the host's generated grid, cell, and ID-map
+construction. The host consumes a validated encoded output in fresh chart
+authoring and complete-grid replacement; the scoped replacement bridge omits
+the old generated grid and requires the replacement before publication.
+
+Chart envelope, style, mediator, and series graph authoring remain host debt.
+Focused same-shape transactions retain their existing contract. Native fresh
+and expanded-grid controls for all three formats passed save/close/reopen and
+focused exact-value readback; the dependency-debt count remains unchanged.

@@ -1702,3 +1702,48 @@ offset bytes and narrow/wide sparse recipes. Successful views must preserve
 column order, contiguous payload ranges, exact iterator lengths, borrowed
 storage pointers, and complete-range bounds. This path does not require
 protobuf Tile admission, so malformed later offsets and padding remain reachable.
+
+## Chart grid creation codec
+
+`chart_grid_creation_codec` turns bounded fuzz input into rectangular semantic
+row and column labels plus finite optional numeric cells. It exercises the
+prepared Buffa authoring path with exact execution limits, compares it with the
+one-shot encoder, and decodes the resulting `ChartGridArchive` through the
+borrowed grid reader. Labels and values are checked in order and by floating
+point bits, so missing cells and signed zero remain observable. Repeating the
+same request and seed must produce identical bytes, including the deterministic
+row and column identifier map. Zero-budget probes keep refusal paths active
+without reserving output storage.
+
+The generator accepts at most 64 KiB of input and caps each axis at 16 labels,
+the matrix at 256 cells, label text at 24 bytes per label, and encoded output at
+128 KiB. No native iWork package bytes or generated fuzz artifacts belong in
+the checkout.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check chart_grid_creation_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-chart-grid-creation-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_grid() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_grid EXIT
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  chart_grid_creation_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
