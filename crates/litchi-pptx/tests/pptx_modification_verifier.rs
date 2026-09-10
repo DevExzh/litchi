@@ -34,3 +34,13 @@ fn presentation_modification_verifier_is_exposed_by_protection_owner() {
     assert!(settings.to_xml().contains(r#"cryptAlgorithmSid="14""#));
     assert!(settings.to_xml().contains(r#"spinCount="100000""#));
 }
+
+#[test]
+fn read_only_recommendation_uses_the_p1710_view_mode_owner() {
+    let settings = Settings::new().with_read_only_recommended(true);
+    let xml = settings.to_pres_props_xml();
+    assert!(xml.contains("{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}"));
+    assert!(xml.contains("p1710:readonlyRecommended"));
+    assert!(xml.contains("http://schemas.microsoft.com/office/powerpoint/2017/10/main"));
+    assert!(!xml.contains("discardImageEditData"));
+}

@@ -128,6 +128,11 @@ pub enum Extension {
     DefaultImageDpi(u32),
     ChartTrackingReferenceBased(bool),
     Math(crate::presentation_properties::math::Properties),
+    /// Whether the host should recommend opening the document read-only.
+    ///
+    /// This is an inert Office hint. It does not restrict editing or change
+    /// package mutation policy.
+    ReadonlyRecommended(bool),
     Unknown(OpaqueExtension),
 }
 
@@ -285,7 +290,7 @@ impl Properties {
 }
 
 fn validate_extension_uris(values: &[Extension]) -> Result<()> {
-    let mut seen = [false; 4];
+    let mut seen = [false; 5];
     for value in values {
         let Some(slot) = (match value {
             Extension::DiscardImageEditData(_) => Some(0),
@@ -295,6 +300,7 @@ fn validate_extension_uris(values: &[Extension]) -> Result<()> {
                 value.validate()?;
                 Some(3)
             },
+            Extension::ReadonlyRecommended(_) => Some(4),
             Extension::Unknown(value) => {
                 if value.uri.is_empty() || value.uri.len() > MAX_STRING {
                     return Err(invalid("opaque presentation extension URI is invalid"));

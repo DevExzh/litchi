@@ -8,9 +8,11 @@ use super::model::{
 use super::{
     A_NS, A_STRICT, A14_NS, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
     DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MATH_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS,
-    MAX_NODES, MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, R_NS, R_STRICT, SHOW_MEDIA_CONTROLS_URI,
+    MAX_NODES, MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, P1710_NS, R_NS, R_STRICT,
+    READONLY_RECOMMENDED_URI, SHOW_MEDIA_CONTROLS_URI,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -25,7 +27,10 @@ impl Properties {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation properties exceed 8 MiB"));
         }
-        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+        let mut capabilities = Capabilities::ooxml_baseline();
+        capabilities.understand_namespace(P1710_NS);
+        let processed =
+            process_markup_compatibility(xml, &capabilities, &MceLimits::default())?.xml;
         if processed.len() > MAX_BYTES {
             return Err(invalid("processed presentation properties exceed 8 MiB"));
         }
@@ -555,6 +560,7 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
     let mut dpi = false;
     let mut tracking = false;
     let mut math_seen = false;
+    let mut readonly_seen = false;
     for ext in extensions {
         let uri = extension_uri(ext)?;
         let value = match uri.as_str() {
@@ -596,6 +602,17 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
                 Extension::Math(crate::presentation_properties::math::parse(&node_xml(
                     payload, false,
                 )?)?)
+            },
+            READONLY_RECOMMENDED_URI => {
+                if readonly_seen {
+                    return Err(invalid("duplicate readonlyRecommended extension"));
+                }
+                readonly_seen = true;
+                Extension::ReadonlyRecommended(parse_extension_bool(
+                    ext,
+                    P1710_NS,
+                    "readonlyRecommended",
+                )?)
             },
             _ => Extension::Unknown(OpaqueExtension {
                 uri,
@@ -860,6 +877,15 @@ fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) 
                 crate::presentation_properties::math::write(x, value, strict)?;
                 x.push_str("</p:ext>");
             },
+            Extension::ReadonlyRecommended(value) => {
+                write_bool_extension(
+                    x,
+                    READONLY_RECOMMENDED_URI,
+                    "p1710",
+                    "readonlyRecommended",
+                    *value,
+                );
+            },
             Extension::Unknown(value) => write_unknown_extension(x, value, strict)?,
         }
     }
@@ -910,7 +936,12 @@ fn write_bool_extension(x: &mut String, uri: &str, prefix: &str, local: &str, va
     x.push_str(" xmlns:");
     x.push_str(prefix);
     x.push_str("=\"");
-    x.push_str(if prefix == "p15" { P15_NS } else { P14_NS });
+    let namespace = match prefix {
+        "p15" => P15_NS,
+        "p1710" => P1710_NS,
+        _ => P14_NS,
+    };
+    x.push_str(namespace);
     x.push_str("\" val=\"");
     x.push_str(if value { "1" } else { "0" });
     x.push_str("\"/></p:ext>");
@@ -936,6 +967,7 @@ fn known_extension_uri(uri: &str) -> bool {
             | DEFAULT_IMAGE_DPI_URI
             | CHART_TRACKING_REF_BASED_URI
             | MATH_URI
+            | READONLY_RECOMMENDED_URI
             | BROWSE_MODE_URI
             | LASER_COLOR_URI
             | SHOW_MEDIA_CONTROLS_URI
@@ -1398,6 +1430,27 @@ mod tests {
             assert!(text.contains("r:id=\"rIdNeverFetched\""));
             assert!(text.contains("https://example.invalid/not-opened"));
         }
+    }
+
+    #[test]
+    fn readonly_recommended_writer_uses_the_p1710_namespace() {
+        let properties = Properties {
+            extensions: vec![Extension::ReadonlyRecommended(true)],
+            ..Properties::default()
+        };
+        let xml = properties.to_xml(false).unwrap();
+        assert!(std::str::from_utf8(&xml).unwrap().contains(
+            "xmlns:p1710=\"http://schemas.microsoft.com/office/powerpoint/2017/10/main\""
+        ));
+        assert_eq!(Properties::parse(&xml).unwrap(), properties);
+    }
+
+    #[test]
+    fn duplicate_readonly_recommended_extensions_are_rejected() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p1710="{P1710_NS}"><p:extLst><p:ext uri="{READONLY_RECOMMENDED_URI}"><p1710:readonlyRecommended val="1"/></p:ext><p:ext uri="{READONLY_RECOMMENDED_URI}"><p1710:readonlyRecommended val="0"/></p:ext></p:extLst></p:presentationPr>"#
+        );
+        assert!(Properties::parse(xml.as_bytes()).is_err());
     }
     #[test]
     fn browse_mode_extension_round_trips() {
