@@ -1,5 +1,28 @@
 # Performance optimization ADR-compliance matrix
 
+## 0499: operation-local worker reuse preserves bounded ownership
+
+[0499](changes/0499-operation-local-part-workers.md) keeps the accepted 0498
+ADR boundaries while changing only the multi-wave scheduler lifetime. Workers
+are scoped to one call, command and reply storage is bounded and admitted
+before startup, all workers join on success or failure, and the existing
+source/cancellation fences and typed lowest-ordinal errors remain authoritative.
+The two MiB stack reservation and conservative four KiB per-worker channel
+control allowance are explicit scheduler admission charges; the latter is not
+an exact portable allocator-size promise. The provider-panic cleanup guard is
+an unwind-build property, while the release profile remains panic-abort. No
+unsafe code, global executor, runtime dependency, or facade/archive dependency
+was added. Final performance claims await the matched evidence review.
+
+The completed matched capture has 60 children, 3,600 measured samples, and
+360 warmups with matching byte/source/work/budget oracles. Many-small owned
+batch p50 falls 669.84→186.51, 542.70→186.04, and 475.25→228.74 microseconds
+at widths 2/4/8; warm-file falls 780.59→296.04, 562.99→248.77, and
+496.17→273.70. The batch route remains slower than after serial for these
+local rows. Five aggregate and ten per-repeat flags remain visible, and the
+whole-child profiles and traced children do not provide operation-local causal
+attribution.
+
 ## 0498: explicit managed Part-read waves
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) retains the accepted

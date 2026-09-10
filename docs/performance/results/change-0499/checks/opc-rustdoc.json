@@ -1,0 +1,19 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "doc",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--no-deps"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 85.4301655292511,
+  "log_sha256": "68e04b5f45dcd5d7fd4e9cefe0deac4297d6ebca79a27e029f0ae2f1714cdbc1"
+}

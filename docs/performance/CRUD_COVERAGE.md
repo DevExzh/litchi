@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 0499: scheduler reuse only; no new CRUD row
+
+[0499](changes/0499-operation-local-part-workers.md) changes the lifetime of
+the low-level ordered OPC Part workers across multiple admitted waves. It
+preserves the existing `PartBatch` ownership and read contract and adds no
+format-level selector, representative CRUD scenario, native-producer round
+trip, or cold-cache evidence. The full CRUD index and the broader non-iWork
+goal remain unchanged. The matched capture has 60 children and 3,600 measured
+samples; its local many-small batch improvements and retained adverse flags
+describe a low-level scheduler workload only and close no CRUD row.
+
 ## 0498: low-level ordered OPC multi-Part reads
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) adds explicit ordered

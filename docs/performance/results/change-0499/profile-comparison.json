@@ -1,0 +1,99 @@
+{
+  "scope": "one whole-child profile per phase/corpus, includes setup and verification, not operation attribution",
+  "rows": [
+    {
+      "corpus": "few-large",
+      "source": "owned",
+      "workers": 4,
+      "metrics": {
+        "cycles": {
+          "before": 1297186299.0,
+          "after": 1282821627.0,
+          "delta_pct": -1.1073715480246493
+        },
+        "instructions": {
+          "before": 1382807159.0,
+          "after": 1373686227.0,
+          "delta_pct": -0.6595953702319579
+        },
+        "branches": {
+          "before": 96476212.0,
+          "after": 94797304.0,
+          "delta_pct": -1.7402300164936046
+        },
+        "branch-misses": {
+          "before": 173488.0,
+          "after": 152267.0,
+          "delta_pct": -12.23196993451997
+        },
+        "cache-misses": {
+          "before": 3284263.0,
+          "after": 3034150.0,
+          "delta_pct": -7.615498515191987
+        },
+        "context-switches": {
+          "before": 127.0,
+          "after": 131.0,
+          "delta_pct": 3.149606299212593
+        },
+        "cpu-migrations": {
+          "before": 1.0,
+          "after": 0.0,
+          "delta_pct": -100.0
+        },
+        "page-faults": {
+          "before": 6286.0,
+          "after": 5777.0,
+          "delta_pct": -8.097359210944955
+        }
+      }
+    },
+    {
+      "corpus": "many-small",
+      "source": "owned",
+      "workers": 4,
+      "metrics": {
+        "cycles": {
+          "before": 893134754.0,
+          "after": 704014693.0,
+          "delta_pct": -21.17486304871751
+        },
+        "instructions": {
+          "before": 1862673909.0,
+          "after": 1570709917.0,
+          "delta_pct": -15.674455447585267
+        },
+        "branches": {
+          "before": 303688878.0,
+          "after": 248760392.0,
+          "delta_pct": -18.08709175052502
+        },
+        "branch-misses": {
+          "before": 954483.0,
+          "after": 719306.0,
+          "delta_pct": -24.639202584016683
+        },
+        "cache-misses": {
+          "before": 6212366.0,
+          "after": 4203642.0,
+          "delta_pct": -32.3342829446945
+        },
+        "context-switches": {
+          "before": 1639.0,
+          "after": 5761.0,
+          "delta_pct": 251.4948139109213
+        },
+        "cpu-migrations": {
+          "before": 2.0,
+          "after": 31.0,
+          "delta_pct": 1450.0
+        },
+        "page-faults": {
+          "before": 4738.0,
+          "after": 4262.0,
+          "delta_pct": -10.046433094132546
+        }
+      }
+    }
+  ]
+}

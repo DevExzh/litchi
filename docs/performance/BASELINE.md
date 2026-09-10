@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0499: operation-local worker reuse matched capture
+
+[0499](changes/0499-operation-local-part-workers.md) keeps the 0498 ordered
+source-backed Part API and reuses one bounded operation-local worker set across
+multiple waves. The single-wave route remains available, and the scheduler
+continues to enforce worker, task, declared-byte, source-fence, cancellation,
+ownership, and accounting boundaries. The matched before/after capture uses
+the frozen 0498 executable and unchanged harness: 60 children, 3,600 measured
+samples, and 360 warmups. Many-small owned batch p50 falls from 669.84/542.70/
+475.25 to 186.51/186.04/228.74 microseconds at widths 2/4/8; warm-file falls
+from 780.59/562.99/496.17 to 296.04/248.77/273.70. Batch remains slower than
+the after serial control for these local small-Part rows. Five aggregate and
+ten per-repeat latency/throughput flags remain retained; see the [0499
+record](changes/0499-operation-local-part-workers.md) for their row scope.
+
 ## 0498: frozen serial controls and matched production batch matrix
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) retains hashed before

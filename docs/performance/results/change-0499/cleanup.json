@@ -1,0 +1,41 @@
+{
+  "scope": "dedicated 0499 scratch only; shared target and unrelated work untouched",
+  "same_user_processes_scanned": 63,
+  "inaccessible_or_exited_processes": 4,
+  "active_matching_processes": [],
+  "retained": [
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/retained/source_backed_batch_perf-before",
+      "sha256": "4521702894bc28584573313bb10b2cf9d6901bae1ec6ed0c2240a80f5c952c39",
+      "bytes": 1245752
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/retained/source_backed_batch_perf-after",
+      "sha256": "0b97affe90f75d29bd685a60b014e5c89c353007a1828a563355a877bd078413",
+      "bytes": 1307936
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/trace-corpora",
+      "allocated_bytes": 4096,
+      "files": 0
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/target",
+      "allocated_bytes": 1060261888,
+      "files": 6286
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/final-corpora",
+      "allocated_bytes": 4096,
+      "files": 0
+    },
+    {
+      "path": "/home/zhuhe/.cache/litchi-goal-0499/profile-corpora",
+      "allocated_bytes": 4096,
+      "files": 0
+    }
+  ],
+  "removed_allocated_bytes": 1060274176
+}

@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 23.377024173736572,
+  "log_sha256": "c8905d56d53e220a7e48b030bb6f971f75350279d3e02b6952d9c3b2f7f99309"
+}

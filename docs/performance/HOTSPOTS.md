@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0499: worker creation is reduced, but local batch overhead remains
+
+[0499](changes/0499-operation-local-part-workers.md) reuses operation-local
+scoped workers across ordered Part waves with bounded per-worker command and
+reply queues. The old single-wave route remains in place. This targets the
+repeated worker creation observed in the 0498 scheduler; the matched capture
+has 3,600 measured samples and 360 warmups. Many-small owned p50 improves
+3.59x/2.92x/2.08x and warm-file 2.64x/2.26x/1.81x at widths 2/4/8, yet both
+remain slower than ordinary serial local reads. The capture retains five
+aggregate and ten per-repeat latency/throughput flags, including a sparse
+few-large width-eight tail cluster. Traced many-small width-four creation
+falls 64→4 successful `clone3` calls; traced counts are diagnostic evidence,
+not timing evidence, and synthetic delay remains a provider model rather than
+a real remote-service result.
+
 ## 0498: Part-read concurrency helps delayed providers; small local reads remain serial candidates
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) measures explicit

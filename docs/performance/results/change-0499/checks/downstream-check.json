@@ -1,0 +1,24 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "check",
+    "--release",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-xlsb",
+    "--all-targets"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 84.20864629745483,
+  "log_sha256": "a9307e6c0b025ea2186b654b5365bbe835d1fcc6e1d203be4104ae9d8e16f72e"
+}
