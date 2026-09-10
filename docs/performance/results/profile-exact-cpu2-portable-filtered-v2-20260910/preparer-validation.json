@@ -1,0 +1,131 @@
+{
+  "archive": {
+    "bytes": 1596546,
+    "deterministic_repack": {
+      "byte_identical": true,
+      "repacked_archive_sha256": "58384afa7434d55cc95c4f99900fd00f8c4f384e969a2b27f6c2555d1fb980e2"
+    },
+    "inner_manifest_sha256": "52b43594f0760f645c496ba5922b4903c859b048e0f689f16e706020d5b378e0",
+    "path": "publication-bundle.tar.zst",
+    "payload_bytes": 6833355,
+    "payload_file_count": 52,
+    "raw_input_manifest_sha256": "2b5d78d25d3233364dccffa09654fa6ff353079b952223f47becf710bf6334ac",
+    "sha256": "58384afa7434d55cc95c4f99900fd00f8c4f384e969a2b27f6c2555d1fb980e2"
+  },
+  "candidate_path": "docs/performance/results/profile-exact-cpu2-portable-filtered-v2-20260910",
+  "checks": {
+    "bundled_raw_inputs": {
+      "external_capture_root_is_optional_cross_check": true,
+      "external_source_path_is_provenance_only": true,
+      "lanes": {
+        "opc-open": {
+          "compressed_sha256": "49dba52da1bafca91559689520291880aed556f713980b190c5051acca4efbfa",
+          "uncompressed_bytes": 10861242,
+          "uncompressed_sha256": "c47040d8267d57e5bae69517b821d9887ab39169a57611d30cc0f7466af9c2b6"
+        },
+        "opc-source-main-read": {
+          "compressed_sha256": "c0f48716c1372f69a0ac1eed158d7abe3d8627d7f4f28b2433cdc49c4509fc6a",
+          "uncompressed_bytes": 7797685,
+          "uncompressed_sha256": "59794997fd52c3d94ba41ea911d3797a3e60394001afaa9a738e2e40573444d4"
+        },
+        "opc-source-open": {
+          "compressed_sha256": "1b13bc70bfbc6b7876c0a98e5ba5a30bee7fdf27adb5a101160a6968564cecb7",
+          "uncompressed_bytes": 8001513,
+          "uncompressed_sha256": "52721b0e423f8c97287316634f4b5d907930cfba55286907223715c529b9e6ce"
+        },
+        "xlsx-one-percent-save": {
+          "compressed_sha256": "aadaa084b6df468b3b85a06461fb90fbda0788bd8ae5f3487433c6cbd2eca71d",
+          "uncompressed_bytes": 15823892,
+          "uncompressed_sha256": "78de87bf31345e8cad91f5ec21980c375233687e3974d04b59158257f6a671f2"
+        }
+      },
+      "manifest_sha256": "2b5d78d25d3233364dccffa09654fa6ff353079b952223f47becf710bf6334ac",
+      "mode": "four gzip-compressed raw perf.json inputs; default verifier uses them; external source path is provenance-only",
+      "uncompressed_hashes_bind_to_capture_manifest": true
+    },
+    "frame_pointer_depfile_sha256": "04ae04b9785c6a6a6cd820aff948fb355fd2e27782f95cf3b02573be28325c0e",
+    "independent_direct_raw_recompute": {
+      "opc-open": {
+        "control_handshake_samples": 14,
+        "counts_match": true,
+        "operation_denominator": 4422,
+        "operation_folded_stack_exact": true,
+        "operation_folded_stack_has_control_marker": false,
+        "raw_bytes": 10861242,
+        "raw_sha256": "c47040d8267d57e5bae69517b821d9887ab39169a57611d30cc0f7466af9c2b6",
+        "sample_count": 4441,
+        "samples_with_binary_frames": 4436,
+        "summary_semantic_match": true
+      },
+      "opc-source-main-read": {
+        "control_handshake_samples": 11,
+        "counts_match": true,
+        "operation_denominator": 3329,
+        "operation_folded_stack_exact": true,
+        "operation_folded_stack_has_control_marker": false,
+        "raw_bytes": 7797685,
+        "raw_sha256": "59794997fd52c3d94ba41ea911d3797a3e60394001afaa9a738e2e40573444d4",
+        "sample_count": 3345,
+        "samples_with_binary_frames": 3340,
+        "summary_semantic_match": true
+      },
+      "opc-source-open": {
+        "control_handshake_samples": 14,
+        "counts_match": true,
+        "operation_denominator": 3434,
+        "operation_folded_stack_exact": true,
+        "operation_folded_stack_has_control_marker": false,
+        "raw_bytes": 8001513,
+        "raw_sha256": "52721b0e423f8c97287316634f4b5d907930cfba55286907223715c529b9e6ce",
+        "sample_count": 3454,
+        "samples_with_binary_frames": 3448,
+        "summary_semantic_match": true
+      },
+      "xlsx-one-percent-save": {
+        "control_handshake_samples": 9,
+        "counts_match": true,
+        "operation_denominator": 6750,
+        "operation_folded_stack_exact": true,
+        "operation_folded_stack_has_control_marker": false,
+        "raw_bytes": 15823892,
+        "raw_sha256": "78de87bf31345e8cad91f5ec21980c375233687e3974d04b59158257f6a671f2",
+        "sample_count": 6759,
+        "samples_with_binary_frames": 6759,
+        "summary_semantic_match": true
+      }
+    },
+    "manifest_payload_hashes": "PASS",
+    "normal_depfile_sha256": "9132bc56c2e17e156f73b61917bb24324f4b74fc2a673b1f36670cbe45135f21",
+    "original_d1bd_archive_preserved": {
+      "path": "docs/performance/results/profile-exact-cpu2-portable-filtered-20260910/publication-bundle.tar.zst",
+      "sha256": "d1bd39b9cf522f5aa97856712cc0eed67730764f78a4dacc5a7b83a5d0438623"
+    },
+    "original_dc26_archive_preserved": {
+      "sha256": "dc26ba06db7264abb72ee8eb87de1969096afad4523d7607b3544fbfe5a841da"
+    },
+    "portable_verifier_bundled_raw": "PASS",
+    "portable_verifier_external_raw": "PASS",
+    "profile_binary_hashes": {
+      "frame_pointer": "d3efaa5c8499454dfb155630d184ae2f87f435423b0504a9991fd8f03939314b",
+      "normal": "8e0024b0b654fbb261eb88a4b93536646a6e8580d5f2b6c4a655cf208721a083"
+    },
+    "source_and_depfile_receipt_sha256": "67ce07ba7ddd5dce1a389780e8d6727f6963dc4fedb7b8dd9b95fd2eaec1ecd9",
+    "source_base_commit": "cf98bee37455e8e6d0e73002ff2e94299ef546cb",
+    "source_diff_sha256": "487820aba1d94428d8d2fb086d0d2bc889b1b9b9b99bfd65b5f72dc324db5a3b",
+    "source_overlay_sha256": "7dee21be77f466dc62dfbaaaf4353027ac1ca5a10619c0a2a6d1b1414d7ac4a5"
+  },
+  "kind": "corrected_filtered_cpu2_profile_preparer_validation",
+  "no_benchmark_or_timing_run_during_packaging": true,
+  "pmu_boundary": {
+    "control_samples_excluded_from_operation_stacks": true,
+    "disable_ack_after_elapsed_read": true,
+    "enable_ack_before_operation_timer": true,
+    "handshake_boundary_remains_in_raw_pmu_totals": true,
+    "perf_start_delay": "-D -1",
+    "protocol": "perf --control=fifo:control,ack; target writes enable/disable and reads five-byte ack\\n\\0",
+    "timing_claim": "none; diagnostic PMU/sample evidence only"
+  },
+  "schema_version": 2,
+  "validated_source_worktree": "/var/tmp/litchi-profile-filtered-publication-worktree-20260910",
+  "worktree_base_commit": "42be13576f97958c81526d9b239351c72d179fa8"
+}
