@@ -1,0 +1,39 @@
+{
+  "candidate": "/var/tmp/litchi-docx-ink-trace-v5-git-validation-20260910",
+  "base_commit": "42cce54f0e04dafd49c996876e1a569594238101",
+  "paths": [
+    {
+      "path": "crates/litchi-docx/src/ink/trace.rs",
+      "sha256": "0839583a155137bfb4dd166543c7cb6a615dc865c0d6520eec8a8c6fcc0d8eb4",
+      "primary_preimage_sha256": null
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/package.rs",
+      "sha256": "5ddd87b2f03628627eed1acd64320376312582f25bd910eae75dc6510b29b64e",
+      "primary_preimage_sha256": "5277bd1a859b3dc9903907977d7e822a241022065846a63a964edfb778088a53"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/mod.rs",
+      "sha256": "a82c8216e08d3960c352434ef7cede25258dc76033f1c0c8531e0e28436f7f29",
+      "primary_preimage_sha256": "cc06788ee12b13856cac695c021de3cf0cae33b806a59230dc6bca2eea6cc010"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/graph/add.rs",
+      "sha256": "05c66ce6628e8e38e1887ad9f60947aa3296da1162a65ae825c1cb38595ef191",
+      "primary_preimage_sha256": "5bf346edfb67db4865effe7293e37e4c7bb17b7d71c9bd8119a72dc83b3a419c"
+    },
+    {
+      "path": "crates/litchi-docx/tests/ink_inventory.rs",
+      "sha256": "3461aed69000ad6283832113f7545a2ef7057c3f5dd57f4b24d722a235459ad8",
+      "primary_preimage_sha256": "73934fd823d470e129357ebe409aaded7b93892e3e4ead8e77c30f69054f1541"
+    },
+    {
+      "path": "crates/litchi-docx/tests/ink_inventory/durable.rs",
+      "sha256": "57c3d5c47d28f7a1e3759cefabad5b1efaa088c64e3c5153949f1503137666f9",
+      "primary_preimage_sha256": "7a8724be0e99b7da9fb3a8b48e98f7024db6ea097f4ccc109f66329b457ae047"
+    }
+  ],
+  "patch_sha256": "dce80eda2ec0bb9d5136a078a4a7e92a67d0c9d1f7770f108a63f10fdff2892c",
+  "full_source_closure": "exact six candidate paths against verified Git base; all primary preimages match HEAD",
+  "root_test_exit_code": 0
+}

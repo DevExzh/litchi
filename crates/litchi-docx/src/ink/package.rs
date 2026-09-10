@@ -16,6 +16,7 @@ use quick_xml::reader::NsReader;
 
 use super::codec::{Form, scan};
 use super::model::Payload;
+use super::trace::{self, Channel, TraceFormat};
 use super::{Annotation, CONTENT_TYPE, Limits, Location, Snapshot};
 use crate::package::story::{StoryDialect, StoryKind, capture};
 use crate::{Error, Package, Result};
@@ -134,6 +135,8 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
     let mut stack = Vec::new();
     let mut definitions = Vec::new();
     let mut traces = Vec::new();
+    let mut formats = Vec::new();
+    let mut channel_properties = Vec::new();
     let mut projection = ProfileProjection::default();
     let mut root_seen = false;
     let mut root_closed = false;
@@ -174,7 +177,10 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                         &mut stack,
                         &mut definitions,
                         &mut traces,
+                        &mut formats,
+                        &mut channel_properties,
                         start,
+                        end,
                     )?
                 };
                 stack.try_reserve(1).map_err(|source| Error::Allocation {
@@ -210,7 +216,10 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                         &mut stack,
                         &mut definitions,
                         &mut traces,
+                        &mut formats,
+                        &mut channel_properties,
                         start,
+                        end,
                     )?
                 };
                 complete_profile_frame(&frame)?;
@@ -219,6 +228,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                     shared::SourceSpan::new(start, end),
                     &mut projection,
                 )?;
+                finish_trace_frame(&frame, end, &mut traces)?;
                 if kind == ProfileKind::Root && stack.is_empty() {
                     root_closed = true;
                 }
@@ -233,6 +243,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                     shared::SourceSpan::new(frame.start, end),
                     &mut projection,
                 )?;
+                finish_trace_frame(&frame, start, &mut traces)?;
                 if frame.kind == ProfileKind::Root && stack.is_empty() {
                     root_closed = true;
                 }
@@ -253,14 +264,35 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
             "DOCX Ink content part root is absent or unterminated".into(),
         ));
     }
-    validate_definition_ids(&mut definitions)?;
-    for trace in traces {
-        let context = local_reference(trace.context.as_deref(), "contextRef")?;
-        if !has_definition(&definitions, DefinitionKind::Context, context) {
-            return Err(Error::Invalid(format!(
-                "DOCX Ink trace contextRef has no matching context definition: {context}"
-            )));
+    for (format_index, format) in formats.iter().enumerate() {
+        let Some(context_definition) = format.context_definition else {
+            continue;
+        };
+        let definition = definitions.get_mut(context_definition).ok_or_else(|| {
+            Error::Invalid("DOCX Ink traceFormat context owner is out of range".into())
+        })?;
+        if definition.trace_format.replace(format_index).is_some() {
+            return Err(Error::Invalid(
+                "DOCX Ink context contains more than one traceFormat".into(),
+            ));
         }
+    }
+    validate_definition_ids(&mut definitions)?;
+    for format in &formats {
+        if format.regular.is_empty() {
+            return Err(Error::Invalid(
+                "DOCX Ink traceFormat must declare at least one regular channel".into(),
+            ));
+        }
+    }
+    validate_channel_properties(&channel_properties, &formats)?;
+    for trace in &traces {
+        let context = local_reference(trace.context.as_deref(), "contextRef")?;
+        find_definition(&definitions, DefinitionKind::Context, context).ok_or_else(|| {
+            Error::Invalid(format!(
+                "DOCX Ink trace contextRef has no matching context definition: {context}"
+            ))
+        })?;
         let brush = local_reference(trace.brush.as_deref(), "brushRef")?;
         if !has_definition(&definitions, DefinitionKind::Brush, brush) {
             return Err(Error::Invalid(format!(
@@ -268,7 +300,224 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
             )));
         }
     }
+    validate_trace_streams(xml, &definitions, &formats, &traces)?;
     Ok(projection)
+}
+
+fn finish_trace_frame(
+    frame: &ProfileFrame,
+    data_end: usize,
+    traces: &mut [TraceReferences],
+) -> Result<()> {
+    let Some(index) = frame.trace else {
+        return Ok(());
+    };
+    let trace = traces.get_mut(index).ok_or_else(|| {
+        Error::Invalid("DOCX Ink trace frame points outside its trace records".into())
+    })?;
+    trace.data = shared::SourceSpan::new(frame.data_start, data_end);
+    Ok(())
+}
+
+fn validate_channel_properties(
+    properties: &[ChannelPropertyReference],
+    formats: &[TraceFormat],
+) -> Result<()> {
+    for property in properties {
+        let format_index = property.format.ok_or_else(|| {
+            Error::Invalid("DOCX Ink channelProperty has no active traceFormat owner".into())
+        })?;
+        let format = formats.get(format_index).ok_or_else(|| {
+            Error::Invalid("DOCX Ink channelProperty traceFormat owner is out of range".into())
+        })?;
+        if !format
+            .regular
+            .iter()
+            .any(|channel| channel.name == property.channel)
+        {
+            return Err(Error::Invalid(format!(
+                "DOCX Ink channelProperty refers to an undefined channel: {}",
+                property.channel
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_trace_streams(
+    xml: &[u8],
+    definitions: &[Definition],
+    formats: &[TraceFormat],
+    traces: &[TraceReferences],
+) -> Result<()> {
+    let default_format = TraceFormat::default_xy();
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader.resolver_mut().set_max_declarations_per_element(256);
+    let mut next_trace = 0usize;
+    let mut active: Option<(usize, trace::Validator<'_>)> = None;
+
+    loop {
+        let start = position(&reader)?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let end = position(&reader)?;
+        match event {
+            Event::Start(_) => {
+                if active.is_some() {
+                    return Err(Error::Invalid(
+                        "DOCX Ink trace character data cannot contain nested elements".into(),
+                    ));
+                }
+                if let Some(record) = traces.get(next_trace)
+                    && record.data.start() == end
+                {
+                    let format = trace_format_for(record, definitions, formats, &default_format)?;
+                    active = Some((next_trace, trace::Validator::new(format)?));
+                }
+            },
+            Event::Empty(_) => {
+                if active.is_some() {
+                    return Err(Error::Invalid(
+                        "DOCX Ink trace character data cannot contain nested elements".into(),
+                    ));
+                }
+                if let Some(record) = traces.get(next_trace)
+                    && record.data.start() == end
+                {
+                    let format = trace_format_for(record, definitions, formats, &default_format)?;
+                    let mut validator = trace::Validator::new(format)?;
+                    validator.finish()?;
+                    next_trace = next_trace
+                        .checked_add(1)
+                        .ok_or_else(|| Error::Invalid("DOCX Ink trace count overflowed".into()))?;
+                }
+            },
+            Event::End(_) => {
+                if let Some((index, mut validator)) = active.take() {
+                    let record = traces.get(index).ok_or_else(|| {
+                        Error::Invalid("DOCX Ink trace stream record is out of range".into())
+                    })?;
+                    if record.data.end() != start {
+                        return Err(Error::Invalid(
+                            "DOCX Ink trace character data has an unexpected closing element"
+                                .into(),
+                        ));
+                    }
+                    validator.finish()?;
+                    next_trace = next_trace
+                        .checked_add(1)
+                        .ok_or_else(|| Error::Invalid("DOCX Ink trace count overflowed".into()))?;
+                }
+            },
+            Event::Text(text) => {
+                if let Some((_, validator)) = active.as_mut() {
+                    let text = text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    let text = quick_xml::escape::unescape(&text)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validator.feed(text.as_bytes())?;
+                }
+            },
+            Event::CData(text) => {
+                if let Some((_, validator)) = active.as_mut() {
+                    validator.feed(text.as_ref())?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some((_, validator)) = active.as_mut() {
+                    feed_trace_reference(reference.as_ref(), validator)?;
+                }
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {},
+        }
+    }
+    if active.is_some() || next_trace != traces.len() {
+        return Err(Error::Invalid(
+            "DOCX Ink trace stream records do not match recognized trace elements".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn trace_format_for<'a>(
+    trace: &TraceReferences,
+    definitions: &[Definition],
+    formats: &'a [TraceFormat],
+    default: &'a TraceFormat,
+) -> Result<&'a TraceFormat> {
+    let context = local_reference(trace.context.as_deref(), "contextRef")?;
+    let definition =
+        find_definition(definitions, DefinitionKind::Context, context).ok_or_else(|| {
+            Error::Invalid(format!(
+                "DOCX Ink trace contextRef has no matching context definition: {context}"
+            ))
+        })?;
+    Ok(definition
+        .trace_format
+        .and_then(|index| formats.get(index))
+        .unwrap_or(default))
+}
+
+fn feed_trace_reference(reference: &[u8], validator: &mut trace::Validator<'_>) -> Result<()> {
+    let decoded = match reference {
+        b"amp" => u32::from(b'&'),
+        b"lt" => u32::from(b'<'),
+        b"gt" => u32::from(b'>'),
+        b"apos" => u32::from(b'\''),
+        b"quot" => u32::from(b'"'),
+        value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
+            parse_trace_reference(&value[2..], 16)?
+        },
+        value if value.starts_with(b"#") => parse_trace_reference(&value[1..], 10)?,
+        _ => {
+            return Err(Error::Invalid(
+                "DOCX Ink trace uses an undeclared XML entity reference".into(),
+            ));
+        },
+    };
+    let byte = u8::try_from(decoded).map_err(|_| {
+        Error::Invalid("DOCX Ink trace entity reference is not an ASCII grammar character".into())
+    })?;
+    validator.feed(&[byte])
+}
+
+fn parse_trace_reference(value: &[u8], radix: u32) -> Result<u32> {
+    if value.is_empty() {
+        return Err(Error::Invalid(
+            "DOCX Ink numeric entity reference has no digits".into(),
+        ));
+    }
+    let mut result = 0u32;
+    for &byte in value {
+        let digit = match byte {
+            b'0'..=b'9' => u32::from(byte - b'0'),
+            b'a'..=b'f' if radix == 16 => u32::from(byte - b'a' + 10),
+            b'A'..=b'F' if radix == 16 => u32::from(byte - b'A' + 10),
+            _ => {
+                return Err(Error::Invalid(
+                    "DOCX Ink numeric entity reference has an invalid digit".into(),
+                ));
+            },
+        };
+        if digit >= radix {
+            return Err(Error::Invalid(
+                "DOCX Ink numeric entity reference has an invalid digit".into(),
+            ));
+        }
+        result = result
+            .checked_mul(radix)
+            .and_then(|value| value.checked_add(digit))
+            .ok_or_else(|| {
+                Error::Invalid("DOCX Ink numeric entity reference is too large".into())
+            })?;
+    }
+    Ok(result)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -277,6 +526,12 @@ enum ProfileKind {
     Definitions,
     Context,
     Brush,
+    InkSource,
+    TraceFormat,
+    IntermittentChannels,
+    Channel,
+    ChannelProperties,
+    ChannelProperty,
     Trace,
     TraceGroup,
     BrushProperty,
@@ -293,16 +548,24 @@ enum ProfileKind {
 enum DefinitionKind {
     Context,
     Brush,
+    InkSource,
 }
 
 struct Definition {
     kind: DefinitionKind,
     value: String,
+    trace_format: Option<usize>,
 }
 
 struct TraceReferences {
     context: Option<String>,
     brush: Option<String>,
+    data: shared::SourceSpan,
+}
+
+struct ChannelPropertyReference {
+    format: Option<usize>,
+    channel: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -348,6 +611,12 @@ struct ProfileFrame {
     start: usize,
     child_elements: usize,
     required_child: bool,
+    intermittent_channels: bool,
+    definition: Option<usize>,
+    context_definition: Option<usize>,
+    format: Option<usize>,
+    trace: Option<usize>,
+    data_start: usize,
 }
 
 impl ProfileFrame {
@@ -360,6 +629,12 @@ impl ProfileFrame {
             start,
             child_elements: 0,
             required_child: false,
+            intermittent_channels: false,
+            definition: None,
+            context_definition: None,
+            format: None,
+            trace: None,
+            data_start: start,
         }
     }
 
@@ -376,6 +651,12 @@ impl ProfileFrame {
             start,
             child_elements: 0,
             required_child: false,
+            intermittent_channels: false,
+            definition: None,
+            context_definition: None,
+            format: None,
+            trace: None,
+            data_start: start,
         }
     }
 
@@ -388,6 +669,12 @@ impl ProfileFrame {
             start,
             child_elements: 0,
             required_child: false,
+            intermittent_channels: false,
+            definition: None,
+            context_definition: None,
+            format: None,
+            trace: None,
+            data_start: start,
         }
     }
 }
@@ -400,6 +687,12 @@ fn profile_kind(element: &BytesStart<'_>, namespace: &ResolveResult<'_>) -> Prof
             b"definitions" => ProfileKind::Definitions,
             b"context" => ProfileKind::Context,
             b"brush" => ProfileKind::Brush,
+            b"inkSource" => ProfileKind::InkSource,
+            b"traceFormat" => ProfileKind::TraceFormat,
+            b"intermittentChannels" => ProfileKind::IntermittentChannels,
+            b"channel" => ProfileKind::Channel,
+            b"channelProperties" => ProfileKind::ChannelProperties,
+            b"channelProperty" => ProfileKind::ChannelProperty,
             b"trace" => ProfileKind::Trace,
             b"traceGroup" => ProfileKind::TraceGroup,
             b"brushProperty" => ProfileKind::BrushProperty,
@@ -440,7 +733,10 @@ fn observe_profile_element(
     stack: &mut [ProfileFrame],
     definitions: &mut Vec<Definition>,
     traces: &mut Vec<TraceReferences>,
+    formats: &mut Vec<TraceFormat>,
+    channel_properties: &mut Vec<ChannelPropertyReference>,
     start: usize,
+    data_start: usize,
 ) -> Result<ProfileFrame> {
     let Some(parent_index) = stack.len().checked_sub(1) else {
         return Err(Error::Invalid(
@@ -485,6 +781,7 @@ fn observe_profile_element(
                         resource: "DOCX Ink definition identifiers",
                         source,
                     })?;
+                let definition = definitions.len();
                 definitions.push(Definition {
                     kind: if kind == ProfileKind::Context {
                         DefinitionKind::Context
@@ -492,8 +789,169 @@ fn observe_profile_element(
                         DefinitionKind::Brush
                     },
                     value,
+                    trace_format: None,
                 });
+                let mut frame = ProfileFrame::recognized(kind, start);
+                frame.definition = Some(definition);
+                return Ok(frame);
             }
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::InkSource if parent.recognized && parent.kind == ProfileKind::Context => {
+            let value = xml_id(element)?
+                .ok_or_else(|| Error::Invalid("DOCX Ink inkSource xml:id is missing".into()))?;
+            if !is_ncname(&value) {
+                return Err(Error::Invalid(
+                    "DOCX Ink inkSource xml:id is not an XML NCName".into(),
+                ));
+            }
+            let context_definition = parent.definition;
+            if definitions.len() >= shared::MAX_NODES {
+                return Err(exceeded(
+                    "DOCX Ink profile definition records",
+                    definitions.len().saturating_add(1),
+                    shared::MAX_NODES,
+                ));
+            }
+            definitions
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "DOCX Ink definition identifiers",
+                    source,
+                })?;
+            let definition = definitions.len();
+            definitions.push(Definition {
+                kind: DefinitionKind::InkSource,
+                value,
+                trace_format: None,
+            });
+            let mut frame = ProfileFrame::recognized(kind, start);
+            frame.definition = Some(definition);
+            frame.context_definition = context_definition;
+            Ok(frame)
+        },
+        ProfileKind::TraceFormat if parent.recognized && parent.kind == ProfileKind::InkSource => {
+            if parent.format.is_some() {
+                return Err(Error::Invalid(
+                    "DOCX Ink inkSource contains more than one traceFormat".into(),
+                ));
+            }
+            let context_definition = parent.context_definition;
+            if formats.len() >= shared::MAX_NODES {
+                return Err(exceeded(
+                    "DOCX Ink traceFormat records",
+                    formats.len().saturating_add(1),
+                    shared::MAX_NODES,
+                ));
+            }
+            formats.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "DOCX Ink traceFormat records",
+                source,
+            })?;
+            let format = formats.len();
+            formats.push(TraceFormat {
+                context_definition,
+                ..TraceFormat::default()
+            });
+            stack[parent_index].format = Some(format);
+            let mut frame = ProfileFrame::recognized(kind, start);
+            frame.format = Some(format);
+            frame.context_definition = context_definition;
+            Ok(frame)
+        },
+        ProfileKind::IntermittentChannels
+            if parent.recognized && parent.kind == ProfileKind::TraceFormat =>
+        {
+            if parent.intermittent_channels {
+                return Err(Error::Invalid(
+                    "DOCX Ink traceFormat contains more than one intermittentChannels section"
+                        .into(),
+                ));
+            }
+            let format = parent.format.ok_or_else(|| {
+                Error::Invalid("DOCX Ink intermittentChannels owner is out of range".into())
+            })?;
+            formats
+                .get_mut(format)
+                .ok_or_else(|| {
+                    Error::Invalid("DOCX Ink intermittentChannels owner is out of range".into())
+                })?
+                .opaque_intermittent = true;
+            stack[parent_index].intermittent_channels = true;
+            // The Office profile explicitly ignores intermittentChannels and
+            // their channel declarations. Keep the subtree opaque while the
+            // enclosing traceFormat still tracks its grammar-level position.
+            Ok(ProfileFrame::ignored(kind, start))
+        },
+        ProfileKind::Channel
+            if parent.recognized
+                && matches!(
+                    parent.kind,
+                    ProfileKind::TraceFormat | ProfileKind::IntermittentChannels
+                ) =>
+        {
+            if parent.kind == ProfileKind::TraceFormat && parent.intermittent_channels {
+                return Err(Error::Invalid(
+                    "DOCX Ink traceFormat regular channel appears after intermittentChannels"
+                        .into(),
+                ));
+            }
+            if parent.kind == ProfileKind::IntermittentChannels {
+                return Ok(ProfileFrame::ignored(kind, start));
+            }
+            let format = parent.format.ok_or_else(|| {
+                Error::Invalid("DOCX Ink channel is missing its traceFormat owner".into())
+            })?;
+            let name = profile_attr(element, b"name")?.ok_or_else(|| {
+                Error::Invalid("DOCX Ink traceFormat channel name is missing".into())
+            })?;
+            let channel_kind = trace::channel_type(profile_attr(element, b"type")?.as_deref())?;
+            let target = formats.get_mut(format).ok_or_else(|| {
+                Error::Invalid("DOCX Ink channel traceFormat owner is out of range".into())
+            })?;
+            if target.total_channels() >= shared::MAX_NODES {
+                return Err(exceeded(
+                    "DOCX Ink traceFormat channels",
+                    target.total_channels().saturating_add(1),
+                    shared::MAX_NODES,
+                ));
+            }
+            target
+                .regular
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "DOCX Ink regular channels",
+                    source,
+                })?;
+            target.push(Channel {
+                name,
+                kind: channel_kind,
+            });
+            Ok(ProfileFrame::recognized(ProfileKind::Channel, start))
+        },
+        ProfileKind::ChannelProperties
+            if parent.recognized && parent.kind == ProfileKind::InkSource =>
+        {
+            let mut frame = ProfileFrame::recognized(kind, start);
+            frame.format = parent.format;
+            Ok(frame)
+        },
+        ProfileKind::ChannelProperty
+            if parent.recognized && parent.kind == ProfileKind::ChannelProperties =>
+        {
+            let channel = profile_attr(element, b"channel")?.ok_or_else(|| {
+                Error::Invalid("DOCX Ink channelProperty channel is missing".into())
+            })?;
+            channel_properties
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "DOCX Ink channel properties",
+                    source,
+                })?;
+            channel_properties.push(ChannelPropertyReference {
+                format: parent.format,
+                channel,
+            });
             Ok(ProfileFrame::recognized(kind, start))
         },
         ProfileKind::Trace
@@ -514,12 +972,13 @@ fn observe_profile_element(
             traces.push(TraceReferences {
                 context: profile_attr(element, b"contextRef")?,
                 brush: profile_attr(element, b"brushRef")?,
+                data: shared::SourceSpan::new(data_start, data_start),
             });
-            Ok(ProfileFrame::recognized_projection(
-                kind,
-                start,
-                ProjectionKind::Trace,
-            ))
+            let trace = traces.len() - 1;
+            let mut frame = ProfileFrame::recognized_projection(kind, start, ProjectionKind::Trace);
+            frame.trace = Some(trace);
+            frame.data_start = data_start;
+            Ok(frame)
         },
         ProfileKind::TraceGroup
             if parent.recognized
@@ -800,11 +1259,22 @@ fn validate_definition_ids(definitions: &mut [Definition]) -> Result<()> {
     Ok(())
 }
 
-fn has_definition(definitions: &[Definition], kind: DefinitionKind, value: &str) -> bool {
+fn find_definition<'a>(
+    definitions: &'a [Definition],
+    kind: DefinitionKind,
+    value: &str,
+) -> Option<&'a Definition> {
     definitions
         .binary_search_by(|definition| definition.value.as_str().cmp(value))
         .ok()
-        .is_some_and(|index| definitions[index].kind == kind)
+        .and_then(|index| {
+            let definition = &definitions[index];
+            (definition.kind == kind).then_some(definition)
+        })
+}
+
+fn has_definition(definitions: &[Definition], kind: DefinitionKind, value: &str) -> bool {
+    find_definition(definitions, kind, value).is_some()
 }
 
 fn local_reference<'a>(value: Option<&'a str>, name: &'static str) -> Result<&'a str> {
@@ -1233,6 +1703,106 @@ mod tests {
     fn profile_accepts_forward_references() {
         let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions></i:ink>"##;
         validate_content_part(source).unwrap();
+    }
+
+    #[test]
+    fn profile_validates_trace_format_channels_and_inkml_lexicals() {
+        let valid = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:channel name="Y" type="integer"/><i:channel name="T" type="integer" units="ms"/><i:channel name="F" type="boolean"/><i:intermittentChannels><i:channel name="pressure" type="not-a-type"/></i:intermittentChannels></i:traceFormat><i:channelProperties><i:channelProperty channel="T" name="resolution" value="1"/></i:channelProperties></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2 0 T,'3 '4 '5 F,"1 "2 "3 *</i:trace></i:ink>"##;
+        validate_content_part(valid).expect("valid imported InkML trace grammar");
+        for body in [
+            "<![CDATA[1 2 0 T,'3 '4 '5 F,\"1 \"2 \"3 *]]>",
+            "1&#x20;2 0 T,3 4 5 F",
+            "1 2 0 T<!-- preserved comment -->,3 4 5 F",
+        ] {
+            let source = format!(
+                r##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:channel name="Y" type="integer"/><i:channel name="T" type="integer"/><i:channel name="F" type="boolean"/><i:intermittentChannels><i:channel name="pressure" type="not-a-type"/></i:intermittentChannels></i:traceFormat></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">{body}</i:trace></i:ink>"##
+            );
+            validate_content_part(source.as_bytes()).expect("split XML character data is valid");
+        }
+
+        let valid_text = String::from_utf8(valid.to_vec()).unwrap();
+        let opaque_intermittent_data = valid_text
+            .replace(
+                "1 2 0 T,'3 '4 '5 F,\"1 \"2 \"3 *",
+                "1 2 0 T 1e1,'3 '4 '5 F 2e1,\"1 \"2 \"3 * ?",
+            )
+            .into_bytes();
+        validate_content_part(&opaque_intermittent_data)
+            .expect("ignored intermittent channels remain generic trace data");
+        let replace_data = |data: &str| {
+            valid_text
+                .replace("1 2 0 T,'3 '4 '5 F,\"1 \"2 \"3 *", data)
+                .into_bytes()
+        };
+        let invalid = [
+            replace_data("'1 2 0 T"),
+            replace_data("1 2 1.5 T"),
+            replace_data("1 2 0 T,\"3 4 5 F"),
+            replace_data("1 2 0 T,3 4 5 F #"),
+            replace_data(r#"1 2 0 T,'3 '4 '5 F,\"1 \"2 \"3 *,'4 '5 '6 F"#),
+        ];
+        for source in invalid {
+            assert!(
+                validate_content_part(&source).is_err(),
+                "invalid trace data must be rejected: {}",
+                String::from_utf8_lossy(&source)
+            );
+        }
+
+        let invalid_t = valid_text
+            .replace("name=\"T\" type=\"integer\"", "name=\"T\" type=\"decimal\"")
+            .replace("1 2 0 T", "1 2 0.5 T")
+            .into_bytes();
+        assert!(validate_content_part(&invalid_t).is_err());
+        let boolean_t = valid_text
+            .replace("name=\"T\" type=\"integer\"", "name=\"T\" type=\"boolean\"")
+            .replace("1 2 0 T", "1 2 T T")
+            .into_bytes();
+        assert!(validate_content_part(&boolean_t).is_err());
+        let invalid_property = valid_text
+            .replace("channel=\"T\"", "channel=\"unknown\"")
+            .into_bytes();
+        assert!(validate_content_part(&invalid_property).is_err());
+    }
+
+    #[test]
+    fn profile_rejects_duplicate_or_late_intermittent_channel_sections() {
+        let duplicate = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:intermittentChannels><i:channel name="ignored" type="not-a-type"/></i:intermittentChannels><i:intermittentChannels><i:channel name="alsoIgnored" type="not-a-type"/></i:intermittentChannels></i:traceFormat></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1</i:trace></i:ink>"##;
+        assert!(validate_content_part(duplicate).is_err());
+
+        let late_regular = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:intermittentChannels><i:channel name="ignored" type="not-a-type"/></i:intermittentChannels><i:channel name="Y" type="integer"/></i:traceFormat></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:ink>"##;
+        assert!(validate_content_part(late_regular).is_err());
+    }
+
+    #[test]
+    fn profile_accepts_t_default_or_decimal_declarations_with_integer_values() {
+        for declaration in [
+            r#"<i:channel name="T"/>"#,
+            r#"<i:channel name="T" type="decimal"/>"#,
+        ] {
+            let source = format!(
+                r##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:channel name="Y" type="integer"/>{declaration}</i:traceFormat></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:ink>"##
+            );
+            validate_content_part(source.as_bytes())
+                .expect("integer lexical T values are valid for default/decimal channels");
+        }
+    }
+
+    #[test]
+    fn profile_does_not_reject_boolean_t_declarations_without_t_values() {
+        let declaration_only = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="T" type="boolean"/></i:traceFormat></i:inkSource></i:context></i:definitions></i:ink>"##;
+        validate_content_part(declaration_only)
+            .expect("a declaration alone does not provide a Boolean T value");
+
+        let ignored_intermittent = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"><i:inkSource xml:id="source0"><i:traceFormat><i:channel name="X" type="integer"/><i:channel name="Y" type="integer"/><i:intermittentChannels><i:channel name="T" type="boolean"/></i:intermittentChannels></i:traceFormat></i:inkSource></i:context><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2 *</i:trace></i:ink>"##;
+        validate_content_part(ignored_intermittent)
+            .expect("an ignored Boolean T declaration and first-point wildcard remain generic");
+    }
+
+    #[test]
+    fn profile_ignores_trace_formats_outside_ink_source_owner() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:traceFormat><i:channel type="not-a-type"/></i:traceFormat><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:ink>"##;
+        validate_content_part(source).expect("misplaced traceFormat is opaque");
     }
 
     #[test]
