@@ -1,0 +1,9 @@
+{
+  "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+  "base_sha256": "f5df2a79d8621543147667037c18effb87b5da8ff8a6d867de3617ffd4364d1a",
+  "primary_sha256": "f65dede5b0f022f0f6dc2359234e72e61466aa8d8fac9de3e573ee689e49128f",
+  "clean_sha256": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+  "mixed_sha256": "fc36c04f289f062bf6e9c4748a8c71691143932d61f29d521d6a26ef67f77482",
+  "pending_line": "| [MS-OREACTXML] `commentsExtensible` reactions | N/A | N/A | N/A | [MS-OREACTXML] \u00a7\u00a71.3 and 1.5 explicitly bind these extensions to WordprocessingML. Its Word `commentsExtensible` part is not an XLSX part; this corrects the format assignment in the 2026-09-08 gap audit. It does not make a broader claim about Excel-service reaction features. |\n",
+  "mixed_is_clean_plus_exact_pending_line": true
+}

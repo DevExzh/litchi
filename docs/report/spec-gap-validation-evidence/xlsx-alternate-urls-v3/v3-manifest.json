@@ -1,0 +1,86 @@
+{
+  "candidate_root": "/var/tmp/litchi-xlsx-alternate-urls-validation-v3-20260910",
+  "base_commit": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "v2_preserved_root": "/var/tmp/litchi-xlsx-alternate-urls-validation-v2-20260910",
+  "v2_manifest": "/var/tmp/litchi-xlsx-alternate-urls-validation-v2-20260910-manifest.json",
+  "v2_patch_preserved": "/var/tmp/litchi-xlsx-alternate-urls-v2.patch",
+  "candidate_patch": "/var/tmp/litchi-xlsx-alternate-urls-v3.patch",
+  "candidate_patch_sha256": "001830d2e57187708de7380555ce8d4f873262cfd7980b0e7dd90554278126bd",
+  "tracked_paths": [
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-xlsx/src/external_links/codec.rs",
+    "crates/litchi-xlsx/src/external_links/mod.rs",
+    "crates/litchi-xlsx/src/external_links/model.rs",
+    "crates/litchi-xlsx/src/external_links/package.rs",
+    "crates/litchi-xlsx/src/external_links/tests.rs",
+    "crates/litchi-xlsx/src/external_links/transaction.rs",
+    "crates/litchi-xlsx/src/lib.rs",
+    "Cargo.lock"
+  ],
+  "sha256": {
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "0d567b6fe8e2af2ff066595668c08d50a301fcf01540517c79b4bed28d7b8042",
+    "crates/litchi-xlsx/src/external_links/codec.rs": "da08bf9bb82c30de93c2c6b08aa24dba92b9afe7ce5f5314a9585036e8fd0797",
+    "crates/litchi-xlsx/src/external_links/mod.rs": "9da1ed0b839016ce200a7d70591149803a64c754bae363662636d0d38851ff48",
+    "crates/litchi-xlsx/src/external_links/model.rs": "08f02f007f4ccd0da0862b48f20b508e24dcb3767b0444bdb2b9166b6339fd02",
+    "crates/litchi-xlsx/src/external_links/package.rs": "6fc26903321433cabb1b0f4ae199b663f36d429f7bb5bb13e72288e90d22fd5b",
+    "crates/litchi-xlsx/src/external_links/tests.rs": "9834bd272a8be9ad101e7593505de8332f7527fc4f29bb65a3029222fba197ef",
+    "crates/litchi-xlsx/src/external_links/transaction.rs": "a8a6d9c87758a4a99f5d92c759d2a4dc6cb67b4070ed185dcb783a7345921c27",
+    "crates/litchi-xlsx/src/lib.rs": "61a1d1d4f48773c19a8c3b86521d4debdc5164f199644c609f346dcec4a6e01f",
+    "Cargo.lock": "0e5a074c629cbbea9838943f0a585a0a991c6a32417d0473751134dc61baa446"
+  },
+  "toolchain": {
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "rust_toolchain": "1.95.0",
+    "cpu_affinity": "8-31",
+    "target_dir": "/var/tmp/litchi-xlsx-alternate-urls-validation-v3-20260910-target"
+  },
+  "gates": {
+    "focused_tests": {
+      "command": "taskset -c 8-31 cargo test -p litchi-xlsx external_links --locked",
+      "log": "/var/tmp/litchi-xlsx-alternate-urls-v3-focused-v3.log",
+      "result": "19 passed"
+    },
+    "all_features_tests": {
+      "command": "taskset -c 8-31 cargo test -p litchi-xlsx --all-features --all-targets --locked",
+      "log": "/var/tmp/litchi-xlsx-alternate-urls-v3-tests-v1.log",
+      "result": "passed"
+    },
+    "clippy": {
+      "command": "taskset -c 8-31 cargo clippy -p litchi-xlsx --all-features --all-targets --locked -- -D warnings",
+      "log": "/var/tmp/litchi-xlsx-alternate-urls-v3-clippy-v2.log",
+      "result": "passed"
+    },
+    "rustdoc": {
+      "command": "taskset -c 8-31 cargo doc -p litchi-xlsx --all-features --no-deps --locked",
+      "log": "/var/tmp/litchi-xlsx-alternate-urls-v3-rustdoc-v1.log",
+      "result": "passed"
+    },
+    "fmt_targeted": {
+      "command": "rustfmt --edition 2024 --check crates/litchi-xlsx/src/external_links/codec.rs crates/litchi-xlsx/src/external_links/package.rs crates/litchi-xlsx/src/external_links/tests.rs",
+      "result": "passed"
+    },
+    "fmt_workspace": {
+      "command": "cargo fmt --all -- --check",
+      "log": "/var/tmp/litchi-xlsx-alternate-urls-v3-fmt-v1.log",
+      "result": "pre-existing unrelated litchi-keynote/src/document.rs formatting diff"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  },
+  "normative_sources": [
+    "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLSX]/2 Structures/2.4 Global Elements.md \u00a72.4.97",
+    "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLSX]/2 Structures/2.6 Complex Types.md \u00a7\u00a72.6.227\u2013228",
+    "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLSX]/5 Appendix A - Full XML Schema/5.34 http---schemas.microsoft.com-office-spreadsheetml-2021-extlinks2021 Schema.md"
+  ],
+  "scope": [
+    "V2 alternateUrls implementation preserved.",
+    "Source patch matching now stores and checks expanded element namespace URIs for SpreadsheetML, extlinks2021 and x14 owners.",
+    "External-link source XML is bounded at MAX_CACHE_TEXT_BYTES before parse/retention and before replacement cloning.",
+    "Alternate URL r:id raw bytes and decoded values are bounded before semantic allocation.",
+    "Removal refuses unknown attributes, non-whitespace text/comments, foreign children, or nested opaque descendants."
+  ],
+  "no_primary_mutation": true,
+  "no_stage_or_commit": true
+}

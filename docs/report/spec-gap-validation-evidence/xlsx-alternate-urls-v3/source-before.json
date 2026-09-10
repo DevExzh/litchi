@@ -1,0 +1,11 @@
+{
+  "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+  "crates/litchi-xlsx/src/external_links/codec.rs": "da08bf9bb82c30de93c2c6b08aa24dba92b9afe7ce5f5314a9585036e8fd0797",
+  "crates/litchi-xlsx/src/external_links/mod.rs": "9da1ed0b839016ce200a7d70591149803a64c754bae363662636d0d38851ff48",
+  "crates/litchi-xlsx/src/external_links/model.rs": "08f02f007f4ccd0da0862b48f20b508e24dcb3767b0444bdb2b9166b6339fd02",
+  "crates/litchi-xlsx/src/external_links/package.rs": "6fc26903321433cabb1b0f4ae199b663f36d429f7bb5bb13e72288e90d22fd5b",
+  "crates/litchi-xlsx/src/external_links/tests.rs": "9834bd272a8be9ad101e7593505de8332f7527fc4f29bb65a3029222fba197ef",
+  "crates/litchi-xlsx/src/external_links/transaction.rs": "a8a6d9c87758a4a99f5d92c759d2a4dc6cb67b4070ed185dcb783a7345921c27",
+  "crates/litchi-xlsx/src/lib.rs": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a",
+  "Cargo.lock": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88"
+}

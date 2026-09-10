@@ -2,7 +2,7 @@
 
 use litchi_opc::OpcPackage;
 
-use super::model::Link;
+use super::model::{AlternateUrls, Link};
 use super::package::apply_entries;
 use super::patch::{Commit, Patch};
 use super::snapshot::{Snapshot, next_part_uri};
@@ -74,6 +74,26 @@ impl<'a> Transaction<'a> {
     pub fn set(&mut self, index: usize, link: Link) -> Result<bool> {
         self.edit(index, |value| {
             *value = link;
+            Ok(())
+        })
+    }
+
+    /// Replace or remove one workbook link's inert `alternateUrls` extension.
+    ///
+    /// DDE and OLE links do not carry this SpreadsheetML extension and are
+    /// rejected before the staged catalog changes.
+    pub fn set_alternate_urls(
+        &mut self,
+        index: usize,
+        alternate_urls: Option<AlternateUrls>,
+    ) -> Result<bool> {
+        self.edit(index, |value| {
+            let Link::Workbook(workbook) = value else {
+                return Err(invalid(
+                    "alternateUrls can only be edited on an external workbook link",
+                ));
+            };
+            workbook.alternate_urls = alternate_urls;
             Ok(())
         })
     }

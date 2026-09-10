@@ -1,0 +1,176 @@
+{
+  "review": "alternate-urls-integration-shared-merge",
+  "review_date": "2026-09-10",
+  "verdict": "CLEAR",
+  "scope": "clean AlternateURLs integration ownership, mixed matrix-only pending merge, primary pending preservation, and refreshIntervals 784 preservation",
+  "source_manifest": "/var/tmp/litchi-xlsx-alternate-urls-integration-manifest-20260910.json",
+  "source_manifest_sha256": "abb4958847c46010c240dd3d8901f25599df0b5fb5bcc750d0e102ccd2a29712",
+  "base_commit": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "source_owner": "AlternateURLs V3",
+  "source_owner_delta": "/var/tmp/litchi-xlsx-alternate-urls-v3.patch",
+  "source_owner_delta_sha256": "001830d2e57187708de7380555ce8d4f873262cfd7980b0e7dd90554278126bd",
+  "clean_worktree": "/var/tmp/litchi-xlsx-alternate-urls-integration-clean-20260910",
+  "mixed_worktree": "/var/tmp/litchi-xlsx-alternate-urls-integration-mixed-20260910",
+  "patches": {
+    "clean": {
+      "path": "/var/tmp/litchi-xlsx-alternate-urls-integration-clean.patch",
+      "sha256": "bd19269b86b227d78e82ead9b7b6ab2fdd95263d7fa11ccb7d83a5bcf56cd04b"
+    },
+    "mixed": {
+      "path": "/var/tmp/litchi-xlsx-alternate-urls-integration-mixed.patch",
+      "sha256": "b8f2995e045b93967aec513429af4c17e9afc9c95a02b16fea213fdade4d7795"
+    },
+    "v3_clean_patch_id_stable": "72925c7440476fc8f7ad27591d5116aa8546df47"
+  },
+  "clean_index_boundary": {
+    "tracked_status_count": 8,
+    "tracked_status_paths": [
+      " M crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+      " M crates/litchi-xlsx/src/external_links/codec.rs",
+      " M crates/litchi-xlsx/src/external_links/mod.rs",
+      " M crates/litchi-xlsx/src/external_links/model.rs",
+      " M crates/litchi-xlsx/src/external_links/package.rs",
+      " M crates/litchi-xlsx/src/external_links/tests.rs",
+      " M crates/litchi-xlsx/src/external_links/transaction.rs",
+      " M crates/litchi-xlsx/src/lib.rs"
+    ],
+    "cached_paths": [],
+    "untracked_paths": [],
+    "owned_path_count": 8,
+    "owned_hashes": {
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+      "crates/litchi-xlsx/src/external_links/codec.rs": "da08bf9bb82c30de93c2c6b08aa24dba92b9afe7ce5f5314a9585036e8fd0797",
+      "crates/litchi-xlsx/src/external_links/mod.rs": "9da1ed0b839016ce200a7d70591149803a64c754bae363662636d0d38851ff48",
+      "crates/litchi-xlsx/src/external_links/model.rs": "08f02f007f4ccd0da0862b48f20b508e24dcb3767b0444bdb2b9166b6339fd02",
+      "crates/litchi-xlsx/src/external_links/package.rs": "6fc26903321433cabb1b0f4ae199b663f36d429f7bb5bb13e72288e90d22fd5b",
+      "crates/litchi-xlsx/src/external_links/tests.rs": "9834bd272a8be9ad101e7593505de8332f7527fc4f29bb65a3029222fba197ef",
+      "crates/litchi-xlsx/src/external_links/transaction.rs": "a8a6d9c87758a4a99f5d92c759d2a4dc6cb67b4070ed185dcb783a7345921c27",
+      "crates/litchi-xlsx/src/lib.rs": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a"
+    },
+    "owned_hashes_match_manifest": true,
+    "git_diff_check": "pass"
+  },
+  "mixed_pending_boundary": {
+    "tracked_status_count": 43,
+    "cached_paths": [],
+    "untracked_paths": [],
+    "expected_union_count": "36 pending tracked + 8 owned AlternateURLs - 1 matrix overlap = 43",
+    "pending_tracked_count": 36,
+    "pending_nonoverlap_hash_matches": 35,
+    "pending_hash_mismatches": [
+      {
+        "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "reason": "intentional shared matrix overlap; independently proved mixed equals clean plus pending MS-OREACTXML row"
+      }
+    ],
+    "untracked_pending_source_count": 4166,
+    "untracked_pending_present_in_clean": [],
+    "untracked_pending_present_in_mixed": [],
+    "git_diff_check": "pass"
+  },
+  "matrix_overlap": {
+    "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "clean_sha256": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+    "primary_pending_sha256": "f65dede5b0f022f0f6dc2359234e72e61466aa8d8fac9de3e573ee689e49128f",
+    "mixed_sha256": "fc36c04f289f062bf6e9c4748a8c71691143932d61f29d521d6a26ef67f77482",
+    "clean_contains_alternate_urls_row": true,
+    "mixed_contains_alternate_urls_row": true,
+    "mixed_contains_mso_reactxml_row": true,
+    "mixed_equals_clean_plus_pending_mso_reactxml_row": true,
+    "expected_composed_sha256": "fc36c04f289f062bf6e9c4748a8c71691143932d61f29d521d6a26ef67f77482"
+  },
+  "refresh_784_preservation": {
+    "paths": [
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+      "crates/litchi-xlsx/src/lib.rs",
+      "crates/litchi-xlsx/src/rich_values/codec/mod.rs",
+      "crates/litchi-xlsx/src/rich_values/mod.rs",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/mod.rs",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/model.rs",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/package.rs",
+      "crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs"
+    ],
+    "clean_hashes": {
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+      "crates/litchi-xlsx/src/lib.rs": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a",
+      "crates/litchi-xlsx/src/rich_values/codec/mod.rs": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+      "crates/litchi-xlsx/src/rich_values/mod.rs": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/mod.rs": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/model.rs": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/package.rs": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+      "crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8"
+    },
+    "clean_hashes_match_manifest": true,
+    "mixed_nonmatrix_paths_same_as_clean": true,
+    "mixed_comparison": {
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": {
+        "clean_sha256": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+        "mixed_sha256": "fc36c04f289f062bf6e9c4748a8c71691143932d61f29d521d6a26ef67f77482",
+        "same": false
+      },
+      "crates/litchi-xlsx/src/lib.rs": {
+        "clean_sha256": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a",
+        "mixed_sha256": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/codec/mod.rs": {
+        "clean_sha256": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+        "mixed_sha256": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/mod.rs": {
+        "clean_sha256": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+        "mixed_sha256": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs": {
+        "clean_sha256": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+        "mixed_sha256": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/mod.rs": {
+        "clean_sha256": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+        "mixed_sha256": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/model.rs": {
+        "clean_sha256": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+        "mixed_sha256": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+        "same": true
+      },
+      "crates/litchi-xlsx/src/rich_values/refresh_intervals/package.rs": {
+        "clean_sha256": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+        "mixed_sha256": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+        "same": true
+      },
+      "crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs": {
+        "clean_sha256": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8",
+        "mixed_sha256": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8",
+        "same": true
+      }
+    },
+    "lib_exports_both_features": true,
+    "lib_sha256_clean_and_mixed": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a",
+    "verified_markers": [
+      "AlternateUrl",
+      "RefreshInterval",
+      "load_rich_value_refresh",
+      "alternateUrls"
+    ]
+  },
+  "build_lock": {
+    "path": "Cargo.lock",
+    "sha256_clean": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "sha256_mixed": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "expected_sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88"
+  },
+  "focused_evidence": {
+    "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/var/tmp/litchi-xlsx-alternate-urls-integration-clean-20260910-target taskset -c 8-31 cargo test -p litchi-xlsx external_links --locked",
+    "result": "19 passed, 0 failed",
+    "log": "/var/tmp/litchi-xlsx-alternate-urls-integration-clean-focused-v1.log",
+    "log_sha256": "fd23dfece2a45dd9704b7460cec1b8e664f2c96f9f1b6fa9622517b413755d49"
+  },
+  "reviewer_mutation": "none; no primary/candidate edits, staging, commits, or broad suite reruns"
+}
