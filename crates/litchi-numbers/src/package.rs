@@ -7,6 +7,7 @@
 
 mod chart_arrangement;
 mod chart_data;
+mod chart_data_edit;
 mod chart_metadata;
 pub mod comments;
 #[allow(
@@ -123,6 +124,10 @@ pub use chart_arrangement::{
     SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch,
 };
 pub use chart_data::{ChartDataError, ChartDataLimitKind};
+pub use chart_data_edit::{
+    ChartDataCommit, ChartDataDiagnostics, ChartDataEdit, ChartDataPatch, SheetChartDataCommit,
+    SheetChartDataDiagnostics, SheetChartDataEdit, SheetChartDataPatch,
+};
 pub use chart_metadata::{ChartMetadataError, ChartMetadataLimitKind};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]

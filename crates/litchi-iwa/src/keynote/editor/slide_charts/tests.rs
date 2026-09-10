@@ -391,6 +391,28 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     editor
         .set_slide_chart_kind(0, chart_selector(&editor, &created), Kind::Bar2d)
         .unwrap();
+
+    let same_shape = ChartData::new(
+        vec!["North".to_owned(), "South".to_owned()],
+        vec!["Q1".to_owned(), "Q2".to_owned(), "Q3".to_owned()],
+        vec![
+            vec![Some(15.0), None, Some(26.0)],
+            vec![Some(11.0), Some(23.0), Some(29.0)],
+        ],
+    )
+    .unwrap();
+    editor
+        .set_slide_chart_data(0, chart_selector(&editor, &created), same_shape.clone())
+        .unwrap();
+    let focused = litchi_keynote::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        focused.slide_chart_data(0usize, 0usize).unwrap(),
+        same_shape
+    );
+    assert_eq!(editor.slide_charts(0).unwrap()[0].data, same_shape);
+
+    // Changed labels and dimensions intentionally retain the legacy full-grid
+    // replacement path until grid authoring owns those transitions.
     editor
         .set_slide_chart_data(0, chart_selector(&editor, &created), replacement.clone())
         .unwrap();

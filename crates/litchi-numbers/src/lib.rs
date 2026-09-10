@@ -361,6 +361,10 @@ pub use package::{
     ChartArrangementLimitKind as SheetChartArrangementLimitKind,
     ChartArrangementPatch as SheetChartArrangementPatch,
 };
+pub use package::{
+    ChartDataCommit, ChartDataDiagnostics, ChartDataEdit, ChartDataPatch, SheetChartDataCommit,
+    SheetChartDataDiagnostics, SheetChartDataEdit, SheetChartDataPatch,
+};
 pub use package::{ChartDataError, ChartDataLimitKind};
 pub use package::{ChartMetadataError, ChartMetadataLimitKind};
 pub use package::{

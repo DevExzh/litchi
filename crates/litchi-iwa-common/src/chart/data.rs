@@ -121,6 +121,35 @@ impl ChartData {
         &self.values
     }
 
+    /// Compare two chart grids using the exact IEEE-754 representation of
+    /// every present value.
+    ///
+    /// Labels, dimensions, missing cells, and numeric values must all match.
+    /// Present values are compared with [`f64::to_bits`], so positive and
+    /// negative zero remain distinct. This comparison only borrows the two
+    /// grids and does not allocate.
+    #[must_use]
+    pub fn bitwise_eq(&self, other: &Self) -> bool {
+        self.row_names == other.row_names
+            && self.column_names == other.column_names
+            && self.values.len() == other.values.len()
+            && self
+                .values
+                .iter()
+                .zip(&other.values)
+                .all(|(left_row, right_row)| {
+                    left_row.len() == right_row.len()
+                        && left_row
+                            .iter()
+                            .zip(right_row)
+                            .all(|(left, right)| match (left, right) {
+                                (None, None) => true,
+                                (Some(left), Some(right)) => left.to_bits() == right.to_bits(),
+                                _ => false,
+                            })
+                })
+    }
+
     /// Return the owned labels and row-major values for a source builder.
     #[must_use]
     pub fn into_parts(self) -> (Vec<String>, Vec<String>, Vec<Vec<Option<f64>>>) {
@@ -153,6 +182,59 @@ mod tests {
         assert_eq!(data.column_names(), columns.as_slice());
         assert_eq!(data.values()[0][1], None);
         assert_eq!(data.values()[1][0], Some(-8.5));
+    }
+
+    #[test]
+    fn bitwise_eq_distinguishes_signed_zero_and_missing_values() {
+        let positive_zero = ChartData::new(
+            vec![String::from("row")],
+            vec![String::from("value")],
+            vec![vec![Some(0.0)]],
+        )
+        .expect("finite chart data");
+        let negative_zero = ChartData::new(
+            vec![String::from("row")],
+            vec![String::from("value")],
+            vec![vec![Some(-0.0)]],
+        )
+        .expect("finite chart data");
+        let missing = ChartData::new(
+            vec![String::from("row")],
+            vec![String::from("value")],
+            vec![vec![None]],
+        )
+        .expect("missing chart data");
+
+        assert_eq!(positive_zero, negative_zero);
+        assert!(positive_zero.bitwise_eq(&positive_zero));
+        assert!(!positive_zero.bitwise_eq(&negative_zero));
+        assert!(!positive_zero.bitwise_eq(&missing));
+    }
+
+    #[test]
+    fn bitwise_eq_includes_finite_labels_and_dimensions() {
+        let reference = ChartData::new(
+            vec![String::from("row")],
+            vec![String::from("value")],
+            vec![vec![Some(4.5)]],
+        )
+        .expect("finite chart data");
+        let different_label = ChartData::new(
+            vec![String::from("other row")],
+            vec![String::from("value")],
+            vec![vec![Some(4.5)]],
+        )
+        .expect("finite chart data");
+        let different_dimensions = ChartData::new(
+            vec![String::from("row")],
+            vec![String::from("value"), String::from("other value")],
+            vec![vec![Some(4.5), None]],
+        )
+        .expect("finite chart data");
+
+        assert!(reference.bitwise_eq(&reference));
+        assert!(!reference.bitwise_eq(&different_label));
+        assert!(!reference.bitwise_eq(&different_dimensions));
     }
 
     #[test]

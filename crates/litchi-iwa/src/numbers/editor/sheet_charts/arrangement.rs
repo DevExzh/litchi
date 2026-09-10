@@ -109,6 +109,18 @@ fn sheet_index(editor: &NumbersEditor, sheet_id: u64) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))
 }
 
+/// Resolve a host chart graph to the focused package's semantic sheet and
+/// chart positions. Native identifiers remain private to this adapter.
+pub(super) fn focused_chart_data_target(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) -> Result<(usize, usize)> {
+    let sheet_index = sheet_index(editor, sheet_id)?;
+    let (chart_position, _) = chart_position(editor, sheet_id, drawable_object_id)?;
+    Ok((sheet_index, chart_position))
+}
+
 /// Resolve a native drawable to its semantic chart position while preserving
 /// the host's source-order ownership checks. This is intentionally private;
 /// focused callers only receive `ChartSelector` positions.

@@ -818,6 +818,25 @@ fn scratch_document_supports_body_chart_crud() {
     editor
         .set_body_chart_kind(created.drawable_object_id, Kind::Bar2d)
         .unwrap();
+
+    let same_shape = ChartData::new(
+        vec!["North".to_owned(), "South".to_owned()],
+        vec!["Q1".to_owned(), "Q2".to_owned(), "Q3".to_owned()],
+        vec![
+            vec![Some(15.0), None, Some(26.0)],
+            vec![Some(11.0), Some(23.0), Some(29.0)],
+        ],
+    )
+    .unwrap();
+    editor
+        .set_body_chart_data(created.drawable_object_id, same_shape.clone())
+        .unwrap();
+    let focused = litchi_pages::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(focused.body_chart_data(0usize).unwrap(), same_shape);
+    assert_eq!(editor.body_charts().unwrap()[0].data, same_shape);
+
+    // Changed labels and dimensions intentionally retain the legacy full-grid
+    // replacement path until grid authoring owns those transitions.
     editor
         .set_body_chart_data(created.drawable_object_id, replacement.clone())
         .unwrap();

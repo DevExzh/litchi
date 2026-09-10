@@ -11727,3 +11727,62 @@ chart-data fuzz target completes 100 sanitizer runs without failure. Decoder
 work and post-decode iterator replay are bounded separately; owned vectors
 and strings are admitted by logical storage size before fallible reservation.
 The boundary suite passes 1,089 tests with the existing 11 debt entries.
+
+## 2026-09-10 Numeric chart data transactions
+
+The focused packages now own staged numeric edits and exact-source reversible
+patches for selected charts. `edit_body_chart_data`, `edit_sheet_chart_data`,
+and `edit_slide_chart_data` accept the common `ChartData` value. The current
+write contract requires the existing labels and dimensions. Changing a grid's
+shape or labels remains a separate migration task because native row/column
+identities and dependent series state need a broader proof.
+
+The shared prepared rewrite changes only numeric field 1 in existing
+`GridValue` messages. It replaces, appends, or removes that scalar while
+preserving labels, the opaque grid identity map, date/duration fields, unknown
+fields, and unrelated chart properties. Nested framing is adjusted only as
+needed. Strict preflight and Buffa lazy projections establish the source
+contract; bounded source-span emission and candidate readback avoid generated
+repeated grid allocations. Preparation and execution admit work and ownership
+before performing the corresponding scans or allocations.
+
+Transactions use bitwise numeric equality, including signed zero, for no-op
+and readback checks. Exact no-ops share source artifacts. Patches retain shared
+semantic values and exact source/target artifacts, so inversion does not clone
+the numeric matrix. Changed packages are reopened and checked for selection
+identity, requested values, and physical locality before publication.
+
+Numbers treats table-backed grids as caches and refuses independent numeric
+edits when the mediator contains source formulas. A mediator reference alone
+does not prove a table dependency: host-authored standalone charts also have
+an empty-source mediator. The focused writer must prove the admitted mediator
+has no source dependency before changing its inline values.
+
+The compatibility setters delegate numeric edits within the focused contract.
+Their existing complete-grid replacement path remains for label/dimension
+changes, and Numbers retains its legacy behavior for dependencies that the
+focused writer explicitly refuses. Malformed-source, limit, and verification
+errors do not trigger that fallback. Fresh grid authoring and broader chart
+mutation graphs still belong to the migration inventory; this is partial
+retirement, not completion of the monolith exit.
+
+Native verification generated edited Pages and Keynote controls from the
+previous numeric fixtures and a standalone Numbers control through the
+existing authoring API. Focused transactions changed the first April value
+from 17.25 to 27.5 and filled the missing May value with 12.75. Pages, Keynote,
+and Numbers 14.4 opened, saved, closed, and reopened the exact outputs. The
+Pages and Keynote data editors confirmed exact 12.75 after reopening; Numbers
+showed its rounded chart value and the focused reader confirmed exact 12.75.
+Keynote retained its separate caption. The resaved standalone Numbers chart
+also accepts another focused numeric edit and exact inverse restoration.
+The original table-backed Numbers controls remain explicit write refusals.
+Tracked `chart-data-edited-native` artifacts and receipts retain this evidence.
+
+Regression coverage includes independent encoded growth and shrinkage,
+unknown groups at multiple grid levels, exact numeric/opaque-field readback,
+all rewrite resource axes, bitwise no-ops, stale patches, inverse artifacts,
+preview invalidation, native goldens, mediator payload and header dependencies,
+and host numeric delegation with complete-grid compatibility fallback. The
+codec uses one owned output allocation even for its byte-exact no-op result;
+the package no-op path shares the existing artifact instead. Logical ownership
+uses vector/string slot and payload lengths, not allocator capacity rounding.
