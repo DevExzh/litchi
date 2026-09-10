@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Evidence scope as of 2026-09-10
+
+The [0470 authority record](changes/0470-performance-authority-reconciliation.md)
+binds each published measurement to its source and keeps the full performance
+program open. The allocator publication proves its 201-row resource contract;
+its instrumented elapsed values are excluded from latency claims. The older
+normal report measures `1b3f2c2d`, and the three-repeat normal control measures
+`995bdaf09`. These code snapshots predate later feature changes. Documentation
+commits do not themselves invalidate a measurement; release evidence must match
+the measured production source and binary identities.
+
+The [accepted XLSX optimization](results/xlsx-plain-cell-tag-20260910/README.md)
+records 5.568% lower pooled normal p50, 20.559% fewer allocation calls and
+7.079% fewer allocated bytes for one dense-wide commit/save workload against
+historical base `995bdaf09`. Region peak increased by four bytes. The separate
+[paired scaling publication](results/paired-scaling-cf98-20260910/README.md)
+retains descriptive fixed-work and simulated-range evidence without a common
+Amdahl or production-wide scaling claim.
+
+The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
+is committed with four opt-in axes and unchanged default selection. Its
+correctness checks are available; measured provider captures remain pending.
+The [dated 264-row audit](results/performance-requirements-audit-20260910/README.md)
+retains its original counts (10 complete, 99 incomplete, 116 weak, 39 missing),
+not a current completion score. The authority record lists eight remaining
+work classes. ADR-0005 and ADR-0008 remain open for their full applicable
+latency, resource, I/O, corpus, native/readback, scaling and release evidence.
+
 ## Current audit: 0466 dense XLSX investigation (2026-09-08)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) advances the required

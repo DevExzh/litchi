@@ -1,0 +1,2963 @@
+{
+  "schema_version": 1,
+  "audit": {
+    "target_commit": "cf4f383c4c203381880d4c2e8445d2616a53d283",
+    "target_subject": "perf: instrument and publish all default allocation scenarios",
+    "integration_base": "bfdc911c0577c6a3304b4a70b8b70e2661721355",
+    "measured_source": "fccbe6595f3a29561a8bfc6c192d8fa5e874ad05",
+    "audited_worktree_head": "e8ee19b063285cb0bb73dea819f1be1ac5e82133",
+    "method": "Read-only inspection of cf4 source/docs, committed bundle contents, hashes, portable verifier, raw report structure, current GOAL/checklist, and existing performance docs. No new Cargo/timed measurement was run.",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "checklist_sha256": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+    "overall_status": "incomplete",
+    "narrow_publication_verdict": "complete for the operation-scoped default allocator resource contract; not evidence of program-level performance completion"
+  },
+  "status_vocabulary": [
+    "complete",
+    "weak",
+    "incomplete",
+    "missing"
+  ],
+  "payload_hashes": {
+    "raw_report_uncompressed": "8c92ba8bfdb830a9b8169ef9a67a70e5e0025007972bf9bfbe4c2a7cf8bedf1d",
+    "corpus_catalog_uncompressed": "233eab0225256682a27769c56318212875900efeed08cc0de3185482d60504e9"
+  },
+  "artifact_inventory": [
+    {
+      "id": "bundle",
+      "path": "committed/litchi-full-default-allocator-publication-bfdc-20260910/publication-bundle.tar.gz",
+      "status": "complete",
+      "what_it_proves": "29-file publication archive matches SHA256SUMS and internal bundle manifest.",
+      "limitation": "Narrow allocator artifact; does not contain raw scaling reports.",
+      "sha256": "9fee5bf89906825a22d6664b34f08507c546ba69f5127724cd4ccb0a157407e0"
+    },
+    {
+      "id": "raw_report",
+      "path": "bundle:capture/raw/full-default-allocator.json.gz",
+      "status": "complete",
+      "what_it_proves": "201 immutable allocator rows; 37 cases; 31 corpora; 15 samples/3 warmups; all 11 allocation vectors measured. Uncompressed report SHA is 8c92ba8b\u2026.",
+      "limitation": "All 201 elapsed claims are explicitly ineligible for latency.",
+      "sha256": "8d658724422d0b61cb1f7fa2440e829d861e1c5abe41c9902c05db8f0f28a682",
+      "sha256_basis": "compressed file bytes"
+    },
+    {
+      "id": "corpus_catalog",
+      "path": "bundle:capture/raw/full-default-allocator.corpus-manifest-v2.json.gz",
+      "status": "complete",
+      "what_it_proves": "Binds captured corpus identities/hashes and shapes. Uncompressed catalog SHA is 233eab02\u2026.",
+      "limitation": "Synthetic/default catalog; no full security/native/very-large corpus.",
+      "sha256": "c11023b2e7c5faa2d1b8e4dbb42a5bf1689d7bb02822e49a77875ed1f95440ac",
+      "sha256_basis": "compressed file bytes"
+    },
+    {
+      "id": "publication_manifest",
+      "path": "bundle:publication-source-manifest.json",
+      "status": "complete",
+      "what_it_proves": "Binds integration base bfdc, measured source fcc, four source files, lock/binary/report/catalog hashes, 201 contract.",
+      "limitation": "Measured source is not cf4 itself; report worktree was dirty at capture.",
+      "sha256": "411e70dfb3d3fafb56bbb94de90a4e7067cbc1f91895c74de49af55224191c04"
+    },
+    {
+      "id": "source_patch",
+      "path": "bundle:source-delta.patch",
+      "status": "complete",
+      "what_it_proves": "Reapplies four publication paths onto bfdc; independent git apply/check and source hash checks pass.",
+      "limitation": "Patch reproducibility is source identity, not whole-workspace validation.",
+      "sha256": "0aaf3ee77c772b4ed603a2a07cb61cec51939e66c7b79acb6bec9892b9dada50"
+    },
+    {
+      "id": "portable_verifier",
+      "path": "bundle:verify-publication.py",
+      "status": "complete",
+      "what_it_proves": "Validates fixed file set, hashes, raw report/catalog, 201 result digest, source identity when requested.",
+      "limitation": "Does not run workload or inspect GOAL/CRUD/perf claims.",
+      "sha256": "b7399c75941ff9c8ac09fd54a68d23868abd8c0aada504bc4645400fbfae8206"
+    },
+    {
+      "id": "root_validation",
+      "path": "committed/root-validation.json",
+      "status": "weak",
+      "what_it_proves": "Perf-crate lib tests (360 passed/1 ignored) and perf-crate Clippy passed.",
+      "limitation": "Not a workspace/all-feature/rustdoc/boundary/native/fuzz gate.",
+      "sha256": "473328384fd8ea6b7368c770c0db41e7606ccdb69ff8b8a501c441972a3640b2"
+    },
+    {
+      "id": "scaling_receipt",
+      "path": "bundle:capture/provenance/scaling-capture-complete.json",
+      "status": "weak",
+      "what_it_proves": "Receipt claims workers 1/2/4/8 plus OPC/XLSX range reports and validator pass.",
+      "limitation": "Six named report files are absent from bundle; cannot independently audit metrics.",
+      "sha256": "bbefbd0c5d1312eff9b709512897c243987935a2c5562d4c81b1802a2b45136e"
+    },
+    {
+      "id": "historical_baseline",
+      "path": "cf4:docs/performance/results/full-baseline-20260910/",
+      "status": "weak",
+      "what_it_proves": "201 normal historical rows and two-row allocator smoke are carefully caveated.",
+      "limitation": "Measured at 1b3f, publication at cf98; no current cf4 baseline, zero normal filesystem rows, cold-requested not physical."
+    },
+    {
+      "id": "baseline_doc",
+      "path": "cf4:docs/performance/BASELINE.md",
+      "status": "weak",
+      "what_it_proves": "Contains historical publication and older hotspot/profile sections.",
+      "limitation": "Not reconciled as one current cf4 baseline; lacks current full I/O/scaling/Amdahl closure."
+    },
+    {
+      "id": "goal_audit_doc",
+      "path": "cf4:docs/performance/GOAL_AUDIT.md",
+      "status": "weak",
+      "what_it_proves": "Contains prior route audits and explicit limitations.",
+      "limitation": "Current top section is 0485; no cf4 allocator integration and not a whole-goal completion matrix."
+    },
+    {
+      "id": "report_doc",
+      "path": "cf4:docs/performance/REPORT.md",
+      "status": "weak",
+      "what_it_proves": "Contains route reports and historical claims with limitations.",
+      "limitation": "Current top is 0485 and claim registry classifies only two historical tables; allocator is outside registry."
+    },
+    {
+      "id": "adr_doc",
+      "path": "cf4:docs/performance/ADR_COMPLIANCE.md",
+      "status": "weak",
+      "what_it_proves": "Contains per-change ADR matrices.",
+      "limitation": "No cf4-specific matrix for publication/allocator evidence; broad ADR measurement contract remains incomplete."
+    },
+    {
+      "id": "crud_coverage_doc",
+      "path": "cf4:docs/performance/CRUD_COVERAGE.md",
+      "status": "incomplete",
+      "what_it_proves": "Provides required scenario table with Partial/Covered/unsupported scope.",
+      "limitation": "Many rows remain Partial; resource publication does not certify the matrix."
+    },
+    {
+      "id": "regression_comparator",
+      "path": "cf4:docs/performance/REGRESSION_COMPARATOR.md + perf-regression-policy-v1.json",
+      "status": "weak",
+      "what_it_proves": "Comparator/policy infrastructure and 201-row policy exist.",
+      "limitation": "Prose still says 36 cases/198 rows while policy is schema 2, 37/201; no current normal ABBA report pair in this bundle."
+    },
+    {
+      "id": "claim_registry",
+      "path": "cf4:docs/performance/claim-registry-v1.md + report-claim-classification-v1.json",
+      "status": "complete",
+      "what_it_proves": "Explicitly bounds registry to two historical REPORT tables and excludes allocator evidence.",
+      "limitation": "Boundary is honest but means allocator is not a registered program-level performance claim."
+    },
+    {
+      "id": "goal_source",
+      "path": "current docs/GOAL.md",
+      "status": "weak",
+      "what_it_proves": "Supplied goal text is the authoritative broad requirement source for this audit.",
+      "limitation": "GOAL.md is untracked/absent from target cf4 tree, so cf4 does not itself package the audited goal version.",
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "publication.contract.201_rows",
+      "group": "publication contract",
+      "source": "cf4:docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md; publication-source-manifest.json",
+      "requirement": "Canonical default selection must produce exactly 201 operation-scoped allocator rows.",
+      "status": "complete",
+      "scope": "committed allocator publication",
+      "authoritative_evidence": "Raw report allocation_coverage and portable verifier: 201/201 rows; digest f0fd7629\u2026; 37 cases; 15 samples; all 201 allocation statuses measured.",
+      "observed_or_gap": "Complete for the allocator resource artifact only; this is not a latency or end-to-end program completion claim."
+    },
+    {
+      "id": "publication.contract.vectors",
+      "group": "publication contract",
+      "source": "cf4:docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md",
+      "requirement": "Every published row must carry all allocation vectors with aligned samples.",
+      "status": "complete",
+      "scope": "committed allocator publication",
+      "authoritative_evidence": "Static raw-report inspection found 11 measured vectors on each of 201 rows; operation_metrics tests passed 27 and contract tests passed 3.",
+      "observed_or_gap": "The vectors are allocator-region measurements; they do not supply RSS, physical I/O, or decompression measurements."
+    },
+    {
+      "id": "publication.contract.claim_boundary",
+      "group": "publication contract",
+      "source": "cf4:docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md; portable-reproduction.md",
+      "requirement": "Allocator-instrumented elapsed samples must not be presented as latency measurements.",
+      "status": "complete",
+      "scope": "claim policy",
+      "authoritative_evidence": "All 201 operation_metrics latency_claim values are allocator_instrumented_elapsed_not_latency_claim; publication docs repeat the exclusion.",
+      "observed_or_gap": "Existing stale performance prose still describes a 36/198 normal policy and needs reconciliation before a current release claim."
+    },
+    {
+      "id": "publication.provenance.source",
+      "group": "publication contract",
+      "source": "publication-source-manifest.json; root-validation.json; source-delta.patch",
+      "requirement": "The report source, integration base, patch, source hashes, lock hash, and binary identity must be bound.",
+      "status": "complete",
+      "scope": "provenance",
+      "authoritative_evidence": "Measured source fccbe659\u2026, integration base bfdc911c\u2026, patch SHA 0aaf3ee7\u2026, four source hashes, Cargo.lock hash, binary hash, and source patch application check all match.",
+      "observed_or_gap": "Measured source is historical relative to integration commit cf4f; the report has git_worktree_dirty=true, so this is a frozen artifact identity rather than a clean current-tree run."
+    },
+    {
+      "id": "publication.verifier.scope",
+      "group": "publication contract",
+      "source": "verify-publication.py; validation/results.json",
+      "requirement": "The verifier must enforce the publication file set, hashes, row identities, sample vectors, and source binding.",
+      "status": "complete",
+      "scope": "verifier boundary",
+      "authoritative_evidence": "Portable verifier exits 0 with result_count 201; bundle SHA256SUMS and 29-file manifest match.",
+      "observed_or_gap": "The verifier does not run Cargo, apply the patch, validate the whole workspace, validate GOAL/CRUD rows, or check absent scaling reports."
+    },
+    {
+      "id": "publication.root_gates",
+      "group": "publication contract",
+      "source": "root-validation.json; root-tests.log.gz; root-clippy.log.gz",
+      "requirement": "A root validation gate should prove current integrated behavior and workspace quality.",
+      "status": "weak",
+      "scope": "current integrated tree",
+      "authoritative_evidence": "Scoped perf-crate test gate passed 360 tests with 1 ignored; perf-crate all-target Clippy passed.",
+      "observed_or_gap": "Commands are only tools/perf-baseline library tests and Clippy. No current full workspace check, rustdoc, boundary, fuzz, native, or all-feature receipt is in this publication."
+    },
+    {
+      "id": "publication.scaling_receipt",
+      "group": "publication contract",
+      "source": "capture/provenance/scaling-capture-complete.json; scaling-reservation-release.txt",
+      "requirement": "Scaling and range reports named by the receipt must be retained and independently verifiable.",
+      "status": "weak",
+      "scope": "scaling evidence",
+      "authoritative_evidence": "Receipt says workers 1/2/4/8 and two range families terminal with validator passed.",
+      "observed_or_gap": "The receipt names six report paths and hashes, but none of those report files is in the 29-file bundle; no speedup, serial fraction, lock wait, or Amdahl calculation can be audited from this publication."
+    },
+    {
+      "id": "goal.constraint.precedence",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Correctness, lossless preservation, bounded resources, and safety precede speed",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "ADR/GOAL text is explicit and allocator publication is fail-closed; broad current gate evidence is not bundled.",
+      "observed_or_gap": "Keep every optimization scoped behind preservation/limit/refusal tests."
+    },
+    {
+      "id": "goal.constraint.preservation",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Untouched package members, streams, unknowns, lexical forms, relationships, order, compression metadata, macros and media survive per contract",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Many format-specific preservation tests/docs exist; current allocator artifact is resource-only.",
+      "observed_or_gap": "Bind preservation proof to every measured save/edit family."
+    },
+    {
+      "id": "goal.constraint.fail_closed",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Unsupported edits fail typed and atomically rather than guessing or dropping data",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing change records document narrow refusals; no full current CRUD matrix.",
+      "observed_or_gap": "Add failure/atomicity rows for all supported closures."
+    },
+    {
+      "id": "goal.constraint.snapshots_edits",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Immutable cheap-to-share snapshots, isolated edits, atomic commits, source-checked reversible patches, deterministic conflicts",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Architecture/docs and many targeted tests exist; current publication does not certify all paths.",
+      "observed_or_gap": "Run full concurrent/patch/stale-source matrix."
+    },
+    {
+      "id": "goal.constraint.noop_sharing",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Exact semantic no-ops retain exact bytes and share source allocations where required",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Generated-format no-op coverage is documented; current 201 report measures allocation but not all no-op sharing semantics.",
+      "observed_or_gap": "Bind Arc/source identity and byte checks to current scenarios."
+    },
+    {
+      "id": "goal.constraint.validation_determinism",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Validation does not mutate; save does not silently repair; determinism/security boundaries remain intact",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Targeted validation/no-op tests exist; broad current release receipt absent.",
+      "observed_or_gap": "Add deterministic and explicit-repair gates."
+    },
+    {
+      "id": "goal.constraint.api_hiding",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Public CRUD does not expose archive types, physical IDs, raw locks, runtimes or unsafe storage",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "ADR and crate boundary policy exist; no current boundary receipt in bundle.",
+      "observed_or_gap": "Run public API and dependency boundary checks."
+    },
+    {
+      "id": "goal.constraint.ambient_behavior",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "No ambient filesystem/network/clock/process/random/Tokio/Rayon where explicit providers are required",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Policy is documented; current publication does not prove all workspace paths.",
+      "observed_or_gap": "Audit providers/executors and run boundary checks."
+    },
+    {
+      "id": "goal.constraint.execution_context",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "CPU parallelism is opt-in with explicit worker/memory/I/O/cancel/task budgets",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Scaling receipt names workers; allocator run uses one worker and raw scaling reports are absent.",
+      "observed_or_gap": "Retain explicit execution-context and scaling evidence."
+    },
+    {
+      "id": "goal.constraint.unsafe",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Unsafe remains forbidden unless ADR-permitted, isolated, safe fallback, invariants and measured benefit",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "No SIMD/unsafe optimization is published in this artifact.",
+      "observed_or_gap": "Keep no-unsafe gate and evidence for any future low-level change."
+    },
+    {
+      "id": "goal.constraint.dependency_direction",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Crate ownership and dependency direction remain valid",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Policy/checker exists; current boundary gate absent from bundle.",
+      "observed_or_gap": "Run current dependency-boundary checker."
+    },
+    {
+      "id": "goal.constraint.limits_security",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Source limits, hierarchical budgets, cancellation, typed errors, encryption/signature and malicious-input defenses persist",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "ADR and scoped format tests exist; full adversarial/security gate absent.",
+      "observed_or_gap": "Add limit/failure/security corpus evidence."
+    },
+    {
+      "id": "goal.constraint.claim_discipline",
+      "group": "GOAL/ADR constraint",
+      "source": "docs/GOAL.md:61-136; docs/adr/0005-io-memory-and-performance.md:8-61",
+      "requirement": "Unsupported performance claims are omitted from docs/comments/commits/reports",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator docs explicitly disqualify elapsed as latency; stale comparator prose needs reconciliation and broad claim registry excludes allocator.",
+      "observed_or_gap": "Refresh authoritative claim registry and docs."
+    },
+    {
+      "id": "goal.path.source",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "source/path/bytes/range provider",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Provider cases and ADR ReadAt model are documented, but current source counters are unavailable.",
+      "observed_or_gap": "Measure provider reads and source identity."
+    },
+    {
+      "id": "goal.path.detect",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "format detection",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Detection/prepared-source paths exist; no current repeat-indexing measurement.",
+      "observed_or_gap": "Add detection/reuse rows."
+    },
+    {
+      "id": "goal.path.container",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "ZIP/OPC, CFB, ODF, iWork container index",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default allocator includes ZIP/OPC/CFB substrate; ODF/iWork are outside its matrix.",
+      "observed_or_gap": "Cover all relevant container families."
+    },
+    {
+      "id": "goal.path.catalog",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "content types/relationships/directory/component graph and mandatory catalog",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Catalog correctness is part of many routes; no current catalog allocation/I/O decomposition.",
+      "observed_or_gap": "Record mandatory-open work."
+    },
+    {
+      "id": "goal.path.lazy",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "lazy semantic part/stream parsing",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Selective routes and docs exist; materialization counters are absent.",
+      "observed_or_gap": "Measure lazy payload behavior."
+    },
+    {
+      "id": "goal.path.query",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "queries and traversal",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD coverage has many selectors; broad performance matrix remains partial.",
+      "observed_or_gap": "Measure indexed/query paths."
+    },
+    {
+      "id": "goal.path.edit",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "Edit planning",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Many typed editors/patches exist; current full closure evidence absent.",
+      "observed_or_gap": "Measure planning vs publication."
+    },
+    {
+      "id": "goal.path.closure",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "dependency-closure validation",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Guarded closure correctness exists; broad categories remain Partial.",
+      "observed_or_gap": "Measure closure sizes and validation repeats."
+    },
+    {
+      "id": "goal.path.commit",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "Commit and Patch construction",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Patch rows are Partial; no current full lifecycle baseline.",
+      "observed_or_gap": "Add durable patch/commit metrics."
+    },
+    {
+      "id": "goal.path.publish",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "publication validation",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Validation reports and no-mutation tests exist in selected formats; no current all-format gate.",
+      "observed_or_gap": "Measure validation and no-op costs."
+    },
+    {
+      "id": "goal.path.save",
+      "group": "GOAL data path",
+      "source": "docs/GOAL.md:142-155",
+      "requirement": "save/repackage/atomic replacement",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Atomic/save correctness is scoped; current performance baseline absent.",
+      "observed_or_gap": "Measure output, passthrough, atomic replacement."
+    },
+    {
+      "id": "goal.inspect.litchi_core",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "litchi-core source, budget, patch, selector infrastructure",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Core infrastructure is referenced by existing routes; no audit artifact here maps each current hot path.",
+      "observed_or_gap": "Publish path map and budget counters."
+    },
+    {
+      "id": "goal.inspect.soapberry_zip",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "soapberry-zip indexing/ReadAt/decompression/cache/writer",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "ZIP cases and docs exist; no current physical/copy/decompression report.",
+      "observed_or_gap": "Instrument archive path."
+    },
+    {
+      "id": "goal.inspect.opc",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "litchi-opc physical package/PackageReader/OpcPackage/Part/writer",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "OPC rows exist; materialization/source groups are not applicable in allocator report.",
+      "observed_or_gap": "Measure package open/part/save."
+    },
+    {
+      "id": "goal.inspect.cfb",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "litchi-cfb read/sector/FAT/MiniFAT/directory/stream/writer",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CFB substrate rows exist; physical sector/copy metrics absent.",
+      "observed_or_gap": "Measure CFB-specific paths."
+    },
+    {
+      "id": "goal.inspect.ooxml_common",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "litchi-ooxml-common and DrawingML owners",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Format correctness docs cover selected paths; no current performance matrix.",
+      "observed_or_gap": "Map shared-owner effects."
+    },
+    {
+      "id": "goal.inspect.verticals",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "DOCX/XLSX/PPTX/DOC/XLS/PPT/XLSB vertical paths",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default matrix includes selected XLSX and legacy writers; full vertical CRUD remains partial.",
+      "observed_or_gap": "Add per-vertical scenario matrix."
+    },
+    {
+      "id": "goal.inspect.detection",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "shared detection and prepared-source paths",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Prepared-source behavior is documented; no current repeat-indexing result.",
+      "observed_or_gap": "Measure detection handoff."
+    },
+    {
+      "id": "goal.inspect.fixtures",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "fuzz targets, fixtures, native Office evidence, CI checks",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current bundle receipts for these classes.",
+      "observed_or_gap": "Retain exact fixture/fuzz/native/CI evidence."
+    },
+    {
+      "id": "goal.inspect.alloc_helpers",
+      "group": "GOAL repository exploration",
+      "source": "docs/GOAL.md:157-186",
+      "requirement": "allocation helpers, caches, Arc/arenas/SmallVec/maps/traits/scratch/serializers",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator instrumentation covers resource vectors; no full layout/cache/hardware analysis.",
+      "observed_or_gap": "Tie resource observations to object paths."
+    },
+    {
+      "id": "goal.path_fact.bytes_read",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which bytes are read",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "Current allocator source groups are not_applicable; no physical read counters.",
+      "observed_or_gap": "Record logical/physical bytes per scenario."
+    },
+    {
+      "id": "goal.path_fact.decompressed",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which bytes are decompressed",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No decompressed-byte counters in publication.",
+      "observed_or_gap": "Add decompression accounting."
+    },
+    {
+      "id": "goal.path_fact.copied",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which bytes are copied",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No copied-byte counters in publication.",
+      "observed_or_gap": "Add copy accounting."
+    },
+    {
+      "id": "goal.path_fact.retained",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which data is retained",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Docs/profile discussions describe retention; no current measured retained-byte map.",
+      "observed_or_gap": "Record cache/materialization retention."
+    },
+    {
+      "id": "goal.path_fact.allocations",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which values allocate",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "11 allocation vectors are complete for operation regions; no semantic allocation attribution.",
+      "observed_or_gap": "Map allocations to object/phase."
+    },
+    {
+      "id": "goal.path_fact.rebuilt",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which structures are rebuilt",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Profiles suggest parser/compaction work; no full current rebuild map.",
+      "observed_or_gap": "Add phase/path attribution."
+    },
+    {
+      "id": "goal.path_fact.repeated_validation",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which validation is repeated",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Older profiles/docs identify validation; no current comprehensive count.",
+      "observed_or_gap": "Instrument validation passes."
+    },
+    {
+      "id": "goal.path_fact.locks",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which locks are acquired",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "Lock wait is unavailable and no lock map is published.",
+      "observed_or_gap": "Trace lock acquisition/contention."
+    },
+    {
+      "id": "goal.path_fact.parallel_serial",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "which work is parallel/serial",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Execution worker configuration and scaling receipt exist without raw reports.",
+      "observed_or_gap": "Publish DAG/serial fraction."
+    },
+    {
+      "id": "goal.path_fact.closure_proportionality",
+      "group": "GOAL path accounting",
+      "source": "docs/GOAL.md:170-186",
+      "requirement": "whole document versus touched closure",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Selective/copy/edit docs are narrow and many rows Partial.",
+      "observed_or_gap": "Measure proportionality per format."
+    },
+    {
+      "id": "goal.optimization_order",
+      "group": "GOAL optimization order",
+      "source": "docs/GOAL.md:49-59",
+      "requirement": "Optimize by removing work, I/O/decompression/parsing/allocation/copy/validation, layout, algorithms/indexes, bounded parallelism, then measured SIMD.",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468/0469 profile and allocation work follow parts of this order.",
+      "observed_or_gap": "No complete program-level before/after demonstrates the order across CRUD scenarios."
+    },
+    {
+      "id": "goal.measurement_tools",
+      "group": "GOAL measurement facility",
+      "source": "docs/GOAL.md:192-204",
+      "requirement": "Use a separate benchmark facility with perf/flamegraph/DHAT/heaptrack/strace/platform fallbacks.",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Perf harness, allocator instrumentation, historical profiles and helper scripts exist.",
+      "observed_or_gap": "Current publication does not package a complete current tool/corpus/profile/IO gate across all tools."
+    },
+    {
+      "id": "goal.verification.preservation",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "byte/semantic preservation of untouched content",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.unknown_extension",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "unknown extension pass-through",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.noop_sharing",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "exact no-op bytes/source sharing",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.patch_inverse",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "reversible patch application/inverse restoration",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.source_conflict",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "source mismatch conflicts",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.determinism",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "deterministic output",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.resource_limits",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "resource limits and allocation failures",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.cancellation",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "cancellation",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.concurrency",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "concurrent access and joins",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.cache",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "cache eviction and pinning",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.sink_failure",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "sink failure after partial output",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.range_short_reads",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "remote/range short reads/source-version changes",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.zip_variants",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "ZIP64/data descriptors/stored/Deflate",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.malformed",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "malformed ZIP/XML/CFB/BIFF/relationship graphs",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format-specific tests/docs cover selected narrow cases; no current bundle receipt covers this family end to end.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.security",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "signed/encrypted/protected/macro-enabled files",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current bundle receipt for this family.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.cross_platform",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "cross-platform behavior",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current bundle receipt for this family.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.verification.miri_sanitizer_loom",
+      "group": "GOAL correctness test family",
+      "source": "docs/GOAL.md:718-739",
+      "requirement": "Miri/sanitizers/loom where applicable",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current bundle receipt for this family.",
+      "observed_or_gap": "Bind the applicable test/fixture receipt to each measured scenario and certified format."
+    },
+    {
+      "id": "goal.metric.wall_latency",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "wall-clock and tail latency",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator elapsed is explicitly ineligible; historical route measurements are not a current full-matrix baseline.",
+      "observed_or_gap": "Run paired current normal ABBA/repeated process measurements with p50/p95/p99 for named CRUD scenarios."
+    },
+    {
+      "id": "goal.metric.throughput",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "single-thread throughput and instructions per byte/object",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current throughput table or instructions-per-byte result is bound to cf4.",
+      "observed_or_gap": "Measure normalized bytes/cells/paragraphs/slides/parts per second and instructions."
+    },
+    {
+      "id": "goal.metric.cache_branch",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "cache locality and branch prediction",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current hardware-counter publication; 0468 profile is diagnostic and older.",
+      "observed_or_gap": "Collect cycles, instructions, branches, branch misses, L1/LLC misses on representative workloads."
+    },
+    {
+      "id": "goal.metric.allocation",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "allocation count/size, peak live bytes, peak RSS",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "201 rows have 11 operation allocation vectors, but process RSS and a whole-program peak are unavailable for 198 rows.",
+      "observed_or_gap": "Pair allocator vectors with process-level peak live/RSS and current normal baseline."
+    },
+    {
+      "id": "goal.metric.copies_bandwidth",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "memory copies, bandwidth pressure, working set",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No copied-byte or bandwidth evidence is in the allocator bundle.",
+      "observed_or_gap": "Instrument copied bytes and working-set/bandwidth counters."
+    },
+    {
+      "id": "goal.metric.ilp",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "instruction-level parallelism",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No ILP profile or evidence is published.",
+      "observed_or_gap": "Only optimize after measured serial hot-loop evidence."
+    },
+    {
+      "id": "goal.metric.simd",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "safe SIMD with scalar fallback and end-to-end benefit",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No SIMD implementation/evidence/differential benchmark is bound.",
+      "observed_or_gap": "Keep unclaimed until requirements in GOAL.md:641-653 are met."
+    },
+    {
+      "id": "goal.metric.parallel",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "bounded parallelism and Amdahl scaling",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Receipt names workers 1/2/4/8, but raw reports are absent from bundle and allocator run is execution_workers=[1].",
+      "observed_or_gap": "Retain raw scaling/range reports and publish efficiency, serial fraction, lock wait, and uncertainty."
+    },
+    {
+      "id": "goal.metric.contention",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "lock contention/synchronization overhead",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "parallel_metrics lock wait is unavailable; no retained per-lock counters.",
+      "observed_or_gap": "Collect lock wait/contention proxy under concurrent reads and disjoint writes."
+    },
+    {
+      "id": "goal.metric.disk_syscalls",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "disk access, positional/sequential reads, syscall count",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "Current allocator rows use in-process operations; source metrics are not applicable and process I/O counters are unavailable.",
+      "observed_or_gap": "Run process-isolated filesystem/ReadAt traces and retain syscall/read-size distributions."
+    },
+    {
+      "id": "goal.metric.range_sources",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "caller remote/range sources without ambient networking",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Range settings are present in the default configuration, but source logical vectors are not applicable in the allocator report.",
+      "observed_or_gap": "Measure explicit ReadAt/high-latency range providers with request count/size/latency."
+    },
+    {
+      "id": "goal.metric.sequential_sink",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "sequential non-seek output",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Top-level sink summaries exist for 28 rows, but no paired latency/throughput matrix or all writer families is published.",
+      "observed_or_gap": "Cover forward-only sinks and partial/failure behavior in current end-to-end measurements."
+    },
+    {
+      "id": "goal.metric.zero_copy",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "zero-copy/single-copy ownership",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current copied-byte proof; comments or raw range settings do not establish zero-copy.",
+      "observed_or_gap": "Publish source-range/copy accounting or omit the claim."
+    },
+    {
+      "id": "goal.metric.passthrough",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "unchanged compressed-entry/stream passthrough",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Correctness documentation and substrate cases exist, but no current decompressed/recompressed/copied-byte measurement is retained.",
+      "observed_or_gap": "Measure unchanged ZIP/CFB passthrough during no-op and targeted saves."
+    },
+    {
+      "id": "goal.metric.cache_states",
+      "group": "GOAL metric dimension",
+      "source": "docs/GOAL.md:27-43",
+      "requirement": "cold, warm, and concurrent workloads",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "The report says warm and cold-requested, but allocator process rows are in-process; cold-requested is not physical cache eviction. Concurrent cases exist as selected operations, yet execution_workers=[1].",
+      "observed_or_gap": "Publish physically verified cold and warm process runs plus concurrent scaling."
+    },
+    {
+      "id": "goal.measurement.percentiles",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "p50/p95/p99 elapsed time",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Raw report contains p50/p95/p99 and confidence intervals, but the only published elapsed values are allocator-instrumented and explicitly latency-ineligible.",
+      "observed_or_gap": "Current normal ABBA/process measurements."
+    },
+    {
+      "id": "goal.measurement.throughput",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Throughput in source/logical units",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No normalized throughput results in the allocator publication.",
+      "observed_or_gap": "Add scenario-specific throughput with units."
+    },
+    {
+      "id": "goal.measurement.hardware_counters",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Cycles/instructions/IPC/branches/misses/page faults",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current perf-counter table in bundle.",
+      "observed_or_gap": "Retain perf stat/profile output with environment."
+    },
+    {
+      "id": "goal.measurement.memory",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Allocations/bytes/peak live/RSS",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocation vectors are complete narrowly; process status is measured for only 3 ODP rows in raw report and unavailable for 198.",
+      "observed_or_gap": "Separate operation peak from whole-child RSS and collect both."
+    },
+    {
+      "id": "goal.measurement.source_io",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Source bytes, range count, request sizes",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "Operation source metric groups are not_applicable for all 201 rows.",
+      "observed_or_gap": "Instrument source providers and retain raw counters."
+    },
+    {
+      "id": "goal.measurement.compression",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Decompressed/recompressed bytes",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current compression byte counters in report.",
+      "observed_or_gap": "Add ZIP/CFB compressed/decompressed/recompressed accounting."
+    },
+    {
+      "id": "goal.measurement.copies",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Copied bytes",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current copy counter.",
+      "observed_or_gap": "Add copy accounting where practical."
+    },
+    {
+      "id": "goal.measurement.output_io",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Output bytes and write-call distribution",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "28 top-level sink rows contain sink summaries; operation sink vectors are measured only for those rows, with 173 rows not applicable.",
+      "observed_or_gap": "Cover all writers and pair with process write/syscall evidence."
+    },
+    {
+      "id": "goal.measurement.lock_wait",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Lock wait/contention proxy",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No lock wait metric in current report.",
+      "observed_or_gap": "Instrument concurrent cache/read paths."
+    },
+    {
+      "id": "goal.measurement.scaling",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "CPU utilization and widths 1/2/4/8/available",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Scaling receipt names widths but raw reports are not packaged; allocator contract itself records one worker.",
+      "observed_or_gap": "Package reports and publish efficiency/CPU utilization."
+    },
+    {
+      "id": "goal.measurement.amdahl",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Serial fraction and Amdahl model",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No retained calculation or raw inputs.",
+      "observed_or_gap": "Publish serial fraction and Amdahl model per parallel scenario."
+    },
+    {
+      "id": "goal.measurement.environment",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "CPU/toolchain/flags/allocator/storage environment",
+      "status": "complete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Raw report and validation manifests record Rust 1.95, AMD EPYC 9R45, Linux/kernel, affinity, allocator, memory, flags, target, and hashes.",
+      "observed_or_gap": "Complete as provenance for this artifact; not a substitute for missing metrics."
+    },
+    {
+      "id": "goal.measurement.uncertainty",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Warmup, samples, uncertainty/confidence",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "15 samples and 3 warmups plus Student-t intervals are recorded. The intervals describe allocator elapsed/resource observations, not latency; no ABBA noise characterization for cf4 is retained.",
+      "observed_or_gap": "Run repeated paired process lanes and report uncertainty for claimed metrics."
+    },
+    {
+      "id": "goal.measurement.corpus_manifest",
+      "group": "GOAL baseline measurement",
+      "source": "docs/GOAL.md:192-247",
+      "requirement": "Deterministic manifests/hashes and representative axes",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "31 corpus identities and hashes are catalogued; only the default synthetic matrix is covered. Security/native/very-large/adversarial axes are absent from this report.",
+      "observed_or_gap": "Expand and classify corpus families below."
+    },
+    {
+      "id": "goal.corpus.tiny",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "tiny documents",
+      "status": "complete",
+      "scope": "overall goal",
+      "authoritative_evidence": "31 synthetic corpus identities include tiny shapes.",
+      "observed_or_gap": "Add real producer comparison."
+    },
+    {
+      "id": "goal.corpus.small_medium",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "small and medium documents",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default catalog has tiny/medium-like shapes but no complete named size ladder in this artifact.",
+      "observed_or_gap": "Publish size-bound corpus descriptions and hashes."
+    },
+    {
+      "id": "goal.corpus.large_very_large",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "large and very large documents",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Large writer/XLSX shape names are configured; captured corpus set is still synthetic and not a very-large stream/append evidence package.",
+      "observed_or_gap": "Add bounded very-large creation/append corpora."
+    },
+    {
+      "id": "goal.corpus.sparse_dense",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "sparse and dense spreadsheets",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Configuration names dense-wide and dense-sparse shape families, but the 31 captured corpus names do not provide a complete sparse/dense published workload matrix.",
+      "observed_or_gap": "Retain explicit sparse/dense corpus files and result bindings."
+    },
+    {
+      "id": "goal.corpus.many_small_few_large",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "many-small and few-large packages",
+      "status": "complete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default report includes both shape families in ZIP/CFB/OPC identities.",
+      "observed_or_gap": "Only complete for allocator resource coverage."
+    },
+    {
+      "id": "goal.corpus.text_media",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "text-heavy and media-heavy",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Historical/current docs describe media-rich and text scenarios, but the allocator bundle does not bind a media-heavy real-producer matrix.",
+      "observed_or_gap": "Add media-heavy hashes and measured save/read scenarios."
+    },
+    {
+      "id": "goal.corpus.compressibility",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "compressible and incompressible",
+      "status": "complete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default catalog has both payload kinds.",
+      "observed_or_gap": "Only synthetic resource evidence."
+    },
+    {
+      "id": "goal.corpus.relationships",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "many relationships/deep dependency closures",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Wide-root and package cases exist; no current closure-depth/relationship-count performance matrix.",
+      "observed_or_gap": "Add explicit relationship/depth axes."
+    },
+    {
+      "id": "goal.corpus.unknown_vendor",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "unknown vendor extensions/unsupported content",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current allocator corpus binds these inputs.",
+      "observed_or_gap": "Add bounded unknown/unsupported fixtures and refusal/preservation results."
+    },
+    {
+      "id": "goal.corpus.security",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "encrypted/signed/protected/macro/external-link files",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current allocator publication binds these security corpus classes.",
+      "observed_or_gap": "Add inert/security policy fixtures and evidence."
+    },
+    {
+      "id": "goal.corpus.malformed",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "malformed/adversarial within limits",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current allocator corpus or gate publication for malformed/adversarial performance.",
+      "observed_or_gap": "Add bounded negative corpus and resource-failure measurements."
+    },
+    {
+      "id": "goal.corpus.producers",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "multiple real-world producers",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "The 201-row allocator report is synthetic; native producer coverage is elsewhere and not bound to this publication.",
+      "observed_or_gap": "Add producer/version/license metadata and measured rows."
+    },
+    {
+      "id": "goal.corpus.scaling_synthetic",
+      "group": "GOAL corpus axis",
+      "source": "docs/GOAL.md:232-247",
+      "requirement": "deterministic synthetic scaling files",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default synthetic generators are deterministic; scaling report payloads are not included.",
+      "observed_or_gap": "Package scaling inputs/results and hashes."
+    },
+    {
+      "id": "crud.category.reading",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Content reading and extraction",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:670-677 marks broad open/read/scan/text coverage partial or scoped.",
+      "observed_or_gap": "Add current cross-format timing and native/security corpus evidence."
+    },
+    {
+      "id": "crud.category.queries",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Structural queries and document analysis",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:673-675 has many correctness and narrow selector cases, but broad timing is incomplete.",
+      "observed_or_gap": "Measure named selector workloads."
+    },
+    {
+      "id": "crud.category.conversion",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Conversion and export",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:678 marks semantic sink conversion Partial.",
+      "observed_or_gap": "Complete format/sink matrix with process and sink metrics."
+    },
+    {
+      "id": "crud.category.creation",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Creation from scratch",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:679 marks small create Partial; fresh writer rows cover only DOC/XLS/PPT allocator resource operations.",
+      "observed_or_gap": "Add all public format and independent-consumer evidence."
+    },
+    {
+      "id": "crud.category.template",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Template filling/targeted replacement",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current publication row isolates template filling as a category.",
+      "observed_or_gap": "Add deterministic template fixtures and selective update measurements."
+    },
+    {
+      "id": "crud.category.append",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Append-only/incremental generation",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:680 marks very large create/append Partial and distinguishes lifecycle scopes.",
+      "observed_or_gap": "Cover all four append semantics with bounded memory."
+    },
+    {
+      "id": "crud.category.structural_edit",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Structural editing",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:682-685 has many narrow edits, but broad category remains partial.",
+      "observed_or_gap": "Measure representative structural edits and closure costs."
+    },
+    {
+      "id": "crud.category.deletion",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Deletion/sanitization",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:685-686 marks clear/remove/GC and sanitization Partial.",
+      "observed_or_gap": "Add dependency-aware removal and irreversible redaction matrix."
+    },
+    {
+      "id": "crud.category.copy",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Cross-document copying/assembly",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:687 marks bounded PPTX timing and otherwise correctness-only.",
+      "observed_or_gap": "Add closure breadth and resource measurements."
+    },
+    {
+      "id": "crud.category.merge",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Merging/splitting",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:688 marks selectable correctness evidence but no broad timing.",
+      "observed_or_gap": "Add cross-format merge/split scenarios."
+    },
+    {
+      "id": "crud.category.patch",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Comparison/patch/three-way merge",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:689 marks patch coverage Partial and broad merge incomplete.",
+      "observed_or_gap": "Add durable patch performance and conflict matrix."
+    },
+    {
+      "id": "crud.category.validation",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Validation/repair/normalization",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:690-691 marks bounded validation/repair Partial.",
+      "observed_or_gap": "Add all applicable validators and explicit repair costs."
+    },
+    {
+      "id": "crud.category.calculation",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Dynamic calculation/refresh",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md identifies dynamic calculation/refresh as unsupported or open; no perf claim.",
+      "observed_or_gap": "Keep explicit capability boundary or add separately scoped evaluator work."
+    },
+    {
+      "id": "crud.category.security",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Security/protection/encryption/signing",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:690 and preservation rows cover narrow status/refusal evidence, not full authoring/open matrix.",
+      "observed_or_gap": "Add scoped security paths and native verification."
+    },
+    {
+      "id": "crud.category.low_level",
+      "group": "CRUD category",
+      "source": "docs/GOAL.md:253-270; docs/performance/CRUD_COVERAGE.md:670-694",
+      "requirement": "Low-level Part/Relationship/stream/extension operations",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:693-694 marks guarded owners/substrate covered with explicit residual gaps.",
+      "observed_or_gap": "Measure guarded low-level closures and package passthrough."
+    },
+    {
+      "id": "crud.minimum.open_identify",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Open and identify format",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:670 is Partial; current publication has substrate open cases but no full end-to-end claim.",
+      "observed_or_gap": "Current per-format open/identify process baseline."
+    },
+    {
+      "id": "crud.minimum.list_children",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "List worksheets/slides/sections without payloads",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:671 is Partial; selective catalog behavior exists but broad no-payload evidence is not complete.",
+      "observed_or_gap": "Verify payload-free listing across formats/providers."
+    },
+    {
+      "id": "crud.minimum.query_one",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Query one property or named object",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:672 is Partial; narrow selectors are not a complete benchmark matrix.",
+      "observed_or_gap": "Add representative selectors and source/range counters."
+    },
+    {
+      "id": "crud.minimum.read_one",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Read one cell/paragraph/slide/image/Part",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:673 is Partial and semantic image selection remains missing.",
+      "observed_or_gap": "Complete object-family/provider matrix."
+    },
+    {
+      "id": "crud.minimum.scan_all",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Scan all cells/paragraphs/slides",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:674 is Covered for generated native/OOXML/RTF/ODF text corpora, with XLSB limitations.",
+      "observed_or_gap": "Add real producers and current timing/resource rows."
+    },
+    {
+      "id": "crud.minimum.full_text",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Full text extraction",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:675 is Covered for generated formats and partial XLSB.",
+      "observed_or_gap": "Add independent producers/media and current performance evidence."
+    },
+    {
+      "id": "crud.minimum.semantic_sink",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Semantic conversion to sequential sink",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:676 is Partial; sink correctness exists for selected formats.",
+      "observed_or_gap": "Measure all applicable conversion routes."
+    },
+    {
+      "id": "crud.minimum.small_create",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Create a small document",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:677 is Partial; three fresh legacy writer allocator cases are only a resource subset.",
+      "observed_or_gap": "Cover public format builders and reopen/consumer checks."
+    },
+    {
+      "id": "crud.minimum.large_create_append",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Create or append a very large stream",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:678 is Partial; large legacy writers still accumulate.",
+      "observed_or_gap": "Bound memory and measure streaming/append variants."
+    },
+    {
+      "id": "crud.minimum.noop",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Exact no-op edit and commit",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:679 marks generated formats Covered; producer/security scope remains narrow.",
+      "observed_or_gap": "Bind no-op/source-sharing checks to current release matrix."
+    },
+    {
+      "id": "crud.minimum.one_edit",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Edit one object and save",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:680 marks generated formats Covered with many scoped correctness routes.",
+      "observed_or_gap": "Add current timing/resource and real-producer rows."
+    },
+    {
+      "id": "crud.minimum.one_percent",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Update about 1% and save",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:681 is Covered for several generated formats but Partial for XLSB and not a full current performance baseline.",
+      "observed_or_gap": "Pair all supported formats with process metrics."
+    },
+    {
+      "id": "crud.minimum.bulk_update",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Bulk update matching objects",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:682 is Partial and many cases are correctness-only.",
+      "observed_or_gap": "Measure bounded bulk closures."
+    },
+    {
+      "id": "crud.minimum.clear_remove_hide_detach_gc",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Clear/remove/hide/detach/GC distinctions",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:683 is Partial; general dependency GC remains missing.",
+      "observed_or_gap": "Separate each semantic operation and dependency behavior."
+    },
+    {
+      "id": "crud.minimum.sanitize",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Sanitization and irreversible redaction",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:684 is Partial with narrow DOCX/RTF closures.",
+      "observed_or_gap": "Scope security fixtures and measure bounded redaction."
+    },
+    {
+      "id": "crud.minimum.copy_closure",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Copy one object with complete dependency closure",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:685 is Partial; PPTX timing is bounded and other routes correctness-only.",
+      "observed_or_gap": "Add closure graph sizes and copy/passthrough metrics."
+    },
+    {
+      "id": "crud.minimum.merge_split",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Merge and split",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:686 is Partial with selectable correctness evidence.",
+      "observed_or_gap": "Add broader formats and measured save/reopen."
+    },
+    {
+      "id": "crud.minimum.patch_lifecycle",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Produce/serialize/apply/invert/merge patches",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:687 is Partial; broad patch merge remains incomplete/unmeasured.",
+      "observed_or_gap": "Complete durable patch/conflict performance."
+    },
+    {
+      "id": "crud.minimum.validate",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Validate without mutation",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:688 is Partial; bounded opt-in validators are not full matrix.",
+      "observed_or_gap": "Add all applicable format validators and no-mutation checks."
+    },
+    {
+      "id": "crud.minimum.repair",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Repair through explicit plan",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:689 is Partial; generic ODF plan is narrow.",
+      "observed_or_gap": "Keep refusal boundary and add applicable repair plans."
+    },
+    {
+      "id": "crud.minimum.unknown_extension",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Preserve unknown extension while editing understood content",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:690 is Partial and fail-closed/narrow.",
+      "observed_or_gap": "Expand producer/extension classes and byte proofs."
+    },
+    {
+      "id": "crud.minimum.low_level_part",
+      "group": "minimum E2E scenario",
+      "source": "docs/GOAL.md:272-296; docs/performance/CRUD_COVERAGE.md:670-691",
+      "requirement": "Replace one low-level Part while retaining untouched members",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:691 marks guarded OPC/DOCX/PPTX/XLSX coverage; broad format coverage is outside.",
+      "observed_or_gap": "Measure and document each guarded owner."
+    },
+    {
+      "id": "crud.append.streaming_creation",
+      "group": "append semantics",
+      "source": "docs/GOAL.md:298-305; docs/CRUD_Scenario_Checklist.md:44-45",
+      "requirement": "Streaming creation from scratch",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CRUD_COVERAGE.md:678-680 has selected non-seek writer cases; large legacy writers still accumulate.",
+      "observed_or_gap": "Bounded streaming evidence by format."
+    },
+    {
+      "id": "crud.append.logical_append",
+      "group": "append semantics",
+      "source": "docs/GOAL.md:298-305; docs/CRUD_Scenario_Checklist.md:44-45",
+      "requirement": "Logical append to existing structure",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "RTF/DOCX/ODP narrow routes exist, but full append matrix and current measurements are absent.",
+      "observed_or_gap": "Separate tail-only append from arbitrary edits."
+    },
+    {
+      "id": "crud.append.new_part",
+      "group": "append semantics",
+      "source": "docs/GOAL.md:298-305; docs/CRUD_Scenario_Checklist.md:44-45",
+      "requirement": "Adding a new package Part",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Low-level Part routes are guarded correctness cases, not a complete append benchmark.",
+      "observed_or_gap": "Add Part-add topology and performance cases."
+    },
+    {
+      "id": "crud.append.repackage",
+      "group": "append semantics",
+      "source": "docs/GOAL.md:298-305; docs/CRUD_Scenario_Checklist.md:44-45",
+      "requirement": "Arbitrary modification followed by repackaging",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current artifact isolates this semantic from append.",
+      "observed_or_gap": "Benchmark as a separate save/repackage scenario."
+    },
+    {
+      "id": "crud.provider.owned",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "owned bytes",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default cases include owned OPC/XLSX paths; no complete cross-format provider matrix.",
+      "observed_or_gap": "Run named open/read/edit/save scenarios."
+    },
+    {
+      "id": "crud.provider.borrowed",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "borrowed bytes",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Some CFB writer and source-backed cases exist; not complete across formats.",
+      "observed_or_gap": "Complete provider intersection."
+    },
+    {
+      "id": "crud.provider.filesystem",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "filesystem-backed positional input",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Historical/older documentation has filesystem rows, but current allocator artifact has no normal filesystem rows.",
+      "observed_or_gap": "Current process-isolated positional filesystem baseline."
+    },
+    {
+      "id": "crud.provider.readat",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "instrumented caller ReadAt",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Docs and historical substrate evidence cover selected ReadAt paths; current publication source counters are unavailable.",
+      "observed_or_gap": "Retain source call/byte traces."
+    },
+    {
+      "id": "crud.provider.range",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "simulated high-latency range provider",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Default configuration names 100us latency/25us overhead/50MiB bandwidth/4096 max range; no raw range reports are bundled.",
+      "observed_or_gap": "Publish range report files and request distributions."
+    },
+    {
+      "id": "crud.provider.nonseek",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "sequential non-seek sink",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Sink counters appear in selected rows and correctness suites; not a full benchmark matrix.",
+      "observed_or_gap": "Cover sink sizes, backpressure, zero/partial failures."
+    },
+    {
+      "id": "crud.provider.atomic_save",
+      "group": "input/output axis",
+      "source": "docs/GOAL.md:307-319; docs/adr/0005-io-memory-and-performance.md:30-46",
+      "requirement": "filesystem atomic save",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Atomic-save correctness is documented in selected routes, but no current performance artifact covers it.",
+      "observed_or_gap": "Process-isolated atomic save measurements and failure checks."
+    },
+    {
+      "id": "goal.hypothesis.H1",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "OPC path/generic reader may slurp Vec",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current complete before/after source-retention measurement; source fields not applicable in allocator report.",
+      "observed_or_gap": "Profile owned/path/ReadAt memory and copied bytes."
+    },
+    {
+      "id": "goal.hypothesis.H2",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "OPC open may decompress all parts",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Selective cases exist in docs, but no current full part-materialization counters.",
+      "observed_or_gap": "Compare mandatory catalog vs accessed payload."
+    },
+    {
+      "id": "goal.hypothesis.H3",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "lazy cache clone/lock contention",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Concurrent case names exist; lock diagnostics false and no wait data.",
+      "observed_or_gap": "Measure cache misses, copies, locks, eviction."
+    },
+    {
+      "id": "goal.hypothesis.H4",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "hidden global Rayon",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Static policy/ADR forbids hidden Rayon; no current performance proof of execution behavior.",
+      "observed_or_gap": "Audit execution context and measure explicit workers."
+    },
+    {
+      "id": "goal.hypothesis.H5",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "stored ZIP copies unnecessarily",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Passthrough correctness is documented; no copied-byte current proof.",
+      "observed_or_gap": "Measure borrowed/shared ranges."
+    },
+    {
+      "id": "goal.hypothesis.H6",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "save recompresses all parts",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current decompressed/recompressed byte evidence.",
+      "observed_or_gap": "Measure dirty closure vs untouched members."
+    },
+    {
+      "id": "goal.hypothesis.H7",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "duplicated indexes/trait objects",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468/older profiles point at parsing/validation costs but no current structural measurement.",
+      "observed_or_gap": "Profile representative package indexes."
+    },
+    {
+      "id": "goal.hypothesis.H8",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "XLSX eager OPC undermines selective loading",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "XLSX profiling and selective correctness exist; current publication does not measure it.",
+      "observed_or_gap": "Run source-backed selective query benchmark."
+    },
+    {
+      "id": "goal.hypothesis.H9",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "XLSX small edits clone/scan broad graph",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468 identifies parser/snapshot/compaction cost; 0469 reports allocation improvement only.",
+      "observed_or_gap": "Measure closure proportionality and current ABBA latency."
+    },
+    {
+      "id": "goal.hypothesis.H10",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "per-cell representation dominates allocations",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Dense XLSX profile and allocator contract support investigation, not causal current end-to-end proof.",
+      "observed_or_gap": "Collect type/layout/cache/allocation evidence."
+    },
+    {
+      "id": "goal.hypothesis.H11",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "CFB shared seek/sector copies/MiniFAT materialization",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CFB cases and old targeted evidence exist; current publication has no physical read/copy counters.",
+      "observed_or_gap": "Measure positional CFB and lazy stream paths."
+    },
+    {
+      "id": "goal.hypothesis.H12",
+      "group": "initial hypothesis",
+      "source": "docs/GOAL.md:322-368",
+      "requirement": "detection repeats indexing",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Prepared-source paths are documented; current publication does not isolate repeat indexing.",
+      "observed_or_gap": "Measure detection/open reuse."
+    },
+    {
+      "id": "goal.workstream.A",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "source and I/O",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "ADR positional-source requirements and historical targeted evidence exist; no current full provider/range/syscall matrix.",
+      "observed_or_gap": "Complete ReadAt/filesystem/range/sink evidence."
+    },
+    {
+      "id": "goal.workstream.B",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "container laziness and copy-on-write",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Docs record selective/lazy routes and preservation tests, but no complete current lazy cache/materialization/eviction measurements.",
+      "observed_or_gap": "Measure mandatory-only open, cache weights, passthrough."
+    },
+    {
+      "id": "goal.workstream.C",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "memory layout and allocations",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Full allocator resource artifact is complete for default rows; causal layout/hardware evidence is not.",
+      "observed_or_gap": "Connect allocation results to measured hotspots and RSS."
+    },
+    {
+      "id": "goal.workstream.D",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "parsing/indexing/serialization",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468 profile identifies parser/snapshot/compaction hotspots; no current before/after program baseline.",
+      "observed_or_gap": "Measure and address largest closure costs."
+    },
+    {
+      "id": "goal.workstream.E",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "edits/patches/dependency closures",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Many correctness-only routes exist; broad measured closure/patch matrix remains partial.",
+      "observed_or_gap": "Add proportional update/copy/patch scenarios."
+    },
+    {
+      "id": "goal.workstream.F",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "parallelism/ILP/contention",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Scaling receipt is non-auditable without raw files; allocator run is one worker.",
+      "observed_or_gap": "Publish raw scaling and contention/Amdahl results."
+    },
+    {
+      "id": "goal.workstream.G",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "SIMD",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No implementation/evidence satisfying scalar fallback/differential/end-to-end requirements.",
+      "observed_or_gap": "No work until measured hot loop is identified."
+    },
+    {
+      "id": "goal.workstream.CFB",
+      "group": "optimization workstream",
+      "source": "docs/GOAL.md:370-675",
+      "requirement": "legacy CFB-specific work",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "CFB substrate correctness and historical range cases exist, but current physical I/O/copy/parallel evidence is absent.",
+      "observed_or_gap": "Measure CFB ReadAt, sector buffers, MiniFAT, stream passthrough and bounded spooling."
+    },
+    {
+      "id": "goal.decision.before_after",
+      "group": "decision/regression rule",
+      "source": "docs/GOAL.md:678-701",
+      "requirement": "Every optimization has matched before/after setup",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator publication is one frozen resource capture and not a matched normal latency comparison.",
+      "observed_or_gap": "Pair revisions/corpus/build and retain raw reports."
+    },
+    {
+      "id": "goal.decision.regression_threshold",
+      "group": "decision/regression rule",
+      "source": "docs/GOAL.md:678-701",
+      "requirement": "5% latency/throughput/RSS/scaling review trigger",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Comparator policy exists, but current cf4 allocator report has no eligible latency/RSS/scaling result.",
+      "observed_or_gap": "Run comparator on current normal reports."
+    },
+    {
+      "id": "goal.decision.individual_geomean",
+      "group": "decision/regression rule",
+      "source": "docs/GOAL.md:678-701",
+      "requirement": "Individual results plus sensible geometric means",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current report of program-level before/after or geomean is bound.",
+      "observed_or_gap": "Publish individual rows and scoped aggregate calculations."
+    },
+    {
+      "id": "goal.gate.fmt",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "cargo fmt",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Perf-crate fmt check passed in publication validation.",
+      "observed_or_gap": "Workspace/feature combinations are not covered by this artifact."
+    },
+    {
+      "id": "goal.gate.check",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "workspace and feature cargo check",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current workspace check receipt in bundle.",
+      "observed_or_gap": "Run scoped release matrix."
+    },
+    {
+      "id": "goal.gate.clippy",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "warning-denied Clippy",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Perf-crate all-target Clippy passed.",
+      "observed_or_gap": "Run workspace/all certified feature combinations."
+    },
+    {
+      "id": "goal.gate.rustdoc",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "warning-denied rustdoc",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current rustdoc receipt in bundle.",
+      "observed_or_gap": "Run relevant docs gate."
+    },
+    {
+      "id": "goal.gate.boundaries",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "crate-boundary/dependency checks",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current boundary receipt in bundle.",
+      "observed_or_gap": "Run boundary checker."
+    },
+    {
+      "id": "goal.gate.tests",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "unit/integration/doc/compile tests",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "360 perf-crate library tests passed, one ignored.",
+      "observed_or_gap": "Run workspace and feature isolation gates."
+    },
+    {
+      "id": "goal.gate.fuzz",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "existing fuzz targets",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current fuzz receipt.",
+      "observed_or_gap": "Run applicable fuzz/sanitizer smoke."
+    },
+    {
+      "id": "goal.gate.native",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "native Office fixtures",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current native fixture receipt in bundle.",
+      "observed_or_gap": "Run relevant native read/save/reverse checks."
+    },
+    {
+      "id": "goal.gate.preservation",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "untouched bytes/unknown/no-op/patch/conflict",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Existing format suites document many narrow gates; not tied to all current perf scenarios.",
+      "observed_or_gap": "Bind preservation checks to each benchmark family."
+    },
+    {
+      "id": "goal.gate.limits",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "limits/allocation/cancellation/concurrency/cache/sink/range",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "ADRs and targeted tests exist; full current matrix absent.",
+      "observed_or_gap": "Add explicit adversarial and failure lanes."
+    },
+    {
+      "id": "goal.gate.formats",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "ZIP64/descriptors/stored/Deflate/malformed ZIP/XML/CFB/BIFF/relationships",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Format-specific historical tests exist, but not current allocator/perf publication gates.",
+      "observed_or_gap": "Retain applicable fixture receipts."
+    },
+    {
+      "id": "goal.gate.security",
+      "group": "correctness and safety gate",
+      "source": "docs/GOAL.md:703-739",
+      "requirement": "signed/encrypted/protected/macro-enabled/cross-platform",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current bundle evidence.",
+      "observed_or_gap": "Add inert/security/cross-platform release lanes."
+    },
+    {
+      "id": "goal.deliverable.harness",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "Benchmark harness and deterministic corpus/generator manifest",
+      "status": "complete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Perf harness plus corpus manifest and source/binary provenance are packaged for allocator contract.",
+      "observed_or_gap": "Complete only for default allocator artifact; broad program harness coverage remains open."
+    },
+    {
+      "id": "goal.deliverable.baseline",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "docs/performance/BASELINE.md with environment/corpus/commands/metrics/profiles/alloc/I/O/Amdahl",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "BASELINE has a historical 201-row publication and older hotspot sections; current cf4 normal/allocator integration is not a current full baseline and lacks I/O/Amdahl evidence.",
+      "observed_or_gap": "Publish one authoritative current baseline with all required metric classes."
+    },
+    {
+      "id": "goal.deliverable.hotspots",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "HOTSPOTS.md path maps/bottlenecks/hypotheses/ranking",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468/older profile and performance docs identify some hotspots; no complete current HOTSPOTS closure was bound to cf4.",
+      "observed_or_gap": "Refresh hotspots against current source and corpus."
+    },
+    {
+      "id": "goal.deliverable.adr_matrix",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "ADR-compliance matrix for every optimization",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Older per-change matrices and ADR docs exist; no cf4-specific full matrix in bundle.",
+      "observed_or_gap": "Add current optimization-to-ADR matrix."
+    },
+    {
+      "id": "goal.deliverable.production",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "Production changes with focused tests",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "cf4 instrumentation has 30 focused contract/metric tests plus root perf tests; broad production optimizations are outside this publication.",
+      "observed_or_gap": "Track production change evidence separately."
+    },
+    {
+      "id": "goal.deliverable.machine_results",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "Machine-readable before/after results with revision/corpus/env/uncertainty",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Raw allocator JSON has revision/corpus/environment/sample/CI fields, but no before/after or eligible latency comparison.",
+      "observed_or_gap": "Add paired normal before/after machine report."
+    },
+    {
+      "id": "goal.deliverable.change_record",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "Per-change record of work/scenarios/regressions/memory/concurrency/limits",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "0469 and older records document selected changes; no current allocator publication record covers the full goal.",
+      "observed_or_gap": "Create current per-change record."
+    },
+    {
+      "id": "goal.deliverable.ci_smoke",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "CI smoke and scheduled/full benchmark workflow",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Perf harness/commands exist; no current CI workflow receipt or full schedule evidence in bundle.",
+      "observed_or_gap": "Bind CI smoke and manual full workflow."
+    },
+    {
+      "id": "goal.deliverable.final_report",
+      "group": "GOAL deliverable",
+      "source": "docs/GOAL.md:741-793",
+      "requirement": "Final report with before/after/RSS/allocation/copy/compression/cold/range/scaling/serial/bottlenecks",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current final report satisfying all named fields; REPORT is stale relative to cf4 and claim registry excludes allocator.",
+      "observed_or_gap": "Produce final scoped report only after evidence exists."
+    },
+    {
+      "id": "goal.done.baselines",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Important CRUD scenarios have reproducible baselines",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Only the default allocator resource matrix is fully reproducible; CRUD docs retain many Partial/correctness-only rows.",
+      "observed_or_gap": "Baseline named scenario/provider/corpus families."
+    },
+    {
+      "id": "goal.done.bottlenecks",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Largest measured bottlenecks addressed in Amdahl/ROI order",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "0468 identifies hotspots and 0469 changes allocation behavior, but no current causal end-to-end closure.",
+      "observed_or_gap": "Run controlled before/after and address highest ROI."
+    },
+    {
+      "id": "goal.done.selective",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Selective reads proportional to mandatory metadata/accessed content",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Selective correctness and historical source-backed evidence exist; no current broad proof.",
+      "observed_or_gap": "Measure mandatory/index/accessed bytes."
+    },
+    {
+      "id": "goal.done.targeted_updates",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Targeted updates avoid unrelated parse/recompress",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Guarded preservation routes exist; current decompression/copy counters absent.",
+      "observed_or_gap": "Measure dirty closure and untouched passthrough."
+    },
+    {
+      "id": "goal.done.media",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Unchanged large media flows without unnecessary work",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No current allocator publication for media-heavy unchanged members.",
+      "observed_or_gap": "Add media-heavy passthrough measurements."
+    },
+    {
+      "id": "goal.done.streaming",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Streaming create/append bounded by explicit window",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Some non-seek routes exist; large legacy writers still accumulate and no current memory evidence.",
+      "observed_or_gap": "Complete four append semantics."
+    },
+    {
+      "id": "goal.done.parallel_real",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Parallel paths have explicit bounded execution and real scaling",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Explicit-worker receipt is not independently auditable and current allocator run uses one worker.",
+      "observed_or_gap": "Package and analyze raw scaling."
+    },
+    {
+      "id": "goal.done.layout",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "Hot layouts/caches justified by allocation/hardware evidence",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator vectors and profiles exist separately; no joined causal hardware proof.",
+      "observed_or_gap": "Correlate layout change with hardware/resource evidence."
+    },
+    {
+      "id": "goal.done.simd_done",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "SIMD only proven hot loops with fallbacks/differential tests",
+      "status": "missing",
+      "scope": "overall goal",
+      "authoritative_evidence": "No SIMD evidence.",
+      "observed_or_gap": "Remain open."
+    },
+    {
+      "id": "goal.done.adr_correctness",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "ADR/correctness/preservation/security/determinism/boundaries pass",
+      "status": "incomplete",
+      "scope": "overall goal",
+      "authoritative_evidence": "Scoped perf-crate gates pass; broad workspace and security/native gates are absent.",
+      "observed_or_gap": "Run full applicable matrix."
+    },
+    {
+      "id": "goal.done.claims",
+      "group": "definition of done",
+      "source": "docs/GOAL.md:795-817",
+      "requirement": "No performance claim lacks reproducible evidence",
+      "status": "weak",
+      "scope": "overall goal",
+      "authoritative_evidence": "Allocator docs correctly prohibit latency claims; stale docs/policy prose need reconciliation and broad goal claims remain open.",
+      "observed_or_gap": "Refresh claim registry/report boundaries."
+    },
+    {
+      "id": "checklist.18",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:18",
+      "requirement": "Scope is explicit",
+      "status": "weak",
+      "scope": "Claim and API gate",
+      "authoritative_evidence": "Checklist requires: The matrix names the exact format, package flavor, standards revision, and supported semantic subset.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.19",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:19",
+      "requirement": "Read and write are independent",
+      "status": "incomplete",
+      "scope": "Claim and API gate",
+      "authoritative_evidence": "Checklist requires: Read-only, fresh-write, opened-document edit, and opaque preservation are not conflated.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.20",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:20",
+      "requirement": "Public API is semantic",
+      "status": "incomplete",
+      "scope": "Claim and API gate",
+      "authoritative_evidence": "Checklist requires: Focused modules use short names, checked value types, typed selectors, and typed errors; native IDs and raw wire fields stay at the codec boundary.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.21",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:21",
+      "requirement": "Unsupported states are explicit",
+      "status": "weak",
+      "scope": "Claim and API gate",
+      "authoritative_evidence": "Checklist requires: Unsupported, ambiguous, noncanonical, protected, stale, and over-limit inputs fail without silently dropping data.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.22",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:22",
+      "requirement": "Feature isolation is explicit",
+      "status": "weak",
+      "scope": "Claim and API gate",
+      "authoritative_evidence": "Checklist requires: The required Cargo feature set is documented and builds without unrelated format families.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.28",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:28",
+      "requirement": "Open valid input",
+      "status": "incomplete",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: At least one representative producer file opens through the public facade.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.29",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:29",
+      "requirement": "Reject wrong family",
+      "status": "incomplete",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: MIME, container, relationship, root-element, or record-family mismatches return a typed error.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.30",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:30",
+      "requirement": "Snapshot is immutable",
+      "status": "weak",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: Cloneable snapshots share immutable source state; ordinary public methods cannot mutate attached document state.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.31",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:31",
+      "requirement": "Selection is checked",
+      "status": "incomplete",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: Name, index, address, relationship, and object selectors distinguish absent, ambiguous, and invalid values without panicking.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.32",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:32",
+      "requirement": "Unknown data is bounded",
+      "status": "weak",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: Unknown XML, records, streams, and extensions are retained within explicit limits or rejected before allocation.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.33",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:33",
+      "requirement": "Malformed input is covered",
+      "status": "weak",
+      "scope": "Read and snapshot scenarios",
+      "authoritative_evidence": "Checklist requires: Truncation, duplicate ownership, invalid ordering/cardinality, bad lexical values, and hostile nesting have focused negative tests.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.39",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:39",
+      "requirement": "Minimal valid artifact",
+      "status": "incomplete",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: The smallest public builder output reopens through Litchi and a relevant independent producer or consumer when available.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.40",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:40",
+      "requirement": "Deterministic output",
+      "status": "incomplete",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: Identical semantic inputs and explicit options produce identical bytes; ambient time, randomness, locale, or network state is not consulted.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.41",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:41",
+      "requirement": "Compact XML output",
+      "status": "incomplete",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: Every generated XML part is byte-minimal: no pretty-print indentation, non-semantic formatting whitespace, indentation-only nodes, whitespace between tags, or optional space before `/>` or `>`. Required separators remain intact, and all semantic character data is preserved byte-for-byte.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.42",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:42",
+      "requirement": "Referenced XML is compact",
+      "status": "incomplete",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: Relationships, content types, manifests, metadata, styles, settings, and every other generated or rewritten referenced XML part follow the same compact rule.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.43",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:43",
+      "requirement": "Package topology is valid",
+      "status": "incomplete",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: Content types, manifests, relationships, owner cardinalities, part names, and orphan rules are checked before publication.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.44",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:44",
+      "requirement": "Authoring is bounded",
+      "status": "weak",
+      "scope": "Create scenarios",
+      "authoritative_evidence": "Checklist requires: Builders validate semantic counts, strings, opaque payloads, aggregate bytes, and final output size before committing allocations or I/O.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.50",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:50",
+      "requirement": "Create semantic owner",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Add the first owner and another owner at every supported placement boundary.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.51",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:51",
+      "requirement": "Read after create",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Reopen the serialized artifact and compare the complete supported semantic state.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.52",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:52",
+      "requirement": "Update each field family",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Replace scalars, optional values, lists, references, and opaque extensions independently and in composition.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.53",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:53",
+      "requirement": "Delete first/middle/last/only",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Remove owners across boundary positions and remove the final owner/container where the format permits it.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.54",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:54",
+      "requirement": "Reorder or move",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Stable semantic identity, references, positional metadata, and package ownership remain correct.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.55",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:55",
+      "requirement": "Exact no-op",
+      "status": "weak",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: An unchanged commit returns byte-identical output and preserves signatures and opaque content.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.56",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:56",
+      "requirement": "Atomic failure",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Any validation, allocation, protection, or I/O failure leaves the published snapshot and destination unchanged.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.57",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:57",
+      "requirement": "Reversible patch",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Forward application checks its source, inverse application restores exact source bytes, and application to another artifact reports conflict.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.58",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:58",
+      "requirement": "Concurrent composition",
+      "status": "incomplete",
+      "scope": "Opened-document CRUD scenarios",
+      "authoritative_evidence": "Checklist requires: Independent edits join deterministically or return structured conflicts; no last-writer-wins mutation occurs.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.64",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:64",
+      "requirement": "Unknown content survives",
+      "status": "weak",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: Unmodeled attributes, children, records, streams, namespace bindings, and package members survive supported mutations byte-exactly where promised.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.65",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:65",
+      "requirement": "Lossless-or-refuse is enforced",
+      "status": "weak",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: A writer refuses mutation when it cannot prove preservation of adjacent opaque or producer-specific content.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.66",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:66",
+      "requirement": "Strict/transitional variants",
+      "status": "incomplete",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: Applicable namespace, relationship, package, and lexical variants are tested without prefix-sensitive matching.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.67",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:67",
+      "requirement": "Signature policy is explicit",
+      "status": "incomplete",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: Exact no-ops preserve signatures; changed writes either resign under explicit caller policy or remove/refuse stale signatures.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.68",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:68",
+      "requirement": "Encryption policy is explicit",
+      "status": "incomplete",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: Password opening, re-encryption, unsupported profiles, and protected mutation have separate typed outcomes.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.69",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:69",
+      "requirement": "Independent producer evidence",
+      "status": "incomplete",
+      "scope": "Preservation and compatibility scenarios",
+      "authoritative_evidence": "Checklist requires: Real files and save/reopen round trips identify producer versions and the exact scenario certified.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.75",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:75",
+      "requirement": "Caller-selected limits",
+      "status": "weak",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Input, output, node/record count, depth, string, opaque payload, relationship, and aggregate ceilings are configurable where untrusted data is accepted.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.76",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:76",
+      "requirement": "Exact boundaries",
+      "status": "incomplete",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Each important limit has below, exact, and above-boundary tests, including decoded/entity-expanded values where applicable.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.77",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:77",
+      "requirement": "Pre-allocation checks",
+      "status": "weak",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Encoded lengths and counts are rejected before proportional allocation, decoding, decompression, or cloning.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.78",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:78",
+      "requirement": "Iterative hostile traversal",
+      "status": "incomplete",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Attacker-controlled recursion uses bounded iterative traversal or proves a safe depth ceiling.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.79",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:79",
+      "requirement": "Hot paths are indexed",
+      "status": "incomplete",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Graph lookup, overlap detection, ownership checks, and repeated edits avoid accidental quadratic behavior.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.80",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:80",
+      "requirement": "Allocation failures are atomic",
+      "status": "incomplete",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Fallible reservation and serialization failures do not leave queued or partially published mutations.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.81",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:81",
+      "requirement": "Performance claims are measured",
+      "status": "incomplete",
+      "scope": "Validation, limits, and performance scenarios",
+      "authoritative_evidence": "Checklist requires: Throughput, allocation, zero-copy, lazy, streaming, or memory-efficiency claims cite a reproducible benchmark or are omitted.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.87",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:87",
+      "requirement": "Macros and VBA remain inert",
+      "status": "weak",
+      "scope": "Permanent non-execution boundary",
+      "authoritative_evidence": "Checklist requires: Code may be detected, inventoried, validated, preserved, or edited as data but is never compiled, interpreted, or executed.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.88",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:88",
+      "requirement": "Controls and actions remain inert",
+      "status": "weak",
+      "scope": "Permanent non-execution boundary",
+      "authoritative_evidence": "Checklist requires: ActiveX, form controls, actions, event bindings, add-ins, and embedded code are never activated or dispatched.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.89",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:89",
+      "requirement": "External targets remain inert",
+      "status": "weak",
+      "scope": "Permanent non-execution boundary",
+      "authoritative_evidence": "Checklist requires: DDE, database commands, mail merge, links, schemas, media, and remote relationships are never fetched, refreshed, followed, or executed.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.90",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:90",
+      "requirement": "Formula behavior is capability-bound",
+      "status": "weak",
+      "scope": "Permanent non-execution boundary",
+      "authoritative_evidence": "Checklist requires: Parsing and serialization do not imply evaluation; any evaluator accepts only explicit caller capabilities and a documented function subset.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.91",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:91",
+      "requirement": "Embedded payloads remain data",
+      "status": "weak",
+      "scope": "Permanent non-execution boundary",
+      "authoritative_evidence": "Checklist requires: OLE objects, media, scripts, and nested documents are not opened by host applications or handed to execution runtimes.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.97",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:97",
+      "requirement": "Formatting and lints pass",
+      "status": "weak",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: Workspace formatting plus warning-denied Clippy gates pass for the certified feature combinations.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.98",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:98",
+      "requirement": "Tests pass in isolation",
+      "status": "weak",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: No-default, required-feature, all-target, doc-test, and relevant all-feature configurations pass.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.99",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:99",
+      "requirement": "Dependency boundaries pass",
+      "status": "weak",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: `tools/check_crate_boundaries.py` reports no unclassified, forbidden, or stale edges.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.100",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:100",
+      "requirement": "Metadata and examples pass",
+      "status": "weak",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: Cargo metadata resolves and consumer-facing examples use only public facade paths with correct `required-features`.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.101",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:101",
+      "requirement": "Matrices match evidence",
+      "status": "incomplete",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: Every supported row names its boundary; known gaps remain `\ud83d\udfe1` or `\u274c` rather than being inferred from shared crates.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    },
+    {
+      "id": "checklist.102",
+      "group": "CRUD checklist",
+      "source": "docs/CRUD_Scenario_Checklist.md:102",
+      "requirement": "Diff and generated XML are audited",
+      "status": "weak",
+      "scope": "Workspace release gate",
+      "authoritative_evidence": "Checklist requires: The integrated diff is inspected, compact XML fixtures pass the repository auditor, and no iWork result is used as evidence for non-iWork certification.",
+      "observed_or_gap": "Current cf4 publication proves only the scoped allocator resource contract; the checklist requires format/direction-specific correctness, preservation, limits, and/or benchmark evidence. See docs/performance/CRUD_COVERAGE.md for the current partial/covered matrix."
+    }
+  ],
+  "remaining_work": [
+    {
+      "priority": 1,
+      "id": "evidence-authority",
+      "work": "Reconcile authoritative performance documents and publication identities.",
+      "why": "BASELINE/GOAL_AUDIT/REPORT/ADR_COMPLIANCE are led by older change sections; REGRESSION_COMPARATOR prose says 36/198 while the checked policy and allocator contract are 37/201. The current GOAL is not in cf4.",
+      "deliverable": "Add a cf4/0469 publication entry, reconcile policy counts, bind current source/revision and full gate receipts, and keep historical tables explicitly historical."
+    },
+    {
+      "priority": 2,
+      "id": "current-normal-baseline",
+      "work": "Capture a current normal (uninstrumented) 201-row baseline and a paired before/after control.",
+      "why": "The allocator report deliberately cannot support latency; the available 201-row normal baseline is historical source 1b3f and has zero normal filesystem rows.",
+      "deliverable": "ABBA/repeated process-isolated rows with p50/p95/p99, throughput, RSS, binary/source/corpus identity, uncertainty, and explicit cold/warm semantics."
+    },
+    {
+      "priority": 3,
+      "id": "dense-xlsx-hotspot",
+      "work": "Close the dense XLSX one-percent commit/save hotspot with current causal evidence.",
+      "why": "0468 profile attributes inclusive cost to eager parser 40.01%, snapshot scanning 24.41%, compaction 13.27%, and web validation 10.33%; 0469 reports a 10.985% whole-process Heaptrack-call decrease but not an accepted end-to-end speedup.",
+      "deliverable": "Matched current normal latency/resource/copy/validation measurements, preserve exact no-op/source/unknown behavior, and report adverse tails."
+    },
+    {
+      "priority": 4,
+      "id": "provider-io-matrix",
+      "work": "Measure the required provider and sink axes.",
+      "why": "Current allocator source groups are not_applicable; normal filesystem rows are absent; range settings are configuration only.",
+      "deliverable": "Owned/borrowed/filesystem positional/ReadAt/high-latency range/non-seek/atomic-save rows with physical and logical read/write counters, request distributions, copied/decompressed bytes."
+    },
+    {
+      "priority": 5,
+      "id": "scaling-evidence",
+      "work": "Package and analyze the claimed workers 1/2/4/8 and range reports.",
+      "why": "A receipt names six reports but the raw files are absent, so there is no independently reviewable speedup/serial fraction/lock-wait evidence.",
+      "deliverable": "Raw report files, hashes, CPU utilization, task overhead, lock wait, efficiency, serial fraction, Amdahl model, and shared-host caveat."
+    },
+    {
+      "priority": 6,
+      "id": "corpus-security-native",
+      "work": "Expand representative corpus and native/security coverage.",
+      "why": "The default matrix is synthetic and does not bind encrypted/signed/protected/macro/external, malformed/adversarial, very-large, or multiple real producer classes.",
+      "deliverable": "Content-addressed producer/version corpus, inert security fixtures, bounded malformed set, very-large sparse/dense/media/dependency shapes, and corresponding timing/resource rows."
+    },
+    {
+      "priority": 7,
+      "id": "crud-and-streaming",
+      "work": "Complete the minimum CRUD and four append semantics with bounded memory.",
+      "why": "CRUD_COVERAGE rows remain Partial for conversion, large create/append, bulk/delete/sanitize/copy/merge/patch/validation/repair; large legacy writers still accumulate.",
+      "deliverable": "Distinct streaming-create, logical-append, new-Part, and arbitrary-repackage scenarios, each with correctness/preservation and resource/latency evidence."
+    },
+    {
+      "priority": 8,
+      "id": "release-gates",
+      "work": "Run current workspace release and safety gates for the certified scope.",
+      "why": "Publication has perf-crate tests/Clippy only; no current workspace check/rustdoc/boundary/fuzz/native/security/cross-platform receipt.",
+      "deliverable": "Pinned fmt/check/Clippy/rustdoc/boundary/unit/integration/doc/compile/fuzz/native/security evidence and matrix status."
+    }
+  ],
+  "summary": {
+    "requirement_count": 264,
+    "counts_by_status": {
+      "complete": 10,
+      "incomplete": 99,
+      "missing": 39,
+      "weak": 116
+    },
+    "counts_by_group": {
+      "CRUD category": {
+        "incomplete": 10,
+        "missing": 1,
+        "weak": 4
+      },
+      "CRUD checklist": {
+        "incomplete": 28,
+        "weak": 22
+      },
+      "GOAL baseline measurement": {
+        "complete": 1,
+        "missing": 7,
+        "weak": 6
+      },
+      "GOAL corpus axis": {
+        "complete": 3,
+        "missing": 4,
+        "weak": 6
+      },
+      "GOAL correctness test family": {
+        "incomplete": 5,
+        "missing": 3,
+        "weak": 9
+      },
+      "GOAL data path": {
+        "incomplete": 3,
+        "weak": 8
+      },
+      "GOAL deliverable": {
+        "complete": 1,
+        "incomplete": 2,
+        "missing": 1,
+        "weak": 5
+      },
+      "GOAL measurement facility": {
+        "weak": 1
+      },
+      "GOAL metric dimension": {
+        "missing": 9,
+        "weak": 6
+      },
+      "GOAL optimization order": {
+        "weak": 1
+      },
+      "GOAL path accounting": {
+        "incomplete": 3,
+        "missing": 4,
+        "weak": 3
+      },
+      "GOAL repository exploration": {
+        "incomplete": 2,
+        "missing": 1,
+        "weak": 6
+      },
+      "GOAL/ADR constraint": {
+        "weak": 13
+      },
+      "append semantics": {
+        "incomplete": 4
+      },
+      "correctness and safety gate": {
+        "missing": 6,
+        "weak": 6
+      },
+      "decision/regression rule": {
+        "incomplete": 3
+      },
+      "definition of done": {
+        "incomplete": 8,
+        "missing": 2,
+        "weak": 1
+      },
+      "initial hypothesis": {
+        "incomplete": 8,
+        "weak": 4
+      },
+      "input/output axis": {
+        "incomplete": 1,
+        "weak": 6
+      },
+      "minimum E2E scenario": {
+        "incomplete": 17,
+        "weak": 5
+      },
+      "optimization workstream": {
+        "incomplete": 5,
+        "missing": 1,
+        "weak": 2
+      },
+      "publication contract": {
+        "complete": 5,
+        "weak": 2
+      }
+    },
+    "checklist_row_count": 50,
+    "goal_and_program_row_count": 214
+  }
+}
