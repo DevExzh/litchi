@@ -4,7 +4,7 @@ use litchi_ods::{
     scenario::OptionalSetting,
 };
 
-const CONTENT: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Base"><office:dde-source office:dde-application="soffice" office:dde-topic="file:///never-contacted.ods" office:dde-item="Sheet1.A1:B2" office:name="Reference" office:conversion-mode="keep-text" office:automatic-update="true"/><table:table-row><table:table-cell office:value-type="string"><text:p>Pre <text:span text:style-name="Bold">styled <text:a xlink:href="https://never-fetched.invalid/" xlink:type="simple">link</text:a></text:span> tail</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Scenario"><table:scenario table:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/><table:table-row/></table:table><table:dde-links><table:dde-link><office:dde-source office:dde-application="calc" office:dde-topic="file:///never-opened.ods" office:dde-item="Prices.A1"/><table:table><table:table-row><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></table:dde-link></table:dde-links></office:spreadsheet></office:body></office:document-content>"##;
+const CONTENT: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Base"><office:dde-source office:dde-application="soffice" office:dde-topic="file:///never-contacted.ods" office:dde-item="Sheet1.A1:B2" office:name="Reference" office:conversion-mode="keep-text" office:automatic-update="true"/><table:table-row><table:table-cell office:value-type="string"><text:p>Pre <text:span text:style-name="Bold">styled <text:a xlink:href="https://never-fetched.invalid/" xlink:type="simple">link</text:a></text:span> tail</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Scenario"><table:scenario table:scenario-ranges="$Scenario.$A$1:.$B$2 'Q1 Sales'.$C$3:.$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/><table:table-row/></table:table><table:dde-links><table:dde-link><office:dde-source office:dde-application="calc" office:dde-topic="file:///never-opened.ods" office:dde-item="Prices.A1"/><table:table><table:table-row><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></table:dde-link></table:dde-links></office:spreadsheet></office:body></office:document-content>"##;
 
 fn spreadsheet() -> Spreadsheet {
     Spreadsheet::from_bytes(
@@ -53,7 +53,7 @@ fn inspects_scenarios_without_applying_values() {
             .iter()
             .map(litchi_ods::scenario::RangeAddress::as_str)
             .collect::<Vec<_>>(),
-        ["$Scenario.$A$1:$B$2", "'Q1 Sales'.$C$3:$D$4"]
+        ["$Scenario.$A$1:.$B$2", "'Q1 Sales'.$C$3:.$D$4"]
     );
     assert!(scenario.is_active());
     assert_eq!(scenario.display_border(), OptionalSetting::Disabled);
@@ -157,7 +157,7 @@ fn self_closing_dde_cache_obeys_the_exact_byte_quota() {
 fn scenario_rejects_entity_content() {
     let scenario = r#"<table:scenario table:scenario-ranges=".A1:.B2" table:is-active="true">&scenario;</table:scenario>"#;
     let malformed = CONTENT.replacen(
-        r##"<table:scenario table:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/>"##,
+        r##"<table:scenario table:scenario-ranges="$Scenario.$A$1:.$B$2 'Q1 Sales'.$C$3:.$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/>"##,
         scenario,
         1,
     );

@@ -255,8 +255,9 @@ impl SourceBackedSpreadsheet {
             let crate::open_parse::OpenOutputs {
                 location: _location,
                 definitions,
-                sheets,
+                mut sheets,
             } = outputs;
+            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
             Ok((
                 content_xml,
                 styles_xml,
@@ -361,6 +362,28 @@ impl SourceBackedSpreadsheet {
         let value = self.styles_xml.as_deref();
         self.check_source()?;
         Ok(value)
+    }
+
+    /// Capture the source-bound standalone table-template catalog.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        self.check_source()?;
+        let result =
+            crate::styles::table_template::Snapshot::from_source(self.styles_xml.as_deref());
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Capture source-bound, inert scenario declarations without applying
+    /// values, evaluating formulas, or refreshing external data.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        self.check_source()?;
+        let result = crate::scenario::Snapshot::parse(&self.content_xml);
+        prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result.map_err(|error| {
+                Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+            }),
+        )
     }
 
     /// Return compact cross-format metadata projected from `meta.xml`.

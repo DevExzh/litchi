@@ -1,0 +1,600 @@
+{
+  "candidate": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910",
+  "candidate_base_head": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "candidate_head": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "clean_v5_to_mixed": {
+    "diff_file": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/clean-v5-vs-mixed.diff",
+    "diff_path_count": 0,
+    "diff_paths": [],
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "interpretation": "The V5 bytes already contain the primary flat-FODS, cell-range-source, and title/description additions; the mixed overlay is the V5 superset, so no byte-level clean-V5 delta is needed for the overlap files.",
+    "report_file": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/clean-v5-vs-mixed-report.json",
+    "report_sha256": "469284a2ff1c32b594f9d56b9c2200ba69e8d79696031e8175dc6cc46361a00e"
+  },
+  "feature": "ods-primary-reconciliation-v5-mixed",
+  "files": [
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "f9885df3755196236b5560dbff18502b8811c7d70b0f9a112a72947597ecda36",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "f9885df3755196236b5560dbff18502b8811c7d70b0f9a112a72947597ecda36",
+      "path": "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+      "primary_preimage_sha256": "a28bc555782d00b8f7906fb2dfacdf670df8937bb0a9cce6bfcaf925b04c3936"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "98de691932a054223360c1026983e6f273167464f4f08633365558e01ce8903d",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "98de691932a054223360c1026983e6f273167464f4f08633365558e01ce8903d",
+      "path": "crates/litchi-ods/src/advanced.rs",
+      "primary_preimage_sha256": "07f468f94df1602055263f6127d0b76959145dadb82a1f81ea9621504df49ccd"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb",
+      "path": "crates/litchi-ods/src/authoring/builder.rs",
+      "primary_preimage_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265",
+      "path": "crates/litchi-ods/src/authoring/mutable.rs",
+      "primary_preimage_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22",
+      "path": "crates/litchi-ods/src/facade/mod.rs",
+      "primary_preimage_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044",
+      "path": "crates/litchi-ods/src/facade/source.rs",
+      "primary_preimage_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565",
+      "path": "crates/litchi-ods/src/lib.rs",
+      "primary_preimage_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565"
+    },
+    {
+      "category": "superseded_older_candidate",
+      "clean_v5_sha256": "87466d5069cee367aacfa7c3b92126869d502ca30d3da585504d4af76eda304c",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "87466d5069cee367aacfa7c3b92126869d502ca30d3da585504d4af76eda304c",
+      "path": "crates/litchi-ods/src/model/scenario.rs",
+      "primary_preimage_sha256": "9a2b8bbb719f85313e27df7197fcccc0d73f0216cfb191b36da9568536d200b2"
+    },
+    {
+      "category": "superseded_older_candidate",
+      "clean_v5_sha256": "3627fdd1bd5de90bf3202e577048d529786c6c609ddfd07b2ddabd224d159fe7",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "3627fdd1bd5de90bf3202e577048d529786c6c609ddfd07b2ddabd224d159fe7",
+      "path": "crates/litchi-ods/src/model/scenario/transaction.rs",
+      "primary_preimage_sha256": "7c29b1b05577f1050404d80a5e5693644bfb211a5f5fa86b47925f417422c46f"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c",
+      "path": "crates/litchi-ods/src/package/document.rs",
+      "primary_preimage_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "3b1df5e5fea46d3ed439c6da1dc7acaf5373f7a0b769618035f776345bfab722",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "3b1df5e5fea46d3ed439c6da1dc7acaf5373f7a0b769618035f776345bfab722",
+      "path": "crates/litchi-ods/src/styles/table_template/codec.rs",
+      "primary_preimage_sha256": "a5c51c034dfeaa096aafa9b407e739fe81671c0ac006c26bfe7e7d06fbc195d3"
+    },
+    {
+      "category": "already_v5_exact",
+      "clean_v5_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": true,
+      "mixed_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09",
+      "path": "crates/litchi-ods/src/styles/table_template/mod.rs",
+      "primary_preimage_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "62bb45dc4ab99ade55016479123a350fee1fd2d2f5900a09fe62a17682bc87b0",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "62bb45dc4ab99ade55016479123a350fee1fd2d2f5900a09fe62a17682bc87b0",
+      "path": "crates/litchi-ods/src/styles/table_template/semantic.rs",
+      "primary_preimage_sha256": "2a65a33f137b43b7a3b6bea9746eaef14d6fa41d8ec8ec1bd0a8f7070b2ca097"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "ead83c8b3e69f977b9eafc82d5c14d8e421388d22fc5be8fb11b498474220c48",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "ead83c8b3e69f977b9eafc82d5c14d8e421388d22fc5be8fb11b498474220c48",
+      "path": "crates/litchi-ods/src/styles/table_template/tests.rs",
+      "primary_preimage_sha256": "70cfc7ce8f354b6ffe76b638473562abfe9118990304d293a378aa183cd91be6"
+    },
+    {
+      "category": "superseded_older_candidate",
+      "clean_v5_sha256": "f49f45e6b6fde3993aaa983a207ff9da57ed3ada7ce74ffa31ff9d97ac923041",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "f49f45e6b6fde3993aaa983a207ff9da57ed3ada7ce74ffa31ff9d97ac923041",
+      "path": "crates/litchi-ods/src/styles/table_template/transaction.rs",
+      "primary_preimage_sha256": "d649f8e50850dc091bf4727b91e330aaabc760825a77a564a8182b1f7c817268"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "d6168abb6a8d1af610d8c0796cf39aaa2755dcc58dce94dea4800a3f15fcb749",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "d6168abb6a8d1af610d8c0796cf39aaa2755dcc58dce94dea4800a3f15fcb749",
+      "path": "crates/litchi-ods/src/styles/table_template/validation.rs",
+      "primary_preimage_sha256": "af3dda1814d7960c7a146e5f15658ba6a9b9fc1513df170377aa2db13a792d9c"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "628b2735659c4c3749c9c6c1d50d62d6e1bacc63323762fd702b2085daf4772e",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "628b2735659c4c3749c9c6c1d50d62d6e1bacc63323762fd702b2085daf4772e",
+      "path": "crates/litchi-ods/src/worksheet/codec.rs",
+      "primary_preimage_sha256": "b07389cd300d654db5abf3be5d477911c1022f0a32e030770cde8677fdc98024"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "8233cf429108a41858f651a9d2fdf9371b4d38e6b290bc6d074d23f5ac222042",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "8233cf429108a41858f651a9d2fdf9371b4d38e6b290bc6d074d23f5ac222042",
+      "path": "crates/litchi-ods/src/worksheet/model.rs",
+      "primary_preimage_sha256": "5ba50e37afc4f77075ea6e20e5f0291e946162b902df0f4738641b4414755895"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "c1181f9298d5b1d1d2faf024a459fc3b1f4d4f6bed01ff6bd21af1bc60723322",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "c1181f9298d5b1d1d2faf024a459fc3b1f4d4f6bed01ff6bd21af1bc60723322",
+      "path": "crates/litchi-ods/src/worksheet/package.rs",
+      "primary_preimage_sha256": "67f85c108ebd8a567debf410acd008762a4b4c2cdf93ed42464cb3f3702b59a4"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "2ea8a85614faa2caa5ed23a1aeb388e6e6fb673dd889b25ecdded35a44397ce3",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "2ea8a85614faa2caa5ed23a1aeb388e6e6fb673dd889b25ecdded35a44397ce3",
+      "path": "crates/litchi-ods/src/worksheet/validation.rs",
+      "primary_preimage_sha256": "dfccc7ae18fa866f5bbc05e9fb83e7636a4ecfbe610c29ed6bbd8d07d5a155e7"
+    },
+    {
+      "category": "different_pending_work",
+      "clean_v5_sha256": "2488aef2eec6510baca55ec22d6868211141ba2a75d8d1fb37a12cc51eb09b0f",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "2488aef2eec6510baca55ec22d6868211141ba2a75d8d1fb37a12cc51eb09b0f",
+      "path": "crates/litchi-ods/tests/ods_metadata_transactions.rs",
+      "primary_preimage_sha256": "b2b9edefc151625a58f1393c242a9cb00952f14fa2bb5c6765f92ca16ffc9b14"
+    },
+    {
+      "category": "superseded_older_candidate",
+      "clean_v5_sha256": "de71ecb9ef3abf41e1bf73715080ff1d462ee5cc47963c977369e6e112b712ed",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "de71ecb9ef3abf41e1bf73715080ff1d462ee5cc47963c977369e6e112b712ed",
+      "path": "crates/litchi-ods/tests/scenario_transactions.rs",
+      "primary_preimage_sha256": "de6a0c97853a429089f674eea9e32070948ceb567885043d01fd29dd7bd0e6af"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "795de3b8839f77ddb7a931ec45647325b65908e35f05fb1b21c061c9d8fbed49",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "795de3b8839f77ddb7a931ec45647325b65908e35f05fb1b21c061c9d8fbed49",
+      "path": "crates/litchi-ods/tests/source_catalog.rs",
+      "primary_preimage_sha256": "49b79db4caa0b1f27bff744f56169755cc107670f9671f83f86eebb8ea3cda82"
+    },
+    {
+      "category": "v5_only_new",
+      "clean_v5_sha256": "d77fedeb1c3e8caaf38e66f64973c332b47cd94bb3cf1bbb1a625dd4d6ccaf46",
+      "mixed_equals_clean_v5": true,
+      "mixed_equals_primary_preimage": false,
+      "mixed_sha256": "d77fedeb1c3e8caaf38e66f64973c332b47cd94bb3cf1bbb1a625dd4d6ccaf46",
+      "path": "crates/litchi-ods/tests/source_features.rs",
+      "primary_preimage_sha256": "54a73ce3b49915c0c9995e7678db6f9ba5fc7507912ac3e834bbeaece4a66b99"
+    }
+  ],
+  "focused_validation": {
+    "fmt_command_file": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/fmt-command.txt",
+    "fmt_log": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/fmt.log",
+    "fmt_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "offline": true,
+    "result": "pass",
+    "tests": [
+      "ods_metadata_transactions",
+      "scenario_transactions",
+      "source_catalog",
+      "source_features"
+    ],
+    "tests_command_file": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/focused-test-command.txt",
+    "tests_log": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/focused-tests.log",
+    "tests_log_sha256": "4d6a931717940d0f72f9d16856a4ae15cfb1e5c2143ff641f5bb2fe9ca3d0a9e",
+    "toolchain": "1.95"
+  },
+  "overlap_pending_feature_checks": {
+    "crates/litchi-ods/docs/FEATURE_MATRIX.md": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "Flat single-XML ODS (`.fods`)",
+        "Cell-level external range source (`table:cell-range-source`)"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/src/advanced.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "title: None",
+        "description: None"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/src/worksheet/codec.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "range_source",
+        "table:cell-range-source",
+        "template_name",
+        "use-first-row-styles",
+        "actuate_seen"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/src/worksheet/model.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "range_source",
+        "pub title:",
+        "pub description:",
+        "template_name",
+        "style_usage"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/src/worksheet/package.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "replace_table_metadata",
+        "validate_cell_range_source_lexical",
+        "template_name",
+        "style_usage"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/src/worksheet/validation.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "cell.range_source",
+        "table title",
+        "table description",
+        "template_name"
+      ],
+      "missing_markers": []
+    },
+    "crates/litchi-ods/tests/ods_metadata_transactions.rs": {
+      "all_markers_present_in_mixed": true,
+      "markers": [
+        "table_metadata_and_cell_range_source_round_trip_through_owned_and_source_open",
+        "cell_range_source_builder_rejects_zero_dimensions",
+        "fresh_table_template_builder_writes_normative_owner_and_axes",
+        "normative_table_template_usage_round_trips_through_sheet_edit"
+      ],
+      "missing_markers": []
+    }
+  },
+  "primary_postcheck": {
+    "head": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+    "head_unchanged": true,
+    "status_path_count": 195,
+    "status_sha256": "f4fe4e2915ffcbadaf7b78ed9fcf67b407a83601125bde04ea78bf2c70c17fee",
+    "status_unchanged_from_preimage": true
+  },
+  "primary_preimage": {
+    "classification": "/var/tmp/litchi-ods-primary-reconciliation-v5-20260910-classification.json",
+    "classification_sha256": "385af38f5d6727486dd15c6db303616b8687beae3f8c85bef2ecfaa3ff2a2409",
+    "head": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+    "path": "/home/zhuhe/code/litchi-spec-gaps",
+    "preimage_backup": "/var/tmp/litchi-ods-primary-reconciliation-v5-20260910-preimage",
+    "preimage_manifest": "/var/tmp/litchi-ods-primary-reconciliation-v5-20260910-preimage/preimage-manifest.json",
+    "preimage_manifest_sha256": "23d6281f17f81f19bcf943e98a9a6a26f8feaf09c3de9e157ca6f923f57049a7",
+    "status_path_count": 195,
+    "status_sha256": "f4fe4e2915ffcbadaf7b78ed9fcf67b407a83601125bde04ea78bf2c70c17fee"
+  },
+  "primary_to_mixed": {
+    "diff_file": "/var/tmp/litchi-ods-feature-reconciliation-v5-mixed-20260910-evidence/primary-vs-mixed.diff",
+    "diff_sha256": "3b994905dee87b7990f82942b2a3b6efd37e16d590caa105ae655090df614d51",
+    "records": [
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "f9885df3755196236b5560dbff18502b8811c7d70b0f9a112a72947597ecda36",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "f9885df3755196236b5560dbff18502b8811c7d70b0f9a112a72947597ecda36",
+        "path": "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+        "primary_preimage_sha256": "a28bc555782d00b8f7906fb2dfacdf670df8937bb0a9cce6bfcaf925b04c3936"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "98de691932a054223360c1026983e6f273167464f4f08633365558e01ce8903d",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "98de691932a054223360c1026983e6f273167464f4f08633365558e01ce8903d",
+        "path": "crates/litchi-ods/src/advanced.rs",
+        "primary_preimage_sha256": "07f468f94df1602055263f6127d0b76959145dadb82a1f81ea9621504df49ccd"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb",
+        "path": "crates/litchi-ods/src/authoring/builder.rs",
+        "primary_preimage_sha256": "8bdaad33792f77d3e81232a0d39aeebf0baf105ba9f3bcfbccd0c53b4139c9fb"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265",
+        "path": "crates/litchi-ods/src/authoring/mutable.rs",
+        "primary_preimage_sha256": "b1e99b3f76ccc164764d82c2e1be8d8bc0a3a3e292fd3ec368379082d3e8b265"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22",
+        "path": "crates/litchi-ods/src/facade/mod.rs",
+        "primary_preimage_sha256": "88f13fee1e99e2a761ea7061ef19527605af6cab9fb66b19afb10438b6a26d22"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044",
+        "path": "crates/litchi-ods/src/facade/source.rs",
+        "primary_preimage_sha256": "19ac69541d63dc46e7f600e0ea6f18d89468de3d8d1d60685e39dd4738550044"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565",
+        "path": "crates/litchi-ods/src/lib.rs",
+        "primary_preimage_sha256": "ddcacff49699c04911e7e388aee811d467f219d0e58d8398f136edfb61ce6565"
+      },
+      {
+        "category": "superseded_older_candidate",
+        "clean_v5_sha256": "87466d5069cee367aacfa7c3b92126869d502ca30d3da585504d4af76eda304c",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "87466d5069cee367aacfa7c3b92126869d502ca30d3da585504d4af76eda304c",
+        "path": "crates/litchi-ods/src/model/scenario.rs",
+        "primary_preimage_sha256": "9a2b8bbb719f85313e27df7197fcccc0d73f0216cfb191b36da9568536d200b2"
+      },
+      {
+        "category": "superseded_older_candidate",
+        "clean_v5_sha256": "3627fdd1bd5de90bf3202e577048d529786c6c609ddfd07b2ddabd224d159fe7",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "3627fdd1bd5de90bf3202e577048d529786c6c609ddfd07b2ddabd224d159fe7",
+        "path": "crates/litchi-ods/src/model/scenario/transaction.rs",
+        "primary_preimage_sha256": "7c29b1b05577f1050404d80a5e5693644bfb211a5f5fa86b47925f417422c46f"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c",
+        "path": "crates/litchi-ods/src/package/document.rs",
+        "primary_preimage_sha256": "478d1523642a114daa2d3cbf06e0d1ffeaf9d5b2ac3e7a144d88af33ec2b6c0c"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "3b1df5e5fea46d3ed439c6da1dc7acaf5373f7a0b769618035f776345bfab722",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "3b1df5e5fea46d3ed439c6da1dc7acaf5373f7a0b769618035f776345bfab722",
+        "path": "crates/litchi-ods/src/styles/table_template/codec.rs",
+        "primary_preimage_sha256": "a5c51c034dfeaa096aafa9b407e739fe81671c0ac006c26bfe7e7d06fbc195d3"
+      },
+      {
+        "category": "already_v5_exact",
+        "clean_v5_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": true,
+        "mixed_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09",
+        "path": "crates/litchi-ods/src/styles/table_template/mod.rs",
+        "primary_preimage_sha256": "56cd74ab1a04eb19f41cc8aac3213a6e653b209a74a3b19fdfb70698623b7d09"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "62bb45dc4ab99ade55016479123a350fee1fd2d2f5900a09fe62a17682bc87b0",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "62bb45dc4ab99ade55016479123a350fee1fd2d2f5900a09fe62a17682bc87b0",
+        "path": "crates/litchi-ods/src/styles/table_template/semantic.rs",
+        "primary_preimage_sha256": "2a65a33f137b43b7a3b6bea9746eaef14d6fa41d8ec8ec1bd0a8f7070b2ca097"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "ead83c8b3e69f977b9eafc82d5c14d8e421388d22fc5be8fb11b498474220c48",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "ead83c8b3e69f977b9eafc82d5c14d8e421388d22fc5be8fb11b498474220c48",
+        "path": "crates/litchi-ods/src/styles/table_template/tests.rs",
+        "primary_preimage_sha256": "70cfc7ce8f354b6ffe76b638473562abfe9118990304d293a378aa183cd91be6"
+      },
+      {
+        "category": "superseded_older_candidate",
+        "clean_v5_sha256": "f49f45e6b6fde3993aaa983a207ff9da57ed3ada7ce74ffa31ff9d97ac923041",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "f49f45e6b6fde3993aaa983a207ff9da57ed3ada7ce74ffa31ff9d97ac923041",
+        "path": "crates/litchi-ods/src/styles/table_template/transaction.rs",
+        "primary_preimage_sha256": "d649f8e50850dc091bf4727b91e330aaabc760825a77a564a8182b1f7c817268"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "d6168abb6a8d1af610d8c0796cf39aaa2755dcc58dce94dea4800a3f15fcb749",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "d6168abb6a8d1af610d8c0796cf39aaa2755dcc58dce94dea4800a3f15fcb749",
+        "path": "crates/litchi-ods/src/styles/table_template/validation.rs",
+        "primary_preimage_sha256": "af3dda1814d7960c7a146e5f15658ba6a9b9fc1513df170377aa2db13a792d9c"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "628b2735659c4c3749c9c6c1d50d62d6e1bacc63323762fd702b2085daf4772e",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "628b2735659c4c3749c9c6c1d50d62d6e1bacc63323762fd702b2085daf4772e",
+        "path": "crates/litchi-ods/src/worksheet/codec.rs",
+        "primary_preimage_sha256": "b07389cd300d654db5abf3be5d477911c1022f0a32e030770cde8677fdc98024"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "8233cf429108a41858f651a9d2fdf9371b4d38e6b290bc6d074d23f5ac222042",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "8233cf429108a41858f651a9d2fdf9371b4d38e6b290bc6d074d23f5ac222042",
+        "path": "crates/litchi-ods/src/worksheet/model.rs",
+        "primary_preimage_sha256": "5ba50e37afc4f77075ea6e20e5f0291e946162b902df0f4738641b4414755895"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "c1181f9298d5b1d1d2faf024a459fc3b1f4d4f6bed01ff6bd21af1bc60723322",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "c1181f9298d5b1d1d2faf024a459fc3b1f4d4f6bed01ff6bd21af1bc60723322",
+        "path": "crates/litchi-ods/src/worksheet/package.rs",
+        "primary_preimage_sha256": "67f85c108ebd8a567debf410acd008762a4b4c2cdf93ed42464cb3f3702b59a4"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "2ea8a85614faa2caa5ed23a1aeb388e6e6fb673dd889b25ecdded35a44397ce3",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "2ea8a85614faa2caa5ed23a1aeb388e6e6fb673dd889b25ecdded35a44397ce3",
+        "path": "crates/litchi-ods/src/worksheet/validation.rs",
+        "primary_preimage_sha256": "dfccc7ae18fa866f5bbc05e9fb83e7636a4ecfbe610c29ed6bbd8d07d5a155e7"
+      },
+      {
+        "category": "different_pending_work",
+        "clean_v5_sha256": "2488aef2eec6510baca55ec22d6868211141ba2a75d8d1fb37a12cc51eb09b0f",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "2488aef2eec6510baca55ec22d6868211141ba2a75d8d1fb37a12cc51eb09b0f",
+        "path": "crates/litchi-ods/tests/ods_metadata_transactions.rs",
+        "primary_preimage_sha256": "b2b9edefc151625a58f1393c242a9cb00952f14fa2bb5c6765f92ca16ffc9b14"
+      },
+      {
+        "category": "superseded_older_candidate",
+        "clean_v5_sha256": "de71ecb9ef3abf41e1bf73715080ff1d462ee5cc47963c977369e6e112b712ed",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "de71ecb9ef3abf41e1bf73715080ff1d462ee5cc47963c977369e6e112b712ed",
+        "path": "crates/litchi-ods/tests/scenario_transactions.rs",
+        "primary_preimage_sha256": "de6a0c97853a429089f674eea9e32070948ceb567885043d01fd29dd7bd0e6af"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "795de3b8839f77ddb7a931ec45647325b65908e35f05fb1b21c061c9d8fbed49",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "795de3b8839f77ddb7a931ec45647325b65908e35f05fb1b21c061c9d8fbed49",
+        "path": "crates/litchi-ods/tests/source_catalog.rs",
+        "primary_preimage_sha256": "49b79db4caa0b1f27bff744f56169755cc107670f9671f83f86eebb8ea3cda82"
+      },
+      {
+        "category": "v5_only_new",
+        "clean_v5_sha256": "d77fedeb1c3e8caaf38e66f64973c332b47cd94bb3cf1bbb1a625dd4d6ccaf46",
+        "mixed_equals_clean_v5": true,
+        "mixed_equals_primary_preimage": false,
+        "mixed_sha256": "d77fedeb1c3e8caaf38e66f64973c332b47cd94bb3cf1bbb1a625dd4d6ccaf46",
+        "path": "crates/litchi-ods/tests/source_features.rs",
+        "primary_preimage_sha256": "54a73ce3b49915c0c9995e7678db6f9ba5fc7507912ac3e834bbeaece4a66b99"
+      }
+    ]
+  },
+  "scope": {
+    "candidate_committed": false,
+    "candidate_outside_owned_paths": [],
+    "candidate_staged": false,
+    "owned_path_count": 24,
+    "owned_paths": [
+      "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+      "crates/litchi-ods/src/advanced.rs",
+      "crates/litchi-ods/src/authoring/builder.rs",
+      "crates/litchi-ods/src/authoring/mutable.rs",
+      "crates/litchi-ods/src/facade/mod.rs",
+      "crates/litchi-ods/src/facade/source.rs",
+      "crates/litchi-ods/src/lib.rs",
+      "crates/litchi-ods/src/model/scenario.rs",
+      "crates/litchi-ods/src/model/scenario/transaction.rs",
+      "crates/litchi-ods/src/package/document.rs",
+      "crates/litchi-ods/src/styles/table_template/codec.rs",
+      "crates/litchi-ods/src/styles/table_template/mod.rs",
+      "crates/litchi-ods/src/styles/table_template/semantic.rs",
+      "crates/litchi-ods/src/styles/table_template/tests.rs",
+      "crates/litchi-ods/src/styles/table_template/transaction.rs",
+      "crates/litchi-ods/src/styles/table_template/validation.rs",
+      "crates/litchi-ods/src/worksheet/codec.rs",
+      "crates/litchi-ods/src/worksheet/model.rs",
+      "crates/litchi-ods/src/worksheet/package.rs",
+      "crates/litchi-ods/src/worksheet/validation.rs",
+      "crates/litchi-ods/tests/ods_metadata_transactions.rs",
+      "crates/litchi-ods/tests/scenario_transactions.rs",
+      "crates/litchi-ods/tests/source_catalog.rs",
+      "crates/litchi-ods/tests/source_features.rs"
+    ],
+    "owned_prefix": "crates/litchi-ods/"
+  },
+  "source_clean_v5": {
+    "candidate": "/var/tmp/litchi-ods-feature-reconciliation-v5-20260910",
+    "manifest": "/var/tmp/litchi-ods-feature-reconciliation-v5-20260910-manifest.json",
+    "manifest_sha256": "001ffcc090a09b9567722415ac49904b53f18eaa3cfdfa8d7038e43a14cdd2a7",
+    "status_path_count": 24,
+    "status_sha256": "a9878fae9618832afcbf04feee4f70bb8cb49bc9225cdfad4b092ac36be8a641"
+  }
+}

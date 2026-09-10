@@ -9,6 +9,10 @@ use quick_xml::{
 };
 use std::sync::Arc;
 
+mod transaction;
+
+pub use transaction::{Commit, Edit, Patch};
+
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const MAX_INPUT_BYTES: usize = 256 * 1024 * 1024;
@@ -16,6 +20,7 @@ const MAX_SCENARIOS: usize = 65_536;
 const MAX_RANGES: usize = 65_536;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_RANGE_LIST_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_AGGREGATE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 1_024;
 
 /// A scenario metadata inspection result.
@@ -66,6 +71,7 @@ pub struct Limits {
     ranges: usize,
     text_bytes: usize,
     range_list_bytes: usize,
+    aggregate_bytes: usize,
     depth: usize,
 }
 
@@ -77,6 +83,7 @@ impl Default for Limits {
             ranges: MAX_RANGES,
             text_bytes: MAX_TEXT_BYTES,
             range_list_bytes: MAX_RANGE_LIST_BYTES,
+            aggregate_bytes: MAX_AGGREGATE_BYTES,
             depth: MAX_DEPTH,
         }
     }
@@ -113,6 +120,13 @@ impl Limits {
         self
     }
 
+    /// Bound the aggregate authored scenario metadata retained by one snapshot.
+    #[must_use]
+    pub const fn with_aggregate_bytes(mut self, value: usize) -> Self {
+        self.aggregate_bytes = value;
+        self
+    }
+
     #[must_use]
     pub const fn with_depth(mut self, value: usize) -> Self {
         self.depth = value;
@@ -129,6 +143,11 @@ impl Limits {
                 "range-list bytes",
                 self.range_list_bytes,
                 MAX_RANGE_LIST_BYTES,
+            ),
+            (
+                "aggregate scenario bytes",
+                self.aggregate_bytes,
+                MAX_AGGREGATE_BYTES,
             ),
             ("XML depth", self.depth, MAX_DEPTH),
         ] {
@@ -187,6 +206,12 @@ pub struct RgbColor {
 }
 
 impl RgbColor {
+    /// Creates a checked RGB color from its individual components.
+    #[must_use]
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
+        Self { red, green, blue }
+    }
+
     /// Parses an ODF `#RRGGBB` color.
     ///
     /// # Errors
@@ -246,10 +271,14 @@ impl RangeAddress {
     ///
     /// # Errors
     ///
-    /// Returns an error when `value` is empty, malformed, oversized, or
-    /// contains more than one range address.
+    /// Returns an error when `value` is empty or whitespace-only, malformed,
+    /// oversized, or contains more than one range address.
     pub fn new(source: impl Into<String>) -> Result<Self> {
         let value = source.into();
+        if value.trim().is_empty() {
+            return Err(invalid("scenario range address must not be empty"));
+        }
+        validate_cell_range_address(&value)?;
         let limits = Limits::default().with_ranges(1);
         preflight_ranges(&value, limits)?;
         let parsed = crate::model::structure::split_cell_range_addresses(&value)
@@ -319,7 +348,7 @@ impl Scenario {
                 maximum: MAX_RANGES,
             });
         }
-        Ok(Self {
+        let scenario = Self {
             sheet,
             ranges,
             state,
@@ -330,7 +359,127 @@ impl Scenario {
             copy_formulas: OptionalSetting::Unspecified,
             comment: None,
             protected: OptionalSetting::Unspecified,
-        })
+        };
+        scenario.validate()?;
+        Ok(scenario)
+    }
+
+    /// Set whether the scenario border is displayed when this metadata is
+    /// interpreted by an ODF consumer.
+    #[must_use]
+    pub const fn with_display_border(mut self, value: OptionalSetting) -> Self {
+        self.display_border = value;
+        self
+    }
+
+    /// Set or clear the optional scenario border color.
+    #[must_use]
+    pub const fn with_border_color(mut self, value: Option<RgbColor>) -> Self {
+        self.border_color = value;
+        self
+    }
+
+    /// Set the optional copy-back setting.
+    #[must_use]
+    pub const fn with_copy_back(mut self, value: OptionalSetting) -> Self {
+        self.copy_back = value;
+        self
+    }
+
+    /// Set the optional copy-styles setting.
+    #[must_use]
+    pub const fn with_copy_styles(mut self, value: OptionalSetting) -> Self {
+        self.copy_styles = value;
+        self
+    }
+
+    /// Set the optional copy-formulas setting.  This only records metadata;
+    /// it never evaluates or copies formulas.
+    #[must_use]
+    pub const fn with_copy_formulas(mut self, value: OptionalSetting) -> Self {
+        self.copy_formulas = value;
+        self
+    }
+
+    /// Set or clear the optional scenario comment.
+    #[must_use]
+    pub fn with_comment(mut self, value: impl Into<String>) -> Self {
+        self.comment = Some(value.into());
+        self
+    }
+
+    /// Clear the optional scenario comment.
+    #[must_use]
+    pub fn without_comment(mut self) -> Self {
+        self.comment = None;
+        self
+    }
+
+    /// Set the optional protection setting.
+    #[must_use]
+    pub const fn with_protected(mut self, value: OptionalSetting) -> Self {
+        self.protected = value;
+        self
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        if self.sheet.is_empty()
+            || self.sheet.len() > MAX_TEXT_BYTES
+            || !xml_text_is_valid(&self.sheet)
+        {
+            return Err(invalid("invalid scenario sheet name"));
+        }
+        if self.ranges.is_empty() {
+            return Err(invalid("scenario range list must not be empty"));
+        }
+        if self.ranges.len() > MAX_RANGES {
+            return Err(Error::ResourceLimit {
+                resource: "ranges",
+                actual: self.ranges.len(),
+                maximum: MAX_RANGES,
+            });
+        }
+        let mut range_bytes = 0usize;
+        for range in &self.ranges {
+            // Re-run the bounded range validation so detached descriptors
+            // cannot smuggle an invalid or over-budget list into a writer.
+            RangeAddress::new(range.as_str())?;
+            range_bytes = range_bytes
+                .checked_add(range.as_str().len())
+                .and_then(|value| value.checked_add(if range_bytes == 0 { 0 } else { 1 }))
+                .ok_or_else(|| invalid("scenario range list size overflows"))?;
+        }
+        if range_bytes > MAX_RANGE_LIST_BYTES {
+            return Err(Error::ResourceLimit {
+                resource: "range-list bytes",
+                actual: range_bytes,
+                maximum: MAX_RANGE_LIST_BYTES,
+            });
+        }
+        if self
+            .comment
+            .as_deref()
+            .is_some_and(|comment| comment.len() > MAX_TEXT_BYTES || !xml_text_is_valid(comment))
+        {
+            return Err(invalid("invalid or oversized scenario comment"));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn aggregate_bytes(&self) -> Result<usize> {
+        let mut total = self.sheet.len();
+        for (index, range) in self.ranges.iter().enumerate() {
+            total = total
+                .checked_add(range.as_str().len())
+                .and_then(|value| value.checked_add(usize::from(index != 0)))
+                .ok_or_else(|| invalid("scenario aggregate size overflows"))?;
+        }
+        if let Some(comment) = self.comment.as_deref() {
+            total = total
+                .checked_add(comment.len())
+                .ok_or_else(|| invalid("scenario aggregate size overflows"))?;
+        }
+        Ok(total)
     }
 
     #[must_use]
@@ -390,10 +539,12 @@ impl Scenario {
 }
 
 /// Immutable source-bound scenario inventory.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Snapshot {
     content: Arc<str>,
     scenarios: Vec<Scenario>,
+    aggregate_bytes: usize,
+    limits: Limits,
 }
 
 impl Snapshot {
@@ -424,9 +575,10 @@ impl Snapshot {
         let mut buffer = Vec::new();
         let mut depth = 0usize;
         let mut spreadsheet_depth = None;
-        let mut sheet: Option<(usize, String, bool)> = None;
+        let mut sheet: Option<(usize, Option<String>, bool)> = None;
         let mut scenario_depth = None;
         let mut scenarios = Vec::new();
+        let mut aggregate_bytes = 0usize;
 
         loop {
             let (namespace, event) = reader
@@ -452,7 +604,7 @@ impl Snapshot {
                     {
                         sheet = Some((
                             depth,
-                            required_attr(&element, &reader, b"name", limits.text_bytes)?,
+                            optional_attr(&element, &reader, b"name", limits.text_bytes)?,
                             false,
                         ));
                     } else if sheet.as_ref().is_some_and(|value| depth == value.0 + 1)
@@ -463,20 +615,25 @@ impl Snapshot {
                             b"scenario",
                         )
                     {
+                        precharge_scenario_slot(&mut scenarios, limits)?;
                         let (sheet_name, seen) = {
                             let Some(current) = sheet.as_mut() else {
                                 return Err(invalid("scenario sheet parser state is missing"));
                             };
-                            (current.1.clone(), &mut current.2)
+                            (
+                                current.1.clone().ok_or_else(|| {
+                                    invalid("table:scenario requires a named worksheet")
+                                })?,
+                                &mut current.2,
+                            )
                         };
                         if *seen {
                             return Err(invalid("a table may contain only one scenario"));
                         }
                         *seen = true;
-                        scenarios.push(parse_scenario(&element, &reader, sheet_name, limits)?);
-                        if scenarios.len() > limits.scenarios {
-                            return Err(invalid("scenario count exceeds its limit"));
-                        }
+                        let parsed = parse_scenario(&element, &reader, sheet_name, limits)?;
+                        aggregate_bytes = add_aggregate_bytes(aggregate_bytes, &parsed, limits)?;
+                        scenarios.push(parsed);
                         scenario_depth = Some(depth);
                     } else if scenario_depth.is_some() {
                         return Err(invalid("table:scenario must not contain child elements"));
@@ -496,20 +653,25 @@ impl Snapshot {
                             b"scenario",
                         )
                     {
+                        precharge_scenario_slot(&mut scenarios, limits)?;
                         let (sheet_name, seen) = {
                             let Some(current) = sheet.as_mut() else {
                                 return Err(invalid("scenario sheet parser state is missing"));
                             };
-                            (current.1.clone(), &mut current.2)
+                            (
+                                current.1.clone().ok_or_else(|| {
+                                    invalid("table:scenario requires a named worksheet")
+                                })?,
+                                &mut current.2,
+                            )
                         };
                         if *seen {
                             return Err(invalid("a table may contain only one scenario"));
                         }
                         *seen = true;
-                        scenarios.push(parse_scenario(&element, &reader, sheet_name, limits)?);
-                        if scenarios.len() > limits.scenarios {
-                            return Err(invalid("scenario count exceeds its limit"));
-                        }
+                        let parsed = parse_scenario(&element, &reader, sheet_name, limits)?;
+                        aggregate_bytes = add_aggregate_bytes(aggregate_bytes, &parsed, limits)?;
+                        scenarios.push(parsed);
                     }
                 },
                 Event::End(element) => {
@@ -574,6 +736,8 @@ impl Snapshot {
         Ok(Self {
             content: Arc::from(content_xml),
             scenarios,
+            aggregate_bytes,
+            limits,
         })
     }
 
@@ -586,6 +750,55 @@ impl Snapshot {
     pub fn scenarios(&self) -> &[Scenario] {
         &self.scenarios
     }
+
+    /// Begin a source-checked, failure-atomic edit of scenario declarations.
+    #[must_use]
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
+    }
+
+    /// Find one scenario by its exact worksheet name.
+    #[must_use]
+    pub fn for_sheet(&self, sheet_name: &str) -> Option<&Scenario> {
+        let mut matches = self
+            .scenarios
+            .iter()
+            .filter(|scenario| scenario.sheet() == sheet_name);
+        let first = matches.next();
+        first.filter(|_| matches.next().is_none())
+    }
+}
+
+fn add_aggregate_bytes(current: usize, scenario: &Scenario, limits: Limits) -> Result<usize> {
+    let next = current
+        .checked_add(scenario.aggregate_bytes()?)
+        .ok_or_else(|| invalid("scenario aggregate size overflows"))?;
+    if next > limits.aggregate_bytes {
+        return Err(Error::ResourceLimit {
+            resource: "aggregate scenario bytes",
+            actual: next,
+            maximum: limits.aggregate_bytes,
+        });
+    }
+    Ok(next)
+}
+
+fn precharge_scenario_slot(scenarios: &mut Vec<Scenario>, limits: Limits) -> Result<()> {
+    let actual = scenarios
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| invalid("scenario count overflows"))?;
+    if actual > limits.scenarios {
+        return Err(Error::ResourceLimit {
+            resource: "scenarios",
+            actual,
+            maximum: limits.scenarios,
+        });
+    }
+    scenarios
+        .try_reserve(1)
+        .map_err(|_| invalid("scenario catalog allocation failed"))?;
+    Ok(())
 }
 
 fn parse_scenario(
@@ -600,6 +813,9 @@ fn parse_scenario(
         .map_err(|error| invalid(format!("invalid scenario range list: {error}")))?;
     if ranges.is_empty() || ranges.len() > limits.ranges {
         return Err(invalid("scenario range list is empty or exceeds its limit"));
+    }
+    for range in &ranges {
+        validate_cell_range_address(range)?;
     }
     let active = parse_bool(&required_attr(
         element,
@@ -618,11 +834,8 @@ fn parse_scenario(
         .as_deref()
         .map(RgbColor::from_hex)
         .transpose()?;
-    let mut scenario = Scenario::new(
-        sheet,
-        ranges.into_iter().map(RangeAddress).collect(),
-        active.into(),
-    )?;
+    let ranges = ranges.into_iter().map(RangeAddress).collect::<Vec<_>>();
+    let mut scenario = Scenario::new(sheet, ranges, active.into())?;
     scenario.display_border = optional_setting(b"display-border")?;
     scenario.border_color = border_color;
     scenario.copy_back = optional_setting(b"copy-back")?;
@@ -679,6 +892,218 @@ fn preflight_ranges(value: &str, limits: Limits) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CellRangeKind {
+    Cell,
+    Column,
+    Row,
+}
+
+/// Validate one ODF `cellRangeAddress` against the three alternatives in the
+/// schema: cell or cell-range, column-range, and row-range.  This is kept
+/// lexical and inert; it does not resolve sheet names or cell bounds.
+fn validate_cell_range_address(value: &str) -> Result<()> {
+    if value.is_empty() || value.trim() != value {
+        return Err(invalid(
+            "scenario range address has invalid surrounding whitespace",
+        ));
+    }
+    let mut cursor = 0usize;
+    parse_sheet_qualifier(value, &mut cursor)?;
+    let kind = parse_first_range_endpoint(value, &mut cursor)?;
+    match kind {
+        CellRangeKind::Cell => {
+            if cursor == value.len() {
+                return Ok(());
+            }
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_cell_endpoint(value, &mut cursor)?;
+        },
+        CellRangeKind::Column => {
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_column_endpoint(value, &mut cursor)?;
+        },
+        CellRangeKind::Row => {
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_row_endpoint(value, &mut cursor)?;
+        },
+    }
+    if cursor != value.len() {
+        return Err(invalid("scenario range address has trailing characters"));
+    }
+    Ok(())
+}
+
+fn parse_sheet_qualifier(value: &str, cursor: &mut usize) -> Result<()> {
+    if char_at(value, *cursor) == Some('.') {
+        *cursor += 1;
+        return Ok(());
+    }
+    // The optional absolute marker is ambiguous with a legal unquoted sheet
+    // name consisting of `$`.  When `$` is immediately followed by the
+    // separator, the grammar must take it as the sheet name instead of
+    // consuming it as the marker.
+    if char_at(value, *cursor) == Some('$') && char_at(value, *cursor + 1) != Some('.') {
+        *cursor += 1;
+    }
+    match char_at(value, *cursor) {
+        Some('\'') => {
+            *cursor += 1;
+            let mut has_content = false;
+            loop {
+                let Some(character) = char_at(value, *cursor) else {
+                    return Err(invalid(
+                        "scenario range address has an unterminated sheet name",
+                    ));
+                };
+                if character != '\'' {
+                    *cursor += character.len_utf8();
+                    has_content = true;
+                    continue;
+                }
+                if char_at(value, *cursor + character.len_utf8()) == Some('\'') {
+                    *cursor += character.len_utf8() * 2;
+                    has_content = true;
+                    continue;
+                }
+                *cursor += character.len_utf8();
+                if !has_content {
+                    return Err(invalid("scenario range address has an empty sheet name"));
+                }
+                break;
+            }
+        },
+        Some(character) if character != ' ' && character != '\'' && character != '.' => {
+            let mut has_content = false;
+            while let Some(character) = char_at(value, *cursor) {
+                if character == '.' {
+                    break;
+                }
+                if character == ' ' || character == '\'' {
+                    return Err(invalid("scenario range address has an invalid sheet name"));
+                }
+                *cursor += character.len_utf8();
+                has_content = true;
+            }
+            if !has_content {
+                return Err(invalid("scenario range address has an empty sheet name"));
+            }
+        },
+        _ => return Err(invalid("scenario range address requires a sheet separator")),
+    }
+    expect_char(value, cursor, '.')
+}
+
+fn parse_first_range_endpoint(value: &str, cursor: &mut usize) -> Result<CellRangeKind> {
+    consume_optional_dollar(value, cursor);
+    match char_at(value, *cursor) {
+        Some(character) if character.is_ascii_uppercase() => {
+            parse_uppercase_run(value, cursor);
+            if char_at(value, *cursor) == Some('$') {
+                *cursor += 1;
+                parse_digits(value, cursor)?;
+                Ok(CellRangeKind::Cell)
+            } else if char_at(value, *cursor).is_some_and(|value| value.is_ascii_digit()) {
+                parse_digits(value, cursor)?;
+                Ok(CellRangeKind::Cell)
+            } else if char_at(value, *cursor) == Some(':') {
+                Ok(CellRangeKind::Row)
+            } else {
+                Err(invalid(
+                    "scenario range address has an invalid cell or row endpoint",
+                ))
+            }
+        },
+        Some(character) if character.is_ascii_digit() => {
+            parse_digits(value, cursor)?;
+            if char_at(value, *cursor) != Some(':') {
+                return Err(invalid(
+                    "scenario range address requires a column range endpoint",
+                ));
+            }
+            Ok(CellRangeKind::Column)
+        },
+        _ => Err(invalid("scenario range address has an invalid endpoint")),
+    }
+}
+
+fn parse_cell_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    if !char_at(value, *cursor).is_some_and(|value| value.is_ascii_uppercase()) {
+        return Err(invalid(
+            "scenario range address requires uppercase cell columns",
+        ));
+    }
+    parse_uppercase_run(value, cursor);
+    consume_optional_dollar(value, cursor);
+    parse_digits(value, cursor)
+}
+
+fn parse_column_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    parse_digits(value, cursor)
+}
+
+fn parse_row_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    if !char_at(value, *cursor).is_some_and(|value| value.is_ascii_uppercase()) {
+        return Err(invalid(
+            "scenario range address requires uppercase row columns",
+        ));
+    }
+    parse_uppercase_run(value, cursor);
+    Ok(())
+}
+
+fn parse_uppercase_run(value: &str, cursor: &mut usize) {
+    while let Some(character) = char_at(value, *cursor) {
+        if !character.is_ascii_uppercase() {
+            break;
+        }
+        *cursor += character.len_utf8();
+    }
+}
+
+fn parse_digits(value: &str, cursor: &mut usize) -> Result<()> {
+    let start = *cursor;
+    while let Some(character) = char_at(value, *cursor) {
+        if !character.is_ascii_digit() {
+            break;
+        }
+        *cursor += character.len_utf8();
+    }
+    if *cursor == start {
+        return Err(invalid(
+            "scenario range address requires decimal row digits",
+        ));
+    }
+    Ok(())
+}
+
+fn consume_optional_dollar(value: &str, cursor: &mut usize) {
+    if char_at(value, *cursor) == Some('$') {
+        *cursor += 1;
+    }
+}
+
+fn expect_char(value: &str, cursor: &mut usize, expected: char) -> Result<()> {
+    if char_at(value, *cursor) == Some(expected) {
+        *cursor += expected.len_utf8();
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "scenario range address expected '{expected}'"
+        )))
+    }
+}
+
+fn char_at(value: &str, cursor: usize) -> Option<char> {
+    value.get(cursor..)?.chars().next()
 }
 
 fn required_attr(

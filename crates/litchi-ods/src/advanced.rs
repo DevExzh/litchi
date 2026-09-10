@@ -1017,6 +1017,10 @@ fn validate_planned_rows(rows: &[PlannedRow]) -> Result<()> {
         name: "litchi-row-plan".to_string(),
         rows: planned_rows,
         style_name: None,
+        template_name: None,
+        style_usage: crate::model::structure::StyleUsage::default(),
+        title: None,
+        description: None,
     };
     crate::worksheet::validation::validate_sheet(&sheet)
 }
@@ -1026,6 +1030,10 @@ fn audit_inserted_row(row: &Row) -> Result<()> {
         name: "litchi-inserted-row".to_string(),
         rows: vec![row.clone()],
         style_name: None,
+        template_name: None,
+        style_usage: crate::model::structure::StyleUsage::default(),
+        title: None,
+        description: None,
     };
     crate::worksheet::validation::validate_sheet(&sheet)?;
     if row.style_name.is_some()

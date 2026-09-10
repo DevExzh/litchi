@@ -1,0 +1,106 @@
+[
+  {
+    "gate": "tests",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-ods-feature-root-v5-20260910-tests.log",
+    "sha256": "e283e052ee7355420aee5dc8636f97c06d359788c3eb7e7c95cb662e2bab641e"
+  },
+  {
+    "gate": "doctests",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--doc"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-ods-feature-root-v5-20260910-doctests.log",
+    "sha256": "389c7abd072fb641e0b084d7744966f7a58ff6a51547eca5e4b1c79846c610ea"
+  },
+  {
+    "gate": "clippy",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-ods",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-ods-feature-root-v5-20260910-clippy.log",
+    "sha256": "24084b7ee87ca48771885d340b5bb986dcf8a2817c5282222d304c055351a571"
+  },
+  {
+    "gate": "rustdoc",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--no-deps"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-ods-feature-root-v5-20260910-rustdoc.log",
+    "sha256": "787756db712ee40898e3d15317c40a2b55403b0df191ea789276e4ef71fa0631"
+  },
+  {
+    "gate": "fmt",
+    "command": [
+      "rustup",
+      "run",
+      "1.95.0",
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-ods/src/advanced.rs",
+      "crates/litchi-ods/src/authoring/builder.rs",
+      "crates/litchi-ods/src/authoring/mutable.rs",
+      "crates/litchi-ods/src/facade/mod.rs",
+      "crates/litchi-ods/src/facade/source.rs",
+      "crates/litchi-ods/src/lib.rs",
+      "crates/litchi-ods/src/model/scenario.rs",
+      "crates/litchi-ods/src/model/scenario/transaction.rs",
+      "crates/litchi-ods/src/package/document.rs",
+      "crates/litchi-ods/src/styles/table_template/codec.rs",
+      "crates/litchi-ods/src/styles/table_template/mod.rs",
+      "crates/litchi-ods/src/styles/table_template/semantic.rs",
+      "crates/litchi-ods/src/styles/table_template/tests.rs",
+      "crates/litchi-ods/src/styles/table_template/transaction.rs",
+      "crates/litchi-ods/src/styles/table_template/validation.rs",
+      "crates/litchi-ods/src/worksheet/codec.rs",
+      "crates/litchi-ods/src/worksheet/model.rs",
+      "crates/litchi-ods/src/worksheet/package.rs",
+      "crates/litchi-ods/src/worksheet/validation.rs",
+      "crates/litchi-ods/tests/ods_metadata_transactions.rs",
+      "crates/litchi-ods/tests/scenario_transactions.rs",
+      "crates/litchi-ods/tests/source_catalog.rs",
+      "crates/litchi-ods/tests/source_features.rs"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-ods-feature-root-v5-20260910-fmt.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

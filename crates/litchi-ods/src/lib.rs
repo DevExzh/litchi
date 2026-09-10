@@ -94,6 +94,7 @@ pub use litchi_odf_common::rdf;
 pub use media::Image;
 pub use model::hyperlink::{Actuate, Link, Show};
 pub use model::names;
+pub use model::source::CellRange;
 pub use model::tracked_changes;
 pub use model::{dde, scenario};
 pub use settings::{Iteration, IterationStatus, NullDate, Settings};

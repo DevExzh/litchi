@@ -263,6 +263,7 @@ impl Package {
     pub(crate) fn replace_metadata_xml(&self, metadata_xml: Option<&str>) -> Result<Self> {
         let bytes = self.rebuild(
             self.content_xml(),
+            Part::Preserve,
             Part::from_option(metadata_xml),
             Part::Preserve,
         )?;
@@ -282,13 +283,26 @@ impl Package {
             return Self::from_bytes(self.inner.as_bytes().to_vec());
         }
         let content_xml = commit.into_owned();
-        let bytes = self.rebuild(&content_xml, Part::Preserve, Part::Preserve)?;
+        let bytes = self.rebuild(&content_xml, Part::Preserve, Part::Preserve, Part::Preserve)?;
+        Self::from_bytes(bytes)
+    }
+
+    /// Replace or remove the document styles part while preserving every
+    /// unrelated package member.
+    pub(crate) fn replace_styles_xml(&self, styles_xml: Option<&str>) -> Result<Self> {
+        let bytes = self.rebuild(
+            self.content_xml(),
+            Part::from_option(styles_xml),
+            Part::Preserve,
+            Part::Preserve,
+        )?;
         Self::from_bytes(bytes)
     }
 
     fn rebuild(
         &self,
         content_xml: &str,
+        styles: Part<'_>,
         metadata: Part<'_>,
         settings: Part<'_>,
     ) -> Result<Vec<u8>> {
@@ -296,9 +310,7 @@ impl Package {
         let mut writer = PackageWriter::new();
         writer.set_mimetype(&source.mimetype()?)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
-        if source.has_file("styles.xml")? {
-            writer.add_file("styles.xml", &source.get_file("styles.xml")?)?;
-        }
+        write_part(&mut writer, source, "styles.xml", styles)?;
         write_part(&mut writer, source, "meta.xml", metadata)?;
         write_part(&mut writer, source, "settings.xml", settings)?;
         writer.copy_auxiliary_files_from_except(

@@ -303,6 +303,48 @@ impl Spreadsheet {
         self.package.styles_xml()
     }
 
+    /// Capture the standalone table-template catalog from styles.xml.
+    ///
+    /// The snapshot retains the exact styles source for no-op, stale-source,
+    /// and inverse transaction checks.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        crate::styles::table_template::Snapshot::from_source(self.package.styles_xml())
+    }
+
+    /// Apply an exact-source table-template patch and rehydrate the facade.
+    pub fn apply_table_template_patch(
+        &mut self,
+        patch: &crate::styles::table_template::Patch,
+    ) -> Result<()> {
+        let snapshot = self.table_templates()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_styles_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Stage a source-checked table-template edit and publish it atomically.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let snapshot = self.table_templates()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_styles_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
     /// Capture document, sheet, and automatic cell-protection metadata in a
     /// source-checked immutable snapshot.
     ///
@@ -406,6 +448,45 @@ impl Spreadsheet {
                 "ODS scenario metadata inspection failed: {error}"
             ))
         })
+    }
+
+    /// Apply an exact-source, inert scenario metadata patch and rehydrate the
+    /// package only after the candidate has passed typed readback.
+    ///
+    /// Scenario declarations are metadata only.  This method never applies a
+    /// what-if scenario, evaluates a formula, or refreshes external data.
+    pub fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
+        let snapshot = self.scenarios()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Stage and publish one failure-atomic scenario metadata edit.
+    ///
+    /// The closure edits typed declarations selected by exact worksheet name
+    /// or source order.  A failed closure, stale source, invalid XML, or typed
+    /// readback leaves this spreadsheet unchanged.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let snapshot = self.scenarios()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
     }
 
     /// Stage, validate, rebuild, and fully rehydrate one inert tracked-change edit.
