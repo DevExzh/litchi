@@ -13508,6 +13508,157 @@ IWA_NUMBERS_CELL_VALUE_READER_LEGACY_METHODS = (
         re.compile(r"\.[ \t\r\n]*cached_scalar[ \t\r\n]*\("),
     ),
 )
+# Table-data-list root/segment selection has one shared topology owner.  The
+# wire module coordinates borrowed message candidates, duplicate roots/segments,
+# key-range admission, and sorted publication.  Format readers retain their
+# decoder calls, aggregate budgets, and typed sidecar converters; those adapter
+# responsibilities are intentionally outside this ratchet.
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/table_data_list.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_LIB_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/lib.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_MODULE_EXPORT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?table_data_list[ \t]*;"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TYPES = (
+    (
+        "Message",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?Message\b"
+        ),
+    ),
+    (
+        "RootOrSegment",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?RootOrSegment\b"
+        ),
+    ),
+    (
+        "KeyRange",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?KeyRange\b"
+        ),
+    ),
+    (
+        "EntryBounds",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?EntryBounds\b"
+        ),
+    ),
+    (
+        "Candidate",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?Candidate\b"
+        ),
+    ),
+    (
+        "CoordinatorIssue",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?CoordinatorIssue\b"
+        ),
+    ),
+    (
+        "ListReadPolicy",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?ListReadPolicy\b"
+        ),
+    ),
+    (
+        "AllocationTarget",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?AllocationTarget\b"
+        ),
+    ),
+    (
+        "OverflowPolicy",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            r"(?:r#)?OverflowPolicy\b"
+        ),
+    ),
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TRAIT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+trait[ \t]+(?:r#)?ListDecoder\b"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_FUNCTION = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+    r"(?:r#)?read_list\b"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_BORROWED_MESSAGE = re.compile(
+    r"(?ms)^[ \t]*pub[ \t]+struct[ \t]+(?:r#)?Message[ \t]*<[^>]*>"
+    r"[^{]*\{[^{}]*pub[ \t]+data[ \t]*:[ \t]*&[ \t]*['\"]?"
+    r"[A-Za-z_][A-Za-z0-9_]*[ \t]*\[[ \t]*u8[ \t]*\]"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_READ_LIST_GENERIC = re.compile(
+    r"(?ms)^[ \t]*pub[ \t]+fn[ \t]+(?:r#)?read_list\b"
+    r".{0,500}\b(?:Root|Segments|Resolve|Decoder)\b"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_IMPORT_STATEMENT = re.compile(
+    r"(?ms)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+    r"(?:use|extern[ \t]+crate)\b.*?;"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:litchi_iwa_protos|prost|buffa|"
+    r"litchi_numbers|litchi_pages|litchi_keynote|litchi_iwa|"
+    r"litchi_iwa_core)(?![A-Za-z0-9_])"
+)
+IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TOPOLOGY_MARKERS = (
+    "TABLE_DATA_LIST_MESSAGE_KIND",
+    "NATIVE_TABLE_DATA_LIST_MESSAGE_KIND",
+    "TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND",
+    "DuplicateRoot",
+    "DuplicateSegmentPayload",
+    "WrongSegmentType",
+    "MissingKeyRange",
+    "KeyRangeOverflow",
+    "EntryOutsideKeyRange",
+    "DuplicateEntryKey",
+    "EntryLimit",
+    "Allocation",
+    "sort_unstable_by_key",
+)
+IWA_NUMBERS_TABLE_DATA_LIST_READER_SOURCES = (
+    IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE,
+    NUMBERS_EXTRACTOR_SOURCE,
+)
+IWA_NUMBERS_TABLE_DATA_LIST_READER_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*"
+    r"table_data_list\b"
+)
+IWA_NUMBERS_TABLE_DATA_LIST_READER_CALL = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:r#)?read_list[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_DATA_LIST_ROOT_TOPOLOGY_FILTER = re.compile(
+    r"\.filter\([ \t\r\n]*\|[ \t\r\n]*message[ \t\r\n]*\|"
+    r"[ \t\r\n]*message[ \t\r\n]*\.[ \t\r\n]*"
+    r"(?:type_|kind)[ \t\r\n]*==[ \t\r\n]*"
+    r"(?:6005|6_005|TABLE_DATA_LIST_MESSAGE_KIND)"
+    r"[ \t\r\n]*\|\|[ \t\r\n]*message[ \t\r\n]*\.[ \t\r\n]*"
+    r"(?:type_|kind)[ \t\r\n]*==[ \t\r\n]*"
+    r"(?:6201|6_201|NATIVE_TABLE_DATA_LIST_MESSAGE_KIND)"
+    r"[ \t\r\n]*\)"
+)
+IWA_NUMBERS_TABLE_DATA_LIST_SEGMENT_TOPOLOGY_FILTER = re.compile(
+    r"\.filter\([ \t\r\n]*\|[ \t\r\n]*message[ \t\r\n]*\|"
+    r"[ \t\r\n]*message[ \t\r\n]*\.[ \t\r\n]*"
+    r"(?:type_|kind)[ \t\r\n]*==[ \t\r\n]*"
+    r"(?:6011|6_011|TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND)"
+    r"[ \t\r\n]*\)"
+)
+IWA_NUMBERS_TABLE_DATA_LIST_SELECTION_STATE = re.compile(
+    r"\b(?:selected_values|selected_keys|segment_count)\b"
+)
 # Wave109 moves the strict FormulaArchive envelope walk and schema validator
 # beside the shared formula event adapter.  It remains a generated-code
 # boundary: ``litchi-numbers-wire`` may inspect the generated-free codec, while
@@ -45599,6 +45750,148 @@ def audit_iwa_numbers_wire_cell_value_ownership(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_wire_table_data_list_ownership(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep table-data-list topology selection in the shared wire owner.
+
+    The low-level coordinator owns only borrowed root/segment message routing,
+    duplicate and key-range checks, bounded merge admission, and final sorted
+    publication.  Readers keep their generated-free decoder, aggregate budget,
+    and sidecar converter hooks.  Missing reader files are accepted so a host
+    can disappear during monolith retirement; a reader that remains must call
+    the shared coordinator and must not restore the old root/segment loops.
+    """
+
+    violations: list[str] = []
+    owner_path = root / IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE
+    lib_path = root / IWA_NUMBERS_WIRE_TABLE_DATA_LIST_LIB_SOURCE
+
+    if not owner_path.is_file():
+        return [
+            "Numbers wire table-data-list coordinator is missing: "
+            f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+        ]
+
+    owner_raw = owner_path.read_text(encoding="utf-8")
+    owner_code = _mask_rust_non_code(_mask_rust_cfg_test_items(owner_raw))
+
+    if not lib_path.is_file():
+        violations.append(
+            "Numbers wire table-data-list coordinator is not exported from the crate: "
+            f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_LIB_SOURCE}"
+        )
+    else:
+        lib_raw = lib_path.read_text(encoding="utf-8")
+        lib_code = _mask_rust_non_code(_mask_rust_cfg_test_items(lib_raw))
+        if IWA_NUMBERS_WIRE_TABLE_DATA_LIST_MODULE_EXPORT.search(lib_code) is None:
+            violations.append(
+                "Numbers wire table-data-list coordinator is missing its public "
+                "module export: "
+                f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_LIB_SOURCE}"
+            )
+
+    for label, declaration in IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TYPES:
+        matches = list(declaration.finditer(owner_code))
+        if not matches:
+            violations.append(
+                "Numbers wire table-data-list coordinator is missing public "
+                f"{label}: {IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+            )
+        elif len(matches) > 1:
+            line_number = owner_code.count("\n", 0, matches[1].start()) + 1
+            violations.append(
+                "Numbers wire table-data-list coordinator redeclares shared "
+                f"{label}: {IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}:{line_number}"
+            )
+
+    if IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TRAIT.search(owner_code) is None:
+        violations.append(
+            "Numbers wire table-data-list coordinator is missing public ListDecoder: "
+            f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_FUNCTION.search(owner_code) is None:
+        violations.append(
+            "Numbers wire table-data-list coordinator is missing public read_list: "
+            f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_TABLE_DATA_LIST_BORROWED_MESSAGE.search(owner_code) is None:
+        violations.append(
+            "Numbers wire table-data-list coordinator must carry borrowed Message "
+            f"payloads: {IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_TABLE_DATA_LIST_READ_LIST_GENERIC.search(owner_code) is None:
+        violations.append(
+            "Numbers wire table-data-list read_list must use generic borrowed "
+            f"adapter hooks: {IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+        )
+
+    for marker in IWA_NUMBERS_WIRE_TABLE_DATA_LIST_REQUIRED_TOPOLOGY_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", owner_code) is None:
+            violations.append(
+                "Numbers wire table-data-list coordinator is missing its "
+                f"{marker} topology route: {IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}"
+            )
+
+    for statement in IWA_NUMBERS_WIRE_TABLE_DATA_LIST_IMPORT_STATEMENT.finditer(
+        owner_code
+    ):
+        forbidden = IWA_NUMBERS_WIRE_TABLE_DATA_LIST_FORBIDDEN_IMPORT.search(
+            statement.group()
+        )
+        if forbidden is None:
+            continue
+        line_number = owner_code.count("\n", 0, statement.start()) + 1
+        violations.append(
+            "Numbers wire table-data-list coordinator imports a concrete "
+            f"format/protobuf/core crate ({forbidden.group()}): "
+            f"{IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE}:{line_number}"
+        )
+
+    for relative in IWA_NUMBERS_TABLE_DATA_LIST_READER_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            # A missing host is the intended monolith-exit state.  Do not make
+            # the coordinator ratchet block deletion of the old reader.
+            continue
+
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+        if IWA_NUMBERS_TABLE_DATA_LIST_READER_IMPORT.search(production_code) is None:
+            violations.append(
+                "Numbers table-data-list reader is missing the shared wire owner "
+                f"import: {relative}"
+            )
+        if IWA_NUMBERS_TABLE_DATA_LIST_READER_CALL.search(production_code) is None:
+            violations.append(
+                "Numbers table-data-list reader is missing the shared read_list "
+                f"call: {relative}"
+            )
+
+        for pattern, label in (
+            (
+                IWA_NUMBERS_TABLE_DATA_LIST_ROOT_TOPOLOGY_FILTER,
+                "root candidate topology filter",
+            ),
+            (
+                IWA_NUMBERS_TABLE_DATA_LIST_SEGMENT_TOPOLOGY_FILTER,
+                "segment payload topology filter",
+            ),
+            (
+                IWA_NUMBERS_TABLE_DATA_LIST_SELECTION_STATE,
+                "root/segment selection state",
+            ),
+        ):
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "Numbers table-data-list reader retains duplicated "
+                    f"{label}: {relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_wire_formula_envelope_ownership(
     root: Path = ROOT,
 ) -> list[str]:
@@ -70378,6 +70671,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
         + audit_iwa_numbers_wire_formula_render_ownership()
         + audit_iwa_numbers_wire_cell_value_ownership()
+        + audit_iwa_numbers_wire_table_data_list_ownership()
         + audit_iwa_numbers_wire_formula_envelope_ownership()
         + audit_iwa_common_formula_render_ownership()
         + audit_iwa_numbers_model_storage_source_topology()

@@ -1,0 +1,37 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "table-data-list-native.numbers",
+  "size": 134196,
+  "sha256": "dfa7d0b71b9e4a521ff9ecadaa3f42021fe68e969c090abac43ae13a2bb2619e",
+  "source": "cell-value-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 10,
+  "columns": 3,
+  "native_display": {
+    "B9": "Text Café, \"北京\"",
+    "C9": "Text Café, \"北京\"",
+    "B10": "43.5",
+    "C10": "Formula error: Numbers cannot divide by zero"
+  },
+  "formulas": {
+    "B6": "=B2+1",
+    "B7": "=1/0",
+    "B10": "=B2+1",
+    "C10": "=1/0"
+  },
+  "comments": {
+    "B6": "Shared cell value control — 北京",
+    "B10": "Sidecar value control — Café 北京"
+  },
+  "lifecycle": [
+    "Copied the native cell-value control into a disposable directory.",
+    "Extended the table to ten rows through Numbers UI with repeated text and formula controls.",
+    "Added a separate comment to B10, saved, and closed the document.",
+    "Reopened the exact saved path and verified all ten rows through accessibility and both comment texts visually.",
+    "Closed the verified document."
+  ],
+  "scope": "Native repeated sidecar-backed value and comment readback control. The small document does not establish segmented storage; handwritten wire tests cover segmented topology and malformed lists."
+}

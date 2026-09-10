@@ -11481,3 +11481,31 @@ matrices cover actual date and duration scalar encodings.
 Validation includes 101 focused extractor tests, 43 host extractor tests
 plus the new native parity control, eight shared wire matrix tests, 1,051
 boundary regressions, and 1,000 AddressSanitizer fuzz runs.
+
+## 2026-09-10 Shared table-data-list coordination
+
+Both the focused Numbers extractor and migration host now delegate list-root
+selection, segment traversal, range checks, cross-segment key merging, and
+sorted publication to `litchi-numbers-wire::table_data_list`. Owner callbacks
+retain strict Buffa-backed envelope decoding, typed value conversion, and
+resource charging. Message iterators borrow archive storage without copying
+raw objects into the shared layer.
+
+Wrong-type and duplicate payloads remain fully validated but do not admit
+sidecar values. Structural errors retain precedence over deferred semantic
+errors, while a later wire failure still aborts the read. The host's immediate
+key-range overflow and focused Numbers' deferred overflow remain explicit
+policies; this extraction does not silently unify their budget contracts.
+
+The native `table-data-list-native.numbers` control was extended, saved,
+closed, and reopened in Numbers 14.4. It retains repeated Unicode text,
+repeated formula and formula-error controls, and two independent comments.
+The adjacent receipt records the verified contents; the small native control
+does not establish segmented storage. Handwritten wire fixtures exercise
+segmented topology and malformed candidates. The native parity regression
+compares every host/focused cell, both comments, and exact focused write bytes.
+The focused extractor suite passes 101 tests and the host suite passes 45.
+
+The remaining Pages and Keynote full-table host callers still require focused
+value and comment readers. This change removes duplicated list coordination,
+not the remaining host package traversal or mutation paths.

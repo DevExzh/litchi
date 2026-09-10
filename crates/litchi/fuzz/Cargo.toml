@@ -411,6 +411,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "table_data_list"
+path = "fuzz_targets/table_data_list.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }
