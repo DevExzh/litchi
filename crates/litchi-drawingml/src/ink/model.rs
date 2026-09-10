@@ -10,7 +10,7 @@ use super::{
 };
 
 /// A source byte span into an Ink document source buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[must_use]
 pub struct SourceSpan {
     start: usize,
@@ -18,7 +18,12 @@ pub struct SourceSpan {
 }
 
 impl SourceSpan {
-    pub(crate) const fn new(start: usize, end: usize) -> Self {
+    /// Construct an unchecked half-open source span.
+    ///
+    /// A source-backed reader validates the span before exposing it. Callers
+    /// that select semantic projections must use spans from the same source;
+    /// unmatched selections are rejected by the filtered readers.
+    pub const fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
     /// Start offset, inclusive.

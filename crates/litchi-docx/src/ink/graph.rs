@@ -660,7 +660,14 @@ fn validate_target_payload(content_type: &str, payload: &[u8]) -> Result<()> {
                 "selected XML resource is not a namespace-bound InkML part",
             ));
         }
-        let _ = shared::read_metadata(payload)?;
+        let projection = super::package::validate_content_part(payload)?;
+        let _ = shared::read_metadata_with_source_spans(
+            payload,
+            projection.contexts(),
+            projection.traces(),
+            projection.brush_properties(),
+            projection.links(),
+        )?;
     }
     Ok(())
 }

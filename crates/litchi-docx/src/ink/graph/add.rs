@@ -490,7 +490,15 @@ fn validate_new_target(input: &NewTarget) -> Result<()> {
                     "new Ink target is not a namespace-bound InkML part",
                 ));
             }
-            let _ = shared::read_metadata(input.payload.as_slice())?;
+            let projection =
+                super::super::package::validate_content_part(input.payload.as_slice())?;
+            let _ = shared::read_metadata_with_source_spans(
+                input.payload.as_slice(),
+                projection.contexts(),
+                projection.traces(),
+                projection.brush_properties(),
+                projection.links(),
+            )?;
         },
         NewTargetKind::Image { content_type } => {
             if content_type.len() > 4096
@@ -691,8 +699,7 @@ mod tests {
     use litchi_opc::PackageWriter;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
-    const INK: &[u8] =
-        br#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:trace>1 2 3</i:trace></i:ink>"#;
+    const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:ink>"##;
 
     fn package() -> OpcPackage {
         let mut package = OpcPackage::new();

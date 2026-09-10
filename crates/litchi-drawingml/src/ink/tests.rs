@@ -1,6 +1,7 @@
 use super::{
     BrushPropertyName, ContextKind, InkEffect, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
-    MAX_SOURCE_BYTES, SemanticType, actions, read, read_metadata, read_shared, write,
+    MAX_SOURCE_BYTES, SemanticType, SourceSpan, actions, read, read_metadata,
+    read_metadata_with_source_spans, read_shared, write,
 };
 use std::sync::Arc;
 
@@ -77,6 +78,41 @@ fn metadata_matches_shared_document_and_clones_share_storage() {
     assert_eq!(
         metadata.brush_properties().as_ptr(),
         clone.brush_properties().as_ptr()
+    );
+}
+
+#[test]
+fn filtered_metadata_requires_exact_source_spans() {
+    let document = read(INK).expect("InkML fixture must parse");
+    let context = document.contexts()[0].source_span();
+    let trace = document.traces()[0].source_span();
+    let property = document.brush_properties()[0].source_span();
+    let metadata = read_metadata_with_source_spans(INK, &[context], &[trace], &[property], &[])
+        .expect("exact semantic spans must be accepted");
+    assert_eq!(metadata.context_count(), 1);
+    assert_eq!(metadata.trace_count(), 1);
+    assert_eq!(metadata.brush_property_count(), 1);
+
+    assert!(
+        read_metadata_with_source_spans(
+            INK,
+            &[SourceSpan::new(context.start(), context.end() + 1)],
+            &[],
+            &[],
+            &[],
+        )
+        .is_err()
+    );
+    assert!(read_metadata_with_source_spans(INK, &[context, context], &[], &[], &[]).is_err());
+    assert!(
+        read_metadata_with_source_spans(
+            INK,
+            &[SourceSpan::new(INK.len() + 1, INK.len() + 1)],
+            &[],
+            &[],
+            &[],
+        )
+        .is_err()
     );
 }
 

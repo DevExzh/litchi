@@ -1,0 +1,40 @@
+{
+  "base_commit": "6da91778c4003b6c9819e5c25168cfe9a847359e",
+  "source_manifest_sha256": "53dc72db0a6d735ecfb78629036b313f3be25b591fad3144e86cb97fb3062812",
+  "root_gates_sha256": "5d14a81aadc985e7bac3ecd9c6aad8454f8abc47d08d4dd4f89e0442736261d1",
+  "actual_root_commands": [
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-docx-ink-root-target-195 CARGO_BUILD_JOBS=4 cargo +1.95.0 test -p litchi-docx -p litchi-drawingml --all-features --no-fail-fast",
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-docx-ink-root-target-195 CARGO_BUILD_JOBS=4 cargo +1.95.0 clippy -p litchi-docx -p litchi-drawingml --all-targets --all-features -- -D warnings",
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-docx-ink-root-target-195 CARGO_BUILD_JOBS=4 RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-docx -p litchi-drawingml --all-features --no-deps"
+  ],
+  "invocation_note": "No --locked or --offline flags passed. The source-manifest validation section describes coder gates; root commands above describe these retained root logs.",
+  "cargo_lock_sha256": "37718061c1a24826a91b5904c2a1f7b30593037d243f3fba5b4af814e7b3a40f",
+  "logs": {
+    "tests": {
+      "file": "tests.log.gz",
+      "raw_sha256": "1e205bffd1158d2416817e11997e1305a719fa5044118f99eeae494dfac3042b",
+      "sha256": "60c6eda34557d0749cec64211eb0b54e4e51338a9634a60084c241b4e43f04e0",
+      "exit_code": 0
+    },
+    "clippy": {
+      "file": "clippy.log.gz",
+      "raw_sha256": "6f0a6b431141af3d97a35e545ed976416f6f72710801ab02765e2c09d71a17b9",
+      "sha256": "6d15e1d2252274c16a3b8347e1216d7eb387beeefdd5a66fe8e6bb89ca74fbaf",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "file": "rustdoc.log.gz",
+      "raw_sha256": "ce30efd716438251dd195bb5dc3e47a59d1142811a43f4946a98266313231768",
+      "sha256": "1c0783ace1e20d9d3ef289e349285d5eb71a5db3c18efa671c262eaad5885f51",
+      "exit_code": 0
+    }
+  },
+  "tests": {
+    "unit_integration_passed": 1666,
+    "unit_integration_ignored": 1,
+    "doctests_passed": 77,
+    "doctests_ignored": 31
+  },
+  "format_diff_source_hashes": "passed",
+  "review": "independent crypto_profile_fix clear for projection/reference-closure scope"
+}
