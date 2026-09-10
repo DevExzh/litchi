@@ -1628,9 +1628,25 @@ trait Sink {
     fn raw(&mut self, bytes: &[u8]) -> Result<()>;
 
     fn escaped(&mut self, value: &str, attribute: bool) -> Result<()> {
+        self.escaped_with_options(value, attribute, false)
+    }
+
+    fn escaped_preserving_xml_whitespace(&mut self, value: &str) -> Result<()> {
+        self.escaped_with_options(value, true, true)
+    }
+
+    fn escaped_with_options(
+        &mut self,
+        value: &str,
+        attribute: bool,
+        preserve_xml_whitespace: bool,
+    ) -> Result<()> {
         let mut segment = 0usize;
         for (index, character) in value.char_indices() {
             let replacement = match character {
+                '\t' if preserve_xml_whitespace => Some(b"&#x9;".as_slice()),
+                '\n' if preserve_xml_whitespace => Some(b"&#xA;".as_slice()),
+                '\r' if preserve_xml_whitespace => Some(b"&#xD;".as_slice()),
                 '&' => Some(b"&amp;".as_slice()),
                 '<' => Some(b"&lt;".as_slice()),
                 '>' => Some(b"&gt;".as_slice()),
@@ -1648,10 +1664,27 @@ trait Sink {
     }
 
     fn attr(&mut self, name: &str, value: &str) -> Result<()> {
+        self.attr_with_options(name, value, false)
+    }
+
+    fn attr_preserving_xml_whitespace(&mut self, name: &str, value: &str) -> Result<()> {
+        self.attr_with_options(name, value, true)
+    }
+
+    fn attr_with_options(
+        &mut self,
+        name: &str,
+        value: &str,
+        preserve_xml_whitespace: bool,
+    ) -> Result<()> {
         self.raw(b" ")?;
         self.raw(name.as_bytes())?;
         self.raw(b"=\"")?;
-        self.escaped(value, true)?;
+        if preserve_xml_whitespace {
+            self.escaped_preserving_xml_whitespace(value)?;
+        } else {
+            self.escaped(value, true)?;
+        }
         self.raw(b"\"")
     }
 }
@@ -1757,11 +1790,22 @@ fn emit_document<S: Sink>(
             sink.attr("xml:id", &brush.id)?;
             sink.raw(b">")?;
             for property in &brush.properties {
+                let preserve_custom_lexicals =
+                    matches!(property.name(), BrushPropertyName::Custom(_));
                 sink.raw(b"<inkml:brushProperty")?;
-                sink.attr("name", property.name.as_str())?;
-                sink.attr("value", &property.value)?;
+                if preserve_custom_lexicals {
+                    sink.attr_preserving_xml_whitespace("name", property.name.as_str())?;
+                    sink.attr_preserving_xml_whitespace("value", &property.value)?;
+                } else {
+                    sink.attr("name", property.name.as_str())?;
+                    sink.attr("value", &property.value)?;
+                }
                 if let Some(units) = property.units.as_deref() {
-                    sink.attr("units", units)?;
+                    if preserve_custom_lexicals {
+                        sink.attr_preserving_xml_whitespace("units", units)?;
+                    } else {
+                        sink.attr("units", units)?;
+                    }
                 }
                 sink.raw(b"/>")?;
             }
@@ -2787,6 +2831,54 @@ mod tests {
                 .any(|window| { window == b"&amp;" })
         );
         assert!(Prepared::from_bytes_with_limits(prepared.as_bytes(), limits).is_ok());
+    }
+
+    #[test]
+    fn custom_brush_property_xml_escaping_preserves_attribute_whitespace() {
+        let name = "future\tname\r";
+        let value = "\tcustom\r\nvalue";
+        let units = "u\nit\t";
+        let brush = BrushDraft::new("customWhitespace")
+            .expect("brush")
+            .property(
+                BrushPropertyDraft::new(BrushPropertyName::Custom(name.into()), value)
+                    .expect("custom property")
+                    .with_units(units)
+                    .expect("custom units"),
+            )
+            .expect("property");
+        let prepared = Draft::default()
+            .brush(brush)
+            .expect("brush")
+            .finish()
+            .expect("custom XML whitespace is escaped as character references");
+        let document = prepared.readback().expect("prepared readback");
+        let property = &document.brush_properties()[0];
+
+        assert_eq!(property.name().as_str(), name);
+        assert_eq!(property.value(), value);
+        assert_eq!(property.units(), Some(units));
+        assert!(
+            prepared
+                .as_bytes()
+                .windows(b"&#x9;".len())
+                .any(|window| window == b"&#x9;")
+        );
+        assert!(
+            prepared
+                .as_bytes()
+                .windows(b"&#xA;".len())
+                .any(|window| window == b"&#xA;")
+        );
+        assert!(
+            prepared
+                .as_bytes()
+                .windows(b"&#xD;".len())
+                .any(|window| window == b"&#xD;")
+        );
+
+        let imported = Prepared::from_bytes(prepared.as_bytes()).expect("custom readback import");
+        assert_eq!(imported.as_bytes(), prepared.as_bytes());
     }
 
     #[test]
