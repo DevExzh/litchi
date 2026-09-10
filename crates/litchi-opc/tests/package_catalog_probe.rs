@@ -14,6 +14,7 @@ use litchi_opc::{
     probe_package_catalog_from_reader, probe_package_catalog_from_reader_with_limits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
+use soapberry_zip::{ZipArchive, ZipArchiveWriter};
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -235,6 +236,99 @@ fn expected_types() -> Vec<String> {
     ];
     types.sort_unstable();
     types
+}
+
+fn directory_entry_fixture() -> Vec<u8> {
+    let content_types = format!(
+        r#"<Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="{DOCUMENT_CONTENT_TYPE}"/><Override PartName="/custom/data.bin" ContentType="{DATA_CONTENT_TYPE}"/></Types>"#
+    );
+    let package_relationships = format!(
+        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
+    );
+    let document_relationships =
+        format!(r#"<Relationships xmlns="{RELATIONSHIPS_NS}"></Relationships>"#);
+    let mut output = Cursor::new(Vec::new());
+    let mut writer = ZipArchiveWriter::new(&mut output);
+    writer.new_dir("unused/").create().unwrap();
+    writer
+        .write_stored_file("[Content_Types].xml", content_types.as_bytes())
+        .unwrap();
+    writer
+        .write_stored_file("_rels/.rels", package_relationships.as_bytes())
+        .unwrap();
+    writer
+        .write_stored_file(
+            "word/_rels/document.xml.rels",
+            document_relationships.as_bytes(),
+        )
+        .unwrap();
+    writer
+        .write_stored_file("word/document.xml", b"<document/>")
+        .unwrap();
+    writer
+        .write_stored_file("custom/data.bin", b"data")
+        .unwrap();
+    writer.finish().unwrap();
+    let bytes = output.into_inner();
+    assert_eq!(ZipArchive::from_slice(&bytes).unwrap().entries_hint(), 6);
+    bytes
+}
+
+fn directory_entry_limits(maximum: usize) -> ReadLimits {
+    ReadLimits::builder()
+        .max_archive_members(5)
+        .unwrap()
+        .max_parts(5)
+        .unwrap()
+        .max_relationship_parts(5)
+        .unwrap()
+        .max_archive_total_entries(maximum)
+        .unwrap()
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
+    let bytes = directory_entry_fixture();
+    let exact = directory_entry_limits(6);
+    assert!(SourceBackedPackage::from_vec_with_limits(bytes.clone(), exact).is_ok());
+    assert!(OpcPackage::from_bytes_with_limits(&bytes, exact).is_ok());
+    let mut exact_reader = Cursor::new(bytes.clone());
+    assert!(
+        probe_package_catalog_from_reader_with_limits(&mut exact_reader, exact).is_ok(),
+        "metadata probe must admit the exact physical entry ceiling"
+    );
+
+    let under = directory_entry_limits(5);
+    let source = SourceBackedPackage::from_vec_with_limits(bytes.clone(), under);
+    assert!(matches!(
+        source,
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::ArchiveTotalEntries,
+            actual: 6,
+            maximum: 5,
+        })
+    ));
+    let eager = OpcPackage::from_bytes_with_limits(&bytes, under);
+    assert!(matches!(
+        eager,
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::ArchiveTotalEntries,
+            actual: 6,
+            maximum: 5,
+        })
+    ));
+    let mut reader = Cursor::new(bytes);
+    let probe = probe_package_catalog_from_reader_with_limits(&mut reader, under);
+    assert!(matches!(
+        probe,
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::ArchiveTotalEntries,
+            actual: 6,
+            maximum: 5,
+        })
+    ));
 }
 
 #[test]

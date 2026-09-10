@@ -16,7 +16,7 @@ use crate::part::PartFactory;
 use crate::phys_pkg::read_limited;
 use crate::pkgreader::{
     PackageReader, SerializedRelationship, SourceCatalog, ValidationCatalogError,
-    ValidationCatalogPhase, is_xml_id,
+    ValidationCatalogPhase, indexed_archive_with_limits, is_xml_id,
 };
 use crate::rel::{Relationships, TargetMode};
 use crate::xml_splice::SourceXmlPart;
@@ -5185,16 +5185,15 @@ impl SourceBackedPackage {
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
-        let archive = match IndexedArchive::from_reader_with_limits(
+        let archive = match indexed_archive_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
             },
             length,
-            limits.zip_limits(),
+            limits,
         ) {
             Ok(archive) => archive,
-            Err(error) => {
-                let mapped = map_preservation_error(error);
+            Err(mapped) => {
                 if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
                     return Err(phase(ValidationCatalogPhase::Ingress, mapped));
                 }
@@ -5475,16 +5474,15 @@ impl SourceBackedPackage {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
-        let archive = match IndexedArchive::from_reader_with_limits(
+        let archive = match indexed_archive_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
             },
             length,
-            limits.zip_limits(),
+            limits,
         ) {
             Ok(archive) => archive,
-            Err(error) => {
-                let mapped = map_preservation_error(error);
+            Err(mapped) => {
                 if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
                     return Err(mapped);
                 }
