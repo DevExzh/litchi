@@ -1,5 +1,12 @@
 //! Focused regression tests for the worksheet codec seams.
 
+use std::mem::size_of;
+
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::reader::NsReader;
+
+use super::wire::{cell_tag, tag as owned_tag, write_cell_tag};
 use super::{Attribute, Tag, scan, scan_with_event_limit, sibling_name, write_tag};
 use crate::raw::worksheet::model::MAX_XML_DEPTH;
 
@@ -127,4 +134,241 @@ fn snapshot_scan_rejects_flat_event_stream_over_event_limit() {
         error.to_string(),
         "invalid XLSX structure: worksheet XML exceeds event limit"
     );
+}
+
+fn start_element(xml: &[u8]) -> (BytesStart<'static>, Decoder) {
+    let mut reader = NsReader::from_reader(xml);
+    let event = reader.read_event().expect("cell start event");
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element.into_owned(),
+        other => panic!("expected a cell start event, got {other:?}"),
+    };
+    (element, reader.decoder())
+}
+
+fn serialize_cell_tag(xml: &[u8], expected_reference: &str) -> (Option<Tag>, Vec<u8>, Vec<u8>) {
+    let (old_element, old_decoder) = start_element(xml);
+    let old = owned_tag(&old_element, old_decoder).expect("owned cell tag");
+    let mut old_output = Vec::new();
+    write_tag(
+        &mut old_output,
+        &old,
+        true,
+        &["r"],
+        &[("r", expected_reference.to_owned())],
+    );
+
+    let (new_element, new_decoder) = start_element(xml);
+    let compact = cell_tag(&new_element, new_decoder).expect("compact cell tag");
+    let mut new_output = Vec::new();
+    match compact.as_ref() {
+        Some(tag) => write_tag(
+            &mut new_output,
+            tag,
+            true,
+            &["r"],
+            &[("r", expected_reference.to_owned())],
+        ),
+        None => write_cell_tag(
+            &mut new_output,
+            true,
+            &[("r", expected_reference.to_owned())],
+        ),
+    }
+    (compact, old_output, new_output)
+}
+
+#[test]
+fn compact_cell_tag_uses_the_niche_without_growing_the_owned_tag() {
+    assert!(size_of::<Option<Tag>>() <= size_of::<Tag>());
+}
+
+#[test]
+fn compact_cell_tag_matches_owned_serialization_for_plain_cells() {
+    let cases = [
+        (br#"<c/>"#.as_slice(), false),
+        (br#"<c r="A1"/>"#.as_slice(), false),
+        (br#"<c r="A&#x31;"/>"#.as_slice(), false),
+        (br#"<c r=" A1 "/>"#.as_slice(), false),
+        (br#"<c r="A1" s="7"/>"#.as_slice(), true),
+        (br#"<c s="7" r="A1"/>"#.as_slice(), true),
+        (br#"<c cm="1" vm="2" t="inlineStr"/>"#.as_slice(), true),
+        (br#"<c r="A1" future="a&amp;b"/>"#.as_slice(), true),
+        (br#"<x:c r="A1"/>"#.as_slice(), true),
+        (
+            br#"<c xmlns:x="urn:future" x:opaque="yes" r="A1"/>"#.as_slice(),
+            true,
+        ),
+    ];
+
+    for (xml, retains_tag) in cases {
+        let (compact, old_output, new_output) = serialize_cell_tag(xml, "A1");
+        assert_eq!(
+            compact.is_some(),
+            retains_tag,
+            "unexpected tag retention for {xml:?}"
+        );
+        assert_eq!(new_output, old_output, "serialization changed for {xml:?}");
+    }
+}
+
+#[test]
+fn compact_cell_writer_matches_empty_style_and_clear_start_shapes() {
+    let cases = [
+        (br#"<c/>"#.as_slice(), true, vec![("r", "A1")]),
+        (
+            br#"<c r="A1"/>"#.as_slice(),
+            true,
+            vec![("r", "A1"), ("s", "7")],
+        ),
+        (
+            br#"<c r="A1"/>"#.as_slice(),
+            true,
+            vec![("r", "A1"), ("t", "inlineStr")],
+        ),
+        (br#"<c r="A1">"#.as_slice(), false, vec![("r", "A1")]),
+        (
+            br#"<c r="A1">"#.as_slice(),
+            false,
+            vec![("r", "A1"), ("t", "inlineStr"), ("future", "A&B")],
+        ),
+    ];
+    for (xml, empty, attributes) in cases {
+        let (element, decoder) = start_element(xml);
+        let old = owned_tag(&element, decoder).expect("owned cell tag");
+        let appended = attributes
+            .into_iter()
+            .map(|(name, value)| (name, value.to_owned()))
+            .collect::<Vec<_>>();
+        let mut expected = Vec::new();
+        write_tag(
+            &mut expected,
+            &old,
+            empty,
+            &["r", "s", "t", "future"],
+            &appended,
+        );
+        let mut output = Vec::new();
+        write_cell_tag(&mut output, empty, &appended);
+        assert_eq!(output, expected, "compact writer changed {xml:?}");
+    }
+}
+
+#[test]
+fn snapshot_scan_marks_only_plain_cells_as_tagless() {
+    let source = format!(
+        r#"<worksheet xmlns="{MAIN}" xmlns:x="{MAIN}" xmlns:future="urn:future"><sheetData><row r="1"><c/><c r="B1"/><c r="C1" s="7" cm="1" vm="2" future:opaque="yes"/><x:c r="D1"/><c r="E1" xmlns:future="urn:future" future:opaque="yes"/></row></sheetData></worksheet>"#
+    );
+    let layout = scan(source.as_bytes()).expect("worksheet scan");
+    let cells = &layout.sheet_data.rows[0].cells;
+    assert_eq!(cells.len(), 5);
+    assert!(cells[0].tag.is_none());
+    assert!(cells[1].tag.is_none());
+    assert!(cells[2].tag.is_some());
+    assert!(cells[3].tag.is_some());
+    assert!(cells[4].tag.is_some());
+}
+
+#[test]
+fn snapshot_scan_reports_cell_address_errors_before_compact_tag_errors() {
+    let duplicate_reference = format!(
+        r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A1" r="B1" future="&missing;"/></row></sheetData></worksheet>"#
+    );
+    let error = scan(duplicate_reference.as_bytes())
+        .expect_err("duplicate cell references should be rejected")
+        .to_string();
+    assert!(
+        error.contains("duplicated attribute"),
+        "unexpected error: {error}"
+    );
+
+    let mismatched_row = format!(
+        r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A2" future="&missing;"/></row></sheetData></worksheet>"#
+    );
+    let error = scan(mismatched_row.as_bytes())
+        .expect_err("cell address must match its row")
+        .to_string();
+    assert!(
+        error.contains("does not belong to row 1"),
+        "unexpected error: {error}"
+    );
+
+    let malformed_reference = format!(
+        r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="&missing;" future="&later;" future="two"/></row></sheetData></worksheet>"#
+    );
+    let error = scan(malformed_reference.as_bytes())
+        .expect_err("malformed cell reference should be rejected")
+        .to_string();
+    assert!(error.contains("missing"), "unexpected error: {error}");
+    assert!(
+        !error.contains("duplicate XML attribute"),
+        "unexpected later error: {error}"
+    );
+}
+
+fn assert_tag_results_match(xml: &[u8]) {
+    let (old_element, old_decoder) = start_element(xml);
+    let old_result = owned_tag(&old_element, old_decoder);
+    let (new_element, new_decoder) = start_element(xml);
+    let new_result = cell_tag(&new_element, new_decoder);
+    match (old_result, new_result) {
+        (Ok(old), Ok(Some(new))) => {
+            assert_eq!(format!("{old:?}"), format!("{new:?}"));
+        },
+        (Err(old_error), Err(new_error)) => {
+            assert_eq!(
+                format!("{old_error:?}"),
+                format!("{new_error:?}"),
+                "debug error changed for {xml:?}"
+            );
+            assert_eq!(
+                old_error.to_string(),
+                new_error.to_string(),
+                "display error changed for {xml:?}"
+            );
+        },
+        (old, new) => panic!("owned and compact results diverged for {xml:?}: {old:?} vs {new:?}"),
+    }
+}
+
+fn assert_tag_errors_match(xml: &[u8]) {
+    let (old_element, old_decoder) = start_element(xml);
+    let old_error = owned_tag(&old_element, old_decoder).expect_err("owned tag should fail");
+    let (new_element, new_decoder) = start_element(xml);
+    let new_error = cell_tag(&new_element, new_decoder).expect_err("compact tag should fail");
+    assert_eq!(
+        format!("{old_error:?}"),
+        format!("{new_error:?}"),
+        "debug error changed for {xml:?}"
+    );
+    assert_eq!(
+        old_error.to_string(),
+        new_error.to_string(),
+        "display error changed for {xml:?}"
+    );
+}
+
+#[test]
+fn compact_cell_tag_keeps_attribute_error_order_and_messages() {
+    let duplicate_cases: &[&[u8]] = &[
+        br#"<c future="one" future="two" r="A1"/>"#,
+        br#"<c r="A1" future="one" future="two"/>"#,
+        br#"<c r="A1" r="A2"/>"#,
+    ];
+    for xml in duplicate_cases {
+        assert_tag_errors_match(xml);
+    }
+
+    let malformed_cases: &[&[u8]] = &[
+        b"<c \xff=\"value\"/>",
+        b"<c r=\"\xff\"/>",
+        br#"<c future="&missing;" later="value"/>"#,
+        br#"<c r="A1" future="&missing;" later="value"/>"#,
+        br#"<c future="&missing;" future="two"/>"#,
+        br#"<c future="one" future="&missing;"/>"#,
+        br#"<c r="A1" future="&missing;" future="two"/>"#,
+    ];
+    for xml in malformed_cases {
+        assert_tag_results_match(xml);
+    }
 }
