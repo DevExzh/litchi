@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "59f2c8430a6eb19a7f17b33ac5a3582cec9a8028bdef25b12968f72ea0447949",
+  "archive_bytes": 94493,
+  "regular_files": 71,
+  "fresh_standalone_verifier": {
+    "binary_rerun_supported": false,
+    "candidate_allocated_bytes_p50": 334455230,
+    "candidate_allocation_calls_p50": 6993923,
+    "control_allocated_bytes_p50": 308232531,
+    "control_allocation_calls_p50": 3187631,
+    "normal_candidate_p50_ns": 466103976.0,
+    "normal_control_p50_ns": 339308559.5,
+    "reports": 8,
+    "status": "passed",
+    "workload_started": false
+  },
+  "checksum_validation": "passed after fresh verifier",
+  "extraction": "safe member paths and regular files/directories only; original non-special permission bits restored for source-mode checks",
+  "extraction_removed": true
+}
