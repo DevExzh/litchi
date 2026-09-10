@@ -18,7 +18,8 @@ use thiserror::Error as ThisError;
 use crate::{Error, Result};
 
 use super::model::{
-    Bounds, Common, Kind, PlaceholderRecord, Record, Shape, Shapes, Span, TextSpan,
+    Bounds, Common, Kind, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderRecord,
+    PlaceholderTypeExtension, Record, Shape, Shapes, Span, TextSpan,
 };
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -27,6 +28,7 @@ const DIAGRAM: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/diagra
 const STRICT_DIAGRAM: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/diagram";
 const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
+const P232: &str = "http://schemas.microsoft.com/office/powerpoint/2023/02/main";
 
 const TABLE: u8 = 1;
 const CHART: u8 = 1 << 1;
@@ -205,6 +207,7 @@ impl<'a> Scene<'a> {
         let mut capabilities = Capabilities::ooxml_baseline();
         capabilities.understand_namespace(P14);
         capabilities.understand_namespace(P15);
+        capabilities.understand_namespace(P232);
         let mce_limits = litchi_ooxml_common::mce::Limits {
             max_input_bytes: limits.input_bytes,
             max_output_bytes: limits.output_bytes,
@@ -388,6 +391,22 @@ struct Active {
     text_depth: Option<usize>,
     text: Option<String>,
     seen_paragraph: bool,
+    placeholder_depth: Option<usize>,
+    placeholder_ext_lst_depth: Option<usize>,
+    placeholder_ext_depth: Option<usize>,
+    placeholder_type_ext_depth: Option<usize>,
+    placeholder_type_depth: Option<usize>,
+    placeholder_variant_depth: Option<usize>,
+    seen_placeholder_ext_lst: bool,
+    placeholder_ext_child_count: u8,
+    placeholder_ext_has_other_child: bool,
+    placeholder_ext_has_forbidden_attribute: bool,
+    placeholder_ext_has_typed_child: bool,
+    placeholder_ext_uri: Option<String>,
+    seen_placeholder_type_ext: bool,
+    seen_placeholder_type: bool,
+    seen_placeholder_variant: bool,
+    placeholder_type_extension: Option<PlaceholderTypeExtension>,
 }
 
 struct Scanner<'a> {
@@ -399,6 +418,7 @@ struct Scanner<'a> {
     retained_text: usize,
     depth: usize,
     nodes: usize,
+    pml_nv_pr_stack: Vec<bool>,
     common_slide_depth: Option<usize>,
     tree_depth: Option<usize>,
     seen_tree: bool,
@@ -415,6 +435,7 @@ impl<'a> Scanner<'a> {
             retained_text: 0,
             depth: 0,
             nodes: 0,
+            pml_nv_pr_stack: Vec::new(),
             common_slide_depth: None,
             tree_depth: None,
             seen_tree: false,
@@ -434,31 +455,38 @@ impl<'a> Scanner<'a> {
                 Event::Start(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
+                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
                     self.start_element(
                         &namespace,
                         &element,
                         decoder,
                         start,
                         event_depth,
+                        parent_is_nv_pr,
                         false,
                         end,
                     )?;
+                    self.pml_nv_pr_stack
+                        .push(is_pml(&namespace, element.name(), b"nvPr"));
                     self.depth = event_depth;
                 },
                 Event::Empty(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
+                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
                     self.start_element(
                         &namespace,
                         &element,
                         decoder,
                         start,
                         event_depth,
+                        parent_is_nv_pr,
                         true,
                         end,
                     )?;
                 },
                 Event::Text(text) => {
+                    self.reject_placeholder_character_data(Some(text.as_ref()), false)?;
                     if self
                         .active
                         .last()
@@ -473,6 +501,7 @@ impl<'a> Scanner<'a> {
                     }
                 },
                 Event::CData(text) => {
+                    self.reject_placeholder_character_data(Some(text.as_ref()), true)?;
                     if self
                         .active
                         .last()
@@ -485,6 +514,7 @@ impl<'a> Scanner<'a> {
                     }
                 },
                 Event::GeneralRef(reference) => {
+                    self.reject_placeholder_character_data(None, true)?;
                     if self
                         .active
                         .last()
@@ -493,7 +523,12 @@ impl<'a> Scanner<'a> {
                         self.append_text(&decode_xml_reference(&reference)?)?;
                     }
                 },
-                Event::End(element) => self.end_element(&namespace, element.name(), end)?,
+                Event::End(element) => {
+                    self.end_element(&namespace, element.name(), end)?;
+                    self.pml_nv_pr_stack.pop().ok_or_else(|| {
+                        Error::Invalid("shape XML element stack became inconsistent".into())
+                    })?;
+                },
                 Event::DocType(_) | Event::PI(_) => {
                     return Err(Error::Invalid(
                         "DOCTYPE and processing instructions are forbidden in shape XML".into(),
@@ -503,12 +538,41 @@ impl<'a> Scanner<'a> {
                 _ => {},
             }
         }
-        if self.depth != 0 || !self.active.is_empty() {
+        if self.depth != 0 || !self.active.is_empty() || !self.pml_nv_pr_stack.is_empty() {
             return Err(Error::Invalid(
                 "shape XML ended with unclosed elements".into(),
             ));
         }
         Ok((self.records, self.strings))
+    }
+
+    fn reject_placeholder_character_data(
+        &self,
+        bytes: Option<&[u8]>,
+        explicit_markup: bool,
+    ) -> Result<()> {
+        let Some(active) = self.active.last() else {
+            return Ok(());
+        };
+        if active.placeholder_type_ext_depth.is_some()
+            || active.placeholder_type_depth.is_some()
+            || active.placeholder_variant_depth.is_some()
+        {
+            if explicit_markup || !bytes.is_some_and(|value| value.iter().all(is_xml_whitespace)) {
+                return Err(Error::Invalid(
+                    "p232 phTypeExt/type and empty tokens allow XML whitespace only".into(),
+                ));
+            }
+        }
+        if active.placeholder_ext_depth == Some(self.depth)
+            && (explicit_markup
+                || bytes.is_some_and(|value| value.iter().any(|byte| !is_xml_whitespace(byte))))
+        {
+            return Err(Error::Invalid(
+                "p:ext owner cannot contain direct character data".into(),
+            ));
+        }
+        Ok(())
     }
 
     #[allow(
@@ -522,6 +586,7 @@ impl<'a> Scanner<'a> {
         decoder: quick_xml::encoding::Decoder,
         start: usize,
         event_depth: usize,
+        parent_is_nv_pr: bool,
         empty: bool,
         end: usize,
     ) -> Result<()> {
@@ -600,7 +665,7 @@ impl<'a> Scanner<'a> {
             })?;
             record.name = name;
             record.id = id;
-        } else if is_pml(namespace, element.name(), b"ph") && relative <= 3 {
+        } else if is_pml(namespace, element.name(), b"ph") && parent_is_nv_pr {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -626,7 +691,18 @@ impl<'a> Scanner<'a> {
             let record = self.records.get_mut(record_index).ok_or_else(|| {
                 Error::Invalid("shape placeholder metadata lost its record".into())
             })?;
-            record.placeholder = Some(PlaceholderRecord { kind, index });
+            record.placeholder = Some(PlaceholderRecord {
+                kind,
+                index,
+                type_extension: None,
+            });
+            if !empty {
+                let active = self
+                    .active
+                    .get_mut(active_offset)
+                    .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
+                active.placeholder_depth = Some(event_depth);
+            }
         } else if is_dml(namespace, element.name(), b"off") && relative <= 3 {
             let active = self
                 .active
@@ -646,6 +722,16 @@ impl<'a> Scanner<'a> {
                 active.height = Some(parse_nonnegative(element, b"cy", decoder)?);
             }
         }
+
+        self.scan_placeholder_extension(
+            namespace,
+            element,
+            element.name(),
+            decoder,
+            event_depth,
+            empty,
+            active_offset,
+        )?;
 
         let marker = if is_dml(namespace, element.name(), b"tbl") {
             TABLE
@@ -695,6 +781,234 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
+    fn scan_placeholder_extension(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        name: QName<'_>,
+        decoder: quick_xml::encoding::Decoder,
+        event_depth: usize,
+        empty: bool,
+        active_offset: usize,
+    ) -> Result<()> {
+        let Some(active) = self.active.get_mut(active_offset) else {
+            return Ok(());
+        };
+        let parent_depth = event_depth.checked_sub(1);
+
+        if active
+            .placeholder_variant_depth
+            .is_some_and(|depth| event_depth > depth)
+        {
+            return Err(Error::Invalid(
+                "p232 placeholder type elements must be empty".into(),
+            ));
+        }
+
+        if is_pml(namespace, name, b"extLst") && active.placeholder_depth == parent_depth {
+            if active.seen_placeholder_ext_lst {
+                return Err(Error::Invalid(
+                    "placeholder contains more than one p:extLst".into(),
+                ));
+            }
+            active.seen_placeholder_ext_lst = true;
+            if !empty {
+                active.placeholder_ext_lst_depth = Some(event_depth);
+            }
+        } else if is_pml(namespace, name, b"ext")
+            && active.placeholder_ext_lst_depth == parent_depth
+        {
+            let uri = validate_extension_attributes(element, decoder)?;
+            if empty {
+                return Err(Error::Invalid(
+                    "p:ext owner requires exactly one child element".into(),
+                ));
+            }
+            if !empty {
+                active.placeholder_ext_depth = Some(event_depth);
+                active.placeholder_ext_child_count = 0;
+                active.placeholder_ext_has_other_child = false;
+                active.placeholder_ext_has_forbidden_attribute = false;
+                active.placeholder_ext_has_typed_child = false;
+                active.placeholder_ext_uri = Some(uri);
+            }
+        } else if is_p232(namespace, name, b"phTypeExt")
+            && active.placeholder_ext_depth == parent_depth
+            && active.placeholder_ext_uri.as_deref() == Some(PLACEHOLDER_TYPE_EXTENSION_URI)
+        {
+            if active.placeholder_ext_child_count != 0 {
+                return Err(Error::Invalid(
+                    "p:ext owner requires exactly one direct child element".into(),
+                ));
+            }
+            active.placeholder_ext_child_count = 1;
+            if has_forbidden_attribute(element, decoder)? {
+                return Err(Error::Invalid(
+                    "p232:phTypeExt does not allow attributes".into(),
+                ));
+            }
+            if active.placeholder_ext_has_other_child
+                || active.placeholder_ext_has_forbidden_attribute
+            {
+                return Err(Error::Invalid(
+                    "p232:phTypeExt p:ext owner contains attributes or extra children".into(),
+                ));
+            }
+            if active.placeholder_ext_uri.as_deref() != Some(PLACEHOLDER_TYPE_EXTENSION_URI) {
+                return Err(Error::Invalid(
+                    "p232:phTypeExt p:ext owner has an unexpected uri".into(),
+                ));
+            }
+            if active.seen_placeholder_type_ext {
+                return Err(Error::Invalid(
+                    "placeholder contains more than one p232:phTypeExt".into(),
+                ));
+            }
+            if empty {
+                return Err(Error::Invalid(
+                    "p232:phTypeExt is missing its required type child".into(),
+                ));
+            }
+            active.seen_placeholder_type_ext = true;
+            active.placeholder_ext_has_typed_child = true;
+            active.placeholder_type_ext_depth = Some(event_depth);
+        } else if is_p232(namespace, name, b"type")
+            && active.placeholder_type_ext_depth == parent_depth
+        {
+            if has_forbidden_attribute(element, decoder)? {
+                return Err(Error::Invalid("p232:type does not allow attributes".into()));
+            }
+            if active.seen_placeholder_type {
+                return Err(Error::Invalid(
+                    "p232:phTypeExt contains more than one type child".into(),
+                ));
+            }
+            if empty {
+                return Err(Error::Invalid(
+                    "p232:type is missing its required type token".into(),
+                ));
+            }
+            active.seen_placeholder_type = true;
+            active.placeholder_type_depth = Some(event_depth);
+        } else if active.placeholder_type_ext_depth == parent_depth {
+            return Err(Error::Invalid(
+                "p232:phTypeExt contains only its required type child".into(),
+            ));
+        } else if active.placeholder_type_depth == parent_depth {
+            if has_forbidden_attribute(element, decoder)? {
+                return Err(Error::Invalid(
+                    "p232 placeholder type token does not allow attributes".into(),
+                ));
+            }
+            let extension = if is_p232(namespace, name, b"cameo") {
+                Some(PlaceholderTypeExtension::Cameo)
+            } else if is_p232(namespace, name, b"unknown") {
+                Some(PlaceholderTypeExtension::Unknown)
+            } else {
+                return Err(Error::Invalid(
+                    "p232:type must contain cameo or unknown".into(),
+                ));
+            };
+            if active.seen_placeholder_variant {
+                return Err(Error::Invalid(
+                    "p232:type contains more than one placeholder token".into(),
+                ));
+            }
+            active.seen_placeholder_variant = true;
+            active.placeholder_type_extension = extension;
+            if !empty {
+                active.placeholder_variant_depth = Some(event_depth);
+            }
+        } else if active.placeholder_ext_depth == parent_depth {
+            if active.placeholder_ext_child_count != 0 {
+                return Err(Error::Invalid(
+                    "p:ext owner requires exactly one direct child element".into(),
+                ));
+            }
+            active.placeholder_ext_child_count = 1;
+            active.placeholder_ext_has_other_child = true;
+        }
+        Ok(())
+    }
+
+    fn finish_placeholder_extension(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        name: QName<'_>,
+    ) -> Result<()> {
+        let Some(active) = self.active.last_mut() else {
+            return Ok(());
+        };
+        if is_p232(namespace, name, b"cameo") || is_p232(namespace, name, b"unknown") {
+            if active.placeholder_variant_depth == Some(self.depth) {
+                active.placeholder_variant_depth = None;
+            }
+        } else if is_p232(namespace, name, b"type") {
+            if active.placeholder_type_depth == Some(self.depth) {
+                if !active.seen_placeholder_variant {
+                    return Err(Error::Invalid(
+                        "p232:type is missing its required type token".into(),
+                    ));
+                }
+                active.placeholder_type_depth = None;
+            }
+        } else if is_p232(namespace, name, b"phTypeExt") {
+            if active.placeholder_type_ext_depth == Some(self.depth) {
+                if !active.seen_placeholder_type || !active.seen_placeholder_variant {
+                    return Err(Error::Invalid(
+                        "p232:phTypeExt has incomplete placeholder type metadata".into(),
+                    ));
+                }
+                active.placeholder_type_ext_depth = None;
+            }
+        } else if is_pml(namespace, name, b"ext") {
+            if active.placeholder_ext_depth == Some(self.depth) {
+                if active.placeholder_ext_child_count != 1 {
+                    return Err(Error::Invalid(
+                        "p:ext owner requires exactly one child element".into(),
+                    ));
+                }
+                if active.placeholder_ext_uri.as_deref() == Some(PLACEHOLDER_TYPE_EXTENSION_URI)
+                    && !active.placeholder_ext_has_typed_child
+                {
+                    return Err(Error::Invalid(
+                        "p232 placeholder owner uri is missing its phTypeExt child".into(),
+                    ));
+                }
+                active.placeholder_ext_depth = None;
+                active.placeholder_ext_child_count = 0;
+                active.placeholder_ext_has_other_child = false;
+                active.placeholder_ext_has_forbidden_attribute = false;
+                active.placeholder_ext_has_typed_child = false;
+                active.placeholder_ext_uri = None;
+            }
+        } else if is_pml(namespace, name, b"extLst") {
+            if active.placeholder_ext_lst_depth == Some(self.depth) {
+                active.placeholder_ext_lst_depth = None;
+            }
+        } else if is_pml(namespace, name, b"ph") && active.placeholder_depth == Some(self.depth) {
+            if active.seen_placeholder_type_ext
+                && (!active.seen_placeholder_type
+                    || !active.seen_placeholder_variant
+                    || active.placeholder_type_extension.is_none())
+            {
+                return Err(Error::Invalid(
+                    "p232 placeholder type metadata is incomplete".into(),
+                ));
+            }
+            active.placeholder_depth = None;
+            active.placeholder_ext_lst_depth = None;
+            active.placeholder_ext_depth = None;
+            active.seen_placeholder_ext_lst = false;
+            active.placeholder_ext_child_count = 0;
+            active.placeholder_ext_has_other_child = false;
+            active.placeholder_ext_has_forbidden_attribute = false;
+            active.placeholder_ext_has_typed_child = false;
+            active.placeholder_ext_uri = None;
+        }
+        Ok(())
+    }
+
     fn end_element(
         &mut self,
         namespace: &ResolveResult<'_>,
@@ -706,6 +1020,7 @@ impl<'a> Scanner<'a> {
                 "shape XML contains an unmatched end tag".into(),
             ));
         }
+        self.finish_placeholder_extension(namespace, name)?;
         if is_dml(namespace, name, b"t")
             && let Some(active) = self.active.last_mut()
             && active.text_depth == Some(self.depth)
@@ -804,6 +1119,22 @@ impl<'a> Scanner<'a> {
             text_depth: None,
             text: None,
             seen_paragraph: false,
+            placeholder_depth: None,
+            placeholder_ext_lst_depth: None,
+            placeholder_ext_depth: None,
+            placeholder_type_ext_depth: None,
+            placeholder_type_depth: None,
+            placeholder_variant_depth: None,
+            seen_placeholder_ext_lst: false,
+            placeholder_ext_child_count: 0,
+            placeholder_ext_has_other_child: false,
+            placeholder_ext_has_forbidden_attribute: false,
+            placeholder_ext_has_typed_child: false,
+            placeholder_ext_uri: None,
+            seen_placeholder_type_ext: false,
+            seen_placeholder_type: false,
+            seen_placeholder_variant: false,
+            placeholder_type_extension: None,
         });
         Ok(index)
     }
@@ -854,6 +1185,9 @@ impl<'a> Scanner<'a> {
         record.subtree_end = subtree_end;
         record.bounds = bounds;
         record.text = text;
+        if let Some(placeholder) = record.placeholder.as_mut() {
+            placeholder.type_extension = active.placeholder_type_extension;
+        }
         if record.kind == Kind::Frame {
             record.kind = match active.markers {
                 value if value & OLE != 0 => Kind::Ole,
@@ -988,6 +1322,11 @@ fn is_pml(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool 
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == PML || *value == STRICT_PML)
 }
 
+fn is_p232(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
+    name.local_name().as_ref() == local
+        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P232.as_bytes())
+}
+
 fn is_dml(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
     name.local_name().as_ref() == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE)
@@ -1037,6 +1376,86 @@ fn parse_nonnegative(
     } else {
         Ok(value)
     }
+}
+
+/// Validate the generic `p:ext` owner used by `CT_Extension`.
+///
+/// The owner always carries exactly one unqualified, nonempty XML Schema
+/// `token` URI. Namespace declarations are source namespace context and are not
+/// schema attributes. The p232 owner has no normative GUID in the local
+/// Microsoft specification, so the reader and writer use the crate's stable
+/// `urn:litchi:pptx:p232:phTypeExt` owner contract.
+fn validate_extension_attributes(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<String> {
+    let uri = unqualified_attribute_value(element, b"uri", decoder)?;
+    let mut seen_non_namespace = false;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            continue;
+        }
+        if key != b"uri" || seen_non_namespace {
+            return Err(Error::Invalid(
+                "p:ext allows exactly one unqualified uri attribute".into(),
+            ));
+        }
+        seen_non_namespace = true;
+    }
+    let Some(uri) = uri else {
+        return Err(Error::Invalid(
+            "p:ext is missing its required uri attribute".into(),
+        ));
+    };
+    collapse_xsd_token(&uri)
+        .ok_or_else(|| Error::Invalid("p:ext uri must be a nonempty XML Schema token".into()))
+}
+
+fn is_xml_whitespace(byte: &u8) -> bool {
+    matches!(*byte, b' ' | b'\t' | b'\r' | b'\n')
+}
+
+/// Apply the XML Schema `token` whitespace facet.  `token` uses XML whitespace
+/// (`#x20`, tab, carriage return, and line feed), replacing runs with one
+/// ordinary space and trimming the ends.  The source bytes remain untouched;
+/// this normalized value is only used for typed-owner recognition.
+fn collapse_xsd_token(value: &str) -> Option<String> {
+    let mut collapsed = String::new();
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, ' ' | '\t' | '\r' | '\n') {
+            if !collapsed.is_empty() {
+                pending_space = true;
+            }
+            continue;
+        }
+        if pending_space {
+            collapsed.push(' ');
+            pending_space = false;
+        }
+        collapsed.push(character);
+    }
+    (!collapsed.is_empty()).then_some(collapsed)
+}
+
+/// Return whether a p232 element has an attribute other than an XML namespace
+/// declaration. Namespace declarations are part of the source namespace
+/// context and are therefore not schema attributes on the typed p232 tokens.
+fn has_forbidden_attribute(
+    element: &BytesStart<'_>,
+    _decoder: quick_xml::encoding::Decoder,
+) -> Result<bool> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            continue;
+        }
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {

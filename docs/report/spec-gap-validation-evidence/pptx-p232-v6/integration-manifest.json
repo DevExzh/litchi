@@ -1,0 +1,310 @@
+{
+  "kind": "pptx-p232-v6-clean-current-integration-overlay",
+  "primary_repository": "/home/zhuhe/code/litchi-spec-gaps",
+  "overlay_worktree": "/var/tmp/litchi-pptx-p232-v6-integration-clean-20260910",
+  "overlay_head": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "requested_head": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "source_v6_worktree": "/var/tmp/litchi-pptx-p232-v6-validation-20260910",
+  "source_v6_patch": "/var/tmp/litchi-pptx-p232-v6-evidence-20260910/candidate-p232-v6.patch",
+  "integration_patch": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/candidate-p232-v6-integration.patch",
+  "evidence_directory": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910",
+  "primary_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_head": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "primary_all_dirty_file_count": 4238,
+  "primary_all_dirty_status_sha256": "d86b6a1bcc6674d18ba3dac3ccd6d4e60e3d2b884aa4aeee4972a7ac76b164fe",
+  "primary_pptx_scope_clean_at_snapshot": true,
+  "primary_pptx_dirty_paths": [],
+  "mixed_overlay_patch": {
+    "path": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/primary-pptx-dirty.patch",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "required": false,
+    "reason": "primary crates/litchi-pptx scope was clean; unrelated primary dirty paths were excluded from the clean candidate"
+  },
+  "preserved_landed_features": [
+    {
+      "commit": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+      "subject": "feat(pptx): add source-preserving presence and threading metadata edits",
+      "ancestor_of_overlay_head": true
+    },
+    {
+      "commit": "44ea437d8f8a37ffc2ca6f886e633e2dcc1f31d3",
+      "subject": "feat(pptx): add reversible read-only recommendation metadata",
+      "ancestor_of_overlay_head": true
+    },
+    {
+      "commit": "73f7a1a4437d11136937f68da90e19c63f9af694",
+      "subject": "feat(pptx): support remaining p14 transition effects and exact durations",
+      "ancestor_of_overlay_head": true
+    },
+    {
+      "commit": "f0097deb0e80aa4ca7d4347cbba1aebdeadee764",
+      "subject": "feat(pptx): preserve and edit content-part black-and-white modes",
+      "ancestor_of_overlay_head": true
+    }
+  ],
+  "candidate_status_exact": true,
+  "candidate_status": [
+    " M crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+    " M crates/litchi-pptx/src/lib.rs",
+    " M crates/litchi-pptx/src/master_layout/codec.rs",
+    " M crates/litchi-pptx/src/master_layout/mod.rs",
+    " M crates/litchi-pptx/src/master_layout/model.rs",
+    " M crates/litchi-pptx/src/master_layout/package.rs",
+    " M crates/litchi-pptx/src/master_layout/tests.rs",
+    " M crates/litchi-pptx/src/package/model.rs",
+    " M crates/litchi-pptx/src/shape/mod.rs",
+    " M crates/litchi-pptx/src/shape/model.rs",
+    " M crates/litchi-pptx/src/shape/reader.rs",
+    "?? crates/litchi-pptx/src/master_layout/placeholder.rs"
+  ],
+  "source_closure": [
+    {
+      "path": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "overlay": {
+        "sha256": "e701213f2360b9bb79e050ef298b050b09ae8e56de96dc9744b828e860376fa2",
+        "bytes": 23485
+      },
+      "integration_preimage": {
+        "sha256": "a708571b2be9c758dae69f6ec8752cf6a9b4b4a905f22b9ed7d5c4b8b886b8e7",
+        "bytes": 23326
+      },
+      "primary_preimage": {
+        "sha256": "a708571b2be9c758dae69f6ec8752cf6a9b4b4a905f22b9ed7d5c4b8b886b8e7",
+        "bytes": 23326
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/lib.rs",
+      "overlay": {
+        "sha256": "c04602b06eb8dfcdca71efe6d84596c0dae5fb23b6179f43529260551f08fe4b",
+        "bytes": 8686
+      },
+      "integration_preimage": {
+        "sha256": "68b570b44fb965d7f8e7cb8d4305e84221716667d6b6ac6dc6e306a779ebddb7",
+        "bytes": 8278
+      },
+      "primary_preimage": {
+        "sha256": "68b570b44fb965d7f8e7cb8d4305e84221716667d6b6ac6dc6e306a779ebddb7",
+        "bytes": 8278
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/codec.rs",
+      "overlay": {
+        "sha256": "86bdd208caa508d07a7046fde551918d163975d807cebf066ce271a7f0314684",
+        "bytes": 29561
+      },
+      "integration_preimage": {
+        "sha256": "0a3d4663a2e171f2cf638638be64a466cb4c62c15f488dba4c8314838fbfc070",
+        "bytes": 25543
+      },
+      "primary_preimage": {
+        "sha256": "0a3d4663a2e171f2cf638638be64a466cb4c62c15f488dba4c8314838fbfc070",
+        "bytes": 25543
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/mod.rs",
+      "overlay": {
+        "sha256": "6efcf4ad7e5dadb0e197e6153c874f212e6fc4d68fa121b571304c7b49be12d9",
+        "bytes": 1894
+      },
+      "integration_preimage": {
+        "sha256": "9d68db12e1af860e8fcff234d3e5cb01b65eebc61250835af30dae3900018605",
+        "bytes": 411
+      },
+      "primary_preimage": {
+        "sha256": "9d68db12e1af860e8fcff234d3e5cb01b65eebc61250835af30dae3900018605",
+        "bytes": 411
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/model.rs",
+      "overlay": {
+        "sha256": "757012a0ed9985e0a9b68bad3e5b682a9d1126cc03fc9d78bc00dbfd226493d2",
+        "bytes": 8073
+      },
+      "integration_preimage": {
+        "sha256": "8ce7047dca915a840d3c801af452eaaeb5118ce2b15ed10a12cc58e5981c8a88",
+        "bytes": 7638
+      },
+      "primary_preimage": {
+        "sha256": "8ce7047dca915a840d3c801af452eaaeb5118ce2b15ed10a12cc58e5981c8a88",
+        "bytes": 7638
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/package.rs",
+      "overlay": {
+        "sha256": "efe1251d4a75d8921074384eabfd14126d06370bf070972fe61a20028d50f775",
+        "bytes": 34941
+      },
+      "integration_preimage": {
+        "sha256": "594867c464c7dbb56055c5df6dd91ca659dc7f6bd6aa2e9009762828c5cca44d",
+        "bytes": 34112
+      },
+      "primary_preimage": {
+        "sha256": "594867c464c7dbb56055c5df6dd91ca659dc7f6bd6aa2e9009762828c5cca44d",
+        "bytes": 34112
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/placeholder.rs",
+      "overlay": {
+        "sha256": "c3c532ab6ad1d1260859dc5c0a95a7def194a77fdcbe298d3e1bb873765b1d60",
+        "bytes": 80467
+      },
+      "integration_preimage": null,
+      "primary_preimage": null
+    },
+    {
+      "path": "crates/litchi-pptx/src/master_layout/tests.rs",
+      "overlay": {
+        "sha256": "eb5352cbc8862d77274a003a38088554b288890e07638ff012aea35581f51cf3",
+        "bytes": 47247
+      },
+      "integration_preimage": {
+        "sha256": "1e484395a8acddb10d03d78182f817ea2b5e24035fd4308e17255cae90510918",
+        "bytes": 13298
+      },
+      "primary_preimage": {
+        "sha256": "1e484395a8acddb10d03d78182f817ea2b5e24035fd4308e17255cae90510918",
+        "bytes": 13298
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/package/model.rs",
+      "overlay": {
+        "sha256": "5e80fbfe149713b27038eb3993aa5ec4595efc44fba9d4bd41c57ca8505088be",
+        "bytes": 71184
+      },
+      "integration_preimage": {
+        "sha256": "410433ca92c775e33541a4d71b894e83e5b7df59b3c21dd68782a164d8f7a38b",
+        "bytes": 65327
+      },
+      "primary_preimage": {
+        "sha256": "410433ca92c775e33541a4d71b894e83e5b7df59b3c21dd68782a164d8f7a38b",
+        "bytes": 65327
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/shape/mod.rs",
+      "overlay": {
+        "sha256": "a561e225821403bd9a2f382e7a0ff494ce2ffca73112089f190c23d9cdf91649",
+        "bytes": 23008
+      },
+      "integration_preimage": {
+        "sha256": "f706b841aabcfa4272b03f3338d340d1d5e589b28e208300762960270d2a956f",
+        "bytes": 9974
+      },
+      "primary_preimage": {
+        "sha256": "f706b841aabcfa4272b03f3338d340d1d5e589b28e208300762960270d2a956f",
+        "bytes": 9974
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/shape/model.rs",
+      "overlay": {
+        "sha256": "61869b9a34968a808f47b90eb7ee061782a07adb6867d2d84e6efe4a1690d40d",
+        "bytes": 14451
+      },
+      "integration_preimage": {
+        "sha256": "14d262c44f73e6454a2fac9ff2b250c458d0b3f5acb040cbf54e9f2e49780057",
+        "bytes": 13222
+      },
+      "primary_preimage": {
+        "sha256": "14d262c44f73e6454a2fac9ff2b250c458d0b3f5acb040cbf54e9f2e49780057",
+        "bytes": 13222
+      }
+    },
+    {
+      "path": "crates/litchi-pptx/src/shape/reader.rs",
+      "overlay": {
+        "sha256": "848f95510c58ae55ce6f20674384d50b706ae19b0f9aa4d77d5c94a42b61af75",
+        "bytes": 53259
+      },
+      "integration_preimage": {
+        "sha256": "9ed870696f6829173e65841a0bded6f400353cec47e9ff8ef74ed7f53cc903da",
+        "bytes": 35542
+      },
+      "primary_preimage": {
+        "sha256": "9ed870696f6829173e65841a0bded6f400353cec47e9ff8ef74ed7f53cc903da",
+        "bytes": 35542
+      }
+    }
+  ],
+  "normative_specs": [
+    {
+      "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-PPTX]/2 Structures/2.22 http---schemas.microsoft.com-office-powerpoint-2023-02-main.md",
+      "digest": {
+        "sha256": "33d3298302be9443d94fa7e95a41734483118cdfcb1df49574238fa48098b4bc",
+        "bytes": 2637
+      }
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-PPTX]/5 Appendix A - Full XML Schemas/5.20 http---schemas.microsoft.com-office-powerpoint-2023-02-main Schema.md",
+      "digest": {
+        "sha256": "c4462056a55f4b050d5ade865e3145f0849802eee8b837ce2f1e48b71305629a",
+        "bytes": 1156
+      }
+    }
+  ],
+  "artifacts": {
+    "source_closure_manifest": {
+      "sha256": "7ab1afc173ac9f7e71582a03c4c2b4fd2513cb2a1b36bf86be1f2b9d278f4226",
+      "bytes": 2687
+    },
+    "integration_preimages_manifest": {
+      "sha256": "613257a2c982196b9aaad01b201e49cbc62025880b4a286b10552b17f3b297b5",
+      "bytes": 2134
+    },
+    "primary_preimages_manifest": {
+      "sha256": "b63e2de073937031e24b74cf852df83fba943426fa04acc24873f9e9eafaab61",
+      "bytes": 2090
+    },
+    "source_v6_patch": {
+      "sha256": "b2bb8d5b1cc65ed74999d6be002dd0ad045cdb5562fd7a3472cb6d0ca25adf41",
+      "bytes": 210576
+    },
+    "integration_patch": {
+      "sha256": "37e5f902253a76d85737ed3fce350d9a9cb12fa3644c5018e650200a44b4b63f",
+      "bytes": 210576
+    },
+    "primary_status_snapshot": {
+      "sha256": "d86b6a1bcc6674d18ba3dac3ccd6d4e60e3d2b884aa4aeee4972a7ac76b164fe",
+      "bytes": 501634
+    },
+    "primary_pptx_dirty_patch": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "integration_report": {
+      "sha256": "9800b156a4b961a85d41ba2b8f47048e049002dc929571b606215c9379000c43",
+      "bytes": 1837
+    },
+    "root_primary_preimages_manifest": {
+      "sha256": "14ef7d7ad7385e481af27b6e4974de2cf469fb5d40a06fcee54c90c6b24982e8",
+      "bytes": 1496
+    },
+    "root_primary_status_snapshot": {
+      "sha256": "a16efb533ad5b64642e666516a8d8ba8842400c0bfaad8c0d6f3530a6e4139b7",
+      "bytes": 11383
+    }
+  },
+  "full_source_closure_manifest": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/source-closure-manifest.sha256",
+  "primary_preimage_root": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/primary-preimages",
+  "integration_preimage_root": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/integration-preimages",
+  "focused_test": {
+    "command": "CARGO_NET_OFFLINE=true taskset -c 8-31 RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/var/tmp/litchi-pptx-p232-v6-target-20260910 cargo test -p litchi-pptx master_layout::tests::p232_",
+    "result": "14 passed; 0 failed; all integration binaries ran with zero selected tests",
+    "target_cache": "/var/tmp/litchi-pptx-p232-v6-target-20260910"
+  },
+  "root_primary_snapshot": {
+    "worktree": "/home/zhuhe/code/litchi",
+    "head": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "status_snapshot": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/root-primary-status.txt",
+    "preimage_root": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/root-primary-preimages",
+    "preimage_manifest": "/var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/root-primary-preimages.sha256"
+  }
+}
