@@ -12,7 +12,9 @@ mod transaction;
 mod validation;
 
 pub use litchi_opc::TargetMode;
-pub use model::{Anchor, ContentPart, Payload, Relationship, RelationshipMetadata, Target};
+pub use model::{
+    Anchor, BlackWhiteMode, ContentPart, Payload, Relationship, RelationshipMetadata, Target,
+};
 pub use package::{Limits, apply_commit, apply_patch, load_slide, load_snapshot};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 

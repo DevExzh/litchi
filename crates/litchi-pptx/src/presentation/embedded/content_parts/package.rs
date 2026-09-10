@@ -170,11 +170,13 @@ pub fn load_slide(
             };
             Target::Internal(payload)
         };
+        let bw_mode = anchor.black_white_mode();
         result.push(ContentPart {
             slide_index,
             slide_part_name: slide_part_name.clone(),
             index,
             anchor,
+            bw_mode,
             relationship: Relationship {
                 id: relationship_data.id,
                 relationship_type: relationship_data.relationship_type,
@@ -225,9 +227,13 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if patch.is_empty() {
         return Ok(current);
     }
+    if package.is_signed() || package.requires_signature_edit_policy() {
+        return Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+        ));
+    }
 
     let mut staged = package.clone();
-    staged.unsign();
     install_patch(&mut staged, patch)?;
     let slide = staged.get_part(&before.slide_part_name)?;
     let resulting = load_snapshot(

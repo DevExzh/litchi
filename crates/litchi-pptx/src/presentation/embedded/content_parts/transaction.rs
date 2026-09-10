@@ -6,7 +6,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
 use super::codec;
-use super::model::{Anchor, ContentPart, Payload, Relationship, Target};
+use super::model::{Anchor, BlackWhiteMode, ContentPart, Payload, Relationship, Target};
 use super::validation;
 use crate::{Error, Result};
 
@@ -68,6 +68,11 @@ impl Snapshot {
             part.slide_index = slide_index;
             part.slide_part_name = slide_part_name.clone();
             part.index = index;
+            // This bit only records a detached edit that inserted the local
+            // namespace declaration. Once the source snapshot is committed,
+            // the declaration is authored source and must compare exactly to
+            // a subsequent package reload.
+            part.anchor.bw_mode_namespace_added = false;
         }
         validation::validate_parts(&parts)?;
         let slide_relationships = sorted_relationships(slide_relationships)?;
@@ -219,7 +224,13 @@ impl Transaction {
         relationship: Relationship,
     ) -> Result<bool> {
         let mut candidate = self.part(index)?.clone();
+        let mut anchor = anchor;
+        let (bw_mode, bw_mode_key) = codec::anchor_bw_mode(anchor.xml())?;
+        anchor.bw_mode = bw_mode;
+        anchor.bw_mode_key = bw_mode_key;
+        anchor.bw_mode_namespace_added = false;
         candidate.anchor = anchor;
+        candidate.bw_mode = bw_mode;
         candidate.relationship = relationship;
         self.validate_candidate(&candidate, Some(index))?;
         if candidate == self.working[index] {
@@ -241,13 +252,58 @@ impl Transaction {
         if candidate.relationship_id() == value {
             return Ok(false);
         }
-        candidate.anchor.xml =
-            codec::rewrite_anchor_relationship_id(candidate.anchor.xml(), &value)?;
+        candidate.anchor.xml = codec::rewrite_anchor_relationship_id(
+            candidate.anchor.xml(),
+            &value,
+            candidate.anchor.bw_mode_key.as_deref(),
+        )?;
         candidate.anchor.relationship_id.clone_from(&value);
         candidate.relationship.id = value;
         self.validate_candidate(&candidate, Some(index))?;
         self.working[index] = candidate;
         Ok(true)
+    }
+
+    /// Set or remove the inert PowerPoint 2010 `p14:bwMode` value on one
+    /// content-part anchor.
+    ///
+    /// The edit rewrites only the selected attribute, adding a local `p14`
+    /// declaration when the detached anchor has no usable declaration. All
+    /// other anchor bytes remain opaque and the staged graph is validated
+    /// before it is replaced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn set_black_white_mode(
+        &mut self,
+        index: usize,
+        value: Option<BlackWhiteMode>,
+    ) -> Result<bool> {
+        let mut candidate = self.part(index)?.clone();
+        if candidate.bw_mode == value {
+            return Ok(false);
+        }
+        let (xml, key, namespace_added) = codec::rewrite_anchor_bw_mode(
+            candidate.anchor.xml(),
+            candidate.anchor.bw_mode_key.as_deref(),
+            candidate.anchor.bw_mode_namespace_added,
+            value,
+        )?;
+        candidate.anchor.xml = xml;
+        candidate.anchor.bw_mode = value;
+        candidate.anchor.bw_mode_key = key;
+        candidate.anchor.bw_mode_namespace_added = namespace_added;
+        candidate.bw_mode = value;
+        self.validate_candidate(&candidate, Some(index))?;
+        self.working[index] = candidate;
+        Ok(true)
+    }
+
+    /// Alias using the schema attribute's compact name.
+    #[inline]
+    pub fn set_bw_mode(&mut self, index: usize, value: Option<BlackWhiteMode>) -> Result<bool> {
+        self.set_black_white_mode(index, value)
     }
 
     /// Update the relationship type without rewriting the owning slide XML.
@@ -474,14 +530,19 @@ impl Transaction {
     fn make_part(
         &self,
         index: usize,
-        anchor: Anchor,
+        mut anchor: Anchor,
         relationship: Relationship,
     ) -> Result<ContentPart> {
+        let (bw_mode, bw_mode_key) = codec::anchor_bw_mode(anchor.xml())?;
+        anchor.bw_mode = bw_mode;
+        anchor.bw_mode_key = bw_mode_key;
+        anchor.bw_mode_namespace_added = false;
         let part = ContentPart {
             slide_index: self.source.slide_index,
             slide_part_name: self.source.slide_part_name.clone(),
             index,
             anchor,
+            bw_mode,
             relationship,
         };
         validation::validate_parts(std::slice::from_ref(&part))?;
@@ -762,6 +823,7 @@ fn build_source(
             let id_only = codec::rewrite_anchor_relationship_id(
                 original.anchor.xml(),
                 replacement.relationship_id(),
+                original.anchor.bw_mode_key.as_deref(),
             )
             .is_ok_and(|value| value == replacement.anchor.xml);
             if id_only {
