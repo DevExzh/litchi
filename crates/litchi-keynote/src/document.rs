@@ -592,10 +592,12 @@ impl Document {
             .source()
             .detector_limits()
             .map_err(map_detection_error)?;
-        let source =
-            litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(path, source_limits)
-                .map_err(map_detection_error)?
-                .ok_or(DocumentReadError::InvalidFormat)?;
+        let source = litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(
+            path,
+            source_limits,
+        )
+        .map_err(map_detection_error)?
+        .ok_or(DocumentReadError::InvalidFormat)?;
         if source.format() != litchi_iwa_detect::Format::Keynote {
             return Err(DocumentReadError::NotKeynote);
         }
