@@ -1,0 +1,326 @@
+{
+  "all_candidate_hashes_match_source": true,
+  "all_source_paths_differ_from_base": true,
+  "archive_tar": {
+    "bytes": 2169640960,
+    "kind": "file",
+    "path": "/var/tmp/litchi-odb-v7-integration-eff351997.tar",
+    "sha256": "d61960f6e3a8687da293ea2da7bf1210b9c3e20fb0f548b5b1bc81ab343c46cf"
+  },
+  "base_commit": "eff351997f11e4017bd1504cce0b6ebb646ee58e",
+  "candidate_path_set": {
+    "base_path_count": 32439,
+    "candidate_file_path_count": 32442,
+    "exact": true,
+    "expected_extra_paths": [
+      "Cargo.lock",
+      "crates/litchi-odb/src/model/settings.rs",
+      "crates/litchi-odb/tests/settings.rs"
+    ],
+    "missing_paths": [],
+    "new_owned_paths": [
+      "crates/litchi-odb/src/model/settings.rs",
+      "crates/litchi-odb/tests/settings.rs"
+    ],
+    "unexpected_paths": []
+  },
+  "candidate_root": "/var/tmp/litchi-odb-v7-integration-clean-20260910",
+  "captured_utc": "2026-09-10T13:25:57.619076+00:00",
+  "explicit_lock_input": {
+    "candidate_equals_source": true,
+    "candidate_meta": {
+      "bytes": 138848,
+      "kind": "file",
+      "sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88"
+    },
+    "destination": "/var/tmp/litchi-odb-v7-integration-clean-20260910/Cargo.lock",
+    "source": "/var/tmp/litchi-odg-v8-integration-base-clean-20260910/Cargo.lock",
+    "source_meta": {
+      "bytes": 138848,
+      "kind": "file",
+      "sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88"
+    },
+    "tracked_in_base_commit": false
+  },
+  "owned_path_count": 13,
+  "owned_paths": [
+    {
+      "base": {
+        "bytes": 6261,
+        "git_blob": "ea8f31fc5835cc411c0cacf63073bca5adb086cf",
+        "kind": "file",
+        "sha256": "bd25ff949f2d6aef2a932905fd183ff77acb14e1dc57e02259828d2ed6b29d16"
+      },
+      "candidate": {
+        "bytes": 8056,
+        "kind": "file",
+        "sha256": "82c6ed964073ce04e3b5ebdd05b6d97e72838e1e1319084e6b767cbefcfe9cf7"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/docs/FEATURE_MATRIX.md",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 8056,
+        "kind": "file",
+        "sha256": "82c6ed964073ce04e3b5ebdd05b6d97e72838e1e1319084e6b767cbefcfe9cf7"
+      }
+    },
+    {
+      "base": {
+        "bytes": 11723,
+        "git_blob": "83bad374e21ec35100d8fb05b0c39bfe1cfeee52",
+        "kind": "file",
+        "sha256": "75497cb45cb64bd076a3d17d921f154c1556436585d23e80b4e2c171b2bfe7d8"
+      },
+      "candidate": {
+        "bytes": 11843,
+        "kind": "file",
+        "sha256": "d71d792f4e223fb7049b4d48613a1ab8ae6caea6746a0c3990295a69a6e02e14"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/authoring/composition.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 11843,
+        "kind": "file",
+        "sha256": "d71d792f4e223fb7049b4d48613a1ab8ae6caea6746a0c3990295a69a6e02e14"
+      }
+    },
+    {
+      "base": {
+        "bytes": 12622,
+        "git_blob": "f21d836114d4431f0c30922a433f92ca61509b66",
+        "kind": "file",
+        "sha256": "ad73e6a41311c555eaaa30c30f67c0432cb08d644e5565e82621255b6b995d5c"
+      },
+      "candidate": {
+        "bytes": 12699,
+        "kind": "file",
+        "sha256": "3daa67231db9978ac9d785b4316179f9137a47032544978a4ac0368c3604146d"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/authoring/durable.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 12699,
+        "kind": "file",
+        "sha256": "3daa67231db9978ac9d785b4316179f9137a47032544978a4ac0368c3604146d"
+      }
+    },
+    {
+      "base": {
+        "bytes": 113665,
+        "git_blob": "007fcd4be6082600f612346bf0f92e4c190b6ba1",
+        "kind": "file",
+        "sha256": "01fe8724c4ae640ea1ec13537420ec769a047aeb4cbc66e4bfff75ecd90a4774"
+      },
+      "candidate": {
+        "bytes": 213948,
+        "kind": "file",
+        "sha256": "18de85e4ce34c88761caaa855c0400ec231385492e1d897e0294118c3d9f3994"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/authoring/transaction.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 213948,
+        "kind": "file",
+        "sha256": "18de85e4ce34c88761caaa855c0400ec231385492e1d897e0294118c3d9f3994"
+      }
+    },
+    {
+      "base": {
+        "bytes": 6330,
+        "git_blob": "f2c128d2c617d1081589416be35040958affc0be",
+        "kind": "file",
+        "sha256": "56a96bfb76feff9dff228a88aca7d61da5edd88d9374b678072be07520881847"
+      },
+      "candidate": {
+        "bytes": 6485,
+        "kind": "file",
+        "sha256": "366bb6affcebb62daf062add772f7c29e7794f5afc039d7dd00dcc92347979d9"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/codec/content.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 6485,
+        "kind": "file",
+        "sha256": "366bb6affcebb62daf062add772f7c29e7794f5afc039d7dd00dcc92347979d9"
+      }
+    },
+    {
+      "base": {
+        "bytes": 13593,
+        "git_blob": "9f9be7ff69cfc1fc6b40b92b1c96ecbdfb4e40d9",
+        "kind": "file",
+        "sha256": "a7334de20f51c5ad72806bf623b9b751adc8b8d44c9fd7145dcff08c7f8c5e0e"
+      },
+      "candidate": {
+        "bytes": 17342,
+        "kind": "file",
+        "sha256": "3a0a721d7f7e1e369662d164ecdedea551b6c66505c3c81c255a322bd8297243"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/facade/mod.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 17342,
+        "kind": "file",
+        "sha256": "3a0a721d7f7e1e369662d164ecdedea551b6c66505c3c81c255a322bd8297243"
+      }
+    },
+    {
+      "base": {
+        "bytes": 2124,
+        "git_blob": "920872c0044a0c743e1e7d6aad751ce9e7c564dd",
+        "kind": "file",
+        "sha256": "5ac361381f8af244d3323df5986579461da5a4d01d8839c473dbcf17338c9a17"
+      },
+      "candidate": {
+        "bytes": 2468,
+        "kind": "file",
+        "sha256": "71ce2808acc69a7438d33099aefd9765b9e8ee84b406109447de99614feeba98"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/lib.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 2468,
+        "kind": "file",
+        "sha256": "71ce2808acc69a7438d33099aefd9765b9e8ee84b406109447de99614feeba98"
+      }
+    },
+    {
+      "base": {
+        "bytes": 44827,
+        "git_blob": "5b269408704711370452620cd5bdc195d9ad92cb",
+        "kind": "file",
+        "sha256": "730f0ab2e8af088b3495dca0fb84a38e8a860ef8720ff945df99398495f4e843"
+      },
+      "candidate": {
+        "bytes": 70524,
+        "kind": "file",
+        "sha256": "5cd3a2558b36e5e2615c474b637545a5d351f2aa4970f063479c84342f7f89cc"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/model/catalog.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 70524,
+        "kind": "file",
+        "sha256": "5cd3a2558b36e5e2615c474b637545a5d351f2aa4970f063479c84342f7f89cc"
+      }
+    },
+    {
+      "base": {
+        "bytes": 922,
+        "git_blob": "e5f8327d75ee774a44458d49b4e10a97dfe555a7",
+        "kind": "file",
+        "sha256": "64f5dff73b9bf8dadbde1398de477b27d3ccf14434d7ac8d5b32fb4cf12f530a"
+      },
+      "candidate": {
+        "bytes": 7942,
+        "kind": "file",
+        "sha256": "e8754f68cbd5a7580de61f48b712996556051958befdd5bb9b379eaf85de3e3d"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/model/connection.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 7942,
+        "kind": "file",
+        "sha256": "e8754f68cbd5a7580de61f48b712996556051958befdd5bb9b379eaf85de3e3d"
+      }
+    },
+    {
+      "base": {
+        "bytes": 750,
+        "git_blob": "ea1c05cc61959c010919649265508c07a8bfcbfb",
+        "kind": "file",
+        "sha256": "4c6b13402b61676184c7c715034e8bfd31aee1d6f63d7c645241853e1f0bf8c3"
+      },
+      "candidate": {
+        "bytes": 1242,
+        "kind": "file",
+        "sha256": "a4b9fd8eb33b1858ba409537f5b2ef5a443b956b8dc405852d242085b45c858d"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/model/mod.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 1242,
+        "kind": "file",
+        "sha256": "a4b9fd8eb33b1858ba409537f5b2ef5a443b956b8dc405852d242085b45c858d"
+      }
+    },
+    {
+      "base": {
+        "bytes": null,
+        "git_blob": null,
+        "kind": "absent",
+        "sha256": null
+      },
+      "candidate": {
+        "bytes": 87087,
+        "kind": "file",
+        "sha256": "62bb41b354b671c56e587e6bde023dcb076da63140bc51d338a9653409686228"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/src/model/settings.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 87087,
+        "kind": "file",
+        "sha256": "62bb41b354b671c56e587e6bde023dcb076da63140bc51d338a9653409686228"
+      }
+    },
+    {
+      "base": {
+        "bytes": 11944,
+        "git_blob": "413d9955f4298c5a791e5d326adde5f566b0a672",
+        "kind": "file",
+        "sha256": "c44c0b57c3a291659ff411f5464b8a1e1168c9bffc03d157f2053ed58af9ff9b"
+      },
+      "candidate": {
+        "bytes": 12779,
+        "kind": "file",
+        "sha256": "c2cbd3c8381b9994775a43d8ef1e9a53d839a41723ae51ae14d171e0978da1b7"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/tests/schema_catalog.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 12779,
+        "kind": "file",
+        "sha256": "c2cbd3c8381b9994775a43d8ef1e9a53d839a41723ae51ae14d171e0978da1b7"
+      }
+    },
+    {
+      "base": {
+        "bytes": null,
+        "git_blob": null,
+        "kind": "absent",
+        "sha256": null
+      },
+      "candidate": {
+        "bytes": 50307,
+        "kind": "file",
+        "sha256": "2ce9ec5f2c051f7dba5e4cd708e0d7ef2da019e69c635cbd863fbb7413c5788f"
+      },
+      "candidate_equals_source": true,
+      "path": "crates/litchi-odb/tests/settings.rs",
+      "source_differs_from_base": true,
+      "source_v7": {
+        "bytes": 50307,
+        "kind": "file",
+        "sha256": "2ce9ec5f2c051f7dba5e4cd708e0d7ef2da019e69c635cbd863fbb7413c5788f"
+      }
+    }
+  ],
+  "primary_head_at_capture": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "primary_root": "/home/zhuhe/code/litchi",
+  "schema": "litchi.odb.v7.integration-owned-preimages-and-base.v1",
+  "source_head": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+  "source_root": "/var/tmp/litchi-odb-settings-validation-v7-20260910"
+}

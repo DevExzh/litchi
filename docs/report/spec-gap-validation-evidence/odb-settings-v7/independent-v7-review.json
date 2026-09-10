@@ -1,0 +1,139 @@
+{
+  "receipt_type": "independent-clear-v7",
+  "receipt_version": 1,
+  "date": "2026-09-10",
+  "status": "CLEAR",
+  "scope": "ODB V7 escaped settings-budget delta: explicit text-vs-attribute preflight, 16000 tab-heavy regression, allocation ordering across all settings contexts and nested counts, and prior V6 controls",
+  "candidate": {
+    "root": "/var/tmp/litchi-odb-settings-validation-v7-20260910",
+    "head": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+    "source_manifest": "/var/tmp/litchi-odb-settings-validation-v7-evidence-20260910/source-sha256.txt",
+    "source_manifest_sha256": "57818f1e03a012c9f586dd4bc379ea1a7cfab7664822f4282f5b5749594ba51b",
+    "source_manifest_entries": 13,
+    "source_hash_receipt": "all 13 entries OK",
+    "candidate_edits_by_review": false,
+    "candidate_staged_or_committed_by_review": false,
+    "primary_edits_by_review": false
+  },
+  "frozen_evidence": {
+    "root": "/var/tmp/litchi-odb-settings-validation-v7-evidence-20260910",
+    "evidence_manifest": "/var/tmp/litchi-odb-settings-validation-v7-evidence-20260910/evidence-sha256.txt",
+    "evidence_manifest_sha256": "df62536e94652a71baa420c29d5f82d5de04b31816880a6ed5cd6066c99470e2",
+    "spec_source_manifest_sha256": "9e75c8153ba01ec3d2c749bfcc1039306a9dca898d9c1c742ddc7f206e6eedca",
+    "evidence_hash_receipt": "all evidence-sha256.txt entries OK"
+  },
+  "tooling": {
+    "rust_toolchain": "1.95.0",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "cpu_affinity": "8-31",
+    "cargo_build_jobs": 24,
+    "review_probe_receipt_root": "/var/tmp/litchi-odb-settings-validation-v7-independent-review-20260910"
+  },
+  "focused_results": {
+    "settings": {
+      "command": "cargo +1.95.0 test --manifest-path crates/litchi-odb/Cargo.toml --test settings --offline",
+      "result": "36 passed, 0 failed",
+      "frozen_log": "/var/tmp/litchi-odb-settings-validation-v7-evidence-20260910/full-test.log",
+      "frozen_log_sha256": "d126526f5dae22ee1b9410e7e5cb689e8e61fb053c17b7b59b68b0db7dd6eccb",
+      "command_file": "commands/settings-focused.txt",
+      "command_sha256": "0fe9d11323b77c3759bd4679dad8f2619be8b2c42d136749f68e19d00b1de9fe",
+      "test_source_sha256": "2ce9ec5f2c051f7dba5e4cd708e0d7ef2da019e69c635cbd863fbb7413c5788f"
+    },
+    "schema_catalog": {
+      "command": "cargo +1.95.0 test --manifest-path crates/litchi-odb/Cargo.toml --test schema_catalog --offline",
+      "result": "12 passed, 0 failed",
+      "frozen_log": "/var/tmp/litchi-odb-settings-validation-v7-evidence-20260910/full-test.log",
+      "frozen_log_sha256": "d126526f5dae22ee1b9410e7e5cb689e8e61fb053c17b7b59b68b0db7dd6eccb",
+      "command_file": "commands/schema-catalog-focused.txt",
+      "command_sha256": "74159c49185a8058856e8f3eb9754749c7d2830c11ee46fa78f2d10f6d26484a",
+      "test_source_sha256": "c2cbd3c8381b9994775a43d8ef1e9a53d839a41723ae51ae14d171e0978da1b7"
+    },
+    "total_focused_results": "48 passed, 0 failed"
+  },
+  "frozen_gate_log_hashes": {
+    "full_test.log": "d126526f5dae22ee1b9410e7e5cb689e8e61fb053c17b7b59b68b0db7dd6eccb",
+    "external_probe.log": "cd2927328b31e28ea4d1f1a532c851d482a8977cbbb26593f603b30e5507bc02",
+    "clippy.log": "22e0df986057b9ba5be07526ac5fb348862a3dedef42108383cc3e088acbb889",
+    "rustdoc.log": "c943189ff852820bb0bf88f2f618c430b93aad93285ae61670ae84e9c17bb061",
+    "diff_check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "workspace_rustfmt.log": "2069c1f4cf3c654d46e8153dfd90d20b26c5ddf4e45b8c1e8b8e7eb130b64b3a"
+  },
+  "independent_probe_logs": {
+    "attr_budget": {
+      "command_file": "commands/attr-budget.txt",
+      "command_sha256": "49f318555939118191fa084784ca1d6c32717301682abfae00bfbdbf145041a5",
+      "log": "logs/attr-budget.log",
+      "log_sha256": "c72c4028c5a1d6b1c3849432484fd9801efae09d17774deb2e5d63fb821d5d6c",
+      "result": "rejects before mutation: escaped output exceeds 67108864 bytes (data-source setting name)"
+    },
+    "nested_budget": {
+      "command_file": "commands/nested-budget.txt",
+      "command_sha256": "e3b5437849bd7367f2bd9a305951224a58e45a727c73d79824a6e20dd4194754",
+      "log": "logs/nested-budget.log",
+      "log_sha256": "020a4f64ef328096fc9d9e228f7440e2258ae4051ce6702ae1cd83f9a74a9c50",
+      "result": "rejects before mutation: escaped output exceeds 67108864 bytes (delimiter field)"
+    },
+    "attribute_roundtrip": {
+      "command_file": "commands/attribute-roundtrip.txt",
+      "command_sha256": "15fb97fd8c40fa6bafd53a3485dc2caa7030f00e4ea30a549ff8f1107ecdae5c",
+      "log": "logs/attribute-roundtrip.log",
+      "log_sha256": "ea8b9ff70037bbc2d928881186fe4e5aaa0c1f51c3151bd31adf630e044aeb41",
+      "result": "all attribute and text setting contexts reopened exactly"
+    },
+    "text_budget_mixed": {
+      "command_file": "commands/text-budget-mixed.txt",
+      "command_sha256": "570747dadbd0bef53294040c2ea646f4198892a3f7251ebee1274cffea3020bf",
+      "log": "logs/text-budget-mixed.log",
+      "log_sha256": "4801f74e31723fd17d729dcc02577a573c92b5d7e8dbf769138cca7a6e18d98f",
+      "result": "16000 mixed tab-heavy text values accepted under text-node budget and reopened exactly"
+    },
+    "typed_readback": {
+      "command_file": "commands/readback.txt",
+      "command_sha256": "10ee4a23e4e40964c4c37a4b521f4d5d804300f491c495e24350ff55c91587b1",
+      "log": "logs/readback.log",
+      "log_sha256": "cc4afd0905f86de38384fef10ecc246eedfc42bd8a8ac79185c971ceebdb8efd",
+      "result": "typed readback mismatch rejects atomically; staged and commit source unchanged"
+    },
+    "cr_budget": {
+      "command_file": "commands/budget.txt",
+      "command_sha256": "795fa18291697bb43e39c87903cd22a75396193c19ebbb30ddf44100aa460bac",
+      "log": "logs/budget.log",
+      "log_sha256": "15bde4783a7666323eb589cc20d74e1614f4a49870d83cebf000b4f1bdf12d0f",
+      "result": "CR expansion budget rejects atomically at data-source setting value"
+    },
+    "server_v6_control": {
+      "command_file": "commands/server.txt",
+      "command_sha256": "522b9cc2f87dbd0be81f05944d9ac7be5649da5d8cfffaa31217bd48e792a432",
+      "log": "logs/server.log",
+      "log_sha256": "c1ca2fe5da8068661517194efad843399d775e119318c0a45f748025b4e6efb6",
+      "result": "schema-valid bound type-only server with optional database name author/reopen succeeds"
+    },
+    "inherited_namespace_and_fixture_probe": {
+      "command_file": "commands/review.txt",
+      "command_sha256": "510ffb6367a9b19ad98e3b1da462906c366a9154d175b3ca1b164ee3650f47f3",
+      "log": "logs/review.log",
+      "log_sha256": "c7a4a5443667e92da5247fb55df63986124d0db288da2c9ed8d617270062c56f",
+      "result": "CR text exact roundtrip; no-address/local-socket servers; reserved and rebound QName refusal; xlink alias and ancestor extension preservation; fixture outcomes as recorded"
+    }
+  },
+  "prior_v6_controls": [
+    "text CR is serialized numerically and typed readback is exact",
+    "schema-valid bound type-only server with optional database name is reversible",
+    "typed-readback mismatch refuses before publication and preserves staged/committed source",
+    "CR-expanded text budget refuses before mutation",
+    "all settings attribute and text contexts roundtrip exact",
+    "foreign namespace attributes and ancestor namespace bindings survive conversion",
+    "xlink alias binding is accepted; rebound xlink URI and unknown reserved db/xlink attributes refuse",
+    "no database driver, credential, or network execution path is used",
+    "unknown markup and comments remain preserved by settings splices",
+    "no-op, inverse, exact source, and required-container atomicity are covered by the 36 focused tests"
+  ],
+  "implementation_check": {
+    "preflight_order": "validate_settings runs inside set_settings before set_settings_inner, scans, serialization, or source edits",
+    "aggregate_count_order": "SettingsBudget.add charges value_count and enforces 65536 before escaped_bytes",
+    "attribute_estimator": "xml_attribute_escaped_len counts tab/LF/CR as five-byte numeric references and matches xml_attribute_escape",
+    "text_estimator": "xml_escaped_len leaves tab/LF literal and counts CR as five-byte numeric reference, matching xml_escape",
+    "scope_caveat": "whitespace-only authored text is rejected later by the existing compactness verifier; mixed tab-heavy text passes the text budget and reopens exactly"
+  },
+  "no_measurements": true
+}

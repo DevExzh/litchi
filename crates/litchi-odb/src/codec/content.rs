@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn requires_family_body() {
         assert!(validate(
-            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/></o:database></o:body></o:document-content>"#,
+            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source><d:connection-data><d:connection-resource xlink:href="" xlink:type="simple"/></d:connection-data></d:data-source></o:database></o:body></o:document-content>"#,
         )
         .is_ok());
         assert!(validate("<office:database/>").is_err());

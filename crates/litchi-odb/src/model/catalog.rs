@@ -2,8 +2,9 @@
 
 use super::{
     component::{Component, ComponentKind},
-    connection::Connection,
+    connection::{Connection, FileDatabaseTarget, ServerDatabaseTarget},
     query::{Query, QueryUpdateTarget},
+    settings::{self, DatabaseSettings},
     table::{
         Column, ColumnSchema, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
         ReferentialAction, Relation, RelationResolution, Table, TableKind,
@@ -11,10 +12,13 @@ use super::{
 };
 use litchi_core::{Error, Result};
 use quick_xml::{
-    XmlVersion,
-    events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    events::{BytesStart, Event, attributes::Attribute},
+    name::{Namespace, QName, ResolveResult},
     reader::NsReader,
+};
+use std::{
+    fmt,
+    sync::{Arc, OnceLock},
 };
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -38,6 +42,10 @@ pub struct Limits {
     max_keys: usize,
     max_indices: usize,
     max_attribute_bytes: usize,
+    max_settings: usize,
+    max_setting_values: usize,
+    max_table_settings: usize,
+    max_filter_patterns: usize,
 }
 
 impl Limits {
@@ -110,6 +118,34 @@ impl Limits {
         self.max_attribute_bytes = value;
         self
     }
+
+    /// Sets the maximum number of data-source setting declarations.
+    #[must_use]
+    pub const fn with_max_settings(mut self, value: usize) -> Self {
+        self.max_settings = value;
+        self
+    }
+
+    /// Sets the maximum number of data-source setting values.
+    #[must_use]
+    pub const fn with_max_setting_values(mut self, value: usize) -> Self {
+        self.max_setting_values = value;
+        self
+    }
+
+    /// Sets the maximum number of driver table-setting declarations.
+    #[must_use]
+    pub const fn with_max_table_settings(mut self, value: usize) -> Self {
+        self.max_table_settings = value;
+        self
+    }
+
+    /// Sets the maximum combined table-filter patterns and table types.
+    #[must_use]
+    pub const fn with_max_filter_patterns(mut self, value: usize) -> Self {
+        self.max_filter_patterns = value;
+        self
+    }
 }
 
 impl Default for Limits {
@@ -125,6 +161,10 @@ impl Default for Limits {
             max_keys: 65_536,
             max_indices: 65_536,
             max_attribute_bytes: 1024 * 1024,
+            max_settings: 65_536,
+            max_setting_values: 65_536,
+            max_table_settings: 65_536,
+            max_filter_patterns: 65_536,
         }
     }
 }
@@ -138,13 +178,84 @@ impl Default for Limits {
 pub struct Catalog<'source> {
     source: &'source str,
     owned: OwnedCatalog,
+    settings: LazySettings<'source>,
 }
+
+/// A source-backed settings projection that materializes only after an
+/// explicit settings read. Failed parses are deliberately not cached, so a
+/// caller never observes a stale error after the source-bound view changes.
+#[derive(Clone)]
+struct LazySettings<'source> {
+    source: &'source str,
+    limits: Limits,
+    value: Arc<OnceLock<DatabaseSettings>>,
+}
+
+impl<'source> LazySettings<'source> {
+    fn with_cache(
+        source: &'source str,
+        limits: Limits,
+        value: Arc<OnceLock<DatabaseSettings>>,
+    ) -> Self {
+        Self {
+            source,
+            limits,
+            value,
+        }
+    }
+
+    fn get(&self) -> Result<&DatabaseSettings> {
+        if let Some(value) = self.value.get() {
+            return Ok(value);
+        }
+        let value = settings::parse(
+            self.source,
+            self.limits.max_attribute_bytes,
+            self.limits.max_settings,
+            self.limits.max_setting_values,
+            self.limits.max_table_settings,
+            self.limits.max_filter_patterns,
+        )?;
+        let _ = self.value.set(value);
+        self.value
+            .get()
+            .ok_or_else(|| invalid("ODB settings projection was not materialized"))
+    }
+}
+
+impl fmt::Debug for LazySettings<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("LazySettings")
+            .field("source_bytes", &self.source.len())
+            .field("limits", &self.limits)
+            .field("materialized", &self.value.get().is_some())
+            .finish()
+    }
+}
+
+impl PartialEq for LazySettings<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.source == other.source && self.limits == other.limits
+    }
+}
+
+impl Eq for LazySettings<'_> {}
 
 impl<'source> Catalog<'source> {
     pub(crate) fn parse(source: &'source str, limits: Limits) -> Result<Self> {
+        Self::parse_with_settings(source, limits, Arc::new(OnceLock::new()))
+    }
+
+    pub(crate) fn parse_with_settings(
+        source: &'source str,
+        limits: Limits,
+        settings_cache: Arc<OnceLock<DatabaseSettings>>,
+    ) -> Result<Self> {
         Ok(Self {
             source,
             owned: parse(source, limits)?,
+            settings: LazySettings::with_cache(source, limits, settings_cache),
         })
     }
 
@@ -235,6 +346,15 @@ impl<'source> Catalog<'source> {
     #[must_use]
     pub const fn connection(&self) -> Option<&Connection> {
         self.owned.connection()
+    }
+
+    /// Returns bounded inert login, driver, application, and filter settings.
+    ///
+    /// The optional projection is parsed on the first call and successful
+    /// reads are reused by this source-bound view. A malformed projection is
+    /// returned as a typed error and is not cached.
+    pub fn settings(&self) -> Result<&DatabaseSettings> {
+        self.settings.get()
     }
 
     /// Finds one unambiguous table declaration by exact producer-visible name.
@@ -362,6 +482,7 @@ struct Frame {
 enum NamespaceKind {
     Office,
     Database,
+    Xlink,
     Other,
 }
 
@@ -386,6 +507,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
     let mut components = 0usize;
     let mut keys = 0usize;
     let mut indices = 0usize;
+    let mut strict_targets = false;
 
     loop {
         events = events
@@ -399,9 +521,22 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(&format!("invalid ODB semantic XML: {error}")))?;
         let namespace = namespace_kind(&resolved);
-        let event = raw_event.into_owned();
-        match event {
+        match raw_event {
             Event::Start(element) => {
+                if stack
+                    .last()
+                    .is_some_and(|frame| is_connection_target(frame.element))
+                {
+                    return Err(invalid("ODB connection target must have empty content"));
+                }
+                let event_strict_targets = if stack.is_empty()
+                    && namespace == NamespaceKind::Office
+                    && element.local_name().as_ref() == b"document-content"
+                {
+                    odf14_targets(&reader, &element, limits)?
+                } else {
+                    strict_targets
+                };
                 let frame = start(
                     &reader,
                     namespace,
@@ -414,6 +549,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                     &mut components,
                     &mut keys,
                     &mut indices,
+                    event_strict_targets,
                     limits,
                 )?;
                 if stack.is_empty() {
@@ -423,6 +559,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                         ));
                     }
                     root_seen = true;
+                    strict_targets = event_strict_targets;
                 }
                 if stack.len() >= limits.max_depth {
                     return Err(invalid("ODB semantic catalog exceeds the nesting limit"));
@@ -432,6 +569,12 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
             Event::Empty(element) => {
                 if stack.is_empty() {
                     return Err(invalid("ODB semantic catalog root cannot be empty"));
+                }
+                if stack
+                    .last()
+                    .is_some_and(|frame| is_connection_target(frame.element))
+                {
+                    return Err(invalid("ODB connection target must have empty content"));
                 }
                 if stack.len() >= limits.max_depth {
                     return Err(invalid("ODB semantic catalog exceeds the nesting limit"));
@@ -448,6 +591,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                     &mut components,
                     &mut keys,
                     &mut indices,
+                    strict_targets,
                     limits,
                 )?;
             },
@@ -463,6 +607,20 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                 return Err(invalid("DOCTYPE is not permitted in ODB content.xml"));
             },
             Event::Eof => break,
+            Event::Text(_) | Event::CData(_)
+                if stack
+                    .last()
+                    .is_some_and(|frame| is_connection_target(frame.element)) =>
+            {
+                return Err(invalid("ODB connection target must have empty content"));
+            },
+            Event::GeneralRef(_)
+                if stack
+                    .last()
+                    .is_some_and(|frame| is_connection_target(frame.element)) =>
+            {
+                return Err(invalid("ODB connection target must have empty content"));
+            },
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
@@ -532,9 +690,12 @@ fn start(
     components: &mut usize,
     keys: &mut usize,
     indices: &mut usize,
+    strict_targets: bool,
     limits: Limits,
 ) -> Result<Frame> {
     let local = element.local_name();
+    validate_reserved_element(parent.map(|frame| frame.element), namespace, local.as_ref())?;
+    validate_reserved_attributes(reader, element, local.as_ref())?;
     let kind = classify(parent, namespace, local.as_ref());
     let in_database = parent.is_some_and(|frame| frame.in_database) || kind == Element::Database;
     if kind == Element::Other && is_catalog_node(namespace, local.as_ref()) {
@@ -605,24 +766,13 @@ fn start(
         )
     {
         let connection = match kind {
-            Element::FileBasedDatabase => Connection::file(required_attr(
-                reader,
-                element,
-                XLINK_NAMESPACE,
-                b"href",
-                limits,
-            )?),
-            Element::ServerDatabase => Connection::server(
-                required_db_attr(reader, element, b"hostname", limits)?,
-                required_db_attr(reader, element, b"database-name", limits)?,
-            ),
-            Element::ConnectionResource => Connection::resource(required_attr(
-                reader,
-                element,
-                XLINK_NAMESPACE,
-                b"href",
-                limits,
-            )?),
+            Element::FileBasedDatabase => {
+                parse_file_target(reader, element, strict_targets, limits)?
+            },
+            Element::ServerDatabase => {
+                parse_server_target(reader, element, strict_targets, limits)?
+            },
+            Element::ConnectionResource => parse_resource_target(reader, element, limits)?,
             Element::Document
             | Element::Body
             | Element::Database
@@ -1066,12 +1216,431 @@ fn is_catalog_node(namespace: NamespaceKind, local: &[u8]) -> bool {
         )
 }
 
+fn is_connection_target(element: Element) -> bool {
+    matches!(
+        element,
+        Element::FileBasedDatabase | Element::ServerDatabase | Element::ConnectionResource
+    )
+}
+
+fn odf14_targets(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    limits: Limits,
+) -> Result<bool> {
+    let Some(version) = optional_attr(reader, element, OFFICE_NAMESPACE, b"version", limits)?
+    else {
+        return Ok(false);
+    };
+    let version = collapse_xml_whitespace(&version)?;
+    let mut parts = version.split('.');
+    let major = parts
+        .next()
+        .ok_or_else(|| invalid("ODB office:version is empty"))?
+        .parse::<u16>()
+        .map_err(|_| invalid("invalid ODB office:version"))?;
+    let minor = parts
+        .next()
+        .ok_or_else(|| invalid("invalid ODB office:version"))?
+        .parse::<u16>()
+        .map_err(|_| invalid("invalid ODB office:version"))?;
+    if parts.next().is_some() {
+        return Err(invalid("invalid ODB office:version"));
+    }
+    Ok((major, minor) >= (1, 4))
+}
+
+fn parse_file_target(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    strict_targets: bool,
+    limits: Limits,
+) -> Result<Connection> {
+    validate_connection_target_attributes(reader, element, b"file-based-database")?;
+    let href = required_attr(reader, element, XLINK_NAMESPACE, b"href", limits)?;
+    // `xlink:type` is a fixed schema token.  Keep its tiny lexical value
+    // readable even when a caller sets the semantic string limit to zero to
+    // exercise the separately lazy settings projection.
+    let link_type = optional_attr(
+        reader,
+        element,
+        XLINK_NAMESPACE,
+        b"type",
+        connection_link_limits(limits),
+    )?;
+    let media_type = optional_db_attr(reader, element, b"media-type", limits)?;
+    let extension = optional_db_attr(reader, element, b"extension", limits)?;
+    if let Some(value) = link_type.as_deref()
+        && collapse_xml_whitespace(value)? != "simple"
+    {
+        return Err(invalid("ODB file-based-database xlink:type must be simple"));
+    }
+    if strict_targets && (link_type.is_none() || media_type.is_none()) {
+        return Err(invalid(
+            "ODB file-based-database requires xlink:type and db:media-type",
+        ));
+    }
+    let (Some(_link_type), Some(media_type)) = (link_type, media_type) else {
+        return Ok(Connection::file(href));
+    };
+    Ok(Connection::FileTarget(
+        FileDatabaseTarget::new(href, media_type).with_extension(extension),
+    ))
+}
+
+fn parse_server_target(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    strict_targets: bool,
+    limits: Limits,
+) -> Result<Connection> {
+    validate_connection_target_attributes(reader, element, b"server-database")?;
+    let database_type = optional_db_attr(reader, element, b"type", limits)?;
+    if database_type.is_none() {
+        if strict_targets {
+            return Err(invalid("ODB server-database is missing db:type"));
+        }
+        return Ok(Connection::server(
+            required_db_attr(reader, element, b"hostname", limits)?,
+            required_db_attr(reader, element, b"database-name", limits)?,
+        ));
+    }
+    let database_type =
+        database_type.ok_or_else(|| invalid("ODB server-database is missing db:type"))?;
+    let database_type = collapse_xml_whitespace(&database_type)?;
+    let database_type_namespace =
+        parse_namespaced_token(reader, &database_type, "server-database type")?;
+    let hostname = optional_db_attr(reader, element, b"hostname", limits)?;
+    let port = optional_db_attr(reader, element, b"port", limits)?
+        .map(|value| parse_positive_u64(&value, "server-database port"))
+        .transpose()?;
+    let local_socket = optional_db_attr(reader, element, b"local-socket", limits)?;
+    if hostname.is_some() && local_socket.is_some() {
+        return Err(invalid(
+            "ODB server-database cannot declare both hostname and local-socket",
+        ));
+    }
+    if port.is_some() && hostname.is_none() {
+        return Err(invalid("ODB server-database port requires a hostname"));
+    }
+    let database_name = optional_db_attr(reader, element, b"database-name", limits)?;
+    let mut target = ServerDatabaseTarget::new(database_type);
+    if let Some(namespace) = database_type_namespace {
+        target = target.with_database_type_namespace(namespace);
+    }
+    if let Some(hostname) = hostname {
+        target = target.with_host(hostname, port);
+    } else if let Some(local_socket) = local_socket {
+        target = target.with_local_socket(local_socket);
+    }
+    Ok(Connection::ServerTarget(
+        target.with_database_name(database_name),
+    ))
+}
+
+fn parse_resource_target(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    limits: Limits,
+) -> Result<Connection> {
+    validate_connection_target_attributes(reader, element, b"connection-resource")?;
+    let link_limits = connection_link_limits(limits);
+    let link_type = required_attr(reader, element, XLINK_NAMESPACE, b"type", link_limits)?;
+    if collapse_xml_whitespace(&link_type)? != "simple" {
+        return Err(invalid("ODB connection-resource xlink:type must be simple"));
+    }
+    let href = required_attr(reader, element, XLINK_NAMESPACE, b"href", limits)?;
+    if let Some(show) = optional_attr(reader, element, XLINK_NAMESPACE, b"show", link_limits)?
+        && collapse_xml_whitespace(&show)? != "none"
+    {
+        return Err(invalid("ODB connection-resource xlink:show must be none"));
+    }
+    if let Some(actuate) = optional_attr(reader, element, XLINK_NAMESPACE, b"actuate", link_limits)?
+        && collapse_xml_whitespace(&actuate)? != "onRequest"
+    {
+        return Err(invalid(
+            "ODB connection-resource xlink:actuate must be onRequest",
+        ));
+    }
+    Ok(Connection::resource(href))
+}
+
+fn connection_link_limits(mut limits: Limits) -> Limits {
+    limits.max_attribute_bytes = limits.max_attribute_bytes.max(64);
+    limits
+}
+
+fn validate_connection_target_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    target: &[u8],
+) -> Result<()> {
+    for raw in element.attributes() {
+        let attribute = raw.map_err(|error| invalid(&format!("invalid ODB attribute: {error}")))?;
+        let raw_name = attribute.key.as_ref();
+        if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
+        let allowed = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => match target {
+                b"connection-resource" => {
+                    matches!(name.as_ref(), b"type" | b"href" | b"show" | b"actuate")
+                },
+                b"file-based-database" => matches!(name.as_ref(), b"type" | b"href"),
+                b"server-database" => false,
+                _ => false,
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == DATABASE_NAMESPACE => match target {
+                b"connection-resource" => false,
+                b"file-based-database" => matches!(name.as_ref(), b"media-type" | b"extension"),
+                b"server-database" => matches!(
+                    name.as_ref(),
+                    b"type" | b"hostname" | b"port" | b"local-socket" | b"database-name"
+                ),
+                _ => false,
+            },
+            ResolveResult::Bound(Namespace(uri))
+                if uri == OFFICE_NAMESPACE || uri == b"http://www.w3.org/2000/xmlns/" =>
+            {
+                false
+            },
+            ResolveResult::Unknown(_) | ResolveResult::Unbound if reserved_prefix(raw_name) => {
+                false
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unknown(_) | ResolveResult::Unbound => true,
+        };
+        if !allowed {
+            return Err(invalid(
+                "ODB connection target contains an unknown reserved attribute",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_reserved_element(
+    parent: Option<Element>,
+    namespace: NamespaceKind,
+    local: &[u8],
+) -> Result<()> {
+    match namespace {
+        NamespaceKind::Office => {
+            let allowed = match parent {
+                None => local == b"document-content",
+                Some(Element::Document) => matches!(
+                    local,
+                    b"automatic-styles" | b"body" | b"font-face-decls" | b"scripts"
+                ),
+                Some(Element::Body) => local == b"database",
+                _ => false,
+            };
+            if !allowed {
+                return Err(invalid(
+                    "ODB semantic catalog contains an invalid office element",
+                ));
+            }
+        },
+        NamespaceKind::Database if !is_known_database_element(local) => {
+            return Err(invalid(
+                "ODB semantic catalog contains an unknown database element",
+            ));
+        },
+        NamespaceKind::Xlink => {
+            return Err(invalid(
+                "ODB semantic catalog contains an invalid xlink element",
+            ));
+        },
+        NamespaceKind::Database | NamespaceKind::Other => {},
+    }
+    Ok(())
+}
+
+fn is_known_database_element(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"application-connection-settings"
+            | b"auto-increment"
+            | b"character-set"
+            | b"column"
+            | b"column-definition"
+            | b"column-definitions"
+            | b"columns"
+            | b"component"
+            | b"component-collection"
+            | b"connection-data"
+            | b"connection-resource"
+            | b"data-source"
+            | b"data-source-setting"
+            | b"data-source-setting-value"
+            | b"data-source-settings"
+            | b"database-description"
+            | b"delimiter"
+            | b"driver-settings"
+            | b"file-based-database"
+            | b"font-charset"
+            | b"filter-statement"
+            | b"forms"
+            | b"index"
+            | b"index-column"
+            | b"index-columns"
+            | b"indices"
+            | b"key"
+            | b"key-column"
+            | b"key-columns"
+            | b"keys"
+            | b"login"
+            | b"order-statement"
+            | b"queries"
+            | b"query"
+            | b"query-collection"
+            | b"reports"
+            | b"schema-definition"
+            | b"server-database"
+            | b"table-definition"
+            | b"table-definitions"
+            | b"table-exclude-filter"
+            | b"table-filter"
+            | b"table-filter-pattern"
+            | b"table-include-filter"
+            | b"table-representation"
+            | b"table-representations"
+            | b"table-setting"
+            | b"table-settings"
+            | b"table-type"
+            | b"table-type-filter"
+            | b"update-table"
+    )
+}
+
+fn validate_reserved_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local: &[u8],
+) -> Result<()> {
+    for raw in element.attributes() {
+        let attribute =
+            raw.map_err(|error| invalid(&format!("invalid ODB semantic attribute: {error}")))?;
+        let raw_name = attribute.key.as_ref();
+        if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (attribute_namespace, name) = reader.resolver().resolve_attribute(attribute.key);
+        let allowed = match attribute_namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == DATABASE_NAMESPACE => {
+                known_database_attribute(name.as_ref())
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => match local {
+                b"component" => matches!(
+                    name.as_ref(),
+                    b"actuate" | b"href" | b"show" | b"title" | b"type"
+                ),
+                b"connection-resource" => {
+                    matches!(name.as_ref(), b"actuate" | b"href" | b"show" | b"type")
+                },
+                b"file-based-database" => matches!(name.as_ref(), b"href" | b"type"),
+                _ => false,
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE => {
+                local == b"document-content" && name.as_ref() == b"version"
+            },
+            ResolveResult::Unknown(_) | ResolveResult::Unbound if reserved_prefix(raw_name) => {
+                false
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unknown(_) | ResolveResult::Unbound => true,
+        };
+        if !allowed {
+            return Err(invalid(
+                "ODB semantic catalog contains an unknown reserved attribute",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn known_database_attribute(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"additional-column-statement"
+            | b"append-table-alias-name"
+            | b"apply-command"
+            | b"as-template"
+            | b"base-dn"
+            | b"boolean-comparison-mode"
+            | b"catalog-name"
+            | b"command"
+            | b"data-source-setting-is-list"
+            | b"data-source-setting-name"
+            | b"data-source-setting-type"
+            | b"data-type"
+            | b"database-name"
+            | b"decimal"
+            | b"default-cell-style-name"
+            | b"default-value"
+            | b"default-row-style-name"
+            | b"delete-rule"
+            | b"description"
+            | b"enable-sql92-check"
+            | b"encoding"
+            | b"escape-processing"
+            | b"extension"
+            | b"field"
+            | b"hostname"
+            | b"ignore-driver-privileges"
+            | b"is-ascending"
+            | b"is-autoincrement"
+            | b"is-clustered"
+            | b"is-empty-allowed"
+            | b"is-first-row-header-line"
+            | b"is-nullable"
+            | b"is-password-required"
+            | b"is-table-name-length-limited"
+            | b"is-unique"
+            | b"local-socket"
+            | b"login-timeout"
+            | b"max-row-count"
+            | b"media-type"
+            | b"name"
+            | b"parameter-name-substitution"
+            | b"port"
+            | b"precision"
+            | b"referenced-table-name"
+            | b"related-column-name"
+            | b"row-retrieving-statement"
+            | b"scale"
+            | b"schema-name"
+            | b"show-deleted"
+            | b"string"
+            | b"style-name"
+            | b"suppress-version-columns"
+            | b"system-driver-settings"
+            | b"thousand"
+            | b"title"
+            | b"type"
+            | b"type-name"
+            | b"update-rule"
+            | b"use-catalog"
+            | b"use-system-user"
+            | b"user-name"
+            | b"visible"
+    )
+}
+
+fn reserved_prefix(raw_name: &[u8]) -> bool {
+    raw_name
+        .iter()
+        .position(|byte| *byte == b':')
+        .is_some_and(|index| matches!(&raw_name[..index], b"db" | b"office" | b"xlink"))
+}
+
 fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE) {
         NamespaceKind::Office
     } else if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == DATABASE_NAMESPACE)
     {
         NamespaceKind::Database
+    } else if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == XLINK_NAMESPACE) {
+        NamespaceKind::Xlink
     } else {
         NamespaceKind::Other
     }
@@ -1109,10 +1678,7 @@ fn optional_db_attr(
             if attribute.value.len() > limits.max_attribute_bytes {
                 return Err(invalid("ODB semantic attribute exceeds the byte limit"));
             }
-            let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                .map_err(|error| invalid(&format!("invalid ODB attribute value: {error}")))?
-                .into_owned();
+            let value = decode_attribute_value(reader, &attribute)?;
             if value.len() > limits.max_attribute_bytes {
                 return Err(invalid(
                     "decoded ODB semantic attribute exceeds the byte limit",
@@ -1160,10 +1726,7 @@ fn optional_attr(
             if attribute.value.len() > limits.max_attribute_bytes {
                 return Err(invalid("ODB semantic attribute exceeds the byte limit"));
             }
-            let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                .map_err(|error| invalid(&format!("invalid ODB attribute value: {error}")))?
-                .into_owned();
+            let value = decode_attribute_value(reader, &attribute)?;
             if value.len() > limits.max_attribute_bytes {
                 return Err(invalid(
                     "decoded ODB semantic attribute exceeds the byte limit",
@@ -1177,16 +1740,107 @@ fn optional_attr(
     Ok(found)
 }
 
+fn decode_attribute_value(reader: &NsReader<&[u8]>, attribute: &Attribute<'_>) -> Result<String> {
+    let decoded = reader
+        .decoder()
+        .decode(attribute.value.as_ref())
+        .map_err(|error| invalid(&format!("invalid ODB attribute value: {error}")))?;
+    quick_xml::escape::unescape(decoded.as_ref())
+        .map(|value| value.into_owned())
+        .map_err(|error| invalid(&format!("invalid ODB attribute value: {error}")))
+}
+
 fn parse_bool(value: &str) -> Result<bool> {
-    match value {
+    let value = collapse_xml_whitespace(value)?;
+    match value.as_str() {
         "true" | "1" => Ok(true),
         "false" | "0" => Ok(false),
         _ => Err(invalid("invalid ODB boolean attribute")),
     }
 }
 
+fn parse_positive_u64(value: &str, kind: &str) -> Result<u64> {
+    let value = collapse_xml_whitespace(value)?
+        .parse::<u64>()
+        .map_err(|_| invalid(&format!("invalid ODB {kind}")))?;
+    if value == 0 {
+        return Err(invalid(&format!("ODB {kind} must be positive")));
+    }
+    Ok(value)
+}
+
+fn parse_namespaced_token(
+    reader: &NsReader<&[u8]>,
+    value: &str,
+    kind: &str,
+) -> Result<Option<String>> {
+    let value = collapse_xml_whitespace(value)?;
+    let mut parts = value.split(':');
+    let prefix = parts.next().unwrap_or_default();
+    let local = parts.next().unwrap_or_default();
+    if !is_ncname(prefix) || !is_ncname(local) || parts.next().is_some() {
+        return Err(invalid(&format!("invalid ODB {kind}")));
+    }
+    match reader
+        .resolver()
+        .resolve_prefix(QName(value.as_bytes()).prefix(), false)
+    {
+        ResolveResult::Bound(Namespace(uri)) => std::str::from_utf8(uri)
+            .map(str::to_owned)
+            .map(Some)
+            .map_err(|_| invalid(&format!("invalid ODB {kind} namespace"))),
+        ResolveResult::Unknown(_) | ResolveResult::Unbound => {
+            Err(invalid(&format!("ODB {kind} prefix is not bound")))
+        },
+    }
+}
+
+fn is_ncname(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first.is_alphabetic()) {
+        return false;
+    }
+    chars.all(|character| {
+        character == '_'
+            || character == '-'
+            || character == '.'
+            || character.is_alphanumeric()
+            || character == '\u{b7}'
+            || matches!(character as u32, 0x0300..=0x036f | 0x203f..=0x2040)
+    })
+}
+
+fn collapse_xml_whitespace(value: &str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODB semantic token",
+            source,
+        })?;
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, ' ' | '\t' | '\n' | '\r') {
+            if !output.is_empty() {
+                pending_space = true;
+            }
+        } else {
+            if pending_space {
+                output.push(' ');
+                pending_space = false;
+            }
+            output.push(character);
+        }
+    }
+    Ok(output)
+}
+
 fn parse_key_kind(value: &str) -> Result<KeyKind> {
-    match value {
+    let value = collapse_xml_whitespace(value)?;
+    match value.as_str() {
         "primary" => Ok(KeyKind::Primary),
         "unique" => Ok(KeyKind::Unique),
         "foreign" => Ok(KeyKind::Foreign),
@@ -1195,7 +1849,8 @@ fn parse_key_kind(value: &str) -> Result<KeyKind> {
 }
 
 fn parse_referential_action(value: &str) -> Result<ReferentialAction> {
-    match value {
+    let value = collapse_xml_whitespace(value)?;
+    match value.as_str() {
         "cascade" => Ok(ReferentialAction::Cascade),
         "restrict" => Ok(ReferentialAction::Restrict),
         "set-null" => Ok(ReferentialAction::SetNull),
@@ -1206,7 +1861,8 @@ fn parse_referential_action(value: &str) -> Result<ReferentialAction> {
 }
 
 fn parse_nullability(value: &str) -> Result<bool> {
-    match value {
+    let value = collapse_xml_whitespace(value)?;
+    match value.as_str() {
         "nullable" => Ok(true),
         "no-nulls" => Ok(false),
         _ => Err(invalid("invalid ODB column nullability")),
@@ -1214,6 +1870,7 @@ fn parse_nullability(value: &str) -> Result<bool> {
 }
 
 fn parse_positive_integer(value: &str, kind: &str) -> Result<u64> {
+    let value = collapse_xml_whitespace(value)?;
     let parsed = value
         .parse::<u64>()
         .map_err(|_error| invalid(&format!("invalid ODB column {kind}")))?;
@@ -1224,7 +1881,8 @@ fn parse_positive_integer(value: &str, kind: &str) -> Result<u64> {
 }
 
 fn validate_data_type(value: &str) -> Result<DataType> {
-    match value {
+    let value = collapse_xml_whitespace(value)?;
+    match value.as_str() {
         "bit" => Ok(DataType::Bit),
         "boolean" => Ok(DataType::Boolean),
         "tinyint" => Ok(DataType::TinyInt),
@@ -1284,4 +1942,53 @@ fn select<'a, T>(
 
 fn invalid(message: &str) -> Error {
     Error::InvalidFormat(message.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Catalog, Limits};
+    use crate::model::{parse_count, parse_test_lock, reset_parse_count};
+
+    const SOURCE: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+        r#"<office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/></db:connection-data></db:data-source></office:database></office:body>"#,
+        r#"</office:document-content>"#,
+    );
+    const INVALID_SETTINGS_SOURCE: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+        r#"<office:body><office:database><db:data-source><db:connection-data>"#,
+        r#"<db:connection-resource xlink:href="" xlink:type="simple"/><db:login db:login-timeout="not-a-number"/></db:connection-data>"#,
+        r#"</db:data-source></office:database></office:body></office:document-content>"#,
+    );
+
+    #[test]
+    fn settings_projection_is_lazy_and_reused() {
+        let _lock = parse_test_lock().lock().unwrap();
+        reset_parse_count();
+        let catalog = Catalog::parse(SOURCE, Limits::default()).unwrap();
+        assert_eq!(parse_count(), 0);
+        assert!(catalog.tables().is_empty());
+        assert_eq!(parse_count(), 0);
+
+        let first = catalog.settings().unwrap();
+        assert!(first.is_empty());
+        assert_eq!(parse_count(), 1);
+        let second = catalog.settings().unwrap();
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(parse_count(), 1);
+    }
+
+    #[test]
+    fn failed_settings_reads_are_not_cached() {
+        let _lock = parse_test_lock().lock().unwrap();
+        reset_parse_count();
+        let catalog = Catalog::parse(INVALID_SETTINGS_SOURCE, Limits::default()).unwrap();
+        assert!(catalog.settings().is_err());
+        assert!(catalog.settings().is_err());
+        assert_eq!(parse_count(), 2);
+    }
 }

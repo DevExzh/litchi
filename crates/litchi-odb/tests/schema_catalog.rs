@@ -150,6 +150,28 @@ fn schema_columns_keys_and_indices_are_typed_and_bounded() {
 }
 
 #[test]
+fn catalog_schema_tokens_apply_xml_whitespace_collapse() {
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:queries><d:query d:name="q" d:command="SELECT 1" d:escape-processing="&#x9;true&#xA;"/></d:queries></o:database></o:body></o:document-content>"#;
+    let database = Database::from_bytes(
+        litchi_odb::Builder::new()
+            .content_xml(content)
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        database
+            .catalog()
+            .unwrap()
+            .query("q")
+            .unwrap()
+            .unwrap()
+            .escape_processing(),
+        Some(true)
+    );
+}
+
+#[test]
 fn schema_rejects_invalid_typed_constraint_scalars() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:schema-definition><d:table-definitions><d:table-definition d:name="broken"><d:column-definitions><d:column-definition d:name="id" d:data-type="not-an-odf-type"/></d:column-definitions></d:table-definition></d:table-definitions></d:schema-definition></o:database></o:body></o:document-content>"#;
     let database = Database::from_bytes(
