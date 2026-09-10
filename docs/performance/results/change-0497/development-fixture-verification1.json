@@ -1,0 +1,18 @@
+{
+  "verified_utc": "2026-09-10T15:16:30.536050+00:00",
+  "manifest_sha256": "772a9cd011956965c9cf9137a3a802936a9e56eb53b04c8b5657e2410b8f2fb2",
+  "phases": {
+    "before": {
+      "source_root": "/home/zhuhe/.cache/litchi-goal-0497/before",
+      "checked_files": 2471,
+      "checked_bytes": 85041278,
+      "status": "pass"
+    },
+    "after": {
+      "source_root": "/home/zhuhe/.cache/litchi-goal-0497/after",
+      "checked_files": 2471,
+      "checked_bytes": 85041278,
+      "status": "pass"
+    }
+  }
+}

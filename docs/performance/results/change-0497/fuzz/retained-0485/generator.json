@@ -1,0 +1,73 @@
+{
+  "generator_sha256": "9fd05df397e8a0b4c3e2564773bca05ce00259657eb62f511cceab9c789ce98d",
+  "input_cap_bytes": 65536,
+  "raw_input_sha256_verified": true,
+  "recipes": [
+    {
+      "expected_prepare_success": true,
+      "name": "valid-empty",
+      "recipe_hex": ""
+    },
+    {
+      "expected_prepare_success": true,
+      "name": "valid-escaped-chunks",
+      "recipe_hex": "00000203040506070809"
+    },
+    {
+      "expected_prepare_success": true,
+      "name": "valid-many-paragraphs",
+      "recipe_hex": "0003010203040506070809"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "text-before-start",
+      "recipe_hex": "01"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "nested-start",
+      "recipe_hex": "02"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "truncated-paragraph",
+      "recipe_hex": "03"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "unmatched-end",
+      "recipe_hex": "04"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "invalid-xml-character",
+      "recipe_hex": "05"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "changed-replay",
+      "recipe_hex": "0600020304"
+    },
+    {
+      "expected_prepare_success": false,
+      "name": "empty-stream",
+      "recipe_hex": "07"
+    }
+  ],
+  "schema": "litchi-docx-stream-fuzz-generator-v1",
+  "seed_count": 90,
+  "source_seed_change": "0483",
+  "source_seed_manifest_sha256": "af718d53b76a05c6d979c03bed16458291dddbc5868c4ba834119d168057f253",
+  "source_seeds": [
+    "plain-stored.docx",
+    "plain-deflate.docx",
+    "strict-stored.docx",
+    "strict-deflate.docx",
+    "default-namespace-stored.docx",
+    "default-namespace-deflate.docx",
+    "section-stored.docx",
+    "section-deflate.docx",
+    "empty-paragraph-stored.docx"
+  ],
+  "target": "source_backed_tail_append_stream"
+}

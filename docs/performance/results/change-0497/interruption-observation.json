@@ -1,0 +1,11 @@
+{
+  "schema": "docx-publication-interruption-observation-v1",
+  "observed_utc": "2026-09-10T17:35:02.283812+00:00",
+  "coordinator_session_id": 62956,
+  "coordinator_exit_code": 1,
+  "observed_error": "OSError: [Errno 28] No space left on device while _write_new(directory / replay-cleanup.json, cleanup) closed its output file",
+  "completed_terminal_children": 191,
+  "incomplete_label": "r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64",
+  "child_exit_code": "unknown; no terminal or resource/report evidence was retained",
+  "scope": "Coordinator-observed failure; no fabricated child receipt or reconstructed measurement."
+}

@@ -1,5 +1,49 @@
 # Performance program phase report
 
+## 0497: atomic DOCX publication capability; descriptive formal analysis verified
+
+[0497](changes/0497-docx-atomic-publication.md) adds consuming
+`write_to_path` methods to the existing bounded DOCX logical-tail append plan
+and commit. They reuse the existing DOCX source/replay splice and OPC's atomic
+sibling-temporary replacement path. The scoped failure contract preserves an
+existing destination when source, replay, limit, cancellation, sink, or late
+managed-output failure occurs before replacement; a parent-directory sync
+failure after replacement returns `OpcError::Committed`.
+
+The default hashing sequential sink remains the historical route and keeps its
+serialized schema and timing scope. The counting non-retaining sink and atomic
+filesystem route are after-only capability baselines. The frozen inventory
+contains 72 before/default hashing children, 72 after hashing children, 72
+after counting-sink children, and 72 after atomic-path children: 288 formal
+children and 8,640 samples, plus a separate 72-child/216-sample pilot. Formal
+verification passes all 288 child terminals, including the 97-child resume
+after the original `ENOSPC` interruption.
+
+The descriptive analysis retains 864 matched default-hashing comparison cells
+and 144 after-only capability rows. It retains all 100 >5% adverse flags: 72
+allocator live-byte endpoint, 16 latency, and 12 whole-child RSS. The original
+ordinal-191 raw observation remains archived without fabricated evidence. The
+emergency cleanup overlapped two formal whole-child intervals, so the capture is not
+isolated-host evidence and individual outliers are not attributed to that
+cleanup. Do not turn these scoped observations into a broad speedup, causal,
+durability, cross-platform, or atomic-route comparison claim. Final cleanup verification passes; the evidence inventory is recorded by
+`results/change-0497/seal.py`.
+
+The allocator live-byte flags are endpoint observations, not allocation-count
+or operation-delta results. A possible harness-level explanation is that the
+current sample representation reserves an inline `Option<PublicationRecord>`
+before the measured region even when it is `None`; this is an inference about
+harness layout and makes no production live-memory claim. The file-store small
+allocator hashing p99 remains unresolved at +73.58% and +75.90% across the two
+repeats (aggregate median +74.79%), with no causal attribution.
+
+The atomic interval includes sibling creation, publication, data
+sync, replacement, parent-directory sync, publication drop, and lifecycle
+work. Readback, semantic/raw checks, fixture inverse comparison, replay cleanup,
+report serialization, and process/allocation endpoint snapshots remain outside
+the interval. See the [0497 record](changes/0497-docx-atomic-publication.md)
+and [evidence README](results/change-0497/README.md).
+
 ## 0496: verified descriptive DOCX edit phase attribution
 
 [0496](changes/0496-docx-edit-phase-attribution.md) adds an opt-in diagnostic

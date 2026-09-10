@@ -1,5 +1,31 @@
 # Performance CRUD coverage
 
+## 0497: atomic logical-tail publication capability; no new CRUD row
+
+[0497](changes/0497-docx-atomic-publication.md) adds consuming filesystem
+publication methods to the existing bounded DOCX logical-tail append route. It
+does not add a representative CRUD selector or a default index row. The route
+delegates to OPC's existing sibling-temporary replacement helper and preserves
+source freshness, replay, cancellation, resource, candidate, and inverse-proof
+checks. Failures before replacement preserve the destination and clean the
+private temporary; the post-replacement parent-sync state is typed
+`OpcError::Committed`.
+
+The default hashing sink remains unchanged and is the only before/after
+comparison. Counting is a non-retaining after-only capability, and atomic
+publication is an after-only filesystem capability. Formal verification passes
+288 child terminals and 8,640 samples, including the 97-child resume after the
+original `ENOSPC` interruption. The descriptive analysis retains 864 matched
+default-hashing comparison cells and 144 after-only capability rows, including
+all 100 >5% adverse flags (72 allocator live-byte endpoint, 16 latency, and 12
+whole-child RSS).
+The original ordinal-191 raw observation remains archived without fabricated
+evidence. No broad speedup, cross-platform, durability, write-call, digest, or
+CRUD claim follows. The formal cleanup overlap remains a potential
+I/O-interference limitation, with no isolated-host or individual-outlier
+attribution; final cleanup verification passes, with the evidence inventory recorded by
+`results/change-0497/seal.py`.
+
 ## 0496: verified phase attribution; no new CRUD row
 
 [0496](changes/0496-docx-edit-phase-attribution.md) overlays opt-in wall-clock

@@ -1,0 +1,822 @@
+diff --git a/crates/litchi-opc/src/source_backed.rs b/crates/litchi-opc/src/source_backed.rs
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -45,3 +45,4 @@
+ mod artifact_restore;
+ pub use artifact_restore::SourceArtifactRestoreProof;
++mod batch;
+ mod read_ahead;
+@@ -5782,9 +5782,28 @@
+     /// Return metadata-only views of every ordinary part.
+     pub fn iter_parts(&self) -> impl Iterator<Item = PartView<'_>> {
+         (0..self.parts.len()).map(|index| PartView {
+             package: self,
+             index,
+         })
+     }
+
++    /// Read an explicitly requested set of Parts in input order.
++    ///
++    /// The managed execution context selects a bounded local worker team only
++    /// when the request is large enough for the caller's policy. Without a
++    /// context, below-threshold work, one worker, one request, or a request
++    /// containing a Part larger than the in-flight byte ceiling, this method
++    /// uses the existing serial `read_part` path. Every task still enters the
++    /// cache, source-freshness, ZIP-validation, and managed `PartData`
++    /// contracts owned by this package.
++    ///
++    /// Results have the same order and cardinality as `partnames`; repeated
++    /// names are retained and may share one cached allocation. A failure or
++    /// cancellation drops every completed result after joining all local
++    /// workers. Runtime errors are selected by their lowest input ordinal so
++    /// provider completion order does not change the public error.
++    pub fn read_parts_ordered(&self, partnames: &[PackURI]) -> Result<Vec<PartData>> {
++        batch::read_parts_ordered(self, partnames)
++    }
++
+     /// Return the exact ZIP member names retained by the indexed source.
+diff --git a/crates/litchi-opc/src/source_backed/batch.rs b/crates/litchi-opc/src/source_backed/batch.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/litchi-opc/src/source_backed/batch.rs
+@@ -0,0 +1,758 @@
++//! Bounded, opt-in source-backed multi-Part scheduling.
++//!
++//! The package remains the owner of source fences, ZIP validation, cache
++//! admission, and managed `PartData`; this adapter only schedules calls to
++//! the existing one-Part path.
++
++use super::{PartData, SourceBackedPackage};
++use crate::error::{OpcError, Result};
++use crate::limits::ReadResource;
++use crate::packuri::PackURI;
++use litchi_core::{ExecutionContext, Reservation, Resource, SourceVersion};
++use std::mem::size_of;
++use std::panic::{AssertUnwindSafe, catch_unwind};
++use std::sync::{
++    Arc, Condvar, Mutex, MutexGuard,
++    atomic::{AtomicBool, AtomicUsize, Ordering},
++};
++use std::thread;
++use std::time::Duration;
++
++const WAIT_POLL: Duration = Duration::from_millis(10);
++const ALLOCATOR_ALLOWANCE: usize = 64;
++const CONTROL_BYTES: usize = 2048;
++const ERROR_TEXT_BYTES: usize = 512;
++const THREAD_STACK_BYTES: usize = 256 * 1024;
++
++#[derive(Clone, Copy)]
++struct Request {
++    index: usize,
++    declared_bytes: u64,
++}
++
++/// The parallel error slot is deliberately fixed-size. Provider and ZIP
++/// diagnostics can contain unbounded strings or boxed causes, so workers keep
++/// only a bounded classification and reconstruct a content-free public error.
++#[derive(Debug)]
++enum StoredFailure {
++    Cancelled,
++    SourceChanged {
++        expected: SourceVersion,
++        actual: SourceVersion,
++    },
++    ReadLimit {
++        resource: ReadResource,
++        actual: u64,
++        maximum: u64,
++    },
++    ExecutionLimit {
++        resource: Resource,
++        observed: u64,
++        limit: u64,
++    },
++    Io(std::io::ErrorKind),
++    Zip,
++    Allocation,
++    Other,
++}
++
++impl StoredFailure {
++    fn from_error(error: OpcError) -> Self {
++        match error {
++            OpcError::Cancelled => Self::Cancelled,
++            OpcError::SourceChanged { expected, actual } => {
++                Self::SourceChanged { expected, actual }
++            },
++            OpcError::ReadLimit {
++                resource,
++                actual,
++                maximum,
++            } => Self::ReadLimit {
++                resource,
++                actual,
++                maximum,
++            },
++            OpcError::Execution(error) => match error {
++                litchi_core::ExecutionError::ResourceLimit(limit) => Self::ExecutionLimit {
++                    resource: limit.resource,
++                    observed: limit.observed,
++                    limit: limit.limit,
++                },
++                _ => Self::Other,
++            },
++            OpcError::IoError(error) => Self::Io(error.kind()),
++            OpcError::ParallelRead(_) | OpcError::ZipError(_) => Self::Zip,
++            OpcError::Allocation { .. } | OpcError::CollectionAllocation { .. } => {
++                Self::Allocation
++            },
++            _ => Self::Other,
++        }
++    }
++
++    fn into_error(self) -> OpcError {
++        match self {
++            Self::Cancelled => OpcError::Cancelled,
++            Self::SourceChanged { expected, actual } => {
++                OpcError::SourceChanged { expected, actual }
++            },
++            Self::ReadLimit {
++                resource,
++                actual,
++                maximum,
++            } => OpcError::ReadLimit {
++                resource,
++                actual,
++                maximum,
++            },
++            Self::ExecutionLimit {
++                resource,
++                observed,
++                limit,
++            } => OpcError::Execution(litchi_core::ExecutionError::ResourceLimit(
++                litchi_core::ResourceLimit {
++                    resource,
++                    observed,
++                    limit,
++                    scope: Arc::<str>::from("source-backed batch"),
++                },
++            )),
++            Self::Io(kind) => OpcError::IoError(std::io::Error::from(kind)),
++            Self::Zip => OpcError::ZipError("source-backed batch ZIP read failed".to_string()),
++            Self::Allocation => OpcError::CollectionAllocation {
++                resource: "source-backed batch worker",
++            },
++            Self::Other => super::overlay_unavailable("source-backed batch worker failed"),
++        }
++    }
++}
++
++struct PreparedBatch {
++    requests: Vec<Request>,
++    declared_total: u64,
++    all_fit_inflight: bool,
++    _memory: Option<Reservation>,
++    _objects: Option<Reservation>,
++}
++
++impl PreparedBatch {
++    fn build(
++        package: &SourceBackedPackage,
++        names: &[PackURI],
++        context: Option<&ExecutionContext>,
++    ) -> Result<Self> {
++        let descriptor_bytes = reserved_bytes(
++            names.len(),
++            size_of::<Request>(),
++            "source-backed batch descriptors",
++        )?;
++        let (memory, objects) = reserve_shape(context, descriptor_bytes, 1)?;
++        let mut requests = Vec::new();
++        requests
++            .try_reserve_exact(names.len())
++            .map_err(|source| OpcError::Allocation {
++                resource: "source-backed batch descriptors",
++                source,
++            })?;
++        capacity_fits::<Request>(
++            requests.capacity(),
++            descriptor_bytes,
++            "source-backed batch descriptors",
++        )?;
++
++        let max_inflight = context.map_or(u64::MAX, |context| {
++            context.limits().max_in_flight_bytes().get()
++        });
++        let mut declared_total = 0_u64;
++        let mut all_fit_inflight = true;
++        for name in names {
++            fence(package)?;
++            let index = package
++                .part_index(name)
++                .ok_or_else(|| OpcError::PartNotFound(name.to_string()))?;
++            let declared_bytes = declared_size(package, index)?;
++            package.limits.check(
++                ReadResource::PartBytes,
++                declared_bytes,
++                package.limits.max_part_bytes(),
++            )?;
++            declared_total = declared_total.checked_add(declared_bytes).ok_or_else(|| {
++                OpcError::ReadLimit {
++                    resource: ReadResource::TotalPartBytes,
++                    actual: u64::MAX,
++                    maximum: package.limits.max_total_part_bytes(),
++                }
++            })?;
++            package.limits.check(
++                ReadResource::TotalPartBytes,
++                declared_total,
++                package.limits.max_total_part_bytes(),
++            )?;
++            all_fit_inflight &= declared_bytes <= max_inflight;
++            requests.push(Request {
++                index,
++                declared_bytes,
++            });
++        }
++        // This is the handoff fence between metadata preparation and dispatch.
++        fence(package)?;
++        Ok(Self {
++            requests,
++            declared_total,
++            all_fit_inflight,
++            _memory: memory,
++            _objects: objects,
++        })
++    }
++}
++
++struct Workspace {
++    _memory: Option<Reservation>,
++    _objects: Option<Reservation>,
++    output_bytes: usize,
++    slot_bytes: usize,
++    handle_bytes: usize,
++}
++
++impl Workspace {
++    fn reserve(
++        context: &ExecutionContext,
++        requests: usize,
++        workers: usize,
++        parallel: bool,
++    ) -> Result<Self> {
++        let output_bytes = reserved_bytes(
++            requests,
++            size_of::<PartData>(),
++            "source-backed batch output",
++        )?;
++        let slot_bytes = if parallel {
++            reserved_bytes(
++                requests,
++                size_of::<Option<PartData>>(),
++                "source-backed batch result slots",
++            )?
++        } else {
++            0
++        };
++        let handle_bytes = if parallel {
++            reserved_bytes(
++                workers,
++                size_of::<thread::ScopedJoinHandle<'static, ()>>(),
++                "source-backed batch worker handles",
++            )?
++        } else {
++            0
++        };
++        let worker_state_bytes = if parallel {
++            reserved_bytes(
++                workers,
++                size_of::<usize>(),
++                "source-backed batch worker state",
++            )?
++        } else {
++            0
++        };
++        let stack_bytes = if parallel {
++            workers
++                .checked_mul(THREAD_STACK_BYTES)
++                .ok_or_else(|| super::overlay_unavailable("batch thread stacks overflow"))?
++        } else {
++            0
++        };
++        let control_bytes = CONTROL_BYTES
++            .checked_add(size_of::<Gate>())
++            .and_then(|bytes| bytes.checked_add(size_of::<StoredFailure>()))
++            .and_then(|bytes| bytes.checked_add(ERROR_TEXT_BYTES))
++            .and_then(|bytes| bytes.checked_add(worker_state_bytes))
++            .and_then(|bytes| bytes.checked_add(stack_bytes))
++            .and_then(|bytes| bytes.checked_add(slot_bytes))
++            .and_then(|bytes| bytes.checked_add(output_bytes))
++            .and_then(|bytes| bytes.checked_add(handle_bytes))
++            .ok_or_else(|| super::overlay_unavailable("batch workspace size overflows"))?;
++        let memory = context
++            .reserve(
++                Resource::Memory,
++                u64::try_from(control_bytes)
++                    .map_err(|_| super::overlay_unavailable("batch workspace exceeds u64"))?,
++            )
++            .map_err(super::map_execution_error)?;
++        let object_count = if parallel {
++            workers
++                .checked_add(4)
++                .ok_or_else(|| super::overlay_unavailable("batch object count overflows"))?
++        } else {
++            1
++        };
++        let objects = context.reserve(
++            Resource::Objects,
++            u64::try_from(object_count)
++                .map_err(|_| super::overlay_unavailable("batch object count exceeds u64"))?,
++        );
++        match objects {
++            Ok(objects) => Ok(Self {
++                _memory: Some(memory),
++                _objects: Some(objects),
++                output_bytes,
++                slot_bytes,
++                handle_bytes,
++            }),
++            Err(error) => {
++                drop(memory);
++                Err(super::map_execution_error(error))
++            },
++        }
++    }
++}
++
++struct GateState {
++    tasks: usize,
++    bytes: u64,
++}
++
++struct Gate {
++    state: Mutex<GateState>,
++    ready: Condvar,
++    context: ExecutionContext,
++    max_tasks: usize,
++    max_bytes: u64,
++}
++
++struct Permit<'gate> {
++    gate: &'gate Gate,
++    bytes: u64,
++}
++
++enum Acquire<'gate> {
++    Permit(Permit<'gate>),
++    Stopped,
++}
++
++impl Gate {
++    fn new(context: ExecutionContext) -> Self {
++        let limits = context.limits();
++        Self {
++            state: Mutex::new(GateState { tasks: 0, bytes: 0 }),
++            ready: Condvar::new(),
++            context,
++            max_tasks: limits.max_in_flight_tasks().get(),
++            max_bytes: limits.max_in_flight_bytes().get(),
++        }
++    }
++
++    fn acquire(&self, declared_bytes: u64, stop: &AtomicBool) -> Result<Acquire<'_>> {
++        if declared_bytes > self.max_bytes {
++            return Err(super::overlay_unavailable(
++                "batch task cannot fit in its admitted byte gate",
++            ));
++        }
++        let mut state = lock(&self.state);
++        loop {
++            if stop.load(Ordering::Acquire) {
++                return Ok(Acquire::Stopped);
++            }
++            self.context
++                .check()
++                .map_err(super::map_execution_error)?;
++            let fits = state
++                .bytes
++                .checked_add(declared_bytes)
++                .is_some_and(|bytes| bytes <= self.max_bytes);
++            if state.tasks < self.max_tasks && fits {
++                state.tasks = state
++                    .tasks
++                    .checked_add(1)
++                    .ok_or_else(|| super::overlay_unavailable("batch task counter overflows"))?;
++                state.bytes = state.bytes.checked_add(declared_bytes).ok_or_else(|| {
++                    super::overlay_unavailable("batch byte gate counter overflows")
++                })?;
++                return Ok(Acquire::Permit(Permit {
++                    gate: self,
++                    bytes: declared_bytes,
++                }));
++            }
++            let (next, _) = self
++                .ready
++                .wait_timeout(state, WAIT_POLL)
++                .unwrap_or_else(|poisoned| poisoned.into_inner());
++            state = next;
++        }
++    }
++
++    fn stop_waiters(&self) {
++        self.ready.notify_all();
++    }
++
++    fn release(&self, bytes: u64) {
++        let mut state = lock(&self.state);
++        assert!(state.tasks > 0, "batch gate task counter underflow");
++        assert!(state.bytes >= bytes, "batch gate byte counter underflow");
++        state.tasks -= 1;
++        state.bytes -= bytes;
++        self.ready.notify_all();
++    }
++}
++
++impl Drop for Permit<'_> {
++    fn drop(&mut self) {
++        self.gate.release(self.bytes);
++    }
++}
++
++fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
++    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
++}
++
++pub(super) fn read_parts_ordered(
++    package: &SourceBackedPackage,
++    names: &[PackURI],
++) -> Result<Vec<PartData>> {
++    if let Err(error) = fence(package) {
++        return Err(error);
++    }
++    if names.is_empty() {
++        return finish(package, Ok(Vec::new()));
++    }
++    if let Err(error) = check_request_count(package, names.len()) {
++        return finish(package, Err(error));
++    }
++
++    let context = package.cache.context().cloned();
++    let prepared = match PreparedBatch::build(package, names, context.as_ref()) {
++        Ok(prepared) => prepared,
++        Err(error) => return finish(package, Err(error)),
++    };
++    let parallel = context.as_ref().is_some_and(|context| {
++        let limits = context.limits();
++        let workers = limits
++            .workers()
++            .get()
++            .min(limits.max_in_flight_tasks().get())
++            .min(prepared.requests.len());
++        workers > 1
++            && prepared.requests.len() > 1
++            && prepared.declared_total >= limits.min_parallel_bytes()
++            && prepared.all_fit_inflight
++    });
++    let workers = context.as_ref().map_or(0, |context| {
++        context
++            .limits()
++            .workers()
++            .get()
++            .min(context.limits().max_in_flight_tasks().get())
++            .min(prepared.requests.len())
++    });
++
++    let result = if let Some(context) = context {
++        let workspace = match Workspace::reserve(
++            &context,
++            prepared.requests.len(),
++            workers,
++            parallel,
++        ) {
++            Ok(workspace) => workspace,
++            Err(error) => {
++                drop(prepared);
++                return finish(package, Err(error));
++            },
++        };
++        if let Err(error) = fence(package) {
++            drop(workspace);
++            drop(prepared);
++            return finish(package, Err(error));
++        }
++        let result = if parallel {
++            read_parallel(package, context, &prepared.requests, workers, &workspace)
++        } else {
++            read_serial(package, &prepared.requests, workspace.output_bytes)
++        };
++        drop(workspace);
++        result
++    } else {
++        read_serial(package, &prepared.requests, 0)
++    };
++    drop(prepared);
++    finish(package, result)
++}
++
++fn check_request_count(package: &SourceBackedPackage, actual: usize) -> Result<()> {
++    let actual = u64::try_from(actual)
++        .map_err(|_| super::overlay_unavailable("batch request count exceeds u64"))?;
++    let maximum = u64::try_from(package.limits.max_parts())
++        .map_err(|_| super::overlay_unavailable("batch part limit exceeds u64"))?;
++    if actual > maximum {
++        return Err(OpcError::ReadLimit {
++            resource: ReadResource::Parts,
++            actual,
++            maximum,
++        });
++    }
++    Ok(())
++}
++
++fn declared_size(package: &SourceBackedPackage, index: usize) -> Result<u64> {
++    let part = package
++        .parts
++        .get(index)
++        .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
++    // Preserve source/context precedence even if central-directory metadata
++    // itself fails: the metadata result is not exposed until both fences pass.
++    let metadata = package
++        .archive
++        .metadata_for(part.entry_id)
++        .map_err(super::map_preservation_error);
++    package.source.ensure_current()?;
++    package
++        .cache
++        .check_context()
++        .map_err(super::map_execution_error)?;
++    Ok(metadata?.uncompressed_size())
++}
++
++fn read_serial(
++    package: &SourceBackedPackage,
++    requests: &[Request],
++    output_bytes: usize,
++) -> Result<Vec<PartData>> {
++    let mut output = Vec::new();
++    if !requests.is_empty() {
++        output
++            .try_reserve_exact(requests.len())
++            .map_err(|source| OpcError::Allocation {
++                resource: "source-backed batch results",
++                source,
++            })?;
++        if output_bytes != 0 {
++            capacity_fits::<PartData>(
++                output.capacity(),
++                output_bytes,
++                "source-backed batch output",
++            )?;
++        }
++    }
++    for request in requests {
++        output.push(package.read_part(request.index)?);
++    }
++    Ok(output)
++}
++
++fn read_parallel(
++    package: &SourceBackedPackage,
++    context: ExecutionContext,
++    requests: &[Request],
++    workers: usize,
++    workspace: &Workspace,
++) -> Result<Vec<PartData>> {
++    let mut slots = Vec::new();
++    slots
++        .try_reserve_exact(requests.len())
++        .map_err(|source| OpcError::Allocation {
++            resource: "source-backed batch result slots",
++            source,
++        })?;
++    capacity_fits::<Option<PartData>>(
++        slots.capacity(),
++        workspace.slot_bytes,
++        "source-backed batch result slots",
++    )?;
++    slots.resize_with(requests.len(), || None);
++    let slots = Mutex::new(slots);
++    let failures = Mutex::new(None::<(usize, StoredFailure)>);
++    let next = AtomicUsize::new(0);
++    let stop = AtomicBool::new(false);
++    let gate = Gate::new(context);
++    thread::scope(|scope| -> Result<()> {
++        let mut handles = Vec::new();
++        handles
++            .try_reserve_exact(workers)
++            .map_err(|source| OpcError::Allocation {
++                resource: "source-backed batch worker handles",
++                source,
++            })?;
++        capacity_fits::<thread::ScopedJoinHandle<'static, ()>>(
++            handles.capacity(),
++            workspace.handle_bytes,
++            "source-backed batch worker handles",
++        )?;
++
++        let mut spawn_error = None;
++        for _ in 0..workers {
++            match thread::Builder::new()
++                .stack_size(THREAD_STACK_BYTES)
++                .spawn_scoped(scope, move || {
++                    worker(package, requests, &next, &stop, &gate, &slots, &failures)
++                }) {
++                Ok(handle) => handles.push(handle),
++                Err(error) => {
++                    signal_stop(&stop, &gate);
++                    spawn_error = Some(OpcError::IoError(error));
++                    break;
++                },
++            }
++        }
++        let mut join_panicked = false;
++        for handle in handles {
++            if handle.join().is_err() {
++                join_panicked = true;
++            }
++        }
++        if let Some(error) = spawn_error {
++            return Err(error);
++        }
++        if join_panicked {
++            return Err(super::overlay_unavailable(
++                "source-backed batch worker escaped its panic boundary",
++            ));
++        }
++        Ok(())
++    })?;
++
++    if let Some((_, failure)) = lock(&failures).take() {
++        return Err(failure.into_error());
++    }
++    let mut output = Vec::new();
++    output
++        .try_reserve_exact(requests.len())
++        .map_err(|source| OpcError::Allocation {
++            resource: "source-backed ordered batch output",
++            source,
++        })?;
++    capacity_fits::<PartData>(
++        output.capacity(),
++        workspace.output_bytes,
++        "source-backed batch output",
++    )?;
++    let mut slots = lock(&slots);
++    for slot in slots.drain(..) {
++        output.push(slot.ok_or_else(|| {
++            super::overlay_unavailable("batch worker left an empty result slot")
++        })?);
++    }
++    Ok(output)
++}
++
++fn worker(
++    package: &SourceBackedPackage,
++    requests: &[Request],
++    next: &AtomicUsize,
++    stop: &AtomicBool,
++    gate: &Gate,
++    slots: &Mutex<Vec<Option<PartData>>>,
++    failures: &Mutex<Option<(usize, StoredFailure)>>,
++) {
++    loop {
++        let mut ordinal_hint = usize::MAX;
++        let outcome = catch_unwind(AssertUnwindSafe(|| {
++            if stop.load(Ordering::Acquire) {
++                return Ok(false);
++            }
++            let ordinal = next.fetch_add(1, Ordering::AcqRel);
++            ordinal_hint = ordinal;
++            let Some(request) = requests.get(ordinal).copied() else {
++                return Ok(false);
++            };
++            let permit = match gate.acquire(request.declared_bytes, stop)? {
++                Acquire::Permit(permit) => permit,
++                Acquire::Stopped => return Ok(false),
++            };
++            let data = package.read_part(request.index)?;
++            lock(slots)[ordinal] = Some(data);
++            drop(permit);
++            Ok(true)
++        }));
++        match outcome {
++            Ok(Ok(true)) => continue,
++            Ok(Ok(false)) => return,
++            Ok(Err(error)) => {
++                record_failure(
++                    failures,
++                    ordinal_hint,
++                    StoredFailure::from_error(error),
++                );
++                signal_stop(stop, gate);
++                return;
++            },
++            Err(_) => {
++                record_failure(failures, ordinal_hint, StoredFailure::Other);
++                signal_stop(stop, gate);
++                return;
++            },
++        }
++    }
++}
++
++fn record_failure(
++    failures: &Mutex<Option<(usize, StoredFailure)>>,
++    ordinal: usize,
++    failure: StoredFailure,
++) {
++    let mut selected = lock(failures);
++    if selected
++        .as_ref()
++        .is_none_or(|(current, _)| ordinal < *current)
++    {
++        *selected = Some((ordinal, failure));
++    }
++}
++
++fn signal_stop(stop: &AtomicBool, gate: &Gate) {
++    stop.store(true, Ordering::Release);
++    gate.stop_waiters();
++}
++
++fn reserved_bytes(elements: usize, element_size: usize, label: &'static str) -> Result<usize> {
++    let per_element = element_size
++        .checked_add(ALLOCATOR_ALLOWANCE)
++        .ok_or_else(|| super::overlay_unavailable("batch allocation envelope overflows"))?;
++    elements
++        .checked_mul(per_element)
++        .ok_or_else(|| super::overlay_unavailable(label))
++}
++
++fn capacity_fits<T>(capacity: usize, charged: usize, label: &'static str) -> Result<()> {
++    let actual = capacity
++        .checked_mul(size_of::<T>())
++        .ok_or_else(|| super::overlay_unavailable("batch capacity measurement overflows"))?;
++    if actual > charged {
++        return Err(super::overlay_unavailable(label));
++    }
++    Ok(())
++}
++
++fn reserve_shape(
++    context: Option<&ExecutionContext>,
++    memory_bytes: usize,
++    object_count: u64,
++) -> Result<(Option<Reservation>, Option<Reservation>)> {
++    let Some(context) = context else {
++        return Ok((None, None));
++    };
++    let memory = context
++        .reserve(
++            Resource::Memory,
++            u64::try_from(memory_bytes)
++                .map_err(|_| super::overlay_unavailable("batch descriptors exceed u64"))?,
++        )
++        .map_err(super::map_execution_error)?;
++    match context.reserve(Resource::Objects, object_count) {
++        Ok(objects) => Ok((Some(memory), Some(objects))),
++        Err(error) => {
++            drop(memory);
++            Err(super::map_execution_error(error))
++        },
++    }
++}
++
++fn fence(package: &SourceBackedPackage) -> Result<()> {
++    package.source.ensure_current()?;
++    package
++        .cache
++        .check_context()
++        .map_err(super::map_execution_error)
++}
++
++fn finish(package: &SourceBackedPackage, result: Result<Vec<PartData>>) -> Result<Vec<PartData>> {
++    // The source fence deliberately precedes cancellation and the stored task
++    // error. This is the same freshness boundary used by one-Part reads.
++    fence(package)?;
++    result
++}
+diff --git a/crates/litchi-opc/tests/source_backed_batch.rs b/crates/litchi-opc/tests/source_backed_batch.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/litchi-opc/tests/source_backed_batch.rs
+@@ -0,0 +1,17 @@
++//! Focused contract coverage for the proposed operation.
++//!
++//! This file is part of the review patch. It is intentionally not installed
++//! in the workspace until the next-batch baseline and acceptance gates pass.
++
++// The implementation slice should add these tests with the existing local
++// OPC fixture helpers:
++//
++// serial_equivalence_preserves_order_and_duplicate_allocation
++// bounded_workers_and_declared_bytes_overlap_only_within_policy
++// same_part_duplicates_share_one_cold_load
++// cache_and_scheduler_reservations_return_to_baseline
++// lower_input_ordinal_error_wins_after_out_of_order_completion
++// cancellation_before_dispatch_and_while_waiting_joins_every_worker
++// source_change_during_worker_is_source_first
++// short_read_owned_file_and_delayed_read_at_providers
++// no_worker_team_for_one_worker_or_below_threshold_work

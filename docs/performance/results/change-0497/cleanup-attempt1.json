@@ -1,0 +1,5430 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0497/cleanup.py"
+  ],
+  "dry_run": {
+    "bytes": 140458,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/cleanup-dry-run2.json",
+    "relative_path": "cleanup-dry-run2.json",
+    "sha256": "0e15e596ce00a697b634be7dcfa4910eff621040957bf39be9118afa85872656"
+  },
+  "exit_code": 1,
+  "plan": {
+    "fuzz_target_cleanup": {
+      "early_receipt": {
+        "allocated_bytes": 1148923904,
+        "completed_ns": 1789061578613365068,
+        "descriptor": {
+          "bytes": 301,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/early-fuzz-target-cleanup.json",
+          "relative_path": "early-fuzz-target-cleanup.json",
+          "sha256": "7e995efe4c11752ce8d00089ca87b5abf0c8d32d2e22b1eebcb1e8eb560becca"
+        },
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/fuzz-target/target",
+        "reason": "ASan build and both20k total fuzz iterations verified; retained binary SHA authenticated; interrupted formal capture ENOSPC emergency cleanup."
+      },
+      "mode": "early"
+    },
+    "preserved_failed": [
+      {
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/tmp",
+        "reason": "failed private cleanup terminal"
+      }
+    ],
+    "process_audit": {
+      "candidate_references": [],
+      "excluded_kernel_threads": [
+        {
+          "comm": "kworker/0:0H-kblockd",
+          "pid": 10,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/14",
+          "pid": 100,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/14",
+          "pid": 101,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/5:0-mm_percpu_wq",
+          "pid": 1010848,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/14",
+          "pid": 102,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/14",
+          "pid": 103,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/18:1H-kblockd",
+          "pid": 1035,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/14:0H-kblockd",
+          "pid": 105,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/15",
+          "pid": 106,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/22:1H-kblockd",
+          "pid": 1062,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/19:1H-kblockd",
+          "pid": 1063,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/23:1H-kblockd",
+          "pid": 1066,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/20:1H-kblockd",
+          "pid": 1069,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/15",
+          "pid": 107,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/21:1H-kblockd",
+          "pid": 1070,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/24:1H-kblockd",
+          "pid": 1071,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/25:1H-kblockd",
+          "pid": 1072,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/26:1H-kblockd",
+          "pid": 1073,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/27:1H-kblockd",
+          "pid": 1074,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/28:1H-kblockd",
+          "pid": 1075,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/29:1H-kblockd",
+          "pid": 1076,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/30:1H-kblockd",
+          "pid": 1077,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/15",
+          "pid": 108,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/15",
+          "pid": 109,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/13:0",
+          "pid": 1107046,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/15:0H-kblockd",
+          "pid": 111,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/16",
+          "pid": 112,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/16",
+          "pid": 113,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/16",
+          "pid": 114,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/16",
+          "pid": 115,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/16:0H-kblockd",
+          "pid": 117,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_exp_par_gp_kthread_worker/2",
+          "pid": 118,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/17",
+          "pid": 119,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u128:0-ipv6_addrconf",
+          "pid": 12,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/17",
+          "pid": 120,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/17",
+          "pid": 121,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/17",
+          "pid": 122,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/17:0H-kblockd",
+          "pid": 124,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/18",
+          "pid": 125,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/18",
+          "pid": 126,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/18",
+          "pid": 127,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/18",
+          "pid": 128,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-mm_percpu_wq",
+          "pid": 13,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/18:0H-kblockd",
+          "pid": 130,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/19",
+          "pid": 131,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/19:2-events",
+          "pid": 1316232,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/19",
+          "pid": 132,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/19",
+          "pid": 133,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/19",
+          "pid": 134,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/14:1H-kblockd",
+          "pid": 1355,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/15:1H-kblockd",
+          "pid": 1356,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/19:0H-kblockd",
+          "pid": 136,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/20",
+          "pid": 137,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/20",
+          "pid": 138,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/20",
+          "pid": 139,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/0",
+          "pid": 14,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/20",
+          "pid": 140,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/20:0H-kblockd",
+          "pid": 142,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/21",
+          "pid": 143,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/21",
+          "pid": 144,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/21",
+          "pid": 145,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/30:1-events",
+          "pid": 1454338,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/17:2-mm_percpu_wq",
+          "pid": 1459687,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/21",
+          "pid": 146,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/9:0-events",
+          "pid": 1478331,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/31:2-mm_percpu_wq",
+          "pid": 1478332,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/21:0H-kblockd",
+          "pid": 148,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/22",
+          "pid": 149,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_sched",
+          "pid": 15,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/22",
+          "pid": 150,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/22",
+          "pid": 151,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/22",
+          "pid": 152,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/22:2-mm_percpu_wq",
+          "pid": 1533725,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/22:0H-kblockd",
+          "pid": 154,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/23",
+          "pid": 155,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/23",
+          "pid": 156,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/30:0",
+          "pid": 1567661,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/23",
+          "pid": 157,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/23",
+          "pid": 158,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_exp_par_gp_kthread_worker/1",
+          "pid": 16,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/23:0H-kblockd",
+          "pid": 160,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/24",
+          "pid": 161,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/24",
+          "pid": 162,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/24",
+          "pid": 163,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/24",
+          "pid": 164,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/8:2",
+          "pid": 1643617,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/24:0H-kblockd",
+          "pid": 166,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/25",
+          "pid": 167,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/25",
+          "pid": 168,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/25",
+          "pid": 169,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/16:0",
+          "pid": 1691498,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_exp_gp_kthread_worker",
+          "pid": 17,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/25",
+          "pid": 170,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u131:2-events_unbound",
+          "pid": 1715626,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/25:0H-kblockd",
+          "pid": 172,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/26",
+          "pid": 173,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/26",
+          "pid": 174,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/26",
+          "pid": 175,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/26",
+          "pid": 176,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/26:0H-kblockd",
+          "pid": 178,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/27",
+          "pid": 179,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/0",
+          "pid": 18,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/27",
+          "pid": 180,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/27",
+          "pid": 181,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/2:0-events",
+          "pid": 1811061,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/27",
+          "pid": 182,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/19:0-mm_percpu_wq",
+          "pid": 1822042,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/27:0H-kblockd",
+          "pid": 184,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/28",
+          "pid": 185,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/28",
+          "pid": 186,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/28",
+          "pid": 187,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/28",
+          "pid": 188,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kprobe-optimizer",
+          "pid": 19,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/28:0H-kblockd",
+          "pid": 190,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/29",
+          "pid": 191,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/29",
+          "pid": 192,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/29",
+          "pid": 193,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/29",
+          "pid": 194,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/21:2-cgroup_free",
+          "pid": 1943278,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/29:0H-kblockd",
+          "pid": 196,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/30",
+          "pid": 197,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/30",
+          "pid": 198,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/30",
+          "pid": 199,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kthreadd",
+          "pid": 2,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/0",
+          "pid": 20,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/30",
+          "pid": 200,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u130:0-events_unbound",
+          "pid": 2005431,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/29:2-mm_percpu_wq",
+          "pid": 2015487,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/11:0-events",
+          "pid": 2017253,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/27:0-mm_percpu_wq",
+          "pid": 2017279,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/30:0H-kblockd",
+          "pid": 202,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/31",
+          "pid": 203,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/31",
+          "pid": 204,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/14:2",
+          "pid": 2040285,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/6:0",
+          "pid": 2046204,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/31",
+          "pid": 205,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/31",
+          "pid": 206,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/16:1-mm_percpu_wq",
+          "pid": 2064828,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/31:0H-kblockd",
+          "pid": 208,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/5:1",
+          "pid": 2084443,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/0",
+          "pid": 21,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/17:0",
+          "pid": 2107800,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kdevtmpfs",
+          "pid": 213,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/20:1",
+          "pid": 2134562,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "psimon",
+          "pid": 2134893,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-inet_frag_wq",
+          "pid": 214,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_tasks_kthread",
+          "pid": 215,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "rcu_tasks_rude_kthread",
+          "pid": 216,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kauditd",
+          "pid": 217,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "khungtaskd",
+          "pid": 218,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "oom_reaper",
+          "pid": 219,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/1",
+          "pid": 22,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/12:2-mm_percpu_wq",
+          "pid": 2206664,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u132:5-events_unbound",
+          "pid": 2218030,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/22:1",
+          "pid": 2218179,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-writeback",
+          "pid": 222,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u130:3-events_unbound",
+          "pid": 2220385,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/18:2-cgroup_free",
+          "pid": 2223215,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kcompactd0",
+          "pid": 223,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksmd",
+          "pid": 224,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "khugepaged",
+          "pid": 225,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kblockd",
+          "pid": 226,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-blkcg_punt_bio",
+          "pid": 227,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kintegrityd",
+          "pid": 228,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/9-acpi",
+          "pid": 229,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/1",
+          "pid": 23,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/1:2-events",
+          "pid": 2314134,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-tpm_dev_wq",
+          "pid": 232,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-ata_sff",
+          "pid": 233,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-md_bitmap",
+          "pid": 234,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-md_llbitmap_io",
+          "pid": 235,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-md_llbitmap_unplug",
+          "pid": 236,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-edac-poller",
+          "pid": 237,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u129:0-events_unbound",
+          "pid": 2377860,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u128:1-ipv6_addrconf",
+          "pid": 238,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-devfreq_wq",
+          "pid": 239,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/1",
+          "pid": 24,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "watchdogd",
+          "pid": 240,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-quota_events_unbound",
+          "pid": 242,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/12:0",
+          "pid": 2429223,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kswapd0",
+          "pid": 244,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ecryptfs-kthread",
+          "pid": 245,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kthrotld",
+          "pid": 246,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/24-pciehp",
+          "pid": 247,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/10:1-events",
+          "pid": 2476437,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/24:1",
+          "pid": 2476989,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/25-pciehp",
+          "pid": 248,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/26-pciehp",
+          "pid": 249,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/1",
+          "pid": 25,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/27-pciehp",
+          "pid": 250,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/26:0",
+          "pid": 2504365,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u129:1-events_unbound",
+          "pid": 2507053,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/15:1-events",
+          "pid": 2507104,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u131:3-events_unbound",
+          "pid": 2508078,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/28-pciehp",
+          "pid": 251,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/3:1",
+          "pid": 2512512,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/13:1-mm_percpu_wq",
+          "pid": 2516009,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/7:0",
+          "pid": 2516010,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/25:2",
+          "pid": 2516171,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u132:2-events_power_efficient",
+          "pid": 2518318,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u129:2-events_unbound",
+          "pid": 2518630,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/29-pciehp",
+          "pid": 252,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/23:1",
+          "pid": 2520359,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/30-pciehp",
+          "pid": 253,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u130:2-events_unbound",
+          "pid": 2538293,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/31-pciehp",
+          "pid": 254,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/28:2",
+          "pid": 2540538,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/21:1-mm_percpu_wq",
+          "pid": 2541107,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/32-pciehp",
+          "pid": 255,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/33-pciehp",
+          "pid": 256,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/31:1",
+          "pid": 2565783,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u131:0-events_unbound",
+          "pid": 2566053,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/34-pciehp",
+          "pid": 257,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u132:1-events_unbound",
+          "pid": 2571089,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/35-pciehp",
+          "pid": 258,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/36-pciehp",
+          "pid": 259,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/37-pciehp",
+          "pid": 260,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u131:1-events_unbound",
+          "pid": 2600793,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/25:0-events",
+          "pid": 2601922,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/9:1",
+          "pid": 2601927,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/38-pciehp",
+          "pid": 261,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/39-pciehp",
+          "pid": 262,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u129:3-events_unbound",
+          "pid": 2623692,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/1:0-events",
+          "pid": 2628669,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/40-pciehp",
+          "pid": 263,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/8:0-mm_percpu_wq",
+          "pid": 2638043,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/41-pciehp",
+          "pid": 264,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u130:1",
+          "pid": 2642396,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/0:0",
+          "pid": 2647981,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/42-pciehp",
+          "pid": 265,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/43-pciehp",
+          "pid": 266,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/44-pciehp",
+          "pid": 267,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/45-pciehp",
+          "pid": 268,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/46-pciehp",
+          "pid": 269,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/1:1-cgroup_free",
+          "pid": 2695966,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/1:0H-kblockd",
+          "pid": 27,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/47-pciehp",
+          "pid": 270,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/48-pciehp",
+          "pid": 271,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/49-pciehp",
+          "pid": 272,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/50-pciehp",
+          "pid": 273,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/26:2-mm_percpu_wq",
+          "pid": 273146,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/51-pciehp",
+          "pid": 274,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/52-pciehp",
+          "pid": 275,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/28:1-mm_percpu_wq",
+          "pid": 2751698,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/53-pciehp",
+          "pid": 276,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/0:2-events",
+          "pid": 2760412,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/54-pciehp",
+          "pid": 277,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/55-pciehp",
+          "pid": 278,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/6:1-mm_percpu_wq",
+          "pid": 2783540,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/56-pciehp",
+          "pid": 279,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/2",
+          "pid": 28,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/57-pciehp",
+          "pid": 280,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/58-pciehp",
+          "pid": 281,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/59-pciehp",
+          "pid": 282,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/60-pciehp",
+          "pid": 283,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/61-pciehp",
+          "pid": 284,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/62-pciehp",
+          "pid": 285,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/63-pciehp",
+          "pid": 286,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/64-pciehp",
+          "pid": 287,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/65-pciehp",
+          "pid": 288,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/2:1-events",
+          "pid": 2882304,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/66-pciehp",
+          "pid": 289,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/2",
+          "pid": 29,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/67-pciehp",
+          "pid": 290,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "irq/68-pciehp",
+          "pid": 291,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/10:2-mm_percpu_wq",
+          "pid": 2910582,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-acpi_thermal_pm",
+          "pid": 292,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-nvme-wq",
+          "pid": 293,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-nvme-reset-wq",
+          "pid": 294,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-nvme-delete-wq",
+          "pid": 295,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-nvme-auth-wq",
+          "pid": 296,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "pool_workqueue_release",
+          "pid": 3,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/2",
+          "pid": 30,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-mld",
+          "pid": 300,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-ipv6_addrconf",
+          "pid": 301,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kstrp",
+          "pid": 302,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/2",
+          "pid": 31,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u133:0",
+          "pid": 315,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/29:1",
+          "pid": 3159122,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u134:0",
+          "pid": 316,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u135:0",
+          "pid": 317,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u136:0",
+          "pid": 318,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/4:0-events",
+          "pid": 3187050,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/u137:0",
+          "pid": 319,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/24:0-mm_percpu_wq",
+          "pid": 3250604,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/4:1",
+          "pid": 327935,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/2:0H-kblockd",
+          "pid": 33,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-charger_manager",
+          "pid": 332,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/11:1-mm_percpu_wq",
+          "pid": 3334795,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "jbd2/nvme0n1p1-8",
+          "pid": 334,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-ext4-rsv-conversion",
+          "pid": 335,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/3",
+          "pid": 34,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/7:1-mm_percpu_wq",
+          "pid": 3439293,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/14:0-mm_percpu_wq",
+          "pid": 3469491,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/15:0-mm_percpu_wq",
+          "pid": 3486448,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/3",
+          "pid": 35,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/3",
+          "pid": 36,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/20:2-mm_percpu_wq",
+          "pid": 3608760,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/3",
+          "pid": 37,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/0:1H-kblockd",
+          "pid": 387,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/3:0H-kblockd",
+          "pid": 39,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/18:0-events",
+          "pid": 3931800,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "psimon",
+          "pid": 3932005,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-rcu_gp",
+          "pid": 4,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/4",
+          "pid": 40,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/4",
+          "pid": 41,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kmpathd",
+          "pid": 411,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kmpath_handlerd",
+          "pid": 412,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/4",
+          "pid": 42,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/4",
+          "pid": 43,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/4:0H-kblockd",
+          "pid": 45,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/5",
+          "pid": 46,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/16:1H-kblockd",
+          "pid": 460,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/8:1-events",
+          "pid": 462939,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/5",
+          "pid": 47,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/5",
+          "pid": 48,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/5",
+          "pid": 49,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-sync_wq",
+          "pid": 5,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/3:0-mm_percpu_wq",
+          "pid": 500149,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/5:0H-kblockd",
+          "pid": 51,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/6",
+          "pid": 52,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/6",
+          "pid": 53,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/6",
+          "pid": 54,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/6",
+          "pid": 55,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/27:1",
+          "pid": 561651,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/6:0H-kblockd",
+          "pid": 57,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/7",
+          "pid": 58,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-ena",
+          "pid": 582,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/7",
+          "pid": 59,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-kvfree_rcu_reclaim",
+          "pid": 6,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/7",
+          "pid": 60,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/7",
+          "pid": 61,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "jbd2/nvme0n1p13-8",
+          "pid": 625,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-ext4-rsv-conversion",
+          "pid": 626,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/7:0H-kblockd",
+          "pid": 63,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/8",
+          "pid": 64,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/8",
+          "pid": 65,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/8",
+          "pid": 66,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/8",
+          "pid": 67,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/8:0H-kblockd",
+          "pid": 69,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-slub_flushwq",
+          "pid": 7,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/9",
+          "pid": 70,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/9",
+          "pid": 71,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/9",
+          "pid": 72,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/9",
+          "pid": 73,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/9:0H-kblockd",
+          "pid": 75,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/10",
+          "pid": 76,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/1:1H-kblockd",
+          "pid": 762,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/10",
+          "pid": 77,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/2:1H-kblockd",
+          "pid": 776,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/10",
+          "pid": 78,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/3:1H-kblockd",
+          "pid": 785,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/10",
+          "pid": 79,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-netns",
+          "pid": 8,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/4:1H-kblockd",
+          "pid": 805,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/10:0H-kblockd",
+          "pid": 81,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/11",
+          "pid": 82,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/11",
+          "pid": 83,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/17:1H-kblockd",
+          "pid": 834,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/11",
+          "pid": 84,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/11",
+          "pid": 85,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/5:1H-kblockd",
+          "pid": 850,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/6:1H-kblockd",
+          "pid": 851,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/7:1H-kblockd",
+          "pid": 852,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/8:1H-kblockd",
+          "pid": 853,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/9:1H-kblockd",
+          "pid": 854,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/10:1H-kblockd",
+          "pid": 855,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/11:1H-kblockd",
+          "pid": 856,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/12:1H-kblockd",
+          "pid": 857,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/13:1H-kblockd",
+          "pid": 858,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/11:0H-kblockd",
+          "pid": 87,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/31:1H-kblockd",
+          "pid": 877,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/12",
+          "pid": 88,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/23:0-events",
+          "pid": 88975,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/12",
+          "pid": 89,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/R-cfg80211",
+          "pid": 895,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/12",
+          "pid": 90,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/12",
+          "pid": 91,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/12:0H-kblockd",
+          "pid": 93,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "cpuhp/13",
+          "pid": 94,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "idle_inject/13",
+          "pid": 95,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "migration/13",
+          "pid": 96,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "ksoftirqd/13",
+          "pid": 97,
+          "reason": "kernel thread cannot hold user-space paths"
+        },
+        {
+          "comm": "kworker/13:0H-kblockd",
+          "pid": 99,
+          "reason": "kernel thread cannot hold user-space paths"
+        }
+      ],
+      "excluded_other_uid_processes": [
+        {
+          "pid": 1,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 10,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 100,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 101,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1010848,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 102,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 103,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1035,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 105,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 106,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1062,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1063,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1066,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1069,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 107,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1070,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1071,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1072,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1073,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1074,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1075,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1076,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1077,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 108,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 109,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1106,
+          "reason": "audited despite different uid",
+          "uid": 995
+        },
+        {
+          "pid": 1107046,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 111,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 112,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1124,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 113,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 114,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1149,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 115,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 117,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 118,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 119,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 12,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 120,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 121,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 122,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 124,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1241,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 125,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 126,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 127,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 128,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1283,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 13,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 130,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 131,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1316232,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 132,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 133,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 134,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1342,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1355,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1356,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 136,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 137,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 138,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 139,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 14,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 140,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 142,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 143,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 144,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 145,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1454338,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1459687,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 146,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1478331,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1478332,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 148,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 149,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 15,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 150,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 151,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1515,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 152,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1533725,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 154,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 155,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 156,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1566241,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1567661,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 157,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1577604,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 158,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 16,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 160,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 161,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 162,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 163,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 164,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1643617,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 166,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 167,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 168,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 169,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1691498,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 17,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 170,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1715626,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 172,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 173,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 174,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 175,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 176,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 178,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 179,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 18,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 180,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 181,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1811061,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 182,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1822042,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 184,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 185,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 186,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 187,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 188,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 19,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 190,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 191,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 192,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 193,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 194,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 1943278,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 196,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 197,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 198,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 199,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 20,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 200,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2005431,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2015487,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2017253,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2017279,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2017548,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2017572,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2017658,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 202,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 203,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 204,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2040285,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2046204,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 205,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 206,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2064828,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 208,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2084443,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 21,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2107800,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 213,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2134562,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2134893,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 214,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 215,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 216,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 217,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 218,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 219,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 22,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2206664,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2218030,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2218179,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 222,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2220385,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2223215,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 223,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 224,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 225,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 226,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 227,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 228,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 229,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2294342,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 23,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2314134,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 232,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 233,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 234,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 235,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 236,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 237,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2377860,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 238,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 239,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 24,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 240,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 242,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2429223,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 244,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 245,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 246,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 247,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2476437,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2476989,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 248,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 249,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 25,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 250,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2504365,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2507053,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2507104,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2508078,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 251,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2512512,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2516009,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2516010,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2516171,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2518318,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2518630,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 252,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2520359,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 253,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2538293,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 254,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2540538,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2541107,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 255,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 256,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2565783,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2566053,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 257,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2571089,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2571882,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 258,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 259,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 260,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2600793,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2601922,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2601927,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 261,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 262,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2623228,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2623229,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2623692,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2625042,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2628669,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 263,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2638043,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2638893,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2639073,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2639074,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 264,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2640844,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2641832,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642396,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642794,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642795,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642796,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642797,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642822,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2642823,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2647981,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 265,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 266,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 267,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 268,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 269,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2695966,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 27,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 270,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 271,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 272,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 273,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 273146,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 274,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 275,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2751698,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 276,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2760412,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 277,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 278,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2783540,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 279,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 28,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 280,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 281,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 282,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 283,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 284,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 285,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 286,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 287,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 288,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2882304,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 289,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 29,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 290,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 291,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 2910582,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 292,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 293,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 294,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 295,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 296,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 30,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 300,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 301,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 302,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 31,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3138863,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 315,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3159122,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 316,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 317,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 318,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3187050,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 319,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3250604,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 327935,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 33,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 332,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3334795,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 334,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 335,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 34,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3439293,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3469491,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3486448,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 35,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 36,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3608760,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 37,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3768794,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 387,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 39,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931800,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931860,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931864,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931875,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931895,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931909,
+          "reason": "audited despite different uid",
+          "uid": 988
+        },
+        {
+          "pid": 3931915,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931920,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931921,
+          "reason": "audited despite different uid",
+          "uid": 988
+        },
+        {
+          "pid": 3931926,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931945,
+          "reason": "audited despite different uid",
+          "uid": 989
+        },
+        {
+          "pid": 3931946,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931948,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931960,
+          "reason": "audited despite different uid",
+          "uid": 983
+        },
+        {
+          "pid": 3931971,
+          "reason": "audited despite different uid",
+          "uid": 100
+        },
+        {
+          "pid": 3931973,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3931975,
+          "reason": "audited despite different uid",
+          "uid": 33
+        },
+        {
+          "pid": 3931991,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3932005,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 3932009,
+          "reason": "audited despite different uid",
+          "uid": 998
+        },
+        {
+          "pid": 4,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 40,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 41,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 411,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 412,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 42,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 43,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 45,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 46,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 460,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 462939,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 47,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 48,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 49,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 5,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 500149,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 51,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 52,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 53,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 54,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 55,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 561651,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 57,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 58,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 582,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 59,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 6,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 60,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 61,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 6112,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 625,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 626,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 63,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 6319,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 6343,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 64,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 65,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 66,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 67,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 69,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 7,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 70,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 71,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 72,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 73,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 75,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 76,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 762,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 77,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 776,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 78,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 785,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 79,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 8,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 805,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 81,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 82,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 83,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 834,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 84,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 85,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 850,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 851,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 852,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 853,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 854,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 855,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 856,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 857,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 858,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 87,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 877,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 88,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 88975,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 89,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 895,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 90,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 91,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 93,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 94,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 95,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 96,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 97,
+          "reason": "audited despite different uid",
+          "uid": 0
+        },
+        {
+          "pid": 99,
+          "reason": "audited despite different uid",
+          "uid": 0
+        }
+      ],
+      "excluded_session_daemons": [
+        {
+          "comm": "sshd-session",
+          "pid": 3138992
+        },
+        {
+          "comm": "systemd",
+          "pid": 3635
+        },
+        {
+          "comm": "(sd-pam)",
+          "pid": 3637
+        },
+        {
+          "comm": "sshd-session",
+          "pid": 3769012
+        }
+      ],
+      "foreign_unobservable_processes": [
+        {
+          "cgroup": "0::/init.scope",
+          "cgroup_error": null,
+          "comm": "systemd",
+          "command_bytes": 51,
+          "command_error": null,
+          "command_sha256": "039a4e9679bbf27d3093a67a18ed5e4b732c421e27fa64096e8b726e2a1824e3",
+          "explicit_experiment_reference": false,
+          "pid": 1,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/dbus.service",
+          "cgroup_error": null,
+          "comm": "dbus-daemon",
+          "command_bytes": 97,
+          "command_error": null,
+          "command_sha256": "32c19440de98b3788928897a362b6af816e7e76120be2e6c4297b54d098d3b43",
+          "explicit_experiment_reference": false,
+          "pid": 1106,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 995,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/networkd-dispatcher.service",
+          "cgroup_error": null,
+          "comm": "networkd-dispat",
+          "command_bytes": 69,
+          "command_error": null,
+          "command_sha256": "5decb50b5bf4332f5a54dfe548896e1323788f2cf8bdb23aa2b9c5e4bcee58a7",
+          "explicit_experiment_reference": false,
+          "pid": 1124,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/systemd-logind.service",
+          "cgroup_error": null,
+          "comm": "systemd-logind",
+          "command_bytes": 32,
+          "command_error": null,
+          "command_sha256": "8b8c40f33a0599b43a323ab968e42c5eb6d8f0cb9a4dbd8cecb71e96cc757c3a",
+          "explicit_experiment_reference": false,
+          "pid": 1149,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/unattended-upgrades.service",
+          "cgroup_error": null,
+          "comm": "unattended-upgr",
+          "command_bytes": 94,
+          "command_error": null,
+          "command_sha256": "6cfb05e10c3db8de3abe3a3c04ad26deea28c90d63bad74be1c7dab6ec876ead",
+          "explicit_experiment_reference": false,
+          "pid": 1241,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/system-serial\\x2dgetty.slice/serial-getty@ttyS0.service",
+          "cgroup_error": null,
+          "comm": "agetty",
+          "command_bytes": 148,
+          "command_error": null,
+          "command_sha256": "ed59c09a267fe609e1f9b7bef6f6d8bf8f600b8c8602d7ca83a1bd2a7fa450a1",
+          "explicit_experiment_reference": false,
+          "pid": 1283,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/system-getty.slice/getty@tty1.service",
+          "cgroup_error": null,
+          "comm": "agetty",
+          "command_bytes": 112,
+          "command_error": null,
+          "command_sha256": "7a895bd90f913975e0d022d3f3d8143a1801c6b8d2fbbddea221f591aeab0251",
+          "explicit_experiment_reference": false,
+          "pid": 1342,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/snap.amazon-ssm-agent.amazon-ssm-agent.service",
+          "cgroup_error": null,
+          "comm": "amazon-ssm-agen",
+          "command_bytes": 46,
+          "command_error": null,
+          "command_sha256": "edf456c33a8a2fe12b092b360101ad61584953d7b76af9cf0ba73f74472359ac",
+          "explicit_experiment_reference": false,
+          "pid": 1515,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/fwupd.service",
+          "cgroup_error": null,
+          "comm": "fwupd",
+          "command_bytes": 25,
+          "command_error": null,
+          "command_sha256": "a8b10d72b2d1619fe7c4c35db9a1aea0a53892d8df0a7d122bbc97f30208ae77",
+          "explicit_experiment_reference": false,
+          "pid": 1566241,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/upower.service",
+          "cgroup_error": null,
+          "comm": "upowerd",
+          "command_bytes": 21,
+          "command_error": null,
+          "command_sha256": "7d58ec6c83bf054542f40291c0a963be3c06b81ecaff46a8abef32214504767c",
+          "explicit_experiment_reference": false,
+          "pid": 1577604,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/containerd.service",
+          "cgroup_error": null,
+          "comm": "containerd-shim",
+          "command_bytes": 159,
+          "command_error": null,
+          "command_sha256": "6fafc2fb8e7dc260db5573788ea3eb108865e35add8bfc1f766576ada9a56643",
+          "explicit_experiment_reference": false,
+          "pid": 2017548,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "tini",
+          "command_bytes": 87,
+          "command_error": null,
+          "command_sha256": "8881ac6540a2ccf997ff67569fecbaa217cf76cd63b010b5afd703cc4c3bde16",
+          "explicit_experiment_reference": false,
+          "pid": 2017572,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "run-pipeline3",
+          "command_bytes": 110,
+          "command_error": null,
+          "command_sha256": "2a74c9b04d2a606bc66de1d4bdb2150d31fe110e2e45f3da1b76236e1d29f6f0",
+          "explicit_experiment_reference": false,
+          "pid": 2017658,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/snapd.service",
+          "cgroup_error": null,
+          "comm": "snapd",
+          "command_bytes": 40,
+          "command_error": null,
+          "command_sha256": "f97757c75ebeca2050760823e4787a3e1f17081ddf3386dd02734dc0ce2dd001",
+          "explicit_experiment_reference": false,
+          "pid": 2294342,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "wget-at",
+          "command_bytes": 1431,
+          "command_error": null,
+          "command_sha256": "240b67671d4b4db29319c6806ad96020ea5f7a501d4e5aebb5d9447ad28e7457",
+          "explicit_experiment_reference": false,
+          "pid": 2571882,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sh",
+          "command_bytes": 16,
+          "command_error": null,
+          "command_sha256": "989315121f3acef96bf1a3b15c90f1d3e7f7284873c1b7241c7f67dd3c575329",
+          "explicit_experiment_reference": false,
+          "pid": 2623228,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sleep",
+          "command_bytes": 10,
+          "command_error": null,
+          "command_sha256": "e3ddf84d371211493ee147896fbd4dd561867b22b0a044c7bb753afad023c16d",
+          "explicit_experiment_reference": false,
+          "pid": 2623229,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "wget-at",
+          "command_bytes": 1537,
+          "command_error": null,
+          "command_sha256": "2531a1dce737258362eef2554c7ad189333daf320e7d8bbd26d4d504ca770be9",
+          "explicit_experiment_reference": false,
+          "pid": 2625042,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "wget-at",
+          "command_bytes": 1527,
+          "command_error": null,
+          "command_sha256": "fcb989bcc719358d1da07fe6226de933a3e20ee64f5afd6b315bf507d096cba4",
+          "explicit_experiment_reference": false,
+          "pid": 2638893,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sh",
+          "command_bytes": 16,
+          "command_error": null,
+          "command_sha256": "36eb9db97861216ac662789d3df7852bd129b382a968069f75ed7d003f87fd87",
+          "explicit_experiment_reference": false,
+          "pid": 2639073,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sleep",
+          "command_bytes": 10,
+          "command_error": null,
+          "command_sha256": "91f459962abefe652fd9588c71ebec127f97044cf9b86b69711183c8dbd9f202",
+          "explicit_experiment_reference": false,
+          "pid": 2639074,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "wget-at",
+          "command_bytes": 1527,
+          "command_error": null,
+          "command_sha256": "70d03eebc08bd004b464e5cf6f96d0fadbd3fb6929e8975e809adb1cf93f4258",
+          "explicit_experiment_reference": false,
+          "pid": 2640844,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "wget-at",
+          "command_bytes": 1541,
+          "command_error": null,
+          "command_sha256": "5e8bc500bbc2178e78288b31d6c24d213b060812c69d90ab4273f67497bc315c",
+          "explicit_experiment_reference": false,
+          "pid": 2641832,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sh",
+          "command_bytes": 15,
+          "command_error": null,
+          "command_sha256": "ffb842db502d6d15dd346ccaaf08808897a15d73803ab6c6b0f96b7a52b442c5",
+          "explicit_experiment_reference": false,
+          "pid": 2642794,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sleep",
+          "command_bytes": 9,
+          "command_error": null,
+          "command_sha256": "9f921b25b0ba74f771e801ba3fb24f9640e3ab92cd76a4a9069e024ec4912de6",
+          "explicit_experiment_reference": false,
+          "pid": 2642795,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sh",
+          "command_bytes": 15,
+          "command_error": null,
+          "command_sha256": "0b957607af54ec2a6e9cbe7f3a702b5c7a18edf3dcd15e04bd94a8c3117aed86",
+          "explicit_experiment_reference": false,
+          "pid": 2642796,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sleep",
+          "command_bytes": 9,
+          "command_error": null,
+          "command_sha256": "3ef674ea0fccbb8edc6d3c8e0e88375f39ceb2d7f594102f7d3d94803f42b4b7",
+          "explicit_experiment_reference": false,
+          "pid": 2642797,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sh",
+          "command_bytes": 15,
+          "command_error": null,
+          "command_sha256": "0e8b04890fa5243c1712b31177601efba3517cd59e64e71477bc6e27e710a88a",
+          "explicit_experiment_reference": false,
+          "pid": 2642822,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-90105ba56ae43cba90dd6f2438bd88f58d676e8db589b210b802fa83d85052c0.scope",
+          "cgroup_error": null,
+          "comm": "sleep",
+          "command_bytes": 9,
+          "command_error": null,
+          "command_sha256": "17f0c94af18d45400153ddb761fc6b070e97bf282252f054f27bfadbdef52757",
+          "explicit_experiment_reference": false,
+          "pid": 2642823,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/user.slice/user-1001.slice/session-221.scope",
+          "cgroup_error": null,
+          "comm": "sshd-session",
+          "command_bytes": 178,
+          "command_error": null,
+          "command_sha256": "c3d6d346c4e7cd479cd4a0bdf7cc2cd65403f5394612f613700851ee450861e3",
+          "explicit_experiment_reference": false,
+          "pid": 3138863,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/user.slice/user-1001.slice/session-224.scope",
+          "cgroup_error": null,
+          "comm": "sshd-session",
+          "command_bytes": 178,
+          "command_error": null,
+          "command_sha256": "c3d6d346c4e7cd479cd4a0bdf7cc2cd65403f5394612f613700851ee450861e3",
+          "explicit_experiment_reference": false,
+          "pid": 3768794,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/cron.service",
+          "cgroup_error": null,
+          "comm": "cron",
+          "command_bytes": 21,
+          "command_error": null,
+          "command_sha256": "16b2bd09b93ba7e5661ac69ec37b6b18678f0467e6b8b49ecf664f59c4438fc3",
+          "explicit_experiment_reference": false,
+          "pid": 3931860,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/chrony.service",
+          "cgroup_error": null,
+          "comm": "chronyd-starter",
+          "command_bytes": 60,
+          "command_error": null,
+          "command_sha256": "1c6c117321bdeccf50b45f5844221b9f301342c05fec6a4075d8adbd15fae9be",
+          "explicit_experiment_reference": false,
+          "pid": 3931864,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/irqbalance.service",
+          "cgroup_error": null,
+          "comm": "irqbalance",
+          "command_bytes": 21,
+          "command_error": null,
+          "command_sha256": "718c24c97645cf650b0d7fd66fa4081cbbee2899e92625f75c0e39df0b72862c",
+          "explicit_experiment_reference": false,
+          "pid": 3931875,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/acpid.service",
+          "cgroup_error": null,
+          "comm": "acpid",
+          "command_bytes": 16,
+          "command_error": null,
+          "command_sha256": "5f84dc2df00ce8eb0cb02b5529df7e7e7dfd6f0e9b06fccd564f60741c81e399",
+          "explicit_experiment_reference": false,
+          "pid": 3931895,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/chrony.service",
+          "cgroup_error": null,
+          "comm": "chronyd",
+          "command_bytes": 26,
+          "command_error": null,
+          "command_sha256": "792d607f7a861742a7d8f8b0cc1c391aa5ff0bd2695d7e7185972d5220fb8cea",
+          "explicit_experiment_reference": false,
+          "pid": 3931909,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 988,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/containerd.service",
+          "cgroup_error": null,
+          "comm": "containerd",
+          "command_bytes": 20,
+          "command_error": null,
+          "command_sha256": "fdff3990b589d174dec4e1c7bd0c2b6660965c8f6a0b9dd4ca1ac93729b3d6a7",
+          "explicit_experiment_reference": false,
+          "pid": 3931915,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/multipathd.service",
+          "cgroup_error": null,
+          "comm": "multipathd",
+          "command_bytes": 27,
+          "command_error": null,
+          "command_sha256": "400ac1d76971ee65c9b1bae5781e96c451647367b7d80ef0b310e49a0bf9e00b",
+          "explicit_experiment_reference": false,
+          "pid": 3931920,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/chrony.service",
+          "cgroup_error": null,
+          "comm": "chronyd",
+          "command_bytes": 26,
+          "command_error": null,
+          "command_sha256": "792d607f7a861742a7d8f8b0cc1c391aa5ff0bd2695d7e7185972d5220fb8cea",
+          "explicit_experiment_reference": false,
+          "pid": 3931921,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 988,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/ssh.service",
+          "cgroup_error": null,
+          "comm": "sshd",
+          "command_bytes": 193,
+          "command_error": null,
+          "command_sha256": "c758b8d9aa26d7bb5d1c3123a4630438f779c202b52a0f1bbb2a05dbc0d79e0b",
+          "explicit_experiment_reference": false,
+          "pid": 3931926,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/systemd-resolved.service",
+          "cgroup_error": null,
+          "comm": "systemd-resolve",
+          "command_bytes": 34,
+          "command_error": null,
+          "command_sha256": "645a91b743a775a30992d442fb5480378281ce94ee7654e37897fa41748fbbc5",
+          "explicit_experiment_reference": false,
+          "pid": 3931945,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 989,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/udisks2.service",
+          "cgroup_error": null,
+          "comm": "udisksd",
+          "command_bytes": 29,
+          "command_error": null,
+          "command_sha256": "5054aff1126814d5670f767a2ce65efa24bed13ae7455948943adb6cacbdce40",
+          "explicit_experiment_reference": false,
+          "pid": 3931946,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/systemd-journald.service",
+          "cgroup_error": null,
+          "comm": "systemd-journal",
+          "command_bytes": 34,
+          "command_error": null,
+          "command_sha256": "65f388a1804eb5b5f4b1d349cb3c99a0d64a641104b044815a20ed0c72856527",
+          "explicit_experiment_reference": false,
+          "pid": 3931948,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/polkit.service",
+          "cgroup_error": null,
+          "comm": "polkitd",
+          "command_bytes": 56,
+          "command_error": null,
+          "command_sha256": "07de758cce84695b6edc72ebcbc95fc8afa580ddbd9f7271d31fb26aba7e6f7f",
+          "explicit_experiment_reference": false,
+          "pid": 3931960,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 983,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/rsyslog.service",
+          "cgroup_error": null,
+          "comm": "rsyslogd",
+          "command_bytes": 29,
+          "command_error": null,
+          "command_sha256": "3464deed8c9747061a92d72531ee30650c373e6685489c2a12cd589359b40626",
+          "explicit_experiment_reference": false,
+          "pid": 3931971,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 100,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/systemd-udevd.service/udev",
+          "cgroup_error": null,
+          "comm": "systemd-udevd",
+          "command_bytes": 31,
+          "command_error": null,
+          "command_sha256": "57751e23d9848293d4c0f972c0776c582df083fdd0028f2657014ba500c4a00e",
+          "explicit_experiment_reference": false,
+          "pid": 3931973,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/lighttpd.service",
+          "cgroup_error": null,
+          "comm": "lighttpd",
+          "command_bytes": 53,
+          "command_error": null,
+          "command_sha256": "c30d71fe4a501341b914b40e8157beffef435f90364632f8e5d1f7db243ef8d6",
+          "explicit_experiment_reference": false,
+          "pid": 3931975,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 33,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/ModemManager.service",
+          "cgroup_error": null,
+          "comm": "ModemManager",
+          "command_bytes": 23,
+          "command_error": null,
+          "command_sha256": "368bd3c76ff3c9878668330a3d9c5af61a886f8c45fa125d478df1b800477383",
+          "explicit_experiment_reference": false,
+          "pid": 3931991,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/systemd-networkd.service",
+          "cgroup_error": null,
+          "comm": "systemd-network",
+          "command_bytes": 34,
+          "command_error": null,
+          "command_sha256": "9af229b196db6e831e1cf4b9a10893bba77d92c967ffebda90342c507f136de0",
+          "explicit_experiment_reference": false,
+          "pid": 3932009,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 998,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker.service",
+          "cgroup_error": null,
+          "comm": "dockerd",
+          "command_bytes": 71,
+          "command_error": null,
+          "command_sha256": "b3fa205301c03a808e972996eaf026a30224f01be6482743feb25c4c746fe5b0",
+          "explicit_experiment_reference": false,
+          "pid": 6112,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/containerd.service",
+          "cgroup_error": null,
+          "comm": "containerd-shim",
+          "command_bytes": 159,
+          "command_error": null,
+          "command_sha256": "463c8870d8e685eb43e4cce7b2728ef81c3e4fd5064b8239c746afc8c499667d",
+          "explicit_experiment_reference": false,
+          "pid": 6319,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        },
+        {
+          "cgroup": "0::/system.slice/docker-c2c03a47d870f767e9d96c582aa1fcfdb1eb4805a74b323366ed424ba39fb96b.scope",
+          "cgroup_error": null,
+          "comm": "watchtower",
+          "command_bytes": 74,
+          "command_error": null,
+          "command_sha256": "d42074171425bdf1f19bde58313badbe3f58e3698dc1b0bb838224da2c46687d",
+          "explicit_experiment_reference": false,
+          "pid": 6343,
+          "references_observable": false,
+          "script_reference": false,
+          "uid": 0,
+          "unobservable_references": [
+            "cwd",
+            "exe",
+            "fd"
+          ],
+          "workspace_reference": false
+        }
+      ],
+      "proc_root": "/proc",
+      "root_gate_capture_processes": [],
+      "safe": true,
+      "scanned_processes": 63,
+      "self_pid": 2642826,
+      "uid_scope": 1001,
+      "vanished_processes": 0
+    },
+    "removed_paths": [
+      {
+        "allocated_bytes": 254464000,
+        "device": 66305,
+        "directories": 1696,
+        "files": 9858,
+        "fingerprint": "79a53b69f442c98dbfb6bbd8abc19e5b704ae630fec0cbe646618cda3d8cd37c",
+        "inode": 20900718,
+        "kind": "directory",
+        "logical_bytes": 223164527,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/after",
+        "relative_path": "after"
+      },
+      {
+        "allocated_bytes": 254402560,
+        "device": 66305,
+        "directories": 1696,
+        "files": 9857,
+        "fingerprint": "913626fc336f027209367e86b0f039b5be2464d522c1c07ce8e29e1a4a76a548",
+        "inode": 20074967,
+        "kind": "directory",
+        "logical_bytes": 223108600,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/before",
+        "relative_path": "before"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "2d120ea661abfe71934008197b8228991a3a63bbc652f945740daccfb38bb617",
+        "inode": 46422493,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/projections",
+        "relative_path": "projections"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "80b5b6979b164d8495edee3bdca2c25e77e7c41b890dd62e87048b2783e72ac9",
+        "inode": 48695450,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace1",
+        "relative_path": "publication-profiles/strace1"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "b88640d76c868e15623d041dc595adb1a6eb5ec12e87e12e1d246df636c213a3",
+        "inode": 48697479,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace2",
+        "relative_path": "publication-profiles/strace2"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "2708f00f478dff590c57d9d8f7a090539dc17125393264c0c9650b91d8fa3a34",
+        "inode": 49953822,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace3",
+        "relative_path": "publication-profiles/strace3"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "31eed9853783edefd9fbac80be1dc5fb0bae7022e6b0126b1a49847e057bf45a",
+        "inode": 49948455,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4",
+        "relative_path": "publication-profiles/strace4"
+      },
+      {
+        "allocated_bytes": 4096,
+        "device": 66305,
+        "directories": 1,
+        "files": 0,
+        "fingerprint": "ed3fa4d3f01187bd9d15e05af5fbc5643202655c64d10f232d4546aee888a0a4",
+        "inode": 51473252,
+        "kind": "directory",
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace5",
+        "relative_path": "publication-profiles/strace5"
+      },
+      {
+        "allocated_bytes": 3428352,
+        "device": 66305,
+        "directories": 11,
+        "files": 800,
+        "fingerprint": "0cb4e5500fb2e708135529a904ac0ba7a25e9974a4fa2accf4a3cccc2a186270",
+        "inode": 48185412,
+        "kind": "directory",
+        "logical_bytes": 1018482,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/fuzz-target",
+        "relative_path": "fuzz-target"
+      }
+    ],
+    "removed_totals": {
+      "allocated_bytes": 512319488,
+      "directories": 3409,
+      "files": 20515,
+      "logical_bytes": 447291609,
+      "paths": 9
+    },
+    "status": "ready",
+    "target_cleanup": {
+      "early_receipt": {
+        "active_build_refs": [],
+        "allocated_bytes": 13417771008,
+        "completed_ns": 1789060193242372667,
+        "descriptor": {
+          "bytes": 386,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/early-target-cleanup.json",
+          "relative_path": "early-target-cleanup.json",
+          "sha256": "a7c0bd6678f0e69cdc4fc7bfd769eff6cd71385c02dba831b1b1f027317e1cee"
+        },
+        "free_after": 14605287424,
+        "free_before": 1769324544,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/target",
+        "reason": "All root Cargo benchmark/gate builds terminal; four executables hash-verified; ASan uses separate fuzz-target/target. Disk pressure from shared activity."
+      },
+      "mode": "early"
+    }
+  },
+  "postcondition": {
+    "cleanup_receipt_written": false,
+    "error": "unexpected temporary paths remain after cleanup",
+    "expected_temporary_children": [
+      "retained"
+    ],
+    "fuzz_temporary_present": false,
+    "observed_publication_profiles_children": [],
+    "observed_temporary_children": [
+      "publication-profiles",
+      "retained"
+    ],
+    "target_present": false
+  },
+  "recorded_utc": "2026-09-10T18:44:20.689775Z",
+  "removed_paths_observed": [
+    {
+      "allocated_bytes": 254464000,
+      "device": 66305,
+      "directories": 1696,
+      "files": 9858,
+      "fingerprint": "79a53b69f442c98dbfb6bbd8abc19e5b704ae630fec0cbe646618cda3d8cd37c",
+      "inode": 20900718,
+      "kind": "directory",
+      "logical_bytes": 223164527,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/after",
+      "relative_path": "after"
+    },
+    {
+      "allocated_bytes": 254402560,
+      "device": 66305,
+      "directories": 1696,
+      "files": 9857,
+      "fingerprint": "913626fc336f027209367e86b0f039b5be2464d522c1c07ce8e29e1a4a76a548",
+      "inode": 20074967,
+      "kind": "directory",
+      "logical_bytes": 223108600,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/before",
+      "relative_path": "before"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "2d120ea661abfe71934008197b8228991a3a63bbc652f945740daccfb38bb617",
+      "inode": 46422493,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/projections",
+      "relative_path": "projections"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "80b5b6979b164d8495edee3bdca2c25e77e7c41b890dd62e87048b2783e72ac9",
+      "inode": 48695450,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace1",
+      "relative_path": "publication-profiles/strace1"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "b88640d76c868e15623d041dc595adb1a6eb5ec12e87e12e1d246df636c213a3",
+      "inode": 48697479,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace2",
+      "relative_path": "publication-profiles/strace2"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "2708f00f478dff590c57d9d8f7a090539dc17125393264c0c9650b91d8fa3a34",
+      "inode": 49953822,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace3",
+      "relative_path": "publication-profiles/strace3"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "31eed9853783edefd9fbac80be1dc5fb0bae7022e6b0126b1a49847e057bf45a",
+      "inode": 49948455,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4",
+      "relative_path": "publication-profiles/strace4"
+    },
+    {
+      "allocated_bytes": 4096,
+      "device": 66305,
+      "directories": 1,
+      "files": 0,
+      "fingerprint": "ed3fa4d3f01187bd9d15e05af5fbc5643202655c64d10f232d4546aee888a0a4",
+      "inode": 51473252,
+      "kind": "directory",
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace5",
+      "relative_path": "publication-profiles/strace5"
+    },
+    {
+      "allocated_bytes": 3428352,
+      "device": 66305,
+      "directories": 11,
+      "files": 800,
+      "fingerprint": "0cb4e5500fb2e708135529a904ac0ba7a25e9974a4fa2accf4a3cccc2a186270",
+      "inode": 48185412,
+      "kind": "directory",
+      "logical_bytes": 1018482,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/fuzz-target",
+      "relative_path": "fuzz-target"
+    }
+  ],
+  "schema": "docx-tail-append-0497-cleanup-attempt-v1",
+  "scope": {
+    "evidence_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0497",
+    "fuzz_temporary_root": "/home/zhuhe/.cache/litchi-goal-0497/fuzz-target",
+    "target_root": "/home/zhuhe/.cache/litchi-goal-0497/target",
+    "temporary_root": "/home/zhuhe/.cache/litchi-goal-0497"
+  },
+  "status": "partial",
+  "stderr": "cleanup.py: error: unexpected temporary paths remain after cleanup\n",
+  "version": 1
+}

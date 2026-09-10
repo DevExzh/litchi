@@ -1,0 +1,9 @@
+{
+  "audit_directory": "/home/zhuhe/.cache/litchi-cleanup-0497-mid",
+  "removed_entries": 1046,
+  "allocated_bytes": 3710889984,
+  "free_before": 148466749440,
+  "free_after": 152138403840,
+  "skipped": 0,
+  "scope": "Inactive >2h Rust incremental directories and .rlib/.rmeta/.o intermediates only; process references excluded and protected worktree not accessed."
+}

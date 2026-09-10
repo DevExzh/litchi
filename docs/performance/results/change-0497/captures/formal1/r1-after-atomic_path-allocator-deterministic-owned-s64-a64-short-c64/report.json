@@ -1,0 +1,4068 @@
+{
+  "schema": "docx-replayable-tail-append-v1",
+  "version": 1,
+  "binary": {
+    "binary": "litchi-perf-baseline-alloc",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  },
+  "config": {
+    "source_counts": [
+      64
+    ],
+    "authored_counts": [
+      64
+    ],
+    "chunk_modes": [
+      "fixed64"
+    ],
+    "text_modes": [
+      "short"
+    ],
+    "samples": 30,
+    "warmups": 3,
+    "sink_write_bytes": 4096,
+    "lifecycle": [
+      "source_admission",
+      "prepare",
+      "publish",
+      "drop"
+    ],
+    "expected_authored_opens": 5,
+    "expected_replay_opens": 0,
+    "source": "profile_owned_positional_read_at_requested_returned_fixed_histograms",
+    "authored_provider": "deterministic_replayable_bounded_cursor",
+    "provider": "deterministic",
+    "replay_max_bytes": 1,
+    "replay_dir": null,
+    "replay_sync": "none",
+    "compression": "current",
+    "input_mode": "owned",
+    "input_storage_kind": "owned",
+    "input_identity_validation": "setup_fingerprint_outside_timing",
+    "input_max_range_bytes": null,
+    "input_delay_us": 0,
+    "input_overhead_us": 0,
+    "input_bytes_per_second": null,
+    "sink": "production_atomic_path_output_proof_post_timer_destination_oracle",
+    "fixture_dir": null,
+    "publication": "atomic_path"
+  },
+  "cases": [
+    {
+      "source_count": 64,
+      "authored_count": 64,
+      "chunk_mode": "fixed64",
+      "text_mode": "short",
+      "provider": "deterministic",
+      "replay_max_bytes": 1,
+      "compression": "current",
+      "input_mode": "owned",
+      "input_storage_kind": "owned",
+      "input_identity_validation": "setup_fingerprint_outside_timing",
+      "sink_write_bytes": 4096,
+      "source": {
+        "archive_bytes": 2106,
+        "archive_sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+        "main_xml_bytes": 3223,
+        "main_xml_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+        "member_count": 4,
+        "semantic": {
+          "paragraph_count": 64,
+          "order_sha256": "4443ad3c2075effa0b9915bbcce9c6efde10a76cf4a01b8658a86c7a1ececc2c",
+          "text_sha256": "4cba4274650a9adfc3968218866ce3276e1d7a7b317e5fa0e92776f642935060",
+          "text_bytes": 960
+        },
+        "members": [
+          {
+            "path": "[Content_Types].xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 2913692623,
+            "decoded_bytes": 512,
+            "decoded_sha256": "049d77f77eb8f77142e902247c2c78116578472c463c0296534ef63662c28cf5",
+            "compressed_bytes": 267,
+            "compressed_sha256": "ec2bb72dbd54fa475a53e57acd55d10c9610c7b2908091852f296bffd8afb664"
+          },
+          {
+            "path": "_rels/.rels",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 3929537947,
+            "decoded_bytes": 297,
+            "decoded_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde",
+            "compressed_bytes": 183,
+            "compressed_sha256": "311240e02d07fd8ec141a3826798f5dff305763449ebaf0f04b902ef6775b327"
+          },
+          {
+            "path": "word/document.xml",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 1416465303,
+            "decoded_bytes": 3223,
+            "decoded_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+            "compressed_bytes": 321,
+            "compressed_sha256": "ce4c9abe647531fc5b8a2097ff58d3ddfb61de397b4f23827bcc25dfeac4ae5a"
+          },
+          {
+            "path": "word/perf-opaque.bin",
+            "compression_method": "Deflate",
+            "data_descriptor": true,
+            "crc32": 528510375,
+            "decoded_bytes": 32768,
+            "decoded_sha256": "7c697d881b1f1e264566d6ab95c8304a77229b468642128de4f271e9d9a25856",
+            "compressed_bytes": 811,
+            "compressed_sha256": "08b03e3dee92bfdb588419a524154cfd0935d768cd0550d7fadb48a85e29c5c2"
+          }
+        ],
+        "unchanged_oracle": true,
+        "opaque_member_exact": true
+      },
+      "authored": {
+        "authored_count": 64,
+        "chunk_mode": "fixed64",
+        "text_mode": "short",
+        "max_chunk_bytes": 21,
+        "replay_window_bytes": 65536,
+        "max_encoded_paragraph_bytes": 156,
+        "xml_entity_reference_count": 192,
+        "text_bytes": 1344,
+        "encoded_xml_bytes": 9984,
+        "event_count": 192,
+        "text_chunk_count": 64,
+        "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+        "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75"
+      },
+      "limits": {
+        "parser_event_limit": 1664,
+        "parser_token_bytes": 65536,
+        "parser_workspace_bytes": 13649335,
+        "max_xml_depth": 16,
+        "max_authored_chunk_bytes": 21,
+        "replay_window_bytes": 65536
+      },
+      "oracle": {
+        "candidate_archive_bytes": 2336,
+        "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+        "candidate_main_xml_bytes": 13207,
+        "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+        "candidate_semantic": {
+          "paragraph_count": 128,
+          "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+          "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+          "text_bytes": 2304
+        },
+        "candidate_member_count": 4,
+        "candidate_xml_exact": true,
+        "candidate_semantic_exact": true,
+        "untouched_member_metadata_exact": true,
+        "untouched_raw_members_preserved": true,
+        "physical_order_exact": true,
+        "opaque_member_exact": true,
+        "source_unchanged": true,
+        "inverse_exact": true
+      },
+      "proof": {
+        "source_len": 3223,
+        "source_sha256": "503cbab198eb9d73d655e9c47d95e1bb608da0b4e3dd8ceb7e32ba61272481ee",
+        "source_paragraph_count": 64,
+        "source_event_count": 454,
+        "insertion_offset": 3201,
+        "candidate_len": 13207,
+        "candidate_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+        "candidate_paragraph_count": 128,
+        "candidate_event_count": 1094,
+        "generated_offset": 3201,
+        "generated_once": true,
+        "authored": {
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "max_chunk_bytes": 21,
+          "replay_window_bytes": 65536,
+          "max_encoded_paragraph_bytes": 156,
+          "xml_entity_reference_count": 192,
+          "text_bytes": 1344,
+          "encoded_xml_bytes": 9984,
+          "event_count": 192,
+          "text_chunk_count": 64,
+          "expected_event_sha256": "e01681a93e9e590506c76d1823a8bb95bfdb43f3b6a41ac793dfe660694daf21",
+          "expected_encoded_sha256": "1e4d96e3df35bbfc99d257d104c58ebda11ce12fe2077f38bfe0f70bee400b75"
+        }
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 5648335,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 54465,
+            "live_bytes_after": 54465,
+            "peak_live_bytes_before": 847044,
+            "peak_live_bytes_after": 847044,
+            "region_peak_live_bytes": 847044
+          },
+          "process": {
+            "rchar": 1980,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6971392
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-3/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-3",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 1,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7428403,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 55178,
+            "live_bytes_after": 55178,
+            "peak_live_bytes_before": 847044,
+            "peak_live_bytes_after": 847757,
+            "region_peak_live_bytes": 847757
+          },
+          "process": {
+            "rchar": 1981,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 6971392
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-4/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-4",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 2,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6167457,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 55891,
+            "live_bytes_after": 55891,
+            "peak_live_bytes_before": 847757,
+            "peak_live_bytes_after": 848470,
+            "region_peak_live_bytes": 848470
+          },
+          "process": {
+            "rchar": 1982,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 17,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 69632,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-5/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-5",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 3,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 9936214,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 56604,
+            "live_bytes_after": 56604,
+            "peak_live_bytes_before": 848470,
+            "peak_live_bytes_after": 849183,
+            "region_peak_live_bytes": 849183
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-6/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-6",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 4,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8090216,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 57317,
+            "live_bytes_after": 57317,
+            "peak_live_bytes_before": 849183,
+            "peak_live_bytes_after": 849896,
+            "region_peak_live_bytes": 849896
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-7/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-7",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 5,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 9376990,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 58030,
+            "live_bytes_after": 58030,
+            "peak_live_bytes_before": 849896,
+            "peak_live_bytes_after": 850609,
+            "region_peak_live_bytes": 850609
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-8/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-8",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 6,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 9045180,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660410,
+            "deallocated_bytes": 3660410,
+            "live_bytes_before": 58743,
+            "live_bytes_after": 58743,
+            "peak_live_bytes_before": 850609,
+            "peak_live_bytes_after": 851322,
+            "region_peak_live_bytes": 851322
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-9/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-9",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 7,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8123165,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 59458,
+            "live_bytes_after": 59458,
+            "peak_live_bytes_before": 851322,
+            "peak_live_bytes_after": 852038,
+            "region_peak_live_bytes": 852038
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-10/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-10",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 8,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7700643,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 60173,
+            "live_bytes_after": 60173,
+            "peak_live_bytes_before": 852038,
+            "peak_live_bytes_after": 852753,
+            "region_peak_live_bytes": 852753
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-11/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-11",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 9,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8705348,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 60888,
+            "live_bytes_after": 60888,
+            "peak_live_bytes_before": 852753,
+            "peak_live_bytes_after": 853468,
+            "region_peak_live_bytes": 853468
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-12/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-12",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 10,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7846454,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 61603,
+            "live_bytes_after": 61603,
+            "peak_live_bytes_before": 853468,
+            "peak_live_bytes_after": 854183,
+            "region_peak_live_bytes": 854183
+          },
+          "process": {
+            "rchar": 1983,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-13/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-13",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 11,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6550988,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 62318,
+            "live_bytes_after": 62318,
+            "peak_live_bytes_before": 854183,
+            "peak_live_bytes_after": 854898,
+            "region_peak_live_bytes": 854898
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-14/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-14",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 12,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 9077840,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 63033,
+            "live_bytes_after": 63033,
+            "peak_live_bytes_before": 854898,
+            "peak_live_bytes_after": 855613,
+            "region_peak_live_bytes": 855613
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-15/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-15",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 13,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8137576,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 63748,
+            "live_bytes_after": 63748,
+            "peak_live_bytes_before": 855613,
+            "peak_live_bytes_after": 856328,
+            "region_peak_live_bytes": 856328
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-16/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-16",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 14,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6730619,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 64463,
+            "live_bytes_after": 64463,
+            "peak_live_bytes_before": 856328,
+            "peak_live_bytes_after": 857043,
+            "region_peak_live_bytes": 857043
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-17/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-17",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 15,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8422057,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 65178,
+            "live_bytes_after": 65178,
+            "peak_live_bytes_before": 857043,
+            "peak_live_bytes_after": 857758,
+            "region_peak_live_bytes": 857758
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-18/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-18",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 16,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6036197,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 65893,
+            "live_bytes_after": 65893,
+            "peak_live_bytes_before": 857758,
+            "peak_live_bytes_after": 858473,
+            "region_peak_live_bytes": 858473
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-19/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-19",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 17,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6224298,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 66608,
+            "live_bytes_after": 66608,
+            "peak_live_bytes_before": 858473,
+            "peak_live_bytes_after": 859188,
+            "region_peak_live_bytes": 859188
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-20/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-20",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 18,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7467493,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 67323,
+            "live_bytes_after": 67323,
+            "peak_live_bytes_before": 859188,
+            "peak_live_bytes_after": 859903,
+            "region_peak_live_bytes": 859903
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-21/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-21",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 19,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6199678,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 68038,
+            "live_bytes_after": 68038,
+            "peak_live_bytes_before": 859903,
+            "peak_live_bytes_after": 860618,
+            "region_peak_live_bytes": 860618
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-22/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-22",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 20,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7674934,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 68753,
+            "live_bytes_after": 68753,
+            "peak_live_bytes_before": 860618,
+            "peak_live_bytes_after": 861333,
+            "region_peak_live_bytes": 861333
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-23/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-23",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 21,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7271221,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 69468,
+            "live_bytes_after": 69468,
+            "peak_live_bytes_before": 861333,
+            "peak_live_bytes_after": 862048,
+            "region_peak_live_bytes": 862048
+          },
+          "process": {
+            "rchar": 1984,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-24/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-24",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 22,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 6373728,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 70183,
+            "live_bytes_after": 70183,
+            "peak_live_bytes_before": 862048,
+            "peak_live_bytes_after": 862763,
+            "region_peak_live_bytes": 862763
+          },
+          "process": {
+            "rchar": 1985,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7041024
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-25/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-25",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 23,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 5894535,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 70898,
+            "live_bytes_after": 70898,
+            "peak_live_bytes_before": 862763,
+            "peak_live_bytes_after": 863478,
+            "region_peak_live_bytes": 863478
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 17,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 69632,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-26/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-26",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 24,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 7810114,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 71613,
+            "live_bytes_after": 71613,
+            "peak_live_bytes_before": 863478,
+            "peak_live_bytes_after": 864193,
+            "region_peak_live_bytes": 864193
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 1,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-27/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-27",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 25,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8927879,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 72328,
+            "live_bytes_after": 72328,
+            "peak_live_bytes_before": 864193,
+            "peak_live_bytes_after": 864908,
+            "region_peak_live_bytes": 864908
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-28/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-28",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 26,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8460997,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 73043,
+            "live_bytes_after": 73043,
+            "peak_live_bytes_before": 864908,
+            "peak_live_bytes_after": 865623,
+            "region_peak_live_bytes": 865623
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-29/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-29",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 27,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8655058,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 73758,
+            "live_bytes_after": 73758,
+            "peak_live_bytes_before": 865623,
+            "peak_live_bytes_after": 866338,
+            "region_peak_live_bytes": 866338
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-30/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-30",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 28,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8618318,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 74473,
+            "live_bytes_after": 74473,
+            "peak_live_bytes_before": 866338,
+            "peak_live_bytes_after": 867053,
+            "region_peak_live_bytes": 867053
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-31/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-31",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        },
+        {
+          "sample": 29,
+          "source_count": 64,
+          "authored_count": 64,
+          "chunk_mode": "fixed64",
+          "text_mode": "short",
+          "elapsed_ns": 8269416,
+          "source_reads": {
+            "calls": 60,
+            "requested_bytes": 7651,
+            "returned_bytes": 7651,
+            "request_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "returned_histogram": {
+              "bytes_0": 8,
+              "bytes_1_to_512": 50,
+              "bytes_513_to_4096": 2,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "authored": {
+            "opens": 5,
+            "events": 960,
+            "text_chunks": 320,
+            "text_bytes": 6720
+          },
+          "replay": null,
+          "sink": {
+            "accepted_bytes": null,
+            "write_calls": null,
+            "largest_write": null,
+            "histogram": null,
+            "sha256": null
+          },
+          "allocation": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 550,
+            "deallocation_calls": 513,
+            "reallocation_calls": 37,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 3660414,
+            "deallocated_bytes": 3660414,
+            "live_bytes_before": 75188,
+            "live_bytes_after": 75188,
+            "peak_live_bytes_before": 867053,
+            "peak_live_bytes_after": 867768,
+            "region_peak_live_bytes": 867768
+          },
+          "process": {
+            "rchar": 1986,
+            "wchar": 2336,
+            "read_bytes": 0,
+            "write_bytes": 4096,
+            "cancelled_write_bytes": 0,
+            "syscr": 18,
+            "syscw": 18,
+            "minor_faults": 0,
+            "major_faults": 0,
+            "user_cpu_ticks": 0,
+            "system_cpu_ticks": 0,
+            "clock_ticks_per_second": 100,
+            "voluntary_context_switches": 3,
+            "nonvoluntary_context_switches": 0,
+            "rss_bytes": 0,
+            "peak_rss_bytes": 7110656
+          },
+          "publication": {
+            "schema": "docx-replayable-tail-append-publication-v1",
+            "route": "atomic_path",
+            "timing_scope": "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+            "timed_candidate_artifact_bytes": 2336,
+            "timed_candidate_artifact_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+            "timed_candidate_matches_oracle": true,
+            "verification_scope": "timed_production_artifact_proof_plus_post_timer_path_oracle",
+            "atomic": {
+              "destination_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-32/published.docx",
+              "private_parent_path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-owned-s64-a64-short-c64/tmp/litchi-docx-replay-atomic-2151347-32",
+              "before": {
+                "exists": false,
+                "regular_file": false,
+                "bytes": null
+              },
+              "after": {
+                "exists": true,
+                "regular_file": true,
+                "bytes": 2336
+              },
+              "post_timer_archive_bytes": 2336,
+              "post_timer_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+              "output_bytes_exact": true,
+              "output_sha256_exact": true,
+              "inverse_oracle_scope": "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+              "post_timer_oracle": {
+                "candidate_archive_bytes": 2336,
+                "candidate_archive_sha256": "43416b45be7ab2eacfd9e1f60fd314937969d1dddd2663c8f0587e61eb0c4010",
+                "candidate_main_xml_bytes": 13207,
+                "candidate_main_xml_sha256": "0b05889b059f4c334af0b3de89e268c1d89ef648729dc9bedcec9d5d876de124",
+                "candidate_semantic": {
+                  "paragraph_count": 128,
+                  "order_sha256": "3e8374493f880009b57f3f668459f79a87e404c9351ac1c28cf69ab2ecb2d5a5",
+                  "text_sha256": "7198948c41bc218d117693f361a6f48aa0ab2f0c447b7775e45452c4d072c30c",
+                  "text_bytes": 2304
+                },
+                "candidate_member_count": 4,
+                "candidate_xml_exact": true,
+                "candidate_semantic_exact": true,
+                "untouched_member_metadata_exact": true,
+                "untouched_raw_members_preserved": true,
+                "physical_order_exact": true,
+                "opaque_member_exact": true,
+                "source_unchanged": true,
+                "inverse_exact": true
+              },
+              "cleanup": {
+                "destination_removed": true,
+                "parent_removed": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

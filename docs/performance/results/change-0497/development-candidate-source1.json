@@ -1,0 +1,22 @@
+{
+  "crates/litchi-docx/src/source_backed/tail_append_stream.rs": {
+    "bytes": 90220,
+    "sha256": "963373a9d3b826b5f6651067f6f1e12cc4ad00371b29a58ce35d06d6835c8bf3"
+  },
+  "crates/litchi-docx/tests/source_backed_tail_append_stream.rs": {
+    "bytes": 87725,
+    "sha256": "e68b5d4e3ac216257df7fb76e2413759f5fb23dcb046482dc03cc171df0ce70f"
+  },
+  "tools/perf-baseline/src/docx_replayable_tail_append.rs": {
+    "bytes": 164597,
+    "sha256": "b6303b7b353415a4bad997951f98b2dc1c655f795233e10c908f17c684f9b5be"
+  },
+  "tools/perf-baseline/src/docx_replayable_tail_append/route_smoke_tests.rs": {
+    "bytes": 8210,
+    "sha256": "f6a1fb5915c3fdb6cd01acaf4389fe972c926f995a6662e8328cd981665e448a"
+  },
+  "tools/perf-baseline/src/docx_replayable_tail_append/publication_route_tests.rs": {
+    "bytes": 7156,
+    "sha256": "3e2e515d1b4f04748e53bfb5e88461a525ed7ddf80abbea541cde21f2ab529d7"
+  }
+}

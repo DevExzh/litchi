@@ -13,12 +13,17 @@
 //! close to the contract exercised by callers.
 
 use std::fmt;
+use std::fs;
 use std::io::{self, Cursor, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::path::Path;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicU64, AtomicUsize, Ordering},
 };
+
+#[cfg(unix)]
+use std::os::unix::fs::{PermissionsExt, symlink};
 
 use litchi_core::{
     Budget, CancellationSource, CancellationToken, ExecutionContext, ExecutionLimits,
@@ -41,6 +46,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, SourceBackedPackage};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
+use tempfile::tempdir;
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -376,6 +382,34 @@ fn semantic_texts(archive: &[u8]) -> Vec<String> {
         .collect()
 }
 
+fn path_semantic_texts(path: &Path) -> Vec<String> {
+    let package = source_backed::Package::from_path(path).expect("published path must reopen");
+    package
+        .document_snapshot()
+        .expect("published path document must decode")
+        .paragraphs()
+        .iter()
+        .map(|paragraph| {
+            paragraph
+                .text()
+                .expect("published path paragraph must decode")
+        })
+        .collect()
+}
+
+fn assert_no_atomic_temporary_files(directory: &Path) {
+    let leftovers = fs::read_dir(directory)
+        .expect("atomic publication directory must be readable")
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.starts_with(".litchi-") && name.ends_with(".tmp"))
+        .collect::<Vec<_>>();
+    assert!(
+        leftovers.is_empty(),
+        "atomic publication must remove temporary siblings: {leftovers:?}"
+    );
+}
+
 #[derive(Debug)]
 struct PrefixFailSink {
     bytes: Vec<u8>,
@@ -600,6 +634,70 @@ impl AuthoredReplayStore for ForgedReplayStore {
             .replacement
             .take()
             .expect("forged store must have a presealed replacement"))
+    }
+}
+
+#[derive(Debug)]
+struct PostPrepareFailingReplayHandle {
+    inner: MemoryReplayHandle,
+    fail_open: Arc<AtomicUsize>,
+}
+
+impl AuthoredReplayHandle for PostPrepareFailingReplayHandle {
+    fn proof(&self) -> AuthoredStreamProof {
+        self.inner.proof()
+    }
+
+    fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+        if self.fail_open.load(Ordering::Acquire) != 0 {
+            return Err(AuthoredReplayError::Changed);
+        }
+        self.inner.open()
+    }
+
+    fn durable_reference(&self) -> Option<AuthoredReplayReference> {
+        self.inner.durable_reference()
+    }
+}
+
+#[derive(Debug)]
+struct PostPrepareFailingReplayStore {
+    inner: Option<MemoryReplayStore>,
+    fail_open: Arc<AtomicUsize>,
+}
+
+impl AuthoredReplayStore for PostPrepareFailingReplayStore {
+    type Handle = PostPrepareFailingReplayHandle;
+
+    fn prepare_for_operation(
+        &mut self,
+        limits: ParagraphStreamLimits,
+        context: Option<&ExecutionContext>,
+        cancellation: Option<&CancellationToken>,
+    ) -> Result<(), AuthoredReplayError> {
+        self.inner
+            .as_mut()
+            .expect("post-prepare replay store must remain available")
+            .prepare_for_operation(limits, context, cancellation)
+    }
+
+    fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
+        self.inner
+            .as_mut()
+            .expect("post-prepare replay store must remain available")
+            .append(chunk)
+    }
+
+    fn finish(mut self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
+        let inner = self
+            .inner
+            .take()
+            .expect("post-prepare replay store must remain available")
+            .finish(proof)?;
+        Ok(PostPrepareFailingReplayHandle {
+            inner,
+            fail_open: self.fail_open,
+        })
     }
 }
 
@@ -1834,4 +1932,532 @@ fn source_change_after_preparation_refuses_without_archive_output() {
         output.is_empty(),
         "stale preflight must emit no archive bytes"
     );
+}
+
+#[test]
+fn path_publication_replaces_new_and_existing_destinations_with_exact_reopenable_bytes() {
+    for strict in [false, true] {
+        for compression in [Compression::Store, Compression::Deflate] {
+            let source_xml = source_xml_without_section(strict);
+            let source_archive = archive(&source_xml, strict, compression);
+            let expected = {
+                let package = open_package(source_archive.clone());
+                let plan = package
+                    .tail_append_plain_paragraphs(
+                        EventSource::new(events_for(&["path tail"])),
+                        limits(source_xml.len()),
+                    )
+                    .prepare()
+                    .expect("path fixture must prepare for stream comparison");
+                let mut output = Vec::new();
+                plan.write_to_stream(&mut output)
+                    .expect("path fixture stream comparison must publish");
+                output
+            };
+
+            for existing in [false, true] {
+                let directory = tempdir().expect("path publication temporary directory");
+                let destination = directory.path().join("candidate.docx");
+                if existing {
+                    fs::write(&destination, b"old destination bytes")
+                        .expect("existing destination must be writable");
+                }
+
+                let package = open_package(source_archive.clone());
+                let plan = package
+                    .tail_append_plain_paragraphs(
+                        EventSource::new(events_for(&["path tail"])),
+                        limits(source_xml.len()),
+                    )
+                    .prepare()
+                    .expect("path fixture must prepare");
+                let publication = plan
+                    .write_to_path(&destination)
+                    .expect("atomic path publication must succeed");
+
+                let actual = fs::read(&destination).expect("published destination must exist");
+                assert_eq!(actual, expected, "path output must match stream output");
+                assert_eq!(
+                    publication.candidate_artifact_length(),
+                    expected.len() as u64
+                );
+                assert_eq!(path_semantic_texts(&destination), vec!["seed", "path tail"]);
+                assert_no_atomic_temporary_files(directory.path());
+            }
+        }
+    }
+}
+
+#[test]
+fn path_publication_retains_durable_forward_and_inverse_authorizations() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let stream_limits = limits(source_xml.len());
+    let authored_reference = AuthoredReplayReference::try_from_bytes(
+        b"path-durable-authored-provider",
+        stream_limits.max_patch_bytes,
+    )
+    .expect("durable path provider reference must be bounded");
+    let captured = Arc::new(Mutex::new(None));
+    let producer = |sink: &mut dyn ParagraphEventSink| -> Result<(), AuthoredReplayError> {
+        sink.push(PlainParagraphEvent::ParagraphStart)?;
+        sink.push(PlainParagraphEvent::TextChunk("path durable"))?;
+        sink.push(PlainParagraphEvent::ParagraphEnd)?;
+        Ok(())
+    };
+    let store = CapturingReplayStore {
+        inner: Some(
+            MemoryReplayStore::new(stream_limits.max_replay_bytes)
+                .expect("durable path replay store must be bounded")
+                .with_durable_reference(authored_reference.clone()),
+        ),
+        captured: Arc::clone(&captured),
+    };
+    let package = open_package(source_archive.clone());
+    let plan = package
+        .tail_append_plain_paragraphs_from_producer(producer, store, stream_limits)
+        .expect("durable path producer route must be accepted")
+        .prepare()
+        .expect("durable path producer must prepare");
+
+    let directory = tempdir().expect("durable path temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    let publication = plan
+        .write_to_path(&destination)
+        .expect("durable path publication must succeed");
+    let candidate = fs::read(&destination).expect("durable path candidate must exist");
+    let patch = publication
+        .durable_patch()
+        .expect("path publication must retain a durable patch");
+    let wire = patch.to_bytes().expect("durable path patch must serialize");
+    let decoded = ParagraphStreamPatch::from_bytes(&wire)
+        .expect("durable path patch must decode after publication");
+    let captured_handle = Arc::new(
+        captured
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+            .expect("durable path store must expose its sealed handle"),
+    );
+    let resolver = TestReplayResolver {
+        expected: authored_reference,
+        handle: captured_handle,
+    };
+    let reopened_source = source_backed::Package::from_read_at(Arc::new(
+        VersionedArchiveSource::new(source_archive.clone()),
+    ))
+    .expect("durable path source must reopen");
+    let mut applied = Vec::new();
+    reopened_source
+        .apply_tail_append_stream_patch(&decoded, &resolver, &mut applied)
+        .expect("durable path patch must apply after reopen");
+    assert_eq!(applied, candidate);
+    assert_eq!(semantic_texts(&applied), vec!["seed", "path durable"]);
+
+    let reopened_candidate = source_backed::Package::from_path(&destination)
+        .expect("durable path candidate must reopen from its destination");
+    let mut restored = Vec::new();
+    publication
+        .write_inverse_to_stream(&reopened_candidate, &mut restored)
+        .expect("path publication inverse must restore the source archive");
+    assert_eq!(restored, source_archive);
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[test]
+fn path_publication_replay_failure_after_prepare_preserves_destination() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let stream_limits = limits(source_xml.len());
+    let fail_open = Arc::new(AtomicUsize::new(0));
+    let producer = |sink: &mut dyn ParagraphEventSink| -> Result<(), AuthoredReplayError> {
+        sink.push(PlainParagraphEvent::ParagraphStart)?;
+        sink.push(PlainParagraphEvent::TextChunk("replay failure"))?;
+        sink.push(PlainParagraphEvent::ParagraphEnd)?;
+        Ok(())
+    };
+    let package = open_package(source_archive);
+    let plan = package
+        .tail_append_plain_paragraphs_from_producer(
+            producer,
+            PostPrepareFailingReplayStore {
+                inner: Some(
+                    MemoryReplayStore::new(stream_limits.max_replay_bytes)
+                        .expect("post-prepare replay store limit is finite"),
+                ),
+                fail_open: Arc::clone(&fail_open),
+            },
+            stream_limits,
+        )
+        .expect("post-prepare replay producer route must be accepted")
+        .prepare()
+        .expect("post-prepare replay plan must prepare before failure");
+
+    let directory = tempdir().expect("replay failure temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    let original_destination = b"replay failure destination".to_vec();
+    fs::write(&destination, &original_destination).expect("replay failure destination seed");
+    fail_open.store(1, Ordering::Release);
+
+    let result = plan.write_to_path(&destination);
+    assert!(
+        matches!(
+            &result,
+            Err(StreamError::Opc(
+                litchi_opc::error::OpcError::IncompleteOutput { .. }
+                    | litchi_opc::error::OpcError::IoError(_)
+            ))
+        ),
+        "post-prepare replay failure must remain a typed OPC error: {result:?}"
+    );
+    assert_eq!(
+        fs::read(&destination).expect("replay failure destination must remain readable"),
+        original_destination
+    );
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[test]
+fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_inode() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let directory = tempdir().expect("source-path temporary directory");
+    let source_path = directory.path().join("source.docx");
+    fs::write(&source_path, &source_archive).expect("source path fixture");
+    let package =
+        source_backed::Package::from_path(&source_path).expect("filesystem source path must open");
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["same path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("same source and destination path plan must prepare");
+    let publication = plan
+        .write_to_path(&source_path)
+        .expect("same source and destination path must replace atomically");
+
+    assert_eq!(path_semantic_texts(&source_path), vec!["seed", "same path"]);
+    let replaced = fs::read(&source_path).expect("replaced source path must be readable");
+    assert_eq!(
+        publication.candidate_artifact_length(),
+        replaced.len() as u64
+    );
+    let reopened_candidate = source_backed::Package::from_path(&source_path)
+        .expect("replacement inode must reopen independently");
+    let mut restored = Vec::new();
+    publication
+        .write_inverse_to_stream(&reopened_candidate, &mut restored)
+        .expect("inverse must authenticate the replacement inode");
+    assert_eq!(restored, source_archive);
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[cfg(unix)]
+#[test]
+fn path_publication_hardlink_destination_preserves_the_original_source_inode() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let directory = tempdir().expect("hardlink source temporary directory");
+    let source_path = directory.path().join("source.docx");
+    let destination = directory.path().join("hardlink-candidate.docx");
+    fs::write(&source_path, &source_archive).expect("hardlink source fixture");
+    fs::hard_link(&source_path, &destination).expect("hardlink destination fixture");
+
+    let package = source_backed::Package::from_path(&source_path)
+        .expect("hardlink filesystem source must open");
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["hardlink path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("hardlink path plan must prepare");
+    let publication = plan
+        .write_to_path(&destination)
+        .expect("hardlink destination must replace atomically");
+
+    assert_eq!(
+        fs::read(&source_path).expect("original hardlink inode must remain readable"),
+        source_archive
+    );
+    let candidate = fs::read(&destination).expect("hardlink candidate must exist");
+    assert_eq!(
+        publication.candidate_artifact_length(),
+        candidate.len() as u64
+    );
+    assert_eq!(
+        path_semantic_texts(&destination),
+        vec!["seed", "hardlink path"]
+    );
+    let reopened_candidate = source_backed::Package::from_path(&destination)
+        .expect("hardlink candidate replacement must reopen");
+    let mut restored = Vec::new();
+    publication
+        .write_inverse_to_stream(&reopened_candidate, &mut restored)
+        .expect("hardlink candidate inverse must authenticate");
+    assert_eq!(restored, source_archive);
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[test]
+fn path_publication_rejects_stale_or_mutated_sources_without_replacing_destination() {
+    for mutated in [false, true] {
+        let source_xml = source_xml_without_section(false);
+        let source_archive = archive(&source_xml, false, Compression::Store);
+        let source = Arc::new(VersionedArchiveSource::new(source_archive.clone()));
+        let package = source_backed::Package::from_read_at(source.clone())
+            .expect("stale path source must open");
+        let directory = tempdir().expect("stale path temporary directory");
+        let destination = directory.path().join("candidate.docx");
+        let original_destination = b"destination remains untouched".to_vec();
+        fs::write(&destination, &original_destination).expect("stale path destination seed");
+        let plan = package
+            .tail_append_plain_paragraphs(
+                EventSource::new(events_for(&["stale path"])),
+                limits(source_xml.len()),
+            )
+            .prepare()
+            .expect("stale path plan must prepare before source change");
+
+        if mutated {
+            source.mutate_opaque_payload();
+        } else {
+            source.bump();
+        }
+        let result = plan.write_to_path(&destination);
+        assert!(
+            matches!(result, Err(StreamError::Opc(_))),
+            "stale path publication must return an OPC source failure"
+        );
+        assert_eq!(
+            fs::read(&destination).expect("stale destination must remain readable"),
+            original_destination
+        );
+        assert_no_atomic_temporary_files(directory.path());
+    }
+}
+
+#[test]
+fn path_publication_cancellation_leaves_destination_and_managed_memory_untouched() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let (budget, cancellation_source, context) =
+        managed_context_with_objects(64 * 1024 * 1024, u64::MAX, u64::MAX);
+    let package = source_backed::Package::from_read_at_with_execution_context(
+        Arc::new(VersionedArchiveSource::new(source_archive.clone())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .expect("cancelled managed path source must open");
+    let directory = tempdir().expect("cancelled path temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    let original_destination = b"cancelled destination".to_vec();
+    fs::write(&destination, &original_destination).expect("cancelled destination seed");
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["cancelled path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("cancelled path plan must prepare before cancellation");
+    cancellation_source.cancel();
+    let result = plan.write_to_path(&destination);
+    assert!(
+        matches!(
+            &result,
+            Err(StreamError::Opc(litchi_opc::error::OpcError::Cancelled))
+        ),
+        "cancelled path publication must be typed: {result:?}"
+    );
+    assert_eq!(
+        fs::read(&destination).expect("cancelled destination must remain readable"),
+        original_destination
+    );
+    assert_no_atomic_temporary_files(directory.path());
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn path_publication_late_managed_output_failure_leaves_destination_and_no_temporary_file() {
+    let source_xml = source_xml(false, 16 * 1024);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let expected = {
+        let package = open_package(source_archive.clone());
+        let plan = package
+            .tail_append_plain_paragraphs(
+                EventSource::new(events_for(&["output limited path"])),
+                limits(source_xml.len()),
+            )
+            .prepare()
+            .expect("late output-limit comparison must prepare");
+        let mut output = Vec::new();
+        plan.write_to_stream(&mut output)
+            .expect("late output-limit comparison must publish");
+        output
+    };
+    let output_limit = (expected.len() as u64) / 2;
+    assert!(
+        output_limit > 0,
+        "late output-limit fixture must be nonempty"
+    );
+    let (budget, package) = managed_package(source_archive, 64 * 1024 * 1024, output_limit);
+    let directory = tempdir().expect("output-limited path temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    let original_destination = b"output limit destination".to_vec();
+    fs::write(&destination, &original_destination).expect("output-limit destination seed");
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["output limited path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("managed output-limit plan must prepare before publication");
+    let result = plan.write_to_path(&destination);
+    assert!(
+        matches!(
+            result,
+            Err(StreamError::Opc(
+                litchi_opc::error::OpcError::IncompleteOutput { written, .. }
+            )) if written > 0
+        ),
+        "late managed output failure must report incomplete output"
+    );
+    assert!(
+        budget.used(Resource::OutputBytes) > 0,
+        "late managed output failure must accept a temporary prefix"
+    );
+    assert_eq!(
+        fs::read(&destination).expect("failed destination must remain readable"),
+        original_destination
+    );
+    assert_no_atomic_temporary_files(directory.path());
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn path_publication_refuses_symlink_and_nonregular_destinations_before_output() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let directory = tempdir().expect("destination-shape temporary directory");
+    let target = directory.path().join("target.docx");
+    let original = b"symlink target remains untouched";
+    fs::write(&target, original).expect("symlink target seed");
+    let link = directory.path().join("link.docx");
+    symlink(&target, &link).expect("symlink destination fixture");
+
+    let package = open_package(source_archive.clone());
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["symlink refusal"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("symlink refusal plan must prepare");
+    let result = plan.write_to_path(&link);
+    match result {
+        Err(StreamError::Opc(litchi_opc::error::OpcError::IoError(error))) => {
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput)
+        },
+        other => panic!("symlink destination must be refused before output: {other:?}"),
+    }
+    assert_eq!(
+        fs::read(&target).expect("symlink target must remain readable"),
+        original
+    );
+
+    let directory_destination = directory.path().join("destination-directory");
+    fs::create_dir(&directory_destination).expect("nonregular destination fixture");
+    let package = open_package(source_archive);
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["directory refusal"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("directory refusal plan must prepare");
+    let result = plan.write_to_path(&directory_destination);
+    match result {
+        Err(StreamError::Opc(litchi_opc::error::OpcError::IoError(error))) => {
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput)
+        },
+        other => panic!("directory destination must be refused before output: {other:?}"),
+    }
+    assert!(directory_destination.is_dir());
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[cfg(unix)]
+#[test]
+fn path_publication_preserves_existing_unix_permissions() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let directory = tempdir().expect("permissions temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    fs::write(&destination, b"old permissions destination").expect("permissions destination seed");
+    fs::set_permissions(&destination, fs::Permissions::from_mode(0o640))
+        .expect("permissions destination mode");
+
+    let package = open_package(source_archive);
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["permissions path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("permissions path plan must prepare");
+    plan.write_to_path(&destination)
+        .expect("permissions path publication must succeed");
+    let mode = fs::metadata(&destination)
+        .expect("permissions destination metadata")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o640);
+    assert_no_atomic_temporary_files(directory.path());
+}
+
+#[test]
+fn path_publication_releases_managed_workspace_after_success() {
+    let source_xml = source_xml_without_section(false);
+    let source_archive = archive(&source_xml, false, Compression::Store);
+    let expected = {
+        let package = open_package(source_archive.clone());
+        let plan = package
+            .tail_append_plain_paragraphs(
+                EventSource::new(events_for(&["managed path"])),
+                limits(source_xml.len()),
+            )
+            .prepare()
+            .expect("managed path comparison must prepare");
+        let mut output = Vec::new();
+        plan.write_to_stream(&mut output)
+            .expect("managed path comparison must publish");
+        output
+    };
+    let (budget, package) =
+        managed_package(source_archive, 64 * 1024 * 1024, expected.len() as u64);
+    let directory = tempdir().expect("managed path temporary directory");
+    let destination = directory.path().join("candidate.docx");
+    let plan = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(events_for(&["managed path"])),
+            limits(source_xml.len()),
+        )
+        .prepare()
+        .expect("managed path plan must prepare");
+    plan.write_to_path(&destination)
+        .expect("managed path publication must succeed");
+    assert_eq!(
+        fs::read(&destination).expect("managed path output"),
+        expected
+    );
+    assert_eq!(budget.used(Resource::OutputBytes), expected.len() as u64);
+    assert_no_atomic_temporary_files(directory.path());
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
 }

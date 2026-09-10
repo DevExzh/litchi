@@ -1,0 +1,90 @@
+{
+  "attempt": "strace1",
+  "binary": {
+    "bytes": 428547008,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+  },
+  "build": {
+    "binding": {
+      "binary": {
+        "bytes": 428547008,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+        "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+      },
+      "bytes": 1642,
+      "git_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+      "role": "normal",
+      "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788",
+      "source": {
+        "bytes": 1930173,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-source.json",
+        "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+      }
+    },
+    "bytes": 1642,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+    "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788"
+  },
+  "caller_gate": {
+    "driver": "root-owned change-0497 gate.py plus flock",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller runs flock -x for the complete profiler command",
+    "required": true
+  },
+  "cpu": 2,
+  "finished_utc": "2026-09-10T17:12:15.274862+00:00",
+  "helper": {
+    "bytes": 65338,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profile.py",
+    "sha256": "b433b8831bfaa3470bd3e67e420bf780a8b8e490152c75366cb89d8fadc5509a"
+  },
+  "modes": [
+    "counting",
+    "atomic"
+  ],
+  "operation_attribution_claim": false,
+  "performance_claim": "diagnostic syscall paths and counts only; no operation attribution, latency comparison, throughput comparison, or optimization claim",
+  "records": [
+    {
+      "error": "profile child failed",
+      "label": "strace-counting",
+      "mode": "counting",
+      "operation_attribution_claim": false,
+      "report": null,
+      "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+      "status": "failed",
+      "terminal": {
+        "bytes": 8024,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace1/strace-counting/terminal.json",
+        "sha256": "43440a34820210885c9d007c9debcc76bd182794c5ef65ae80eae10f70319fa1"
+      },
+      "trace": null
+    },
+    {
+      "error": "profile child failed",
+      "label": "strace-atomic",
+      "mode": "atomic",
+      "operation_attribution_claim": false,
+      "report": null,
+      "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+      "status": "failed",
+      "terminal": {
+        "bytes": 7978,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace1/strace-atomic/terminal.json",
+        "sha256": "ac326ddd2a0aef422b02461cd3b9b990926a20f1ecadafe91850795ec5d3550b"
+      },
+      "trace": null
+    }
+  ],
+  "samples": 1,
+  "schema": "docx-tail-append-publication-profile-result-v1",
+  "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+  "source_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+  "status": "incomplete",
+  "version": 1,
+  "warmups": 1
+}

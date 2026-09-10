@@ -70,6 +70,7 @@ fn config_for(
         input_delay_us: 0,
         input_overhead_us: 0,
         input_bytes_per_second: None,
+        publication: PublicationMode::HashingSink,
     }
 }
 
@@ -119,7 +120,10 @@ fn assert_store_sample(case: &CaseRecord, provider: AuthoredProvider) {
     assert_eq!(sample.authored.text_chunks, case.authored.text_chunk_count);
     assert_eq!(sample.authored.text_bytes, case.authored.text_bytes);
     assert_eq!(
-        sample.sink.accepted_bytes,
+        sample
+            .sink
+            .accepted_bytes
+            .expect("hashing sink must report accepted bytes"),
         u64::try_from(case.oracle.candidate_archive_bytes).expect("archive length fits u64")
     );
 

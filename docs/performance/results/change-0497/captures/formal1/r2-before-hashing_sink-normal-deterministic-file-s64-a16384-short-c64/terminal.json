@@ -1,0 +1,188 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0497/retained/before/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "16384",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "30",
+    "--warmups",
+    "3",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "file",
+    "--input-file",
+    "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/input/s64-a16384-short-c64-source.docx",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 531,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/replay-cleanup.json",
+      "sha256": "d95d3cf3e058735635e59f003d1d1d464c539447ab593f4846b953343baa5e41"
+    },
+    "report.json": {
+      "bytes": 72036,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/report.json",
+      "sha256": "66c99d2668312dd48c3e60ff44865f00a790e62de7061a26dd2735208afb90e5"
+    },
+    "resource.txt": {
+      "bytes": 1390,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/resource.txt",
+      "sha256": "737b65d66becfd98dcbf5bd2909af6f5c06774d9f26b482c9d3cd7063661804a"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 426409040,
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/before/normal/docx_replayable_tail_append",
+    "sha256": "d0ab7f0c88f798b3ed5ffe2d6702512b0868aa63784f8ccb3c1ce5dddabb505a"
+  },
+  "build": {
+    "binary": {
+      "bytes": 426409040,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/before/normal/docx_replayable_tail_append",
+      "sha256": "d0ab7f0c88f798b3ed5ffe2d6702512b0868aa63784f8ccb3c1ce5dddabb505a"
+    },
+    "gate": {
+      "bytes": 1746,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/before-baseline1-normal.json",
+      "sha256": "dff3a74f19b2be39b5b3d2eb805b6c32bdd596ccc1230e17b6850c3ff2dbc279"
+    },
+    "git_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+    "key": "before/normal",
+    "phase": "before",
+    "role": "normal",
+    "source_manifest": {
+      "bytes": 1937076,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/before-baseline1-source.json",
+      "sha256": "665bf079393067607a9c96076b64a4f9134132e68a5bba9a63901dde543b6477"
+    }
+  },
+  "cleanup": {
+    "inventory": [],
+    "preserved": false,
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64",
+      "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1",
+      "/home/zhuhe/.cache/litchi-goal-0497/runs"
+    ],
+    "root": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64",
+    "schema": "docx-replayable-tail-publication-private-cleanup-v1",
+    "status": "pass"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 108524,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/measure.py",
+    "sha256": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0497/target",
+    "DEBUGINFOD_URLS": "",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "RUSTDOCFLAGS": "-Dwarnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/tmp",
+    "USER": "zhuhe"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T17:25:37.097886Z",
+  "input_file": {
+    "bytes": 2106,
+    "identity": "private_prepared_file_capability_fingerprint_matches_source_archive",
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/input/s64-a16384-short-c64-source.docx",
+    "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5",
+    "source_fixture": {
+      "bytes": 2106,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0484/axis-input/s64-a16384-short-c64-source.docx",
+      "sha256": "c9928d7a5d70d31c2447f434f81d908ed29c3adc4701f4ea32855005fc974ea5"
+    }
+  },
+  "launch_error": null,
+  "machine": {
+    "bytes": 1347,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/machine.json",
+    "sha256": "37096578ef4ef061afda775953b4a594168f4b12d51bf78711f828107bcc18f2"
+  },
+  "missing_artifacts": [],
+  "private_root": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64",
+  "protocol": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/protocol.json",
+    "sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d"
+  },
+  "replay_dir": null,
+  "run": {
+    "arm": "deterministic-file-s64-a16384-short-c64",
+    "input_mode": "file",
+    "label": "r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64",
+    "ordinal": 123,
+    "phase": "before",
+    "publication": "hashing_sink",
+    "repeat": 2,
+    "role": "normal",
+    "route": "deterministic",
+    "samples": 30,
+    "warmups": 3,
+    "workload": "s64-a16384-short-c64"
+  },
+  "schema": "docx-replayable-tail-publication-terminal-v1",
+  "source_manifest": {
+    "bytes": 1937076,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/before-baseline1-source.json",
+    "sha256": "665bf079393067607a9c96076b64a4f9134132e68a5bba9a63901dde543b6477"
+  },
+  "started_artifact": {
+    "bytes": 5799,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/started.json",
+    "sha256": "b9f9e308cd02ada6bf4a1158e7ed1ebd99c61c76ae44e0a12eddbfb5c2dc4c8a"
+  },
+  "started_utc": "2026-09-10T17:25:32.519971Z",
+  "status": "pass",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/tmp",
+  "validation_error": null,
+  "version": 1
+}

@@ -1,0 +1,10 @@
+.cleanup.py: error: destructive mode is restricted to fixed 0497 roots
+................................................usage: python3 -m unittest [-h] {capture,verify} ...
+python3 -m unittest: error: argument command: invalid choice: 'unsupported' (choose from capture, verify)
+.usage: python3 -m unittest [-h] {capture,verify} ...
+python3 -m unittest: error: the following arguments are required: command
+................................
+----------------------------------------------------------------------
+Ran 82 tests in 0.260s
+
+OK

@@ -1,0 +1,12 @@
+{
+  "attempt": "formal1",
+  "children": 288,
+  "protocol": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/protocol.json",
+    "sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d"
+  },
+  "samples": 8640,
+  "schema": "docx-replayable-tail-publication-verification-v1",
+  "status": "pass",
+  "version": 1
+}

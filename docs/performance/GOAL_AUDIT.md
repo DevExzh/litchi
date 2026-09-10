@@ -1,5 +1,39 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0497 adds an atomic DOCX publication capability; formal analysis is verified
+
+[0497](changes/0497-docx-atomic-publication.md) adds consuming
+`ParagraphStreamPlan::write_to_path` and
+`ParagraphStreamCommit::write_to_path` methods for the existing bounded DOCX
+logical-tail append route. The methods use OPC's sibling-temporary atomic
+replacement helper and retain the existing source, replay, budget,
+cancellation, candidate, and inverse-proof boundaries. A callback failure before
+replacement preserves the destination and removes the private temporary;
+post-replacement parent-directory sync failure returns typed
+`OpcError::Committed` and must not be blindly retried.
+
+The default hashing route remains the only before/after comparison and keeps
+its existing report shape. Counting is a bounded non-retaining after-only
+capability; atomic publication is also after-only because the before revision
+has no atomic destination method. The frozen formal inventory contains 288
+children and 8,640 samples, with a separate 72-child/216-sample pilot. Formal
+verification passes all 288 child terminals, including the 97-child resume
+after the original `ENOSPC` interruption. The descriptive analysis retains 864
+matched default-hashing comparison cells and 144 after-only capability rows.
+It retains all 100 >5% adverse flags: 72 allocator live-byte endpoint, 16
+latency, and 12 whole-child RSS. The original ordinal-191 raw observation
+remains archived without fabricated evidence. Cleanup overlapped two formal
+whole-child intervals, so no isolated-host or individual-outlier attribution is
+made. Final cleanup verification passes; the evidence inventory is recorded
+by `results/change-0497/seal.py`.
+
+| Goal area | 0497 candidate evidence | Audit status and boundary |
+| --- | --- | --- |
+| Atomic filesystem publication | Consuming DOCX plan/commit path methods delegate to the existing OPC atomic sibling replacement | Capability scope only; no general atomic-save or durability claim |
+| Default publication comparison | Historical hashing sink remains unchanged and is the only before/after route | 864 descriptive comparison cells; no broad speedup or causal claim |
+| Counting and atomic routes | Non-retaining counting and filesystem atomic routes are balanced after-only capabilities | 144 descriptive capability rows; no atomic before/after comparison or synthetic write-call/digest values |
+| Broader non-iWork goal | No new representative CRUD selector; borrowed input, producers, cold behavior, scaling, history, and broad CRUD remain open | Open |
+
 ## Current audit: 0496 verifies descriptive phase attribution; the full goal remains open
 
 [0496](changes/0496-docx-edit-phase-attribution.md) is a harness-only,

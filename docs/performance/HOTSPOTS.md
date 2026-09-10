@@ -1,5 +1,33 @@
 # Performance hotspot inventory
 
+## 0497: atomic publication capture is descriptive; hotspot attribution remains limited
+
+[0497](changes/0497-docx-atomic-publication.md) moves the bounded DOCX
+logical-tail append route toward an explicit filesystem destination. The
+consuming plan/commit methods use OPC's sibling temporary, data synchronization,
+replacement, and parent-directory synchronization path. The atomic route is
+after-only, while the unchanged hashing sink is the only before/after control.
+Counting is a non-retaining after-only capability.
+
+The measured interval includes the production atomic publication work and
+publication drop; destination readback, semantic/raw verification, fixture
+inverse checks, replay cleanup, and process/allocation endpoint snapshots are
+outside it. The frozen formal matrix contains 288 children and 8,640 samples,
+with a separate 72-child/216-sample pilot. Formal verification passes all 288
+child terminals, including the 97-child resume after the original `ENOSPC`
+interruption. The analysis retains 864 matched default-hashing comparison cells
+and 144 after-only capability rows, with all 100 >5% adverse flags retained:
+72 allocator live-byte endpoint, 16 latency, and 12 whole-child RSS.
+
+These records support descriptive route and lifecycle observations only. The
+default hashing sink is the only before/after comparison; counting and atomic
+routes are after-only, so no general speedup, durability, cross-platform, or
+atomic-performance claim is authorized. The original ordinal-191 raw
+observation remains archived without fabricated evidence. Emergency cleanup
+overlapped two formal whole-child intervals, so no isolated-host or
+individual-outlier attribution is made. Final cleanup verification passes. The retained failure custody, diagnostic
+syscall scope, and fixture-only inverse oracle continue to bound interpretation.
+
 ## 0496: publication dominates named normal phases; attribution remains descriptive
 
 [0496](changes/0496-docx-edit-phase-attribution.md) targets the unresolved

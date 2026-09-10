@@ -1,0 +1,217 @@
+{
+  "argv": [
+    "/usr/bin/strace",
+    "-f",
+    "-yy",
+    "-ttt",
+    "-T",
+    "-s",
+    "512",
+    "-e",
+    "trace=open,openat,openat2,creat,read,pread64,preadv,readv,write,pwrite64,pwritev,writev,close,fsync,fdatasync,rename,renameat,renameat2,unlink,unlinkat,stat,statx,fstat,newfstatat,mkdir,mkdirat",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/strace.raw",
+    "--",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "256",
+    "--chunks",
+    "window",
+    "--text",
+    "near",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "67108864",
+    "--replay-sync",
+    "data",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/replay",
+    "--publication",
+    "atomic_path",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 692,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/replay-cleanup.json",
+      "sha256": "2abfb1872f573bf9f9d6f4538396714272dfd2c6011fdd1168237bf3a7c1efbe"
+    },
+    "stderr.txt": {
+      "bytes": 81,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/stderr.txt",
+      "sha256": "3f843b3319f4eda64b7d81f171715d36ef7080c85724a6cf4de11849803b6e01"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "strace.raw": {
+      "bytes": 13933,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/strace.raw",
+      "sha256": "46e846744382af454edaafd8626d6c50c3673a34eb31e13639ecbb6169a81799"
+    }
+  },
+  "attempt": "strace4",
+  "benchmark_argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "64",
+    "--authored-counts",
+    "256",
+    "--chunks",
+    "window",
+    "--text",
+    "near",
+    "--samples",
+    "1",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "file-store",
+    "--replay-max-bytes",
+    "67108864",
+    "--replay-sync",
+    "data",
+    "--replay-dir",
+    "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/replay",
+    "--publication",
+    "atomic_path",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/report.json"
+  ],
+  "binary": {
+    "bytes": 428547008,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+  },
+  "build": {
+    "binding": {
+      "binary": {
+        "bytes": 428547008,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+        "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+      },
+      "bytes": 1642,
+      "git_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+      "role": "normal",
+      "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788",
+      "source": {
+        "bytes": 1930173,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-source.json",
+        "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+      }
+    },
+    "bytes": 1642,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+    "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788"
+  },
+  "caller_gate": {
+    "driver": "root-owned change-0497 gate.py plus flock",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller runs flock -x for the complete profiler command",
+    "required": true
+  },
+  "cleanup": {
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/tmp",
+      "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/replay",
+      "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic"
+    ],
+    "replay_dir": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/replay",
+    "run_root": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic",
+    "schema": "docx-tail-append-publication-profile-cleanup-v1",
+    "status": "pass",
+    "tmpdir": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/tmp"
+  },
+  "cpu": 2,
+  "cwd": "/home/zhuhe/code/litchi",
+  "destination_contract": {
+    "destination_descriptor": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/tmp/litchi-docx-replay-atomic-<pid>-<serial>/published.docx",
+    "directory_sync_parent": "the generated atomic destination parent directory",
+    "exact_paths_source": "strace -yy raw trace and parsed paths.paths",
+    "sibling_temporary_prefix": ".litchi-",
+    "sibling_temporary_suffix": ".tmp"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/tmp"
+  },
+  "exit_code": 1,
+  "finished_utc": "2026-09-10T17:38:19.942586+00:00",
+  "helper": {
+    "bytes": 65705,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profile_v2.py",
+    "sha256": "2eda27edad8c18314cbac1b356187644323c4381822e1a8fa1e979928c5cfb89"
+  },
+  "label": "strace-atomic",
+  "missing_artifacts": [
+    "report.json"
+  ],
+  "mode": "atomic",
+  "operation_attribution_claim": false,
+  "performance_claim": "diagnostic syscall paths and counts only; no operation attribution, latency comparison, throughput comparison, or optimization claim",
+  "profiler": null,
+  "replay_dir": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/replay",
+  "report_summary": null,
+  "run": {
+    "authored_count": 256,
+    "chunk": "window",
+    "provider": "file-store",
+    "publication_flag": "--publication",
+    "publication_path_flag": null,
+    "replay_max_bytes": 67108864,
+    "replay_sync": "data",
+    "source_count": 64,
+    "text": "near"
+  },
+  "samples": 1,
+  "schema": "docx-tail-append-publication-profile-terminal-v1",
+  "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+  "source_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+  "source_revision_after": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+  "source_revision_before": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+  "started_artifact": {
+    "bytes": 5894,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/started.json",
+    "sha256": "8774243fab1f9446a0fd1052fe2fd2f5b3d9f0d26245c2fc0b7c60cf7b0d0eb1"
+  },
+  "started_utc": "2026-09-10T17:38:19.376147+00:00",
+  "status": "failed",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 900,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0497/publication-profiles/strace4/strace-atomic/tmp",
+  "tool": "strace",
+  "tool_executable": {
+    "bytes": 2374392,
+    "executable": true,
+    "path": "/usr/bin/strace",
+    "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5"
+  },
+  "version": 1,
+  "warmups": 1
+}

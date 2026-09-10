@@ -1,0 +1,86 @@
+0497 next-batch review (read-only; patch remains unapplied)
+
+Decision: do not adopt this patch yet. The design is directionally compatible
+with ADR 0005 (explicit local workers, cache ownership, and source fences), but
+the following must be resolved before production use.
+
+Blockers
+
+1. The immutable preflight plan is not authoritative at dispatch. The design
+   promises that serial and parallel paths do not resolve metadata a second
+   time (design.md:46-57), but both patch paths call `read_part` with only an
+   index (implementation.patch:574-575, 699). The current implementation then
+   calls `archive.metadata_for` again for managed reads
+   (source_backed.rs:9789-9802). This duplicates metadata work and lets the
+   scheduler gate, `Work` charge, and decoded-size check derive from a second
+   lookup instead of the prepared record. Add an internal read entry point that
+   accepts the prepared entry id and declared size (while retaining all final
+   source/context fences), or make the prepared record the sole input to the
+   existing path. Add a test that fails if metadata is re-read and one that
+   covers a metadata/source race.
+
+2. The serial fallback violates its own budget envelope. `Workspace::reserve`
+   unconditionally charges `CONTROL_BYTES`, `Gate`, `StoredFailure`, and
+   `ERROR_TEXT_BYTES` (implementation.patch:304-312), even when `parallel` is
+   false. The design says serial work reserves only descriptor and output
+   shapes (design.md:120-127). Under a tight managed memory budget this can
+   refuse a serial-equivalent request before any Part read. Charge gate/error/
+   worker control only for the parallel branch, then test one-worker,
+   below-threshold, and oversized-Part fallback under exact tight budgets.
+
+3. Parallel error transport is not serial- or diagnostic-equivalent. The slot
+   rewrites every execution-limit scope to `"source-backed batch"`, maps every
+   ZIP failure to one generic message, maps allocation failures to
+   `CollectionAllocation`, and maps all other variants to
+   `SourceBackedOverlayUnavailable` (implementation.patch:145-166). This loses
+   the budget ancestor scope and typed/provider detail required by the existing
+   `OpcError` boundary; the same request can report a different error solely
+   because the threshold selected parallelism. Preserve the required variant
+   fields (including the original `ResourceLimit.scope`) through an operation-
+   local bounded transport, or explicitly change and accept the public error
+   contract before exposing this method. The required serial typed-error,
+   lower-ordinal, and setup/task precedence tests are currently absent.
+
+4. The cumulative-budget contract is unresolved. `next-implementation.md:72-76`
+   requires failed/cancelled calls to leave budget counters at the same
+   post-call state as serial execution, while design.md:196-203 explicitly
+   declines rollback for cumulative `InputBytes` and `Work` (the current cache
+   charges `Work` cumulatively at source_backed.rs:4450-4458). Choose an
+   operation-local child context/rollback design, or amend the acceptance
+   contract and its ADR-backed tests before treating this as production-ready.
+
+5. Required acceptance evidence is not present. The proposed test file is only
+   comments (implementation.patch:801-822), and the design explicitly says no
+   compiler, serial-equivalence, resource, cancellation, freshness,
+   deterministic-error, or scaling result exists yet (design.md:159-214).
+   Implement the executable focused tests and run the required checks before
+   benchmark hookup; then capture the production route's overlap, bounds,
+   retention, and Amdahl/scaling evidence. Existing eager/harness measurements
+   are not evidence for this source-backed API.
+
+Additional boundedness/complexity fixes required by the stated contract
+
+6. `next.fetch_add(1)` is unchecked (implementation.patch:684-692), despite
+   the design requiring checked scheduler counters (design.md:134-137). Use a
+   bounded compare/exchange or `fetch_update` claim that stops at request_count.
+   Likewise, gate underflow is handled with public-operation `assert!`s
+   (implementation.patch:427-434); convert invariant failure to the typed
+   scheduler refusal used by the operation rather than allowing an internal
+   panic to escape.
+
+7. `PreparedBatch::build` applies aggregate/declared metadata checks even for
+   unmanaged packages (implementation.patch:204-239), whereas the design's
+   metadata plan is scoped to managed packages (design.md:46-52) and the
+   existing unmanaged `read_part` path does not preflight `TotalPartBytes`.
+   Decide and document the new API's unmanaged semantics; otherwise this makes
+   the serial fallback observably reject requests that the current one-Part
+   operation accepts. Cover the decision in serial-equivalence tests.
+
+8. Managed case-insensitive lookup can remain a linear scan
+   (source_backed.rs:5866-5880). A batch of up to the 100,000-Part limit with
+   adversarial case-equivalent misses can therefore make preflight O(requests
+   * parts), with no context check inside the scan. Add a temporary bounded
+   lookup index for the operation or a cancellation-aware resolver, and test
+   the worst-case shape before making a complexity claim.
+
+No repository files were modified and no patch, build, or benchmark was run.

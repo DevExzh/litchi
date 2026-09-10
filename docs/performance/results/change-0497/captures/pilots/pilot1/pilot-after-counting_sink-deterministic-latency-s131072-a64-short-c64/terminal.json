@@ -1,0 +1,186 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "--source-counts",
+    "131072",
+    "--authored-counts",
+    "64",
+    "--chunks",
+    "64",
+    "--text",
+    "short",
+    "--samples",
+    "3",
+    "--warmups",
+    "1",
+    "--sink-write",
+    "4096",
+    "--authored-provider",
+    "deterministic",
+    "--replay-max-bytes",
+    "1",
+    "--replay-sync",
+    "none",
+    "--compression",
+    "current",
+    "--input-mode",
+    "latency",
+    "--input-max-range",
+    "65536",
+    "--input-delay-us",
+    "50",
+    "--input-overhead-us",
+    "10",
+    "--input-bytes-per-second",
+    "100000000",
+    "--publication",
+    "counting_sink",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 556,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/replay-cleanup.json",
+      "sha256": "9213341817f7c28ff74db06654a1c2ddadfe343d2ff765999f8eba62c87dbca8"
+    },
+    "report.json": {
+      "bytes": 15291,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/report.json",
+      "sha256": "13522093f4dc290b22b7ca179be18196169c4e7653189c505abf52296513048c"
+    },
+    "resource.txt": {
+      "bytes": 1359,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/resource.txt",
+      "sha256": "c20dc0ed50b6f25e8861a56aa7b295a5a3afc8da8ab255873cdb84bce5e022ab"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "pilot1",
+  "binary": {
+    "bytes": 428547008,
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+  },
+  "build": {
+    "binary": {
+      "bytes": 428547008,
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+      "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+    },
+    "gate": {
+      "bytes": 1743,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-normal.json",
+      "sha256": "324e5511bd950071ab5bdcde47574934222a2154e0a9e9ff063b4cab25ea4781"
+    },
+    "git_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+    "key": "after/normal",
+    "phase": "after",
+    "role": "normal",
+    "source_manifest": {
+      "bytes": 1930173,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-source.json",
+      "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+    }
+  },
+  "cleanup": {
+    "inventory": [],
+    "preserved": false,
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64",
+      "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1",
+      "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots"
+    ],
+    "root": "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64",
+    "schema": "docx-replayable-tail-publication-private-cleanup-v1",
+    "status": "pass"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "bytes": 108524,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/measure.py",
+    "sha256": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0497/target",
+    "DEBUGINFOD_URLS": "",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "RUSTDOCFLAGS": "-Dwarnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/tmp",
+    "USER": "zhuhe"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T17:11:32.434064Z",
+  "input_file": null,
+  "launch_error": null,
+  "machine": {
+    "bytes": 1347,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/machine.json",
+    "sha256": "37096578ef4ef061afda775953b4a594168f4b12d51bf78711f828107bcc18f2"
+  },
+  "missing_artifacts": [],
+  "private_root": "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64",
+  "protocol": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/protocol.json",
+    "sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d"
+  },
+  "replay_dir": null,
+  "run": {
+    "arm": "deterministic-latency-s131072-a64-short-c64",
+    "input_mode": "latency",
+    "label": "pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64",
+    "ordinal": 47,
+    "phase": "after",
+    "publication": "counting_sink",
+    "repeat": 1,
+    "role": "normal",
+    "route": "deterministic",
+    "samples": 3,
+    "warmups": 1,
+    "workload": "s131072-a64-short-c64"
+  },
+  "schema": "docx-replayable-tail-publication-terminal-v1",
+  "source_manifest": {
+    "bytes": 1930173,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-source.json",
+    "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+  },
+  "started_artifact": {
+    "bytes": 5229,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/started.json",
+    "sha256": "0bda9c0b257b6d90a2a154d80439c8c86f2114f0196592da83aa2798cf16e8cf"
+  },
+  "started_utc": "2026-09-10T17:11:30.115145Z",
+  "status": "pass",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0497/runs/pilots/pilot1/pilot-after-counting_sink-deterministic-latency-s131072-a64-short-c64/tmp",
+  "validation_error": null,
+  "version": 1
+}

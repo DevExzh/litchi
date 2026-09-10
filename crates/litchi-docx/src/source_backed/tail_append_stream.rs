@@ -18,6 +18,7 @@ use sha2::{Digest as _, Sha256};
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::marker::PhantomData;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -1616,6 +1617,21 @@ impl<'package> ParagraphStreamPlan<'package> {
     pub fn write_to_stream(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
         self.commit().write_to_stream(writer)
     }
+
+    /// Atomically publish this plan to a filesystem path.
+    ///
+    /// The path publication uses the same consuming commit and source-backed
+    /// splice as [`Self::write_to_stream`].  The existing splice callback
+    /// authenticates the source, candidate, replay, budget, and cancellation
+    /// state while writing the complete candidate to an atomic temporary
+    /// sibling; only then does the filesystem layer synchronize and replace
+    /// the destination.  This is not a compare-and-swap or a continuous source
+    /// watch, so source freshness remains the callback's existing contract.
+    /// A successful call returns the same source, candidate, replay, and
+    /// inverse evidence as stream publication.
+    pub fn write_to_path(self, path: impl AsRef<Path>) -> Result<ParagraphStreamPublication> {
+        self.commit().write_to_path(path)
+    }
 }
 
 /// Named consuming commit product for one stream append.
@@ -1639,6 +1655,20 @@ impl<'package> ParagraphStreamCommit<'package> {
     /// Publish to a sequential sink and retain an exact immediate inverse.
     pub fn write_to_stream(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
         publish_stream(self, writer)
+    }
+
+    /// Atomically publish this consuming commit to a filesystem path.
+    ///
+    /// OPC filesystem failures are returned as [`Error::Opc`], including
+    /// [`litchi_opc::error::OpcError::Committed`] when replacement succeeded
+    /// but the parent directory could not be synchronized.  `Committed` means
+    /// the destination has already been replaced; this method returns no
+    /// publication or inverse product in that case, so callers must inspect
+    /// the output and must not blindly retry.  A source, candidate, replay,
+    /// budget, cancellation, or inverse-proof failure from the splice callback
+    /// is passed through unchanged and leaves the destination untouched.
+    pub fn write_to_path(self, path: impl AsRef<Path>) -> Result<ParagraphStreamPublication> {
+        publish_stream_to_path(self, path.as_ref())
     }
 }
 
@@ -2239,6 +2269,21 @@ fn publish_stream(
         main_part,
         replay_reference,
     })
+}
+
+fn publish_stream_to_path(
+    commit: ParagraphStreamCommit<'_>,
+    path: &Path,
+) -> Result<ParagraphStreamPublication> {
+    let mut publication = None;
+    litchi_opc::atomic::replace_with::<Error>(path, |temporary| {
+        let published = publish_stream(commit, temporary)?;
+        publication = Some(published);
+        Ok(())
+    })?;
+    publication.ok_or(Error::Invalid(
+        "atomic stream publication completed without a publication product",
+    ))
 }
 
 struct ReplaySpliceReader<'a> {

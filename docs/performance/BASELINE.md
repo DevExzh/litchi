@@ -1,5 +1,55 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0497: atomic DOCX publication capability; descriptive capture verified
+
+[0497](changes/0497-docx-atomic-publication.md) adds consuming filesystem
+publication to the bounded DOCX logical-tail append plan and commit. The
+existing default hashing route remains unchanged and is the only before/after
+baseline used. Counting is a non-retaining after-only route, and the
+atomic destination is an after-only capability because the before revision has
+no corresponding method.
+
+The frozen protocol names 72 before/default hashing children, 72 after hashing
+children, 72 after counting-sink children, and 72 after atomic-path children:
+288 formal children and 8,640 samples, plus a separate 72-child/216-sample
+pilot. Formal verification passes all 288 child terminals, including the
+97-child resume after the original `ENOSPC` interruption. The analysis retains
+864 matched default-hashing comparison cells and 144 after-only capability
+rows. It retains all 100 >5% adverse flags: 72 allocator live-byte endpoint,
+16 latency, and 12 whole-child RSS. These are descriptive scoped observations;
+the default hashing route remains the only before/after comparison and no broad
+speedup claim is authorized.
+
+For one normal deterministic-owned slice, the table below shows descriptive p50
+latency in milliseconds (repeat one / repeat two):
+
+| Workload | Hashing before | Hashing after | Counting after | Atomic after |
+| --- | ---: | ---: | ---: | ---: |
+| `s64-a64` | 0.553 / 0.547 | 0.565 / 0.566 | 0.564 / 0.565 | 5.674 / 5.510 |
+| `s64-a16384` | 77.407 / 77.488 | 79.747 / 78.936 | 78.639 / 79.409 | 91.149 / 84.652 |
+| `s131072-a64` | 309.207 / 307.985 | 311.234 / 308.519 | 308.348 / 309.652 | 319.784 / 318.130 |
+
+Hashing before/after is the only matched comparison. Counting and atomic are
+after-only capabilities with different sink/publication contracts; these rows
+do not establish route ranking or a speedup claim.
+
+The 72 allocator live-byte flags are endpoint observations, not allocation
+count or operation-delta results. A possible harness-level explanation is
+that the current sample representation reserves an inline
+`Option<PublicationRecord>` before the measured region even when it is
+`None`; this is an inference about harness layout and makes no production
+live-memory claim. The file-store small allocator hashing p99 remains
+unresolved at +73.58% and +75.90% in the two repeats (aggregate median
++74.79%), with no causal attribution.
+
+The original ordinal-191 raw observation remains archived without fabricated
+evidence. Emergency cleanup overlapped two formal whole-child intervals, so
+the capture remains shared-host evidence and individual outliers are not
+attributed to that cleanup. The atomic timing boundary includes the production
+sibling-file publication and sync path; readback and correctness oracles
+remain outside timing. Final cleanup verification passes; the evidence inventory is recorded by
+`results/change-0497/seal.py`. The full non-iWork goal remains open.
+
 ## 0496: verified DOCX edit phase-attribution baseline
 
 [0496](changes/0496-docx-edit-phase-attribution.md) records an opt-in,

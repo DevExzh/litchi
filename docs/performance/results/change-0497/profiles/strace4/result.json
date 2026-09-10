@@ -1,0 +1,98 @@
+{
+  "attempt": "strace4",
+  "binary": {
+    "bytes": 428547008,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+    "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+  },
+  "build": {
+    "binding": {
+      "binary": {
+        "bytes": 428547008,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0497/retained/after/normal/docx_replayable_tail_append",
+        "sha256": "c7ea684cce1dfd383a5b7dda6fd6f901eca153feb9cc7feab03ccf25b61371c9"
+      },
+      "bytes": 1642,
+      "git_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+      "role": "normal",
+      "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788",
+      "source": {
+        "bytes": 1930173,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds/after-candidate1-source.json",
+        "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+      }
+    },
+    "bytes": 1642,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+    "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788"
+  },
+  "caller_gate": {
+    "driver": "root-owned change-0497 gate.py plus flock",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller runs flock -x for the complete profiler command",
+    "required": true
+  },
+  "cpu": 2,
+  "finished_utc": "2026-09-10T17:38:19.943001+00:00",
+  "helper": {
+    "bytes": 65705,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profile_v2.py",
+    "sha256": "2eda27edad8c18314cbac1b356187644323c4381822e1a8fa1e979928c5cfb89"
+  },
+  "modes": [
+    "counting",
+    "atomic"
+  ],
+  "operation_attribution_claim": false,
+  "performance_claim": "diagnostic syscall paths and counts only; no operation attribution, latency comparison, throughput comparison, or optimization claim",
+  "records": [
+    {
+      "error": "profile child failed",
+      "label": "strace-counting",
+      "mode": "counting",
+      "operation_attribution_claim": false,
+      "report": null,
+      "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+      "status": "failed",
+      "terminal": {
+        "bytes": 8249,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-counting/terminal.json",
+        "sha256": "4f7c2db80018ac6e6ab7ea20d24d6620ccdb303c4a0fc7098da21220e08ba018"
+      },
+      "trace": {
+        "bytes": 13955,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-counting/strace.raw",
+        "sha256": "45e97cf70a01068b38f625c640bcc0f42b392619223d6797c053a92ce6eac328"
+      }
+    },
+    {
+      "error": "profile child failed",
+      "label": "strace-atomic",
+      "mode": "atomic",
+      "operation_attribution_claim": false,
+      "report": null,
+      "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+      "status": "failed",
+      "terminal": {
+        "bytes": 8201,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/terminal.json",
+        "sha256": "4dc7dda74b4e5ebe29b00fc45bc402552a5978df90b55f5baa8f99f7351d18bc"
+      },
+      "trace": {
+        "bytes": 13933,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace4/strace-atomic/strace.raw",
+        "sha256": "46e846744382af454edaafd8626d6c50c3673a34eb31e13639ecbb6169a81799"
+      }
+    }
+  ],
+  "samples": 1,
+  "schema": "docx-tail-append-publication-profile-result-v1",
+  "scope": "whole strace child including benchmark setup, corpus construction, preflight, warmups, measured samples, post-timer destination/oracle checks, cleanup, and report serialization",
+  "source_revision": "66af25e2fc3c208e6819fffa5fa29e102942bc8e",
+  "status": "incomplete",
+  "version": 1,
+  "warmups": 1
+}

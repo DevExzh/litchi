@@ -1,5 +1,35 @@
 # Performance optimization ADR-compliance matrix
 
+## 0497: atomic DOCX publication preserves ownership; formal analysis is verified
+
+[0497](changes/0497-docx-atomic-publication.md) adds only the scoped
+filesystem-publication capability and its harness routes. The candidate review
+and planned evidence keep these ADR boundaries explicit:
+
+| ADR | 0497 mapping |
+| --- | --- |
+| 0001 — priorities and API layers | DOCX owns the logical-tail plan/commit API; filesystem replacement remains delegated to the existing OPC owner. No broad CRUD priority or optimization claim is added. |
+| 0002 — crate topology and dependency direction | The DOCX source-backed stream calls OPC's atomic helper without exposing an archive implementation type through the format API. |
+| 0003 — snapshots, edits, patches, and concurrency | Consuming plan/commit publication preserves source identity, replay admission, cancellation, candidate proof, and inverse authorization. `OpcError::Committed` is explicit after replacement and forbids blind retry. |
+| 0005 — I/O, memory, and measured performance | The atomic interval includes sibling write/data sync/replace/parent sync and publication drop; readback and endpoint snapshots are outside timing. Counting and atomic routes are after-only, and unobservable write-call/digest values are not fabricated. |
+| 0006 — validation, security, and compatibility | Destination aliases, symlink/nonregular refusal, source freshness, partial-output preservation, exact bytes, raw-member/semantic checks, and typed failures remain in the focused contract; Windows guarantees are unclaimed. |
+| 0008 — migration and verification | Source/build manifests, the frozen ABBA inventory, route/schema validators, terminal custody, cleanup, and final sealing are required; formal1 verification passes all 288 child terminals after the 97-child resume, and final cleanup verification passes; the seal inventories the retained evidence. |
+| 0011 — physical package ownership | OPC owns sibling-temporary publication, synchronization, replacement, and parent-directory durability signaling; DOCX owns the stream splice and semantic proof. |
+| 0024 — current post-migration workspace topology | The candidate uses the current `litchi-docx`/`litchi-opc` path and excludes the protected worktree. |
+
+The default hashing route remains the only before/after comparison. Counting is
+a non-retaining after-only capability and atomic publication is an after-only
+filesystem capability. The frozen protocol contains 288 formal children and
+8,640 samples plus a separate 72-child/216-sample pilot; formal verification
+passes all 288 child terminals after the 97-child resume. The analysis retains
+864 matched default-hashing comparison cells, 144 after-only capability rows,
+and all 100 >5% adverse flags (72 allocator live-byte endpoint, 16 latency,
+and 12 whole-child RSS). The original ordinal-191 raw observation remains archived without
+fabricated evidence. Emergency cleanup overlapped two formal whole-child
+intervals, so no isolated-host or individual-outlier attribution is made. No
+broad speedup, causal, durability, or general atomic-save claim follows; final
+cleanup verification passes; the seal inventories the retained evidence.
+
 ## 0496: verified diagnostic phase attribution preserves ownership and measurement boundaries
 
 [0496](changes/0496-docx-edit-phase-attribution.md) is a harness-only,

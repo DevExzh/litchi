@@ -48,6 +48,40 @@ verified descriptive analysis. It does not authorize a CPU, optimization,
 speed, provider-ranking, or causal claim; allocation remains full-lifecycle and
 RSS remains whole-child evidence.
 
+The `docx_replayable_tail_append` command has three publication modes for the
+0497 bounded logical-tail route. The historical `hashing-sink` mode remains
+the default and is the only before/after comparison. `counting-sink`
+is a bounded, non-retaining after-only capability; `atomic-path` is an
+after-only filesystem capability that publishes through an OPC sibling
+temporary and synchronization path:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin docx_replayable_tail_append -- \
+  --publication atomic-path --authored-provider deterministic \
+  --samples 30 --warmups 3 --json atomic-report.json
+```
+
+The atomic interval includes sibling creation, publication, data sync,
+replacement, parent-directory sync, publication drop, and lifecycle work.
+Destination readback, semantic/raw checks, fixture inverse comparison, replay
+cleanup, report writing, and endpoint snapshots are outside timing. The
+counting and atomic reports do not invent sink write-call or digest values;
+they use the production publication artifact proof. The 0497 protocol is
+frozen and pilot1 verification passes. Formal1 now has 288 status-pass child
+terminals and 8,640 samples; the resumed suffix completed 97/97 children with
+exit code 0. The descriptive analysis retains 864 matched default-hashing
+comparison cells, 144 after-only capability rows, and 100 >5% adverse flags
+(72 allocator live-byte endpoint, 16 latency, and 12 whole-child RSS). The
+original ENOSPC ordinal-191 observation remains archived without fabricated
+evidence. Emergency cleanup overlapped two formal whole-child intervals, so
+the capture remains
+shared-host descriptive evidence and individual outliers are not attributed to
+that cleanup. Final cleanup verification passes; the retained evidence is inventoried by
+`seal.py`. See the
+[0497 record](../../docs/performance/changes/0497-docx-atomic-publication.md)
+and [evidence README](../../docs/performance/results/change-0497/README.md).
+
 The opt-in `odp_source_tail_append_lifecycle` selector added in
 [0457](../../docs/performance/results/change-0457/README.md) measures source-backed
 ODP opening, bounded tail-insertion planning, and sequential replay publication.

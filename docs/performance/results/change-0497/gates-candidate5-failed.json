@@ -1,0 +1,30 @@
+{
+  "fmt": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-fmt.json",
+    "wrapper_exit_code": 1
+  },
+  "harness-allocator": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-harness-allocator.json",
+    "wrapper_exit_code": 0
+  },
+  "harness-clippy": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-harness-clippy.json",
+    "wrapper_exit_code": 0
+  },
+  "harness-rustdoc": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-harness-rustdoc.json",
+    "wrapper_exit_code": 0
+  },
+  "production-clippy": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-production-clippy.json",
+    "wrapper_exit_code": 0
+  },
+  "production-rustdoc": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-production-rustdoc.json",
+    "wrapper_exit_code": 0
+  },
+  "workspace-check": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate5-workspace-check.json",
+    "wrapper_exit_code": 0
+  }
+}
