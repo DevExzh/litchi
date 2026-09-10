@@ -1,0 +1,163 @@
+{
+  "artifacts": {
+    "record_report": {
+      "bytes": 495039,
+      "path": "profiles/before/media-rich-owned.record.report.json",
+      "sha256": "5d61a5fb8a60b1ffb004425a909a75cbd7fa7c1ab50815ab71d82f7fedf8ad1d"
+    },
+    "record_stdout": {
+      "bytes": 159,
+      "path": "profiles/before/media-rich-owned.record.stdout.txt",
+      "sha256": "03b90a1c657ce6f9166432818a5c3c608142f40e23894347b4404ddb37f4572c"
+    },
+    "report": {
+      "bytes": 85,
+      "path": "profiles/before/media-rich-owned.perf-report.txt",
+      "sha256": "6daeed63048ac069d798ba9f80f7ca173d959dc45e0bfd09d3d6531efe9a4767"
+    },
+    "report_json": {
+      "bytes": 495039,
+      "path": "profiles/before/media-rich-owned.report.json",
+      "sha256": "b26e2286dc7c75568c5615b3677b744d43739754deb839c93e7298644116b5ac"
+    },
+    "resource_record": {
+      "bytes": 1186,
+      "path": "profiles/before/media-rich-owned.record.time.txt",
+      "sha256": "7ca34392c06e6c559fbcbfdf47df4d3d3da1c7d02a7397f993d3597ccc4d3330"
+    },
+    "resource_stat": {
+      "bytes": 1286,
+      "path": "profiles/before/media-rich-owned.stat.time.txt",
+      "sha256": "0c92fd36e1a8d6b37bd0db21c4ccb28c4991eb9bf88ccad5f518c086fc7479cb"
+    },
+    "stat": {
+      "bytes": 383,
+      "path": "profiles/before/media-rich-owned.perf-stat.txt",
+      "sha256": "20aca5b5a91a851edb8ebe92a98f82ac4b841c4bde20f98ec9332abac627f752"
+    },
+    "stat_stdout": {
+      "bytes": 0,
+      "path": "profiles/before/media-rich-owned.stat.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 60940344,
+    "path": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "sha256": "c5cfc74102df903e4ab469c100659294e0674350f2d2ef4a6ecb4bd13e6d1d39"
+  },
+  "change": 501,
+  "error": "perf report exited -15: media-rich-owned",
+  "finished_utc": "2026-09-10T21:38:01.976112+00:00",
+  "lane": {
+    "corpus": "media-rich",
+    "provider": "bytes",
+    "provider_label": "owned"
+  },
+  "phase": "before",
+  "profile": {
+    "callgraph": "dwarf,8192",
+    "corpora": [
+      "media-rich"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "cache-misses:u",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "frequency_hz": 99,
+    "providers": [
+      "bytes",
+      "file"
+    ],
+    "raw_perf_max_bytes": 67108864,
+    "samples": 8,
+    "scope": "whole fresh provider-lifecycle child including corpus construction, gates, warmups, diagnostics, report construction, and serialization; perf counters and callchains are supplementary and do not isolate a timed API region",
+    "sha_hotness_tokens": [
+      "digest_touched",
+      "digest_bytes",
+      "sha2",
+      "Sha256"
+    ],
+    "warmups": 1
+  },
+  "protocol_sha256": "f3bb97e9a6d8c9d073c3cb760275d53c769b00e3017be0c47a638fce2a732fb2",
+  "raw_perf_path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+  "record_command": [
+    "taskset",
+    "-c",
+    "0-7",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.record.time.txt",
+    "perf",
+    "record",
+    "--no-buildid-cache",
+    "-o",
+    "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+    "-F",
+    "99",
+    "-e",
+    "cycles:u",
+    "--call-graph",
+    "dwarf,8192",
+    "--",
+    "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "8",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.record.report.json"
+  ],
+  "revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "source_manifest_sha256": "8065a58dc51fbde6d5f26c5f27a223e23255e5ee96c6d66d61224cfe85763d18",
+  "started_utc": "2026-09-10T21:35:37.790427+00:00",
+  "stat_command": [
+    "taskset",
+    "-c",
+    "0-7",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.stat.time.txt",
+    "perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,context-switches,cpu-migrations,page-faults",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.perf-stat.txt",
+    "--",
+    "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "8",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.report.json"
+  ],
+  "status": "failed",
+  "tmpdir": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/tmp"
+}

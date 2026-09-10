@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0501: redundant PPTX payload hashing is a scoped preparation hotspot
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) removes only the image
+and chart decoded-byte contribution to private `digest_touched`, retaining
+exact payload equality, candidate reread, graph/metadata proof, and 64 KiB
+cancellation checks. The fresh before media-rich API p50 is 24.297/24.337 ms
+owned and 28.588/28.910 ms warm-file. The final supplementary profile reports
+SHA-256 compression at 31.01% for owned and 30.08% for warm-file whole-child
+samples; setup, untimed work, and incomplete callgraph coverage prevent
+touched-digest attribution. The first owned export reused the same recorded
+data after local symbol recovery, followed by two owned profiling workload
+reruns; this supplementary history does not change the formal 240 samples.
+Historical targeted caller attribution is about 15.5–16.1%. Each media-rich
+fixture has eight 2 MiB image payloads, so the scoped change removes 32 MiB of
+redundant payload hash input across the two preparation passes. The matched after
+phase cuts media-rich API p50 by 61.481%/61.467% owned and 51.452%/51.870%
+warm-file across R1/R2; all 52 retained >5% flags are favorable and no adverse
+change exceeds five percent. Plain warm-file R2 API p50 rises 1.347% and p99
+1.632%, below the review threshold. The separate default CRUD refresh passes
+both 201-row lanes (6,030 measured samples; 38 static coverage tests), with
+47.42/46.57 seconds wall time and 151,028/160,568 KiB maximum RSS. It supplies
+the current timing-report baseline only. The scoped gates also pass: default
+all-targets 848, all-features library 552, doctests 6 with 2 ignored, focused
+58, private guards 5, plus Clippy, fmt, rustdoc, downstream, and boundaries.
+Independent strict verification passes. Final cleanup removed 2,154,708,992
+unique-inode allocated bytes and retained eight replay files in local tmpfs:
+two binaries and six raw perf files, including two failed attempts. The full
+goal remains open.
+
 ## 0500: repeated managed reconstruction is the measured hotspot
 
 [0500](changes/0500-managed-paragraph-batches.md) targets the existing managed

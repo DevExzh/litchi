@@ -1,5 +1,44 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0501: PPTX touched-payload hashing matched comparison
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) captures the current
+source-backed PPTX cross-copy lifecycle before removing only redundant image
+and chart payload bytes from a private touched digest. Eight serial reports
+contain 240 measured samples across plain/media-rich owned and warm-file lanes.
+The media-rich API p50 is 24.297/24.337 ms owned and 28.588/28.910 ms warm-file
+across the two repeats; the matched after phase retained exact payload, graph,
+source, cache, budget, and publication oracles. The final supplementary
+whole-child SHA profile reports 31.01% for owned and 30.08% for warm-file
+samples; incomplete callgraph coverage means this is child-level SHA hotness,
+not touched-digest attribution. The first owned export was recovered from the
+same recorded data with local symbols, followed by two owned profiling
+workload reruns; these supplementary attempts do not change the formal
+240-sample matrix. Historical 0449 15.5–16.1% touched-digest attribution is
+not a fresh speed claim. All 208 comparison rows are retained; no source,
+destination, output, cache, source-read, or resource-counter fingerprint
+changes.
+
+The matched after phase adds eight reports and 240 measured samples. Media-rich
+API p50 falls from 24.297/24.337 to 9.359/9.378 ms owned and from
+28.588/28.910 to 13.879/13.914 ms warm-file; API p99 falls 61.199%/61.350%
+owned and 50.835%/51.122% warm-file. The comparison retains 52 favorable
+timing/throughput flags and no adverse change above five percent; whole-child
+RSS moves −3.914% to +1.123%. The separate default CRUD refresh now has two
+serial 201-row lanes, 6,030 measured samples across 37 cases and 31 corpora,
+with both generated report/catalog validators and all 38 static coverage tests
+passing. R1/R2 wall time is 47.42/46.57 seconds and maximum RSS is
+151,028/160,568 KiB. This establishes the checked timing-report baseline, not
+coverage promotion or native-producer evidence; broader repository gate totals
+are otherwise scoped as follows: default all-targets 848 pass, all-features
+library 552 pass, doctests 6 pass with 2 ignored, focused suites 58 pass,
+private guards 5 pass, and Clippy, fmt, rustdoc, downstream, boundaries, and
+38 CRUD static tests pass. Independent strict verification now passes. Final
+cleanup removed
+2,154,708,992 unique-inode allocated bytes and retained eight replay files in
+local tmpfs: two binaries and six raw perf files, including two failed
+attempts. The full non-iWork goal remains open.
+
 ## 0500: managed paragraph batch matched comparison
 
 [0500](changes/0500-managed-paragraph-batches.md) adds the managed

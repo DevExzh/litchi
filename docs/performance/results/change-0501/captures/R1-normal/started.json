@@ -1,0 +1,110 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "docs/performance/results/change-0501/captures/R1-normal/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-after",
+    "--workers",
+    "1",
+    "--samples",
+    "15",
+    "--warmup",
+    "3",
+    "--json",
+    "docs/performance/results/change-0501/captures/R1-normal/report.json",
+    "--corpus-manifest",
+    "docs/performance/results/change-0501/captures/R1-normal/corpus-catalog.json"
+  ],
+  "binary": {
+    "bytes": 60940672,
+    "path": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-after",
+    "sha256": "53b6601f11573940c4818eacd767986ded0f51c0c9960252a036de0e154efc58"
+  },
+  "candidate_base_revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TEMP": "/tmp/litchi-goal-0501/default-corpora",
+    "TMP": "/tmp/litchi-goal-0501/default-corpora",
+    "TMPDIR": "/tmp/litchi-goal-0501/default-corpora"
+  },
+  "expected_rows": 201,
+  "lane": "R1-normal",
+  "observed_git_head": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "samples": 15,
+  "schema": "litchi-0501-default-baseline-start-v1",
+  "source_before": {
+    "files": {
+      "Cargo.lock": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292",
+      "crates/litchi-opc/src/source_backed.rs": "6dda2f0ebb73c8d598d15a94c840d069ab8f524ced990bae37f2587eec51f952",
+      "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "691c640187b457cf16caecf3c14684f47a0003d03819ab80d1e03319d0bafd37",
+      "crates/litchi-pptx/src/presentation/source_cross_copy/payload_guard_tests.rs": "2ec3cc29f3f4815d8140a3c61a8c1e5d314c5b4682ca497d99f34d006f8b3aff",
+      "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+      "tools/perf-baseline/src/lib.rs": "1920c807f2efd30dc39625beaa83a8186f153563c6b88967b308d3528eb82cb8",
+      "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "dbc1f21b873e8a1081e58d53dd0f51db49901145726366967bd9986eeb785153",
+      "tools/perf-baseline/src/pptx_range_source.rs": "f4b0d6171ef9a318e1d29affa0e593e6c5114f972c76dace13e572611a074921"
+    },
+    "manifest": {
+      "bytes": 1035,
+      "path": "docs/performance/results/change-0501/after-source.json",
+      "sha256": "ef3119714a2d736c53e2a95537bf05f3233bd9632f04869b9b511d228ea00770"
+    }
+  },
+  "source_manifest": {
+    "artifact": {
+      "bytes": 1035,
+      "path": "docs/performance/results/change-0501/after-source.json",
+      "sha256": "ef3119714a2d736c53e2a95537bf05f3233bd9632f04869b9b511d228ea00770"
+    },
+    "candidate_base_revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+    "files": {
+      "Cargo.lock": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292",
+      "crates/litchi-opc/src/source_backed.rs": "6dda2f0ebb73c8d598d15a94c840d069ab8f524ced990bae37f2587eec51f952",
+      "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "691c640187b457cf16caecf3c14684f47a0003d03819ab80d1e03319d0bafd37",
+      "crates/litchi-pptx/src/presentation/source_cross_copy/payload_guard_tests.rs": "2ec3cc29f3f4815d8140a3c61a8c1e5d314c5b4682ca497d99f34d006f8b3aff",
+      "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+      "tools/perf-baseline/src/lib.rs": "1920c807f2efd30dc39625beaa83a8186f153563c6b88967b308d3528eb82cb8",
+      "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "dbc1f21b873e8a1081e58d53dd0f51db49901145726366967bd9986eeb785153",
+      "tools/perf-baseline/src/pptx_range_source.rs": "f4b0d6171ef9a318e1d29affa0e593e6c5114f972c76dace13e572611a074921"
+    },
+    "files_count": 8,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0501/after-source.json"
+  },
+  "started_utc": "2026-09-10T21:57:39.891229+00:00",
+  "warmups": 3,
+  "worktree_status_before": [
+    " M crates/litchi-keynote/src/document.rs",
+    " M crates/litchi-odg/docs/FEATURE_MATRIX.md",
+    " M crates/litchi-odg/src/facade/mod.rs",
+    " M crates/litchi-odg/src/lib.rs",
+    " M crates/litchi-odg/src/model/mod.rs",
+    " M crates/litchi-odg/src/model/page.rs",
+    " M crates/litchi-odg/src/model/shape.rs",
+    " M crates/litchi-odg/src/package/mod.rs",
+    " M crates/litchi-odg/src/package/snapshot.rs",
+    " M crates/litchi-odg/tests/package_snapshot.rs",
+    " M crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+    " M docs/performance/ADR_COMPLIANCE.md",
+    " M docs/performance/BASELINE.md",
+    " M docs/performance/CRUD_COVERAGE.md",
+    " M docs/performance/GOAL_AUDIT.md",
+    " M docs/performance/HOTSPOTS.md",
+    " M docs/performance/REPORT.md",
+    "?? crates/litchi-odg/src/model/auxiliary.rs",
+    "?? crates/litchi-odg/src/model/enhanced.rs",
+    "?? crates/litchi-odg/src/model/transition.rs",
+    "?? crates/litchi-odg/tests/page_transitions.rs",
+    "?? crates/litchi-pptx/src/presentation/source_cross_copy/",
+    "?? docs/GOAL.md",
+    "?? docs/performance/changes/0501-pptx-exact-payload-comparisons.md",
+    "?? docs/performance/results/change-0501/",
+    "?? docs/report/spec-gap-audit.md"
+  ]
+}

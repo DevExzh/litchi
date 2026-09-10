@@ -1,0 +1,15 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "tools.test_crud_coverage_index"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.2888522148132324,
+  "log_sha256": "34519bf68b0337d3dd572f0783a8d5c225f64839f167666f5188b0d59270330e"
+}

@@ -1,5 +1,30 @@
 # Performance optimization ADR-compliance matrix
 
+## 0501: exact payload authority remains outside the private digest
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) removes only redundant
+SHA input for decoded image/chart bytes. Prepared-vector equality, checked
+payload reuse, candidate reread, graph/layout/master/theme digests, source
+lineage/revision and freshness, compressed authorization, cancellation,
+resource admission, and partial-output behavior remain authoritative. The
+64 KiB cancellation cadence is retained without a new `Work` charge. No public
+API, manifest edge, unsafe code, package-ownership crossing, or digest-only
+authorization is introduced. The matched after phase has eight reports and
+240 measured samples; every lifecycle oracle passes, and its 52 retained
+timing/throughput flags are favorable with no adverse change above five
+percent. The separate default CRUD baseline also passes both 201-row lanes,
+their generated report/catalog validators, and 38 static coverage tests; it
+does not promote correctness-only mappings or add native-producer evidence.
+All 208 comparison rows remain retained, with no source/output/cache or
+resource-counter fingerprint change. The scoped gates pass: default
+all-targets 848, all-features library 552, doctests 6 with 2 ignored, focused
+58, private guards 5, Clippy, fmt, rustdoc, downstream, boundaries, and 38
+CRUD static tests. Independent strict verification passes. Final cleanup
+removed 2,154,708,992 unique-inode allocated bytes and retained eight replay
+files in local tmpfs: two binaries and six raw perf files, including two failed
+attempts. The historical SHA hotness observations remain descriptive, and the
+full goal remains open.
+
 ## 0500: managed paragraph batching keeps source and ownership boundaries
 
 [0500](changes/0500-managed-paragraph-batches.md) extends the existing

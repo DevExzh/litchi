@@ -1,0 +1,126 @@
+{
+  "scope": "latest successful receipts; retained prior failed attempts excluded from pass totals",
+  "gates": [
+    {
+      "gate": "before-focused",
+      "exit_code": 0,
+      "elapsed_seconds": 76.79301571846008,
+      "receipt_sha256": "5a045ca78b7527ecfa6599e9eda597c98fc89af72088ba46861ecbeaec496a25",
+      "log_sha256": "e22780178c1dc71ee1596eddac7beca5ceb5efa67f77eb658792206688bae611",
+      "tests": {
+        "passed": 58,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "gate": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 52.46938967704773,
+      "receipt_sha256": "4fcaf12513b8010360ddb634386b26117d9711dc69f12834322a7894a1d4ef31",
+      "log_sha256": "14141c80d4a7eb6f8032e228a3b31c3adaa3e65910e86eb55290799dd1e4d3e0",
+      "tests": {
+        "passed": 58,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "gate": "payload-guards",
+      "exit_code": 0,
+      "elapsed_seconds": 82.83205056190491,
+      "receipt_sha256": "cbdac796eee4ca0682c5591a0b07c234ffb7978880f64ff2ad31ec0ab4c54ea8",
+      "log_sha256": "6aa5fa33b54b36c54dff498d4b49c03155e645437cd65e153e0babd3b76f0a87",
+      "tests": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "gate": "pptx-default",
+      "exit_code": 0,
+      "elapsed_seconds": 449.2307448387146,
+      "receipt_sha256": "2324e912f4ea4f1534f166287abf82620e5d5d2ed9726a9714a4ecfbe79d5ee8",
+      "log_sha256": "76187629620413ad36cd50d5fb9a9871fbced46ac850ee6e81aecb536b80e5c0",
+      "tests": {
+        "passed": 848,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "gate": "pptx-features",
+      "exit_code": 0,
+      "elapsed_seconds": 122.29974627494812,
+      "receipt_sha256": "d7a72daa5503d914f89cb97c592dbc63ae6cc61a9a2dadb37c52f93402e4509e",
+      "log_sha256": "5413fb0759cce975df0b830eed149ed4b20caa9e29e46f5282e575f0c663c8f3",
+      "tests": {
+        "passed": 552,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "gate": "doctests",
+      "exit_code": 0,
+      "elapsed_seconds": 8.730508804321289,
+      "receipt_sha256": "eba7929a219ab66bfbad3a1a4794dac932b04411d6a8ed76b6a7ac91d9195baf",
+      "log_sha256": "50f881c0dc97e1112dc869ce4f8b449f88005745cf82ed8bdbfdb45e9e0a5da1",
+      "tests": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 2
+      }
+    },
+    {
+      "gate": "clippy",
+      "exit_code": 0,
+      "elapsed_seconds": 7.141828536987305,
+      "receipt_sha256": "2c2f97061a5942ee616b227924cc5c3fb41c89f3676d228f8b15336b689f988f",
+      "log_sha256": "dc00649a6a0e605e3010dda2d4a9e6d3a03aacf2254c7c28f2b247cebff3f87a"
+    },
+    {
+      "gate": "fmt",
+      "exit_code": 0,
+      "elapsed_seconds": 0.8512997627258301,
+      "receipt_sha256": "09be23f9955e86e84a3dd2c9ce6f906230ed236c2da806f9a2193d24308f013b",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": "rustdoc",
+      "exit_code": 0,
+      "elapsed_seconds": 7.186100721359253,
+      "receipt_sha256": "f7280d9786c7bc8f07d4501f9da28cdd184decf69530c754f6ab8e4194b4a60f",
+      "log_sha256": "e640e89c690142b5366f623d18a46a190fd04c2e4f056aaa694358de3619d5f4"
+    },
+    {
+      "gate": "downstream",
+      "exit_code": 0,
+      "elapsed_seconds": 6.684401750564575,
+      "receipt_sha256": "f90b9af7cad2eae684744a0865dffd33c83f4811aef705b05defc5f3b3f8cc76",
+      "log_sha256": "7019d0857b675a085c89b92e101e9d37bd50632945f95505f13120dfe467636b"
+    },
+    {
+      "gate": "boundaries",
+      "exit_code": 0,
+      "elapsed_seconds": 226.58270263671875,
+      "receipt_sha256": "7cacc8e165de65daee102db92563bd055b86e5a1e863bba7d7e6f7b8b06c4821",
+      "log_sha256": "6141948b1724bb5582ee484fa594adea74ba9ce03c955c1d774de43b424c6d56"
+    },
+    {
+      "gate": "crud-index-tests",
+      "exit_code": 0,
+      "elapsed_seconds": 0.2888522148132324,
+      "receipt_sha256": "5f585b7a133ee9e65015cf45e0508aa603e28837c6acb68cd3c32eaa4bfefbbb",
+      "log_sha256": "34519bf68b0337d3dd572f0783a8d5c225f64839f167666f5188b0d59270330e"
+    },
+    {
+      "gate": "benchmark-build",
+      "exit_code": 0,
+      "elapsed_seconds": 115.47693753242493,
+      "receipt_sha256": "4d0ad1a1e552a0f16d5d3fdbdff17543bdf4656c86432b6d7ce82c0c2119154c",
+      "log_sha256": "a5abe40276456aeadc364e75d4f0870c43c4f8253e53ea0eb91c9a6538adec8d"
+    }
+  ]
+}

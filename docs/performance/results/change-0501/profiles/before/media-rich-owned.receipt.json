@@ -1,0 +1,183 @@
+{
+  "artifacts": {
+    "record_report": {
+      "bytes": 495039,
+      "path": "profiles/before/media-rich-owned.record.report.json",
+      "sha256": "232d1444f744d3766c387dc754c0f44d66055e2dc520270e816cf12c30c318b5"
+    },
+    "record_stdout": {
+      "bytes": 159,
+      "path": "profiles/before/media-rich-owned.record.stdout.txt",
+      "sha256": "f71697f5c11510d5342c63f3641a30b3d2a0b510a09d3165dbb37ceea79da089"
+    },
+    "report": {
+      "bytes": 5537,
+      "path": "profiles/before/media-rich-owned.perf-report.txt",
+      "sha256": "0a3f1657a3febdf0d57247ce3c2c3e0356872f98d30c42702de83500f83f7fd0"
+    },
+    "report_json": {
+      "bytes": 495039,
+      "path": "profiles/before/media-rich-owned.report.json",
+      "sha256": "098fab5ec646427fc7bf8d64038b4167d3763b6e9199f7f2e5c7d7fa0c91e2eb"
+    },
+    "resource_record": {
+      "bytes": 1185,
+      "path": "profiles/before/media-rich-owned.record.time.txt",
+      "sha256": "eeff0ed3951c01787cd0c9b01fdfa957db4ea0cefe81ec901d9533f824842eb1"
+    },
+    "resource_stat": {
+      "bytes": 1286,
+      "path": "profiles/before/media-rich-owned.stat.time.txt",
+      "sha256": "d322823648bcaf7c306e350483a2ff842af2976a51cafbb8339d2267712a4e6f"
+    },
+    "stat": {
+      "bytes": 383,
+      "path": "profiles/before/media-rich-owned.perf-stat.txt",
+      "sha256": "4ebfae3039c64372e2fe53fef2696e84d9f28d9b7ff711b9fdf6dc28d83f2306"
+    },
+    "stat_stdout": {
+      "bytes": 0,
+      "path": "profiles/before/media-rich-owned.stat.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 60940344,
+    "path": "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "sha256": "c5cfc74102df903e4ab469c100659294e0674350f2d2ef4a6ecb4bd13e6d1d39"
+  },
+  "change": 501,
+  "finished_utc": "2026-09-10T21:40:24.245905+00:00",
+  "lane": {
+    "corpus": "media-rich",
+    "provider": "bytes",
+    "provider_label": "owned"
+  },
+  "phase": "before",
+  "profile": {
+    "callgraph": "dwarf,8192",
+    "corpora": [
+      "media-rich"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "cache-misses:u",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "frequency_hz": 99,
+    "providers": [
+      "bytes",
+      "file"
+    ],
+    "raw_perf_max_bytes": 67108864,
+    "samples": 8,
+    "scope": "whole fresh provider-lifecycle child including corpus construction, gates, warmups, diagnostics, report construction, and serialization; perf counters and callchains are supplementary and do not isolate a timed API region",
+    "sha_hotness_tokens": [
+      "digest_touched",
+      "digest_bytes",
+      "sha2",
+      "Sha256"
+    ],
+    "warmups": 1
+  },
+  "protocol_sha256": "f3bb97e9a6d8c9d073c3cb760275d53c769b00e3017be0c47a638fce2a732fb2",
+  "raw_perf_bytes": 3909368,
+  "raw_perf_path": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+  "raw_perf_sha256": "f111e15ac210803c44026225458416e0e0ae2ce64fe8741aaf1af430185cc543",
+  "raw_retained_under_owned_tmp": true,
+  "record_command": [
+    "taskset",
+    "-c",
+    "0-7",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.record.time.txt",
+    "perf",
+    "record",
+    "--no-buildid-cache",
+    "-o",
+    "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/perf.data",
+    "-F",
+    "99",
+    "-e",
+    "cycles:u",
+    "--call-graph",
+    "dwarf,8192",
+    "--",
+    "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "8",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.record.report.json"
+  ],
+  "report_identities": {
+    "record": {
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "output_bytes": 33599715,
+      "output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b"
+    },
+    "stat": {
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "output_bytes": 33599715,
+      "output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b"
+    }
+  },
+  "revision": "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+  "sha_hotness_detected": true,
+  "sha_hotness_tokens_found": [
+    "sha2"
+  ],
+  "source_manifest_sha256": "8065a58dc51fbde6d5f26c5f27a223e23255e5ee96c6d66d61224cfe85763d18",
+  "started_utc": "2026-09-10T21:40:14.859869+00:00",
+  "stat_command": [
+    "taskset",
+    "-c",
+    "0-7",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.stat.time.txt",
+    "perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,cache-misses:u,context-switches,cpu-migrations,page-faults",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.perf-stat.txt",
+    "--",
+    "/tmp/litchi-goal-0501/retained/litchi-perf-baseline-before",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "8",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "6eb3ad1064537d9bde796be3e1709dfb7c84c81a",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0501/profiles/before/media-rich-owned.report.json"
+  ],
+  "status": "pass",
+  "tmpdir": "/tmp/litchi-goal-0501/profiles/before/media-rich-owned/tmp"
+}

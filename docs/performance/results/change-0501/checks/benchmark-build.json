@@ -1,0 +1,19 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 115.47693753242493,
+  "log_sha256": "a5abe40276456aeadc364e75d4f0870c43c4f8253e53ea0eb91c9a6538adec8d"
+}

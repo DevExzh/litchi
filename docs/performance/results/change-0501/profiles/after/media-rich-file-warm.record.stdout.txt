@@ -1,0 +1,2 @@
+[ perf record: Woken up 16 times to write data ]
+[ perf record: Captured and wrote 3.761 MB /tmp/litchi-goal-0501/profiles/after/media-rich-file-warm/perf.data ]

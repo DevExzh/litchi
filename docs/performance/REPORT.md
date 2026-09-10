@@ -1,5 +1,63 @@
 # Performance program phase report
 
+## 0501: PPTX exact payload comparisons; matched comparison complete
+
+[0501](changes/0501-pptx-exact-payload-comparisons.md) removes only redundant
+decoded image/chart payload updates from a private PPTX touched digest. Exact
+payload equality, candidate reread, graph and metadata proofs, source
+lineage/freshness, compressed authorization, cancellation, budgets, and
+partial-output behavior remain in the production contract. The before phase
+has eight reports and 240 measured samples across plain/media-rich owned and
+warm-file lanes. Media-rich API p50 is 24.297/24.337 ms owned and
+28.588/28.910 ms warm-file across the two repeats.
+
+The final supplementary whole-child profile reports SHA-256 compression at
+31.01% for owned and 30.08% for warm-file samples; the after profiles report
+27.95% and 26.93%. These profiles include
+broader lifecycle work and have incomplete caller recovery, so they show
+child-level SHA hotness rather than touched-digest attribution and do not
+authorize a causal speedup claim. The first owned export was recovered by
+re-exporting the same recorded `perf.data` with local symbols; the driver then
+reran the owned profiling workload twice, retaining one old supplementary
+dimension-verifier rejection before the final corrected invocation passed.
+Those supplementary attempts do not alter the formal 240-sample matrix.
+Historical 0449 caller attribution is 15.5–16.1% and remains descriptive.
+Existing 0424/0431/0448 synthetic source-backed evidence remains valid; 0501
+does not close native notes/chart producer coverage.
+
+The matched after phase has eight reports and 240 measured samples. Every
+after report passed its lifecycle oracle. Media-rich API p50 falls from
+24.297/24.337 to 9.359/9.378 ms for owned R1/R2 and from 28.588/28.910 to
+13.879/13.914 ms for warm-file R1/R2; API p99 falls 61.199%/61.350% owned
+and 50.835%/51.122% warm-file. Plan p50 falls 64.672%/64.779% owned and
+59.171%/59.031% warm-file; publication p50 falls 61.848%/61.704% owned and
+47.061%/48.021% warm-file. Plain lanes remain within 2% at API p50 except
+plain warm-file R2 (+1.347%); its API p99 is +1.632%, both below the review
+threshold.
+
+All 208 comparison rows are retained. The comparison retains 52 flags,
+comprising 48 favorable timing changes and four favorable throughput changes;
+no measured change above five percent is adverse. No source archive,
+destination archive, exact output, source-read histogram, cache, or
+resource-counter fingerprint changes. Whole-child RSS changes range from
+−3.914% to +1.123%, and the
+media-rich lanes stay within ±0.042%. Both after supplementary profiles pass,
+while their whole-child setup, gate, diagnostic, and serialization scope still
+prevents operation-local CPU attribution. The separate default CRUD baseline
+has now completed two serial 201-row lanes with 15 samples and three warmups
+per row, totaling 6,030 measured samples across 37 cases and 31 corpora. Both
+generated report/catalog validators pass, as do all 38 static coverage tests;
+R1/R2 wall time is 47.42/46.57 seconds and maximum RSS is 151,028/160,568 KiB.
+This closes the checked timing-report baseline gate while leaving
+correctness-only mappings, native-producer coverage, and the full goal outside
+scope. The scoped production gates pass: default all-targets 848, all-features
+library 552, doctests 6 with 2 ignored, focused 58, private guards 5, plus
+Clippy, fmt, rustdoc, downstream, boundaries, and 38 CRUD static tests.
+Independent strict verification passes. Final cleanup removed 2,154,708,992
+unique-inode allocated bytes and retained eight replay files in local tmpfs:
+two binaries and six raw perf files, including two failed attempts. The full
+non-iWork goal remains open.
+
 ## 0500: managed source-backed paragraph batches; matched comparison complete
 
 [0500](changes/0500-managed-paragraph-batches.md) extends the format-owned

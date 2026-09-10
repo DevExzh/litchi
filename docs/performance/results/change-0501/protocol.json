@@ -1,0 +1,166 @@
+{
+  "change": 501,
+  "status": "planned",
+  "title": "PPTX touched image and chart digest cost",
+  "command": "provider-lifecycle",
+  "harness": "tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+  "candidate": "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+  "rust_toolchain": "1.98.1",
+  "build_profile": "release",
+  "release_debug": 0,
+  "incremental": false,
+  "workers": 1,
+  "cpu_set": "0-7",
+  "target_dir": "/tmp/litchi-goal-0501-target",
+  "samples": 30,
+  "warmups": 3,
+  "repeats": ["R1", "R2"],
+  "core_lanes": [
+    {
+      "corpus": "plain",
+      "provider": "bytes",
+      "provider_label": "owned"
+    },
+    {
+      "corpus": "plain",
+      "provider": "file",
+      "provider_label": "file-warm"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "bytes",
+      "provider_label": "owned"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "file",
+      "provider_label": "file-warm"
+    }
+  ],
+  "core_order": [
+    {
+      "corpus": "plain",
+      "provider": "bytes",
+      "provider_label": "owned",
+      "repeat": "R1"
+    },
+    {
+      "corpus": "plain",
+      "provider": "file",
+      "provider_label": "file-warm",
+      "repeat": "R1"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "bytes",
+      "provider_label": "owned",
+      "repeat": "R1"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "file",
+      "provider_label": "file-warm",
+      "repeat": "R1"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "file",
+      "provider_label": "file-warm",
+      "repeat": "R2"
+    },
+    {
+      "corpus": "media-rich",
+      "provider": "bytes",
+      "provider_label": "owned",
+      "repeat": "R2"
+    },
+    {
+      "corpus": "plain",
+      "provider": "file",
+      "provider_label": "file-warm",
+      "repeat": "R2"
+    },
+    {
+      "corpus": "plain",
+      "provider": "bytes",
+      "provider_label": "owned",
+      "repeat": "R2"
+    }
+  ],
+  "optional_range": {
+    "enabled_by_flag": true,
+    "provider": "range",
+    "provider_label": "range-no-delay",
+    "max_range_bytes": 65536,
+    "delay_us": 0,
+    "order": [
+      {
+        "corpus": "plain",
+        "provider": "range",
+        "provider_label": "range-no-delay",
+        "repeat": "R1"
+      },
+      {
+        "corpus": "media-rich",
+        "provider": "range",
+        "provider_label": "range-no-delay",
+        "repeat": "R1"
+      },
+      {
+        "corpus": "media-rich",
+        "provider": "range",
+        "provider_label": "range-no-delay",
+        "repeat": "R2"
+      },
+      {
+        "corpus": "plain",
+        "provider": "range",
+        "provider_label": "range-no-delay",
+        "repeat": "R2"
+      }
+    ],
+    "reports": 4,
+    "retained_samples": 120
+  },
+  "core_reports": 8,
+  "core_retained_samples": 240,
+  "profile": {
+    "corpora": ["media-rich"],
+    "providers": ["bytes", "file"],
+    "samples": 8,
+    "warmups": 1,
+    "raw_perf_max_bytes": 67108864,
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "cache-misses:u",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "callgraph": "dwarf,8192",
+    "frequency_hz": 99,
+    "scope": "whole fresh provider-lifecycle child including corpus construction, gates, warmups, diagnostics, report construction, and serialization; perf counters and callchains are supplementary and do not isolate a timed API region",
+    "sha_hotness_tokens": ["digest_touched", "digest_bytes", "sha2", "Sha256"]
+  },
+  "review_percent": 5,
+  "artifact_limits": {
+    "report_bytes": 67108864,
+    "log_bytes": 16777216,
+    "compact_profile_bytes": 16777216
+  },
+  "timing_scope": "provider-lifecycle source open, destination open, cross-slide planning, and consuming publication clocks; setup, source adapters, staged files, diagnostics, correctness gates, report serialization, and final drops are outside API clocks",
+  "provider_scope": "owned bytes and freshly staged positional files reopened through FileSource for every iteration; file inputs are recently written warm tmpfs files, not cold storage",
+  "oracle_scope": "provider report exact output and all lifecycle gate booleans, plus phase source-read histograms, cache counters, managed budgets, and final owner release; source bytes are caller-visible ReadAt accounting",
+  "claims": "matched single-build before/after evidence for the named synthetic plain and media-rich source-backed PPTX cross-copy workflow only; no native producer, cold I/O, physical network, concurrency, allocation-local, or whole-goal completion claim",
+  "acceptance": {
+    "all_oracles_true": true,
+    "source_and_output_identity_match": true,
+    "counter_and_budget_invariants_hold": true,
+    "review_every_absolute_change_over_percent": 5,
+    "retain_all_flags": true,
+    "sha_profile_before_edit": true
+  }
+}
