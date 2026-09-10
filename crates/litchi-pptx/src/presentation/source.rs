@@ -21,7 +21,7 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
-    SourceCacheLimits, SourceLineage, TargetMode,
+    SourceCacheLimits, SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -650,7 +650,9 @@ enum PictureQueryResult {
 /// Unlike [`SourceBackedPresentation`], this type is intentionally not
 /// cloneable: publishing consumes its deferred OPC source to ensure that the
 /// exact source checked during editing is the source raw-copied to output.
-/// It supports no package topology or relationship changes.
+/// Focused slide edits retain their existing package topology. The SVG picture
+/// transaction is the bounded exception: it may replace the two media Parts
+/// and their owning slide relationship targets as one checked closure.
 pub struct SourceBackedPresentationEditor {
     pub(super) package: SourceBackedPackage,
     // Retain the catalog validated at open so each selected slide does not
@@ -696,6 +698,96 @@ pub struct SourceBackedSlidePatch {
 pub struct SourceBackedSlideCommit {
     snapshot: SourceBackedSlideSnapshot,
     patch: SourceBackedSlidePatch,
+}
+
+/// Replacement payloads for one embedded PPTX SVG picture.
+///
+/// The raster payload is the compatibility fallback required by the native
+/// DrawingML SVG extension.  Callers may optionally select new existing or
+/// newly-added `/ppt/media/` Part URIs; the transaction keeps the relationship
+/// IDs stable and updates the slide relationship closure atomically.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceSvgReplacement {
+    svg: Vec<u8>,
+    raster: Vec<u8>,
+    svg_part_uri: Option<PackURI>,
+    raster_part_uri: Option<PackURI>,
+}
+
+impl SourceSvgReplacement {
+    /// Create a replacement that retains both current media Part URIs.
+    #[must_use]
+    pub fn new(svg: impl Into<Vec<u8>>, raster: impl Into<Vec<u8>>) -> Self {
+        Self {
+            svg: svg.into(),
+            raster: raster.into(),
+            svg_part_uri: None,
+            raster_part_uri: None,
+        }
+    }
+
+    /// Select the internal SVG and raster Part URIs for this replacement.
+    ///
+    /// New names are added to the package when absent. Existing names must
+    /// already be media Parts with compatible content types. Both names are
+    /// validated against the source package before any output is written.
+    #[must_use]
+    pub fn with_part_uris(mut self, svg: PackURI, raster: PackURI) -> Self {
+        self.svg_part_uri = Some(svg);
+        self.raster_part_uri = Some(raster);
+        self
+    }
+
+    /// SVG bytes supplied for the replacement.
+    #[must_use]
+    pub fn svg(&self) -> &[u8] {
+        &self.svg
+    }
+
+    /// Raster fallback bytes supplied for the replacement.
+    #[must_use]
+    pub fn raster(&self) -> &[u8] {
+        &self.raster
+    }
+}
+
+#[derive(Clone)]
+pub struct SourceBackedSvgSnapshot {
+    slide: SourceBackedSlideSnapshot,
+    image_position: usize,
+    svg_relationship_id: String,
+    svg_relationship_type: String,
+    raster_relationship_id: String,
+    raster_relationship_type: String,
+    svg_part_uri: PackURI,
+    raster_part_uri: PackURI,
+    svg: SourcePayload,
+    raster: SourcePayload,
+    limits: ReadLimits,
+}
+
+/// An exact-source transaction over one embedded PPTX SVG picture and its
+/// raster compatibility fallback.
+pub struct SourceBackedSvgEdit {
+    source: SourceBackedSvgSnapshot,
+    svg_part_uri: PackURI,
+    raster_part_uri: PackURI,
+    svg: SourcePayload,
+    raster: SourcePayload,
+    operation_used: bool,
+}
+
+/// A reversible exact-source patch for one PPTX SVG picture closure.
+#[derive(Clone)]
+pub struct SourceBackedSvgPatch {
+    before: SourceBackedSvgSnapshot,
+    after: SourceBackedSvgSnapshot,
+}
+
+/// A checked source-backed SVG picture transaction ready for publication.
+pub struct SourceBackedSvgCommit {
+    snapshot: SourceBackedSvgSnapshot,
+    patch: SourceBackedSvgPatch,
 }
 
 /// A bounded multi-slide shape-text edit borrowing its deferred source.
@@ -1523,6 +1615,23 @@ impl SourceBackedPresentationEditor {
             .edit_checked()
     }
 
+    /// Begin an exact-source transaction over one direct embedded SVG picture.
+    ///
+    /// The selected picture must have an internal SVG relationship and an
+    /// internal raster fallback. Linked SVGs, markup-compatibility picture
+    /// branches, and ambiguous dependency closures are refused before an edit
+    /// handle is returned. The slide XML remains source-backed; only the media
+    /// Parts and their owning relationship targets belong to the transaction.
+    pub fn edit_svg_image(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+    ) -> Result<SourceBackedSvgEdit> {
+        self.package.check_execution()?;
+        self.svg_snapshot_for(slide_position, image_position, "edit_svg_image")?
+            .edit_checked()
+    }
+
     /// Begin an atomic, bounded shape-text edit across existing slides.
     ///
     /// Each selected slide may receive one nonempty same-slide shape batch.
@@ -1580,6 +1689,48 @@ impl SourceBackedPresentationEditor {
                 .write_part_overlays_shared_to_stream(writer, Vec::new())?;
         }
         Ok(target)
+    }
+
+    /// Publish one exact-source-checked SVG picture transaction.
+    ///
+    /// The selected slide XML and every unrelated ZIP member are raw-copied.
+    /// The owning slide relationship member, SVG Part, and raster fallback Part
+    /// are changed together through one bounded OPC topology plan. New media
+    /// Parts are added only when explicitly selected by the replacement; old
+    /// unreferenced media Parts are removed as part of the same dependency
+    /// closure. No-op commits use the exact source publication path.
+    pub fn publish_svg_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &SourceBackedSvgCommit,
+    ) -> Result<SourceBackedSvgSnapshot> {
+        self.package.check_execution()?;
+        let current = self.svg_snapshot_for(
+            commit.patch.before.slide.position,
+            commit.patch.before.image_position,
+            "publish_svg_commit_to_stream",
+        )?;
+        if !current.same_source(&commit.patch.before) {
+            return Err(Error::StaleSource);
+        }
+        let target = commit.patch.apply(&current)?;
+        if target.same_source(&current) {
+            self.package
+                .write_topology_to_stream(writer, SourceTopologyPlan::new())?;
+            return Ok(target);
+        }
+        let plan = build_svg_topology_plan(&self.package, &current, &target)?;
+        self.package.write_topology_to_stream(writer, plan)?;
+        Ok(target)
+    }
+
+    /// Compatibility alias naming the selected media operation explicitly.
+    pub fn publish_svg_image_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &SourceBackedSvgCommit,
+    ) -> Result<SourceBackedSvgSnapshot> {
+        self.publish_svg_commit_to_stream(writer, commit)
     }
 
     /// Publish one exact-source-checked multi-slide commit to a stream.
@@ -1761,6 +1912,141 @@ impl SourceBackedPresentationEditor {
         let snapshot = self.slide_snapshot_from_retained_catalog(position, operation)?;
         self.package.check_execution()?;
         Ok(snapshot)
+    }
+
+    fn svg_snapshot_for(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+        operation: &'static str,
+    ) -> Result<SourceBackedSvgSnapshot> {
+        let slide = self.slide_snapshot_for(slide_position, operation)?;
+        self.capture_svg_snapshot(slide, image_position, operation)
+    }
+
+    fn capture_svg_snapshot(
+        &self,
+        slide: SourceBackedSlideSnapshot,
+        image_position: usize,
+        _operation: &'static str,
+    ) -> Result<SourceBackedSvgSnapshot> {
+        self.package.check_execution()?;
+        let view = self.package.part(&slide.part_uri)?;
+        let source_part = SourcePart::from_view(&view, view.data()?)?;
+        validate_source_slide_root(&source_part)?;
+        reject_picture_markup_compatibility(source_part.blob())?;
+        validate_full_slide_picture_relationships(&self.package, source_part.blob())?;
+        let scene = crate::shape::Scene::read(source_part.blob())?;
+        let mut picture_count = 0usize;
+        let mut selected = None;
+        for shape in scene.iter() {
+            let Shape::Picture(picture) = shape else {
+                continue;
+            };
+            let position = picture_count;
+            picture_count = picture_count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("source-backed picture count overflow".into()))?;
+            let relationship = parse_picture_relationship(picture.common().xml()?)?;
+            let raster_target = resolve_picture_target(&self.package, &view, &relationship)?;
+            let svg_target = relationship
+                .svg
+                .as_ref()
+                .map(|svg| resolve_svg_target(&self.package, &view, svg))
+                .transpose()?;
+            if position == image_position {
+                selected = Some((relationship, raster_target, svg_target));
+            }
+        }
+        let (picture, raster_target, svg_target) = selected.ok_or(Error::IndexOutOfBounds {
+            index: image_position,
+            len: picture_count,
+        })?;
+        let svg = picture.svg.as_ref().ok_or_else(|| {
+            Error::Relationship(format!(
+                "source-backed image {image_position} has no SVG relationship"
+            ))
+        })?;
+        let svg_target = svg_target.ok_or_else(|| {
+            Error::Relationship(format!(
+                "source-backed image {image_position} has no SVG relationship"
+            ))
+        })?;
+        let SourceImageTarget::Internal {
+            part_uri: raster_part_uri,
+            content_type: raster_content_type,
+        } = raster_target
+        else {
+            return Err(Error::Relationship(
+                "source-backed SVG transaction requires an internal raster fallback".into(),
+            ));
+        };
+        let SourceImageTarget::Internal {
+            part_uri: svg_part_uri,
+            content_type: svg_content_type,
+        } = svg_target.target.clone()
+        else {
+            return Err(Error::Relationship(
+                "source-backed SVG transaction refuses linked SVG targets".into(),
+            ));
+        };
+        if raster_part_uri == svg_part_uri {
+            return Err(Error::Relationship(
+                "source-backed SVG transaction requires distinct raster and SVG Parts".into(),
+            ));
+        }
+        let raster_view = self.package.part(&raster_part_uri)?;
+        let svg_view = self.package.part(&svg_part_uri)?;
+        if !raster_view.rels().is_empty() || !svg_view.rels().is_empty() {
+            return Err(Error::Relationship(
+                "source-backed SVG media Parts must not have outbound relationships".into(),
+            ));
+        }
+        if !is_svg_content_type(&svg_content_type) {
+            return Err(Error::ContentType {
+                expected: "image/svg+xml".into(),
+                actual: svg_content_type,
+            });
+        }
+        if !is_png_content_type(&raster_content_type) {
+            return Err(Error::ContentType {
+                expected: "image/png".into(),
+                actual: raster_content_type,
+            });
+        }
+        let raster_data = raster_view.data()?;
+        let svg_data = svg_view.data()?;
+        let raster_relationship = view.rels().get(&picture.id).ok_or_else(|| {
+            Error::Relationship(format!(
+                "picture raster relationship '{}' is missing",
+                picture.id
+            ))
+        })?;
+        let svg_relationship = view.rels().get(&svg.id).ok_or_else(|| {
+            Error::Relationship(format!("picture SVG relationship '{}' is missing", svg.id))
+        })?;
+        if raster_relationship.target_mode() != TargetMode::Internal
+            || svg_relationship.target_mode() != TargetMode::Internal
+        {
+            return Err(Error::Relationship(
+                "source-backed SVG transaction requires internal media relationships".into(),
+            ));
+        }
+        self.package.check_execution()?;
+        self.package.source_version()?;
+        Ok(SourceBackedSvgSnapshot {
+            slide,
+            image_position,
+            svg_relationship_id: svg.id.clone(),
+            svg_relationship_type: svg_relationship.reltype().to_owned(),
+            raster_relationship_id: picture.id,
+            raster_relationship_type: raster_relationship.reltype().to_owned(),
+            svg_part_uri,
+            raster_part_uri,
+            svg: SourcePayload::Original(svg_data),
+            raster: SourcePayload::Original(raster_data),
+            limits: self.limits,
+        })
     }
 
     fn slide_snapshot_from_retained_catalog(
@@ -2079,6 +2365,247 @@ impl SourceBackedSlideCommit {
     }
 }
 
+impl SourceBackedSvgSnapshot {
+    /// Zero-based presentation position of the owning slide.
+    #[must_use]
+    pub const fn slide_position(&self) -> usize {
+        self.slide.position
+    }
+
+    /// Zero-based direct-picture position in the owning slide.
+    #[must_use]
+    pub const fn image_position(&self) -> usize {
+        self.image_position
+    }
+
+    /// Relationship ID retained by the native SVG `asvg:svgBlip`.
+    #[must_use]
+    pub fn svg_relationship_id(&self) -> &str {
+        &self.svg_relationship_id
+    }
+
+    /// Relationship ID retained by the raster compatibility `a:blip`.
+    #[must_use]
+    pub fn raster_relationship_id(&self) -> &str {
+        &self.raster_relationship_id
+    }
+
+    /// Internal SVG Part URI in this exact source snapshot.
+    #[must_use]
+    pub const fn svg_part_uri(&self) -> &PackURI {
+        &self.svg_part_uri
+    }
+
+    /// Internal raster fallback Part URI in this exact source snapshot.
+    #[must_use]
+    pub const fn raster_part_uri(&self) -> &PackURI {
+        &self.raster_part_uri
+    }
+
+    /// Borrow the source or candidate SVG payload bytes.
+    #[must_use]
+    pub fn svg_bytes(&self) -> &[u8] {
+        self.svg.as_bytes()
+    }
+
+    /// Borrow the source or candidate raster fallback bytes.
+    #[must_use]
+    pub fn raster_bytes(&self) -> &[u8] {
+        self.raster.as_bytes()
+    }
+
+    /// Start an isolated edit from this exact SVG source snapshot.
+    #[must_use]
+    pub fn edit(&self) -> SourceBackedSvgEdit {
+        SourceBackedSvgEdit {
+            source: self.clone(),
+            svg_part_uri: self.svg_part_uri.clone(),
+            raster_part_uri: self.raster_part_uri.clone(),
+            svg: self.svg.clone(),
+            raster: self.raster.clone(),
+            operation_used: false,
+        }
+    }
+
+    fn edit_checked(&self) -> Result<SourceBackedSvgEdit> {
+        self.slide.check_execution()?;
+        Ok(self.edit())
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.slide.same_source(&other.slide)
+            && self.image_position == other.image_position
+            && self.svg_relationship_id == other.svg_relationship_id
+            && self.svg_relationship_type == other.svg_relationship_type
+            && self.raster_relationship_id == other.raster_relationship_id
+            && self.raster_relationship_type == other.raster_relationship_type
+            && self.svg_part_uri == other.svg_part_uri
+            && self.raster_part_uri == other.raster_part_uri
+            && self.svg.as_bytes() == other.svg.as_bytes()
+            && self.raster.as_bytes() == other.raster.as_bytes()
+            && self.limits == other.limits
+    }
+}
+
+impl SourceBackedSvgEdit {
+    /// Exact immutable source snapshot against which this edit was created.
+    #[must_use]
+    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
+        &self.source
+    }
+
+    /// Replace the SVG and required raster fallback payloads atomically.
+    ///
+    /// The source relationship IDs remain stable. Optional replacement Part
+    /// URIs are applied as relationship-target changes during publication. An
+    /// equal payload and equal target URI is an exact no-op, retaining the
+    /// original managed source allocation.
+    pub fn replace(&mut self, replacement: SourceSvgReplacement) -> Result<bool> {
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "replace_svg_image",
+                reason: "source-backed SVG edits support one atomic replacement",
+            });
+        }
+        let svg_part_uri = replacement
+            .svg_part_uri
+            .unwrap_or_else(|| self.source.svg_part_uri.clone());
+        let raster_part_uri = replacement
+            .raster_part_uri
+            .unwrap_or_else(|| self.source.raster_part_uri.clone());
+        let svg_part_uri = if svg_part_uri.is_equivalent_to(&self.source.svg_part_uri) {
+            self.source.svg_part_uri.clone()
+        } else {
+            svg_part_uri
+        };
+        let raster_part_uri = if raster_part_uri.is_equivalent_to(&self.source.raster_part_uri) {
+            self.source.raster_part_uri.clone()
+        } else {
+            raster_part_uri
+        };
+        validate_svg_media_uri(&svg_part_uri)?;
+        validate_svg_media_uri(&raster_part_uri)?;
+        if svg_part_uri.is_equivalent_to(&raster_part_uri) {
+            return Err(Error::Relationship(
+                "SVG and raster fallback Part URIs must differ".into(),
+            ));
+        }
+        check_svg_replacement_payload(&self.source.limits, replacement.svg.len(), true)?;
+        check_svg_replacement_payload(&self.source.limits, replacement.raster.len(), false)?;
+        if replacement.svg.is_empty() || replacement.raster.is_empty() {
+            return Err(Error::Invalid(
+                "SVG and raster fallback payloads cannot be empty".into(),
+            ));
+        }
+        let svg = stage_svg_payload(&self.svg, replacement.svg);
+        let raster = stage_svg_payload(&self.raster, replacement.raster);
+        let changed = svg_part_uri != self.svg_part_uri
+            || raster_part_uri != self.raster_part_uri
+            || svg.as_bytes() != self.svg.as_bytes()
+            || raster.as_bytes() != self.raster.as_bytes();
+        self.svg_part_uri = svg_part_uri;
+        self.raster_part_uri = raster_part_uri;
+        self.svg = svg;
+        self.raster = raster;
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Validate and freeze this isolated SVG transaction.
+    #[must_use]
+    pub fn commit(self) -> SourceBackedSvgCommit {
+        let snapshot = SourceBackedSvgSnapshot {
+            slide: self.source.slide.clone(),
+            image_position: self.source.image_position,
+            svg_relationship_id: self.source.svg_relationship_id.clone(),
+            svg_relationship_type: self.source.svg_relationship_type.clone(),
+            raster_relationship_id: self.source.raster_relationship_id.clone(),
+            raster_relationship_type: self.source.raster_relationship_type.clone(),
+            svg_part_uri: self.svg_part_uri,
+            raster_part_uri: self.raster_part_uri,
+            svg: self.svg,
+            raster: self.raster,
+            limits: self.source.limits,
+        };
+        let patch = SourceBackedSvgPatch {
+            before: self.source,
+            after: snapshot.clone(),
+        };
+        SourceBackedSvgCommit { snapshot, patch }
+    }
+
+    /// Check the retained execution policy and freeze this transaction.
+    pub fn commit_checked(self) -> Result<SourceBackedSvgCommit> {
+        self.source.slide.check_execution()?;
+        let commit = self.commit();
+        commit.snapshot.slide.check_execution()?;
+        Ok(commit)
+    }
+}
+
+impl SourceBackedSvgPatch {
+    /// Exact immutable source required by this patch.
+    #[must_use]
+    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
+        &self.before
+    }
+
+    /// Exact immutable target produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> &SourceBackedSvgSnapshot {
+        &self.after
+    }
+
+    /// Whether the media payload or relationship target changes.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        !self.before.same_source(&self.after)
+    }
+
+    /// Return the exact inverse SVG patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply only to the exact source snapshot captured by this patch.
+    pub fn apply(&self, source: &SourceBackedSvgSnapshot) -> Result<SourceBackedSvgSnapshot> {
+        self.before.slide.check_execution()?;
+        source.slide.check_execution()?;
+        if !source.same_source(&self.before) {
+            return Err(Error::StaleSource);
+        }
+        Ok(if self.is_changed() {
+            self.after.clone()
+        } else {
+            source.clone()
+        })
+    }
+}
+
+impl SourceBackedSvgCommit {
+    /// Candidate SVG transaction snapshot after this edit.
+    #[must_use]
+    pub const fn snapshot(&self) -> &SourceBackedSvgSnapshot {
+        &self.snapshot
+    }
+
+    /// Exact-source SVG patch for this edit.
+    #[must_use]
+    pub const fn patch(&self) -> &SourceBackedSvgPatch {
+        &self.patch
+    }
+
+    /// Whether the media payload or relationship target changes.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.patch.is_changed()
+    }
+}
+
 impl SourceBackedSlideBatchEdit<'_> {
     /// Atomically replace visible text in one bounded shape set on one slide.
     ///
@@ -2304,6 +2831,247 @@ impl SourceBackedSlideBatchCommit {
     pub fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
+}
+
+fn stage_svg_payload(current: &SourcePayload, replacement: Vec<u8>) -> SourcePayload {
+    if current.as_bytes() == replacement.as_slice() {
+        return current.clone();
+    }
+    SourcePayload::Edited(Arc::new(replacement))
+}
+
+fn check_svg_replacement_payload(limits: &ReadLimits, bytes: usize, svg: bool) -> Result<()> {
+    if bytes as u64 > limits.max_part_bytes() {
+        return Err(Error::Limit {
+            resource: if svg {
+                "SVG replacement Part bytes"
+            } else {
+                "raster replacement Part bytes"
+            },
+            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+        });
+    }
+    if svg && bytes == 0 {
+        return Err(Error::Invalid("SVG payload cannot be empty".into()));
+    }
+    Ok(())
+}
+
+fn validate_svg_media_uri(uri: &PackURI) -> Result<()> {
+    if !uri.as_str().starts_with("/ppt/media/") || uri.filename().is_empty() {
+        return Err(Error::Relationship(format!(
+            "SVG transaction target '{}' is outside /ppt/media",
+            uri.as_str()
+        )));
+    }
+    let lower = uri.as_str().to_ascii_lowercase();
+    if lower.ends_with(".rels") || lower.ends_with("/[content_types].xml") {
+        return Err(Error::Relationship(
+            "SVG transaction target is a reserved OPC metadata member".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn build_svg_topology_plan(
+    package: &SourceBackedPackage,
+    current: &SourceBackedSvgSnapshot,
+    target: &SourceBackedSvgSnapshot,
+) -> Result<SourceTopologyPlan> {
+    if !target.slide.same_source(&current.slide)
+        || target.image_position != current.image_position
+        || target.svg_relationship_id != current.svg_relationship_id
+        || target.svg_relationship_type != current.svg_relationship_type
+        || target.raster_relationship_id != current.raster_relationship_id
+        || target.raster_relationship_type != current.raster_relationship_type
+    {
+        return Err(Error::StaleSource);
+    }
+    let owner = current.slide.part_uri.clone();
+    let mut plan = SourceTopologyPlan::new();
+    stage_svg_media_part(
+        package,
+        &mut plan,
+        &owner,
+        &current.svg_relationship_id,
+        &current.svg_part_uri,
+        &target.svg_part_uri,
+        target.svg.as_bytes(),
+        true,
+    )?;
+    stage_svg_media_part(
+        package,
+        &mut plan,
+        &owner,
+        &current.raster_relationship_id,
+        &current.raster_part_uri,
+        &target.raster_part_uri,
+        target.raster.as_bytes(),
+        false,
+    )?;
+    if current.svg_part_uri != target.svg_part_uri {
+        plan.try_replace_internal_relationship(
+            owner.clone(),
+            current.svg_relationship_id.clone(),
+            current.svg_relationship_type.clone(),
+            target.svg_part_uri.clone(),
+        )?;
+        remove_svg_media_if_unreferenced(
+            package,
+            &mut plan,
+            &owner,
+            &current.svg_relationship_id,
+            &current.svg_part_uri,
+        )?;
+    }
+    if current.raster_part_uri != target.raster_part_uri {
+        plan.try_replace_internal_relationship(
+            owner.clone(),
+            current.raster_relationship_id.clone(),
+            current.raster_relationship_type.clone(),
+            target.raster_part_uri.clone(),
+        )?;
+        remove_svg_media_if_unreferenced(
+            package,
+            &mut plan,
+            &owner,
+            &current.raster_relationship_id,
+            &current.raster_part_uri,
+        )?;
+    }
+    Ok(plan)
+}
+
+fn stage_svg_media_part(
+    package: &SourceBackedPackage,
+    plan: &mut SourceTopologyPlan,
+    owner: &PackURI,
+    relationship_id: &str,
+    current_uri: &PackURI,
+    target_uri: &PackURI,
+    payload: &[u8],
+    svg: bool,
+) -> Result<()> {
+    validate_svg_media_uri(target_uri)?;
+    let content_type = if svg { "image/svg+xml" } else { "image/png" };
+    match package.part(target_uri) {
+        Ok(view) => {
+            if svg {
+                if !is_svg_content_type(view.content_type()) {
+                    return Err(Error::ContentType {
+                        expected: "image/svg+xml".into(),
+                        actual: view.content_type().to_owned(),
+                    });
+                }
+            } else if !is_png_content_type(view.content_type()) {
+                return Err(Error::ContentType {
+                    expected: "image/png".into(),
+                    actual: view.content_type().to_owned(),
+                });
+            }
+            if !view.rels().is_empty() {
+                return Err(Error::Relationship(format!(
+                    "SVG transaction media Part '{}' has outbound relationships",
+                    target_uri.as_str()
+                )));
+            }
+            let existing = view.data()?;
+            if existing.as_bytes() != payload {
+                if has_other_inbound_media(package, target_uri, owner, relationship_id)? {
+                    return Err(Error::Relationship(format!(
+                        "SVG transaction refuses to mutate shared media Part '{}'",
+                        target_uri.as_str()
+                    )));
+                }
+                plan.try_replace_part(target_uri.clone(), payload.to_vec())?;
+            }
+        },
+        Err(litchi_opc::OpcError::PartNotFound(_)) => {
+            if target_uri == current_uri {
+                return Err(Error::PartNotFound(target_uri.to_string()));
+            }
+            plan.try_add_part(target_uri.clone(), content_type, payload.to_vec())?;
+        },
+        Err(error) => return Err(error.into()),
+    }
+    Ok(())
+}
+
+fn remove_svg_media_if_unreferenced(
+    package: &SourceBackedPackage,
+    plan: &mut SourceTopologyPlan,
+    owner: &PackURI,
+    relationship_id: &str,
+    uri: &PackURI,
+) -> Result<()> {
+    if has_unmodeled_relationship_members(package) {
+        return Err(Error::Relationship(
+            "SVG transaction refuses media removal while an opaque relationships member is retained"
+                .into(),
+        ));
+    }
+    if !has_other_inbound_media(package, uri, owner, relationship_id)? {
+        plan.try_remove_part(uri.clone())?;
+    }
+    Ok(())
+}
+
+fn has_unmodeled_relationship_members(package: &SourceBackedPackage) -> bool {
+    package.physical_member_names().any(|name| {
+        let bytes = name.as_bytes();
+        if bytes.len() < b".rels".len()
+            || !bytes[bytes.len() - b".rels".len()..].eq_ignore_ascii_case(b".rels")
+        {
+            return false;
+        }
+        if name.eq_ignore_ascii_case("_rels/.rels") {
+            return false;
+        }
+        package.iter_parts().all(|part| {
+            part.partname()
+                .rels_uri()
+                .ok()
+                .is_none_or(|rels_uri| !rels_uri.membername().eq_ignore_ascii_case(name))
+        })
+    })
+}
+
+fn has_other_inbound_media(
+    package: &SourceBackedPackage,
+    target: &PackURI,
+    excluded_owner: &PackURI,
+    excluded_relationship_id: &str,
+) -> Result<bool> {
+    let matches = |owner: Option<&PackURI>, relationship: &litchi_opc::Relationship| {
+        if relationship.target_mode() != TargetMode::Internal {
+            return false;
+        }
+        let Some(partname) = relationship.target_partname().ok() else {
+            return false;
+        };
+        if !partname.is_equivalent_to(target) {
+            return false;
+        }
+        owner != Some(excluded_owner) || relationship.r_id() != excluded_relationship_id
+    };
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| matches(None, relationship))
+    {
+        return Ok(true);
+    }
+    for part in package.iter_parts() {
+        let owner = part.partname();
+        if part
+            .rels()
+            .iter()
+            .any(|relationship| matches(Some(owner), relationship))
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 impl SourceSlide {
@@ -3691,6 +4459,13 @@ fn is_image_content_type(content_type: &str) -> bool {
         .split(';')
         .next()
         .is_some_and(|value| value.trim().to_ascii_lowercase().starts_with("image/"))
+}
+
+fn is_png_content_type(content_type: &str) -> bool {
+    content_type
+        .split(';')
+        .next()
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("image/png"))
 }
 
 fn is_svg_content_type(content_type: &str) -> bool {

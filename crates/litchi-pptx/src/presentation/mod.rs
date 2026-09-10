@@ -27,7 +27,8 @@ pub use source::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
-    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
-    SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
+    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
+    SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
 };
 pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};
