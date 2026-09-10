@@ -1,17 +1,16 @@
 //! BIFF8 password-to-open encryption handling.
 
 use super::error::{EncryptionKind, Error, Result};
+use litchi_crypto::legacy_rc4;
 use litchi_crypto::rc4 as office_rc4;
 use litchi_crypto::rc4::{Context, Error as CryptoError, Flags, Header};
-use md5::{Digest, Md5};
 use rand::{TryRng, rngs::SysRng};
-use rc4::{KeyInit, Rc4, StreamCipher};
 use zeroize::Zeroizing;
 
 const FILEPASS_SID: u16 = 0x002f;
 const WRITEPROTECT_SID: u16 = 0x0086;
 const BOUNDSHEET8_SID: u16 = 0x0085;
-const BINARY_RC4_FILEPASS_LEN: usize = 54;
+const BINARY_RC4_FILEPASS_LEN: usize = 2 + legacy_rc4::HEADER_LEN;
 const BINARY_RC4_BLOCK_SIZE: usize = 1024;
 const CODEPAGE_SID: u16 = 0x0042;
 const BOF_SID: u16 = 0x0809;
@@ -128,16 +127,9 @@ struct XorObfuscation {
     verifier: u16,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct BinaryRc4FilePass {
-    salt: [u8; 16],
-    encrypted_verifier: [u8; 16],
-    encrypted_verifier_hash: [u8; 16],
-}
-
 enum FilePassRecord {
     Xor(XorObfuscation),
-    BinaryRc4(BinaryRc4FilePass),
+    BinaryRc4(legacy_rc4::Header),
     CryptoApi(Header),
     Unsupported(EncryptionKind),
 }
@@ -208,17 +200,9 @@ impl FilePassRecord {
                         data.len()
                     )));
                 }
-                let mut salt = [0u8; 16];
-                let mut encrypted_verifier = [0u8; 16];
-                let mut encrypted_verifier_hash = [0u8; 16];
-                salt.copy_from_slice(&data[6..22]);
-                encrypted_verifier.copy_from_slice(&data[22..38]);
-                encrypted_verifier_hash.copy_from_slice(&data[38..54]);
-                Ok(Self::BinaryRc4(BinaryRc4FilePass {
-                    salt,
-                    encrypted_verifier,
-                    encrypted_verifier_hash,
-                }))
+                let header =
+                    legacy_rc4::parse_header(&data[2..]).map_err(map_legacy_header_error)?;
+                Ok(Self::BinaryRc4(header))
             },
             other => Ok(Self::Unsupported(EncryptionKind::Unknown(other))),
         }
@@ -227,70 +211,8 @@ impl FilePassRecord {
 
 enum WorkbookCipher {
     Xor([u8; 16]),
-    BinaryRc4(Box<BinaryRc4Stream>),
+    BinaryRc4(legacy_rc4::Context),
     CryptoApi(Context),
-}
-
-struct BinaryRc4Stream {
-    secret: Zeroizing<[u8; 5]>,
-    block: Option<u32>,
-    offset: usize,
-    cipher: Option<Rc4>,
-}
-
-impl BinaryRc4Stream {
-    fn new(secret: Zeroizing<[u8; 5]>) -> Self {
-        Self {
-            secret,
-            block: None,
-            offset: 0,
-            cipher: None,
-        }
-    }
-
-    fn apply_at(&mut self, mut data: &mut [u8], mut absolute: usize) -> Result<()> {
-        while !data.is_empty() {
-            let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_error| {
-                Error::InvalidData("Workbook stream is too large for binary RC4".to_string())
-            })?;
-            let block_offset = absolute % BINARY_RC4_BLOCK_SIZE;
-            if self.block != Some(block) {
-                let key = derive_binary_rc4_block_key(&self.secret, block);
-                self.cipher = Some(Rc4::new_from_slice(key.as_ref()).map_err(|_error| {
-                    Error::InvalidData("invalid binary RC4 key length".to_string())
-                })?);
-                self.block = Some(block);
-                self.offset = 0;
-            }
-
-            if self.offset > block_offset {
-                return Err(Error::InvalidData(
-                    "binary RC4 stream offsets moved backwards".to_string(),
-                ));
-            }
-            let gap = block_offset - self.offset;
-            if gap != 0 {
-                let mut discarded = Zeroizing::new([0u8; BINARY_RC4_BLOCK_SIZE]);
-                self.cipher
-                    .as_mut()
-                    .expect("binary RC4 cipher initialized")
-                    .apply_keystream(&mut discarded[..gap]);
-                self.offset = block_offset;
-            }
-
-            let count = data
-                .len()
-                .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-            self.cipher
-                .as_mut()
-                .expect("binary RC4 cipher initialized")
-                .apply_keystream(&mut data[..count]);
-            self.offset += count;
-            absolute += count;
-            data = &mut data[count..];
-        }
-        Ok(())
-    }
 }
 
 struct WriterEncryptionMaterial {
@@ -322,24 +244,16 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
         EncryptionProfile::OfficeBinaryRc4 => {
             let salt = random_16("binary RC4 salt")?;
             let verifier = random_16("binary RC4 verifier")?;
-            let secret = derive_binary_rc4_secret(&encryption.password, &salt);
-            let key = derive_binary_rc4_block_key(&secret, 0);
-            let mut encrypted = Zeroizing::new([0u8; 32]);
-            encrypted[..16].copy_from_slice(verifier.as_ref());
-            encrypted[16..].copy_from_slice(&Md5::digest(verifier.as_ref()));
-            Rc4::new_from_slice(key.as_ref())
-                .map_err(|_error| Error::InvalidData("invalid binary RC4 key length".to_string()))?
-                .apply_keystream(encrypted.as_mut());
+            let (header, context) =
+                legacy_rc4::build_header(&encryption.password, &salt, &verifier)
+                    .map_err(map_legacy_runtime_error)?;
 
             let mut filepass = Vec::with_capacity(BINARY_RC4_FILEPASS_LEN);
             filepass.extend_from_slice(&1u16.to_le_bytes());
-            filepass.extend_from_slice(&1u16.to_le_bytes());
-            filepass.extend_from_slice(&1u16.to_le_bytes());
-            filepass.extend_from_slice(salt.as_ref());
-            filepass.extend_from_slice(encrypted.as_ref());
+            filepass.extend_from_slice(&header);
             Ok(WriterEncryptionMaterial {
                 filepass,
-                cipher: WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(secret))),
+                cipher: WorkbookCipher::BinaryRc4(context),
             })
         },
         EncryptionProfile::CryptoApiRc4 { key_bits } => {
@@ -569,7 +483,13 @@ pub(crate) fn encrypt_workbook_for_write(
                 },
                 WorkbookCipher::BinaryRc4(stream) => {
                     let encrypted_start = header_end + clear_prefix;
-                    stream.apply_at(&mut workbook[encrypted_start..record_end], encrypted_start)?;
+                    legacy_rc4::apply_at(
+                        stream,
+                        BINARY_RC4_BLOCK_SIZE,
+                        encrypted_start,
+                        &mut workbook[encrypted_start..record_end],
+                    )
+                    .map_err(map_legacy_runtime_error)?;
                 },
                 WorkbookCipher::CryptoApi(context) => {
                     let encrypted_start = header_end + clear_prefix;
@@ -645,11 +565,10 @@ pub(crate) fn prepare_workbook_stream(
                 },
                 FilePassRecord::BinaryRc4(filepass) => {
                     let password = password.ok_or(Error::PasswordRequired)?;
-                    let secret = verify_binary_rc4_password(&filepass, password)?
+                    let context = legacy_rc4::verify(&filepass, password)
+                        .map_err(map_legacy_runtime_error)?
                         .ok_or(Error::InvalidPassword)?;
-                    cipher = Some(WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(
-                        secret,
-                    ))));
+                    cipher = Some(WorkbookCipher::BinaryRc4(context));
                 },
                 FilePassRecord::CryptoApi(header) => {
                     let password = password.ok_or(Error::PasswordRequired)?;
@@ -680,7 +599,13 @@ pub(crate) fn prepare_workbook_stream(
                 },
                 WorkbookCipher::BinaryRc4(stream) => {
                     let encrypted_start = header_end + clear_prefix;
-                    stream.apply_at(&mut workbook[encrypted_start..record_end], encrypted_start)?;
+                    legacy_rc4::apply_at(
+                        stream,
+                        BINARY_RC4_BLOCK_SIZE,
+                        encrypted_start,
+                        &mut workbook[encrypted_start..record_end],
+                    )
+                    .map_err(map_legacy_runtime_error)?;
                 },
                 WorkbookCipher::CryptoApi(context) => {
                     let encrypted_start = header_end + clear_prefix;
@@ -717,6 +642,39 @@ fn map_cryptoapi_runtime_error(error: CryptoError) -> Error {
     }
 }
 
+fn map_legacy_header_error(error: legacy_rc4::Error) -> Error {
+    match error {
+        legacy_rc4::Error::Malformed(message) => Error::MalformedFilePass(message),
+        legacy_rc4::Error::PasswordTooLong { units } => Error::MalformedFilePass(format!(
+            "legacy RC4 password contains {units} UTF-16 code units; maximum is 255"
+        )),
+        legacy_rc4::Error::UnsupportedVersion { .. } => {
+            Error::UnsupportedEncryption(EncryptionKind::BinaryRc4)
+        },
+        legacy_rc4::Error::InvalidBlockSize { size } => Error::MalformedFilePass(format!(
+            "legacy RC4 block size {size} is outside the bounded range"
+        )),
+        legacy_rc4::Error::StreamRangeOverflow => {
+            Error::MalformedFilePass("legacy RC4 stream range overflow".to_string())
+        },
+    }
+}
+
+fn map_legacy_runtime_error(error: legacy_rc4::Error) -> Error {
+    match error {
+        legacy_rc4::Error::Malformed(message) => Error::InvalidData(message),
+        legacy_rc4::Error::PasswordTooLong { units } => Error::InvalidData(format!(
+            "legacy RC4 password contains {units} UTF-16 code units; maximum is 255"
+        )),
+        legacy_rc4::Error::UnsupportedVersion { .. } => {
+            Error::UnsupportedEncryption(EncryptionKind::BinaryRc4)
+        },
+        legacy_rc4::Error::InvalidBlockSize { .. } | legacy_rc4::Error::StreamRangeOverflow => {
+            Error::InvalidData(error.to_string())
+        },
+    }
+}
+
 fn apply_cryptoapi_at(mut data: &mut [u8], mut absolute: usize, context: &Context) -> Result<()> {
     while !data.is_empty() {
         let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_error| {
@@ -734,53 +692,6 @@ fn apply_cryptoapi_at(mut data: &mut [u8], mut absolute: usize, context: &Contex
         data = &mut data[count..];
     }
     Ok(())
-}
-
-fn derive_binary_rc4_secret(password: &str, salt: &[u8; 16]) -> Zeroizing<[u8; 5]> {
-    let password_bytes = Zeroizing::new(
-        password
-            .encode_utf16()
-            .take(255)
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>(),
-    );
-    let initial_hash = Zeroizing::new(<[u8; 16]>::from(Md5::digest(password_bytes.as_slice())));
-    let mut intermediate = Zeroizing::new([0u8; 336]);
-    for chunk in intermediate.as_chunks_mut::<21>().0.iter_mut() {
-        chunk[..5].copy_from_slice(&initial_hash[..5]);
-        chunk[5..].copy_from_slice(salt);
-    }
-    let final_hash = Zeroizing::new(<[u8; 16]>::from(Md5::digest(intermediate.as_slice())));
-    let mut secret = Zeroizing::new([0u8; 5]);
-    secret.copy_from_slice(&final_hash[..5]);
-    secret
-}
-
-fn derive_binary_rc4_block_key(secret: &[u8; 5], block: u32) -> Zeroizing<[u8; 16]> {
-    let mut input = Zeroizing::new([0u8; 9]);
-    input[..5].copy_from_slice(secret);
-    input[5..].copy_from_slice(&block.to_le_bytes());
-    Zeroizing::new(<[u8; 16]>::from(Md5::digest(input.as_slice())))
-}
-
-fn verify_binary_rc4_password(
-    filepass: &BinaryRc4FilePass,
-    password: &str,
-) -> Result<Option<Zeroizing<[u8; 5]>>> {
-    let secret = derive_binary_rc4_secret(password, &filepass.salt);
-    let key = derive_binary_rc4_block_key(&secret, 0);
-    let mut cipher = Rc4::new_from_slice(key.as_ref())
-        .map_err(|_error| Error::InvalidData("invalid binary RC4 key length".to_string()))?;
-    let mut verifier = Zeroizing::new(filepass.encrypted_verifier);
-    let mut verifier_hash = Zeroizing::new(filepass.encrypted_verifier_hash);
-    cipher.apply_keystream(verifier.as_mut());
-    cipher.apply_keystream(verifier_hash.as_mut());
-    let calculated = Zeroizing::new(<[u8; 16]>::from(Md5::digest(verifier.as_slice())));
-    let difference = calculated
-        .iter()
-        .zip(verifier_hash.iter())
-        .fold(0u8, |difference, (left, right)| difference | (left ^ right));
-    Ok((difference == 0).then_some(secret))
 }
 
 fn is_never_encrypted_record(sid: u16) -> bool {
@@ -1051,43 +962,24 @@ mod tests {
     }
 
     #[test]
-    fn binary_rc4_secret_matches_apache_poi_vector() {
-        let salt = [
-            0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4, 0x81, 0xb5,
-            0xb4, 0x4a,
-        ];
-        assert_eq!(
-            derive_binary_rc4_secret("MoneyForNothing", &salt).as_ref(),
-            &[0xc2, 0xd9, 0x56, 0xb2, 0x6b]
-        );
-    }
-
-    #[test]
     fn binary_rc4_verifier_uses_one_continuous_cipher() {
-        let filepass = BinaryRc4FilePass {
-            salt: [
+        let filepass = binary_rc4_filepass(
+            [
                 0xdf, 0x35, 0x52, 0x38, 0x0d, 0x75, 0x4a, 0xe6, 0x85, 0xc2, 0xfd, 0x78, 0xce, 0x3d,
                 0xd1, 0xb6,
             ],
-            encrypted_verifier: [
+            [
                 0xd4, 0x04, 0x43, 0xec, 0xb7, 0xa7, 0x6f, 0x6a, 0xd2, 0x68, 0xc7, 0xdf, 0xcf, 0xa8,
                 0x80, 0x68,
             ],
-            encrypted_verifier_hash: [
+            [
                 0x8d, 0xc2, 0x63, 0xcc, 0xe1, 0x1d, 0xe0, 0x05, 0x20, 0x16, 0x96, 0xaf, 0x48, 0x59,
                 0x94, 0x64,
             ],
-        };
-        assert!(
-            verify_binary_rc4_password(&filepass, "5ecret")
-                .unwrap()
-                .is_some()
         );
-        assert!(
-            verify_binary_rc4_password(&filepass, "Secret")
-                .unwrap()
-                .is_none()
-        );
+        let header = legacy_rc4::parse_header(&filepass[2..]).unwrap();
+        assert!(legacy_rc4::verify(&header, "5ecret").unwrap().is_some());
+        assert!(legacy_rc4::verify(&header, "Secret").unwrap().is_none());
     }
 
     #[test]
@@ -1109,26 +1001,37 @@ mod tests {
 
     #[test]
     fn binary_rc4_cursor_handles_clear_gaps_and_block_boundaries() {
-        let secret = Zeroizing::new([1, 2, 3, 4, 5]);
+        let (_, encoder_context) =
+            legacy_rc4::build_header("cursor", &[0x31; 16], &[0x72; 16]).unwrap();
+        let (_, decoder_context) =
+            legacy_rc4::build_header("cursor", &[0x31; 16], &[0x72; 16]).unwrap();
         let plaintext = vec![0x5a; 80];
         let mut encrypted = plaintext.clone();
-        BinaryRc4Stream::new(Zeroizing::new(*secret))
-            .apply_at(&mut encrypted, 1000)
-            .unwrap();
+        legacy_rc4::apply_at(
+            &encoder_context,
+            BINARY_RC4_BLOCK_SIZE,
+            1000,
+            &mut encrypted,
+        )
+        .unwrap();
         assert_ne!(encrypted, plaintext);
-        BinaryRc4Stream::new(secret)
-            .apply_at(&mut encrypted, 1000)
-            .unwrap();
+        legacy_rc4::apply_at(
+            &decoder_context,
+            BINARY_RC4_BLOCK_SIZE,
+            1000,
+            &mut encrypted,
+        )
+        .unwrap();
         assert_eq!(encrypted, plaintext);
 
         let mut first = vec![0x11; 12];
         let mut second = vec![0x22; 12];
-        let mut encoder = BinaryRc4Stream::new(Zeroizing::new([5, 4, 3, 2, 1]));
-        encoder.apply_at(&mut first, 1010).unwrap();
-        encoder.apply_at(&mut second, 1040).unwrap();
-        let mut decoder = BinaryRc4Stream::new(Zeroizing::new([5, 4, 3, 2, 1]));
-        decoder.apply_at(&mut first, 1010).unwrap();
-        decoder.apply_at(&mut second, 1040).unwrap();
+        let (_, encoder) = legacy_rc4::build_header("ranges", &[0x11; 16], &[0x22; 16]).unwrap();
+        let (_, decoder) = legacy_rc4::build_header("ranges", &[0x11; 16], &[0x22; 16]).unwrap();
+        legacy_rc4::apply_at(&encoder, BINARY_RC4_BLOCK_SIZE, 1010, &mut first).unwrap();
+        legacy_rc4::apply_at(&encoder, BINARY_RC4_BLOCK_SIZE, 1040, &mut second).unwrap();
+        legacy_rc4::apply_at(&decoder, BINARY_RC4_BLOCK_SIZE, 1010, &mut first).unwrap();
+        legacy_rc4::apply_at(&decoder, BINARY_RC4_BLOCK_SIZE, 1040, &mut second).unwrap();
         assert_eq!(first, vec![0x11; 12]);
         assert_eq!(second, vec![0x22; 12]);
     }

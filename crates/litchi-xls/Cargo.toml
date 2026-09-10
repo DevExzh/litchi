@@ -22,9 +22,7 @@ litchi-ograph      = { workspace = true }
 litchi-ole-common = { workspace = true }
 litchi-sign        = { workspace = true }
 litchi-vba         = { workspace = true }
-md-5               = { workspace = true }
 rand               = { workspace = true }
-rc4                = { workspace = true }
 zerocopy           = { workspace = true }
 zeroize            = { workspace = true }
 
