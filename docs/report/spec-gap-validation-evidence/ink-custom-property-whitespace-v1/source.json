@@ -1,0 +1,10 @@
+{
+  "root": "/var/tmp/litchi-docx-ink-custom-brush-validation-20260910",
+  "base": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "paths": [
+    {
+      "path": "crates/litchi-drawingml/src/ink/authoring.rs",
+      "sha256": "c09f4dd024cc49d9eefc2ad1546ac8a156d7111fcd34b0a09c103d7eeb165362"
+    }
+  ]
+}
