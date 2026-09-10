@@ -21,6 +21,7 @@ pub struct Builder {
     definitions: Vec<Definition>,
     metadata: litchi_core::Metadata,
     settings: Option<Settings>,
+    table_templates: Vec<crate::styles::table_template::Template>,
 }
 
 impl Default for Builder {
@@ -37,6 +38,7 @@ impl Builder {
             definitions: Vec::new(),
             metadata: litchi_core::Metadata::default(),
             settings: None,
+            table_templates: Vec::new(),
         }
     }
 
@@ -78,6 +80,64 @@ impl Builder {
             settings.validate()?;
         }
         self.settings = settings;
+        Ok(self)
+    }
+
+    /// Borrow standalone table templates authored into the next package.
+    #[must_use]
+    pub fn table_templates(&self) -> &[crate::styles::table_template::Template] {
+        &self.table_templates
+    }
+
+    /// Replace the complete standalone table-template catalog.
+    pub fn set_table_templates(
+        &mut self,
+        templates: Vec<crate::styles::table_template::Template>,
+    ) -> Result<&mut Self> {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(templates)?;
+        self.table_templates = edit.templates().to_vec();
+        Ok(self)
+    }
+
+    /// Stage a bounded table-template update in the builder.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(self.table_templates.clone())?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        self.table_templates = commit.snapshot().templates().to_vec();
+        Ok(self)
+    }
+
+    /// Borrow the inert scenario declarations currently staged in
+    /// `content.xml`.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        crate::scenario::Snapshot::parse(&self.content_xml).map_err(|error| {
+            Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+        })
+    }
+
+    /// Stage a source-bound, inert scenario metadata update in the builder.
+    ///
+    /// The update records declarations only.  It never applies a what-if
+    /// scenario, evaluates formulas, or refreshes external data.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let snapshot = self.scenarios()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.snapshot().source_xml().to_owned();
+        }
         Ok(self)
     }
 
@@ -180,6 +240,24 @@ impl Builder {
         })
     }
 
+    /// Set or clear one worksheet's direct table title.
+    pub fn set_sheet_title(
+        &mut self,
+        sheet_name: &str,
+        title: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    }
+
+    /// Set or clear one worksheet's direct table description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_name: &str,
+        description: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
+    }
+
     fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<&mut Self>
     where
         F: FnOnce(&mut Sheet) -> Result<()>,
@@ -258,6 +336,11 @@ impl Builder {
             if let Some(metadata_xml) = transaction.commit()?.into_owned_xml() {
                 writer.add_file("meta.xml", metadata_xml.as_bytes())?;
             }
+        }
+        if !self.table_templates.is_empty() {
+            let styles_xml =
+                crate::styles::table_template::styles_xml_for_templates(&self.table_templates)?;
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
         }
         writer.finish_to_bytes()
     }

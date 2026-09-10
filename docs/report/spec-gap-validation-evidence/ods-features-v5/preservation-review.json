@@ -1,0 +1,10 @@
+{
+  "reviewer": "xlsb_model",
+  "verdict": "Preservation CLEAR",
+  "manifest_sha256": "1fb553dd9238d1597d57ef9f5dc35d7117ee9666761c2c4502ddf341b586cb09",
+  "reviewed_overlap_paths": 8,
+  "findings": "Actual primary-preimage hunks preserve flat-FODS, title/description and cell-range-source semantics. No prior tests removed. GeneralRef permitted only within wholly replaced metadata child; untouched source stays preserved.",
+  "integration_head": "05425a57941de2980d16eb45a08ee93be0571daf",
+  "validated_overlay_base": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "intervening_change": "ODC-only source and evidence; ODS dependencies unchanged"
+}

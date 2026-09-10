@@ -123,10 +123,14 @@ impl Template {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            first_row_start_column: None,
-            first_row_end_column: None,
-            last_row_start_column: None,
-            last_row_end_column: None,
+            // ODF 1.4 requires all four row edge selectors on a
+            // table:table-template.  Keep the ergonomic constructor usable
+            // by choosing the ordinary row-to-column span; callers can still
+            // replace any selector through the public fields.
+            first_row_start_column: Some(Axis::Row),
+            first_row_end_column: Some(Axis::Column),
+            last_row_start_column: Some(Axis::Row),
+            last_row_end_column: Some(Axis::Column),
             use_first_row_styles: None,
             use_last_row_styles: None,
             use_first_column_styles: None,

@@ -1,0 +1,82 @@
+[
+  {
+    "gate": "tests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-ods-root-current-overlay-v5-20260910-tests.log",
+    "sha256": "54adce0040cf41eab544e157ff0b5431123762b009af1cdaaa037a7e9ba44ec4"
+  },
+  {
+    "gate": "doctests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--doc",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-ods-root-current-overlay-v5-20260910-doctests.log",
+    "sha256": "ee9d10cb17dccebe65daf6b31acf16b61ef389d8229f9b44e60e5259b6ec34c7"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-ods-root-current-overlay-v5-20260910-clippy.log",
+    "sha256": "05ef4665923ef210d5c2bc247451cee3bff13459bedcf3501ade09e73a4e1da8"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--no-deps",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-ods-root-current-overlay-v5-20260910-rustdoc.log",
+    "sha256": "0e6f3b7bf4e451f87b2eac588f3a8ebecee453cbe86f097d8332e1446c43919a"
+  }
+]

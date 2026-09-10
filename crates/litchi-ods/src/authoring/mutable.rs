@@ -127,6 +127,45 @@ impl MutableSpreadsheet {
         self.spreadsheet.remove_metadata()
     }
 
+    /// Capture the standalone table-template catalog.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        self.spreadsheet.table_templates()
+    }
+
+    /// Apply an exact-source table-template patch atomically.
+    pub fn apply_table_template_patch(
+        &mut self,
+        patch: &crate::styles::table_template::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_table_template_patch(patch)
+    }
+
+    /// Stage and publish one source-checked table-template edit.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_table_templates(update)
+    }
+
+    /// Capture the inert, source-bound scenario metadata catalog.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        self.spreadsheet.scenarios()
+    }
+
+    /// Apply an exact-source scenario metadata patch atomically.
+    pub fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
+        self.spreadsheet.apply_scenario_patch(patch)
+    }
+
+    /// Stage and publish one failure-atomic scenario metadata edit.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_scenarios(update)
+    }
+
     /// Borrow spreadsheet calculation settings, if present.
     #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {
@@ -446,6 +485,20 @@ impl MutableSpreadsheet {
         self.edit_sheet(sheet_name, move |sheet| {
             sheet.set_cell_style(row, column, style_name)
         })
+    }
+
+    /// Set or clear one worksheet's direct table title.
+    pub fn set_sheet_title(&mut self, sheet_name: &str, title: Option<String>) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    }
+
+    /// Set or clear one worksheet's direct table description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_name: &str,
+        description: Option<String>,
+    ) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
     }
 
     fn edit_sheets<F>(&mut self, operation: F) -> Result<()>

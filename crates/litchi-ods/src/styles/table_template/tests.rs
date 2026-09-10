@@ -58,6 +58,38 @@ fn rejects_invalid_locations_shapes_and_duplicates() {
     );
     assert!(parse_parts(&[&duplicate]).is_err());
     assert!(parse_parts(&[r#"<table:table-template xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" table:name="A"><table:body table:style-name="A"/></table:table-template>"#]).is_err());
+    assert!(parse(
+        r#"<office:automatic-styles><table:table-template table:name="A"><table:body table:style-name="A"/></table:table-template></office:automatic-styles>"#
+    )
+    .is_err());
+}
+
+#[test]
+fn rejects_out_of_order_regions_and_checks_style_name_refs() {
+    let out_of_order = r#"<table:table-template table:name="Order"><table:body table:style-name="Body"/><table:first-row table:style-name="Header"/></table:table-template>"#;
+    assert!(parse(out_of_order).is_err());
+
+    let empty_style = Template::new("Empty").with_region(
+        super::semantic::Region::Body,
+        super::semantic::Style::new(""),
+    );
+    assert!(empty_style.to_xml().is_ok());
+    for invalid in ["bad name", "bad:name", "1bad"] {
+        let template = Template::new("Invalid").with_region(
+            super::semantic::Region::Body,
+            super::semantic::Style::new(invalid),
+        );
+        assert!(
+            template.to_xml().is_err(),
+            "accepted invalid style ref {invalid}"
+        );
+    }
+
+    let parsed = parse(
+        r#"<table:table-template table:name="EmptyRef"><table:body table:style-name=""/></table:table-template>"#,
+    )
+    .expect("empty styleNameRef is schema-valid");
+    assert_eq!(parsed[0].body.as_ref().expect("body").style_name, "");
 }
 
 #[test]
@@ -85,7 +117,7 @@ fn parses_libreoffice_table_style_catalog() {
 #[test]
 fn validates_and_round_trips_deterministic_template_xml() {
     let mut template = parse(
-        r#"<table:table-template table:name="A &amp; B" table:use-banding-columns-styles="false"><table:first-row table:style-name="Head&amp;" table:paragraph-style-name="P&amp;"/><table:even-columns table:style-name="Even"/><table:odd-columns table:style-name="Odd"/></table:table-template>"#,
+        r#"<table:table-template table:name="A &amp; B"><table:first-row table:style-name="Head_1" table:paragraph-style-name="P_1"/><table:body table:style-name="Body"/><table:even-columns table:style-name="Even"/><table:odd-columns table:style-name="Odd"/></table:table-template>"#,
     )
     .expect("test fixture or operation should succeed")
     .remove(0);
@@ -93,7 +125,7 @@ fn validates_and_round_trips_deterministic_template_xml() {
         .to_xml()
         .expect("test fixture or operation should succeed");
     assert!(xml.contains(r#"table:name="A &amp; B""#));
-    assert!(xml.contains(r#"table:style-name="Head&amp;""#));
+    assert!(xml.contains(r#"table:style-name="Head_1""#));
     let reparsed = parse(&xml)
         .expect("test fixture or operation should succeed")
         .remove(0);
@@ -101,8 +133,10 @@ fn validates_and_round_trips_deterministic_template_xml() {
 
     template.odd_columns = None;
     let mut untouched = String::from("prefix");
-    assert!(template.write_xml(&mut untouched).is_err());
-    assert_eq!(untouched, "prefix");
+    template
+        .write_xml(&mut untouched)
+        .expect("individual band regions are optional");
+    assert!(untouched.starts_with("prefix<table:table-template"));
 }
 
 #[test]
