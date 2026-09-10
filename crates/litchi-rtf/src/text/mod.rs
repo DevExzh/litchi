@@ -30,8 +30,10 @@ pub use character_positioning::{
 )]
 pub use types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
-    EmphasisMark, FitText, Indentation, ParagraphDropCap, ParagraphDropCapKind,
-    ParagraphFontAlignment, ParagraphLineBreaking, ParagraphLogicalIndentation,
-    ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata, Spacing,
-    TextDirection as Direction, UnderlineStyle as Underline,
+    EmphasisMark, FitText, Indentation, MAX_PARAGRAPH_FRAME_TWIPS, ParagraphDropCap,
+    ParagraphDropCapKind, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
+    ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphLineBreaking,
+    ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata,
+    Spacing, TextDirection as Direction, UnderlineStyle as Underline,
 };

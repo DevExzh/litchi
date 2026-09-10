@@ -1,0 +1,35 @@
+{
+  "candidate": "/var/tmp/litchi-rtf-paragraph-frames-validation-20260909",
+  "source_manifest": "/var/tmp/litchi-rtf-frames-root-source-v3-20260910.json",
+  "source_manifest_sha256": "47efd8222d3ce748d662562466607f2593d90580cdd67b015a520e409e592940",
+  "source_files_verified": 20,
+  "unit_integration_passed": 1348,
+  "doctests_passed": 9,
+  "failed": 0,
+  "ignored": 0,
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-rtf-frames-root-tests-v3.log",
+      "sha256": "1ebc9c5a4b2c4b3dff869ecf43ac21fffa66c53190a391b5a29785208e26f59a",
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-rtf-frames-root-clippy-v3.log",
+      "sha256": "189e300fd4633812eeedc639bb2df040753add4d3fd0c11aa8d4528cb56a437a",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-rtf-frames-root-rustdoc-v3.log",
+      "sha256": "2bee9c07eabf5a1a233636702a994de22e030216861f2e870d036f338355ab7a",
+      "exit_code": 0
+    }
+  },
+  "format_diff_hashes": "passed",
+  "external_softline_reproducer": {
+    "source": "/var/tmp/litchi-rtf-cell-softline-root-probe.rs",
+    "log": "/var/tmp/litchi-rtf-cell-softline-root-probe-v3.log",
+    "exit_code": 0
+  },
+  "review": "pending, including no-op span allocation and remapping contract",
+  "publication": "not yet published"
+}

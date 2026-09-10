@@ -55,8 +55,14 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 if !structural_table_boundary {
+                    let table_level = self.current_state().ok().and_then(|state| {
+                        (state.in_table || state.table_nesting_level >= 2)
+                            .then_some(state.table_nesting_level)
+                    });
                     if self.current_state().is_ok_and(|state| {
                         state.destination == Destination::DocumentBody
+                            && !state.in_table
+                            && state.table_nesting_level < 2
                             && state.revision_type
                                 != Some(super::super::super::annotation::RevisionType::Deletion)
                     }) {
@@ -86,7 +92,18 @@ impl<'a> Parser<'a> {
                                 })?;
                         }
                     }
-                    text_buffer.push(b'\n');
+                    if let Some(table_level) = table_level {
+                        if self.current_state()?.revision_type
+                            != Some(super::super::super::annotation::RevisionType::Deletion)
+                        {
+                            if matches!(control, ControlWord::Par) {
+                                self.record_table_paragraph_break(table_level)?;
+                            }
+                            self.append_table_text(b"\n", table_level)?;
+                        }
+                    } else {
+                        text_buffer.push(b'\n');
+                    }
                 }
                 if matches!(control, ControlWord::Par) {
                     let state = self.current_state_mut()?;

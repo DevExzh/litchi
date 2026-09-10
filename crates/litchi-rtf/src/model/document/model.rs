@@ -131,6 +131,7 @@ pub(crate) fn owned_table(
             owned_cell.set_revision(cell.revision());
             owned_cell.set_borders(cell.borders().clone());
             owned_cell.set_shading(cell.shading());
+            owned_cell.set_paragraphs(cell.paragraphs().to_vec())?;
             for nested in cell.nested_tables() {
                 owned_cell.add_nested_table(nested.text_offset, owned_table(&nested.table)?)?;
             }
@@ -1223,6 +1224,30 @@ impl<'a> RtfDocument<'a> {
     pub(crate) fn local_paragraph_property_editability(&self) -> Result<(), &'static str> {
         if !self.body_story_events.is_empty() || !self.tables.is_empty() {
             return Err("the body contains tables or positioned structure");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn positioned_paragraph_property_editability(&self) -> Result<(), &'static str> {
+        if !self.tables.is_empty() {
+            return Err("the body contains tables or positioned structure");
+        }
+        // Bookmark markers and passive break markers are zero-width body
+        // offsets. The layout writer re-emits them around the rewritten
+        // paragraph runs, so they do not change the paragraph's local
+        // property closure. Other story events carry payloads or paragraph
+        // boundaries that this narrow rewrite cannot reconstruct safely.
+        if self.body_story_events.iter().any(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::BookmarkStart(_)
+                    | crate::BodyStoryEvent::BookmarkEnd(_)
+                    | crate::BodyStoryEvent::PageBreak(_)
+                    | crate::BodyStoryEvent::ColumnBreak(_)
+                    | crate::BodyStoryEvent::SoftBreak(_)
+            )
+        }) {
+            return Err("the body contains unsupported positioned structure");
         }
         Ok(())
     }

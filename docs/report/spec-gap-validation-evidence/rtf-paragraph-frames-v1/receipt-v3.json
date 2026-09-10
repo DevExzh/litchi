@@ -1,0 +1,102 @@
+{
+  "feature": "RTF positioned paragraph frames and table-cell paragraph-frame preservation",
+  "revision": "v3 soft-line preservation fix",
+  "candidate_root": "/var/tmp/litchi-rtf-paragraph-frames-validation-20260909",
+  "base_commit": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "source_manifest": {
+    "file": "source-manifest-v3.json",
+    "sha256": "47efd8222d3ce748d662562466607f2593d90580cdd67b015a520e409e592940",
+    "source_path_count": 20,
+    "staged": false
+  },
+  "root_gate_receipt": {
+    "file": "root-gates-receipt.json",
+    "sha256": "5ba20f11a6037e7324f0bad8f040ca221e75e6327d96b21f2327d32fb000bd21",
+    "external_receipt": "/var/tmp/litchi-rtf-frames-root-gates-v3-20260910.json"
+  },
+  "toolchain": {
+    "rust": "1.95.0",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup"
+  },
+  "cargo_lock_sha256": "28499130dfcc9fe70f86205d3872b5cac1290a74099bcaeabb88add3c418f3c5",
+  "commands": [
+    "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 CARGO_BUILD_JOBS=4 TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp cargo +1.95.0 test -p litchi-rtf --all-features --no-fail-fast",
+    "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 CARGO_BUILD_JOBS=4 TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp cargo +1.95.0 clippy -p litchi-rtf --all-targets --all-features -- -D warnings",
+    "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc -p litchi-rtf --all-features --no-deps",
+    "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup rustup run 1.95.0 rustfmt --edition 2024 --config skip_children=true --check crates/litchi-rtf/src/api/story.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs crates/litchi-rtf/src/codec/parser/codec/api.rs crates/litchi-rtf/src/codec/parser/codec/content.rs crates/litchi-rtf/src/codec/parser/codec/controls.rs crates/litchi-rtf/src/codec/parser/codec/mod.rs crates/litchi-rtf/src/codec/parser/codec/styles.rs crates/litchi-rtf/src/codec/parser/codec/tables.rs crates/litchi-rtf/src/codec/writer/codec/mod.rs crates/litchi-rtf/src/codec/writer/codec/output/content.rs crates/litchi-rtf/src/codec/writer/codec/output/table.rs crates/litchi-rtf/src/content/table.rs crates/litchi-rtf/src/edit.rs crates/litchi-rtf/src/lib.rs crates/litchi-rtf/src/model/document/model.rs crates/litchi-rtf/src/model/types.rs crates/litchi-rtf/src/text/mod.rs crates/litchi-rtf/tests/paragraph_layout_transactions.rs crates/litchi-rtf/tests/paragraph_frames.rs",
+    "git diff --check"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-rtf-frames-root-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "results": {
+    "unit_integration_passed": 1348,
+    "doctests_passed": 9,
+    "failed": 0,
+    "ignored": 0,
+    "clippy": "pass",
+    "rustdoc_warning_denied": "pass",
+    "rustfmt": "pass",
+    "git_diff_check": "pass",
+    "external_softline_reproducer": "pass"
+  },
+  "external_softline_reproducer": {
+    "source": "/var/tmp/litchi-rtf-cell-softline-root-probe.rs",
+    "source_sha256": "ee392ce4c1ff7ad3c3aa52a75fbe07062d007a3034b9e77f92b2f2a80fae02e6",
+    "log": "softline-probe.log.gz",
+    "exit_code": 0,
+    "published_source": "softline-probe.rs"
+  },
+  "logs": {
+    "tests.log.gz": {
+      "source_path": "/var/tmp/litchi-rtf-frames-root-tests-v3.log",
+      "raw_bytes": 140608,
+      "compressed_bytes": 25984,
+      "raw_sha256": "1ebc9c5a4b2c4b3dff869ecf43ac21fffa66c53190a391b5a29785208e26f59a",
+      "sha256": "b4ceac5ba0ae165a2da4c16775ccb5f5c7771d5258bcb3d7aa3ff4be07ad2f50",
+      "exit_code": 0
+    },
+    "clippy.log.gz": {
+      "source_path": "/var/tmp/litchi-rtf-frames-root-clippy-v3.log",
+      "raw_bytes": 180,
+      "compressed_bytes": 160,
+      "raw_sha256": "189e300fd4633812eeedc639bb2df040753add4d3fd0c11aa8d4528cb56a437a",
+      "sha256": "cf169923b94ab4edbd58504c9bd2583177011a38199d84fc2170cced57f9544a",
+      "exit_code": 0
+    },
+    "rustdoc.log.gz": {
+      "source_path": "/var/tmp/litchi-rtf-frames-root-rustdoc-v3.log",
+      "raw_bytes": 262,
+      "compressed_bytes": 201,
+      "raw_sha256": "2bee9c07eabf5a1a233636702a994de22e030216861f2e870d036f338355ab7a",
+      "sha256": "78e299a7163633d7143a22ff2ead7e5bde767d7755639a4aa90e51dd8b9b2cfa",
+      "exit_code": 0
+    },
+    "softline-probe.log.gz": {
+      "source_path": "/var/tmp/litchi-rtf-cell-softline-root-probe-v3.log",
+      "raw_bytes": 1510,
+      "compressed_bytes": 309,
+      "raw_sha256": "dfeb74a5a9de560b5689406ef7924b773669541b2f5cacf482d950617a9e5126",
+      "sha256": "e30b7e7b8300f788ce8d41f5269f121799fc7fb7b6e2ef11992c8e67b7f7234a",
+      "exit_code": 0
+    }
+  },
+  "semantic_boundaries": [
+    "Models and emits the RTF 1.9.1 positioned paragraph controls with bounded numeric validation; it does not render, paginate, or calculate layout.",
+    "Table cells retain paragraph text spans and effective frames, including inherited controls before intbl and nested itap levels; every paragraph in a positioned table row must carry the same effective frame controls, as required by the local RTF grammar.",
+    "wrapdefault alone remains the existing paragraph line-breaking default and does not manufacture a positioned frame from common native default formatting.",
+    "CellParagraph metadata distinguishes in-paragraph line breaks from paragraph boundaries: preserved or applicable in-range newlines emit line, while paragraph-boundary metadata emits par. Newly unmatched newlines use the existing text-edit paragraph-break semantics.",
+    "Paragraph-layout transactions cover direct paragraph properties and refuse style-dependent effective-property edits; table-containing and unsupported dependent positioned structures are refused before publication.",
+    "Source-aware body layout publication preserves accepted opaque nodes and zero-width bookmark/page/column/soft-break metadata within the admitted source span; unsupported dependent structure, rendering, arbitrary table mutation, and native-producer acceptance remain outside this batch.",
+    "The existing flat table cell text API records bounded paragraph spans and frame metadata but does not claim a full table layout engine."
+  ],
+  "independent_review": "pending; expanded table model, no-op span allocation, remapping contract, and source-preserving semantics require review before publication",
+  "publication_status": "evidence prepared; source batch not published",
+  "cargo_mode_note": "Root validation commands did not pass --offline or --locked. Cargo.lock identity is recorded; no stronger invocation claim is made.",
+  "git_common_worktree": "/home/zhuhe/code/litchi",
+  "cargo_lock_file": "Cargo.lock.gz"
+}
