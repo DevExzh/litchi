@@ -1,0 +1,44 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized] target(s) in 19.96s
+     Running tests/source_backed_managed_document_edit.rs (/home/zhuhe/.cache/litchi-goal-0500/target/release/deps/source_backed_managed_document_edit-319eb1d4eeff86fc)
+
+running 36 tests
+test changed_publication_preserves_standard_ignorable_settings_for_managed_and_unmanaged_sources ... ok
+test changed_publication_rejects_unresolved_ignorable_and_active_mce_controls ... ok
+test managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory ... ok
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_candidate_budget_failure_happens_before_publication_output ... ok
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... ok
+test managed_collapsed_and_symbols_reads_refuse_when_memory_is_held ... ok
+test managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact ... ok
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_empty_text_slots_refuse_low_scan_memory_before_projection_change ... ok
+test managed_failed_second_edit_budget_leaves_first_projection_intact ... ok
+test managed_failed_second_edit_cancellation_leaves_first_projection_intact ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact ... ok
+test managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mutation ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test managed_paragraph_and_nested_run_mutations_refuse_without_state_change ... ok
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test managed_repeated_position_keeps_final_value_and_collapses_equal_setter ... ok
+test managed_retained_runs_resolve_inherited_symex_and_ignore_foreign_bindings ... ok
+test managed_revert_to_original_publishes_exact_noop_bytes ... ok
+test managed_reverting_one_operation_preserves_the_other_and_inverse_artifact ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_source_document_rejects_mce_and_dtd_before_edit ... ok
+test protected_track_revisions_with_ignorable_extension_remains_refused ... ok
+test unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_output ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

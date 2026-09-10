@@ -1,0 +1,10 @@
+{
+  "base_revision": "c797d04c7933e61356effcdccca8e81b430e0762",
+  "files": {
+    "crates/litchi-docx/src/document/transaction.rs": "3f238fa24187e94fbaec6cbb0f7167454a7456d28bfb0f5ef9310ba3873aee81",
+    "crates/litchi-docx/src/source_backed.rs": "0d3e29d545381ed39c41c81b32483afb619d1474e1be525ba484fa6584260ab6",
+    "crates/litchi-docx/examples/managed_paragraph_batch_perf.rs": "89ffdd564f6a76814fcc8b769f324557bd15a5201cb366ce9e75ade0a1c61181",
+    "crates/litchi-docx/tests/source_backed_managed_paragraph_batch.rs": "6324cad86f9705ff596001428e361277febee518b0490efbbed447ebdba0e9bc",
+    "Cargo.lock": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "/home/zhuhe/.cache/litchi-goal-0500/target/release/examples/managed_paragraph_batch_perf",
+    "--paragraphs",
+    "128",
+    "--replacements",
+    "1",
+    "--source",
+    "owned",
+    "--mode",
+    "repeated",
+    "--samples",
+    "1",
+    "--warmups",
+    "0",
+    "--repeats",
+    "1",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0500/pilot-before.csv",
+    "--artifact-dir",
+    "/home/zhuhe/.cache/litchi-goal-0500/pilot-before"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "dd29b7d982f4bea44aa35413a0b4e6b6b44b5045796efd3f151f02fea6ee4d8e",
+  "csv_sha256": "4056de2b571e723637fbd935d4d7ac02ed69aba3debdbd16f174520b1e8662e3",
+  "cleanup_verified": true,
+  "scope": "one unpinned feasibility pilot, excluded from formal comparisons; receipt records observed successful tool completion"
+}

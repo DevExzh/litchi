@@ -1,0 +1,21 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/document/transaction.rs:2217:21
+     |
+2217 |                     operation,
+     |                     ^^^^^^^^^ expected `&str`, found `&Operation`
+     |
+     = note: expected reference `&'static str`
+                found reference `&Operation`
+
+error[E0308]: mismatched types
+    --> crates/litchi-docx/src/document/transaction.rs:2233:21
+     |
+2233 |                     operation,
+     |                     ^^^^^^^^^ expected `&str`, found `&Operation`
+     |
+     = note: expected reference `&'static str`
+                found reference `&Operation`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-docx` (lib) due to 2 previous errors

@@ -1,0 +1,86 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: character literal may only contain one codepoint
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:788:51
+    |
+788 |         .any(|byte| matches!(byte, b',' | b'\"' | b'\\n' | b'\\r'))
+    |                                                   ^^^^^^
+    |
+help: if you meant to write a byte string literal, use double quotes
+    |
+788 -         .any(|byte| matches!(byte, b',' | b'\"' | b'\\n' | b'\\r'))
+788 +         .any(|byte| matches!(byte, b',' | b'\"' | b"\\n" | b'\\r'))
+    |
+
+error: character literal may only contain one codepoint
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:788:60
+    |
+788 |         .any(|byte| matches!(byte, b',' | b'\"' | b'\\n' | b'\\r'))
+    |                                                            ^^^^^^
+    |
+help: if you meant to write a byte string literal, use double quotes
+    |
+788 -         .any(|byte| matches!(byte, b',' | b'\"' | b'\\n' | b'\\r'))
+788 +         .any(|byte| matches!(byte, b',' | b'\"' | b'\\n' | b"\\r"))
+    |
+
+error[E0283]: type annotations needed
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:397:21
+    |
+397 |         .ok_or_else(|| format!("{name} must be UTF-8").into())?
+    |                     ^^                                 ---- type must be known at this point
+    |
+    = note: the type must implement `From<std::string::String>`
+    = note: required for `std::string::String` to implement `Into<_>`
+help: try giving this closure an explicit return type
+    |
+397 |         .ok_or_else(|| -> /* Type */ { format!("{name} must be UTF-8").into() })?
+    |                        +++++++++++++++                                        +
+
+error[E0283]: type annotations needed
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:397:21
+    |
+397 |         .ok_or_else(|| format!("{name} must be UTF-8").into())?
+    |                     ^^                                        - type must be known at this point
+    |
+    = note: multiple `impl`s satisfying `Box<dyn std::error::Error>: From<_>` found in the following crates: `alloc`, `core`:
+            - impl<'a, 'b> From<Cow<'b, str>> for Box<(dyn std::error::Error + 'a)>;
+            - impl<'a, E> From<E> for Box<(dyn std::error::Error + 'a)>
+              where E: std::error::Error, E: 'a;
+            - impl<'a> From<&str> for Box<(dyn std::error::Error + 'a)>;
+            - impl<'a> From<std::string::String> for Box<(dyn std::error::Error + 'a)>;
+            - impl<T> From<T> for T;
+help: try giving this closure an explicit return type
+    |
+397 |         .ok_or_else(|| -> /* Type */ { format!("{name} must be UTF-8").into() })?
+    |                        +++++++++++++++                                        +
+
+error[E0277]: can't compare `std::string::String` with `&std::string::String`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:661:30
+    |
+661 |         if paragraph.text()? != expected_text {
+    |                              ^^ no implementation for `std::string::String == &std::string::String`
+    |
+    = help: the trait `PartialEq<&std::string::String>` is not implemented for `std::string::String`
+help: consider dereferencing here
+    |
+661 |         if paragraph.text()? != *expected_text {
+    |                                 +
+
+error[E0599]: no method named `ok_or_else` found for enum `Result<T, E>` in the current scope
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:676:10
+    |
+674 |       let part = package
+    |  ________________-
+675 | |         .get_part(&PackURI::new(format!("/{name}"))?)
+676 | |         .ok_or_else(|| format!("output is missing OPC member {name}"))?;
+    | |_________-^^^^^^^^^^
+    |
+help: there is a method `or_else` with a similar name
+    |
+676 -         .ok_or_else(|| format!("output is missing OPC member {name}"))?;
+676 +         .or_else(|| format!("output is missing OPC member {name}"))?;
+    |
+
+Some errors have detailed explanations: E0277, E0283, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (example "managed_paragraph_batch_perf") due to 6 previous errors

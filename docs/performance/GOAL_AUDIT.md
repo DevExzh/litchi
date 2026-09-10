@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0500 targets managed paragraph batching; the full goal remains open
+
+[0500](changes/0500-managed-paragraph-batches.md) targets the managed refusal
+at the existing `Edit::replace_body_paragraph_texts` seam. The repeated
+baseline has 12 children, 720 measured samples, and 72 warmups; at 32 selected
+paragraphs, edit accounts for about 93% of the timed lifecycle. The candidate
+builds one source-checked final projection and preserves finite ownership,
+atomic failures, inverse proofs, and monotonic accounting. The 24-child after
+phase completes a 36-child, 2,160-measurement comparison. Against repeated
+scalar in the same final executable, K=32 lifecycle p50 improves 6.947–7.138x
+and edit p50 12.640–13.456x; K=8 lifecycle improves 2.324–2.346x. K=1 p128
+owned retains a 7.34% lifecycle flag, and p512 K=8 warm-file retains a 5.77%
+RSS flag. These are scoped API-choice results; CRUD-index promotion, native
+producers, controlled-cold behavior, one-percent coverage, and other goal
+areas remain open.
+
 ## Current audit: 0499 targets bounded Part worker lifetime; the full goal remains open
 
 [0499](changes/0499-operation-local-part-workers.md) reuses a bounded,

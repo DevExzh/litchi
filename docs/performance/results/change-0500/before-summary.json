@@ -1,0 +1,116 @@
+{
+  "scope": "formal baseline only; ideal bound assumes all edit cost disappears, not a forecast or measured speedup",
+  "children": 12,
+  "measured_samples": 720,
+  "warmup_samples": 72,
+  "rows": [
+    {
+      "name": "p128-k1-file-repeated",
+      "p50_us": 638.722,
+      "p95_us": 649.573,
+      "p99_us": 659.433,
+      "edit_share_of_total_timed_ns": 0.4290346112281823,
+      "ideal_upper_bound_if_edit_cost_zero": 1.7514196476095734,
+      "charged_work": 13326143
+    },
+    {
+      "name": "p128-k1-owned-repeated",
+      "p50_us": 650.082,
+      "p95_us": 668.532,
+      "p99_us": 673.072,
+      "edit_share_of_total_timed_ns": 0.4243684785621298,
+      "ideal_upper_bound_if_edit_cost_zero": 1.737222446578498,
+      "charged_work": 13326143
+    },
+    {
+      "name": "p128-k32-file-repeated",
+      "p50_us": 5919.412,
+      "p95_us": 5947.912,
+      "p99_us": 6250.203,
+      "edit_share_of_total_timed_ns": 0.9328417694907856,
+      "ideal_upper_bound_if_edit_cost_zero": 14.890207684414712,
+      "charged_work": 19744507
+    },
+    {
+      "name": "p128-k32-owned-repeated",
+      "p50_us": 5516.121,
+      "p95_us": 5543.091,
+      "p99_us": 5567.361,
+      "edit_share_of_total_timed_ns": 0.932018661195867,
+      "ideal_upper_bound_if_edit_cost_zero": 14.709919186516577,
+      "charged_work": 19744507
+    },
+    {
+      "name": "p128-k8-file-repeated",
+      "p50_us": 1530.175,
+      "p95_us": 1563.766,
+      "p99_us": 1568.525,
+      "edit_share_of_total_timed_ns": 0.7607970966191209,
+      "ideal_upper_bound_if_edit_cost_zero": 4.180551263659686,
+      "charged_work": 14109499
+    },
+    {
+      "name": "p128-k8-owned-repeated",
+      "p50_us": 1518.316,
+      "p95_us": 1536.956,
+      "p99_us": 1549.615,
+      "edit_share_of_total_timed_ns": 0.7524485413479274,
+      "ideal_upper_bound_if_edit_cost_zero": 4.039564159488453,
+      "charged_work": 14109499
+    },
+    {
+      "name": "p512-k1-file-repeated",
+      "p50_us": 2256.748,
+      "p95_us": 2277.189,
+      "p99_us": 2289.149,
+      "edit_share_of_total_timed_ns": 0.45317777454235175,
+      "ideal_upper_bound_if_edit_cost_zero": 1.82874790643902,
+      "charged_work": 207388991
+    },
+    {
+      "name": "p512-k1-owned-repeated",
+      "p50_us": 2214.499,
+      "p95_us": 2239.849,
+      "p99_us": 2273.919,
+      "edit_share_of_total_timed_ns": 0.4587236214214182,
+      "ideal_upper_bound_if_edit_cost_zero": 1.8474850179607853,
+      "charged_work": 207388991
+    },
+    {
+      "name": "p512-k32-file-repeated",
+      "p50_us": 17268.215,
+      "p95_us": 17556.815,
+      "p99_us": 17904.117,
+      "edit_share_of_total_timed_ns": 0.9291644670440413,
+      "ideal_upper_bound_if_edit_cost_zero": 14.117208670142144,
+      "charged_work": 219806971
+    },
+    {
+      "name": "p512-k32-owned-repeated",
+      "p50_us": 16696.953,
+      "p95_us": 16760.193,
+      "p99_us": 17057.174,
+      "edit_share_of_total_timed_ns": 0.9273983087015588,
+      "ideal_upper_bound_if_edit_cost_zero": 13.773783807450645,
+      "charged_work": 219806971
+    },
+    {
+      "name": "p512-k8-file-repeated",
+      "p50_us": 5367.89,
+      "p95_us": 5402.14,
+      "p99_us": 5440.781,
+      "edit_share_of_total_timed_ns": 0.7669565289439286,
+      "ideal_upper_bound_if_edit_cost_zero": 4.291044908781827,
+      "charged_work": 209527099
+    },
+    {
+      "name": "p512-k8-owned-repeated",
+      "p50_us": 5268.439,
+      "p95_us": 5310.61,
+      "p99_us": 5325.69,
+      "edit_share_of_total_timed_ns": 0.7715049751582737,
+      "ideal_upper_bound_if_edit_cost_zero": 4.37646290413841,
+      "charged_work": 209527099
+    }
+  ]
+}

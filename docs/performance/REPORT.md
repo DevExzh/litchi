@@ -1,5 +1,58 @@
 # Performance program phase report
 
+## 0500: managed source-backed paragraph batches; matched comparison complete
+
+[0500](changes/0500-managed-paragraph-batches.md) extends the format-owned
+`Edit::replace_body_paragraph_texts` operation to managed source-backed edits.
+The batch plans one final base-relative candidate for a canonical set of
+paragraphs, preserving source proofs, semantic readback, exact no-op/error
+atomicity, finite owner reservations, and staged operation composition. The
+isolated example compares this route with repeated scalar edits as explicit
+API choices.
+
+The repeated baseline contains 12 children, 720 measured samples, and 72
+warmups over 128/512-paragraph documents and 1/8/32 selected paragraphs. Edit
+accounts for 93.2–93.3% of the timed lifecycle at 32 selections on p128 and
+92.7–92.9% on p512. The completed after phase adds 24 children for repeated and
+batch routes, for 2,160 measured
+samples and 216 warmups in the combined evidence; output, source, budget, and
+preservation oracles pass.
+
+Batch versus repeated scalar in the same final executable is an explicit
+API-choice comparison. K=8 lifecycle p50 speedups are 2.346/2.324/2.341/2.342x
+and K=32 speedups are 6.997/6.947/7.088/7.138x for p128 owned/file and p512
+owned/file. K=32 edit-phase speedups are 12.640/12.737/13.363/13.456x.
+The p128 K=1 owned batch retains lifecycle p50/p95/mean increases of
+7.34%/5.61%/6.33% and output throughput −5.96%; p512 K=8 warm-file RSS is
++5.77%. Cross-route p512 warm-file RSS flags are +7.89% at K=8 and +5.83% at
+K=32. Historical scalar p512 K=8 p99 rises +6.72% owned and +15.31% warm-file;
+all repeat and phase flags remain in the evidence bundle.
+
+Six whole-child profiles include setup, route-specific preflights, and output
+verification. The p512 K=32 batch profile changes cycles/instructions/branches
+by −81.65%/−82.95%/−83.26% against repeated scalar, but these counters do not
+attribute edit-local CPU or allocation counts. The isolated warm synthetic
+corpus does not promote a CRUD index row or close native-producer,
+controlled-cold, one-percent, or full-goal requirements. Scoped validation is
+complete. The all-target default suite currently
+has 1,371 passing tests with no ignored tests; the all-features library suite
+has 946 passing with no ignored tests; doctests have 74 passing and 31 existing
+ignored; and warnings-denied rustdoc passes. The focused batch (8), managed
+scalar integration (36), and transaction (17) counts are independent subsets,
+not additions to those suite totals. Final formatting and all-target
+warnings-denied Clippy pass. The corrected downstream check,
+`--no-default-features --features docx --lib`, passes. The initial DOCX
+`--all-targets` attempt is retained as a feature-gating limitation:
+`comprehensive_docx_test` imports `litchi::ooxml_common`; enabling that path
+also exposes `core_props_office` imports from `litchi::pptx` and
+`litchi::xlsx`, whose features were disabled. These are example feature-gating
+limitations, not a production defect inference. No manifest edits were made,
+and this retained failure is not a candidate regression.
+
+Final cleanup removed 1,675,444,224 allocated bytes using unique device/inode
+accounting and retained two frozen replay binaries; the shared workspace target
+and 16 protected unrelated files were untouched.
+
 ## 0499: operation-local worker reuse for multi-wave Part batches
 
 [0499](changes/0499-operation-local-part-workers.md) keeps the explicit 0498

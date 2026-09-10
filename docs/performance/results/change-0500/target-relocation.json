@@ -1,0 +1,9 @@
+{
+  "logical_target": "/home/zhuhe/.cache/litchi-goal-0500/target",
+  "physical_target": "/tmp/litchi-goal-0500-target",
+  "reason": "shared root filesystem low on space; only owned build scratch moved to executable tmpfs",
+  "allocated_bytes_relocated": 797200384,
+  "elapsed_seconds": 0.30244970321655273,
+  "retained_binaries_and_fixture_paths_unchanged": true,
+  "block_count_scope": "sum per path before move; may count hard-linked files more than once; not an exact reclaimed-filesystem-byte measurement"
+}

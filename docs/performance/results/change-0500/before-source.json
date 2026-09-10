@@ -1,0 +1,8 @@
+{
+  "revision": "c797d04c7933e61356effcdccca8e81b430e0762",
+  "files": {
+    "crates/litchi-docx/src/document/transaction.rs": "890d5ae4df9a22a6c85ad65bbf7e50e34b751770010758af13c5ab6c09f41769",
+    "crates/litchi-docx/src/source_backed.rs": "0d3e29d545381ed39c41c81b32483afb619d1474e1be525ba484fa6584260ab6",
+    "Cargo.lock": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+  }
+}

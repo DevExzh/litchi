@@ -1,0 +1,103 @@
+{
+  "scope": "Worst individual samples identify observed phases; phase percentiles need not occur in the same sample. Shared-host order and whole-child RSS prevent isolated causal claims. No samples discarded or formal captures replaced.",
+  "cases": [
+    {
+      "phase": "before",
+      "workload": "p512-k8-owned-repeated",
+      "worst_sample": {
+        "repeat": 0,
+        "ordinal": 21,
+        "elapsed_ns": 5325690,
+        "open_ns": 26480,
+        "edit_ns": 4101655,
+        "commit_ns": 400,
+        "publish_ns": 1195595,
+        "drop_ns": 1290
+      }
+    },
+    {
+      "phase": "after",
+      "workload": "p512-k8-owned-repeated",
+      "worst_sample": {
+        "repeat": 1,
+        "ordinal": 5,
+        "elapsed_ns": 5683500,
+        "open_ns": 28730,
+        "edit_ns": 4107124,
+        "commit_ns": 420,
+        "publish_ns": 1545556,
+        "drop_ns": 1230
+      }
+    },
+    {
+      "phase": "before",
+      "workload": "p512-k8-file-repeated",
+      "worst_sample": {
+        "repeat": 1,
+        "ordinal": 10,
+        "elapsed_ns": 5440781,
+        "open_ns": 30240,
+        "edit_ns": 4144496,
+        "commit_ns": 480,
+        "publish_ns": 1263955,
+        "drop_ns": 1420
+      }
+    },
+    {
+      "phase": "after",
+      "workload": "p512-k8-file-repeated",
+      "worst_sample": {
+        "repeat": 1,
+        "ordinal": 4,
+        "elapsed_ns": 6273932,
+        "open_ns": 30121,
+        "edit_ns": 4130044,
+        "commit_ns": 550,
+        "publish_ns": 2111637,
+        "drop_ns": 1330
+      }
+    },
+    {
+      "phase": "before",
+      "workload": "p128-k1-owned-repeated",
+      "worst_sample": {
+        "repeat": 0,
+        "ordinal": 25,
+        "elapsed_ns": 673072,
+        "open_ns": 13790,
+        "edit_ns": 285441,
+        "commit_ns": 400,
+        "publish_ns": 372381,
+        "drop_ns": 800
+      }
+    },
+    {
+      "phase": "after",
+      "workload": "p128-k1-owned-repeated",
+      "worst_sample": {
+        "repeat": 0,
+        "ordinal": 2,
+        "elapsed_ns": 620482,
+        "open_ns": 12810,
+        "edit_ns": 289141,
+        "commit_ns": 300,
+        "publish_ns": 317271,
+        "drop_ns": 780
+      }
+    },
+    {
+      "phase": "after",
+      "workload": "p128-k1-owned-batch",
+      "worst_sample": {
+        "repeat": 1,
+        "ordinal": 4,
+        "elapsed_ns": 651212,
+        "open_ns": 13300,
+        "edit_ns": 279841,
+        "commit_ns": 370,
+        "publish_ns": 356681,
+        "drop_ns": 810
+      }
+    }
+  ]
+}

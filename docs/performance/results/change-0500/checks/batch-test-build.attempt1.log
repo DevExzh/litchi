@@ -1,0 +1,30 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: unused import: `Write`
+  --> crates/litchi-docx/tests/source_backed_managed_paragraph_batch.rs:10:21
+   |
+10 | use std::io::{self, Write};
+   |                     ^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error[E0382]: use of moved value: `reopened`
+    --> crates/litchi-docx/tests/source_backed_managed_paragraph_batch.rs:315:10
+     |
+ 307 |     let (inverse_budget, _inverse_cancel, reopened) = managed(output.clone());
+     |                                           -------- move occurs because `reopened` has type `litchi_docx::source_backed::Package`, which does not implement the `Copy` trait
+...
+ 310 |         .publish_document_inverse_to_stream(&mut restored, &publication)
+     |          --------------------------------------------------------------- `reopened` moved due to this method call
+...
+ 315 |     drop(reopened);
+     |          ^^^^^^^^ value used here after move
+     |
+note: `litchi_docx::source_backed::Package::publish_document_inverse_to_stream` takes ownership of the receiver `self`, which moves `reopened`
+    --> crates/litchi-docx/src/source_backed.rs:1406:9
+     |
+1406 |         self,
+     |         ^^^^
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-docx` (test "source_backed_managed_paragraph_batch") due to 2 previous errors
