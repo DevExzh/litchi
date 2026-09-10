@@ -1,0 +1,107 @@
+{
+  "integration_base": "fa29f97deb6974ec4d2567f20cd02b299dca2ca5",
+  "source_sha256": {
+    "crates/litchi-pptx/src/lib.rs": "1b9974de5b8f0251098e8a49f89ece73c05489ee28a800f5d5965e5283a69640",
+    "crates/litchi-pptx/src/presentation/mod.rs": "89b4c7d7a0e350820afb9479dbe3f7fc6e945e013f9f113b4ff71c01dc8b9b53",
+    "crates/litchi-pptx/src/presentation/source.rs": "b545c1c343dc91dfbc120df7ed8360044f9b9ddb8776d3342195fdcbbf19edc7",
+    "crates/litchi-pptx/tests/source_backed_svg_transaction.rs": "c8eef321fd01ec35d8bc4ec5764472df8523550ee7e6acbd1fcbb3120115c54c"
+  },
+  "root_test_counts": {
+    "passed": 954,
+    "failed": 0,
+    "ignored": 2,
+    "targets": 77
+  },
+  "archives": {
+    "root-integration.json.gz": {
+      "raw_sha256": "6f13960ce88605b3e021fb83b43c03998bab3f30b0e87972d8afb50eb30fd45e",
+      "gzip_sha256": "6df9217d20a841c28b1ad4d780ddf00d4288aee0056037e207871fbe8cc165f1"
+    },
+    "root-gates.json.gz": {
+      "raw_sha256": "458549d06895d91c7d231475e8a3ce78299511025c56e38819788e16997242f4",
+      "gzip_sha256": "66942b44b2f3b7796b18ad222b056d2d7e481b7a6c48ac5932cdc5a605b282ea"
+    },
+    "root-test-counts.json.gz": {
+      "raw_sha256": "e8c44416ea29876c6ff7667a37ffcfb9462ab037768242e9abd5051d441edab2",
+      "gzip_sha256": "1e052baa1801892dab54ec2ce544f5786adbc9587cb92611b6de418e04c94f8a"
+    },
+    "root-source-after.json.gz": {
+      "raw_sha256": "6ab93a32876642f27bc373249ce09c74c2cddea6376f365eb067dedf6afdac40",
+      "gzip_sha256": "76d4357dfdaba5d9adaded9a95d992080af70bc7598ddaa1cfdff4ec39aed206"
+    },
+    "root-build-environment.json.gz": {
+      "raw_sha256": "118815a17dcce8e09a97977e366dffb84d21d8cc0c060e37f6d5bc32cf2bd143",
+      "gzip_sha256": "fe83e0108996a47ea7fe6097cf27030787a456bab7972f37ba5fcefd51be6ce6"
+    },
+    "root-test.log.gz": {
+      "raw_sha256": "252f4f5816c487506625614663fa8a53e6ed7931178664d8cf69432cbf9ff34a",
+      "gzip_sha256": "8f98c19095d0af65ba912cfbacc67ed73b22306ce26cda61d616a5de9770f0bc"
+    },
+    "root-clippy.log.gz": {
+      "raw_sha256": "815f29e3690ec31e12b57aaca2dc77b7155f888d9261a0002abedcb28a5a0ccb",
+      "gzip_sha256": "757d5003b4f10dad99f58bea41579b01c3fec22d9ee449fbc7de4f9c04b02bea"
+    },
+    "root-rustdoc.log.gz": {
+      "raw_sha256": "f7a3c2879591fb84162c0a075dae3ce44cc6160875525e4202c02d0dea52d6f5",
+      "gzip_sha256": "004f2aebd03426728988c4ac01f41fdb358a106959441b45f1be328b97c4647d"
+    },
+    "root-rustfmt.log.gz": {
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    "author-README.md.gz": {
+      "raw_sha256": "e4ca78b51475155d466a3263de07dd14900b740cdbf7a9f33944f67731fed1a4",
+      "gzip_sha256": "42763c1b52a4019752b7cb134d8a231078f5025be947fcfacea9e0aa8815813e"
+    },
+    "author-logs-clippy.log.gz": {
+      "raw_sha256": "ebc88fee85e12bc02be8480f8b9f7994a0925537ef82e723865f469a2c6bfe1c",
+      "gzip_sha256": "c863e8b229c37f0c1e7866898549abfd786e90ae64f1c36727d39838f7449f1b"
+    },
+    "author-logs-focused.log.gz": {
+      "raw_sha256": "94976689f447d2159463fbc551dc503735d6467c0d5a390c497053fd842f903e",
+      "gzip_sha256": "977277e95bc8339f6f61aa6be3ac1d9851818f99748559d82c7f9cd44a8a1828"
+    },
+    "author-logs-full-tests.log.gz": {
+      "raw_sha256": "2d9482dbd4f99fb2518c65d8147f3056b61b418396ac45af6c70ebe978e35eb3",
+      "gzip_sha256": "ca120c8ec9d0da70a2cb7851f6fdf90b6bd99638449f726c273ece9a0de9d734"
+    },
+    "author-logs-rustdoc.log.gz": {
+      "raw_sha256": "2f5f229ff669040bfa91e5fa3dd5883588ef112f03e054f1162dc366e716d3da",
+      "gzip_sha256": "96110f96bb9c4b1e8819769ba096e62a757574f7b07aaf39a952d9cb7168a892"
+    },
+    "author-manifest.json.gz": {
+      "raw_sha256": "b1221a6dd01e3843f4e80f5d4d56ba80b1b703816d94cc24aa9216ffe1e6972b",
+      "gzip_sha256": "1d8a375e760737c2d55c69fc83a132d058b68f81cc57269d41621f8b5111647b"
+    },
+    "author-source-delta.patch.gz": {
+      "raw_sha256": "ee6c9a59dd59d14265b1213a7a1a50b476b6991158b3ca7954a01aefcfa025f5",
+      "gzip_sha256": "716095ee1cbaccebe90cec4027ef4d60b16b1855b148147b262d876ddcfa6fe8"
+    },
+    "independent-review.json.gz": {
+      "raw_sha256": "f3a6249628db143c41edcd9578e006e3a035fe3edb58250ed086f1d922015fa8",
+      "gzip_sha256": "f1539f671c84af20730c835b2c24be36c9fafc6b87e477db29e36b8f510c7d2b"
+    },
+    "prior-v1-rejection.json.gz": {
+      "raw_sha256": "625e90231bf9d7647fe5fe9e204601336517a2c0f0aea72880b813e12f87c9a6",
+      "gzip_sha256": "967428c301fea7669d075863455b0b03f8605c7c524ad9d93f932407d72b4ba8"
+    },
+    "independent-probe-Cargo.toml.gz": {
+      "raw_sha256": "01c0cf2a336842527f7a5ffb9a8ac020255e53bb47fdfe1744d68903aa4e2f4c",
+      "gzip_sha256": "4043bd48cd0a3e5a6a085c458fa4d859d1d62fc0d2952241447349504dfe69f7"
+    },
+    "independent-probe-Cargo.lock.gz": {
+      "raw_sha256": "998347365096cdb905cd1c9ddcc987066ccefad8ad48d71a321ef7e715648f35",
+      "gzip_sha256": "d6212416607ef0bb321d6ebd9c0568b615ee96d32e66f9dfef8f660f2a882228"
+    },
+    "independent-probe-src-lib.rs.gz": {
+      "raw_sha256": "31fa885f698e79038082ebc50ab25633ecf093f74f88faecbb371b43e244a204",
+      "gzip_sha256": "525278e5b4402d3ab9282657c17f69485b8c33341314982f0cd96962ee683174"
+    },
+    "independent-probe-public-tests-final.log.gz": {
+      "raw_sha256": "71e4ae8e4f0f7df6c06f273f473b4ab2a32a4edb4158743c4eaf357d15e8b72e",
+      "gzip_sha256": "73c064b881ec283183d3b17454b34eacb46997a3d7e90baf7f745353f7fbea30"
+    }
+  },
+  "scope": "Source-bound replacement and retargeting of existing PPTX SVG/PNG media, including graph add/remove closure. General picture shape CRUD and SVG attach/detach remain outside this batch.",
+  "review_observation_note": "Review observed sibling /home/zhuhe/code/litchi as primary; root independently verified all four actual integration preimages and gated the current integration base."
+}
