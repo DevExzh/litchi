@@ -98,6 +98,32 @@ class PerfCorpusBindingTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             validate_binding(self.report, catalog)
 
+    def test_content_id_prefix_mismatch_is_rejected_after_rehashing(self) -> None:
+        catalog = copy.deepcopy(self.catalog)
+        original_id = catalog["corpora"][0]["id"]
+        archive_sha256 = original_id.split(":sha256:", 1)[1]
+        replacement_id = f"wrong-format:sha256:{archive_sha256}"
+        catalog["corpora"][0]["id"] = replacement_id
+        for binding in catalog["case_bindings"]:
+            if binding["corpus_id"] == original_id:
+                binding["corpus_id"] = replacement_id
+        _refresh_hashes(catalog)
+        report = copy.deepcopy(self.report)
+        report["corpus_catalog"].update(
+            {
+                "catalog_sha256": catalog["catalog_sha256"],
+                "content_set_sha256": catalog["content_set_sha256"],
+            }
+        )
+        with self.assertRaisesRegex(ValidationError, "does not match package_format"):
+            validate_binding(report, catalog)
+
+    def test_empty_normalized_package_format_is_rejected(self) -> None:
+        report = copy.deepcopy(self.report)
+        report["results"][0]["corpus"]["package_format"] = "!!!"
+        with self.assertRaisesRegex(ValidationError, "ASCII letter or digit"):
+            validate_binding(report, self.catalog)
+
     def test_report_reference_tampering_is_rejected(self) -> None:
         report = copy.deepcopy(self.report)
         report["corpus_catalog"]["content_set_sha256"] = "0" * 64

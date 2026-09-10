@@ -23,6 +23,12 @@ Every corpus has a content-addressed ID:
 <normalized-package-format>:sha256:<lowercase archive SHA-256>
 ```
 
+The package-format slug lowercases ASCII letters and digits and collapses each
+run of other characters to one hyphen before trimming edge hyphens.  It must
+contain at least one ASCII letter or digit.  Rust and Python validators require
+the complete ID to equal that normalized slug plus the exact archive hash; a
+matching hash suffix alone is insufficient.
+
 The archive hash is over the exact input bytes.  Member hashes, when available,
 are over logical member bytes; malformed or unparseable inputs may use
 `members.status = "unavailable"` while retaining the raw archive hash.
