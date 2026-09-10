@@ -11605,3 +11605,41 @@ its UUID binding but does not reuse its allocated identifier. The tests require
 the expected watermark advance, restoration of the original registry, and
 whole-package byte equality after normalizing only that watermark in a test
 copy. Unrelated bytes remain protected.
+
+## 2026-09-10 Remove unused host reference extraction
+
+After table-reader retirement, the only production consumers of the host
+`ObjectIndex` are document statistics and chart metadata. Both need object
+locations and message types, not graph edges. The host reference-extraction
+module, authoritative-header edge ingestion, graph query helpers, and their
+private graph-only tests are therefore deleted. This is a physical-only
+catalog retirement, not a replacement generic reference decoder.
+
+All existing physical validation remains: nonzero and unique object identities,
+checked byte spans, source-position binding, metadata cardinality, fallible
+reservations, deterministic archive ordering, and stale-snapshot refusal.
+Native Pages, Numbers, and Keynote chart controls assert titles, series and
+category labels, chart kind, object/archive/message counts, and snapshot
+read parity. No new supported API exposes archive identities.
+
+Surviving wire contracts retain focused coverage in `keynote_show_codec`,
+`drawable_parent_codec`, `drawable_container_codec`, `comment_storage_codec`,
+`numbers_table_cell_storage_codec`, and shared table-data-list tests. Generic
+graph tests remain in the neutral index/graph crates. The TSWP stylesheet and
+TSCH mediator scanners existed only to supply the retired host graph; their
+fallback-specific edge tests are retired with that unconsumed behavior, not
+claimed as newly migrated codecs. Concrete format ownership checks remain
+unchanged.
+
+The boundary ratchet rejects restoration of the deleted module, its module
+declaration or call path, and stale build provenance. The focused Buffa codec
+checks remain independent. The host's index dependency still has other users,
+so this change does not remove or renumber a dependency-debt entry.
+
+Native verification used scratch copies of `chart-arrangement-native.pages`,
+`chart-arrangement-native.numbers`, and `chart-caption-native.key`. All three
+were opened, saved, closed, and reopened in their applications. Pages retained
+its named chart and Region 1/Region 2 series; Numbers retained its named chart
+and North/South series; Keynote retained the untitled chart and its two region
+series. Native accessibility readback confirmed April data points of 17 and
+55. Repository fixtures were not modified.

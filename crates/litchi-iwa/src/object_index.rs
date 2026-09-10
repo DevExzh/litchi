@@ -1,8 +1,8 @@
-//! Object Index for Cross-Referencing in iWork Documents
+//! Object index for IWA object locations in iWork documents.
 //!
-//! iWork documents contain an object index that maps object IDs to their
-//! locations in IWA files. This allows objects to reference each other
-//! across different archive files.
+//! iWork documents store object identifiers and byte locations in IWA files.
+//! This adapter validates that physical index while retaining borrowed access
+//! to the parsed archive payloads.
 
 use std::collections::HashMap;
 #[cfg(test)]
@@ -12,14 +12,10 @@ use std::sync::Arc;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
 use crate::{Error, Result};
-#[cfg(test)]
-use litchi_iwa_index::Reference;
 use litchi_iwa_index::{
     ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectId, ObjectIndex as NeutralObjectIndex,
     ObjectRecord,
 };
-
-mod reference_extraction;
 
 /// Adapter-only source metadata for one neutral object record.
 ///
@@ -65,10 +61,10 @@ struct PendingObjectMetadata {
 
 /// Typed borrowed metadata for one indexed object.
 ///
-/// The neutral location snapshot owns the immutable object record and graph;
-/// this view borrows that record and combines it with only the archive adapter
-/// metadata needed to resolve a validated source position. No neutral
-/// identity, fragment, or byte-span value is duplicated in the adapter.
+/// The neutral location snapshot owns the immutable object record; this view
+/// borrows that record and combines it with only the archive adapter metadata
+/// needed to resolve a validated source position. No neutral identity,
+/// fragment, or byte-span value is duplicated in the adapter.
 #[derive(Debug, Clone, Copy)]
 pub struct ObjectIndexEntry<'a> {
     record: &'a ObjectRecord,
@@ -144,10 +140,10 @@ impl std::fmt::Debug for IndexSnapshot {
 
 /// Object index that maps object IDs to their locations.
 ///
-/// Archive decoding remains in this adapter, while immutable location and
-/// graph storage is delegated to [`litchi_iwa_index::ObjectIndex`]. The
-/// adapter retains only the metadata needed to resolve a validated source
-/// position back into the already parsed archive.
+/// Archive decoding remains in this adapter, while immutable location storage
+/// is delegated to [`litchi_iwa_index::ObjectIndex`]. The adapter retains only
+/// the metadata needed to resolve a validated source position back into the
+/// already parsed archive.
 #[derive(Debug, Clone)]
 pub struct ObjectIndex {
     snapshot: Arc<IndexSnapshot>,
@@ -288,11 +284,6 @@ impl ObjectIndex {
         for record in self.snapshot.locations.objects() {
             builder.add_object(*record).map_err(index_error)?;
         }
-        for reference in self.snapshot.locations.references() {
-            builder
-                .add_reference(reference.source(), reference.target())
-                .map_err(index_error)?;
-        }
 
         let fragment_id = fragment_id(self.snapshot.fragments.len())?;
         builder.add_fragment(fragment_id).map_err(index_error)?;
@@ -376,16 +367,6 @@ impl ObjectIndex {
         self.snapshot.locations.objects().map(ObjectRecord::id)
     }
 
-    /// Get all indexed object identities in deterministic numeric order.
-    ///
-    /// This is an owned convenience collection over [`Self::iter_object_ids`].
-    /// The index invariants make the operation infallible; callers that only
-    /// need to inspect the catalog should prefer the borrowed iterator.
-    #[cfg(test)]
-    pub fn object_ids(&self) -> Vec<ObjectId> {
-        self.iter_object_ids().collect()
-    }
-
     /// Borrow typed object identities for one fragment in deterministic ID order.
     ///
     /// The identities are validated while the index is built, so this view
@@ -429,69 +410,6 @@ impl ObjectIndex {
     ) -> impl Iterator<Item = ObjectIndexEntry<'_>> {
         self.iter_entries()
             .filter(move |entry| entry.object_type() == object_type)
-    }
-
-    /// Collect all entries in deterministic numeric object-ID order.
-    #[cfg(test)]
-    pub fn all_entries(&self) -> Vec<ObjectIndexEntry<'_>> {
-        self.iter_entries().collect()
-    }
-
-    /// Find objects by type in deterministic numeric object-ID order.
-    #[cfg(test)]
-    pub fn find_objects_by_type(&self, object_type: u32) -> Vec<ObjectIndexEntry<'_>> {
-        self.iter_entries_by_type(object_type).collect()
-    }
-
-    /// Get typed dependencies without exposing raw sentinel IDs.
-    #[cfg(test)]
-    pub fn dependencies(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
-        self.snapshot.locations.outgoing(object_id)
-    }
-
-    /// Get typed dependents without exposing raw sentinel IDs.
-    #[cfg(test)]
-    pub fn dependents(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
-        self.snapshot.locations.incoming(object_id)
-    }
-
-    /// Borrow every indexed edge as a validated typed reference.
-    ///
-    /// Graph storage and native identifiers remain private to the adapter and
-    /// neutral index; callers receive only the stable semantic edge values.
-    #[cfg(test)]
-    pub fn references(&self) -> impl Iterator<Item = Reference> + '_ {
-        self.snapshot.locations.references()
-    }
-
-    /// Check for a cycle through the validated identity API.
-    #[cfg(test)]
-    pub fn has_cycle_from(&self, object_id: ObjectId) -> bool {
-        self.snapshot.locations.has_cycle(object_id)
-    }
-
-    /// Get all objects reachable from the given object
-    ///
-    /// Performs breadth-first traversal to find all transitively referenced objects.
-    /// Useful for extracting complete sub-documents or determining what needs
-    /// to be loaded to fully resolve an object.
-    ///
-    /// # Arguments
-    ///
-    /// * `object_id` - The starting object ID
-    ///
-    /// # Returns
-    ///
-    /// Vector of all reachable object IDs (including the start object)
-    ///
-    /// # Performance
-    ///
-    /// O(V + E) where V is vertices and E is edges in the reachable subgraph
-    ///
-    /// Get typed transitive dependencies, including the starting object.
-    #[cfg(test)]
-    pub fn reachable_from(&self, object_id: ObjectId) -> Vec<ObjectId> {
-        self.snapshot.locations.reachable(object_id)
     }
 
     /// Borrow a protobuf wire identifier for crate-internal readers.
@@ -677,12 +595,6 @@ impl ObjectIndex {
         Ok(resolved_slots)
     }
 
-    /// Check for an indexed object through the validated identity API.
-    #[cfg(test)]
-    pub fn contains(&self, object_id: ObjectId) -> bool {
-        self.snapshot.locations.object(object_id).is_some()
-    }
-
     /// Get the total number of indexed objects
     pub fn object_count(&self) -> usize {
         self.snapshot.locations.len()
@@ -822,37 +734,8 @@ fn append_archive(
             source_position: ArchiveObjectPosition::new(object_position),
             object_type,
         });
-
-        // MessageInfo is the authoritative, application-independent
-        // reference index emitted by iWork for every payload.
-        let mut has_indexed_references = false;
-        for message_info in &object.archive_info.message_infos {
-            has_indexed_references |= !message_info.object_references.is_empty();
-            for &reference in &message_info.object_references {
-                if let Some(target_id) = ObjectId::new(reference) {
-                    add_reference_if_absent(builder, object_id, target_id)?;
-                }
-            }
-        }
-
-        // Some old archives omit MessageInfo references. Decode only
-        // unambiguous high-numbered payloads as a compatibility fallback;
-        // low message types overlap between Numbers and Keynote.
-        if !has_indexed_references && object_type >= 2000 {
-            reference_extraction::extract(object_id, object, builder)?;
-        }
     }
     Ok(())
-}
-
-fn add_reference_if_absent(
-    builder: &mut IndexBuilder,
-    source: ObjectId,
-    target: ObjectId,
-) -> Result<bool> {
-    builder
-        .add_reference_if_absent(source, target)
-        .map_err(index_error)
 }
 
 fn finish_snapshot(
@@ -1006,10 +889,6 @@ impl ResolvedObjectRef<'_> {
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
-    use crate::protobuf::tp::{DocumentArchive, SectionArchive, SectionTemplateArchive};
-    use crate::protobuf::tsp::Reference;
-    use crate::protobuf::tst::{self, TableDataList, TableDataListSegment};
-    use prost::Message;
 
     #[test]
     fn test_object_index_creation() {
@@ -1312,124 +1191,35 @@ mod tests {
     }
 
     #[test]
-    fn test_object_index_with_typed_graph_queries() {
-        let index = ObjectIndex::new();
-        let object_id = ObjectId::try_from(1).unwrap();
-
-        assert_eq!(index.references().next(), None);
-        assert!(index.dependencies(object_id).is_none());
-        assert!(index.dependents(object_id).is_none());
-        assert!(!index.has_cycle_from(object_id));
-        assert_eq!(index.reachable_from(object_id), vec![object_id]);
-    }
-
-    #[test]
-    fn indexes_authoritative_message_info_references() {
-        let mut object = ArchiveObject::new(
-            10,
-            vec![RawMessage {
-                type_: 42,
-                data: Vec::new(),
-            }],
-        )
-        .unwrap();
-        object.archive_info.message_infos[0].object_references = vec![0, 30, 20, 30, 0];
-        let archive = Archive {
-            objects: vec![object],
-        };
-        let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Test.iwa", &archive).unwrap();
-
-        let source = ObjectId::try_from(10).unwrap();
-        let target = ObjectId::try_from(20).unwrap();
-        assert_eq!(
-            index
-                .dependencies(source)
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![target, ObjectId::try_from(30).unwrap()])
-        );
-        assert_eq!(
-            index
-                .dependents(target)
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![source])
-        );
-        assert_eq!(index.snapshot.locations.reference_count(), 2);
-    }
-
-    #[test]
-    fn authoritative_null_only_references_suppress_legacy_fallback() {
-        let table_data = TableDataList {
-            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
-            entries: Vec::new(),
-            segments: vec![Reference {
-                identifier: 20,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-        let mut object = ArchiveObject::new(
-            10,
-            vec![RawMessage {
-                type_: 6005,
-                data: table_data.encode_to_vec(),
-            }],
-        )
-        .unwrap();
-        object.archive_info.message_infos[0].object_references = vec![0];
-
-        let archive = Archive {
-            objects: vec![object],
-        };
-        let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Test.iwa", &archive).unwrap();
-
-        assert!(
-            index
-                .dependencies(ObjectId::try_from(10).unwrap())
-                .is_none()
-        );
-        assert_eq!(index.snapshot.locations.reference_count(), 0);
-    }
-
-    #[test]
-    fn fallback_deduplicates_repeated_payload_references() {
-        let repeated = Reference {
-            identifier: 20,
-            ..Default::default()
-        };
-        let table_data = TableDataList {
-            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
-            entries: Vec::new(),
-            segments: vec![repeated, repeated],
-            ..Default::default()
-        };
+    fn malformed_high_message_payload_does_not_block_physical_index() {
         let object = ArchiveObject::new(
             10,
             vec![RawMessage {
                 type_: 6005,
-                data: table_data.encode_to_vec(),
+                data: vec![0x80, 0xff, 0x00],
             }],
         )
         .unwrap();
-        let archive = Archive {
-            objects: vec![object],
-        };
         let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Test.iwa", &archive).unwrap();
 
-        assert_eq!(
-            index
-                .dependencies(ObjectId::try_from(10).unwrap())
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![ObjectId::try_from(20).unwrap()])
-        );
-        assert_eq!(index.snapshot.locations.reference_count(), 1);
+        index
+            .parse_archive(
+                "Index/Test.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
+
+        let entry = index.entry(ObjectId::try_from(10).unwrap()).unwrap();
+        assert_eq!(entry.id().get(), 10);
+        assert_eq!(entry.object_type(), 6005);
+        assert_eq!(index.object_count(), 1);
     }
 
     #[test]
     fn typed_object_index_queries_preserve_order_and_identity() {
-        let mut object = ArchiveObject::new(
+        let object = ArchiveObject::new(
             10,
             vec![RawMessage {
                 type_: 42,
@@ -1437,7 +1227,6 @@ mod tests {
             }],
         )
         .unwrap();
-        object.archive_info.message_infos[0].object_references = vec![20, 30, 20];
         let archive = Archive {
             objects: vec![object],
         };
@@ -1445,34 +1234,18 @@ mod tests {
         index.parse_archive("Index/Test.iwa", &archive).unwrap();
 
         let source = ObjectId::try_from(10).unwrap();
-        let target = ObjectId::try_from(20).unwrap();
 
         assert_eq!(index.entry(source).map(|entry| entry.id()), Some(source));
         let entry = index.entry(source).unwrap();
         assert_eq!(entry.fragment_id(), FragmentId::try_from(1).unwrap());
         assert_eq!(entry.span(), ByteSpan::new(0, 0).unwrap());
         assert_eq!(entry.object_type(), 42);
-        assert_eq!(index.object_ids(), vec![source]);
         assert_eq!(index.iter_object_ids().collect::<Vec<_>>(), vec![source]);
         assert_eq!(
             index.fragment_object_ids("Index/Test.iwa"),
             Some([source].as_slice())
         );
         assert_eq!(index.fragment_object_ids("missing.iwa"), None);
-        assert_eq!(
-            index.dependencies(source).unwrap().collect::<Vec<_>>(),
-            vec![target, ObjectId::try_from(30).unwrap()]
-        );
-        assert_eq!(
-            index.dependents(target).unwrap().collect::<Vec<_>>(),
-            vec![source]
-        );
-        assert_eq!(
-            index.reachable_from(source),
-            vec![source, target, ObjectId::try_from(30).unwrap()]
-        );
-        assert!(!index.has_cycle_from(source));
-        assert!(index.contains(source));
     }
 
     #[test]
@@ -1506,14 +1279,6 @@ mod tests {
         );
         assert_eq!(
             index
-                .all_entries()
-                .into_iter()
-                .map(|entry| entry.id().get())
-                .collect::<Vec<_>>(),
-            vec![10, 20, 30]
-        );
-        assert_eq!(
-            index
                 .iter_entries()
                 .map(|entry| entry.id().get())
                 .collect::<Vec<_>>(),
@@ -1522,14 +1287,6 @@ mod tests {
         assert_eq!(
             index
                 .iter_entries_by_type(7)
-                .map(|entry| entry.id().get())
-                .collect::<Vec<_>>(),
-            vec![10, 30]
-        );
-        assert_eq!(
-            index
-                .find_objects_by_type(7)
-                .into_iter()
                 .map(|entry| entry.id().get())
                 .collect::<Vec<_>>(),
             vec![10, 30]
@@ -1656,57 +1413,6 @@ mod tests {
     }
 
     #[test]
-    fn bundle_index_builds_reverse_references_in_archive_name_order() {
-        let mut first = ArchiveObject::new(
-            1,
-            vec![RawMessage {
-                type_: 41,
-                data: Vec::new(),
-            }],
-        )
-        .unwrap();
-        first.archive_info.message_infos[0].object_references = vec![3];
-        let mut second = ArchiveObject::new(
-            2,
-            vec![RawMessage {
-                type_: 42,
-                data: Vec::new(),
-            }],
-        )
-        .unwrap();
-        second.archive_info.message_infos[0].object_references = vec![3];
-
-        let mut package = crate::IWorkPackage::new();
-        package
-            .replace_archive(
-                "Index/Z.iwa",
-                &Archive {
-                    objects: vec![second],
-                },
-            )
-            .unwrap();
-        package
-            .replace_archive(
-                "Index/A.iwa",
-                &Archive {
-                    objects: vec![first],
-                },
-            )
-            .unwrap();
-        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
-        let index = ObjectIndex::from_bundle(&bundle).unwrap();
-
-        let target = ObjectId::try_from(3).unwrap();
-        assert_eq!(
-            index.dependents(target).unwrap().collect::<Vec<_>>(),
-            vec![
-                ObjectId::try_from(1).unwrap(),
-                ObjectId::try_from(2).unwrap()
-            ]
-        );
-    }
-
-    #[test]
     fn rejects_object_ids_repeated_across_archives() {
         let object = |message_type| {
             ArchiveObject::new(
@@ -1827,175 +1533,6 @@ mod tests {
             .unwrap_err();
         assert!(
             matches!(error, Error::Archive(message) if message.contains("without an identifier"))
-        );
-    }
-
-    #[test]
-    fn fallback_indexes_segmented_table_data_list_references() {
-        let root = TableDataList {
-            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
-            next_list_id: 2,
-            entries: Vec::new(),
-            segments: vec![Reference {
-                identifier: 20,
-                ..Default::default()
-            }],
-            is_new_for_bnc: Some(true),
-        };
-        let segment = TableDataListSegment {
-            list_type: root.list_type,
-            key_range: crate::protobuf::tsp::Range {
-                location: 1,
-                length: 1,
-            },
-            entries: vec![tst::table_data_list::ListEntry {
-                key: 1,
-                refcount: 1,
-                rich_text_payload: Some(Reference {
-                    identifier: 30,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }],
-        };
-        let archive = Archive {
-            objects: vec![
-                ArchiveObject::new(
-                    10,
-                    vec![RawMessage {
-                        type_: 6005,
-                        data: root.encode_to_vec(),
-                    }],
-                )
-                .unwrap(),
-                ArchiveObject::new(
-                    20,
-                    vec![RawMessage {
-                        type_: 6011,
-                        data: segment.encode_to_vec(),
-                    }],
-                )
-                .unwrap(),
-            ],
-        };
-        let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Test.iwa", &archive).unwrap();
-        assert_eq!(
-            index
-                .dependencies(ObjectId::try_from(10).unwrap())
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![ObjectId::try_from(20).unwrap()])
-        );
-        assert_eq!(
-            index
-                .dependencies(ObjectId::try_from(20).unwrap())
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![ObjectId::try_from(30).unwrap()])
-        );
-    }
-
-    #[test]
-    fn fallback_indexes_comment_author_and_replies() {
-        let comment = crate::protobuf::tsd::CommentStorageArchive {
-            author: Some(Reference {
-                identifier: 20,
-                ..Default::default()
-            }),
-            replies: vec![Reference {
-                identifier: 30,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-        let archive = Archive {
-            objects: vec![
-                ArchiveObject::new(
-                    10,
-                    vec![RawMessage {
-                        type_: 3056,
-                        data: comment.encode_to_vec(),
-                    }],
-                )
-                .unwrap(),
-            ],
-        };
-        let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Comments.iwa", &archive).unwrap();
-        assert_eq!(
-            index
-                .dependencies(ObjectId::try_from(10).unwrap())
-                .map(|references| references.collect::<Vec<_>>()),
-            Some(vec![
-                ObjectId::try_from(20).unwrap(),
-                ObjectId::try_from(30).unwrap()
-            ])
-        );
-    }
-
-    #[test]
-    fn pages_fallback_indexes_document_section_and_template_graph() {
-        let reference = |identifier| Reference {
-            identifier,
-            ..Default::default()
-        };
-        let document = DocumentArchive {
-            body_storage: Some(reference(42)),
-            section: Some(reference(43)),
-            theme: Some(reference(44)),
-            page_templates: vec![reference(45)],
-            ..Default::default()
-        };
-        let section = SectionArchive {
-            first_section_template_page: Some(reference(50)),
-            even_section_template_page: Some(reference(51)),
-            odd_section_template_page: Some(reference(52)),
-            user_defined_guide_storage: Some(reference(53)),
-            ..Default::default()
-        };
-        let template = SectionTemplateArchive {
-            headers: vec![reference(60)],
-            footers: vec![reference(61)],
-            section_template_drawables: vec![reference(62)],
-            ..Default::default()
-        };
-        let object = |identifier, type_, data| {
-            ArchiveObject::new(identifier, vec![RawMessage { type_, data }]).unwrap()
-        };
-        let archive = Archive {
-            objects: vec![
-                object(1, 10000, document.encode_to_vec()),
-                object(43, 10011, section.encode_to_vec()),
-                object(50, 10143, template.encode_to_vec()),
-            ],
-        };
-        let mut index = ObjectIndex::new();
-        index.parse_archive("Index/Document.iwa", &archive).unwrap();
-
-        let document_dependencies = index
-            .dependencies(ObjectId::try_from(1).unwrap())
-            .unwrap()
-            .collect::<Vec<_>>();
-        for identifier in [42, 43, 44, 45] {
-            assert!(document_dependencies.contains(&ObjectId::try_from(identifier).unwrap()));
-        }
-        let section_dependencies = index
-            .dependencies(ObjectId::try_from(43).unwrap())
-            .unwrap()
-            .collect::<Vec<_>>();
-        for identifier in [50, 51, 52, 53] {
-            assert!(section_dependencies.contains(&ObjectId::try_from(identifier).unwrap()));
-        }
-        let template_dependencies = index
-            .dependencies(ObjectId::try_from(50).unwrap())
-            .unwrap()
-            .collect::<Vec<_>>();
-        assert_eq!(
-            template_dependencies,
-            [
-                ObjectId::try_from(60).unwrap(),
-                ObjectId::try_from(61).unwrap(),
-                ObjectId::try_from(62).unwrap()
-            ]
         );
     }
 }

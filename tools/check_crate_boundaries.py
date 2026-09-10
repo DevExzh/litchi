@@ -15687,6 +15687,30 @@ IWA_PAGES_DRAWABLE_ORDER_READ_TYPE_ALIAS = re.compile(
 IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE = Path(
     "crates/litchi-iwa/src/object_index/reference_extraction.rs"
 )
+IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_SOURCE = IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE
+IWA_OBJECT_INDEX_SOURCE = Path("crates/litchi-iwa/src/object_index.rs")
+IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?reference_extraction\b[ \t]*;"
+)
+IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_CALL = re.compile(
+    r"\b(?:r#)?reference_extraction[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?extract[ \t\r\n]*\("
+)
+IWA_OBJECT_INDEX_FORBIDDEN_GRAPH_INSERTION = re.compile(
+    r"(?:\.[ \t\r\n]*add_reference(?:_if_absent)?[ \t\r\n]*\(|"
+    r"\bfn[ \t\r\n]+(?:r#)?add_reference(?:_if_absent)?[ \t\r\n]*\()"
+)
+IWA_OBJECT_INDEX_DOCUMENT_SOURCE = Path("crates/litchi-iwa/src/document.rs")
+IWA_OBJECT_INDEX_CHART_SOURCE = Path(
+    "crates/litchi-iwa/src/charts/metadata_extractor.rs"
+)
+IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_SOURCE = Path(
+    "crates/litchi-iwa-protos/build.rs"
+)
+IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_PATH = re.compile(
+    r"\breference_extraction\.rs\b"
+)
 IWA_DRAWABLE_CONTAINER_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/drawable_container_codec.rs"
 )
@@ -51493,6 +51517,101 @@ def audit_iwa_drawable_container_reference_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_object_index_reference_extraction_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired host fallback and graph bridge out of the index.
+
+    ObjectIndex remains a physical borrowed-lookup adapter for the migration
+    host's document and chart readers.  It must not decode payloads or build
+    and query a host-owned reference graph; the focused Buffa drawable-
+    container codec has its own independent ownership audit below.
+    """
+
+    violations: list[str] = []
+    reference_path = root / IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_SOURCE
+    if reference_path.is_file():
+        violations.append(
+            "retired litchi-iwa object-index reference extractor source returned: "
+            f"{IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_SOURCE}"
+        )
+
+    object_index_path = root / IWA_OBJECT_INDEX_SOURCE
+    if object_index_path.is_file():
+        source = _mask_rust_non_code(object_index_path.read_text(encoding="utf-8"))
+        for pattern, description in (
+            (
+                IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_MODULE,
+                "module",
+            ),
+            (
+                IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_CALL,
+                "call",
+            ),
+        ):
+            for match in pattern.finditer(source):
+                line = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa object-index reference extractor "
+                    f"{description} returned: {IWA_OBJECT_INDEX_SOURCE}:{line}"
+                )
+        for match in IWA_OBJECT_INDEX_FORBIDDEN_GRAPH_INSERTION.finditer(source):
+            line = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa object-index graph insertion returned: "
+                f"{IWA_OBJECT_INDEX_SOURCE}:{line}"
+            )
+
+        reader_requirements = (
+            (
+                IWA_OBJECT_INDEX_DOCUMENT_SOURCE,
+                (
+                    "use crate::object_index::ObjectIndex;",
+                    "object_index: ObjectIndex",
+                    "ObjectIndex::from_bundle(&bundle)",
+                    "iter_refs(&self.state.bundle)",
+                ),
+                "Document",
+            ),
+            (
+                IWA_OBJECT_INDEX_CHART_SOURCE,
+                (
+                    "use crate::object_index::{ObjectIndex, ResolvedObjectRef};",
+                    "iter_entries_by_type",
+                    "resolve_ref(self.bundle",
+                    "resolve_ref_id(self.bundle",
+                ),
+                "chart metadata",
+            ),
+        )
+        for relative, required, owner in reader_requirements:
+            path = root / relative
+            if not path.is_file():
+                continue
+            reader = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for marker in required:
+                if marker in reader:
+                    continue
+                violations.append(
+                    f"{owner} must retain physical ObjectIndex lookup marker "
+                    f"{marker}: {relative}"
+                )
+
+    build_path = root / IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_SOURCE
+    if build_path.is_file():
+        build = build_path.read_text(encoding="utf-8")
+        match = IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_PATH.search(build)
+        if match is not None:
+            line = build.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa object-index reference extractor build "
+                "provenance returned: "
+                f"{IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_SOURCE}:{line}"
+            )
+
+    return sorted(set(violations))
+
+
 def _audit_iwa_drawable_container_projection(
     root: Path,
 ) -> list[str]:
@@ -71520,6 +71639,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_root_facts_graph_source_topology()
         + audit_iwa_pages_drawable_order_read_source_topology()
         + audit_iwa_drawable_container_reference_source_topology()
+        + audit_iwa_object_index_reference_extraction_retirement_source_topology()
         + audit_iwa_drawable_container_codec_source_topology()
         + audit_iwa_keynote_media_creation_source_topology()
         + audit_keynote_media_creation_codec_source_topology()
