@@ -1,6 +1,10 @@
 //! Typed, inert MS-OVBA project authoring.
 
-use super::dir::{Kind as DirKind, WriteModule, WriteProject, encode_dir, encode_mbcs};
+use super::dir::{
+    Kind as DirKind, Reference, WriteModule, WriteProject, encode_dir, encode_mbcs,
+    validate_vba_identifier,
+};
+use super::project::{DesignerFrame, LicenseInfo};
 use super::{Error, Limits, check_limit, codec, invalid};
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_codepage::Mbcs;
@@ -11,13 +15,14 @@ const VBA_STORAGE_NAME: &str = "VBA";
 const DIR_STREAM_NAME: &str = "dir";
 const PROJECT_STREAM_NAME: &str = "PROJECT";
 const PROJECT_WM_STREAM_NAME: &str = "PROJECTwm";
+const PROJECT_LK_STREAM_NAME: &str = "PROJECTlk";
 const VERSION_PROJECT_STREAM_NAME: &str = "_VBA_PROJECT";
 const VERSION_PROJECT_RESERVED: u16 = 0x61cc;
 const VERSION_PROJECT_WRITE_VERSION: u16 = 0xffff;
 const DEFAULT_PROJECT_VERSION_MAJOR: u32 = 1;
 const DEFAULT_PROJECT_VERSION_MINOR: u16 = 0;
 const MAX_CFB_NAME_CODE_UNITS: usize = 31;
-const MAX_VBA_IDENTIFIER_CHARACTERS: usize = 255;
+const MAX_VBA_IDENTIFIER_CHARACTERS: usize = 31;
 const DETERMINISTIC_OBFUSCATION_SEED: u8 = 0;
 const ENCRYPTION_VERSION: u8 = 2;
 const PROJECT_VERSION_COMPATIBLE_32: &str = "393222000";
@@ -54,6 +59,8 @@ pub enum Kind {
     Standard,
     /// A class module (`Class=`).
     Class,
+    /// A designer module with a corresponding VBFrame.
+    Designer,
     /// A host document module (`Document=`).
     Document {
         /// Automation server version written after the module name.
@@ -65,7 +72,9 @@ impl Kind {
     const fn directory_kind(self) -> DirKind {
         match self {
             Self::Standard => DirKind::Procedural,
-            Self::Class | Self::Document { .. } => DirKind::DocumentClassOrDesigner,
+            Self::Class | Self::Designer | Self::Document { .. } => {
+                DirKind::DocumentClassOrDesigner
+            },
         }
     }
 }
@@ -136,6 +145,11 @@ impl Module {
     /// Create a class module.
     pub fn class(name: impl Into<String>, source_body: impl Into<String>) -> Self {
         Self::new(name, source_body, Kind::Class)
+    }
+
+    /// Create a designer module whose project declaration is BaseClass.
+    pub fn designer(name: impl Into<String>, source_body: impl Into<String>) -> Self {
+        Self::new(name, source_body, Kind::Designer)
     }
 
     /// Create a document module.
@@ -226,6 +240,9 @@ pub struct Project {
     help_context: i32,
     version_major: u32,
     version_minor: u16,
+    references: Vec<Reference>,
+    license_info: Vec<LicenseInfo>,
+    designer_frames: Vec<DesignerFrameInput>,
     modules: Vec<Module>,
 }
 
@@ -241,6 +258,9 @@ impl Project {
             help_context: 0,
             version_major: DEFAULT_PROJECT_VERSION_MAJOR,
             version_minor: DEFAULT_PROJECT_VERSION_MINOR,
+            references: Vec::new(),
+            license_info: Vec::new(),
+            designer_frames: Vec::new(),
             modules: Vec::new(),
         }
     }
@@ -307,6 +327,38 @@ impl Project {
         self
     }
 
+    /// Append an inert external reference record.
+    #[must_use]
+    pub fn reference(mut self, reference: Reference) -> Self {
+        self.references.push(reference);
+        self
+    }
+
+    /// Append inert ActiveX-control license metadata.
+    #[must_use]
+    pub fn license_info(mut self, license_info: LicenseInfo) -> Self {
+        self.license_info.push(license_info);
+        self
+    }
+
+    /// Append a validated, inert `VBFrame` stream for a designer module.
+    ///
+    /// `module_name` must identify a module already added to this builder.
+    /// The bytes are retained as source text and are never interpreted as
+    /// executable content.
+    #[must_use]
+    pub fn designer_frame(
+        mut self,
+        module_name: impl Into<String>,
+        raw: impl Into<Vec<u8>>,
+    ) -> Self {
+        self.designer_frames.push(DesignerFrameInput {
+            module_name: module_name.into(),
+            raw: raw.into(),
+        });
+        self
+    }
+
     /// Serialize and validate the project without executing or compiling source.
     ///
     /// # Errors
@@ -321,6 +373,16 @@ impl Project {
             limits.max_cfb_bytes,
         )?;
         check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
+        check_limit(
+            "VBA license count",
+            self.license_info.len(),
+            limits.max_licenses,
+        )?;
+        check_limit(
+            "VBA designer count",
+            self.designer_frames.len(),
+            limits.max_modules,
+        )?;
         let encoding = self.page;
         validate_project_name(&self.name)?;
         validate_quoted_text(&self.description, "VBA project description")?;
@@ -369,12 +431,57 @@ impl Project {
                 help_context: u32::from_le_bytes(self.help_context.to_le_bytes()),
                 version_major: self.version_major,
                 version_minor: self.version_minor,
+                references: &self.references,
                 modules: &directory_modules,
             },
             limits,
         )?;
         let project_stream = encode_project_stream(&self, encoding, limits)?;
         let project_wm_stream = encode_project_wm_stream(&self.modules, encoding, limits)?;
+        let project_lk_stream = encode_project_lk_stream(&self.license_info, limits)?;
+
+        let mut designer_frames = Vec::with_capacity(self.designer_frames.len());
+        let mut designer_names = HashSet::with_capacity(self.designer_frames.len());
+        for input in &self.designer_frames {
+            if !designer_names.insert(input.module_name.to_lowercase()) {
+                return Err(invalid(format!(
+                    "duplicate VBA designer frame for module {}",
+                    input.module_name
+                )));
+            }
+            let module = self
+                .modules
+                .iter()
+                .find(|module| module.name.eq_ignore_ascii_case(&input.module_name))
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "VBA designer frame has no matching module {}",
+                        input.module_name
+                    ))
+                })?;
+            if module.kind != Kind::Designer {
+                return Err(invalid(format!(
+                    "VBA designer frame requires a designer module, found {}",
+                    module.name
+                )));
+            }
+            let _ =
+                DesignerFrame::from_raw(module.name.clone(), input.raw.clone(), encoding, limits)?;
+            designer_frames.push(EncodedDesignerFrame {
+                storage_name: module.stream_name.clone(),
+                raw: input.raw.clone(),
+            });
+        }
+        for module in &self.modules {
+            if module.kind == Kind::Designer
+                && !designer_names.contains(&module.name.to_lowercase())
+            {
+                return Err(invalid(format!(
+                    "designer module {} is missing a VBFrame stream",
+                    module.name
+                )));
+            }
+        }
 
         let modules = self
             .modules
@@ -390,6 +497,8 @@ impl Project {
             directory_stream: directory,
             project_stream,
             project_wm_stream,
+            project_lk_stream,
+            designer_frames,
             modules,
         };
         let module_count = streams.modules.len();
@@ -495,11 +604,25 @@ struct EncodedModule {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+struct DesignerFrameInput {
+    module_name: String,
+    raw: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct EncodedDesignerFrame {
+    storage_name: String,
+    raw: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct Streams {
     version_project_stream: Vec<u8>,
     directory_stream: Vec<u8>,
     project_stream: Vec<u8>,
     project_wm_stream: Vec<u8>,
+    project_lk_stream: Option<Vec<u8>>,
+    designer_frames: Vec<EncodedDesignerFrame>,
     modules: Vec<EncodedModule>,
 }
 
@@ -521,6 +644,21 @@ impl Streams {
         project_path.pop();
         project_path.push(PROJECT_WM_STREAM_NAME.to_owned());
         create_stream(writer, &project_path, &self.project_wm_stream)?;
+        if let Some(project_lk_stream) = &self.project_lk_stream {
+            project_path.pop();
+            project_path.push(PROJECT_LK_STREAM_NAME.to_owned());
+            create_stream(writer, &project_path, project_lk_stream)?;
+        }
+        for designer in &self.designer_frames {
+            let mut designer_path: Vec<String> = project_root_path
+                .iter()
+                .map(|component| (*component).to_owned())
+                .collect();
+            designer_path.push(designer.storage_name.clone());
+            create_storage(writer, &designer_path)?;
+            designer_path.push("\u{3}VBFrame".to_owned());
+            create_stream(writer, &designer_path, &designer.raw)?;
+        }
 
         let mut vba_path = vba_storage;
         vba_path.push(VERSION_PROJECT_STREAM_NAME.to_owned());
@@ -564,6 +702,8 @@ impl Payload {
         )?;
         let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
         let project = crate::project::Project::open(&mut ole, &[], limits)?;
+        project.validate_payload(limits)?;
+        let _ = project.project_wm(limits)?;
         let module_count = project.modules().len();
         Ok(Self {
             bytes,
@@ -660,12 +800,13 @@ fn validate_project_name(name: &str) -> Result<(), Error> {
     }
     if name
         .chars()
-        .any(|character| character == '"' || character.is_control())
+        .any(|character| !valid_quoted_character(character))
     {
         return Err(invalid(
-            "VBA project name contains a quoted-string delimiter or control character",
+            "VBA project name contains a character that cannot appear in QUOTEDCHAR",
         ));
     }
+    validate_vba_identifier(name, "PROJECTNAME")?;
     Ok(())
 }
 
@@ -703,18 +844,15 @@ fn validate_module_identifier(name: &str) -> Result<(), Error> {
             "VBA module name exceeds {MAX_VBA_IDENTIFIER_CHARACTERS} characters"
         )));
     }
-    let mut characters = name.chars();
-    let first = characters
-        .next()
-        .ok_or_else(|| invalid("VBA module name must not be empty"))?;
-    if !first.is_alphabetic() {
-        return Err(invalid(
-            "VBA module name must begin with an alphabetic character",
-        ));
+    if name.is_empty() {
+        return Err(invalid("VBA module name must not be empty"));
     }
-    if characters.any(|character| !(character.is_alphanumeric() || character == '_')) {
+    if name
+        .chars()
+        .any(|character| matches!(character, '\0' | '\r' | '\n'))
+    {
         return Err(invalid(
-            "VBA module name contains a non-identifier character",
+            "VBA module name contains a forbidden line or null character",
         ));
     }
     Ok(())
@@ -750,10 +888,10 @@ fn validate_stream_name(name: &str) -> Result<(), Error> {
 fn validate_quoted_text(value: &str, field: &'static str) -> Result<(), Error> {
     if value
         .chars()
-        .any(|character| character == '"' || character.is_control())
+        .any(|character| !valid_quoted_character(character))
     {
         return Err(invalid(format!(
-            "{field} contains a quoted-string delimiter or control character"
+            "{field} contains a character that cannot appear in QUOTEDCHAR"
         )));
     }
     Ok(())
@@ -762,7 +900,7 @@ fn validate_quoted_text(value: &str, field: &'static str) -> Result<(), Error> {
 fn module_source(module: &Module) -> String {
     let mut source = String::with_capacity(module.name.len() + module.source_body.len() + 32);
     source.push_str("Attribute VB_Name = \"");
-    source.push_str(&module.name);
+    source.push_str(&quote_project_value(&module.name));
     source.push_str("\"\r\n");
     source.push_str(&module.source_body);
     source
@@ -782,9 +920,15 @@ fn encode_project_stream(
         match module.kind {
             Kind::Standard => text.push_str("Module="),
             Kind::Class => text.push_str("Class="),
+            Kind::Designer => text.push_str("BaseClass="),
             Kind::Document {
                 type_library_version,
             } => {
+                if type_library_version > i32::MAX as u32 {
+                    return Err(invalid(
+                        "VBA document type-library version is not a signed HEXINT32",
+                    ));
+                }
                 text.push_str("Document=");
                 text.push_str(&module.name);
                 text.push_str("/&H");
@@ -797,14 +941,14 @@ fn encode_project_stream(
         text.push_str("\r\n");
     }
     text.push_str("Name=\"");
-    text.push_str(&project.name);
+    text.push_str(&quote_project_value(&project.name));
     text.push_str("\"\r\n");
     text.push_str("HelpContextID=\"");
     text.push_str(&project.help_context.to_string());
     text.push_str("\"\r\n");
     if !project.description.is_empty() {
         text.push_str("Description=\"");
-        text.push_str(&project.description);
+        text.push_str(&quote_project_value(&project.description));
         text.push_str("\"\r\n");
     }
     text.push_str("VersionCompatible32=\"");
@@ -829,6 +973,14 @@ fn encode_project_stream(
         limits.max_decompressed_stream_bytes,
     )?;
     Ok(encoded)
+}
+
+fn valid_quoted_character(character: char) -> bool {
+    character == '\t' || !character.is_control() || ('\u{7f}'..='\u{ff}').contains(&character)
+}
+
+fn quote_project_value(value: &str) -> String {
+    value.replace('"', "\"\"")
 }
 
 fn encode_project_wm_stream(
@@ -865,6 +1017,49 @@ fn encode_project_wm_stream(
         limits.max_decompressed_stream_bytes,
     )?;
     Ok(output)
+}
+
+fn encode_project_lk_stream(
+    entries: &[LicenseInfo],
+    limits: &Limits,
+) -> Result<Option<Vec<u8>>, Error> {
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    check_limit("VBA license count", entries.len(), limits.max_licenses)?;
+    let count =
+        u32::try_from(entries.len()).map_err(|_| invalid("PROJECTlk license count exceeds u32"))?;
+    let mut output = Vec::new();
+    output.extend_from_slice(&1u16.to_le_bytes());
+    output.extend_from_slice(&count.to_le_bytes());
+    for entry in entries {
+        check_limit(
+            "VBA license key bytes",
+            entry.license_key().len(),
+            limits.max_string_bytes,
+        )?;
+        let key_length = u32::try_from(entry.license_key().len())
+            .map_err(|_| invalid("PROJECTlk license key length exceeds u32"))?;
+        let record_length = 16usize
+            .checked_add(4)
+            .and_then(|length| length.checked_add(entry.license_key().len()))
+            .and_then(|length| length.checked_add(4))
+            .ok_or_else(|| invalid("PROJECTlk stream size overflow"))?;
+        let next_length = output
+            .len()
+            .checked_add(record_length)
+            .ok_or_else(|| invalid("PROJECTlk stream size overflow"))?;
+        check_limit(
+            "PROJECTlk stream bytes",
+            next_length,
+            limits.max_decompressed_stream_bytes,
+        )?;
+        output.extend_from_slice(&entry.class_id());
+        output.extend_from_slice(&key_length.to_le_bytes());
+        output.extend_from_slice(entry.license_key());
+        output.extend_from_slice(&entry.license_required_raw().to_le_bytes());
+    }
+    Ok(Some(output))
 }
 
 fn version_project_stream() -> Vec<u8> {
@@ -936,12 +1131,23 @@ mod tests {
                     .read_only(true)
                     .private(true),
             )
-            .module(Module::class("Class1", "Private value As Long\r\n"))
+            .module(Module::designer("Class1", "Private value As Long\r\n"))
             .module(Module::document(
                 "ThisDocument",
                 0x0001_0000,
                 "Private Sub Document_Open()\r\nEnd Sub\r\n",
             ))
+            .license_info(LicenseInfo::new([0x11; 16], vec![1, 2, 3], true))
+            .designer_frame(
+                "Class1",
+                concat!(
+                    "VERSION 5.00\r\n",
+                    "Begin {00000000-0000-0000-0000-000000000003} Class1\r\n",
+                    "Caption=\"Designer\"\r\n",
+                    "Enabled=-1\r\n",
+                    "End\r\n",
+                ),
+            )
     }
 
     #[test]
@@ -986,10 +1192,42 @@ mod tests {
             DirKind::DocumentClassOrDesigner
         );
         assert_eq!(project.modules()[2].name(), "ThisDocument");
+        let project_wm = project.project_wm(&limits).unwrap().unwrap();
+        assert_eq!(project_wm.len(), 3);
+        assert_eq!(project_wm[0].mbcs_name(), "Module1");
+        assert_eq!(project_wm[0].unicode_name(), "Module1");
+        let licenses = project.license_info().unwrap();
+        assert_eq!(licenses.len(), 1);
+        assert_eq!(licenses[0].class_id(), [0x11; 16]);
+        assert_eq!(licenses[0].license_key(), [1, 2, 3]);
+        assert!(licenses[0].license_required());
+        assert_eq!(project.designer_frames().len(), 1);
+        assert_eq!(project.designer_frames()[0].module_name(), "Class1");
+        assert_eq!(
+            project.designer_frames()[0].class_id(),
+            "{00000000-0000-0000-0000-000000000003}"
+        );
+        assert_eq!(
+            project.designer_frames()[0].properties()[0].name(),
+            "Caption"
+        );
 
         let properties = project.project_properties().text();
+        let project_text = project.project_text(&limits).unwrap();
+        assert_eq!(
+            project.encode_project_text(project_text, &limits).unwrap(),
+            project.project_properties().raw(),
+            "an unchanged PROJECT text view must preserve the exact source"
+        );
+        assert_eq!(project_text.project_name(), Some("SampleProject"));
+        assert!(
+            project_text
+                .records()
+                .iter()
+                .any(|record| matches!(record, crate::project::ProjectTextRecord::Module { .. }))
+        );
         assert!(properties.contains("Module=Module1\r\n"));
-        assert!(properties.contains("Class=Class1\r\n"));
+        assert!(properties.contains("BaseClass=Class1\r\n"));
         assert!(properties.contains("Document=ThisDocument/&H00010000\r\n"));
         assert!(properties.contains("Description=\"Inert test project\"\r\n"));
         assert!(properties.contains("\r\n[Host Extender Info]\r\n"));
@@ -1048,6 +1286,209 @@ mod tests {
             ole.open_stream(&[PROJECT_WM_STREAM_NAME]).unwrap(),
             expected
         );
+        let project = crate::project::Project::open(&mut ole, &[], &limits).unwrap();
+        let maps = project.project_wm(&limits).unwrap().unwrap().to_vec();
+        assert_eq!(project.encode_project_wm(&maps, &limits).unwrap(), expected);
+        let mut edited = maps;
+        edited[0] = crate::dir::NameMap::new("Class1", "標準");
+        assert!(matches!(
+            project.encode_project_wm(&edited, &limits),
+            Err(Error::InvalidData(message)) if message.contains("MBCS and Unicode")
+        ));
+        assert!(matches!(
+            project.encode_project_wm(&edited[..1], &limits),
+            Err(Error::InvalidData(message)) if message.contains("map count")
+        ));
+    }
+
+    #[test]
+    fn references_are_typed_and_reopenable_without_resolution() {
+        let original = crate::dir::ControlReference::new(
+            "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+            Some(crate::dir::ExtendedReference::new(
+                Some("MSForms".to_owned()),
+                "*\\G{896C2D83-5466-46ED-8FAE-4C3E4F85E710}#2.0#0##",
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+                7,
+            )),
+        );
+        let builder = Project::new("Refs")
+            .reference(Reference::registered(
+                "stdole",
+                "*\\G{00020430-0000-0000-C000-000000000046}#2.0#0##OLE#Automation",
+            ))
+            .reference(Reference::project(
+                "OtherProject",
+                "*\\Cabsolute.xls",
+                "*\\Crelative.xls",
+                3,
+                2,
+            ))
+            .reference(Reference::control(
+                "MSForms",
+                "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+                original.extended().cloned(),
+            ))
+            .reference(Reference::original(
+                Some("MSFormsOriginal".to_owned()),
+                "*\\G{11111111-1111-1111-1111-111111111111}#2.0#0##",
+                original,
+            ))
+            .reference(Reference::opaque(0x7f00, [9, 8, 7, 6]))
+            .module(Module::standard("Module1", ""));
+        let binary = builder.finish(&Limits::default()).unwrap();
+        let mut ole = OleFile::open(Cursor::new(binary.bytes())).unwrap();
+        let project = crate::project::Project::open(&mut ole, &[], &Limits::default()).unwrap();
+        let references = project.references();
+        assert_eq!(references.len(), 5);
+        assert!(matches!(
+            references[0].kind(),
+            crate::dir::ReferenceKind::Registered { libid } if libid.contains("00020430")
+        ));
+        assert!(matches!(
+            references[1].kind(),
+            crate::dir::ReferenceKind::Project {
+                major_version: 3,
+                minor_version: 2,
+                ..
+            }
+        ));
+        assert!(matches!(
+            references[2].kind(),
+            crate::dir::ReferenceKind::Control {
+                extended: Some(_),
+                ..
+            }
+        ));
+        assert!(matches!(
+            references[3].kind(),
+            crate::dir::ReferenceKind::Original { .. }
+        ));
+        assert!(matches!(
+            references[4].kind(),
+            crate::dir::ReferenceKind::Opaque { id: 0x7f00, payload } if payload == &[9, 8, 7, 6]
+        ));
+        let source_bound_name = references[0]
+            .clone()
+            .edit_name_source_bound(
+                Some("stdole-edited".to_owned()),
+                Mbcs::WINDOWS_1252,
+                &Limits::default(),
+            )
+            .unwrap();
+        assert_eq!(source_bound_name.name(), Some("stdole-edited"));
+        assert!(source_bound_name.raw().is_some());
+        assert!(matches!(
+            source_bound_name.kind(),
+            crate::dir::ReferenceKind::Registered { .. }
+        ));
+        assert_eq!(
+            project
+                .encode_dir_with_references(references, &Limits::default())
+                .unwrap(),
+            project.dir_raw(),
+            "an unchanged reference array must preserve the compressed dir source"
+        );
+        let mut edited_references = references.to_vec();
+        edited_references[0] = source_bound_name;
+        let edited_dir = project
+            .encode_dir_with_references(&edited_references, &Limits::default())
+            .unwrap();
+        let edited_directory = crate::dir::Dir::parse(&edited_dir, &Limits::default()).unwrap();
+        assert_eq!(
+            edited_directory.references()[0].name(),
+            Some("stdole-edited")
+        );
+        assert_eq!(
+            edited_directory.modules()[0].name(),
+            project.modules()[0].name(),
+            "reference edits must retain the module records"
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_reference_abnf_known_framing_ids_and_limits() {
+        let malformed_libid = Project::new("BadRef").reference(Reference::registered(
+            "stdole",
+            "*\\G{00000000-0000-0000-0000-000000000000}#1#0##",
+        ));
+        assert!(matches!(
+            malformed_libid.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("LibidReference")
+        ));
+
+        let malformed_project = Project::new("BadRef").reference(Reference::project(
+            "Other",
+            "*\\Eproject.xls",
+            "*\\Cproject.xls",
+            1,
+            0,
+        ));
+        assert!(matches!(
+            malformed_project.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("ProjectReference")
+        ));
+
+        for reference in [
+            Reference::project("", "*\\Aproject.xls", "*\\Cproject.xls", 1, 0),
+            Reference::registered("", "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##"),
+        ] {
+            assert!(matches!(
+                Project::new("BadRef")
+                    .reference(reference)
+                    .finish(&Limits::default()),
+                Err(Error::InvalidData(message)) if message.contains("REFERENCENAME")
+            ));
+        }
+
+        let hyphenated = Project::new("BadRef")
+            .reference(Reference::registered(
+                "stdole-edited",
+                "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+            ))
+            .module(Module::standard("Module1", ""));
+        assert!(matches!(
+            hyphenated.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("REFERENCENAME")
+        ));
+
+        let extended = crate::dir::ExtendedReference::new(
+            Some("stdole-edited".to_owned()),
+            "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+            [0; 16],
+            0,
+        );
+        let control_hyphenated = Project::new("BadRef")
+            .reference(Reference::control(
+                "MSForms",
+                "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+                Some(extended),
+            ))
+            .module(Module::standard("Module1", ""));
+        assert!(matches!(
+            control_hyphenated.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("REFERENCENAME")
+        ));
+
+        let opaque_framing = Project::new("BadRef").reference(Reference::opaque(0x000f, []));
+        assert!(matches!(
+            opaque_framing.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("known directory record")
+        ));
+
+        let long = "a".repeat(65);
+        let limits = Limits {
+            max_string_bytes: 16,
+            ..Limits::default()
+        };
+        let bounded = Project::new("BadRef").reference(Reference::registered("stdole", long));
+        assert!(matches!(
+            bounded.finish(&limits),
+            Err(Error::LimitExceeded {
+                limit: "VBA input string bytes",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -1069,6 +1510,155 @@ mod tests {
         assert_eq!(returned_bytes.as_ptr(), pointer);
         assert_eq!(returned_bytes.capacity(), capacity);
         assert_eq!(returned_bytes, expected);
+    }
+
+    fn rewrite_root_stream(payload: &[u8], stream_name: &str, replacement: &[u8]) -> Vec<u8> {
+        rewrite_stream_path(payload, &[stream_name], replacement)
+    }
+
+    fn rewrite_stream_path(
+        payload: &[u8],
+        replacement_path: &[&str],
+        replacement: &[u8],
+    ) -> Vec<u8> {
+        let mut source = OleFile::open(Cursor::new(payload)).unwrap();
+        let mut writer = OleWriter::new();
+        for path in source.list_streams() {
+            let components: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = if path.len() == replacement_path.len()
+                && path
+                    .iter()
+                    .zip(replacement_path)
+                    .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+            {
+                replacement.to_vec()
+            } else {
+                source.open_stream(&components).unwrap()
+            };
+            if components.len() > 1 {
+                writer
+                    .create_storage(&components[..components.len() - 1])
+                    .unwrap();
+            }
+            writer.create_stream(&components, &data).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn remove_stream_with_suffix(payload: &[u8], suffix: &str) -> Vec<u8> {
+        let mut source = OleFile::open(Cursor::new(payload)).unwrap();
+        let mut writer = OleWriter::new();
+        for path in source.list_streams() {
+            if path
+                .last()
+                .is_some_and(|name| name.eq_ignore_ascii_case(suffix))
+            {
+                continue;
+            }
+            let components: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = source.open_stream(&components).unwrap();
+            if components.len() > 1 {
+                writer
+                    .create_storage(&components[..components.len() - 1])
+                    .unwrap();
+            }
+            writer.create_stream(&components, &data).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn owned_payload_admission_eagerly_validates_project_and_project_wm() {
+        let payload = sample_builder().finish(&Limits::default()).unwrap();
+        let malformed_project = rewrite_root_stream(payload.bytes(), "PROJECT", b"Name=\"P\r\n");
+        assert!(matches!(
+            Payload::read(malformed_project, &Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("PROJECT Name")
+        ));
+
+        let malformed_wm = rewrite_root_stream(payload.bytes(), "PROJECTwm", &[1]);
+        assert!(matches!(
+            Payload::read(malformed_wm, &Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("PROJECTwm")
+        ));
+
+        let designer = Project::new("Designer")
+            .module(Module::designer("Form1", ""))
+            .designer_frame(
+                "Form1",
+                b"VERSION 5.00\r\nBegin {00000000-0000-0000-0000-000000000000} Form1\r\nEnd\r\n"
+                    .to_vec(),
+            )
+            .finish(&Limits::default())
+            .unwrap();
+        let without_frame = remove_stream_with_suffix(designer.bytes(), "\u{3}VBFrame");
+        assert!(matches!(
+            Payload::read(without_frame, &Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("BaseClass Form1")
+        ));
+    }
+
+    #[test]
+    fn owned_payload_admission_closes_project_and_dir_structure() {
+        let limits = Limits::default();
+        let payload = Project::new("P")
+            .module(Module::standard("M", ""))
+            .finish(&limits)
+            .unwrap();
+        for text in [
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\nModule=M\r\nName=\"Q\"\r\nHelpContextID=\"0\"\r\nVersionCompatible32=\"393222000\"\r\nCMG=\"0000000000000000000000\"\r\nDPB=\"0000000000000000\"\r\nGC=\"0000000000000000\"\r\n\r\n[Host Extender Info]\r\n",
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\nName=\"P\"\r\nHelpContextID=\"0\"\r\nVersionCompatible32=\"393222000\"\r\nCMG=\"0000000000000000000000\"\r\nDPB=\"0000000000000000\"\r\nGC=\"0000000000000000\"\r\n\r\n[Host Extender Info]\r\n",
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\nModule=M\r\nModule=Ghost\r\nName=\"P\"\r\nHelpContextID=\"0\"\r\nVersionCompatible32=\"393222000\"\r\nCMG=\"0000000000000000000000\"\r\nDPB=\"0000000000000000\"\r\nGC=\"0000000000000000\"\r\n\r\n[Host Extender Info]\r\n",
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\nModule=M\r\nName=\"P\"\r\nHelpContextID=\"0\"\r\nVersionCompatible32=\"393222000\"\r\nCMG=\"0000000000000000000000\"\r\nDPB=\"0000000000000000\"\r\nGC=\"0000000000000000\"\r\n\r\n[Host Extender Info]\r\n\r\n[Workspace]\r\nGhost=0, 0, 0, 0, C\r\n",
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\nModule=M\r\nName=\"P\"\r\nHelpContextID=\"0\"\r\nVersionCompatible32=\"393222000\"\r\nCMG=\"0000000000000000000000\"\r\nDPB=\"0000000000000000\"\r\nGC=\"0000000000000000\"\r\n\r\n[Host Extender Info]\r\n[Workspace]\r\nM=0, 0, 0, 0, C\r\n",
+            "Name=\"P\"\r\n",
+        ] {
+            assert!(
+                Payload::read(
+                    rewrite_root_stream(payload.bytes(), "PROJECT", text.as_bytes()),
+                    &limits,
+                )
+                .is_err(),
+                "malformed PROJECT text must be rejected during owned admission"
+            );
+        }
+        let valid_workspace = concat!(
+            "ID=\"{00000000-0000-0000-0000-000000000000}\"\r\n",
+            "Module=M\r\n",
+            "Name=\"P\"\r\n",
+            "HelpContextID=\"0\"\r\n",
+            "VersionCompatible32=\"393222000\"\r\n",
+            "CMG=\"0000000000000000000000\"\r\n",
+            "DPB=\"0000000000000000\"\r\n",
+            "GC=\"0000000000000000\"\r\n",
+            "\r\n[Host Extender Info]\r\n",
+            "\r\n[Workspace]\r\n",
+            "M=0, 0, 0, 0, C\r\n",
+        );
+        assert!(
+            Payload::read(
+                rewrite_root_stream(payload.bytes(), "PROJECT", valid_workspace.as_bytes()),
+                &limits,
+            )
+            .is_ok(),
+            "a matching workspace window with the required separator is valid"
+        );
+
+        let mut source = OleFile::open(Cursor::new(payload.bytes())).unwrap();
+        let compressed_dir = source.open_stream(&["VBA", DIR_STREAM_NAME]).unwrap();
+        let mut dir = codec::decode(&compressed_dir, &limits).unwrap();
+        dir.extend_from_slice(&[0xaa, 0xbb]);
+        let compressed = codec::encode(&dir, &limits).unwrap();
+        let malformed =
+            rewrite_stream_path(payload.bytes(), &["VBA", DIR_STREAM_NAME], &compressed);
+        assert!(matches!(
+            Payload::read(malformed, &limits),
+            Err(Error::InvalidData(message)) if message.contains("trailing bytes")
+        ));
     }
 
     #[test]
@@ -1121,6 +1711,12 @@ mod tests {
     #[test]
     fn rejects_invalid_names_codepages_text_and_resource_limits() {
         let limits = Limits::default();
+        for name in ["1Project", "Project Name", "End", "P!"] {
+            assert!(
+                Project::new(name).finish(&limits).is_err(),
+                "fresh PROJECTNAME {name:?} must satisfy VbaIdentifier"
+            );
+        }
         let duplicate = || {
             Project::new("Project")
                 .module(Module::standard("Module1", ""))
@@ -1135,14 +1731,40 @@ mod tests {
             Project::new("Project").module(Module::standard("Module1", "").stream_name("__SRP_0"));
         assert!(cache_name.finish(&limits).is_err());
 
-        let invalid_identifier = Project::new("Project").module(Module::standard("1Module", ""));
+        let invalid_identifier =
+            Project::new("Project").module(Module::standard("bad\0module", ""));
         assert!(invalid_identifier.finish(&limits).is_err());
-
+        let arbitrary_identifier = Project::new("Project")
+            .description("quoted \"description\"\twith DEL \u{7f}")
+            .module(Module::standard("1 Module", ""));
+        let arbitrary_payload = arbitrary_identifier.finish(&limits).unwrap();
+        let mut arbitrary_ole = OleFile::open(Cursor::new(arbitrary_payload.bytes())).unwrap();
+        let arbitrary_project =
+            crate::project::Project::open(&mut arbitrary_ole, &[], &limits).unwrap();
+        assert_eq!(arbitrary_project.modules()[0].name(), "1 Module");
         assert!(
-            Project::new("Project")
-                .description("invalid \"description")
-                .finish(&limits)
-                .is_err()
+            arbitrary_project
+                .project_properties()
+                .text()
+                .contains("Description=\"quoted \"\"description\"\"\twith DEL \u{7f}\"")
+        );
+        let long_identifier = Project::new("Project").module(Module::standard("a".repeat(32), ""));
+        assert!(matches!(
+            long_identifier.finish(&limits),
+            Err(Error::InvalidData(message)) if message.contains("31 characters")
+        ));
+
+        let quoted = Project::new("Project")
+            .description("valid \"description")
+            .finish(&limits)
+            .unwrap();
+        let mut quoted_ole = OleFile::open(Cursor::new(quoted.bytes())).unwrap();
+        let quoted_project = crate::project::Project::open(&mut quoted_ole, &[], &limits).unwrap();
+        assert!(
+            quoted_project
+                .project_properties()
+                .text()
+                .contains("Description=\"valid \"\"description\"")
         );
         let unrepresentable =
             Project::new("Project").module(Module::standard("Module1", "MsgBox \"🙂\""));
@@ -1165,6 +1787,71 @@ mod tests {
         assert!(matches!(
             one_module.finish(&no_source),
             Err(Error::LimitExceeded { .. })
+        ));
+
+        let invalid_reference_names = ["Bad Name", "1Bad", "End", "P!"];
+        for name in invalid_reference_names {
+            assert!(
+                Project::new("Project")
+                    .reference(Reference::project(
+                        name,
+                        "*\\Aproject.xls",
+                        "*\\Cproject.xls",
+                        1,
+                        0,
+                    ))
+                    .finish(&limits)
+                    .is_err(),
+                "fresh project reference name {name:?} must satisfy RefProjectName"
+            );
+            assert!(
+                Project::new("Project")
+                    .reference(Reference::registered(
+                        name,
+                        "*\\G{00000000-0000-0000-0000-000000000000}#0.0#0##",
+                    ))
+                    .finish(&limits)
+                    .is_err(),
+                "fresh library reference name {name:?} must satisfy RefLibraryName"
+            );
+        }
+    }
+
+    #[test]
+    fn designer_frames_require_baseclass_modules_and_round_trip_as_baseclass() {
+        let frame = concat!(
+            "VERSION 5.00\r\n",
+            "Begin {00000000-0000-0000-0000-000000000000} Form1\r\n",
+            "End\r\n",
+        );
+        let payload = Project::new("Designer")
+            .module(Module::designer("Form1", ""))
+            .designer_frame("Form1", frame.as_bytes().to_vec())
+            .finish(&Limits::default())
+            .unwrap();
+        let mut ole = OleFile::open(Cursor::new(payload.bytes())).unwrap();
+        let project = crate::project::Project::open(&mut ole, &[], &Limits::default()).unwrap();
+        assert_eq!(project.designer_frames().len(), 1);
+        assert!(
+            project
+                .project_properties()
+                .text()
+                .contains("BaseClass=Form1\r\n")
+        );
+
+        let class_with_frame = Project::new("Designer")
+            .module(Module::class("Form1", ""))
+            .designer_frame("Form1", frame.as_bytes().to_vec());
+        assert!(matches!(
+            class_with_frame.finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("requires a designer module")
+        ));
+
+        assert!(matches!(
+            Project::new("Designer")
+                .module(Module::designer("Form1", ""))
+                .finish(&Limits::default()),
+            Err(Error::InvalidData(message)) if message.contains("missing a VBFrame")
         ));
     }
 
