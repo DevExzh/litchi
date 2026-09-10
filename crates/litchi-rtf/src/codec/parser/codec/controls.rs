@@ -2025,6 +2025,11 @@ impl Parser<'_> {
                     "RTF password hash is misplaced or not a starred info destination".to_string(),
                 ));
             },
+            ControlWord::PasswordHash => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF passwordhash is misplaced or not a starred info destination".to_string(),
+                ));
+            },
             control if Self::is_math_scoped_control(control) => {
                 return Err(RtfError::MalformedDocument(
                     "RTF math controls may occur only inside a math zone destination".to_string(),

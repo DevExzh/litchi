@@ -483,6 +483,7 @@ pub(crate) enum ControlWord<'a> {
     EnforceProtection(Option<i32>),
     ProtectionLevel(Option<i32>),
     Password,
+    PasswordHash,
     ProtectionUserTable,
     HyphenateAutomatically(Option<i32>),
     HyphenateCapitalizedWords(Option<i32>),

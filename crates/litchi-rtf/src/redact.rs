@@ -389,6 +389,7 @@ fn collect_unsupported(
         || protection.enforced.is_some()
         || protection.level.is_some()
         || protection.password_hash.is_some()
+        || protection.password_hash_data.is_some()
         || !model.protection_ranges().is_empty()
         || !model.editable_regions().is_empty()
         || model.protection_user_table().is_some()

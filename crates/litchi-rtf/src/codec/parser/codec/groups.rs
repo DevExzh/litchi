@@ -4,9 +4,60 @@ use super::{
 };
 
 impl<'a> Parser<'a> {
+    /// Return whether the current group contains a modern password-hash
+    /// control.  Specialized destinations often consume their child groups
+    /// themselves instead of calling [`Self::parse_group`], so the common
+    /// group boundary is the one place where a known protected destination
+    /// must be rejected before it can be retained as opaque syntax.
+    fn current_group_contains_password_hash(&self) -> bool {
+        let mut depth = 1usize;
+        for token in self.tokens.get(self.pos..).into_iter().flatten() {
+            match token {
+                Token::OpenBrace => depth = depth.saturating_add(1),
+                Token::CloseBrace => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        break;
+                    }
+                },
+                Token::Control(ControlWord::PasswordHash) => return true,
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
+            }
+        }
+        false
+    }
+
+    /// Reject a recognized password-hash destination nested in another
+    /// destination.  A modern hash is legal only as a direct root-header
+    /// group; accepting it through an opaque or specialized child parser
+    /// would turn malformed data into an apparently valid document.
+    fn reject_nested_password_hash(&self) -> RtfResult<()> {
+        let is_direct_password_hash = matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::PasswordHash),
+            ])
+        );
+        if self.states.len() > 1
+            && !is_direct_password_hash
+            && self.current_group_contains_password_hash()
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF passwordhash destination must occur in the root header".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Parse a group (content between braces).
     pub(super) fn parse_group(&mut self) -> RtfResult<()> {
         self.expect_token(&Token::OpenBrace)?;
+
+        // Perform this before destination dispatch.  Field, object, picture,
+        // note, header/footer, and unknown-destination parsers all have
+        // specialized child loops that otherwise could swallow a known hash.
+        self.reject_nested_password_hash()?;
 
         // Group parsing recurses, so refuse pathological nesting before it can
         // exhaust the call stack. Reporting a typed error keeps a hostile file

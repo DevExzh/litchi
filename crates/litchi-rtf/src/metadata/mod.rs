@@ -20,8 +20,8 @@ pub(crate) mod xsl_transform;
 pub(crate) use external_reference::DocumentExternalReferenceSpans;
 
 pub use info::{
-    DocumentInfo as Info, DocumentProtection as Protection, ProtectionLevel, ProtectionType,
-    RtfTimestamp as Timestamp,
+    DocumentInfo as Info, DocumentProtection as Protection, MAX_PASSWORD_HASH_BYTES, PasswordHash,
+    ProtectionLevel, ProtectionType, RtfTimestamp as Timestamp,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use user_property::{

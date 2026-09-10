@@ -1,0 +1,82 @@
+[
+  {
+    "gate": "tests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-rtf",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-rtf-passwordhash-root-integration-v3-20260910-tests.log",
+    "sha256": "83422290e6fe3ee610f2834ed6818feafcdccce0e93560e539e7536897b329e2"
+  },
+  {
+    "gate": "doctests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-rtf",
+      "--all-features",
+      "--doc",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-rtf-passwordhash-root-integration-v3-20260910-doctests.log",
+    "sha256": "56aedf207b0c70804f2744e673072f9655967dc62f7663121387ffee07a2a48d"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-rtf",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-rtf-passwordhash-root-integration-v3-20260910-clippy.log",
+    "sha256": "64bf47eec791e35478b9b234fc20ff4f9b3ab7e0bdaf3bf1a0cb4dd4be528871"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-rtf",
+      "--all-features",
+      "--no-deps",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-rtf-passwordhash-root-integration-v3-20260910-rustdoc.log",
+    "sha256": "83c66dbcc4a864759aaf057e206f902a8b7652f5c089ada06c55f48451dc045a"
+  }
+]

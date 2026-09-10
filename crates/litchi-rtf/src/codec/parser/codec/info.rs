@@ -222,6 +222,156 @@ impl<'a> Parser<'a> {
         self.info.protection.validate()
     }
 
+    fn parse_password_hash_hex_group_contents(&mut self, limit: usize) -> RtfResult<Vec<u8>> {
+        // Collect only a fixed header first.  The declared total size is an
+        // untrusted field, so it must be checked before reserving or retaining
+        // the rest of the payload.
+        let mut bytes = Vec::new();
+        crate::error::try_reserve_additional(
+            &mut bytes,
+            crate::info::PASSWORD_HASH_HEADER_BYTES,
+            "RTF passwordhash header",
+        )?;
+        let mut high_nibble = None;
+        let mut encoded_len = 0usize;
+        let mut declared_size = None;
+        loop {
+            let token = self.tokens.get(self.pos).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "unterminated RTF modern protection password hash text group".to_string(),
+                )
+            })?;
+            match token {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    return Err(RtfError::MalformedDocument(
+                        "nested groups are not allowed in RTF modern protection password hash"
+                            .to_string(),
+                    ));
+                },
+                Token::Binary(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "binary data is not allowed in RTF modern protection password hash"
+                            .to_string(),
+                    ));
+                },
+                Token::Text(text) => {
+                    encoded_len = encoded_len.checked_add(text.len()).ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF modern protection password hash text size overflows".to_string(),
+                        )
+                    })?;
+                    if encoded_len > limit {
+                        return Err(RtfError::MalformedDocument(format!(
+                            "RTF modern protection password hash text group exceeds {limit} bytes"
+                        )));
+                    }
+                    for byte in text.bytes() {
+                        if byte.is_ascii_whitespace() {
+                            continue;
+                        }
+                        let nibble = match byte {
+                            b'0'..=b'9' => byte - b'0',
+                            b'a'..=b'f' => byte - b'a' + 10,
+                            b'A'..=b'F' => byte - b'A' + 10,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF passwordhash payload must be hexadecimal SDATA"
+                                        .to_string(),
+                                ));
+                            },
+                        };
+                        if let Some(high) = high_nibble.take() {
+                            if declared_size.is_some_and(|total| bytes.len() >= total) {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF passwordhash payload exceeds its declared size"
+                                        .to_string(),
+                                ));
+                            }
+                            if bytes.len() >= crate::info::MAX_PASSWORD_HASH_BYTES {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF passwordhash payload exceeds the safety limit".to_string(),
+                                ));
+                            }
+                            bytes.push((high << 4) | nibble);
+                            if bytes.len() == crate::info::PASSWORD_HASH_HEADER_BYTES {
+                                let total = bytes
+                                    .get(4..8)
+                                    .and_then(|value| <[u8; 4]>::try_from(value).ok())
+                                    .map(u32::from_le_bytes)
+                                    .ok_or_else(|| {
+                                        RtfError::MalformedDocument(
+                                            "RTF passwordhash size is truncated".to_string(),
+                                        )
+                                    })?;
+                                let total = usize::try_from(total).map_err(|_err| {
+                                    RtfError::MalformedDocument(
+                                        "RTF passwordhash size is not representable".to_string(),
+                                    )
+                                })?;
+                                if !(crate::info::PASSWORD_HASH_HEADER_BYTES
+                                    ..=crate::info::MAX_PASSWORD_HASH_BYTES)
+                                    .contains(&total)
+                                {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF passwordhash declared size is outside the supported payload bounds"
+                                            .to_string(),
+                                    ));
+                                }
+                                let remaining = total.saturating_sub(bytes.len());
+                                crate::error::try_reserve_additional(
+                                    &mut bytes,
+                                    remaining,
+                                    "RTF passwordhash payload",
+                                )?;
+                                declared_size = Some(total);
+                            }
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Token::Control(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "active controls are not allowed in RTF modern protection password hash"
+                            .to_string(),
+                    ));
+                },
+            }
+        }
+        if high_nibble.is_some() {
+            return Err(RtfError::MalformedDocument(
+                "RTF passwordhash payload has an odd number of hexadecimal digits".to_string(),
+            ));
+        }
+        if declared_size.is_some_and(|total| bytes.len() != total) {
+            return Err(RtfError::MalformedDocument(
+                "RTF passwordhash payload is shorter than its declared size".to_string(),
+            ));
+        }
+        Ok(bytes)
+    }
+
+    pub(super) fn parse_info_password_hash(&mut self) -> RtfResult<()> {
+        if self.info.protection.password_hash_data.is_some() {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF modern protection password hash".to_string(),
+            ));
+        }
+        self.pos += 2; // ignorable marker and passwordhash destination
+        let limit = crate::info::MAX_PASSWORD_HASH_BYTES
+            .saturating_mul(2)
+            .saturating_add(4096);
+        let bytes = self.parse_password_hash_hex_group_contents(limit)?;
+        self.info.protection.password_hash_data =
+            Some(crate::PasswordHash::from_bytes(Cow::Owned(bytes))?);
+        self.info.protection.validate()
+    }
+
     pub(super) fn ensure_protection_scope(&self) -> RtfResult<()> {
         if self.states.len() != 2 || self.body_text_len != 0 {
             return Err(RtfError::MalformedDocument(
