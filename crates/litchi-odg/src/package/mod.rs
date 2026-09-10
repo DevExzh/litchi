@@ -6,8 +6,8 @@ pub use litchi_core::patch::HistoryLimits;
 pub use snapshot::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
     DurablePatch, GeometryChange, JoinedEdits, LayerChange, Lineage, MergePlan, NameChange,
-    PageNameChange, PageStyleChange, Patch, PathChange, PreparedEdit, ResourceChange,
-    SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
+    PageNameChange, PageStyleChange, PageTransitionChange, Patch, PathChange, PreparedEdit,
+    ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
     SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
     SnapshotHistory as History, StructureChange, StyleChange, TextChange, Transaction,
     TransferControl, TransferResource, TransferStyle, TransferStyleResource,

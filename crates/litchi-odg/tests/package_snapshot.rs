@@ -199,6 +199,42 @@ fn complex_real_nested_group_geometry_change_reopens_and_inverts_exactly() {
 }
 
 #[test]
+fn cross_drawing_transfer_closes_inherited_producer_namespaces() {
+    const SOURCE: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:loext="urn:example:libreoffice-extension" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Source"><draw:rect draw:name="Producer shape" loext:custom-flag="retained"/></draw:page></office:drawing></office:body></office:document-content>"#;
+    const DESTINATION: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"#;
+
+    let package = |content: &str| {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.graphics")
+            .unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        writer.finish_to_bytes().unwrap()
+    };
+    let source = Drawing::from_bytes(package(SOURCE)).unwrap();
+    let destination = Drawing::from_bytes(package(DESTINATION)).unwrap();
+    let transfer = source.snapshot().prepare_shape_transfer(0, 0).unwrap();
+
+    let mut edit = destination.edit();
+    edit.insert_shape_transfer(0, 0, &transfer).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("xmlns:loext=\"urn:example:libreoffice-extension\"")
+    );
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("loext:custom-flag=\"retained\"")
+    );
+    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.pages()[0].shapes().len(), 1);
+}
+
+#[test]
 fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
     let bytes = REAL_DRAW_CORPUS
         .iter()

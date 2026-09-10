@@ -1,0 +1,334 @@
+{
+  "schema": "litchi.odg.v8.validation-manifest.v1",
+  "isolated_root": "/var/tmp/litchi-odg-v8-clean-20260910",
+  "scope": "ODG V8 clean derived from frozen V7; raw admission depth bounds before quick-xml open-name stack growth",
+  "baseline": {
+    "repository": "/home/zhuhe/code/litchi-spec-gaps",
+    "commit": "9d3da11b61f05707a5320e1c8145f07930f0bc8c",
+    "v7_clean_root": "/var/tmp/litchi-odg-v7-clean-20260910",
+    "v7_manifest": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/manifest-v7-reference.json",
+    "v7_manifest_sha256": "d51c234b80b0983e5f791e7e5ca039dfe3aa970c4b16097934f18c6cf537801f",
+    "v7_freeze_verification": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/v7-freeze-verification.txt"
+  },
+  "source": {
+    "shared_root": "/home/zhuhe/code/litchi",
+    "shared_worktree_touched_by_this_task": false,
+    "primary_worktree_touched_by_this_task": false,
+    "stage_or_commit_performed": false,
+    "paths": [
+      {
+        "path": "crates/litchi-odf-common/src/core/family.rs",
+        "base_commit_sha256": "2944d1e31770db86e781a8dbf368a8dce4b5d1e6245ffd275fd2b041e98d0c94",
+        "v4_sha256": null,
+        "v5_sha256": "c22ab147043493951a5c621fc5ae5dcd30ed8edf8081b0628f82597984145a4a",
+        "v5_vs_v4": "added",
+        "v6_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+        "v6_vs_v5": "modified",
+        "v7_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odf-common/src/core/package.rs",
+        "base_commit_sha256": "e896d014b4280c8e490787722a6ec57c3963632351790c089826b3a6015a7011",
+        "v3_clean_sha256": null,
+        "v4_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+        "v4_vs_v3": "modified",
+        "v5_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/docs/FEATURE_MATRIX.md",
+        "base_commit_sha256": "ab9783917c3a8a414cd27c03d6d327f24f6d100d84017232f84725a53ee7c9f6",
+        "v3_clean_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v4_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/facade/mod.rs",
+        "base_commit_sha256": "f28fafdc2f11f9350b0a8fc1ebc5eb502db9b914a499d063141b269a049064f3",
+        "v3_clean_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v4_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/flat.rs",
+        "base_commit_sha256": "39baff5c7a9bb9b539da9d9bd797787c4ef8321bb64907221a12c3c8a20fa987",
+        "v5_sha256": "39baff5c7a9bb9b539da9d9bd797787c4ef8321bb64907221a12c3c8a20fa987",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "dbd817653d7c01db5d36377d6f813dc929cccd1d82ee0bad6ee30703e6863742",
+        "v6_vs_v5": "modified",
+        "v7_sha256": "636f7772b0c7663009673788ab97b6d461396df98fc580f9c9564b2aafcefc7a",
+        "v7_vs_v6": "modified",
+        "v8_sha256": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+        "v8_vs_v7": "modified"
+      },
+      {
+        "path": "crates/litchi-odg/src/lib.rs",
+        "base_commit_sha256": "9d2a0b8357e9e3a3925f638e5e74e64a601a76ecbe3d74bd6f545f6977721aba",
+        "v3_clean_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v4_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/auxiliary.rs",
+        "base_commit_sha256": null,
+        "v3_clean_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v4_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/enhanced.rs",
+        "base_commit_sha256": null,
+        "v3_clean_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v4_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/mod.rs",
+        "base_commit_sha256": "5e37fb5577fb3d23d1485fb7e6c1bd05756fb3aa4a3b2a60de3660872db873c1",
+        "v3_clean_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v4_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/page.rs",
+        "base_commit_sha256": "13997a0f575ab7b3bc5af3687d869bd784c6daa3f1d7c3a0335ea0ef199ea60e",
+        "v3_clean_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v4_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/shape.rs",
+        "base_commit_sha256": "2e26ebba46ad1357b41284a63f946e1d2f861620cfe5b876406a68b76251a14e",
+        "v3_clean_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v4_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/model/transition.rs",
+        "base_commit_sha256": null,
+        "v3_clean_sha256": "0b6f828044fb462047ed68435537d000b08ad672752d0d7357a3cb32a8f328cc",
+        "v4_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+        "v4_vs_v3": "modified",
+        "v5_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/package/mod.rs",
+        "base_commit_sha256": "ac20f8a3d4eebf7fc6fbce36f0b542f2ab14a7b828997afd3c2c79eb493befe0",
+        "v3_clean_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v4_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/src/package/snapshot.rs",
+        "base_commit_sha256": "0f5e3ca9d1fb387ee41efade45db082599c7776b560c63373b69e82f0b1b2c5f",
+        "v3_clean_sha256": "59ec0a978770dbe8002b16695f1fbd401a4c298fc49bd416ca273fceb4abdeab",
+        "v4_sha256": "6de7a34c79aefea1aa5fc5c95e5a3c43c45667b57c4c0c8b4c82f43d69b9d25c",
+        "v4_vs_v3": "modified",
+        "v5_sha256": "12882e4898e05658fcace8969ca40286085fe79b4f1de19d6d79b99512f5aba9",
+        "v5_vs_v4": "modified",
+        "v6_sha256": "c6b8a684e3ee9a02183c8906b960a60db45a45c056fc98479ba24e3ef693dddc",
+        "v6_vs_v5": "modified",
+        "v7_sha256": "0b47043aeebbd754a034bf3c6150a1207cac96ec6806a4adc8c8b9d2c062c8b8",
+        "v7_vs_v6": "modified",
+        "v8_sha256": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+        "v8_vs_v7": "modified"
+      },
+      {
+        "path": "crates/litchi-odg/tests/allocation_admission.rs",
+        "base_commit_sha256": null,
+        "v4_sha256": null,
+        "v5_sha256": "f85aeee42b2fd08e455fbd24804b2338c6e13aaa5e19421be3e085ecaf8ce61e",
+        "v5_vs_v4": "added",
+        "v6_sha256": "3d5997448f68d8956e06b4e8dd06a4b63f17724ebe032a9396f8f16d0a5d96de",
+        "v6_vs_v5": "modified",
+        "v7_sha256": "4ab9fbdd3d234becf3ef5ff2e0327ccff42ef5071444a25756ac555ecb597d3e",
+        "v7_vs_v6": "modified",
+        "v8_sha256": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+        "v8_vs_v7": "modified"
+      },
+      {
+        "path": "crates/litchi-odg/tests/package_snapshot.rs",
+        "base_commit_sha256": "9dad1a14b2ab842c92194f69e23b9a62769d4edf1d1b02355956d9caa2915fee",
+        "v3_clean_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v4_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v4_vs_v3": "unchanged",
+        "v5_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v5_vs_v4": "unchanged",
+        "v6_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v6_vs_v5": "unchanged",
+        "v7_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+        "v8_vs_v7": "unchanged"
+      },
+      {
+        "path": "crates/litchi-odg/tests/page_transitions.rs",
+        "base_commit_sha256": null,
+        "v3_clean_sha256": "4a75c6a9d4cc2099099cccdb56439f84e25d86f23257cb6a87f974db5a8903fd",
+        "v4_sha256": "824a999b057694612a9db3cd0ff5ebfc4edabd9f74451abad232d91ce8fd3bd8",
+        "v4_vs_v3": "modified",
+        "v5_sha256": "07631f48d2dc3b88f55241fd114b1c53d35f236a583c703f863124d2cd791957",
+        "v5_vs_v4": "modified",
+        "v6_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+        "v6_vs_v5": "modified",
+        "v7_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+        "v7_vs_v6": "unchanged",
+        "v8_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+        "v8_vs_v7": "unchanged"
+      }
+    ]
+  },
+  "changes": [
+    "Both raw XML admission passes now track open-element depth against the existing 256-level ODG limit immediately after each borrowed Start or virtual Empty event; only the bounded max-plus-one quick-xml open-name state can exist before refusal, rather than an unbounded stack.",
+    "The package and Flat depth guards preserve quick-xml check_end_names and leave ordinary malformed/end-name diagnostics to the existing resolver/parser after bounded admission.",
+    "Added a public FlatDrawing allocation probe with eight million nested elements; it refuses at the depth limit before the reader can grow a large open-name stack and keeps observed post-input allocations below 32 MiB.",
+    "Documented the intentional Flat UTF-8-before-detector ordering: invalid UTF-8 retains a direct typed source error, while raw admission still precedes the detector because detector namespace resolution can own oversized root declarations."
+  ],
+  "normative": {
+    "depth_admission": "Raw admission enforces MAX_DEPTH=256 before requesting another event beyond the one current start state quick-xml has already opened; valid inputs at or below the limit retain existing check_end_names behavior. Empty events are checked at their virtual depth without growing the open-name stack.",
+    "allocation_probe": "The public deep-nesting probe constructs 8,000,000 nested <x> elements and asserts typed nesting refusal plus a bounded allocation envelope.",
+    "utf8_order": "Flat invalid UTF-8 is rejected directly before format classification by design; this gives a stable typed source error while protecting the detector NsReader with prior raw admission.",
+    "prior_v7_status": "V7 escaped namespace closure accounting and unknown-prefix/namespace declaration probes remain frozen and verified."
+  },
+  "runtime": {
+    "cpuset": "8-31",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "toolchain": "1.95.0",
+    "offline": true,
+    "target_dir": "/var/tmp/litchi-odg-v8-clean-target-20260910",
+    "tmpdir": "/var/tmp/litchi-odg-v8-clean-tmp-20260910"
+  },
+  "gates": {
+    "odg_tests": "pass: cargo test -p litchi-odg --offline --all-targets (includes eight allocation probes, including the 8,000,000-level public deep-nesting probe)",
+    "common_tests": "pass: cargo test -p litchi-odf-common --offline --all-targets",
+    "clippy": "pass: cargo clippy -p litchi-odg -p litchi-odf-common --offline --all-targets -- -D warnings",
+    "docs": "pass: RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-odg -p litchi-odf-common --offline --no-deps",
+    "fmt": "pass: cargo fmt -p litchi-odg -- --check under Rust 1.95"
+  },
+  "artifacts": {
+    "odg-test.log": {
+      "bytes": 8046,
+      "sha256": "c2dc9ee21386952cc4810faa03540bc4a3340632764312867d900bcb68374449"
+    },
+    "common-test.log": {
+      "bytes": 43639,
+      "sha256": "3d01c4cc073a5275b66629706252b90e20670ed65620c5961093bb877a86369a"
+    },
+    "clippy.log": {
+      "bytes": 215,
+      "sha256": "2433c8f4aa68c0c73774f19bca416e5d72b9c000ba50db26c773d4f1f0dd4006"
+    },
+    "docs.log": {
+      "bytes": 269,
+      "sha256": "a31b3e273733c002aae45f698ba7b2ab5477ea1c10b6ce49542ff3bf166c18e2"
+    },
+    "fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "v5-freeze-verification.txt": {
+      "bytes": 1843,
+      "sha256": "0743023ac4268b7a35e1011a2e582dd97b0b3f4e8d530286f2a430d75a0bfe7d"
+    },
+    "v6-freeze-verification.txt": {
+      "bytes": 1938,
+      "sha256": "94b07b25d2b618bfb41b8391255b57ba38d10a1981acb18f5a0b6e1d6287c0ff"
+    },
+    "v7-freeze-verification.txt": {
+      "bytes": 1938,
+      "sha256": "05977c93fc0b5e4c8ebfabbe8b97a9ef2e93a068b0f0f717efa7eda3c08a275f"
+    },
+    "manifest-v7-reference.json": {
+      "bytes": 16721,
+      "sha256": "d51c234b80b0983e5f791e7e5ca039dfe3aa970c4b16097934f18c6cf537801f"
+    }
+  }
+}
