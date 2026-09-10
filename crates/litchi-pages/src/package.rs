@@ -32,6 +32,7 @@ mod section_pagination;
 pub(crate) mod section_settings;
 mod section_text;
 mod section_transaction;
+pub(crate) mod table_cells;
 mod table_lock;
 #[cfg(feature = "internal-iwork-source")]
 mod text_storage;
@@ -151,6 +152,7 @@ pub use section_text::{
     SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
     SectionTextLimitKind, SectionTextPatch,
 };
+pub use table_cells::{BodyTableCellsError, BodyTableCellsLimitKind};
 pub use table_lock::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
     BodyTableLockLimitKind, BodyTableLockPatch,

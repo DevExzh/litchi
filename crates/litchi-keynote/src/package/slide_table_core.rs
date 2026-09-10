@@ -473,7 +473,7 @@ impl Budget {
         )
     }
 
-    fn storage_codec_options(
+    pub(crate) fn storage_codec_options(
         &self,
         package: &Package,
     ) -> Result<table_dimension_codec::DecodeOptions> {
@@ -647,7 +647,10 @@ impl Budget {
         self.nesting(requirements.max_depth as usize)
     }
 
-    fn storage_codec_report(&mut self, report: table_dimension_codec::DecodeReport) -> Result<()> {
+    pub(crate) fn storage_codec_report(
+        &mut self,
+        report: table_dimension_codec::DecodeReport,
+    ) -> Result<()> {
         self.input(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -1163,6 +1166,154 @@ pub(crate) struct Target {
     pub(crate) columns: u32,
     storage: Vec<StorageRoute>,
     pub(crate) locked: bool,
+}
+
+/// One rooted table display name and its canonical `TableInfo` identity.
+///
+/// Formula owner records refer to the native `TableInfo` object rather than
+/// to a semantic slide/table position.  Keeping this small source-backed
+/// projection private lets formula rendering resolve only identities proven
+/// through the same slide ownership graph as table selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootedTableName {
+    pub(crate) table_info_identifier: u64,
+    pub(crate) name: Box<str>,
+}
+
+/// Collect names for all rooted tables in presentation order.
+///
+/// This is deliberately the same ownership path used by [`select_table`]: a
+/// table must occur exactly once in both the slide's owned-drawable list and
+/// its z-order, its `TableInfo.super.parent` must name that slide, and its
+/// table-model message must be unique and canonical.  The caller uses the
+/// resulting names only while resolving formula owner references; native
+/// identifiers never cross the focused package API.
+pub(crate) fn rooted_table_name_catalog(
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<Vec<RootedTableName>> {
+    let maximum = package.semantic_limits().max_slides();
+    let mut names = Vec::new();
+    let mut seen_table_info = HashSet::new();
+
+    for slide_position in 0..maximum {
+        let Some(record) = package
+            .slide_record_at(slide_position)
+            .map_err(read_error)?
+        else {
+            break;
+        };
+        budget.work(1)?;
+        let slide = locate_object(package, record.slide_identifier)?;
+        let slide_object = object_at(package, &slide)?;
+        let (slide_message_index, slide_payload) =
+            unique_message(slide_object, SLIDE_MESSAGE_TYPE, budget)?;
+        let limits = budget.residual(package)?;
+        let owned =
+            repeated_references(slide_payload, SLIDE_OWNED_DRAWABLES_FIELD, limits, budget)?;
+        let z_order = repeated_references(slide_payload, SLIDE_Z_ORDER_FIELD, limits, budget)?;
+        budget.references(
+            owned
+                .len()
+                .checked_add(z_order.len())
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        reject_duplicates(&owned, budget)?;
+        reject_duplicates(&z_order, budget)?;
+        validate_slide_metadata(slide_object, slide_message_index, &owned, &z_order, budget)?;
+
+        for table_info_identifier in z_order {
+            let info_location = locate_object(package, table_info_identifier)?;
+            let info_object = object_at(package, &info_location)?;
+            let info_count = info_object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+                .count();
+            let has_role_alias = info_object.messages.iter().any(|message| {
+                ROLE_MESSAGE_TYPES.contains(&message.type_)
+                    && message.type_ != TABLE_INFO_MESSAGE_TYPE
+            });
+            if info_count == 0 {
+                if has_role_alias {
+                    return Err(Error::UnsupportedDependency);
+                }
+                continue;
+            }
+            if info_count != 1 || has_role_alias {
+                return Err(Error::UnsupportedDependency);
+            }
+            if owned
+                .iter()
+                .filter(|id| **id == table_info_identifier)
+                .count()
+                != 1
+            {
+                return Err(Error::InvalidSource);
+            }
+            let (info_message_index, info_payload) =
+                unique_message(info_object, TABLE_INFO_MESSAGE_TYPE, budget)?;
+            let info = decode_table_info(info_payload, package, budget)?;
+            if table_parent(info_payload, limits, budget)? != record.slide_identifier {
+                return Err(Error::InvalidSource);
+            }
+            let model_identifier = info.table_model().identifier().get();
+            validate_table_info_metadata(
+                package,
+                info_object,
+                info_message_index,
+                model_identifier,
+                budget,
+            )?;
+            let model_location = locate_object(package, model_identifier)?;
+            let model_object = object_at(package, &model_location)?;
+            let model_count = model_object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+                .count();
+            let has_model_role_alias = model_object.messages.iter().any(|message| {
+                ROLE_MESSAGE_TYPES.contains(&message.type_)
+                    && message.type_ != TABLE_MODEL_MESSAGE_TYPE
+            });
+            if model_count != 1 || has_model_role_alias {
+                return Err(Error::UnsupportedDependency);
+            }
+            let (_model_message_index, model_payload) =
+                unique_message(model_object, TABLE_MODEL_MESSAGE_TYPE, budget)?;
+            let options = budget.model_codec_options(package, model_payload)?;
+            let (model, report) =
+                table_model_discovery_codec::decode_table_model_with_report(model_payload, options)
+                    .map_err(|_| Error::Codec)?;
+            budget.codec_report(report)?;
+            budget.allocations(1)?;
+            budget.retained(size_of::<u64>())?;
+            seen_table_info
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation(1))?;
+            if !seen_table_info.insert(table_info_identifier) {
+                return Err(Error::UnsupportedDependency);
+            }
+            budget.allocations(1)?;
+            budget.retained(size_of::<RootedTableName>())?;
+            let name = model.table_name();
+            budget.allocations(1)?;
+            budget.retained(name.len())?;
+            budget.work(name.len())?;
+            let mut owned_name = String::new();
+            owned_name
+                .try_reserve_exact(name.len())
+                .map_err(|_| Error::Allocation(name.len()))?;
+            owned_name.push_str(name);
+            names.try_reserve(1).map_err(|_| Error::Allocation(1))?;
+            names.push(RootedTableName {
+                table_info_identifier,
+                name: owned_name.into_boxed_str(),
+            });
+        }
+    }
+
+    Ok(names)
 }
 
 impl Target {
@@ -4001,7 +4152,7 @@ fn optional_storage_route(
 /// archive metadata is the authority used by the IWA object graph, and an
 /// opaque row-carried identifier is safe to retain only when that authority
 /// names the same object at the canonical nested field path.
-fn validate_optional_model_route(
+pub(crate) fn validate_optional_model_route(
     package: &Package,
     target: &Target,
     identifier: u64,
@@ -6290,7 +6441,11 @@ fn validate_model_storage_metadata(
     Ok(())
 }
 
-fn ensure_unique_identity(package: &Package, identifier: u64, budget: &mut Budget) -> Result<()> {
+pub(crate) fn ensure_unique_identity(
+    package: &Package,
+    identifier: u64,
+    budget: &mut Budget,
+) -> Result<()> {
     let mut count = 0usize;
     for component in package.state.source.components().iter() {
         budget.components(1)?;

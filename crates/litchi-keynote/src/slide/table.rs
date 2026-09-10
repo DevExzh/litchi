@@ -10,6 +10,8 @@ pub use self::number_format::CellPosition;
 
 /// Effective appearance settings for a table's style graph.
 pub mod appearance;
+/// Archive-free values and comments returned by focused table reads.
+pub mod cells;
 /// Checked row and column point-size values.
 pub mod dimension;
 /// Formula values shared through the neutral iWork semantic model.

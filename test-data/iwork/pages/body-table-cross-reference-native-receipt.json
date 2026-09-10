@@ -1,0 +1,15 @@
+{
+  "fixture": "body-table-cross-reference-native.pages",
+  "application": "Pages",
+  "verified_date": "2026-09-10",
+  "source": "body-table-read-native.pages",
+  "creation": "Copied the native table-read control; entered =Table 1::B2+1 into Table 2 A3 in Pages.",
+  "verification": [
+    "Formula editor visually showed Table 1::B2 reference token followed by +1.",
+    "Saved, closed, and reopened the exact file in Pages.",
+    "Table 2 A3 displayed 13.5 as a formula result after reopening."
+  ],
+  "scope": "Native cross-table formula reference; retains the two original tables and Unicode comment control.",
+  "sha256": "abe0f0068dfb2736ce59bb765043b45c1054d6fe630642bb4e286f65241f4580",
+  "size_bytes": 139820
+}

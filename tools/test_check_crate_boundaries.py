@@ -1107,6 +1107,202 @@ def add_iwa_numbers_wire_table_data_list_scaffold(
         path.write_text(reader, encoding="utf-8")
 
 
+def add_iwa_table_cell_read_scaffold(
+    root: Path,
+    *,
+    common_source: str | None = None,
+    common_module_source: str | None = None,
+    cells_source: str | None = None,
+    sidecars_source: str | None = None,
+    wire_lib_source: str | None = None,
+    pages_source: str | None = None,
+    pages_package_source: str | None = None,
+    keynote_source: str | None = None,
+    keynote_package_source: str | None = None,
+    include_pages: bool = True,
+    include_keynote: bool = True,
+) -> None:
+    """Install minimal common, wire, and focused table-cell owners."""
+
+    common = root / boundaries.IWA_COMMON_TABLE_READ_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text(
+        common_source
+        if common_source is not None
+        else (
+            "pub type Result<T> = std::result::Result<T, Error>;\n"
+            "pub struct CommentTimestamp(u64);\n"
+            "pub struct CommentAuthor;\n"
+            "pub struct CommentReply;\n"
+            "pub struct Comment;\n"
+            "pub struct CellComment;\n"
+            "pub struct TableRead;\n"
+            "pub struct Builder;\n"
+        ),
+        encoding="utf-8",
+    )
+    module = root / boundaries.NEUTRAL_TABLE_MODULE_SOURCE
+    module.parent.mkdir(parents=True, exist_ok=True)
+    module.write_text(
+        common_module_source if common_module_source is not None else "pub mod read;\n",
+        encoding="utf-8",
+    )
+
+    cells = root / boundaries.IWA_NUMBERS_WIRE_TABLE_CELLS_SOURCE
+    cells.parent.mkdir(parents=True, exist_ok=True)
+    cells.write_text(
+        cells_source
+        if cells_source is not None
+        else (
+            "use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;\n"
+            "use crate::cell_value::decode_cell_value;\n"
+            "pub struct TableDimensions;\n"
+            "pub struct TileReference;\n"
+            "pub struct CellSource<'source> { bytes: &'source [u8] }\n"
+            "pub enum TableCellIssue { CellStorageOutOfBounds, CellValueDecode }\n"
+            "pub struct TableCellReadReport;\n"
+            "pub trait TableCellReadBudget { type Error; }\n"
+            "pub trait CellValueSink<Budget: TableCellReadBudget> {}\n"
+            "pub fn read_table_cells() {\n"
+            "    let _ = decode_cell_value;\n"
+            "    let _ = storage::decode_tile_with_visitor;\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    sidecars = root / boundaries.IWA_NUMBERS_WIRE_TABLE_SIDECARS_SOURCE
+    sidecars.parent.mkdir(parents=True, exist_ok=True)
+    sidecars.write_text(
+        sidecars_source
+        if sidecars_source is not None
+        else (
+            "use litchi_iwa_common::table::read::TableRead;\n"
+            "use litchi_iwa_protos::comment_storage_codec;\n"
+            "use crate::table_data_list::read_list_with_decoder;\n"
+            "pub enum SidecarKind { Strings, Comments }\n"
+            "pub struct SidecarReference;\n"
+            "pub enum SidecarValue { Text }\n"
+            "pub struct SidecarList;\n"
+            "pub struct SidecarTables;\n"
+            "pub trait SidecarReadBudget { type Error; }\n"
+            "pub trait CellSidecarResolver { type Error; }\n"
+            "pub fn read_sidecar_list() { let _ = read_list_with_decoder; }\n"
+            "pub fn read_comment_storage() { let _ = comment_storage_codec; }\n"
+            "impl SidecarTables { pub fn materialize_cell() { let _ = TableRead::builder; } }\n"
+        ),
+        encoding="utf-8",
+    )
+    wire_lib = root / boundaries.IWA_NUMBERS_WIRE_TABLE_CELLS_LIB_SOURCE
+    wire_lib.parent.mkdir(parents=True, exist_ok=True)
+    wire_lib.write_text(
+        wire_lib_source
+        if wire_lib_source is not None
+        else "pub mod table_cells;\npub mod table_sidecars;\n",
+        encoding="utf-8",
+    )
+
+    def focused_source(method: str, selector: str) -> str:
+        return (
+            "use litchi_iwa_common::table::read::TableRead;\n"
+            "use litchi_numbers_wire::table_cells::{read_table_cells, TableCellReadBudget};\n"
+            "use litchi_numbers_wire::table_sidecars::{read_sidecar_list, SidecarReadBudget};\n"
+            "struct Budget;\n"
+            "impl TableCellReadBudget for Budget { type Error = (); }\n"
+            "impl SidecarReadBudget for Budget { type Error = (); }\n"
+            "struct Package;\n"
+            f"impl Package {{\n    pub fn {method}<S>(&self, {selector}: S) -> Result<TableRead, ()> {{\n"
+            "        let mut budget = Budget;\n"
+            "        read_sidecar_list();\n"
+            "        read_table_cells();\n"
+            "        let _ = (&mut budget, " + selector + ");\n"
+            "        Ok(TableRead::builder())\n"
+            "    }\n}\n"
+        )
+
+    if include_pages:
+        pages = root / boundaries.PAGES_TABLE_CELLS_SOURCE
+        pages.parent.mkdir(parents=True, exist_ok=True)
+        pages.write_text(
+            pages_source
+            if pages_source is not None
+            else focused_source("body_table_cells", "selector"),
+            encoding="utf-8",
+        )
+        package = root / boundaries.PAGES_TABLE_CELLS_PACKAGE_SOURCE
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            pages_package_source
+            if pages_package_source is not None
+            else "pub(crate) mod table_cells;\n",
+            encoding="utf-8",
+        )
+
+    if include_keynote:
+        keynote = root / boundaries.KEYNOTE_TABLE_CELLS_SOURCE
+        keynote.parent.mkdir(parents=True, exist_ok=True)
+        keynote.write_text(
+            keynote_source
+            if keynote_source is not None
+            else focused_source("slide_table_cells", "slide"),
+            encoding="utf-8",
+        )
+        package = root / boundaries.KEYNOTE_TABLE_CELLS_PACKAGE_SOURCE
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            keynote_package_source
+            if keynote_package_source is not None
+            else "pub(crate) mod slide_table_cells;\n",
+            encoding="utf-8",
+        )
+
+
+def add_iwa_numbers_wire_formula_names_scaffold(
+    root: Path,
+    *,
+    source: str | None = None,
+    lib_source: str | None = None,
+) -> None:
+    """Install a minimal bounded formula-name wire owner."""
+
+    owner = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_NAMES_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        source
+        if source is not None
+        else (
+            "use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};\n"
+            "use litchi_iwa_protos::group_node_category_codec;\n"
+            "pub struct ReadLimits;\n"
+            "pub struct ReadReport;\n"
+            "pub struct FormulaOwnerDependencies;\n"
+            "pub struct FormulaOwnerReadError;\n"
+            "pub struct CategoryReadLimits;\n"
+            "pub enum CategoryLabel<'source> { String(&'source str) }\n"
+            "pub struct CategoryName<'source> { label: CategoryLabel<'source> }\n"
+            "pub struct CategoryRead<'source> { entries: Vec<CategoryName<'source>> }\n"
+            "pub struct CategoryReadError;\n"
+            "pub fn read_formula_owner_dependencies(source: &[u8], limits: ReadLimits)\n"
+            "    -> Result<FormulaOwnerDependencies, FormulaOwnerReadError> {\n"
+            "    let _ = (source, limits, preflight_wire_tree_with_limits, WireDescent);\n"
+            "    todo!()\n"
+            "}\n"
+            "pub fn read_formula_category_names<'source>(source: &'source [u8], limits: CategoryReadLimits)\n"
+            "    -> Result<CategoryRead<'source>, CategoryReadError> {\n"
+            "    let _ = (source, limits, group_node_category_codec);\n"
+            "    todo!()\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+    lib = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_NAMES_LIB_SOURCE
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        lib_source if lib_source is not None else "pub mod formula_names;\n",
+        encoding="utf-8",
+    )
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -47559,6 +47755,182 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_numbers_wire_table_data_list_ownership()",
             main_source,
         )
+
+    def test_table_cell_read_boundaries_accept_shared_and_focused_owners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            for audit in (
+                boundaries.audit_iwa_common_table_read_source_topology,
+                boundaries.audit_iwa_numbers_wire_table_cells_source_topology,
+                boundaries.audit_iwa_numbers_wire_table_sidecars_source_topology,
+                boundaries.audit_pages_table_cells_source_topology,
+                boundaries.audit_keynote_table_cells_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [])
+
+    def test_common_table_read_boundary_rejects_physical_imports_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(
+                root,
+                common_source=(
+                    "use litchi_numbers_wire::table_cells::TableDimensions;\n"
+                    "pub struct CommentTimestamp(u64);\n"
+                    "pub struct CommentAuthor;\n"
+                    "pub struct CommentReply;\n"
+                    "pub struct Comment;\n"
+                    "pub struct CellComment;\n"
+                    "pub struct TableRead;\n"
+                    "pub struct Builder;\n"
+                    "pub fn leaked(table_id: u64) {}\n"
+                ),
+            )
+            violations = boundaries.audit_iwa_common_table_read_source_topology(root)
+            self.assertTrue(
+                any("imports a concrete format, wire, or protobuf" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exposes a raw ID parameter" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_wire_table_cell_owners_retain_shared_routes_and_peer_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            # Replace the generated source after the scaffold has installed it
+            # so the mutation stays focused on the peer dependency rule.
+            cells = root / boundaries.IWA_NUMBERS_WIRE_TABLE_CELLS_SOURCE
+            cells.write_text(
+                cells.read_text(encoding="utf-8")
+                + "use litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_cells_source_topology(root)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+
+            sidecars = root / boundaries.IWA_NUMBERS_WIRE_TABLE_SIDECARS_SOURCE
+            sidecars.write_text(
+                sidecars.read_text(encoding="utf-8").replace(
+                    "use crate::table_data_list::read_list_with_decoder;\n", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_sidecars_source_topology(root)
+            self.assertTrue(any("missing a required shared import" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_reject_public_physical_apis_and_separate_budgets(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            pages = root / boundaries.PAGES_TABLE_CELLS_SOURCE
+            pages.write_text(
+                pages.read_text(encoding="utf-8")
+                + "pub struct ExposedSnapshot(TableModelSnapshot);\n"
+                + "impl Package {\n"
+                + "    pub fn leaked(&self, table_id: u64, bytes: &[u8]) -> Result<TableRead, ()> { todo!() }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_cells_source_topology(root)
+            self.assertTrue(any("exposes generated or wire type" in item for item in violations), violations)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("exposes a raw ID parameter" in item for item in violations), violations)
+
+            pages.write_text(
+                pages.read_text(encoding="utf-8").replace(
+                    "impl SidecarReadBudget for Budget { type Error = (); }",
+                    "impl SidecarReadBudget for OtherBudget { type Error = (); }",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_cells_source_topology(root)
+            self.assertTrue(any("separate aggregate budget types" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_require_private_modules_and_delegation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            package = root / boundaries.KEYNOTE_TABLE_CELLS_PACKAGE_SOURCE
+            package.write_text("pub mod slide_table_cells;\n", encoding="utf-8")
+            keynote = root / boundaries.KEYNOTE_TABLE_CELLS_SOURCE
+            keynote.write_text(
+                keynote.read_text(encoding="utf-8")
+                .replace("read_sidecar_list();\n", "")
+                .replace("use litchi_numbers_wire::table_sidecars", "use litchi_keynote::table_sidecars"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_table_cells_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+            self.assertTrue(any("must delegate through read_sidecar_list" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_allow_adapter_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(
+                root,
+                include_pages=False,
+                include_keynote=False,
+            )
+            self.assertEqual(boundaries.audit_pages_table_cells_source_topology(root), [])
+            self.assertEqual(boundaries.audit_keynote_table_cells_source_topology(root), [])
+
+    def test_table_cell_read_boundaries_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_iwa_common_table_read_source_topology",
+            "audit_iwa_numbers_wire_table_cells_source_topology",
+            "audit_iwa_numbers_wire_table_sidecars_source_topology",
+            "audit_iwa_numbers_wire_formula_names_source_topology",
+            "audit_pages_table_cells_source_topology",
+            "audit_keynote_table_cells_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
+
+    def test_numbers_wire_formula_names_boundary_accepts_bounded_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root),
+                [],
+            )
+
+    def test_numbers_wire_formula_names_boundary_rejects_missing_route_and_peer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root)
+            owner = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_NAMES_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                .replace("pub fn read_formula_category_names", "pub fn removed_category_names")
+                + "use litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root)
+            self.assertTrue(any("missing public read_formula_category_names" in item for item in violations), violations)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+
+    def test_numbers_wire_formula_names_boundary_requires_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root, lib_source="pub mod other;\n")
+            violations = boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root)
+            self.assertTrue(any("missing its public module export" in item for item in violations), violations)
+
+    def test_numbers_wire_formula_names_boundary_allows_owner_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root),
+                [],
+            )
 
     def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

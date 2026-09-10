@@ -69542,6 +69542,186 @@ PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
 )
 KEYNOTE_TABLE_MERGE_FORBIDDEN_MODULES = PAGES_TABLE_MERGE_FORBIDDEN_MODULES
 
+# Selected table-cell reads share the same three-layer boundary as merged
+# geometry: the common crate publishes only archive-free semantic results, the
+# Numbers wire crate owns borrowed storage/sidecar traversal, and each focused
+# format adapter proves its graph selection while delegating both walks through
+# one aggregate budget.  Keep these checks at the public/source seam.  Private
+# adapter helpers are intentionally allowed to mention generated snapshots and
+# native identifiers; the public selector-first method must not leak them.
+IWA_COMMON_TABLE_READ_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "read.rs"
+IWA_COMMON_TABLE_READ_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?read\b"
+)
+IWA_COMMON_TABLE_READ_PUBLIC_TYPES = frozenset(
+    {"CellComment", "Comment", "CommentAuthor", "CommentReply", "CommentTimestamp", "TableRead", "Builder"}
+)
+IWA_COMMON_TABLE_READ_IMPORT_STATEMENT = re.compile(
+    r"(?ms)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+    r"(?:use|extern[ \t]+crate)\b.*?;"
+)
+IWA_COMMON_TABLE_READ_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"litchi_iwa(?:_(?:archive|core|protos|package|structured|text_wire))?|"
+    r"litchi_numbers(?:_wire)?|litchi_pages|litchi_keynote|"
+    r"buffa|prost(?:_types)?|archive|protobuf|proto|wire"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_TABLE_READ_PUBLIC_PHYSICAL_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Archive(?:Object)?|RawMessage|IWorkPackage|Native(?:Id|Object)|"
+    r"(?:Object|Package|Table|DataStore|Tile|Sidecar)Id|"
+    r"(?:TableModel|DataStore|Native|Tile|Sidecar)Snapshot|"
+    r"DecodeOptions|Wire(?:View|Limits|FieldView|Descent)|"
+    r"(?:Formula|Ast)Archive|prost(?:_types)?|buffa"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_TABLE_READ_RAW_ID_PARAMETER = re.compile(
+    r"\b(?:table|model|drawable|object|native|slide|sheet|tile|storage|"
+    r"sidecar|package|data_store|cell|row|column)?"
+    r"_?(?:id|identifier)\b[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
+)
+
+IWA_NUMBERS_WIRE_TABLE_CELLS_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/table_cells.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_LIB_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/lib.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_cells\b"
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_TYPES = frozenset(
+    {"TableDimensions", "TileReference", "CellSource", "TableCellIssue", "TableCellReadReport"}
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_TRAITS = frozenset(
+    {"TableCellReadBudget", "CellValueSink"}
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_IMPORTS = (
+    re.compile(r"\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*numbers_table_cell_storage_codec\b"),
+    re.compile(r"\bcrate[ \t\r\n]*::[ \t\r\n]*cell_value\b"),
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_MARKERS = (
+    "decode_tile_with_visitor",
+    "decode_cell_value",
+    "TableCellIssue",
+)
+IWA_NUMBERS_WIRE_TABLE_CELLS_PEER_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:litchi_numbers|litchi_pages|litchi_keynote|litchi_iwa)"
+    r"(?![A-Za-z0-9_])"
+)
+
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/table_sidecars.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_LIB_SOURCE = IWA_NUMBERS_WIRE_TABLE_CELLS_LIB_SOURCE
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_sidecars\b"
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_TYPES = frozenset(
+    {"SidecarKind", "SidecarReference", "SidecarValue", "SidecarList", "SidecarTables"}
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_TRAITS = frozenset(
+    {"SidecarReadBudget", "CellSidecarResolver"}
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_FUNCTIONS = frozenset(
+    {"read_sidecar_list", "read_comment_storage"}
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_IMPORTS = (
+    re.compile(r"\btable_data_list[ \t\r\n]*::[ \t\r\n]*read_list_with_decoder\b"),
+    re.compile(r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table[ \t\r\n]*::[ \t\r\n]*read\b"),
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_MARKERS = (
+    "read_list_with_decoder",
+    "materialize_cell",
+    "CellSidecarResolver",
+)
+IWA_NUMBERS_WIRE_TABLE_SIDECARS_PEER_IMPORT = IWA_NUMBERS_WIRE_TABLE_CELLS_PEER_IMPORT
+
+# Formula-owner identity and category labels are another low-level Numbers
+# wire seam.  The owner may use the generated GroupNode codec, but it must
+# publish borrowed/scalar projections and keep concrete format crates out of
+# its dependency surface.  Reader migration is checked separately once a
+# focused package actually consumes these APIs.
+IWA_NUMBERS_WIRE_FORMULA_NAMES_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/formula_names.rs"
+)
+IWA_NUMBERS_WIRE_FORMULA_NAMES_LIB_SOURCE = IWA_NUMBERS_WIRE_TABLE_CELLS_LIB_SOURCE
+IWA_NUMBERS_WIRE_FORMULA_NAMES_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?formula_names\b"
+)
+IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_TYPES = frozenset(
+    {
+        "ReadLimits",
+        "ReadReport",
+        "FormulaOwnerDependencies",
+        "FormulaOwnerReadError",
+        "CategoryReadLimits",
+        "CategoryLabel",
+        "CategoryName",
+        "CategoryRead",
+        "CategoryReadError",
+    }
+)
+IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_FUNCTIONS = frozenset(
+    {"read_formula_owner_dependencies", "read_formula_category_names"}
+)
+IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_MARKERS = (
+    "preflight_wire_tree_with_limits",
+    "group_node_category_codec",
+    "WireDescent",
+    "read_formula_owner_dependencies",
+    "read_formula_category_names",
+)
+IWA_NUMBERS_WIRE_FORMULA_NAMES_PEER_IMPORT = IWA_NUMBERS_WIRE_TABLE_CELLS_PEER_IMPORT
+
+PAGES_TABLE_CELLS_SOURCE = Path("crates/litchi-pages/src/package/table_cells.rs")
+KEYNOTE_TABLE_CELLS_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_table_cells.rs"
+)
+PAGES_TABLE_CELLS_PACKAGE_SOURCE = Path("crates/litchi-pages/src/package.rs")
+KEYNOTE_TABLE_CELLS_PACKAGE_SOURCE = Path("crates/litchi-keynote/src/package.rs")
+PAGES_TABLE_CELLS_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+"
+    r"(?:r#)?table_cells\b[ \t]*(?:;|\{)"
+)
+KEYNOTE_TABLE_CELLS_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+"
+    r"(?:r#)?slide_table_cells\b[ \t]*(?:;|\{)"
+)
+IWA_FOCUSED_TABLE_CELLS_COMMON_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table[ \t\r\n]*::"
+    r"[ \t\r\n]*read\b"
+)
+IWA_FOCUSED_TABLE_CELLS_WIRE_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*table_cells\b"
+)
+IWA_FOCUSED_TABLE_CELLS_SIDECAR_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*table_sidecars\b"
+)
+IWA_FOCUSED_TABLE_CELLS_WIRE_CALL = re.compile(r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?read_table_cells\s*\(")
+IWA_FOCUSED_TABLE_CELLS_SIDECAR_CALL = re.compile(r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?read_sidecar_list\s*\(")
+IWA_FOCUSED_TABLE_CELLS_COMMON_CONSTRUCTOR = re.compile(
+    r"\bTableRead[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:builder|new|try_from_(?:owned_parts|comments|parts))"
+    r"[ \t\r\n]*\("
+)
+IWA_FOCUSED_TABLE_CELLS_PEER_IMPORT = IWA_NUMBERS_WIRE_TABLE_CELLS_PEER_IMPORT
+IWA_FOCUSED_TABLE_CELLS_GENERATED_PUBLIC = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"RawMessage|TableModelSnapshot|DataStoreSnapshot|NativeMessages|"
+    r"TileReference|SidecarReference|Sidecar(?:List|Tables|Value)|"
+    r"DecodeOptions|Wire(?:View|Limits|FieldView|Descent)|"
+    r"FormulaArchive|AstNode(?:Archive|Type)|numbers_[A-Za-z0-9_]+_codec|"
+    r"litchi_iwa_protos|prost(?:_types)?|buffa"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_FOCUSED_TABLE_CELLS_BUDGET_IMPL = re.compile(
+    r"(?m)^\s*impl\s+(?P<trait>TableCellReadBudget|SidecarReadBudget)"
+    r"\s+for\s+(?P<owner>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+
 
 def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the cell-border value in common and the old path compatibility-only."""
@@ -70291,6 +70471,447 @@ def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     )
 
 
+def audit_iwa_common_table_read_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the archive-free table-read vocabulary in the common crate."""
+
+    source_path = root / IWA_COMMON_TABLE_READ_SOURCE
+    module_path = root / NEUTRAL_TABLE_MODULE_SOURCE
+    if not source_path.is_file() and not module_path.is_file():
+        return []
+
+    violations: list[str] = []
+    if not source_path.is_file():
+        violations.append(
+            "common table-read semantic owner is missing: "
+            f"{IWA_COMMON_TABLE_READ_SOURCE}"
+        )
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+    if not module_path.is_file():
+        violations.append(
+            "common table module is missing its table-read export: "
+            f"{NEUTRAL_TABLE_MODULE_SOURCE}"
+        )
+    else:
+        module_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(module_path.read_text(encoding="utf-8"))
+        )
+        if IWA_COMMON_TABLE_READ_MODULE.search(module_code) is None:
+            violations.append(
+                "common table module is missing public table-read module: "
+                f"{NEUTRAL_TABLE_MODULE_SOURCE}"
+            )
+
+    for name in sorted(IWA_COMMON_TABLE_READ_PUBLIC_TYPES):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                "common table-read semantic owner is missing public "
+                f"{name}: {IWA_COMMON_TABLE_READ_SOURCE}"
+            )
+
+    for statement in IWA_COMMON_TABLE_READ_IMPORT_STATEMENT.finditer(code):
+        forbidden = IWA_COMMON_TABLE_READ_FORBIDDEN_IMPORT.search(statement.group())
+        if forbidden is None:
+            continue
+        line_number = code.count("\n", 0, statement.start() + forbidden.start()) + 1
+        violations.append(
+            "common table-read semantic owner imports a concrete format, wire, "
+            f"or protobuf crate ({forbidden.group()}): "
+            f"{IWA_COMMON_TABLE_READ_SOURCE}:{line_number}"
+        )
+
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(raw_source)
+    ):
+        physical = IWA_TABLE_READ_PUBLIC_PHYSICAL_TYPES.search(declaration)
+        if physical is not None:
+            physical_line = line_number + declaration.count("\n", 0, physical.start())
+            violations.append(
+                "common table-read semantic owner exposes a physical or generated "
+                f"type {physical.group()}: {IWA_COMMON_TABLE_READ_SOURCE}:{physical_line}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                "common table-read semantic owner exposes raw bytes: "
+                f"{IWA_COMMON_TABLE_READ_SOURCE}:{line_number}"
+            )
+        raw_id = IWA_TABLE_READ_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            raw_id_line = line_number + declaration.count("\n", 0, raw_id.start())
+            violations.append(
+                "common table-read semantic owner exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: "
+                f"{IWA_COMMON_TABLE_READ_SOURCE}:{raw_id_line}"
+            )
+
+    return sorted(set(violations))
+
+
+def _audit_iwa_numbers_wire_table_owner(
+    root: Path,
+    *,
+    source_path: Path,
+    lib_path: Path,
+    module_pattern: re.Pattern[str],
+    required_types: frozenset[str],
+    required_traits: frozenset[str],
+    required_functions: frozenset[str],
+    required_imports: tuple[re.Pattern[str], ...],
+    required_markers: tuple[str, ...],
+    peer_import: re.Pattern[str],
+    label: str,
+) -> list[str]:
+    """Audit one low-level Numbers-wire table reader owner."""
+
+    owner_path = root / source_path
+    lib_absolute = root / lib_path
+    if not owner_path.is_file() and not lib_absolute.is_file():
+        return []
+    if not owner_path.is_file():
+        return [f"Numbers wire {label} owner is missing: {source_path}"]
+
+    violations: list[str] = []
+    raw_source = owner_path.read_text(encoding="utf-8")
+    code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+    if not lib_absolute.is_file():
+        violations.append(
+            f"Numbers wire {label} owner is missing its crate export: {lib_path}"
+        )
+    else:
+        lib_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(lib_absolute.read_text(encoding="utf-8"))
+        )
+        if module_pattern.search(lib_code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing its public module export: "
+                f"{lib_path}"
+            )
+
+    for name in sorted(required_types):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing public {name}: {source_path}"
+            )
+    for name in sorted(required_traits):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+trait[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing public {name}: {source_path}"
+            )
+    for name in sorted(required_functions):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing public {name}: {source_path}"
+            )
+    for pattern in required_imports:
+        if pattern.search(code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing a required shared import: "
+                f"{source_path}"
+            )
+    for marker in required_markers:
+        if re.search(rf"\b{re.escape(marker)}\b", code) is None:
+            violations.append(
+                f"Numbers wire {label} owner is missing its {marker} route: "
+                f"{source_path}"
+            )
+
+    for statement in IWA_COMMON_TABLE_READ_IMPORT_STATEMENT.finditer(code):
+        concrete_peer = peer_import.search(statement.group())
+        if concrete_peer is None:
+            continue
+        line_number = code.count("\n", 0, statement.start() + concrete_peer.start()) + 1
+        violations.append(
+            f"Numbers wire {label} owner imports a concrete format peer "
+            f"{concrete_peer.group()}: {source_path}:{line_number}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_wire_table_cells_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep selected table-cell storage traversal in the Numbers wire owner."""
+
+    return _audit_iwa_numbers_wire_table_owner(
+        root,
+        source_path=IWA_NUMBERS_WIRE_TABLE_CELLS_SOURCE,
+        lib_path=IWA_NUMBERS_WIRE_TABLE_CELLS_LIB_SOURCE,
+        module_pattern=IWA_NUMBERS_WIRE_TABLE_CELLS_MODULE,
+        required_types=IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_TYPES,
+        required_traits=IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_TRAITS,
+        required_functions=frozenset({"read_table_cells"}),
+        required_imports=IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_IMPORTS,
+        required_markers=IWA_NUMBERS_WIRE_TABLE_CELLS_REQUIRED_MARKERS,
+        peer_import=IWA_NUMBERS_WIRE_TABLE_CELLS_PEER_IMPORT,
+        label="table-cell",
+    )
+
+
+def audit_iwa_numbers_wire_table_sidecars_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep selected table sidecar traversal and conversion in wire."""
+
+    return _audit_iwa_numbers_wire_table_owner(
+        root,
+        source_path=IWA_NUMBERS_WIRE_TABLE_SIDECARS_SOURCE,
+        lib_path=IWA_NUMBERS_WIRE_TABLE_SIDECARS_LIB_SOURCE,
+        module_pattern=IWA_NUMBERS_WIRE_TABLE_SIDECARS_MODULE,
+        required_types=IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_TYPES,
+        required_traits=IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_TRAITS,
+        required_functions=IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_FUNCTIONS,
+        required_imports=IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_IMPORTS,
+        required_markers=IWA_NUMBERS_WIRE_TABLE_SIDECARS_REQUIRED_MARKERS,
+        peer_import=IWA_NUMBERS_WIRE_TABLE_SIDECARS_PEER_IMPORT,
+        label="table-sidecar",
+    )
+
+
+def audit_iwa_numbers_wire_formula_names_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep formula-owner identity and category labels in Numbers wire."""
+
+    return _audit_iwa_numbers_wire_table_owner(
+        root,
+        source_path=IWA_NUMBERS_WIRE_FORMULA_NAMES_SOURCE,
+        lib_path=IWA_NUMBERS_WIRE_FORMULA_NAMES_LIB_SOURCE,
+        module_pattern=IWA_NUMBERS_WIRE_FORMULA_NAMES_MODULE,
+        required_types=IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_TYPES,
+        required_traits=frozenset(),
+        required_functions=IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_FUNCTIONS,
+        required_imports=(
+            re.compile(
+                r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*wire\b"
+            ),
+            re.compile(
+                r"\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*"
+                r"group_node_category_codec\b"
+            ),
+        ),
+        required_markers=IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_MARKERS,
+        peer_import=IWA_NUMBERS_WIRE_FORMULA_NAMES_PEER_IMPORT,
+        label="formula-name",
+    )
+
+
+def _audit_focused_table_cells_source_topology(
+    root: Path,
+    *,
+    format_name: str,
+    owner_path: Path,
+    package_path: Path,
+    module_pattern: re.Pattern[str],
+    public_method: str,
+) -> list[str]:
+    """Protect one focused selector-first table-cell semantic adapter."""
+
+    owner_absolute = root / owner_path
+    package_absolute = root / package_path
+    package_source = (
+        package_absolute.read_text(encoding="utf-8")
+        if package_absolute.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(_mask_rust_cfg_test_items(package_source))
+    module_match = module_pattern.search(package_code)
+
+    implementation_sources: list[tuple[Path, str]] = []
+    if package_absolute.is_file():
+        implementation_sources.append((package_path, package_source))
+    package_directory = package_absolute.parent / package_absolute.stem
+    if package_directory.is_dir():
+        implementation_sources.extend(
+            (path.relative_to(root), path.read_text(encoding="utf-8"))
+            for path in sorted(package_directory.glob("*.rs"))
+        )
+    method_evidence = [
+        (path, declaration, body, line)
+        for path, source in implementation_sources
+        for declaration, body, line in _rust_public_method_bodies(source, public_method)
+    ]
+
+    # A completely absent focused API is the expected end state when a host
+    # package is retired.  A package module, owner file, or public method is a
+    # partial migration and therefore remains subject to the ratchet.
+    if not owner_absolute.is_file() and module_match is None and not method_evidence:
+        return []
+
+    violations: list[str] = []
+    if not owner_absolute.is_file():
+        violations.append(
+            f"{format_name} table-cell focused owner is missing: {owner_path}"
+        )
+    if module_match is None:
+        violations.append(
+            f"{format_name} table-cell package is missing its focused module: "
+            f"{package_path}"
+        )
+    module_name = "slide_table_cells" if "Keynote" == format_name else "table_cells"
+    if re.search(
+        rf"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?{re.escape(module_name)}\b",
+        package_code,
+    ):
+        violations.append(
+            f"{format_name} table-cell focused module must remain private: "
+            f"{package_path}"
+        )
+
+    focused_source = (
+        owner_absolute.read_text(encoding="utf-8")
+        if owner_absolute.is_file()
+        else package_source
+    )
+    focused_code = _mask_rust_non_code(_mask_rust_cfg_test_items(focused_source))
+    relative_owner = owner_path if owner_absolute.is_file() else package_path
+
+    for pattern, description in (
+        (IWA_FOCUSED_TABLE_CELLS_COMMON_IMPORT, "common table-read"),
+        (IWA_FOCUSED_TABLE_CELLS_WIRE_IMPORT, "Numbers wire table-cell"),
+        (IWA_FOCUSED_TABLE_CELLS_SIDECAR_IMPORT, "Numbers wire table-sidecar"),
+    ):
+        if pattern.search(focused_code) is None:
+            violations.append(
+                f"{format_name} table-cell focused owner is missing its "
+                f"{description} import: {relative_owner}"
+            )
+    for pattern, description in (
+        (IWA_FOCUSED_TABLE_CELLS_WIRE_CALL, "read_table_cells"),
+        (IWA_FOCUSED_TABLE_CELLS_SIDECAR_CALL, "read_sidecar_list"),
+        (IWA_FOCUSED_TABLE_CELLS_COMMON_CONSTRUCTOR, "a TableRead constructor"),
+    ):
+        if pattern.search(focused_code) is None:
+            violations.append(
+                f"{format_name} table-cell focused owner must delegate through "
+                f"{description}: {relative_owner}"
+            )
+
+    for statement in IWA_COMMON_TABLE_READ_IMPORT_STATEMENT.finditer(focused_code):
+        peer = IWA_FOCUSED_TABLE_CELLS_PEER_IMPORT.search(statement.group())
+        if peer is None:
+            continue
+        line_number = focused_code.count("\n", 0, statement.start() + peer.start()) + 1
+        violations.append(
+            f"{format_name} table-cell focused owner imports a concrete format peer "
+            f"{peer.group()}: {relative_owner}:{line_number}"
+        )
+
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(focused_source)
+    ):
+        generated = IWA_FOCUSED_TABLE_CELLS_GENERATED_PUBLIC.search(declaration)
+        if generated is not None:
+            generated_line = line_number + declaration.count("\n", 0, generated.start())
+            violations.append(
+                f"{format_name} table-cell focused public API exposes generated or "
+                f"wire type {generated.group()}: {relative_owner}:{generated_line}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                f"{format_name} table-cell focused public API exposes raw bytes: "
+                f"{relative_owner}:{line_number}"
+            )
+        raw_id = IWA_TABLE_READ_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            raw_id_line = line_number + declaration.count("\n", 0, raw_id.start())
+            violations.append(
+                f"{format_name} table-cell focused public API exposes a raw ID "
+                f"parameter {raw_id.group(0).strip()}: {relative_owner}:{raw_id_line}"
+            )
+
+    budget_owners: dict[str, list[str]] = {"TableCellReadBudget": [], "SidecarReadBudget": []}
+    budget_impls = list(IWA_FOCUSED_TABLE_CELLS_BUDGET_IMPL.finditer(focused_code))
+    for match in budget_impls:
+        budget_owners[match.group("trait")].append(match.group("owner"))
+    for trait, owners in budget_owners.items():
+        if not owners:
+            violations.append(
+                f"{format_name} table-cell focused owner is missing its {trait} "
+                f"implementation: {relative_owner}"
+            )
+        elif len(owners) > 1:
+            violations.append(
+                f"{format_name} table-cell focused owner has multiple {trait} "
+                f"implementations: {relative_owner}"
+            )
+    present_owners = {owners[0] for owners in budget_owners.values() if len(owners) == 1}
+    if len(present_owners) == 2:
+        violations.append(
+            f"{format_name} table-cell focused owner uses separate aggregate budget "
+            f"types ({', '.join(sorted(present_owners))}): {relative_owner}"
+        )
+
+    if not method_evidence:
+        violations.append(
+            f"{format_name} table-cell focused owner is missing public "
+            f"Package::{public_method}: {owner_path}"
+        )
+    else:
+        for path, declaration, _body, line_number in method_evidence:
+            if re.search(r"\bTableRead\b", declaration) is None:
+                violations.append(
+                    f"{format_name} Package::{public_method} must return common "
+                    f"TableRead values: {path}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration) is not None:
+                violations.append(
+                    f"{format_name} Package::{public_method} exposes raw bytes: "
+                    f"{path}:{line_number}"
+                )
+            raw_id = IWA_TABLE_READ_RAW_ID_PARAMETER.search(declaration)
+            if raw_id is not None:
+                violations.append(
+                    f"{format_name} Package::{public_method} exposes a raw ID "
+                    f"parameter {raw_id.group(0).strip()}: {path}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_cells_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Pages body-table cell reads selector-first and semantic."""
+
+    return _audit_focused_table_cells_source_topology(
+        root,
+        format_name="Pages",
+        owner_path=PAGES_TABLE_CELLS_SOURCE,
+        package_path=PAGES_TABLE_CELLS_PACKAGE_SOURCE,
+        module_pattern=PAGES_TABLE_CELLS_MODULE,
+        public_method="body_table_cells",
+    )
+
+
+def audit_keynote_table_cells_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Keynote slide-table cell reads selector-first and semantic."""
+
+    return _audit_focused_table_cells_source_topology(
+        root,
+        format_name="Keynote",
+        owner_path=KEYNOTE_TABLE_CELLS_SOURCE,
+        package_path=KEYNOTE_TABLE_CELLS_PACKAGE_SOURCE,
+        module_pattern=KEYNOTE_TABLE_CELLS_MODULE,
+        public_method="slide_table_cells",
+    )
+
+
 def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
     """Reject retired XLSX implementation paths from the XLSB crate."""
 
@@ -70672,8 +71293,12 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_wire_formula_render_ownership()
         + audit_iwa_numbers_wire_cell_value_ownership()
         + audit_iwa_numbers_wire_table_data_list_ownership()
+        + audit_iwa_numbers_wire_table_cells_source_topology()
+        + audit_iwa_numbers_wire_table_sidecars_source_topology()
+        + audit_iwa_numbers_wire_formula_names_source_topology()
         + audit_iwa_numbers_wire_formula_envelope_ownership()
         + audit_iwa_common_formula_render_ownership()
+        + audit_iwa_common_table_read_source_topology()
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_shared_image_adjustments_source_topology()
@@ -70816,6 +71441,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_wire_table_merges_source_topology()
         + audit_pages_table_merge_source_topology()
         + audit_keynote_table_merge_source_topology()
+        + audit_pages_table_cells_source_topology()
+        + audit_keynote_table_cells_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

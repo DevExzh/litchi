@@ -20,6 +20,7 @@ use litchi_numbers_wire::table_data_list::{
     Candidate, CoordinatorIssue, KeyRange, ListDecoder, ListReadPolicy, Message,
     NATIVE_TABLE_DATA_LIST_MESSAGE_KIND, OverflowPolicy, RootOrSegment,
     TABLE_DATA_LIST_MESSAGE_KIND, TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND, read_list,
+    read_list_with_decoder,
 };
 
 const STRING_LIST: i32 = 1;
@@ -39,6 +40,7 @@ struct CodecDecoder {
     inject_semantic_error: bool,
     decode_calls: Vec<(RootOrSegment, bool, u64)>,
     visited_entries: usize,
+    resolver_state: usize,
     borrowed_entry_spans: Vec<(usize, usize)>,
     mapped_issues: Vec<CoordinatorIssue>,
 }
@@ -51,6 +53,7 @@ impl Default for CodecDecoder {
             inject_semantic_error: false,
             decode_calls: Vec::new(),
             visited_entries: 0,
+            resolver_state: 0,
             borrowed_entry_spans: Vec::new(),
             mapped_issues: Vec::new(),
         }
@@ -389,6 +392,38 @@ fn valid_root_and_segment_are_sorted_and_borrow_entry_source() {
             .iter()
             .any(|&span| contains_span(&segment_source, span))
     );
+}
+
+#[test]
+fn segment_resolver_receives_the_same_decoder_ledger() {
+    let root_source = root(STRING_LIST, &[], &[41]);
+    let segment_source = segment(STRING_LIST, 5, 1, &[string_entry(5, "same-ledger")]);
+    let mut decoder = CodecDecoder::new();
+    let values = read_list_with_decoder(
+        90,
+        STRING_LIST,
+        vec![Message::new(TABLE_DATA_LIST_MESSAGE_KIND, &root_source)],
+        |segment_id, decoder| {
+            // Mutate state through the resolver argument. A separate decoder
+            // would lose this update before the segment is admitted.
+            decoder.resolver_state = decoder
+                .resolver_state
+                .checked_add(usize::try_from(segment_id).expect("fixture id fits usize"))
+                .expect("fixture state does not overflow");
+            Ok((segment_id == 41).then(|| {
+                vec![Message::new(
+                    TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND,
+                    &segment_source,
+                )]
+            }))
+        },
+        &mut decoder,
+        ListReadPolicy::default(),
+    )
+    .expect("the resolver may use the decoder's existing state");
+
+    assert_eq!(values, vec![(5, "same-ledger".to_owned())]);
+    assert_eq!(decoder.resolver_state, 41);
 }
 
 #[test]

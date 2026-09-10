@@ -14,6 +14,8 @@ pub mod lock;
 pub mod merge;
 /// Shared sparse cell values, table extents, builders, and bounded views.
 pub mod model;
+/// Immutable table reads with sparse, archive-free cell comments.
+pub mod read;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
 /// Lossless, archive-free table title settings.
