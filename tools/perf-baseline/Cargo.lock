@@ -1182,6 +1182,8 @@ dependencies = [
  "memchr",
  "quick-xml",
  "ryu",
+ "serde_json",
+ "sha2 0.11.0",
  "thiserror",
  "unicode-normalization",
  "url",
