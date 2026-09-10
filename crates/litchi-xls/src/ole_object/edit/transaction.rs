@@ -3,7 +3,9 @@
 use crate::error::Result;
 
 use super::super::package::Editor;
-use super::super::{FormControl, ObjectMetadataEdit, OleObjectRecord};
+use super::super::{
+    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataEdit, OleObjectRecord,
+};
 use super::{Commit, Patch, Snapshot};
 
 /// A detached transaction over typed XLS OLE objects and form controls.
@@ -85,6 +87,23 @@ impl Transaction {
         self.with_candidate(|editor| editor.add(worksheet, object, compound_file))
     }
 
+    /// Adds a bounded, inert storage-backed embedded payload.
+    ///
+    /// The typed request authors the matching `Obj` and `MBDxxxxxxxx` storage
+    /// as one identity closure.  The CFB remains opaque and no OLE server,
+    /// macro, control, link, or native payload is activated.
+    /// # Errors
+    ///
+    /// Returns an error if the request conflicts with workbook identity or
+    /// the payload fails bounded CFB admission.
+    pub fn add_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        draft: EmbeddedObjectDraft,
+    ) -> Result<()> {
+        self.with_candidate(|editor| editor.add_embedded_payload(worksheet, draft))
+    }
+
     /// Removes one embedded-OLE `Obj` record and an unreferenced storage.
     /// # Errors
     ///
@@ -94,6 +113,22 @@ impl Transaction {
         let removed = candidate.remove(worksheet, object_id)?;
         self.editor = candidate;
         Ok(removed)
+    }
+
+    /// Removes a selected storage-backed embedded payload and its unreferenced
+    /// MBD storage.
+    ///
+    /// Linked/DDE and controls-stream objects are outside this API and are
+    /// rejected before the candidate is changed.
+    /// # Errors
+    ///
+    /// Returns an error if the selected object is absent or is not a valid
+    /// storage-backed embedded object.
+    pub fn remove_embedded_payload(&mut self, worksheet: usize, object_id: u16) -> Result<()> {
+        let mut candidate = self.editor.clone();
+        candidate.remove_embedded_payload(worksheet, object_id)?;
+        self.editor = candidate;
+        Ok(())
     }
 
     /// Reorders embedded-OLE records while preserving their raw subrecords.
@@ -128,6 +163,27 @@ impl Transaction {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
         self.with_candidate(|editor| editor.replace_storage(storage_name, compound_file))
+    }
+
+    /// Replaces one selected storage-backed embedded payload while retaining
+    /// its object ID and MBD storage identity.
+    ///
+    /// The supplied CFB owns the selected storage's complete inert subtree;
+    /// unrelated workbook records and streams remain retained.  The common
+    /// editor validates the replacement under the snapshot limits and refuses
+    /// protected containers before publication.
+    /// # Errors
+    ///
+    /// Returns an error if the selected object is absent or is not an MBD
+    /// embedded object, or if the payload is malformed, protected, or too
+    /// large.
+    pub fn replace_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+        payload: EmbeddedPayload,
+    ) -> Result<()> {
+        self.with_candidate(|editor| editor.replace_embedded_payload(worksheet, object_id, payload))
     }
 
     /// Whether the current candidate serializes differently from its source.

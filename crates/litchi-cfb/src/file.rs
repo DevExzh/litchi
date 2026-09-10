@@ -2428,6 +2428,238 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(entries)
     }
 
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector.
+    ///
+    /// The callback receives the parsed file and the child SID.  It may read
+    /// the entry through [`Self::directory_entry_by_sid`] and may open a
+    /// stream before returning.  The visitor is deliberately mutable because
+    /// cursor-backed stream reads need exclusive access to the CFB reader.
+    ///
+    /// `max_entries` bounds the number of callbacks and the number of
+    /// directory SIDs discovered. Each SID is charged before the traversal
+    /// stack reserves space, so an unbalanced ordered tree cannot force a
+    /// full left-spine allocation before the caller's budget is applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same path and CFB validation errors as
+    /// [`Self::list_directory_entries`], or [`OleError::LimitExceeded`] when
+    /// the selected directory has more than `max_entries` children.
+    pub fn visit_directory_entries<F, E>(
+        &mut self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&mut Self, u32) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let right = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?
+                .sid_right;
+            visit(self, sid)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector when the callback only needs directory metadata.
+    ///
+    /// This read-only form is used by path resolution and host-owned CFB
+    /// admission code that must retain an immutable borrow of the parsed
+    /// file. The discovered-SID and pending-stack bounds are identical to
+    /// [`Self::visit_directory_entries`].
+    pub fn visit_directory_entry_refs<F, E>(
+        &self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&DirectoryEntry) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let entry = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?;
+            let right = entry.sid_right;
+            visit(entry)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Return one validated directory entry by its SID.
+    ///
+    /// SIDs are supplied by [`Self::visit_directory_entries`].  Returning an
+    /// option keeps this accessor defensive for callers that retain a SID
+    /// beyond the visitor callback.
+    #[must_use]
+    pub fn directory_entry_by_sid(&self, sid: u32) -> Option<&DirectoryEntry> {
+        let index = usize::try_from(sid).ok()?;
+        self.dir_entries.get(index).and_then(Option::as_ref)
+    }
+
+    /// Returns the number of validated directory slots retained by this
+    /// parsed CFB view.  This is a finite upper bound for bounded metadata
+    /// visitors that do not have a format-owner resource budget.
+    #[must_use]
+    pub fn directory_entry_count(&self) -> usize {
+        self.dir_entries.len()
+    }
+
     /// Collect all children from a directory (as references - zero-copy).
     ///
     /// The sibling tree is untrusted input, so this uses an explicit stack
@@ -3262,6 +3494,61 @@ mod tests {
         for name in &names {
             assert_eq!(file.stream_len(&[name]).unwrap(), 0);
         }
+    }
+
+    #[test]
+    fn bounded_directory_visitor_stops_before_collecting_wide_siblings() {
+        let names: Vec<_> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let mut file = file_with_streams(&names);
+        let mut visited = Vec::new();
+        let error = file.visit_directory_entries(&[], 3, |file, sid| {
+            visited.push(
+                file.directory_entry_by_sid(sid)
+                    .expect("visitor SID should resolve")
+                    .name
+                    .clone(),
+            );
+            Ok(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                ..
+            })
+        ));
+        assert!(visited.len() <= 3);
+    }
+
+    #[test]
+    fn bounded_directory_visitor_charges_zero_budget_before_reserving() {
+        let mut file = file_with_streams(["Left", "Right"]);
+        let mut callbacks = 0;
+        let error = file.visit_directory_entries(&[], 0, |_file, _sid| {
+            callbacks += 1;
+            Ok::<(), OleError>(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                maximum: 0,
+                ..
+            })
+        ));
+        assert_eq!(callbacks, 0);
+    }
+
+    #[test]
+    fn read_only_directory_visitor_resolves_without_sibling_materialization() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+        let mut names = Vec::new();
+        file.visit_directory_entry_refs(&[], 3, |entry| {
+            names.push(entry.name.clone());
+            Ok::<(), OleError>(())
+        })
+        .expect("bounded read-only visit should succeed");
+        assert_eq!(names.len(), 3);
     }
 
     #[test]

@@ -80,22 +80,26 @@ impl CfbPath {
     pub(crate) fn resolve<R: Read + Seek>(
         &self,
         ole: &OleFile<R>,
+        max_entries: usize,
     ) -> Result<Vec<String>, OleError> {
         let mut resolved = Vec::with_capacity(self.parts.len());
         for requested in &self.parts {
             let refs = resolved.iter().map(String::as_str).collect::<Vec<_>>();
-            let entry = ole
-                .list_directory_entries(&refs)?
-                .into_iter()
-                .find(|entry| {
-                    entry.entry_type == STORAGE_OBJECT && same_component(&entry.name, requested)
-                })
-                .ok_or_else(|| {
-                    OleError::InvalidFormat(format!(
-                        "object storage path component {requested:?} not found"
-                    ))
-                })?;
-            resolved.push(entry.name.clone());
+            let mut found = None;
+            ole.visit_directory_entry_refs(&refs, max_entries, |entry| {
+                if found.is_none()
+                    && entry.entry_type == STORAGE_OBJECT
+                    && same_component(&entry.name, requested)
+                {
+                    found = Some(entry.name.clone());
+                }
+                Ok::<(), OleError>(())
+            })?;
+            resolved.push(found.ok_or_else(|| {
+                OleError::InvalidFormat(format!(
+                    "object storage path component {requested:?} not found"
+                ))
+            })?);
         }
         Ok(resolved)
     }

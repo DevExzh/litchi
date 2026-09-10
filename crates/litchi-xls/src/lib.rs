@@ -562,9 +562,10 @@ pub use pivot_editor::PivotViewEditor;
 )]
 pub mod ole_object;
 pub use ole_object::{
-    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCblsData, FtCmo,
-    FtEdoData, FtGboData, FtLbsData, FtPictFmla, FtPioGrbit, FtRboData, FtSbs, LbsDropData,
-    LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType, OleObjectRecord,
+    CheckState, DropDownStyle, EditBoxValidation, Editor, EmbeddedObjectDraft, EmbeddedPayload,
+    FormControl, FtCblsData, FtCf, FtCmo, FtEdoData, FtGboData, FtLbsData, FtPictFmla, FtPioGrbit,
+    FtRboData, FtSbs, LbsDropData, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord,
+    ObjectType, OleObjectRecord,
 };
 pub use pivot_table::{
     PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,

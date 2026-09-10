@@ -1,7 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::ole_object::Limits;
 use litchi_xls::{
-    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCmo, FtPictFmla,
+    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCf, FtCmo, FtPictFmla,
     FtPioGrbit, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType,
     OleObjectRecord,
 };
@@ -472,11 +472,17 @@ fn ole_object(id: u16, storage: u32) -> OleObjectRecord {
                 flags: 0,
                 reserved: [0; 12],
             }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
+            }),
             ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
             ObjSubrecord::PictureFormula(FtPictFmla {
-                formula: vec![1, 2, 3],
+                formula: vec![
+                    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00,
+                    0x00,
+                ],
                 storage_position: Some(storage),
-                control_buffer_size: Some(0),
+                control_buffer_size: None,
             }),
             ObjSubrecord::End,
         ],

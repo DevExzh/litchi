@@ -1,0 +1,206 @@
+{
+  "base_commit": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "candidate": "/var/tmp/litchi-xls-embedded-payload-validation-v8-20260910",
+  "feature": "XLS embedded inert payload V8 conditional Obj record ownership",
+  "history": [
+    {
+      "event": "v7_frozen_parent",
+      "path": "/var/tmp/litchi-xls-embedded-payload-validation-v7-20260910-manifest.json",
+      "sha256": "29dfb555aea7ad4da8c0bbe6dcb49569135a2259236cb4e86bb41fe1159c354d",
+      "status": "historical parent candidate; V7 directory was preserved byte-for-byte"
+    },
+    {
+      "destination_path": "/var/tmp/litchi-xls-embedded-payload-validation-v8-20260910",
+      "event": "v8_candidate_copy",
+      "method": "rsync -a --exclude target --exclude .git",
+      "note": "V8 changes were made only in this new directory; V7 remains immutable.",
+      "source_path": "/var/tmp/litchi-xls-embedded-payload-validation-v7-20260910"
+    }
+  ],
+  "manifest_sha256": "a27f3ca48979e9b9ec6d5cc2cfac4a164e05688b835598f09ae5ab752d1d20c0",
+  "scope": {
+    "implemented": "OleObjectRecord ordinary embedded OLE validation now binds modeled and malformed known control-family subrecords to their permitted cmo.ot values; cmo.ot 0x0008 rejects all control-only families.",
+    "limitations": "This V8 delta does not claim generic FormControl, sheet-visibility, customXML, or broad performance-corpus closure; those remain separate scopes."
+  },
+  "source_file_count": 29,
+  "source_files": [
+    {
+      "bytes": 181793,
+      "path": "crates/litchi-cfb/src/file.rs",
+      "sha256": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642"
+    },
+    {
+      "bytes": 8102,
+      "path": "crates/litchi-ole-common/src/object/cfb_path.rs",
+      "sha256": "645f3b2d38607f12de0209061400042a2cf29afd4ad2e1e8934c44af717d2c11"
+    },
+    {
+      "bytes": 37379,
+      "path": "crates/litchi-ole-common/src/object/codec.rs",
+      "sha256": "50c138dda17d354f4efc47bef18c58bcb9f3f1e969d98481f3f1d62570742450"
+    },
+    {
+      "bytes": 2375,
+      "path": "crates/litchi-ole-common/src/object/discovery.rs",
+      "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+    },
+    {
+      "bytes": 34494,
+      "path": "crates/litchi-ole-common/src/object/editor.rs",
+      "sha256": "cbbc9bcde202316efb8b56eb61fc1623dad6a0c145315fb0eed778c478c11e2c"
+    },
+    {
+      "bytes": 19315,
+      "path": "crates/litchi-ole-common/src/object/model.rs",
+      "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+    },
+    {
+      "bytes": 5900,
+      "path": "crates/litchi-ole-common/src/object/target.rs",
+      "sha256": "6296e06b7c1276caf05ccc6f932e65f2ed94082c7b425e837d4d408243c57d69"
+    },
+    {
+      "bytes": 8144,
+      "path": "crates/litchi-ole-common/src/property_set/codec/editor.rs",
+      "sha256": "4d3054b85ca61cc288ae8bea6931483625f6f35ccfef505517b864db0b1909ae"
+    },
+    {
+      "bytes": 5010,
+      "path": "crates/litchi-ole-common/src/protection.rs",
+      "sha256": "4d58bd0a51d6020702f3f4098e3389ae8410c873f37da66f5314f0a1f68b618c"
+    },
+    {
+      "bytes": 36537,
+      "path": "crates/litchi-ole-common/tests/object.rs",
+      "sha256": "770b94894decab0b28681d1a65c1b0e683d45a466fc4cd105ba9ad701eec9482"
+    },
+    {
+      "bytes": 20807,
+      "path": "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+      "sha256": "2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a"
+    },
+    {
+      "bytes": 26056,
+      "path": "crates/litchi-xls/src/lib.rs",
+      "sha256": "98edf44c1231439297a2cd81a0d4cc00acbee85b3b3f6a53abe731b362bff386"
+    },
+    {
+      "bytes": 187,
+      "path": "crates/litchi-xls/src/ole_object/codec/mod.rs",
+      "sha256": "c8cfff8d0ee770efa3692a774072149a0b54b1a63c9087fc326092a324057d1b"
+    },
+    {
+      "bytes": 23576,
+      "path": "crates/litchi-xls/src/ole_object/codec/obj.rs",
+      "sha256": "161ac9b57d6463e9c5bd38d23d0296f9eacabd3bba476012978fa7f850631854"
+    },
+    {
+      "bytes": 8522,
+      "path": "crates/litchi-xls/src/ole_object/edit/transaction.rs",
+      "sha256": "4624b5894a8e0c93676860aaacf4be68d838ab044d2d75c03f8650cd0e173d97"
+    },
+    {
+      "bytes": 42033,
+      "path": "crates/litchi-xls/src/ole_object/package/transaction.rs",
+      "sha256": "b3818082fb6d00d820e761d253f8e12146b21bd583d25e268c9c9f6d5e76979b"
+    },
+    {
+      "bytes": 4096,
+      "path": "crates/litchi-xls/src/ole_object/semantic/metadata.rs",
+      "sha256": "d26ba7cee35bc582a7527b1c72f09fb1a6826eefe2ebf78acff5cbd552b291e1"
+    },
+    {
+      "bytes": 595,
+      "path": "crates/litchi-xls/src/ole_object/semantic/mod.rs",
+      "sha256": "af0e1c78bad6cb7e670952f4ed89f4b128544ba01b2ca26d27b30065bdf4a52d"
+    },
+    {
+      "bytes": 8323,
+      "path": "crates/litchi-xls/src/ole_object/semantic/obj.rs",
+      "sha256": "a0cec6ff0c26cc608117844d09d603081aa58a3358fbd9fbfa76b431133e9565"
+    },
+    {
+      "bytes": 15688,
+      "path": "crates/litchi-xls/src/ole_object/semantic/payload.rs",
+      "sha256": "9cc6669e8527df1c1803d559f18d77b79714ae0b7a79bac7f210cd1e4aaa58aa"
+    },
+    {
+      "bytes": 6644,
+      "path": "crates/litchi-xls/src/ole_object/tests/codec.rs",
+      "sha256": "bff987200a32faf31fcc37f8cfdd552e6b9c0b5f193c2792a79ac04564700ab8"
+    },
+    {
+      "bytes": 11679,
+      "path": "crates/litchi-xls/src/ole_object/tests/package.rs",
+      "sha256": "68efc5e9b7395ad484a1b2243c7385dcebbc6acd250ab3395829655c121b6c09"
+    },
+    {
+      "bytes": 40392,
+      "path": "crates/litchi-xls/src/ole_object/tests/transaction.rs",
+      "sha256": "d447e420a20285915caaa4a2631d3c432107aacf727e6c7caa5d5b69a01c7e3e"
+    },
+    {
+      "bytes": 9779,
+      "path": "crates/litchi-xls/src/ole_object/tests/validation.rs",
+      "sha256": "6c2ba4ba4099391407f4dcea7ea64a3a169762036313931a7d36890da557970b"
+    },
+    {
+      "bytes": 138,
+      "path": "crates/litchi-xls/src/ole_object/validation/mod.rs",
+      "sha256": "ea054ebd3fe2ffc97d2067772d9411986c8cb5008e04db39a31abf94527f894b"
+    },
+    {
+      "bytes": 10852,
+      "path": "crates/litchi-xls/src/ole_object/validation/obj.rs",
+      "sha256": "aa76a03529b13f2efb265db5b179de02c5fc60e9bd66c5391ffb279350daf5cb"
+    },
+    {
+      "bytes": 2797,
+      "path": "crates/litchi-xls/tests/v7_review_probe.rs",
+      "sha256": "acb684f6e97b681193205f25bcf0ee9cd4ed8a6cb85a1bc3c380803b5a6ec30b"
+    },
+    {
+      "bytes": 20992,
+      "path": "crates/litchi-xls/tests/xls_form_controls.rs",
+      "sha256": "8e8d2c5211a4529cc890293c66e34478920cec36e82377ff6d72740328711a74"
+    },
+    {
+      "bytes": 6716,
+      "path": "crates/litchi-xls/tests/xls_ole_objects.rs",
+      "sha256": "3cb31abfea1559f4b151e1f1e77954f27d22e6985204ce4f19d3832ebde04f40"
+    }
+  ],
+  "source_fingerprint_sha256": "14b76c7096fc3c807cbb3147de3f862f6753eb4ec839bc9ff2690a9a54ba491a",
+  "spec_basis": [
+    "3rdparty/specs/[MS-XLS]/2 Structures/2.4 Records.md \u00a72.4.181 Obj",
+    "3rdparty/specs/[MS-XLS]/2 Structures/2.5 Structures.md \u00a7\u00a72.5.141-2.5.154"
+  ],
+  "staged_or_committed": false,
+  "validation": [
+    {
+      "command": "cargo +1.95.0 test -p litchi-xls --no-default-features",
+      "log": "/var/tmp/litchi-xls-embedded-payload-v8-xls-tests-20260910.log"
+    },
+    {
+      "command": "cargo +1.95.0 test -p litchi-xls --no-default-features --test v7_review_probe",
+      "log": "/var/tmp/litchi-xls-embedded-payload-v8-probe-20260910.log"
+    },
+    {
+      "command": "cargo +1.95.0 test -p litchi-xls --no-default-features ole_object::tests::validation --lib",
+      "result": "13 passed, 0 failed"
+    },
+    {
+      "command": "cargo +stable clippy -p litchi-xls --no-default-features --all-targets -- -D warnings -A clippy::chunks_exact_to_as_chunks",
+      "log": "/var/tmp/litchi-xls-embedded-payload-v8-clippy-20260910.log"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-xls --no-default-features --no-deps",
+      "log": "/var/tmp/litchi-xls-embedded-payload-v8-rustdoc-20260910.log"
+    },
+    {
+      "command": "rustfmt +stable --edition 2024 --check <three changed Rust files>",
+      "result": "pass"
+    }
+  ],
+  "validation_note": "Commands were run without --offline or --locked. Cargo used CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-v8-target; the candidate contains no target directory."
+}

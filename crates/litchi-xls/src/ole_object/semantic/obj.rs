@@ -18,6 +18,34 @@ pub struct FtPioGrbit {
     pub raw: u16,
 }
 
+/// Picture clipboard-format metadata (`FtCf`, MS-XLS 2.5.142).
+///
+/// The complete `pictFormat` subrecord is six bytes: the Obj subrecord header
+/// (`ft=0x0007`, `cb=0x0002`) followed by this two-byte format selector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FtCf {
+    /// Clipboard format selector (`cf`).
+    pub format: u16,
+}
+
+impl FtCf {
+    /// Enhanced metafile clipboard format.
+    pub const ENHANCED_METAFILE: u16 = 0x0002;
+    /// Bitmap clipboard format.
+    pub const BITMAP: u16 = 0x0009;
+    /// Unspecified clipboard format.
+    pub const UNSPECIFIED: u16 = 0xFFFF;
+
+    /// Creates a format selector accepted by MS-XLS 2.5.142.
+    #[must_use]
+    pub const fn new(format: u16) -> Option<Self> {
+        match format {
+            Self::ENHANCED_METAFILE | Self::BITMAP | Self::UNSPECIFIED => Some(Self { format }),
+            _ => None,
+        }
+    }
+}
+
 impl FtPioGrbit {
     #[must_use]
     pub fn is_dde(self) -> bool {
@@ -180,6 +208,9 @@ impl FtCmo {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ObjSubrecord {
     Common(FtCmo),
+    /// Normative six-byte `FtCf`/`pictFormat` subrecord.
+    PictureFormat(FtCf),
+    /// Legacy or otherwise unmodeled `FtCf` body retained byte-for-byte.
     ClipboardFormat(Vec<u8>),
     PictureFlags(FtPioGrbit),
     PictureFormula(FtPictFmla),
@@ -227,15 +258,37 @@ impl OleObjectRecord {
 
     #[must_use]
     pub fn storage_name(&self) -> Option<String> {
-        let position = self.storage_position()?;
-        let dde = self
+        let flags = self
             .subrecords
             .iter()
-            .find_map(|value| match value {
-                ObjSubrecord::PictureFlags(value) => Some(value.is_dde()),
+            .filter_map(|value| match value {
+                ObjSubrecord::PictureFlags(value) => Some(*value),
                 _ => None,
             })
-            .unwrap_or(false);
+            .collect::<Vec<_>>();
+        if flags.len() != 1
+            || flags[0].is_control()
+            || flags[0].uses_control_stream()
+            || flags[0].camera_picture()
+        {
+            // fPrstm makes the formula position a Ctls-stream offset, and a
+            // camera/control object does not own an MBD/LNK storage through
+            // the ordinary embedded-object identity closure.
+            return None;
+        }
+        let formulas = self
+            .subrecords
+            .iter()
+            .filter_map(|value| match value {
+                ObjSubrecord::PictureFormula(value) => Some(value),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if formulas.len() != 1 {
+            return None;
+        }
+        let position = formulas[0].storage_position?;
+        let dde = flags[0].is_dde();
         Some(format!(
             "{}{:08X}",
             if dde { "LNK" } else { "MBD" },

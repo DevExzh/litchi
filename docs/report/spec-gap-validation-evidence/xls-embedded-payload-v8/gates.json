@@ -1,0 +1,71 @@
+[
+  {
+    "gate": "test",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "--all-features",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-xls-payload-root-v8-20260910-test.log",
+    "sha256": "451a3f32dee467a23b6cefafb7744894eda2426eab055bbf3863c1d127012c17"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-xls-payload-root-v8-20260910-clippy.log",
+    "sha256": "e244f83a7436327635b4099a276bf11939725b09a38d27ff34accbf93f26fdb4"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "--all-features",
+      "--no-deps"
+    ],
+    "log": "/var/tmp/litchi-xls-payload-root-v8-20260910-rustdoc.log",
+    "sha256": "c64677e2024ef02946ef2d563ef7d7e90ca66ed4ba714a1e4e7ed5dbd17335a4"
+  }
+]

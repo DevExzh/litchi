@@ -25,7 +25,7 @@ pub fn discover<R: Read + Seek>(
             limits.max_objects
         )));
     }
-    codec::open(ole)?;
+    codec::open(ole, limits.max_package_directory_entries())?;
     let mut objects = Vec::new();
     let mut total = 0u64;
     for target in targets {
