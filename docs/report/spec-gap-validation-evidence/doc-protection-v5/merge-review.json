@@ -1,0 +1,12 @@
+{
+  "reviewer": "corpus_binding_review",
+  "verdict": "CLEAR for two-file mixed primary merge",
+  "clean_head": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "mixed_head": "1230d85f75f8e87ed7c6242aec22021bb5d7ae82",
+  "integration_head": "ffcdd9a5084918fdb2dce83b5ea75a0307517ee7",
+  "pending_paths": [
+    "crates/litchi-doc/src/body_text.rs",
+    "crates/litchi-doc/src/document/tests.rs"
+  ],
+  "findings": "Destination authorization, signed-source refusal, pending DOFR auxiliary semantics and lazy metadata tests retained. Other42paths equalcleanV5. Cleanfeatureblobs staged; mixedbytes remainworkingtree only."
+}

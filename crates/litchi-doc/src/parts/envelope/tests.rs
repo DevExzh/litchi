@@ -103,11 +103,18 @@ fn sample() -> Envelope {
 }
 
 fn fib_with_pointer(offset: u32, length: u32) -> FileInformationBlock {
+    const POINTER_COUNT: usize = 136;
     let pointer_offset = 154 + FIB_INDEX * 8;
-    let mut data = vec![0; pointer_offset + 8];
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut data = vec![0; pointer_end + 4];
     data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    data[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    data[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
-    data[152..154].copy_from_slice(&((FIB_INDEX + 1) as u16).to_le_bytes());
+    data[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    data[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    data[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     data[pointer_offset..pointer_offset + 4].copy_from_slice(&offset.to_le_bytes());
     data[pointer_offset + 4..pointer_offset + 8].copy_from_slice(&length.to_le_bytes());
     FileInformationBlock::parse(&data).expect("valid fixture FIB")
@@ -308,12 +315,20 @@ fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() 
 }
 
 fn write_doc(prefix: &[u8], payload: Option<&[u8]>) -> Vec<u8> {
+    const DOP_INDEX: usize = 31;
+    const POINTER_COUNT: usize = 136;
     let mut table_stream = prefix.to_vec();
     let pointer = 154 + FIB_INDEX * 8;
-    let mut word = vec![0u8; pointer + 8];
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut word = vec![0u8; pointer_end + 4];
     word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[152..154].copy_from_slice(&((FIB_INDEX + 1) as u16).to_le_bytes());
+    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     if let Some(payload) = payload {
         let offset = table_stream.len();
         table_stream.extend_from_slice(payload);
@@ -321,6 +336,16 @@ fn write_doc(prefix: &[u8], payload: Option<&[u8]>) -> Vec<u8> {
         word[pointer + 4..pointer + 8]
             .copy_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     }
+    let dop_offset = table_stream.len();
+    table_stream.extend_from_slice(
+        &crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        ),
+    );
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4]
+        .copy_from_slice(&u32::try_from(dop_offset).unwrap().to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
 
     let mut writer = litchi_cfb::OleWriter::new();
     writer.create_stream(&["WordDocument"], &word).unwrap();

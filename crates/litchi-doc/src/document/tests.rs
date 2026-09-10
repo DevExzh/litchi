@@ -236,7 +236,7 @@ fn opened_document_exposes_versioned_document_properties() {
         properties
             .versioned()
             .expect("valid versioned Dop extension"),
-        crate::VersionedDocumentProperties::Word97(_)
+        crate::VersionedDocumentProperties::Word2002(_)
     ));
 }
 

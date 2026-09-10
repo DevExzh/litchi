@@ -336,7 +336,10 @@ pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,
 };
-pub use parts::protection::{Mode, Range, Ranges, Reserved, Role, Selector, User};
+pub use parts::protection::{
+    AuthorizationError as ProtectionAuthorizationError, EditProtection, Mode, PackagePatch,
+    ProtectionAuthorization, ProtectionPolicy, Range, Ranges, Reserved, Role, Selector, User,
+};
 pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;

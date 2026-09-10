@@ -515,30 +515,54 @@ fn command_bars_with_controls(controls: Vec<Control<'static>>) -> CommandBars<'s
 }
 
 fn fib_with_pointer(offset: usize, length: usize) -> FileInformationBlock {
+    const POINTER_COUNT: usize = 136;
     let pointer_offset = 154 + FIB_INDEX_CMDS * 8;
-    let mut data = vec![0; pointer_offset + 8];
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut data = vec![0; pointer_end + 4];
     data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    data[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    data[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
-    data[152..154].copy_from_slice(&((FIB_INDEX_CMDS + 1) as u16).to_le_bytes());
+    data[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    data[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    data[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     data[pointer_offset..pointer_offset + 4].copy_from_slice(&(offset as u32).to_le_bytes());
     data[pointer_offset + 4..pointer_offset + 8].copy_from_slice(&(length as u32).to_le_bytes());
     FileInformationBlock::parse(&data).expect("test FIB")
 }
 
 fn base_document(table: &[u8]) -> Vec<u8> {
-    let pointer_count = 117usize;
-    let word_len = 154 + pointer_count * 8;
-    let mut word = vec![0; word_len];
+    const DOP_INDEX: usize = 31;
+    let pointer_count = 136usize;
+    let pointer_end = 154 + pointer_count * 8;
+    let mut word = vec![0; pointer_end + 4];
     word[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
-    word[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
     word[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+
+    let mut table = table.to_vec();
+    let dop_offset = table.len();
+    table.extend_from_slice(
+        &crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        ),
+    );
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
 
     let mut writer = OleWriter::new();
     writer
         .create_stream(&["WordDocument"], &word)
         .expect("WordDocument stream");
     writer
-        .create_stream(&["0Table"], table)
+        .create_stream(&["0Table"], &table)
         .expect("0Table stream");
     let mut output = std::io::Cursor::new(Vec::new());
     writer.write_to(&mut output).expect("CFB write");

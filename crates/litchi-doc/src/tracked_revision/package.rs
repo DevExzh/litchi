@@ -7,15 +7,16 @@ use super::codec::{
     ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
     delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
     merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
-    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, reject_protection,
-    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
-    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
-    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
+    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, replace_papx_revision_sprms,
+    replace_revision_sprms, restore_before_wall, retain_sprms, revision_opcodes, serialize_authors,
+    serialize_clx, slice, split_transform_chpx, split_transform_papx, strict_sprms, u16_at, u32_at,
+    validate_metadata, validate_range,
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::dofr::{DofrArray, DofrPatch};
 use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{EditProtection, ProtectionPolicy};
 use crate::parts::saved_selection::{
     SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
 };
@@ -913,6 +914,8 @@ pub struct RevisionEditor {
     /// rendered candidate that happens to clear the sticky changed bit.
     source: Arc<Vec<u8>>,
     signed: bool,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     data_changed: bool,
     changed: bool,
 }
@@ -922,14 +925,37 @@ impl RevisionEditor {
         Self::open_with_ole_file(bytes, limits).map(|(editor, _ole)| editor)
     }
 
+    /// Opens a tracked-revision editor with an explicit protected-edit policy.
+    ///
+    /// The default [`Self::open`] path enforces document and range-level
+    /// protection. Callers may opt into the explicit caller-granted capability
+    /// carried by [`ProtectionPolicy`]. The capability records caller
+    /// metadata; it does not authenticate a user or provide cryptographic
+    /// audit.
+    pub fn open_with_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+    ) -> Result<Self> {
+        Self::open_with_ole_file_with_policy(bytes, limits, policy).map(|(editor, _ole)| editor)
+    }
+
     pub(crate) fn open_with_ole_file(
         bytes: Vec<u8>,
         limits: Limits,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
+        Self::open_with_ole_file_with_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    pub(crate) fn open_with_ole_file_with_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
         let (package, mut ole) =
             ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
                 .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package, &mut ole)?;
+        let editor = Self::open_from_package(package, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
@@ -942,13 +968,14 @@ impl RevisionEditor {
         let (package, mut ole) =
             ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
                 .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package, &mut ole)?;
+        let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
         Ok((editor, ole))
     }
 
     fn open_from_package(
         package: ObjectEditor,
         ole: &mut OleFile<Cursor<Vec<u8>>>,
+        protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let word_path = vec!["WordDocument".to_string()];
         let word = package
@@ -981,7 +1008,8 @@ impl RevisionEditor {
             .stream(&data_path)
             .map_or_else(Vec::new, <[u8]>::to_vec);
         let signed = package_has_binary_signature(ole) || word_vba_signature_state(&word, &table);
-        reject_protection(&word, &table)?;
+        let fib = FileInformationBlock::parse(&word)?;
+        let protection = crate::parts::protection::classify(&fib, &table)?;
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
         let pieces = parse_clx(&word, &table)?;
         if pieces.last().is_none_or(|piece| piece.end < main_ccp) {
@@ -1061,6 +1089,8 @@ impl RevisionEditor {
             // keep a handle to that same immutable bytes without copying it.
             source,
             signed,
+            protection,
+            protection_policy,
             data_changed: false,
             changed: false,
         };
@@ -2520,6 +2550,9 @@ impl RevisionEditor {
     }
 
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         let source = Arc::clone(&self.source);
         let signed = self.signed;
         let bytes = self.finish_unchecked()?;
@@ -2539,6 +2572,19 @@ impl RevisionEditor {
     /// public editor use [`Self::finish`], which always applies the guard.
     pub(crate) fn finish_unchecked(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(PackageError::from)
+    }
+
+    /// Apply this editor's protection policy to a rendered candidate while
+    /// preserving exact final-byte no-ops for higher-level facades.
+    pub(crate) fn authorize_rendered(&self, bytes: &[u8]) -> Result<()> {
+        if bytes != self.source.as_slice() {
+            self.protection_policy.authorize(self.protection)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn protection_state(&self) -> EditProtection {
+        self.protection
     }
 
     fn delete_revision_text(&mut self, revision: &Revision) -> Result<()> {
@@ -2888,6 +2934,7 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
+        self.protection_policy.authorize(self.protection)?;
         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
         replacements.push((
             self.word_path.as_slice(),
@@ -3280,6 +3327,50 @@ mod picture_group_tests {
         ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
     };
 
+    fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
+        let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+        let word_path = ["WordDocument".to_string()];
+        let word = package.stream(&word_path).unwrap();
+        let fib = FileInformationBlock::parse(word).unwrap();
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut word = word.to_vec();
+        let mut table = package.stream(&table_path).unwrap().to_vec();
+        let (offset, length) = fib.get_table_pointer(31).unwrap();
+        let offset = usize::try_from(offset).unwrap();
+        let length = usize::try_from(length).unwrap();
+        let dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        );
+        if length < dop.len() {
+            let insertion = offset + length;
+            let extra = dop.len() - length;
+            table.splice(insertion..insertion, std::iter::repeat_n(0, extra));
+            let count = fib.table_pointer_count().unwrap();
+            for index in 0..count {
+                let pointer = 154 + index * 8;
+                let current = usize::try_from(u32::from_le_bytes(
+                    word[pointer..pointer + 4].try_into().unwrap(),
+                ))
+                .unwrap();
+                if current >= insertion {
+                    let shifted = u32::try_from(current + extra).unwrap();
+                    word[pointer..pointer + 4].copy_from_slice(&shifted.to_le_bytes());
+                }
+            }
+        }
+        table[offset..offset + dop.len()].copy_from_slice(&dop);
+        let pointer = 154 + 31 * 8;
+        word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
+        package.put_stream(&word_path, word).unwrap();
+        package.put_stream(&table_path, table).unwrap();
+        package.finish().unwrap()
+    }
+
     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
         let mut output = Vec::new();
         crate::writer::images::write_record_header(
@@ -3393,7 +3484,8 @@ mod picture_group_tests {
         let mut donor_bytes = Cursor::new(Vec::new());
         writer.write_to(&mut donor_bytes).unwrap();
 
-        let mut editor = RevisionEditor::open(donor_bytes.into_inner(), Limits::default()).unwrap();
+        let donor_bytes = normalize_word2002_dop(donor_bytes.into_inner());
+        let mut editor = RevisionEditor::open(donor_bytes, Limits::default()).unwrap();
         let (picture, width, height, shape_id) = editor.canonical_picture_at_cp(0).unwrap();
         let (spa_offset, spa_length) = fib_pair(&editor.word, 40).unwrap();
         let anchors = crate::parts::spa::parse_plcf_spa(
@@ -3430,7 +3522,8 @@ mod picture_group_tests {
             .unwrap();
         let mut receiver_bytes = Cursor::new(Vec::new());
         receiver_writer.write_to(&mut receiver_bytes).unwrap();
-        let receiver = BodySnapshot::parse(&receiver_bytes.into_inner()).unwrap();
+        let receiver_bytes = normalize_word2002_dop(receiver_bytes.into_inner());
+        let receiver = BodySnapshot::parse(&receiver_bytes).unwrap();
         let plan = receiver
             .plan_picture_transfer_from(
                 &donor,

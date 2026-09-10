@@ -4,6 +4,7 @@ use super::super::Limits;
 use super::super::model::{Editor, Inventory, Reference, WriteOptions};
 use super::Transaction;
 use crate::package::Result;
+use crate::parts::protection::ProtectionPolicy;
 use litchi_ole_common::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
 use std::sync::{Arc, OnceLock};
 
@@ -65,8 +66,17 @@ impl Snapshot {
     /// Returns an error when the DOC FIB, field tables, CFB package, resource
     /// bounds, or `ObjectPool` ownership references are invalid.
     pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+        Self::open_with_policy(input, limits, ProtectionPolicy::default())
+    }
+
+    /// Opens and validates a snapshot with an explicit protected-edit policy.
+    pub fn open_with_policy(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let bytes = input.into();
-        let editor = Editor::open(bytes, limits)?;
+        let editor = Editor::open_with_policy(bytes, limits, protection_policy)?;
         editor.validate_references()?;
         // Retain the common owner's admitted source only after DOC reference
         // validation has completed. SourceOwner keeps the common Vec owner
@@ -277,6 +287,16 @@ impl Snapshot {
 
     pub(in crate::embedded_object) fn editor(&self) -> &Editor {
         &self.editor
+    }
+
+    pub(in crate::embedded_object) fn protection_policy(&self) -> ProtectionPolicy {
+        self.editor.protection_policy.clone()
+    }
+
+    pub(in crate::embedded_object) fn authorize_changed(&self) -> Result<()> {
+        self.editor
+            .protection_policy
+            .authorize(self.editor.protection)
     }
 
     #[cfg(test)]

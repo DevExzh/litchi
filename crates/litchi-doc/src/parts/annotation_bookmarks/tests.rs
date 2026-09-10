@@ -3,7 +3,9 @@
 use super::{
     Editor, MAX_ENTRIES, Snapshot, Tag, TagId, Tags, TransactionError, parse, parse_bytes, to_bytes,
 };
+use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
@@ -156,22 +158,65 @@ fn package_edit_appends_and_clear_only_removes_the_fib_range() {
     assert!(table.starts_with(b"opaque prefix"));
 }
 
+#[test]
+fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadata_edit() {
+    let original = write_protected_doc();
+    let committed = Editor::open(original.clone()).unwrap().commit().unwrap();
+    assert_eq!(committed.snapshot().finish().unwrap(), original);
+
+    let mut editor = Editor::open(original.clone()).unwrap();
+    let error = editor.set(sample()).unwrap_err();
+    assert!(matches!(error, PackageError::ProtectionDenied(_)));
+    assert_eq!(editor.finish().unwrap(), original);
+
+    let authorization =
+        ProtectionAuthorization::audited("test-suite", "approved metadata repair").unwrap();
+    let policy = ProtectionPolicy::allow_protected(authorization);
+    let mut editor = Editor::open_with_policy(original.clone(), policy.clone()).unwrap();
+    let committed = editor.set(sample()).unwrap();
+    assert!(!committed.patch().is_noop());
+    assert!(committed.snapshot().value().is_some());
+    assert!(committed.package_patch().apply(&original).is_err());
+    assert_eq!(
+        committed
+            .package_patch()
+            .apply_with_policy(&original, policy)
+            .unwrap(),
+        committed.snapshot().finish().unwrap()
+    );
+}
+
 fn fib_with_pointer(offset: usize, length: usize) -> FileInformationBlock {
-    let mut word = vec![0u8; POINTER + 8];
+    const POINTER_COUNT: usize = 136;
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut word = vec![0u8; pointer_end + 4];
     word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[152..154].copy_from_slice(&38u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     word[POINTER..POINTER + 4].copy_from_slice(&u32::try_from(offset).unwrap().to_le_bytes());
     word[POINTER + 4..POINTER + 8].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
     FileInformationBlock::parse(&word).unwrap()
 }
 
 fn write_doc(prefix: &[u8], payload: Option<&[u8]>) -> Vec<u8> {
+    const DOP_INDEX: usize = 31;
+    const POINTER_COUNT: usize = 136;
     let mut table_stream = prefix.to_vec();
-    let mut word = vec![0u8; POINTER + 8];
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut word = vec![0u8; pointer_end + 4];
     word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[152..154].copy_from_slice(&38u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     if let Some(payload) = payload {
         let offset = table_stream.len();
         table_stream.extend_from_slice(payload);
@@ -179,6 +224,48 @@ fn write_doc(prefix: &[u8], payload: Option<&[u8]>) -> Vec<u8> {
         word[POINTER + 4..POINTER + 8]
             .copy_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     }
+    let dop_offset = table_stream.len();
+    table_stream.extend_from_slice(
+        &crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        ),
+    );
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4]
+        .copy_from_slice(&u32::try_from(dop_offset).unwrap().to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
+
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["WordDocument"], &word).unwrap();
+    writer.create_stream(&["0Table"], &table_stream).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn write_protected_doc() -> Vec<u8> {
+    const DOP_INDEX: usize = 31;
+    let pointer_count = 136usize;
+    let dop_offset = 16usize;
+    let mut table_stream = vec![0x5a; dop_offset];
+    let mut dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+        false, false, false, true,
+    );
+    dop[6] = 0x10;
+    table_stream.extend_from_slice(&dop);
+    let pointer_end = 154 + pointer_count * 8;
+    let mut word = vec![0u8; pointer_end + 4];
+    word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+    let pointer = 154 + DOP_INDEX * 8;
+    word[pointer..pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+    word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
 
     let mut writer = OleWriter::new();
     writer.create_stream(&["WordDocument"], &word).unwrap();
