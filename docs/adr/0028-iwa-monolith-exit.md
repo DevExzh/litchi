@@ -11446,3 +11446,38 @@ and inclusive budgets; all 37 formula-codec tests and seven shared renderer
 tests pass. Two-pass store admission reserves bounded pair/index/region
 vectors once, and Keynote includes the scratch vectors in its operation
 budget. The merge fuzz target completes 1,000 AddressSanitizer runs.
+
+## 2026-09-10 Shared cell-value projection
+
+The focused Numbers and host extractors no longer duplicate BNC/pre-BNC
+cell-type interpretation. The new `litchi-numbers-wire::cell_value` decoder
+returns a small copyable source classification containing finite scalars or
+unresolved string, rich-text, formula, and error references, plus the comment
+reference. It validates the original payload through the existing borrowed
+views before selecting formula precedence or scalar fallbacks. Successful
+projection allocates no owned data.
+
+This extraction preserves native type 9/10 distinctions, absent-value
+defaults, identifier zero, malformed/non-finite refusal, and the adapters'
+generation-specific error context. Sidecar resolution, cumulative text and
+formula budgets, and comment materialization remain in concrete readers.
+Their table graph selection and row traversal are not moved into the neutral
+semantic model. The two Pages/Keynote host full-table call sites remain until
+their complete semantic read paths can migrate.
+
+The native Numbers mixed-value control extends the shared-model fixture with
+date/duration input, a formula with a numeric cache, a division-by-zero
+formula, an empty cell, and a Unicode comment on the numeric formula. It was
+saved, closed, and reopened in Numbers 14.4; accessibility confirmed the
+values and formula displays, and visual inspection confirmed the saved
+comment. Its receipt records the exact source and verification scope.
+
+The native archive retains the date/duration-looking imported strings as
+text; both full-document readers agree on that representation, preserve the
+formula source despite numeric/error caches, retain the Unicode comment,
+and preserve the focused package bytes exactly. Synthetic version/type
+matrices cover actual date and duration scalar encodings.
+
+Validation includes 101 focused extractor tests, 43 host extractor tests
+plus the new native parity control, eight shared wire matrix tests, 1,051
+boundary regressions, and 1,000 AddressSanitizer fuzz runs.

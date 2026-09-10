@@ -13412,6 +13412,102 @@ IWA_FORMULA_RENDER_LOCAL_VISITOR_DECLARATIONS = (
         ),
     ),
 )
+# Wave110 gives the Numbers cell-storage value envelope one low-level semantic
+# owner.  The owner returns only scalar values and unresolved table references;
+# it borrows the input bytes and leaves sidecar lookup to each format adapter.
+# Keep this separate from the existing BNC/pre-BNC view audits: those views are
+# still valid wire-owned building blocks, while this module owns their shared
+# version dispatch and value interpretation.
+IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/cell_value.rs"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_LIB_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/lib.rs"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_MODULE_EXPORT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?cell_value[ \t]*;"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_PUBLIC_DECODER = re.compile(
+    r"(?ms)^[ \t]*pub[ \t]+fn[ \t]+(?:r#)?decode_cell_value\b"
+    r"[ \t\r\n]*\([^)]*&[ \t\r\n]*\[[ \t\r\n]*u8[ \t\r\n]*\][^)]*\)"
+    r"[ \t\r\n]*->[^{;]*\bCellValueSource\b"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_PUBLIC_TYPES = (
+    (
+        "ValueSource",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:enum|struct|union|type)[ \t]+"
+            r"(?:r#)?ValueSource\b"
+        ),
+    ),
+    (
+        "CellValueSource",
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:enum|struct|union|type)[ \t]+"
+            r"(?:r#)?CellValueSource\b"
+        ),
+    ),
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_PARSE_MARKERS = (
+    "BncCellView",
+    "PreBncCellView",
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_IMPORT_STATEMENT = re.compile(
+    r"(?ms)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?use\b.*?;"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:litchi_iwa_protos|prost|buffa|litchi_numbers|"
+    r"litchi_pages|litchi_keynote|litchi_iwa)(?![A-Za-z0-9_])"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_OWNED_RESULT_TYPES = re.compile(
+    r"\b(?:String|Vec|Box|HashMap|BTreeMap|Arc|Rc|Cow|Bytes)\b"
+)
+IWA_NUMBERS_WIRE_CELL_VALUE_COPY_DERIVE = re.compile(
+    r"(?ms)#\s*\[\s*derive\s*\([^]]*\bCopy\b[^]]*\]\s*"
+)
+IWA_NUMBERS_CELL_VALUE_READER_SOURCES = (
+    IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE,
+    NUMBERS_EXTRACTOR_SOURCE,
+)
+IWA_NUMBERS_CELL_VALUE_READER_IMPORT = re.compile(
+    r"(?ms)\buse[ \t\r\n]+litchi_numbers_wire[ \t\r\n]*::"
+    r"[^;]*\bcell_value\b[^;]*;"
+)
+IWA_NUMBERS_CELL_VALUE_READER_CALL = re.compile(
+    r"\b(?:r#)?decode_cell_value[ \t\r\n]*\("
+)
+IWA_NUMBERS_CELL_VALUE_READER_LEGACY_TYPES = (
+    (
+        "BncCellView",
+        re.compile(r"\b(?:r#)?BncCellView\b"),
+    ),
+    (
+        "PreBncCellView",
+        re.compile(r"\b(?:r#)?PreBncCellView\b"),
+    ),
+    (
+        "StoredValue",
+        re.compile(r"\b(?:r#)?StoredValue\b"),
+    ),
+    (
+        "CachedScalar",
+        re.compile(r"\b(?:r#)?CachedScalar\b"),
+    ),
+)
+IWA_NUMBERS_CELL_VALUE_READER_LEGACY_METHODS = (
+    (
+        "cell_type()",
+        re.compile(r"\.[ \t\r\n]*cell_type[ \t\r\n]*\("),
+    ),
+    (
+        "stored_value()",
+        re.compile(r"\.[ \t\r\n]*stored_value[ \t\r\n]*\("),
+    ),
+    (
+        "cached_scalar()",
+        re.compile(r"\.[ \t\r\n]*cached_scalar[ \t\r\n]*\("),
+    ),
+)
 # Wave109 moves the strict FormulaArchive envelope walk and schema validator
 # beside the shared formula event adapter.  It remains a generated-code
 # boundary: ``litchi-numbers-wire`` may inspect the generated-free codec, while
@@ -45348,6 +45444,161 @@ def audit_iwa_numbers_wire_formula_render_ownership(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_wire_cell_value_ownership(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep typed Numbers cell-value interpretation in the wire owner.
+
+    ``cell_value.rs`` owns only the borrowed BNC/pre-BNC value projection.  Its
+    public result is copyable scalar data plus unresolved sidecar identifiers,
+    so adapters can perform their own bounded table lookup and text retention.
+    The compatibility host and focused package reader may keep their error
+    mapping and sidecar work, but must delegate the version/type interpretation
+    to this module.  A reader file may disappear as the monolith exits; any
+    reader that remains is checked after test-only items and non-code have been
+    masked.
+
+    The zero-allocation check is intentionally limited to the successful
+    result shape.  BNC/pre-BNC parsers may retain owned diagnostic text when
+    rejecting malformed input, and the adapter's error wrapper is outside
+    this ratchet.
+    """
+
+    violations: list[str] = []
+    wire_path = root / IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE
+    lib_path = root / IWA_NUMBERS_WIRE_CELL_VALUE_LIB_SOURCE
+
+    if not wire_path.is_file():
+        return [
+            "Numbers wire cell-value owner is missing: "
+            f"{IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}"
+        ]
+
+    wire_raw = wire_path.read_text(encoding="utf-8")
+    wire_code = _mask_rust_non_code(_mask_rust_cfg_test_items(wire_raw))
+
+    if not lib_path.is_file():
+        violations.append(
+            "Numbers wire cell-value module is not exported from the crate: "
+            f"{IWA_NUMBERS_WIRE_CELL_VALUE_LIB_SOURCE}"
+        )
+    else:
+        lib_raw = lib_path.read_text(encoding="utf-8")
+        lib_code = _mask_rust_non_code(_mask_rust_cfg_test_items(lib_raw))
+        if IWA_NUMBERS_WIRE_CELL_VALUE_MODULE_EXPORT.search(lib_code) is None:
+            violations.append(
+                "Numbers wire cell-value owner is missing its public module export: "
+                f"{IWA_NUMBERS_WIRE_CELL_VALUE_LIB_SOURCE}"
+            )
+
+    if IWA_NUMBERS_WIRE_CELL_VALUE_PUBLIC_DECODER.search(wire_code) is None:
+        violations.append(
+            "Numbers wire cell-value owner must expose a borrowed typed decoder: "
+            f"{IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}"
+        )
+
+    for label, declaration in IWA_NUMBERS_WIRE_CELL_VALUE_PUBLIC_TYPES:
+        match = declaration.search(wire_code)
+        if match is None:
+            violations.append(
+                "Numbers wire cell-value owner is missing public "
+                f"{label}: {IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}"
+            )
+            continue
+
+        # A Copy result makes the successful projection's allocation contract
+        # visible at the API boundary.  Search only the nearby derive list so
+        # an unrelated type elsewhere in this module cannot satisfy it.
+        previous_item_end = wire_code.rfind("}", 0, match.start())
+        prefix = wire_code[previous_item_end + 1 : match.start()]
+        if IWA_NUMBERS_WIRE_CELL_VALUE_COPY_DERIVE.search(prefix) is None:
+            line_number = wire_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "Numbers wire cell-value public result must derive Copy: "
+                f"{IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}:{line_number}"
+            )
+
+        # Inspect only this declaration's balanced body (or its type-alias
+        # statement), rather than the whole module.  Error enums and parser
+        # internals are deliberately outside the successful result check.
+        opening = wire_code.find("{", match.end())
+        semicolon = wire_code.find(";", match.end())
+        if opening >= 0 and (semicolon < 0 or opening < semicolon):
+            end = _rust_balanced_delimited_end(wire_code, opening)
+            declaration_code = (
+                wire_code[match.start() : end] if end is not None else ""
+            )
+        else:
+            end = len(wire_code) if semicolon < 0 else semicolon + 1
+            declaration_code = wire_code[match.start() : end]
+        owned = IWA_NUMBERS_WIRE_CELL_VALUE_OWNED_RESULT_TYPES.search(
+            declaration_code
+        )
+        if owned is not None:
+            line_number = wire_code.count("\n", 0, match.start() + owned.start()) + 1
+            violations.append(
+                "Numbers wire cell-value public result owns allocation-backed "
+                f"data ({owned.group()}): {IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}:"
+                f"{line_number}"
+            )
+
+    for marker in IWA_NUMBERS_WIRE_CELL_VALUE_PARSE_MARKERS:
+        if re.search(
+            rf"\b{re.escape(marker)}\b[ \t\r\n]*::[ \t\r\n]*parse\b",
+            wire_code,
+        ) is None:
+            violations.append(
+                "Numbers wire cell-value owner is missing its "
+                f"{marker} parse route: {IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}"
+            )
+
+    for statement in IWA_NUMBERS_WIRE_CELL_VALUE_IMPORT_STATEMENT.finditer(
+        wire_code
+    ):
+        forbidden = IWA_NUMBERS_WIRE_CELL_VALUE_FORBIDDEN_IMPORT.search(
+            statement.group()
+        )
+        if forbidden is None:
+            continue
+        line_number = wire_code.count("\n", 0, statement.start()) + 1
+        violations.append(
+            "Numbers wire cell-value owner imports a format/protobuf crate "
+            f"({forbidden.group()}): {IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE}:"
+            f"{line_number}"
+        )
+
+    for relative in IWA_NUMBERS_CELL_VALUE_READER_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            # Host deletion is the intended monolith-exit state.  A present
+            # reader must still delegate so a stale duplicate cannot return.
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+        if IWA_NUMBERS_CELL_VALUE_READER_IMPORT.search(production_code) is None:
+            violations.append(
+                "Numbers cell-value reader is missing the shared wire owner "
+                f"import: {relative}"
+            )
+        if IWA_NUMBERS_CELL_VALUE_READER_CALL.search(production_code) is None:
+            violations.append(
+                "Numbers cell-value reader is missing the shared typed decoder "
+                f"call: {relative}"
+            )
+        for label, pattern in (
+            *IWA_NUMBERS_CELL_VALUE_READER_LEGACY_TYPES,
+            *IWA_NUMBERS_CELL_VALUE_READER_LEGACY_METHODS,
+        ):
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "Numbers cell-value reader retains duplicated wire "
+                    f"interpretation {label}: {relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_wire_formula_envelope_ownership(
     root: Path = ROOT,
 ) -> list[str]:
@@ -70126,6 +70377,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
         + audit_iwa_numbers_wire_formula_render_ownership()
+        + audit_iwa_numbers_wire_cell_value_ownership()
         + audit_iwa_numbers_wire_formula_envelope_ownership()
         + audit_iwa_common_formula_render_ownership()
         + audit_iwa_numbers_model_storage_source_topology()

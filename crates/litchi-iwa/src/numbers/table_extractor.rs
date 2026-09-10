@@ -29,7 +29,6 @@
 //! }
 //! ```
 
-use super::bnc::{BncCellView, CachedScalar, StoredValue};
 #[cfg(test)]
 use super::bnc::{decimal128_le, read_decimal128_le};
 use super::cell::CellValue;
@@ -51,6 +50,9 @@ use litchi_iwa_protos::numbers_table_cell_storage_codec;
 use litchi_iwa_protos::table_info_codec;
 use litchi_numbers::cell::FiniteF64;
 use litchi_numbers::table::Dimensions;
+use litchi_numbers_wire::cell_value::{
+    DecodeError as CellDecodeError, ValueSource, decode_cell_value,
+};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
@@ -2254,217 +2256,50 @@ impl<'a> TableDataExtractor<'a> {
         column_count: usize,
         formula_budget: &mut ProjectionBudget,
     ) -> Result<ParsedCell> {
-        let version = *data
-            .first()
-            .ok_or_else(|| Error::ParseError("Empty Numbers cell storage".to_string()))?;
-        match version {
-            0..=4 => Self::parse_pre_bnc_cell(
-                data,
-                cell_tables,
-                row,
-                column,
-                row_count,
-                column_count,
-                formula_budget,
-            ),
-            5 => Self::parse_bnc_cell(
-                data,
-                cell_tables,
-                row,
-                column,
-                row_count,
-                column_count,
-                formula_budget,
-            ),
-            other => Err(Error::ParseError(format!(
-                "Unsupported Numbers cell storage version {other}"
-            ))),
-        }
-    }
-
-    fn parse_bnc_cell(
-        data: &[u8],
-        cell_tables: &CellTables<'_>,
-        row: usize,
-        column: usize,
-        row_count: usize,
-        column_count: usize,
-        formula_budget: &mut ProjectionBudget,
-    ) -> Result<ParsedCell> {
-        let cell = BncCellView::parse(data).map_err(|error| {
-            Error::ParseError(format!(
-                "Numbers BNC cell ({row}, {column}) is invalid: {error}"
-            ))
-        })?;
-        let comment_identifier = cell.comment_identifier();
-
-        if let StoredValue::Formula(identifier) = cell.stored_value() {
-            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
-                ))
-            })?;
-            let rendered = render_formula_string(
-                formula,
-                row,
-                column,
-                row_count,
-                column_count,
-                cell_tables.formula_references,
-                formula_budget,
-            )
-            .map_err(|error| {
-                Error::ParseError(format!(
-                    "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
-                ))
-            })?;
-            return Ok(ParsedCell {
-                value: CellValue::Formula(rendered),
-                comment_identifier,
-            });
-        }
-
-        let zero = finite_zero()?;
-        let scalar = cell.cached_scalar();
-        let value = match cell.stored_value() {
-            StoredValue::Empty => CellValue::Empty,
-            StoredValue::Number => match scalar {
-                Some(CachedScalar::Number(value)) => CellValue::Number(to_cell_finite(value)?),
-                Some(
-                    CachedScalar::Boolean(_) | CachedScalar::Date(_) | CachedScalar::Duration(_),
-                ) => {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers numeric BNC cell ({row}, {column}) has a mismatched scalar encoding"
-                    )));
-                },
-                Some(CachedScalar::Unsupported(_)) | None => CellValue::Number(zero),
-            },
-            StoredValue::Text(identifier) => compact_table_get(cell_tables.strings, identifier)
+        let decoded = decode_cell_value(data)
+            .map_err(|error| map_cell_decode_error(error, data, row, column))?;
+        let comment_identifier = decoded.comment_identifier;
+        let value = match decoded.value {
+            ValueSource::Empty => CellValue::Empty,
+            ValueSource::Number(value) => CellValue::Number(to_cell_finite(value)?),
+            ValueSource::Date(value) => CellValue::Date(to_cell_finite(value)?),
+            ValueSource::Boolean(value) => CellValue::Boolean(value),
+            ValueSource::Duration(value) => CellValue::Duration(to_cell_finite(value)?),
+            ValueSource::Text(identifier) => compact_table_get(cell_tables.strings, identifier)
                 .cloned()
                 .map_or(CellValue::Empty, CellValue::Text),
-            StoredValue::RichText(identifier) => {
+            ValueSource::RichText(identifier) => {
                 compact_table_get(cell_tables.rich_text, identifier)
                     .cloned()
                     .map_or(CellValue::Empty, CellValue::Text)
             },
-            StoredValue::Date => match scalar {
-                Some(CachedScalar::Date(value)) => CellValue::Date(to_cell_finite(value)?),
-                Some(_) | None => CellValue::Date(zero),
+            ValueSource::Formula(identifier) => {
+                let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
+                    ))
+                })?;
+                let rendered = render_formula_string(
+                    formula,
+                    row,
+                    column,
+                    row_count,
+                    column_count,
+                    cell_tables.formula_references,
+                    formula_budget,
+                )
+                .map_err(|error| {
+                    Error::ParseError(format!(
+                        "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
+                    ))
+                })?;
+                CellValue::Formula(rendered)
             },
-            StoredValue::Boolean => match scalar {
-                Some(CachedScalar::Boolean(value)) => CellValue::Boolean(value),
-                Some(_) | None => CellValue::Boolean(false),
-            },
-            StoredValue::Duration => match scalar {
-                Some(CachedScalar::Duration(value)) => CellValue::Duration(to_cell_finite(value)?),
-                Some(_) | None => CellValue::Duration(zero),
-            },
-            StoredValue::Error => CellValue::Error(
-                cell.formula_error_identifier()
+            ValueSource::Error(identifier) => CellValue::Error(
+                identifier
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
-            StoredValue::Formula(_) => {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers formula BNC cell ({row}, {column}) reached scalar decoding"
-                )));
-            },
-            StoredValue::Unsupported(other) => {
-                return Err(Error::ParseError(format!(
-                    "Unsupported Numbers BNC cell type {other}"
-                )));
-            },
-        };
-        Ok(ParsedCell {
-            value,
-            comment_identifier,
-        })
-    }
-
-    fn parse_pre_bnc_cell(
-        data: &[u8],
-        cell_tables: &CellTables<'_>,
-        row: usize,
-        column: usize,
-        row_count: usize,
-        column_count: usize,
-        formula_budget: &mut ProjectionBudget,
-    ) -> Result<ParsedCell> {
-        let cell = litchi_numbers_wire::pre_bnc::PreBncCellView::parse(data).map_err(|error| {
-            Error::ParseError(format!(
-                "Numbers pre-BNC cell ({row}, {column}) is invalid: {error}"
-            ))
-        })?;
-        let comment_identifier = cell.comment_identifier();
-
-        if let Some(identifier) = cell.formula_identifier() {
-            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
-                ))
-            })?;
-            let rendered = render_formula_string(
-                formula,
-                row,
-                column,
-                row_count,
-                column_count,
-                cell_tables.formula_references,
-                formula_budget,
-            )
-            .map_err(|error| {
-                Error::ParseError(format!(
-                    "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
-                ))
-            })?;
-            return Ok(ParsedCell {
-                value: CellValue::Formula(rendered),
-                comment_identifier,
-            });
-        }
-
-        let zero = finite_zero()?;
-        let value = match cell.cell_type() {
-            0 => CellValue::Empty,
-            2 => CellValue::Number(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero),
-            ),
-            3 => cell
-                .string_identifier()
-                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
-                .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(cell.date().map(to_cell_finite).transpose()?.unwrap_or(zero)),
-            6 => CellValue::Boolean(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero)
-                    .get()
-                    != 0.0,
-            ),
-            7 => CellValue::Duration(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero),
-            ),
-            8 => CellValue::Error(
-                cell.formula_error_identifier()
-                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
-                    .unwrap_or_else(|| "FORMULA".to_owned()),
-            ),
-            9 => cell
-                .rich_text_identifier()
-                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
-                .map_or(CellValue::Empty, CellValue::Text),
-            other => {
-                return Err(Error::ParseError(format!(
-                    "Unsupported Numbers pre-BNC cell type {other}"
-                )));
-            },
         };
         Ok(ParsedCell {
             value,
@@ -3566,21 +3401,51 @@ fn pop_formula_arguments(
     Ok(stack.split_off(start))
 }
 
+fn map_cell_decode_error(error: CellDecodeError, data: &[u8], row: usize, column: usize) -> Error {
+    match error {
+        CellDecodeError::Empty => Error::ParseError("Empty Numbers cell storage".to_owned()),
+        CellDecodeError::UnsupportedVersion(version) => Error::ParseError(format!(
+            "Unsupported Numbers cell storage version {version}"
+        )),
+        CellDecodeError::Bnc(error) => Error::ParseError(format!(
+            "Numbers BNC cell ({row}, {column}) is invalid: {error}"
+        )),
+        CellDecodeError::PreBnc(error) => Error::ParseError(format!(
+            "Numbers pre-BNC cell ({row}, {column}) is invalid: {error}"
+        )),
+        CellDecodeError::MismatchedNumericScalar => Error::InvalidFormat(format!(
+            "Numbers numeric BNC cell ({row}, {column}) has a mismatched scalar encoding"
+        )),
+        CellDecodeError::UnsupportedCellType(cell_type) => {
+            let generation = if data.first().is_some_and(|version| *version <= 4) {
+                "pre-BNC"
+            } else {
+                "BNC"
+            };
+            Error::ParseError(format!(
+                "Unsupported Numbers {generation} cell type {cell_type}"
+            ))
+        },
+    }
+}
+
 fn to_cell_finite(value: CommonFiniteF64) -> Result<FiniteF64> {
     FiniteF64::new(value.get()).map_err(|_| {
         Error::ParseError("Numbers BNC cached scalar must contain a finite value".to_owned())
     })
 }
 
-fn finite_zero() -> Result<FiniteF64> {
-    FiniteF64::new(0.0).map_err(|_| {
-        Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mismatched_cell_scalar_preserves_invalid_format_category() {
+        let error = map_cell_decode_error(CellDecodeError::MismatchedNumericScalar, &[5], 2, 3);
+        assert!(
+            matches!(error, Error::InvalidFormat(message) if message.contains("mismatched scalar encoding"))
+        );
+    }
 
     fn test_cell_spans<'source>(
         offsets: &'source [u8],
@@ -3631,6 +3496,110 @@ mod tests {
         assert_eq!(tables[0].name(), "Table 1");
         assert_eq!(tables[0].dimensions(), (22, 7));
         assert!(tables[0].cell_count() > 0);
+    }
+
+    #[test]
+    fn native_cell_value_fixture_matches_focused_document_and_comments()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/cell-value-native.numbers");
+        let source = std::fs::read(&path).unwrap();
+
+        let bundle = Bundle::from_bytes(&source).unwrap();
+        let index = ObjectIndex::from_bundle(&bundle).unwrap();
+        let host_tables = TableDataExtractor::new(&bundle, &index)
+            .extract_all_tables()
+            .unwrap();
+        assert_eq!(host_tables.len(), 1);
+        let host_table = &host_tables[0];
+        assert_eq!(host_table.name(), "shared-model");
+        assert_eq!(host_table.dimensions(), (8, 3));
+
+        let focused = litchi_numbers::Package::from_bytes(&source).unwrap();
+        let focused_table = focused
+            .document()
+            .table("Sheet 1", "shared-model")
+            .unwrap()
+            .expect("native table is rooted in the focused document");
+
+        let host_cells = host_table
+            .iter_cells()
+            .map(|(position, value)| (position, value.clone()))
+            .collect::<Vec<_>>();
+        let focused_cells = focused_table
+            .iter_cells()
+            .map(|cell| {
+                (
+                    (
+                        cell.position().row() as usize,
+                        cell.position().column() as usize,
+                    ),
+                    cell.value().clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(focused_cells, host_cells);
+
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(1, 1)),
+            Some(&litchi_numbers::cell::Value::number(42.5).unwrap())
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(2, 1)),
+            Some(&litchi_numbers::cell::Value::Boolean(true))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(1, 2)),
+            Some(&litchi_numbers::cell::Value::Text(
+                "Text Café, \"北京\"".to_owned()
+            ))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(2, 2)),
+            Some(&litchi_numbers::cell::Value::Text(
+                "Text line one\nline two".to_owned()
+            ))
+        );
+        // Numbers preserves these imported date/duration-looking entries
+        // as text; the displayed strings alone do not establish scalar types.
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(3, 1)),
+            Some(&litchi_numbers::cell::Value::Text("2026-09-10".to_owned()))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(4, 1)),
+            Some(&litchi_numbers::cell::Value::Text("1h 2m 3s".to_owned()))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(7, 1)),
+            None
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(5, 1)),
+            Some(&litchi_numbers::cell::Value::Formula("=(B2+1)".to_owned()))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(6, 1)),
+            Some(&litchi_numbers::cell::Value::Formula("=(1/0)".to_owned()))
+        );
+
+        let focused_comment = focused
+            .table_cell_comment(
+                "Sheet 1",
+                "shared-model",
+                litchi_numbers::CellPosition::new(5, 1),
+            )?
+            .expect("native B6 comment is present");
+        let host_comment = host_table
+            .get_comment(5, 1)
+            .expect("host extractor retained the native B6 comment");
+        assert_eq!(focused_comment.text(), host_comment.text);
+        assert_eq!(focused_comment.text(), "Shared cell value control — 北京");
+
+        let mut focused_source = Vec::new();
+        focused.write_to(&mut focused_source).unwrap();
+        assert_eq!(focused_source, source);
+        Ok(())
     }
 
     #[test]

@@ -968,6 +968,64 @@ def add_iwa_numbers_wire_formula_envelope_scaffold(
         path.write_text(reader, encoding="utf-8")
 
 
+def add_iwa_numbers_wire_cell_value_scaffold(
+    root: Path,
+    *,
+    wire_source: str | None = None,
+    lib_source: str | None = None,
+    reader_source: str | None = None,
+    include_host: bool = True,
+    include_focused: bool = True,
+) -> None:
+    """Install the shared cell-value owner and migrated reader fixtures."""
+
+    wire = root / boundaries.IWA_NUMBERS_WIRE_CELL_VALUE_SOURCE
+    wire.parent.mkdir(parents=True, exist_ok=True)
+    wire.write_text(
+        wire_source
+        if wire_source is not None
+        else (
+            "use litchi_iwa_common::formula::FiniteF64;\n"
+            "use crate::{BncCellView, CachedScalar, StoredValue};\n"
+            "use crate::pre_bnc::PreBncCellView;\n"
+            "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+            "pub enum ValueSource { Empty, Number(FiniteF64), Text(u32) }\n"
+            "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+            "pub struct CellValueSource { pub value: ValueSource, pub comment_identifier: Option<u32> }\n"
+            "pub fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {\n"
+            "    let _ = source;\n"
+            "    let _ = (BncCellView::parse, PreBncCellView::parse);\n"
+            "    todo!()\n"
+            "}\n"
+            "enum DecodeError {}\n"
+        ),
+        encoding="utf-8",
+    )
+    lib = root / boundaries.IWA_NUMBERS_WIRE_CELL_VALUE_LIB_SOURCE
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        lib_source if lib_source is not None else "pub mod cell_value;\n",
+        encoding="utf-8",
+    )
+
+    reader = reader_source or (
+        "use litchi_numbers_wire::cell_value::{ValueSource, decode_cell_value};\n"
+        "fn extract(source: &[u8]) {\n"
+        "    let _ = decode_cell_value(source);\n"
+        "    let _ = ValueSource::Empty;\n"
+        "}\n"
+    )
+    reader_paths = []
+    if include_host:
+        reader_paths.append(boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE)
+    if include_focused:
+        reader_paths.append(boundaries.NUMBERS_EXTRACTOR_SOURCE)
+    for relative in reader_paths:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reader, encoding="utf-8")
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -47064,6 +47122,188 @@ fn rewrite_movie_title_operation(
                 any("format/archive or generated AST import" in item for item in violations),
                 violations,
             )
+
+    def test_iwa_numbers_wire_cell_value_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_cell_value_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_cell_value_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_cell_value_requires_owner_contract(self) -> None:
+        mutations = (
+            (
+                "missing module export",
+                {},
+                "pub mod other;\n",
+                "missing its public module export",
+            ),
+            (
+                "missing borrowed decoder",
+                {
+                    "wire_source": (
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub enum ValueSource { Empty }\n"
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub struct CellValueSource { pub value: ValueSource }\n"
+                        "enum DecodeError {}\n"
+                        "fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {\n"
+                        "    let _ = (BncCellView::parse, PreBncCellView::parse, source);\n"
+                        "    todo!()\n"
+                        "}\n"
+                    )
+                },
+                None,
+                "must expose a borrowed typed decoder",
+            ),
+            (
+                "missing pre-BNC route",
+                {
+                    "wire_source": (
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub enum ValueSource { Empty }\n"
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub struct CellValueSource { pub value: ValueSource }\n"
+                        "pub fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {\n"
+                        "    let _ = (BncCellView::parse, source);\n"
+                        "    todo!()\n"
+                        "}\n"
+                        "enum DecodeError {}\n"
+                    )
+                },
+                None,
+                "missing its PreBncCellView parse route",
+            ),
+            (
+                "owned result",
+                {
+                    "wire_source": (
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub enum ValueSource { Empty }\n"
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub struct CellValueSource { pub value: Vec<u8> }\n"
+                        "pub fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {\n"
+                        "    let _ = (BncCellView::parse, PreBncCellView::parse, source);\n"
+                        "    todo!()\n"
+                        "}\n"
+                        "enum DecodeError {}\n"
+                    )
+                },
+                None,
+                "owns allocation-backed data",
+            ),
+            (
+                "format import",
+                {
+                    "wire_source": (
+                        "use litchi_iwa_protos::tst;\n"
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub enum ValueSource { Empty }\n"
+                        "#[derive(Debug, Clone, Copy, PartialEq)]\n"
+                        "pub struct CellValueSource { pub value: ValueSource }\n"
+                        "pub fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {\n"
+                        "    let _ = (BncCellView::parse, PreBncCellView::parse, source);\n"
+                        "    todo!()\n"
+                        "}\n"
+                        "enum DecodeError {}\n"
+                    )
+                },
+                None,
+                "imports a format/protobuf crate",
+            ),
+        )
+        for label, kwargs, lib_source, expected in mutations:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    options = dict(kwargs)
+                    if lib_source is not None:
+                        options["lib_source"] = lib_source
+                    add_iwa_numbers_wire_cell_value_scaffold(root, **options)
+                    violations = boundaries.audit_iwa_numbers_wire_cell_value_ownership(
+                        root
+                    )
+                    self.assertTrue(
+                        any(expected in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_cell_value_requires_reader_delegation(self) -> None:
+        mutations = (
+            (
+                "missing import",
+                "fn extract(source: &[u8]) { let _ = source; }\n",
+                "missing the shared wire owner import",
+            ),
+            (
+                "missing call",
+                "use litchi_numbers_wire::cell_value::ValueSource;\n"
+                "fn extract(source: &[u8]) { let _ = (source, ValueSource::Empty); }\n",
+                "missing the shared typed decoder call",
+            ),
+            (
+                "BNC view",
+                "use litchi_numbers_wire::cell_value::decode_cell_value;\n"
+                "fn extract(source: &[u8]) { let _ = decode_cell_value(source); }\n"
+                "fn legacy() { let _ = BncCellView::parse; }\n",
+                "duplicated wire interpretation BncCellView",
+            ),
+            (
+                "pre-BNC method",
+                "use litchi_numbers_wire::cell_value::decode_cell_value;\n"
+                "fn extract(source: &[u8]) { let _ = decode_cell_value(source); }\n"
+                "fn legacy(view: View) { let _ = view.cell_type(); }\n",
+                "duplicated wire interpretation cell_type()",
+            ),
+        )
+        for label, reader_source, expected in mutations:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_cell_value_scaffold(
+                        root,
+                        reader_source=reader_source,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_cell_value_ownership(
+                        root
+                    )
+                    self.assertTrue(
+                        any(expected in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_cell_value_allows_test_only_legacy_oracles_and_host_exit(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_cell_value_scaffold(
+                root,
+                include_host=False,
+                reader_source=(
+                    "use litchi_numbers_wire::cell_value::decode_cell_value;\n"
+                    "fn extract(source: &[u8]) { let _ = decode_cell_value(source); }\n"
+                    "#[cfg(test)]\n"
+                    "fn oracle() { let _ = BncCellView::parse; }\n"
+                    "// PreBncCellView::parse\n"
+                    "const NOTE: &str = \"StoredValue CachedScalar\";\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_cell_value_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_cell_value_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_wire_cell_value_ownership()",
+            main_source,
+        )
 
     def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

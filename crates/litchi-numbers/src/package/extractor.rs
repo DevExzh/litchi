@@ -29,7 +29,6 @@ use super::{Index, Resolved};
 use crate::DEFAULT_MAX_TEXT_BYTES;
 use crate::cell::FiniteF64;
 use crate::cell::Value as CellValue;
-use crate::cell::wire::{BncCellView, CachedScalar, StoredValue};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
@@ -43,6 +42,9 @@ use litchi_iwa_protos::table_info_codec;
 #[cfg(test)]
 use litchi_iwa_protos::tsce;
 use litchi_iwa_protos::{numbers_formula_codec, numbers_table_cell_storage_codec, tst};
+use litchi_numbers_wire::cell_value::{
+    DecodeError as CellValueDecodeError, ValueSource, decode_cell_value,
+};
 use litchi_numbers_wire::formula_envelope::{
     self as shared_formula_envelope, FormulaEnvelopeLimits,
 };
@@ -50,7 +52,6 @@ use litchi_numbers_wire::formula_render::{
     self as shared_formula_render, FormulaCategoryId, FormulaEventRenderBudget,
     FormulaRenderCodecVisitor, FormulaTablePrefix, ReferenceResolver,
 };
-use litchi_numbers_wire::pre_bnc::PreBncCellView;
 #[cfg(test)]
 use prost::Message as _;
 use std::borrow::Cow;
@@ -3367,231 +3368,50 @@ impl<'a> TableDataExtractor<'a> {
         row_count: usize,
         column_count: usize,
     ) -> Result<ParsedCell> {
-        let version = *data
-            .first()
-            .ok_or_else(|| Error::ParseError("Empty Numbers cell storage".to_string()))?;
-        match version {
-            0..=4 => Self::parse_pre_bnc_cell(
-                data,
-                cell_tables,
-                projection_budget,
-                row,
-                column,
-                row_count,
-                column_count,
-            ),
-            5 => Self::parse_bnc_cell(
-                data,
-                cell_tables,
-                projection_budget,
-                row,
-                column,
-                row_count,
-                column_count,
-            ),
-            other => Err(Error::ParseError(format!(
-                "Unsupported Numbers cell storage version {other}"
-            ))),
-        }
-    }
-
-    fn parse_bnc_cell(
-        data: &[u8],
-        cell_tables: &CellTables<'_>,
-        projection_budget: &mut ProjectionBudget,
-        row: usize,
-        column: usize,
-        row_count: usize,
-        column_count: usize,
-    ) -> Result<ParsedCell> {
-        let cell = BncCellView::parse(data).map_err(|error| {
-            Error::ParseError(format!(
-                "Numbers BNC cell ({row}, {column}) is invalid: {error}"
-            ))
-        })?;
-        let comment_identifier = cell.comment_identifier();
-
-        if let StoredValue::Formula(identifier) = cell.stored_value() {
-            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
-                ))
-            })?;
-            let rendered = Self::extract_formula_string(
-                formula,
-                row,
-                column,
-                row_count,
-                column_count,
-                cell_tables.formula_references,
-                projection_budget,
-            )
-            .map_err(|error| {
-                Error::ParseError(format!(
-                    "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
-                ))
-            })?;
-            return Ok(ParsedCell {
-                value: CellValue::Formula(rendered),
-                comment_identifier,
-            });
-        }
-
-        let zero = finite_zero()?;
-        let scalar = cell.cached_scalar();
-        let value = match cell.stored_value() {
-            StoredValue::Empty => CellValue::Empty,
-            StoredValue::Number => match scalar {
-                Some(CachedScalar::Number(value)) => CellValue::Number(value),
-                Some(
-                    CachedScalar::Boolean(_) | CachedScalar::Date(_) | CachedScalar::Duration(_),
-                ) => {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers numeric BNC cell ({row}, {column}) has a mismatched scalar encoding"
-                    )));
-                },
-                Some(CachedScalar::Unsupported(_)) | None => CellValue::Number(zero),
-            },
-            StoredValue::Text(identifier) => {
+        let decoded = decode_cell_value(data)
+            .map_err(|error| map_cell_value_decode_error(error, data, row, column))?;
+        let comment_identifier = decoded.comment_identifier;
+        let value = match decoded.value {
+            ValueSource::Empty => CellValue::Empty,
+            ValueSource::Number(value) => CellValue::Number(to_cell_finite(value)?),
+            ValueSource::Date(value) => CellValue::Date(to_cell_finite(value)?),
+            ValueSource::Boolean(value) => CellValue::Boolean(value),
+            ValueSource::Duration(value) => CellValue::Duration(to_cell_finite(value)?),
+            ValueSource::Text(identifier) => {
                 retained_table_text(cell_tables.strings, identifier, projection_budget)?
                     .map_or(CellValue::Empty, CellValue::Text)
             },
-            StoredValue::RichText(identifier) => {
+            ValueSource::RichText(identifier) => {
                 retained_table_text(cell_tables.rich_text, identifier, projection_budget)?
                     .map_or(CellValue::Empty, CellValue::Text)
             },
-            StoredValue::Date => match scalar {
-                Some(CachedScalar::Date(value)) => CellValue::Date(value),
-                Some(_) | None => CellValue::Date(zero),
+            ValueSource::Formula(identifier) => {
+                let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
+                    ))
+                })?;
+                let rendered = Self::extract_formula_string(
+                    formula,
+                    row,
+                    column,
+                    row_count,
+                    column_count,
+                    cell_tables.formula_references,
+                    projection_budget,
+                )
+                .map_err(|error| {
+                    Error::ParseError(format!(
+                        "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
+                    ))
+                })?;
+                CellValue::Formula(rendered)
             },
-            StoredValue::Boolean => match scalar {
-                Some(CachedScalar::Boolean(value)) => CellValue::Boolean(value),
-                Some(_) | None => CellValue::Boolean(false),
-            },
-            StoredValue::Duration => match scalar {
-                Some(CachedScalar::Duration(value)) => CellValue::Duration(value),
-                Some(_) | None => CellValue::Duration(zero),
-            },
-            StoredValue::Error => {
-                let error = cell
-                    .formula_error_identifier()
+            ValueSource::Error(identifier) => {
+                let error = identifier
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id))
                     .map_or("FORMULA", String::as_str);
                 CellValue::Error(retain_text(error, projection_budget)?)
-            },
-            StoredValue::Formula(_) => {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers formula BNC cell ({row}, {column}) reached scalar decoding"
-                )));
-            },
-            StoredValue::Unsupported(other) => {
-                return Err(Error::ParseError(format!(
-                    "Unsupported Numbers BNC cell type {other}"
-                )));
-            },
-        };
-        Ok(ParsedCell {
-            value,
-            comment_identifier,
-        })
-    }
-
-    fn parse_pre_bnc_cell(
-        data: &[u8],
-        cell_tables: &CellTables<'_>,
-        projection_budget: &mut ProjectionBudget,
-        row: usize,
-        column: usize,
-        row_count: usize,
-        column_count: usize,
-    ) -> Result<ParsedCell> {
-        if data.is_empty() {
-            return Err(Error::ParseError(
-                "Empty Numbers pre-BNC cell payload".to_owned(),
-            ));
-        }
-        let cell = PreBncCellView::parse(data).map_err(|error| {
-            Error::ParseError(format!(
-                "Numbers pre-BNC cell ({row}, {column}) is invalid: {error}"
-            ))
-        })?;
-        let comment_identifier = cell.comment_identifier();
-
-        if let Some(identifier) = cell.formula_identifier() {
-            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
-                ))
-            })?;
-            let rendered = Self::extract_formula_string(
-                formula,
-                row,
-                column,
-                row_count,
-                column_count,
-                cell_tables.formula_references,
-                projection_budget,
-            )
-            .map_err(|error| {
-                Error::ParseError(format!(
-                    "Numbers formula {identifier} at cell ({row}, {column}) is invalid: {error}"
-                ))
-            })?;
-            return Ok(ParsedCell {
-                value: CellValue::Formula(rendered),
-                comment_identifier,
-            });
-        }
-
-        let zero = finite_zero()?;
-        let value = match cell.cell_type() {
-            0 => CellValue::Empty,
-            2 => CellValue::Number(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero),
-            ),
-            3 => match cell.string_identifier() {
-                Some(identifier) => {
-                    retained_table_text(cell_tables.strings, identifier, projection_budget)?
-                        .map_or(CellValue::Empty, CellValue::Text)
-                },
-                None => CellValue::Empty,
-            },
-            5 => CellValue::Date(cell.date().map(to_cell_finite).transpose()?.unwrap_or(zero)),
-            6 => CellValue::Boolean(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero)
-                    .get()
-                    != 0.0,
-            ),
-            7 => CellValue::Duration(
-                cell.number()
-                    .map(to_cell_finite)
-                    .transpose()?
-                    .unwrap_or(zero),
-            ),
-            8 => {
-                let error = cell
-                    .formula_error_identifier()
-                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id))
-                    .map_or("FORMULA", String::as_str);
-                CellValue::Error(retain_text(error, projection_budget)?)
-            },
-            9 => match cell.rich_text_identifier() {
-                Some(identifier) => {
-                    retained_table_text(cell_tables.rich_text, identifier, projection_budget)?
-                        .map_or(CellValue::Empty, CellValue::Text)
-                },
-                None => CellValue::Empty,
-            },
-            other => {
-                return Err(Error::ParseError(format!(
-                    "Unsupported Numbers pre-BNC cell type {other}"
-                )));
             },
         };
         Ok(ParsedCell {
@@ -6663,15 +6483,39 @@ fn pop_formula_arguments<T>(stack: &mut Vec<T>, count: u32, node_kind: &str) -> 
     Ok(stack.split_off(start))
 }
 
-fn to_cell_finite(value: CommonFiniteF64) -> Result<FiniteF64> {
-    FiniteF64::new(value.get()).map_err(|_| {
-        Error::ParseError("Numbers pre-BNC scalar must contain a finite value".to_owned())
-    })
+fn map_cell_value_decode_error(
+    error: CellValueDecodeError,
+    source: &[u8],
+    row: usize,
+    column: usize,
+) -> Error {
+    match error {
+        CellValueDecodeError::Empty => Error::ParseError("Empty Numbers cell storage".to_owned()),
+        CellValueDecodeError::UnsupportedVersion(version) => Error::ParseError(format!(
+            "Unsupported Numbers cell storage version {version}"
+        )),
+        CellValueDecodeError::Bnc(error) => Error::ParseError(format!(
+            "Numbers BNC cell ({row}, {column}) is invalid: {error}"
+        )),
+        CellValueDecodeError::PreBnc(error) => Error::ParseError(format!(
+            "Numbers pre-BNC cell ({row}, {column}) is invalid: {error}"
+        )),
+        CellValueDecodeError::MismatchedNumericScalar => Error::InvalidFormat(format!(
+            "Numbers numeric BNC cell ({row}, {column}) has a mismatched scalar encoding"
+        )),
+        CellValueDecodeError::UnsupportedCellType(cell_type) => {
+            if source.first().copied() == Some(5) {
+                Error::ParseError(format!("Unsupported Numbers BNC cell type {cell_type}"))
+            } else {
+                Error::ParseError(format!("Unsupported Numbers pre-BNC cell type {cell_type}"))
+            }
+        },
+    }
 }
 
-fn finite_zero() -> Result<FiniteF64> {
-    FiniteF64::new(0.0).map_err(|_| {
-        Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
+fn to_cell_finite(value: CommonFiniteF64) -> Result<FiniteF64> {
+    FiniteF64::new(value.get()).map_err(|_| {
+        Error::ParseError("Numbers cell scalar must contain a finite value".to_owned())
     })
 }
 
@@ -6698,7 +6542,7 @@ mod tests {
         FormulaReferenceMaps, FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES,
         MAX_FORMULA_WORK, MAX_PAYLOAD_WORK, ProjectionBudget, Table, TableDataExtractor,
         TileRowVisitor, collect_formula_category_payload, decode_legacy_table_candidate,
-        formula_table_name, has_legacy_table_model_wire_shape,
+        formula_table_name, has_legacy_table_model_wire_shape, map_cell_value_decode_error,
         map_table_cell_decode_limit_with_offsets,
         map_table_cell_decode_limit_with_reference_offset, preflight_formula_category_payload,
         preflight_formula_owner, render_formula, render_formula_ast_array,
@@ -6723,6 +6567,8 @@ mod tests {
         AstStickyBits,
     };
     use litchi_iwa_protos::{numbers_table_cell_storage_codec, tn, tsce, tsd, tsp, tst};
+    use litchi_numbers_wire::Error as WireError;
+    use litchi_numbers_wire::cell_value::DecodeError as CellValueDecodeError;
     use prost::Message as _;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -8094,6 +7940,66 @@ mod tests {
     }
 
     #[test]
+    fn shared_cell_decode_errors_keep_legacy_categories_and_context() {
+        let empty = map_cell_value_decode_error(CellValueDecodeError::Empty, &[], 2, 3);
+        assert!(matches!(
+            empty,
+            Error::ParseError(message) if message == "Empty Numbers cell storage"
+        ));
+
+        let unsupported_version =
+            map_cell_value_decode_error(CellValueDecodeError::UnsupportedVersion(6), &[6], 2, 3);
+        assert!(matches!(
+            unsupported_version,
+            Error::ParseError(message) if message == "Unsupported Numbers cell storage version 6"
+        ));
+
+        let bnc = map_cell_value_decode_error(
+            CellValueDecodeError::Bnc(WireError::ParseError("truncated".to_owned())),
+            &[5],
+            2,
+            3,
+        );
+        assert!(matches!(
+            bnc,
+            Error::ParseError(message) if message == "Numbers BNC cell (2, 3) is invalid: truncated"
+        ));
+
+        let pre_bnc = map_cell_value_decode_error(
+            CellValueDecodeError::PreBnc(WireError::ParseError("truncated".to_owned())),
+            &[0],
+            2,
+            3,
+        );
+        assert!(matches!(
+            pre_bnc,
+            Error::ParseError(message) if message == "Numbers pre-BNC cell (2, 3) is invalid: truncated"
+        ));
+
+        let mismatch =
+            map_cell_value_decode_error(CellValueDecodeError::MismatchedNumericScalar, &[5], 2, 3);
+        assert!(matches!(
+            mismatch,
+            Error::InvalidFormat(message)
+                if message == "Numbers numeric BNC cell (2, 3) has a mismatched scalar encoding"
+        ));
+
+        let bnc_type =
+            map_cell_value_decode_error(CellValueDecodeError::UnsupportedCellType(99), &[5], 2, 3);
+        assert!(matches!(
+            bnc_type,
+            Error::ParseError(message) if message == "Unsupported Numbers BNC cell type 99"
+        ));
+
+        let pre_bnc_type =
+            map_cell_value_decode_error(CellValueDecodeError::UnsupportedCellType(99), &[0], 2, 3);
+        assert!(matches!(
+            pre_bnc_type,
+            Error::ParseError(message) if message == "Unsupported Numbers pre-BNC cell type 99"
+        ));
+    }
+
+    #[test]
     fn aggregate_cell_limit_precedes_retained_semantic_error_without_row_growth()
     -> super::Result<()> {
         let mut invalid_cell = vec![0; 8];
@@ -8179,9 +8085,16 @@ mod tests {
             .encode();
 
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
-        let parsed =
-            TableDataExtractor::parse_bnc_cell(&round_tripped, &tables, &mut budget, 2, 3, 10, 10)
-                .unwrap_or_else(|error| panic!("type-nine cell did not extract: {error}"));
+        let parsed = TableDataExtractor::parse_cell_storage(
+            &round_tripped,
+            &tables,
+            &mut budget,
+            2,
+            3,
+            10,
+            10,
+        )
+        .unwrap_or_else(|error| panic!("type-nine cell did not extract: {error}"));
         let CellValue::Number(value) = parsed.value else {
             panic!("type-nine decimal was not extracted as a number");
         };
