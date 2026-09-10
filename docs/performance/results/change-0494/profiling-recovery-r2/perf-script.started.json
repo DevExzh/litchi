@@ -1,0 +1,42 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/perf",
+    "script",
+    "--header",
+    "--demangle",
+    "-F",
+    "comm,pid,tid,time,period,event,ip,sym,dso",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+    "LC_ALL": "C",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+  },
+  "input": {
+    "bytes": 11897248,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data",
+    "sha256": "9ef157633f59e231f93111714ad9b0177f626512479eebdf145a13ab774d2c4e"
+  },
+  "new_session": true,
+  "recovery_helper": {
+    "bytes": 25466,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/recover_profile.py",
+    "sha256": "c4a3a1592fabf58a1d75e967fc201080d556d633692d2e4a54d5eb9c551273c8"
+  },
+  "role": "owned-perf-script-recovery",
+  "schema": "docx-edit-provider-profile-recovery-process-start-v1",
+  "scope": "reprocess retained perf.data only; no DOCX workload is launched",
+  "source_before": {
+    "files": 7169,
+    "path": "validation-sources/d27a0d59c741e852dbcec112c88c131ce0dd77042b403ab2d64f65b3ca6c7b82.json",
+    "sha256": "d27a0d59c741e852dbcec112c88c131ce0dd77042b403ab2d64f65b3ca6c7b82"
+  },
+  "started_utc": "2026-09-10T08:31:09.851720+00:00"
+}

@@ -1,0 +1,58 @@
+   Compiling block-padding v0.4.2
+   Compiling encoding_rs v0.8.35
+   Compiling cpubits v0.1.1
+   Compiling sha1 v0.11.0
+   Compiling inout v0.2.2
+   Compiling cipher v0.5.2
+   Compiling universal-hash v0.6.1
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling polyval v0.7.3
+   Compiling bergshamra-core v0.7.0
+   Compiling inout v0.1.4
+   Compiling siphasher v1.0.3
+   Compiling uppsala v0.9.0
+   Compiling cipher v0.4.4
+   Compiling phf_shared v0.14.0
+   Compiling ghash v0.6.0
+   Compiling ctr v0.10.1
+   Compiling aes v0.9.2
+   Compiling aead v0.6.1
+   Compiling hmac v0.13.0
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling byteorder v1.5.0
+   Compiling blowfish v0.9.1
+   Compiling argon2 v0.5.3
+   Compiling aes-gcm v0.11.0
+   Compiling pbkdf2 v0.13.0
+   Compiling phf v0.14.0
+   Compiling cbc v0.2.1
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling bergshamra-xml v0.7.0
+   Compiling bergshamra-c14n v0.7.0
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling rc4 v0.2.0
+   Compiling litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-biff v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-biff)
+   Compiling bumpalo v3.20.3
+   Compiling spin v0.10.1
+   Compiling crc-fast v1.10.0
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling md-5 v0.11.0
+   Compiling litchi-rtf v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-rtf)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+   Compiling litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4m 00s

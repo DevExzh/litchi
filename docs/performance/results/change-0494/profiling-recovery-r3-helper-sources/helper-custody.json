@@ -1,0 +1,14 @@
+{
+  "helpers": {
+    "recover_profile.py": {
+      "bytes": 25761,
+      "sha256": "bea4eac6370dfe1a704321a9f829283182735e9646cb34b5981149006c9c5598"
+    },
+    "test_recover_profile.py": {
+      "bytes": 1577,
+      "sha256": "c95ac051c76eacfee71a0e163db99294613b0267fb2ac86d3c0596c1f6d04b27"
+    }
+  },
+  "label": "recovery-r3-before-future-profile-fix",
+  "schema": "docx-edit-provider-recovery-helper-archive-v1"
+}

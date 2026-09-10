@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0494/recover_observer_counters.py",
+    "--profile-dir",
+    "docs/performance/results/change-0494/profiling-r1",
+    "--recovery-summary",
+    "docs/performance/results/change-0494/profiling-recovery-r3/recovery-summary.json",
+    "--recovery-script",
+    "docs/performance/results/change-0494/profiling-recovery-r3/perf-script.txt",
+    "--build-record",
+    "docs/performance/results/change-0494/build-normal.json",
+    "--gate-receipt",
+    "docs/performance/results/change-0494/validation/profile-r1.json",
+    "--helper-archive",
+    "docs/performance/results/change-0494/profiling-r1-helper-sources",
+    "--output-dir",
+    "docs/performance/results/change-0494/profiling-counter-recovery-r3"
+  ],
+  "artifacts": {
+    "profile-counter-recovery-r3.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "profile-counter-recovery-r3.stdout": {
+      "bytes": 116,
+      "sha256": "351d3927a05330aac99d21a8907f509b075ce7b5abba0cf214a27528f2c6e344"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "64dfdfc91564fff9d9169ad6278ccfa67a8a43b1d622fcba9eb57a6a47c7f1c3",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7b2b2764e321565d6283cac27607021bdff0d7671dffaa35d1fb3ae33c7c668e",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T08:46:28.171323+00:00",
+  "label": "profile-counter-recovery-r3",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7169,
+    "path": "validation-sources/1c024d08fc2e4f4f80b9b8a2cbc0ea22b365964ce2b48532a9b19e23ed56a6f2.json",
+    "sha256": "1c024d08fc2e4f4f80b9b8a2cbc0ea22b365964ce2b48532a9b19e23ed56a6f2"
+  },
+  "source_before": {
+    "files": 7169,
+    "path": "validation-sources/1c024d08fc2e4f4f80b9b8a2cbc0ea22b365964ce2b48532a9b19e23ed56a6f2.json",
+    "sha256": "1c024d08fc2e4f4f80b9b8a2cbc0ea22b365964ce2b48532a9b19e23ed56a6f2"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T08:46:25.946925+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

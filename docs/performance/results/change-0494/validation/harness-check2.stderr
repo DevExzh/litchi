@@ -1,0 +1,16 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0382]: borrow of partially moved value: `config`
+    --> src/docx_edit_provider.rs:1202:19
+     |
+1198 |         source_revision: config.source_revision,
+     |                          ---------------------- value partially moved here
+...
+1202 |         provider: config.provider_config(),
+     |                   ^^^^^^ value borrowed here after partial move
+     |
+     = note: partial move occurs because `config.source_revision` has type `std::string::String`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-perf-baseline` (lib test) due to 1 previous error

@@ -1,0 +1,59 @@
+{
+  "artifacts": {
+    "perf-script.stderr": {
+      "bytes": 357,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-recovery-r3/perf-script.stderr",
+      "sha256": "4f6e6fb00614db45a098a40ec46174701ed540892135b6b1d8e266034301e02c"
+    },
+    "perf-script.txt": {
+      "bytes": 3239852,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-recovery-r3/perf-script.txt",
+      "sha256": "be85c6e0cb404436b90fd73f862f30345ae3fa286ba2c485c840d4a3ed0b7783"
+    }
+  },
+  "finished_utc": "2026-09-10T08:32:35.228686+00:00",
+  "input": {
+    "bytes": 11897248,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data",
+    "sha256": "9ef157633f59e231f93111714ad9b0177f626512479eebdf145a13ab774d2c4e"
+  },
+  "process": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "script",
+      "--header",
+      "--demangle",
+      "-F",
+      "comm,pid,tid,time,period,event,ip,sym,dso",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data"
+    ],
+    "exit_code": 0,
+    "finished_utc": "2026-09-10T08:32:34.576409+00:00",
+    "launch_error": null,
+    "new_session": true,
+    "pid": 3188329,
+    "process_group_id": 3188329,
+    "started_utc": "2026-09-10T08:32:16.984338+00:00",
+    "termination": null,
+    "timed_out": false
+  },
+  "reason": null,
+  "role": "owned-perf-script-recovery",
+  "schema": "docx-edit-provider-profile-recovery-process-terminal-v1",
+  "source_after": {
+    "files": 7169,
+    "path": "validation-sources/099bfc83e78e92fd5e58b3d04e5224dfad1866934d7b02b103a3606671418968.json",
+    "sha256": "099bfc83e78e92fd5e58b3d04e5224dfad1866934d7b02b103a3606671418968"
+  },
+  "source_before": {
+    "files": 7169,
+    "path": "validation-sources/099bfc83e78e92fd5e58b3d04e5224dfad1866934d7b02b103a3606671418968.json",
+    "sha256": "099bfc83e78e92fd5e58b3d04e5224dfad1866934d7b02b103a3606671418968"
+  },
+  "source_unchanged": true,
+  "status": "pass"
+}

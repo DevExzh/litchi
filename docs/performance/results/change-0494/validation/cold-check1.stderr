@@ -1,0 +1,38 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0277]: the trait bound `Corpus: Clone` is not satisfied
+    --> src/docx_edit_provider/cold.rs:42:5
+     |
+  40 | #[derive(Clone, Debug)]
+     |          ----- in this derive macro expansion
+  41 | struct ColdCase {
+  42 |     corpus: crate::Corpus,
+     |     ^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `Corpus`
+     |
+help: consider annotating `Corpus` with `#[derive(Clone)]`
+    -->  src/lib.rs:3457:1
+     |
+3457 + #[derive(Clone)]
+3458 | struct Corpus {
+     |
+
+error[E0308]: mismatched types
+    --> src/docx_edit_provider/cold.rs:441:64
+     |
+ 441 |     let foreign_source_refusal_verified = commit.patch().apply(&foreign_snapshot).is_err();
+     |                                                          ----- ^^^^^^^^^^^^^^^^^ expected `&Snapshot`, found `&Document`
+     |                                                          |
+     |                                                          arguments to this method are incorrect
+     |
+     = note: expected reference `&litchi_docx::document::Snapshot`
+                found reference `&litchi_docx::source_backed::Document`
+note: method defined here
+    --> /home/zhuhe/code/litchi/crates/litchi-docx/src/document/transaction.rs:2770:12
+     |
+2770 |     pub fn apply(&self, source: &Snapshot) -> TransactionResult<Snapshot> {
+     |            ^^^^^
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-perf-baseline` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-perf-baseline` (lib test) due to 2 previous errors

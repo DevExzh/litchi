@@ -1,0 +1,132 @@
+{
+  "attempt": "warm-formal1",
+  "pilot": false,
+  "protocol_sha256": "b02e9e6cb59d31268525c05b226a3e3d2210b03951abc3dcf70b286cbc36e720",
+  "raw_receipts": [
+    {
+      "label": "r1-normal-owned",
+      "report_sha256": "59d35e843bfc348ca2e9b43159f1b6e7d0b86139c8de908314480c19e5888e38",
+      "terminal_sha256": "63b3c886031b498c564d8ea169970b0256eab1de0fcdbbc3881b0ff60f79861f"
+    },
+    {
+      "label": "r1-normal-instrumented",
+      "report_sha256": "604dca519ceabf0de658d067c025cd7ddeeaaa166c8612b8ee4f5fe1cd9035f6",
+      "terminal_sha256": "1da7d62d6e9fcc75cf3ad7b9c7a8e3206d6cb9911c862f44b84e8bf62e59a60c"
+    },
+    {
+      "label": "r1-normal-file-warm",
+      "report_sha256": "9cd072a6e656ba0e85219e6c75c066510b66d92c3f123b653cead841a647c476",
+      "terminal_sha256": "75f3362e4a4478d0174c6dbd0d85d61a1df68e2690cb38c70980de4df3ff9e22"
+    },
+    {
+      "label": "r1-normal-short",
+      "report_sha256": "7814a62e5a07c1d0b2ce8ce037fe0ba5a8372e68dede00d18250bd94853cbf8c",
+      "terminal_sha256": "e73cfea66ef570fdf97e7f1d7407dfa4bec686db302507ab1f2f2a8e14534952"
+    },
+    {
+      "label": "r1-normal-delayed",
+      "report_sha256": "adf4be4cd709615cc3cd2343974267889de55244ca3cba4e161f24ae4f37273a",
+      "terminal_sha256": "7ecaf4d3839af628c05aeb8c333cbb30dfd4cdfc6386138f0aa6f27b103e03cb"
+    },
+    {
+      "label": "r1-normal-range-zero",
+      "report_sha256": "5122cfdd001e9f48b27b06a992939bba935b329b7db8c5a54edd79e0b797b2bf",
+      "terminal_sha256": "3189765516f91fef2d903cc7839295905d93f45191e531d4986f4135168a3331"
+    },
+    {
+      "label": "r1-allocator-owned",
+      "report_sha256": "311a6b74a85300c108cbedc25d5a4fc448c27df988affae42e3917252566d467",
+      "terminal_sha256": "fc47b3fdd155a585c52127120de986754fedd1d24673a5138cca286d1367a6a1"
+    },
+    {
+      "label": "r1-allocator-instrumented",
+      "report_sha256": "978577fd8b3b74934d1aa281683267d4c08976e4dcd3537a16f94e0a54483396",
+      "terminal_sha256": "b3cad5a1902395bd483d8b6271b714c4deecee43dfceb72c3ef552f46b9576b6"
+    },
+    {
+      "label": "r1-allocator-file-warm",
+      "report_sha256": "ff702e3143e08ba0836d739570b302dab79dac91f737404ac1374fcb411ec714",
+      "terminal_sha256": "27f0221493dee0e3aa2a2964414a1d9ef8bdc2e77db768bebac6c172312c2c88"
+    },
+    {
+      "label": "r1-allocator-short",
+      "report_sha256": "16f37bdafaeb6b88da0346a161dc97c33a176fd54ead2a2e1f22327321206938",
+      "terminal_sha256": "0f0277a6c2a502fcee207d910f81e650f69f943f030f68670b9eaa438912ae36"
+    },
+    {
+      "label": "r1-allocator-delayed",
+      "report_sha256": "e977d860b5c02a582de4a2d8ec5992342af2dd3ee9d88e7b0ff1e2a461a3a9e7",
+      "terminal_sha256": "5984179fa950e51a60d960bd8945dbbdc33ff134052bacc4bae90c745274e840"
+    },
+    {
+      "label": "r1-allocator-range-zero",
+      "report_sha256": "c357c540b2d73a28eba4282b213249ed7c22b3141946f074733e55b3a42f2b82",
+      "terminal_sha256": "e68214c68e63a71891301c04eba5ffc542ca5d27fb65c8a9eee549b789a4ffc7"
+    },
+    {
+      "label": "r2-allocator-range-zero",
+      "report_sha256": "39be468110cb53429f4e165ec7462e76a6c7705e956f19e2ba5062760618d267",
+      "terminal_sha256": "9711f93a6dc3401c82c0be5f76fb7a9b60950aaeb177a37bd262e5fd0d470c49"
+    },
+    {
+      "label": "r2-allocator-delayed",
+      "report_sha256": "2f52bc890a1a3bd718fb17fc0dc3915e5705a6f120ca8f2ccdf044e9527d3cf0",
+      "terminal_sha256": "aa86ba76ef67476c69f3e5d7115ab030645ccf0e6e54f887ece4e61f23f80cac"
+    },
+    {
+      "label": "r2-allocator-short",
+      "report_sha256": "872088aa9501eee1d038f634b3f0b2ad156d290a23646afc1f7b72658546cce5",
+      "terminal_sha256": "729374563ef9f8722d8da73a91e84ea8522c5e1164034ce2e7f544f279707965"
+    },
+    {
+      "label": "r2-allocator-file-warm",
+      "report_sha256": "70b80d74d4b24eb3f8f739cc7bc9fb85894f294f3cbf98ba62bcae5d2e292353",
+      "terminal_sha256": "08d76f666531c8bd342e027d3705eef3937aa716f431853c56051ef088942c23"
+    },
+    {
+      "label": "r2-allocator-instrumented",
+      "report_sha256": "f512957408a1e98778f61b948b39242ee15729dceba3914657f8e70feeb4c12a",
+      "terminal_sha256": "ff6af3ab6db4b8b347d37d1d2378aa9dd56cc518407c40f5babc8a7ac33e5f90"
+    },
+    {
+      "label": "r2-allocator-owned",
+      "report_sha256": "0b590a32ead87d8dcb234e7f401eebf6a2a1148ba7e223a60743db81cfa080ba",
+      "terminal_sha256": "026c9cd4fcf7dfa1bbd57b7c1cfe1e95281813299027c0d787e1db235bf46210"
+    },
+    {
+      "label": "r2-normal-range-zero",
+      "report_sha256": "419de788a1a29c7c3bf93a5ff27ee6f6aee4971132ed844244f2ca42d147b961",
+      "terminal_sha256": "f511600876eb32c3f3b0f2557177be36dd44ddef51bf210b712c436ae72cbb0d"
+    },
+    {
+      "label": "r2-normal-delayed",
+      "report_sha256": "81a9f6567d23df5fb4e3be1695735101eb602b37dd8a3330d0e583a822c84b1d",
+      "terminal_sha256": "1489e854fe2c2b9c562c219119060aa9a2119bd43fbd990395e5c33430a257c2"
+    },
+    {
+      "label": "r2-normal-short",
+      "report_sha256": "2e46df92270d00234199d0572eae248326fd3394220b4d786131b9c32303b61a",
+      "terminal_sha256": "f05f71a0d1ce6a21f00738c6f5380f6c69e38e258cfa0273c16571297af59cc3"
+    },
+    {
+      "label": "r2-normal-file-warm",
+      "report_sha256": "aa0f2eea527415a383209eb2333995f780fb2b23cac2dd8e4f3451f967a15ab2",
+      "terminal_sha256": "172827f106b9c5e31ea3d9d9eec3eba7586ebe6e5ed96a0578ced75fef085483"
+    },
+    {
+      "label": "r2-normal-instrumented",
+      "report_sha256": "d10a8161fa8529679b582e40723a77f54fe8d189bd805d7a8f466e160663900d",
+      "terminal_sha256": "082bd3d0ae27d52211166f46157ef7afee3ad81f346bdb8e87c031534eeacd97"
+    },
+    {
+      "label": "r2-normal-owned",
+      "report_sha256": "a9db634640b2e79d6a34e353d31a397f3313196f4e4ad473b06a0af724258a62",
+      "terminal_sha256": "8f05cf3eaccf65aca232bbc0b42884318c8267c0320ec9b9b56c6ee3be3ef754"
+    }
+  ],
+  "schema": "docx-edit-provider-verification-v1",
+  "status": "pass",
+  "summary_sha256": "077430bfd424d408a864160420a3c1f4c99bb53216a2ea11674287627aaa26b9",
+  "verified_utc": "2026-09-10T08:11:51.882985+00:00",
+  "version": 1
+}

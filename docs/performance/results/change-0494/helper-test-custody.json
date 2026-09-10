@@ -1,0 +1,86 @@
+{
+  "gate": {
+    "bytes": 1879,
+    "sha256": "4417d5a64d695fa5418faf01c30121342d3d69c8a6981d16b906f25cfbde0ec7"
+  },
+  "helpers": {
+    "cleanup.py": {
+      "bytes": 44605,
+      "sha256": "8613ea852e13c87a8de8cd6de25dd728040d9186f6129efcb6fc427b9222bf54"
+    },
+    "cold_measure.py": {
+      "bytes": 85486,
+      "sha256": "505e2c792ad6b7b6017268265d831d36d78c63cc9d1c3a1dd1ea3a304ca76d3d"
+    },
+    "gate.py": {
+      "bytes": 4268,
+      "sha256": "7b2b2764e321565d6283cac27607021bdff0d7671dffaa35d1fb3ae33c7c668e"
+    },
+    "measure.py": {
+      "bytes": 93896,
+      "sha256": "b282a73ea4b5853997d7f9bbbceb97346985ed58be4ce6cba08ff4a1d195eb5c"
+    },
+    "profile.py": {
+      "bytes": 57076,
+      "sha256": "c1161e215ddfcb7c9f2395610b1029b03a4c388d370ac36d04422e0d56d960a2"
+    },
+    "recover_observer_counters.py": {
+      "bytes": 25705,
+      "sha256": "97645767e2cfe70a70c6ce2f31f89e86315fc69fb23dd3bc7edc100581f68d5c"
+    },
+    "recover_profile.py": {
+      "bytes": 25980,
+      "sha256": "46241b69d228709be21380e263a925e4f69bb00021d51b8b3dc219e7895d3c0a"
+    },
+    "retain_build.py": {
+      "bytes": 3602,
+      "sha256": "4c1ab6583251d0d61a41bf0c9027537bd29077f5988466d0ea12bf59dc5c2b48"
+    },
+    "support.py": {
+      "bytes": 4853,
+      "sha256": "64dfdfc91564fff9d9169ad6278ccfa67a8a43b1d622fcba9eb57a6a47c7f1c3"
+    },
+    "test_cleanup.py": {
+      "bytes": 9672,
+      "sha256": "37f59df1751b35e2901bdc61219e18cef3a26ea8bacce15922047fa499c9885f"
+    },
+    "test_cold_measure.py": {
+      "bytes": 15469,
+      "sha256": "d576fa257eb2276da1cf4883c831d28013698c4ec342126dcf202a4d85b4a662"
+    },
+    "test_measure.py": {
+      "bytes": 19416,
+      "sha256": "265fd4102cbc469a76e3b1ab91fef5a4f8c8dcfe88f3da8f19f875fe06e8f7bf"
+    },
+    "test_profile.py": {
+      "bytes": 9972,
+      "sha256": "cae3387ad216e1ada5596a395740bb6899795851a7798f409461942eb7f06a1c"
+    },
+    "test_profile_strace_status.py": {
+      "bytes": 1728,
+      "sha256": "ed54c6cb2f77a2f01ae8ff4ddf323eb740ad4d320202e3b62e8532165c6cabe2"
+    },
+    "test_recover_observer_counters.py": {
+      "bytes": 4179,
+      "sha256": "5d0fe65ddfea529c114e2eb6d159e597ed0ce9bc2f9d0736c897801f20831411"
+    },
+    "test_recover_profile.py": {
+      "bytes": 2097,
+      "sha256": "50269b216c5107e38ce849506401ef4a99f85223b1721977cf2db4d97cddf697"
+    },
+    "test_verify_bundle.py": {
+      "bytes": 8564,
+      "sha256": "004e32de2e9e5febd93318df0424d9bc3032f7b739e0f6fe26067f9fdb821a27"
+    },
+    "verify_bundle.py": {
+      "bytes": 58919,
+      "sha256": "a5d577e63604c5f2032d058d44d48ee572868127d520de9a30a0f373407020db"
+    }
+  },
+  "label": "final7-helpers",
+  "source": {
+    "files": 7169,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/42d0d51f6ec70040b90845ec6f9237cb2d4ca6d0af5c499803642bdf6b831530.json",
+    "sha256": "42d0d51f6ec70040b90845ec6f9237cb2d4ca6d0af5c499803642bdf6b831530"
+  }
+}

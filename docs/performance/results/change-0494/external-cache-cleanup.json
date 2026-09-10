@@ -1,0 +1,18 @@
+{
+  "directory": "/var/tmp/litchi-spec-gap-target/debug/deps",
+  "files": 20572,
+  "unshared_allocated_bytes": 21277667328,
+  "minimum_age_hours": 6,
+  "extensions": [
+    ".rlib",
+    ".rmeta",
+    ".d",
+    ".o"
+  ],
+  "cargo_lock_held": true,
+  "active_users": [],
+  "ignored_readonly_du_cmdline": true,
+  "source_worktree_touched": false,
+  "free_before": 433917952,
+  "free_after": 35783933952
+}

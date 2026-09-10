@@ -1,0 +1,99 @@
+{
+  "commands": {
+    "final4-boundaries": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "final4-build-allocator": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc"
+    ],
+    "final4-build-normal": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "final4-clippy": [
+      "cargo",
+      "clippy",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all-targets",
+      "--features",
+      "allocator-metrics",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "final4-format": [
+      "rustfmt",
+      "+1.98.1",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/main.rs",
+      "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "tools/perf-baseline/src/docx_edit_provider.rs",
+      "tools/perf-baseline/src/docx_edit_provider/cold.rs"
+    ],
+    "final4-rustdoc": [
+      "env",
+      "RUSTDOCFLAGS=-Dwarnings",
+      "cargo",
+      "doc",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--features",
+      "allocator-metrics",
+      "--no-deps"
+    ],
+    "final4-tests": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--features",
+      "allocator-metrics",
+      "--",
+      "--test-threads=1"
+    ],
+    "final7-helpers": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0494",
+      "-p",
+      "test_*.py"
+    ]
+  },
+  "schema": "docx-edit-provider-final-gates-v1",
+  "version": 1
+}

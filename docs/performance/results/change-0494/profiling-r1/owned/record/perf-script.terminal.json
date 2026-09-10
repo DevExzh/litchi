@@ -1,0 +1,53 @@
+{
+  "artifacts": {
+    "perf-script.stderr": {
+      "bytes": 86,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-script.stderr",
+      "sha256": "1be706102fdff5406c7b18a2c4a9f86fbd2acd2f306e4a5cfc49ded967598c8a"
+    },
+    "perf-script.txt": {
+      "bytes": 1980,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-script.txt",
+      "sha256": "8a5b48ebdbd5e4f6098319bdfa14d2e5d1443492014bd735a3f2f8aeadd43627"
+    }
+  },
+  "finished_utc": "2026-09-10T08:18:23.964715+00:00",
+  "process": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "script",
+      "--header",
+      "--demangle",
+      "-F",
+      "comm,pid,tid,cpu,time,period,event,ip,sym,dso",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data"
+    ],
+    "exit_code": 255,
+    "finished_utc": "2026-09-10T08:18:23.656709+00:00",
+    "new_session": true,
+    "pid": 2905189,
+    "process_group_id": 2905189,
+    "started_utc": "2026-09-10T08:18:23.624923+00:00",
+    "termination": null,
+    "timed_out": false
+  },
+  "reason": "perf record or target exited nonzero",
+  "role": "owned-perf-script",
+  "schema": "docx-edit-provider-profile-process-terminal-v1",
+  "source_after": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_before": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_unchanged": true,
+  "status": "failed"
+}

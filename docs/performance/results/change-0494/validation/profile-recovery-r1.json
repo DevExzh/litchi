@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0494/recover_profile.py",
+    "--profile-dir",
+    "docs/performance/results/change-0494/profiling-r1",
+    "--build-record",
+    "docs/performance/results/change-0494/build-normal.json",
+    "--gate-receipt",
+    "docs/performance/results/change-0494/validation/profile-r1.json",
+    "--helper-archive",
+    "docs/performance/results/change-0494/profiling-r1-helper-sources",
+    "--cpu",
+    "2",
+    "--output-dir",
+    "docs/performance/results/change-0494/profiling-recovery-r1"
+  ],
+  "artifacts": {
+    "profile-recovery-r1.stderr": {
+      "bytes": 85,
+      "sha256": "7fafbbd7e0f04ed4c911444f2254213a6bfa83fe3b6bbe786235aeab16a4540e"
+    },
+    "profile-recovery-r1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "64dfdfc91564fff9d9169ad6278ccfa67a8a43b1d622fcba9eb57a6a47c7f1c3",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7b2b2764e321565d6283cac27607021bdff0d7671dffaa35d1fb3ae33c7c668e",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+  },
+  "exit_code": 1,
+  "finished_utc": "2026-09-10T08:29:27.904268+00:00",
+  "label": "profile-recovery-r1",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7169,
+    "path": "validation-sources/d980432fe07b721c1247d204323df6f3a2e02ac64497f4b1d345233496e28c2a.json",
+    "sha256": "d980432fe07b721c1247d204323df6f3a2e02ac64497f4b1d345233496e28c2a"
+  },
+  "source_before": {
+    "files": 7169,
+    "path": "validation-sources/d980432fe07b721c1247d204323df6f3a2e02ac64497f4b1d345233496e28c2a.json",
+    "sha256": "d980432fe07b721c1247d204323df6f3a2e02ac64497f4b1d345233496e28c2a"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T08:29:25.672061+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

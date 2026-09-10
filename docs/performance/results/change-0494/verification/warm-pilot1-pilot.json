@@ -1,0 +1,72 @@
+{
+  "attempt": "warm-pilot1",
+  "pilot": true,
+  "protocol_sha256": "734e1a0b272201b889391f09fa13932f7269e8def77abb9b71a87dafe93a6824",
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-normal-owned",
+      "report_sha256": "2779973f2dfca8a98b2f3abb458422e41ab86481267648b19ad11af9c992ac25",
+      "terminal_sha256": "ba9946223fd4bbd53738c0d35e639ad1349cee7dd0404c5d353db2cb76d64227"
+    },
+    {
+      "label": "pilot-r1-normal-instrumented",
+      "report_sha256": "a7f698db84b2a944e97ac229ffaadbd34c097847d00eb7b9a7b1e6d075d26582",
+      "terminal_sha256": "6a00f8bc983205049e83b39d33a1de598a7ed709ef3af2dc2c06bb0928019470"
+    },
+    {
+      "label": "pilot-r1-normal-file-warm",
+      "report_sha256": "24834d5bb14b7ce4931ab6adf3c27e3307bf6f36cedc324e53b8908359f62d80",
+      "terminal_sha256": "e89e979a56e1b69b911d69fef72b283608ce5513d4d953a31550cec90f120a91"
+    },
+    {
+      "label": "pilot-r1-normal-short",
+      "report_sha256": "90ab7da19c83af86ab888c342678d2c61e467dc9964b2de2508b0955b2a1ecbf",
+      "terminal_sha256": "3bf678c98c10d23387006b5a2fd365f93b579f76664d9a1d407ac81cd5822148"
+    },
+    {
+      "label": "pilot-r1-normal-delayed",
+      "report_sha256": "2f970f50e34561ba1b15440127be5fcbde7b06fbe7cd47a9a4c38e049905bc7d",
+      "terminal_sha256": "a871ea7312b2b217f962b8f15460bed1258c908cba2dfa414f8c7ec3b70d9e54"
+    },
+    {
+      "label": "pilot-r1-normal-range-zero",
+      "report_sha256": "fc2ed38fb5b0a129d8bb27f611aa9bce4147fea0234538c4d434f9e6e6a53efc",
+      "terminal_sha256": "0c37ea983a40f251a1850580080047e1d3e003edebfaba7b2ef6b63514475d19"
+    },
+    {
+      "label": "pilot-r1-allocator-owned",
+      "report_sha256": "ca2327b9b7e23d25579191a0368af3e4914dfa9c9a228248c11596c3d81c5df0",
+      "terminal_sha256": "512fceb6b3dfccef2c679b0c7c0e5214cf29f5e147e3f46d9a861f7b1893d0b5"
+    },
+    {
+      "label": "pilot-r1-allocator-instrumented",
+      "report_sha256": "40f4f09cedc9a66ab54ab38dfa33f6a7cc041d371fe0a1f4a3263da81c9268d2",
+      "terminal_sha256": "7f916791335bfe4f208906730e1d748f8b2ad846b3fd8cac112b69b9f94a1baa"
+    },
+    {
+      "label": "pilot-r1-allocator-file-warm",
+      "report_sha256": "a125542ff40185cbc3218d139b9ffa3a53c7e2532c9a352fde34c618e3374205",
+      "terminal_sha256": "b5109e57dfc8792ac2da6f01f641a1c03aa1c37209fa3d7635914fb7ed667139"
+    },
+    {
+      "label": "pilot-r1-allocator-short",
+      "report_sha256": "7add832a8ed80994faef0faafd065df2ac72e0e4fbea7e1fdce6f39cbc4ad674",
+      "terminal_sha256": "17a440802ac58a3c5ede7c8ed18d7749bf6eeb8fc90201d025bcf2e68f6c43a1"
+    },
+    {
+      "label": "pilot-r1-allocator-delayed",
+      "report_sha256": "9beb15827df629d3ad09e87611301f2a1a13e017a22772cd12f0ac1f201b1845",
+      "terminal_sha256": "e6ac4ea031a94bfe7ab587e8fe26dec362d084a832498d43a31cd02848fc5095"
+    },
+    {
+      "label": "pilot-r1-allocator-range-zero",
+      "report_sha256": "239f9f0a902aa72ea9e5ab99777de735251f9894da2e8695927ca419a20b4e98",
+      "terminal_sha256": "b03d0406bb0aa124ea767c71ff8ea20e2af2698b408cafae06d22c4310b0a71d"
+    }
+  ],
+  "schema": "docx-edit-provider-verification-v1",
+  "status": "pass",
+  "summary_sha256": "b6e501432717d599ee9f78eb579f65f594cbbec944127576ef7ad16f5989e138",
+  "verified_utc": "2026-09-10T08:03:49.654548+00:00",
+  "version": 1
+}
