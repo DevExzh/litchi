@@ -44,6 +44,9 @@ use std::time::Duration;
 
 mod artifact_restore;
 pub use artifact_restore::SourceArtifactRestoreProof;
+mod read_ahead;
+use read_ahead::ArchiveReadAhead;
+pub use read_ahead::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
 mod splice;
 pub use splice::{
     SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
@@ -2632,6 +2635,7 @@ impl CacheCounters {
 #[derive(Clone)]
 struct SourceReader {
     snapshot: SourceSnapshot,
+    read_ahead: Option<Arc<ArchiveReadAhead>>,
 }
 
 /// Typed marker used while a positional source reports a version change
@@ -2661,13 +2665,16 @@ impl std::error::Error for SourceChangedIoError {}
 
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        let result = read_source_at_with_context(
-            &self.snapshot,
-            self.snapshot.context.as_ref(),
-            offset,
-            output,
-            "archive",
-        );
+        let result = match &self.read_ahead {
+            Some(read_ahead) => read_ahead.read_at(&self.snapshot, offset, output),
+            None => read_source_at_with_context(
+                &self.snapshot,
+                self.snapshot.context.as_ref(),
+                offset,
+                output,
+                "archive",
+            ),
+        };
         result.map_err(|error| match error {
             OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
             OpcError::Execution(error) => execution_io_error(error),
@@ -5176,7 +5183,9 @@ fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
 /// A structurally validated OPC package backed by an immutable positional source.
 ///
 /// Opening reads and validates ZIP metadata, content types, and relationship
-/// XML, but never reads ordinary part payloads. The ordinary view is immutable.
+/// XML without materializing ordinary part payloads. Existing constructors use
+/// exact reads; an explicit read-ahead policy may fetch adjacent compressed
+/// bytes within its bounded window. The ordinary view is immutable.
 /// [`Self::write_part_overlays_to_stream`] is a narrow, consuming publisher for
 /// a bounded same-topology Part replacement set that raw-copies every other
 /// ZIP member; call [`Self::into_opc_package`] when a general owning mutable
@@ -5184,6 +5193,7 @@ fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
 pub struct SourceBackedPackage {
     source: SourceSnapshot,
     archive: IndexedArchive<SourceReader>,
+    read_ahead: Option<Arc<ArchiveReadAhead>>,
     limits: ReadLimits,
     content_types_member: String,
     package_relationships: Relationships,
@@ -5244,6 +5254,7 @@ impl SourceBackedPackage {
         let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
+                read_ahead: None,
             },
             length,
             limits.zip_limits(),
@@ -5337,6 +5348,7 @@ impl SourceBackedPackage {
         Ok(Self {
             source: snapshot,
             archive,
+            read_ahead: None,
             limits,
             content_types_member,
             package_relationships,
@@ -5480,7 +5492,13 @@ impl SourceBackedPackage {
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, cache_limits, Some(context))
+        Self::from_read_at_inner(
+            source,
+            limits,
+            cache_limits,
+            Some(context),
+            SourceReadPolicy::exact(),
+        )
     }
 
     /// Open a source-backed package with explicit read and cache policies.
@@ -5492,7 +5510,51 @@ impl SourceBackedPackage {
         limits: ReadLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, cache_limits, None)
+        Self::from_read_at_inner(
+            source,
+            limits,
+            cache_limits,
+            None,
+            SourceReadPolicy::exact(),
+        )
+    }
+
+    /// Open with an explicit bounded source-read policy and payload-cache limits.
+    ///
+    /// Read-ahead fetches adjacent compressed bytes and may increase input-byte
+    /// use. Publication and mutable materialization permanently switch this
+    /// package back to exact reads and release the read-ahead window. Existing
+    /// constructors remain exact. Use the execution-context variant to charge
+    /// physical reads and retained memory to a hierarchical budget.
+    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        source_read_policy: SourceReadPolicy,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(source, limits, cache_limits, None, source_read_policy)
+    }
+
+    /// Open with explicit read-ahead, cache, and hierarchical execution policies.
+    ///
+    /// Input charges follow accepted physical reads, including overfetch; cache
+    /// hits consume no additional input bytes. The window's memory reservation
+    /// remains live until the window is released or the package is dropped.
+    /// Publication permanently returns this package to exact reads.
+    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        source_read_policy: SourceReadPolicy,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(
+            source,
+            limits,
+            cache_limits,
+            Some(context),
+            source_read_policy,
+        )
     }
 
     fn from_read_at_inner(
@@ -5500,6 +5562,7 @@ impl SourceBackedPackage {
         limits: ReadLimits,
         cache_limits: SourceCacheLimits,
         context: Option<ExecutionContext>,
+        source_read_policy: SourceReadPolicy,
     ) -> Result<Self> {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
@@ -5531,9 +5594,18 @@ impl SourceBackedPackage {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
+        let read_ahead = if source_read_policy.window_bytes() == 0 {
+            None
+        } else {
+            Some(Arc::new(ArchiveReadAhead::new(
+                &snapshot,
+                source_read_policy,
+            )?))
+        };
         let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
+                read_ahead: read_ahead.clone(),
             },
             length,
             limits.zip_limits(),
@@ -5670,6 +5742,7 @@ impl SourceBackedPackage {
         Ok(Self {
             source: snapshot,
             archive,
+            read_ahead,
             limits,
             content_types_member,
             package_relationships,
@@ -5680,6 +5753,24 @@ impl SourceBackedPackage {
             cache,
             catalog_object_reservation,
         })
+    }
+
+    /// Inspect the explicitly enabled source-read window and its counters.
+    ///
+    /// Exact constructors return `None`. A policy disabled by publication
+    /// retains its diagnostic counters but reports no retained window.
+    pub fn source_read_diagnostics(&self) -> Result<Option<SourceReadDiagnostics>> {
+        self.read_ahead
+            .as_ref()
+            .map(|state| state.diagnostics())
+            .transpose()
+    }
+
+    fn disable_read_ahead_for_publication(&self) -> Result<()> {
+        if let Some(read_ahead) = &self.read_ahead {
+            read_ahead.disable_for_exact_publication(&self.source)?;
+        }
+        Ok(())
     }
 
     /// Package-level relationships parsed during opening.
@@ -5733,6 +5824,7 @@ impl SourceBackedPackage {
     /// are validated for bounded well-formedness, never normalized or passed
     /// through the authored compactness audit.
     pub(crate) fn source_xml_part(&self, index: usize) -> Result<SourceXmlPart> {
+        self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         if self.has_encrypted_entries() {
@@ -5996,6 +6088,7 @@ impl SourceBackedPackage {
         index: usize,
         expected_decoded: Option<Arc<Vec<u8>>>,
     ) -> Result<(Option<PartData>, AuthorizedPrecompressedPart)> {
+        self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         self.validate_topology_source_boundary()?;
@@ -6201,6 +6294,7 @@ impl SourceBackedPackage {
         self,
         accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<OpcPackage> {
+        self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         if self.cache.is_managed() {
@@ -6252,6 +6346,7 @@ impl SourceBackedPackage {
         &self,
         accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<OpcPackage> {
+        self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         if self.cache.is_managed() {
@@ -6283,6 +6378,7 @@ impl SourceBackedPackage {
         non_part_members: Vec<NonPartMember>,
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<OpcPackage> {
+        self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         let mut package = OpcPackage::new();
@@ -6342,6 +6438,7 @@ impl SourceBackedPackage {
         writer: W,
         plan: SourceTopologyPlan,
     ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
         if plan.is_empty() {
             return self.write_exact_source(writer);
         }
@@ -7830,6 +7927,7 @@ impl SourceBackedPackage {
     where
         F: FnOnce(P) -> Arc<Vec<u8>>,
     {
+        self.disable_read_ahead_for_publication()?;
         let target = self
             .parts_by_name
             .get(partname)
@@ -7908,6 +8006,7 @@ impl SourceBackedPackage {
         replacement: Vec<u8>,
         mut removed_relationship_ids: Vec<String>,
     ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
         if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
             return Err(overlay_unavailable(format!(
                 "relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
@@ -8009,6 +8108,7 @@ impl SourceBackedPackage {
         writer: W,
         mut overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
     ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
         if overlays.len() > MAX_SOURCE_OVERLAY_PARTS {
             return Err(overlay_unavailable(format!(
                 "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
@@ -8325,6 +8425,7 @@ impl SourceBackedPackage {
     where
         F: FnMut(P) -> Arc<Vec<u8>>,
     {
+        self.disable_read_ahead_for_publication()?;
         let selected = replacements
             .len()
             .checked_add(deletions.len())
@@ -9314,6 +9415,7 @@ impl SourceBackedPackage {
         appended: Vec<soapberry_zip::RegeneratedEntry>,
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
         self.source.monitor_publication();
         self.source.ensure_current()?;
         let mut scratch = Vec::new();

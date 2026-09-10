@@ -46,6 +46,7 @@ impl SourceBackedPackage {
         max_output_bytes: u64,
         writer: W,
     ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
         let retained = &original.snapshot;
         let context = self
             .cache

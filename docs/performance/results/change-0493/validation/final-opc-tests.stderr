@@ -1,0 +1,28 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unnecessary qualification
+   --> crates/litchi-opc/tests/source_read_ahead.rs:259:12
+    |
+259 |     calls: std::sync::Mutex<Vec<ReadCall>>,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+259 -     calls: std::sync::Mutex<Vec<ReadCall>>,
+259 +     calls: Mutex<Vec<ReadCall>>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/tests/source_read_ahead.rs:266:20
+    |
+266 |             calls: std::sync::Mutex::new(Vec::new()),
+    |                    ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+266 -             calls: std::sync::Mutex::new(Vec::new()),
+266 +             calls: Mutex::new(Vec::new()),
+    |
+
+error: could not compile `litchi-opc` (test "source_read_ahead") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

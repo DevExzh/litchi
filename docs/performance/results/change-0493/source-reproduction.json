@@ -1,0 +1,15 @@
+{
+  "base_revision": "e8ee19b063285cb0bb73dea819f1be1ac5e82133",
+  "patch": {
+    "bytes": 199720,
+    "sha256": "7c249bf79949c6fe661e4017a87854b5c6173691ff300a99c2a9e694d51b87c0"
+  },
+  "preexisting_source_delta": [
+    "crates/litchi-keynote/src/document.rs"
+  ],
+  "source": {
+    "files": 7163,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+    "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+  }
+}

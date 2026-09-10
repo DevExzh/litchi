@@ -1,0 +1,103 @@
+   Compiling stable_deref_trait v1.2.1
+   Compiling syn v2.0.114
+   Compiling litemap v0.7.3
+   Compiling writeable v0.5.5
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling icu_properties_data v1.5.1
+   Compiling generic-array v0.14.9
+   Compiling icu_normalizer_data v1.5.1
+   Compiling smallvec v1.16.0
+   Compiling write16 v1.0.0
+   Compiling utf8_iter v1.0.4
+   Compiling utf16_iter v1.0.5
+   Compiling num-traits v0.2.19
+   Compiling bitflags v2.13.1
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.12.0
+   Compiling sha2 v0.10.9
+   Compiling chrono v0.4.45
+   Compiling rustix v1.1.4
+   Compiling zerocopy v0.8.56
+   Compiling synstructure v0.13.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerofrom v0.1.4
+   Compiling zerovec-derive v0.10.4
+   Compiling displaydoc v0.2.6
+   Compiling yoke v0.7.4
+   Compiling icu_provider_macros v1.5.0
+   Compiling thiserror-impl v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling zerovec v0.10.4
+   Compiling percent-encoding v2.3.2
+   Compiling tempfile v3.27.0
+   Compiling form_urlencoded v1.2.2
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling thiserror v2.0.18
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling tinystr v0.7.6
+   Compiling icu_collections v1.5.0
+   Compiling icu_locid v1.5.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling icu_provider v1.5.0
+   Compiling icu_locid_transform v1.5.0
+   Compiling unicode-normalization v0.1.25
+   Compiling icu_properties v1.5.1
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling caseless v0.2.2
+   Compiling ryu v1.0.22
+   Compiling icu_normalizer v1.5.0
+   Compiling idna_adapter v1.2.0
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4m 52s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/litchi_docx-cfdef4ea06d25fd6)
+     Running tests/alt_api.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/alt_api-4dd3bfa207081341)
+     Running tests/alt_chunk_authoring.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/alt_chunk_authoring-e1e5a4f2ca415b7f)
+     Running tests/block_mutation.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/block_mutation-66f1b989243546ac)
+     Running tests/conflict_revisions.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/conflict_revisions-a8b5cf73bf19a21e)
+     Running tests/core_properties.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/core_properties-0cfdaeef76d0a1bd)
+     Running tests/custom_properties.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/custom_properties-e2ebb4eaec948214)
+     Running tests/custom_xml_data_store.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/custom_xml_data_store-f335d337f08c749a)
+     Running tests/encryption.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/encryption-992cf9d676eef85e)
+     Running tests/font_api.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/font_api-02a10347c8ebbaf5)
+     Running tests/fonts.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/fonts-7c6f61e40e57fd39)
+     Running tests/glossary_api.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/glossary_api-6bb7b6976c8078a8)
+     Running tests/glossary_authoring.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/glossary_authoring-fb9ea2151cd38698)
+     Running tests/mail_merge_authoring.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/mail_merge_authoring-191c8ddc9cee10ff)
+     Running tests/malformed_document.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/malformed_document-1f22b0f9c9e4762f)
+     Running tests/markup_compatibility.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/markup_compatibility-6747872f5c2e49f5)
+     Running tests/note_comment_removal.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/note_comment_removal-aadaaf0af27a621d)
+     Running tests/paragraph_extensions.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/paragraph_extensions-fde983d696d916ab)
+     Running tests/read_limits.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/read_limits-251aae7b25ae2b60)
+     Running tests/sdt_extensions.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/sdt_extensions-be9701bb47966ea5)
+     Running tests/sdt_extensions_encryption.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/sdt_extensions_encryption-6a3885bd27a8ca71)
+     Running tests/sdt_mce_inactive.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/sdt_mce_inactive-145e230523a95c17)
+     Running tests/sdt_visual_extensions.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/sdt_visual_extensions-abd2e72d7ce96001)
+     Running tests/section_mutation.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/section_mutation-448721310450f421)
+     Running tests/sequential_text.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/sequential_text-a798152738759657)
+     Running tests/settings_extensions.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/settings_extensions-73380abb00c73442)
+     Running tests/source_backed.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed-1402ccbbe91abf48)
+     Running tests/source_backed_file.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_file-8eadb47da5eedf99)
+     Running tests/source_backed_glossary_story_text.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_glossary_story_text-1baa2f6597655a7a)
+     Running tests/source_backed_managed.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_managed-626c2823f77cf34c)
+     Running tests/source_backed_paragraph_copy.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_paragraph_copy-53660eb9a058bb6a)
+     Running tests/source_backed_paragraph_removal.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_paragraph_removal-f0e3b8f687464cb5)
+     Running tests/source_backed_redact.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_redact-9393d47b4fe8d375)
+     Running tests/source_backed_sanitize.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_sanitize-c21a24bb2121446c)
+     Running tests/source_backed_secondary_story_text.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_secondary_story_text-ea6a9cc4d610f9f1)
+     Running tests/source_backed_sections.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_sections-33742938d5a67d76)
+     Running tests/source_backed_semantic.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_semantic-bb468a04b95849af)
+     Running tests/source_backed_story_hyperlinks.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_story_hyperlinks-453e9e5dd84a4720)
+     Running tests/source_backed_story_text.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_story_text-a328273fd6a86151)
+     Running tests/source_backed_tail_append.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_tail_append-6a8a9dfcfbc512bd)
+     Running tests/source_backed_tail_append_stream.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_tail_append_stream-61a772daea9b257a)
+     Running tests/source_backed_variables.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_backed_variables-a5d6f2c88358d292)
+     Running tests/source_read_policy.rs (/home/zhuhe/.cache/litchi-build-0493/release/deps/source_read_policy-74ca831fd5d95ff2)
+error: test failed, to rerun pass `-p litchi-docx --test source_read_policy`

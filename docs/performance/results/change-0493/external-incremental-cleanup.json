@@ -1,0 +1,11 @@
+{
+  "path": "/var/tmp/litchi-spec-gap-target/debug/incremental",
+  "removed_files": 346450,
+  "unshared_allocated_bytes": 126449860608,
+  "newest_entry_age_hours": 16.400809272262784,
+  "free_before": 58374471680,
+  "free_after": 193848745984,
+  "cargo_lock_held": true,
+  "active_references": [],
+  "source_worktree_touched": false
+}

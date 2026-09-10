@@ -1,0 +1,12 @@
+ Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: public documentation for `docx_managed_read_ahead` links to private item `CountingReadAt`
+ --> src/docx_managed_read_ahead.rs:8:14
+  |
+8 | //! model; [`CountingReadAt`] below it records the physical calls separately
+  |              ^^^^^^^^^^^^^^ this item is private
+  |
+  = note: this link will resolve properly if you pass `--document-private-items`
+  = note: `-D rustdoc::private-intra-doc-links` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(rustdoc::private_intra_doc_links)]`
+
+error: could not document `litchi-perf-baseline`

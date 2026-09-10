@@ -80,8 +80,9 @@ pub use source_backed::{
     SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
     SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
     SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
-    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceRelationshipTarget,
-    SourceTopologyPlan, VerifiedDecodedReaderError,
+    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceReadDiagnostics,
+    SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget, SourceTopologyPlan,
+    VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};

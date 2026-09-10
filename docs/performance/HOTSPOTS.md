@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## 0493: managed source read-ahead reduces delayed DOCX requests
+
+The opt-in production OPC window, forwarded through DOCX, reduces the pinned
+managed full-text lifecycle from 19 physical reads to 3. The 480-sample formal
+matrix records 82.17–84.87% lower normal-executable medians under the simulated
+1 ms plus 100 MiB/s provider. Zero-delay medians change +0.98% and −2.01%, so
+this does not establish a local-source improvement.
+
+The cost is 1,479 extra input bytes (+37.29%), including 69 compressed media
+bytes, plus three allocations and 4,384 allocator bytes. Window Memory is
+reserved and physical InputBytes are charged; package publication releases the
+window before exact traversal. Queued managed readers retain cancellation
+polling. Delayed tails vary substantially on the shared host; no scaling or
+real-network result follows. The next gaps are opened DOCX edit/save provider
+coverage, bounded concurrent scaling, independent producers, and genuine
+borrowed lifetimes. See [the change record](changes/0493-managed-opc-source-read-ahead.md)
+and [raw evidence](results/change-0493/README.md).
+
 ## 0492: bounded range reads remove simulated request service
 
 [0492](changes/0492-docx-bounded-range-read-ahead.md) verifies the range-locality
