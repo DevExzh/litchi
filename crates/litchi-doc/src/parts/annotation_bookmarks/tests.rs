@@ -1,6 +1,8 @@
 //! Focused regression tests for the inert annotation-bookmark owner.
 
-use super::{Editor, Snapshot, Tag, TagId, Tags, TransactionError, parse, parse_bytes, to_bytes};
+use super::{
+    Editor, MAX_ENTRIES, Snapshot, Tag, TagId, Tags, TransactionError, parse, parse_bytes, to_bytes,
+};
 use crate::parts::fib::FileInformationBlock;
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
@@ -24,6 +26,31 @@ fn round_trip_preserves_opaque_tag_ids() {
     assert_eq!(value.entries()[0].id().raw(), 0x8000_0001);
 }
 
+fn table_with_count(count: usize) -> Vec<u8> {
+    let mut data = Vec::with_capacity(6 + count * 12);
+    data.extend_from_slice(&0xFFFFu16.to_le_bytes());
+    data.extend_from_slice(&(count as u16).to_le_bytes());
+    data.extend_from_slice(&10u16.to_le_bytes());
+    for tag in 0..count {
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0x0100u16.to_le_bytes());
+        data.extend_from_slice(&(tag as u32).to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+    }
+    data
+}
+
+#[test]
+fn accepts_maximum_count_and_rejects_correctly_sized_next_count() {
+    let maximum = table_with_count(MAX_ENTRIES);
+    let tags = parse_bytes(&maximum).expect("maximum annotation-bookmark table parses");
+    assert_eq!(tags.len(), MAX_ENTRIES);
+
+    let too_many = table_with_count(MAX_ENTRIES + 1);
+    assert_eq!(too_many.len(), maximum.len() + 12);
+    assert!(parse_bytes(&too_many).is_err());
+}
+
 #[test]
 fn parses_fib_range_and_rejects_invalid_atnbe_shapes() {
     let payload = to_bytes(&sample()).unwrap();
@@ -42,8 +69,9 @@ fn parses_fib_range_and_rejects_invalid_atnbe_shapes() {
     assert!(parse_bytes(&wrong_extra).is_err());
 
     let mut wrong_count = payload.clone();
-    wrong_count[2..4].copy_from_slice(&0x3ffdu16.to_le_bytes());
-    assert!(parse_bytes(&wrong_count).is_err());
+    wrong_count[2..4].copy_from_slice(&0x3ffcu16.to_le_bytes());
+    let error = parse_bytes(&wrong_count).unwrap_err();
+    assert!(error.to_string().contains("0x3FFB"));
 
     let mut wrong_string = payload.clone();
     wrong_string[6..8].copy_from_slice(&1u16.to_le_bytes());

@@ -29,6 +29,35 @@ impl Document {
         Ok(self.bookmarks_table.bookmarks().to_vec())
     }
 
+    /// Strictly access the inert annotation-bookmark tag table
+    /// (`SttbfAtnBkmk`, MS-DOC §2.9.277), when present.
+    ///
+    /// The tags are opaque identities used to associate annotation ranges
+    /// with comments. They are not resolved to external data or applied to
+    /// host UI state. When the table is independent of ranged-comment
+    /// validation, parsing is deferred so malformed optional metadata does not
+    /// prevent the document's primary text from opening. Documents with ranged
+    /// comments validate this table while constructing the comments facade; the
+    /// first deferred error is cached for deterministic repeated access.
+    pub fn annotation_bookmarks(
+        &self,
+    ) -> Result<Option<&crate::parts::annotation_bookmarks::Tags>> {
+        match self
+            .annotation_bookmarks
+            .get_or_init(|| match &self.annotation_bookmarks_source {
+                Ok(Some(source)) => crate::parts::annotation_bookmarks::Tags::parse_bytes(source)
+                    .map(Some)
+                    .map_err(|error| error.to_string()),
+                Ok(None) => Ok(None),
+                Err(error) => Err(error.clone()),
+            }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid annotation-bookmark metadata: {error}"
+            ))),
+        }
+    }
+
     /// Legacy smart-tag metadata, when the document contains it.
     ///
     /// Recognition code and download URLs remain inert; this only exposes the

@@ -1,4 +1,5 @@
 use crate::package::Result;
+use crate::parts::annotation_bookmarks::Tags;
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
 use crate::parts::bookmarks::BookmarksTable;
@@ -93,6 +94,13 @@ pub struct Document {
     pub(in crate::document) endnotes_table: Option<EndnotesTable>,
     /// Comments table
     pub(in crate::document) comments_table: CommentsTable,
+    /// Bounded raw source for deferred annotation-bookmark tag parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) annotation_bookmarks_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict annotation-bookmark (`SttbfAtnBkmk`) metadata parse.
+    pub(in crate::document) annotation_bookmarks:
+        OnceLock<std::result::Result<Option<Tags>, String>>,
     /// Deferred strict parsing of the versioned document-property record.
     pub(in crate::document) document_properties: Result<Option<DocumentProperties>>,
     /// Standard bookmark tables

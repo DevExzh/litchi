@@ -1,3 +1,4 @@
+use crate::parts::annotation_bookmarks::MAX_ENTRIES;
 use crate::writer::comments::CommentEntry;
 use crate::writer::core::{
     codec,
@@ -35,6 +36,13 @@ impl Writer {
             return Err(WriteError::InvalidData(
                 "every DOC comment must have a reference in the main document".to_string(),
             ));
+        }
+
+        let ranged_count = entries.iter().filter(|entry| entry.range.is_some()).count();
+        if ranged_count > MAX_ENTRIES {
+            return Err(WriteError::InvalidData(format!(
+                "DOC annotation bookmark table exceeds {MAX_ENTRIES:#X} entries"
+            )));
         }
 
         let mut ordered = entries
@@ -91,15 +99,6 @@ impl Writer {
             owner_bytes.extend(units.into_iter().flat_map(u16::to_le_bytes));
         }
 
-        let ranged_count = ordered
-            .iter()
-            .filter(|(entry, _)| entry.range.is_some())
-            .count();
-        if ranged_count > 0x3FFC {
-            return Err(WriteError::InvalidData(
-                "DOC annotation bookmark table exceeds 0x3FFC entries".to_string(),
-            ));
-        }
         let bookmark_sentinel = ccp_text.checked_add(1).ok_or_else(|| {
             WriteError::InvalidData("DOC annotation bookmark sentinel overflows".to_string())
         })?;

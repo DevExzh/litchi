@@ -13,14 +13,17 @@ pub(crate) const POINTER_OFFSET: usize = 154 + FIB_INDEX * 8;
 pub(crate) const BMC_ANNOTATION: u16 = 0x0100;
 /// `ATNBE` size appended to each zero-length STTB string.
 pub(crate) const ATNBE_SIZE: usize = 10;
-/// Maximum `cData` permitted by MS-DOC §2.9.277.
-pub(crate) const MAX_ENTRIES: usize = 0x3FFC;
+/// Maximum annotation-bookmark count permitted by MS-DOC §2.9.277.
+///
+/// The generic extended-STTB field admits `0x3FFC`, but the structure-level
+/// requirement limits the number of annotation bookmarks to `0x3FFB`.
+pub(crate) const MAX_ENTRIES: usize = 0x3FFB;
 /// Maximum complete payload size under the format count bound.
 pub(crate) const MAX_TABLE_BYTES: usize = 6 + MAX_ENTRIES * (2 + ATNBE_SIZE);
 
 pub(crate) fn tags(value: &Tags) -> Result<()> {
     if value.entries().len() > MAX_ENTRIES {
-        return Err(corrupted("SttbfAtnBkmk cData exceeds 0x3FFC entries"));
+        return Err(corrupted("SttbfAtnBkmk cData exceeds 0x3FFB entries"));
     }
     let mut ids = HashSet::with_capacity(value.entries().len());
     for entry in value.entries() {
