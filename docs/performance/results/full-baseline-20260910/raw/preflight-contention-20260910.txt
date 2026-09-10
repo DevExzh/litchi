@@ -1,0 +1,40 @@
+2026-09-10T03:00:51+00:00
+taskset:
+pid 3187965's current affinity list: 2
+loadavg:
+17.07 14.11 10.27 6/1255 3187968
+allowed:
+2
+online:
+0-31
+processes:
+    PID    PPID PSR %CPU %MEM STAT COMMAND         COMMAND
+1416416  225771   0 99.9  0.0 Rs   git             git diff --name-status 5ffc^ 5ffc -- crates/litchi-xlsx/src/survey.rs crates/litchi-xlsx/src/survey/source.rs crates/litchi-xlsx/src/survey/source/properties.rs crates/litchi-xlsx/src/survey/source/questions.rs crates/litchi-xlsx/src/source_attributes.rs crates/litchi-xlsx/src/lib.rs crates/litchi-xlsx/src/package.rs crates/litchi-xlsx/docs/FEATURE_MATRIX.md
+1416559  225771   8 99.9  0.0 Rs   git             git diff --stat 5ffc^ 5ffc --
+3184195 3139190  31 99.8  0.0 R    python3         python3 -B tools/check_crate_boundaries.py
+3187934  225771  29 33.3  0.0 Ss   bash            /bin/bash -lc git -C /var/tmp/litchi-performance-full-baseline-capture-control-20260910 status --porcelain; taskset --cpu-list 2 bash -c '{ date --iso-8601=seconds; echo taskset:; taskset -pc $$; echo loadavg:; cat /proc/loadavg; echo allowed:; sed -n "s/^Cpus_allowed_list:[[:space:]]*//p" /proc/self/status; echo online:; cat /sys/devices/system/cpu/online; echo processes:; ps -eo pid,ppid,psr,pcpu,pmem,stat,comm,args --sort=-pcpu | head -n 30; }' > /var/tmp/litchi-performance-full-baseline-20260910/capture-control/preflight-contention-20260910.txt; cat /var/tmp/litchi-performance-full-baseline-20260910/capture-control/preflight-contention-20260910.txt; sha256sum /var/tmp/litchi-performance-full-baseline-20260909/Cargo.lock.generated.patch /var/tmp/litchi-performance-full-baseline-20260910/capture-control/run-full-baseline-and-allocator.sh /var/tmp/litchi-performance-full-baseline-20260910/capture-control/capture-plan.md
+3187917 3163845  19 25.7  0.0 Sl   rg              rg -l -i --hidden --glob !target/** --glob !*.b64 --glob !*.zip --glob !*.xml _xlfn /var/tmp/litchi-survey-standalone-validation-20260909
+ 225771  192616   8  2.8  0.8 Sl+  codex           codex --yolo resume 01a07fe0-5956-7040-8572-490d5c29ada4
+1511943  198235  20  1.1  0.0 Ssl+ lazygit         /home/zhuhe/go/bin/lazygit
+ 227706  188364  13  0.9  0.5 Sl+  codex           codex --yolo resume 01a07a13-4d72-7ef2-9033-1c05864ab0cb
+ 127282  127198  11  0.6  0.0 S    run-pipeline3   /usr/local/bin/python3.9 /usr/local/bin/run-pipeline3 --disable-web-server pipeline.py --concurrent 5 DevExzh
+3186342  127282  17  0.5  0.0 S    wget-at         ./wget-at -nv --no-hsts --host-lookups dns --hosts-file /dev/null --resolvconf-file /dev/null --dns-servers 9.9.9.10,149.112.112.10,2620:fe::10,2620:fe::fe:10 --reject-reserved-subnets --content-on-error --lua-script sinavideo.lua -o /grab/data/17890092073f49e2a91c3757bf-7981/c408d7cdebb1da08def11a5071e577c79e61aee1/wget.log --output-document /grab/data/17890092073f49e2a91c3757bf-7981/c408d7cdebb1da08def11a5071e577c79e61aee1/wget.tmp --truncate-output -e robots=off --recursive --level=inf --no-parent --page-requisites --timeout 60 --connect-timeout 10 --tries inf --domains iask.com,sina.cn,sina.com,sina.com.cn,sina.net,sina.net.cn,sinaapp.com,sinacloud.net,sincloud.net,sinaedge.com,sinaimg.cn,sinajs.cn,weibo.cn,weibo.com,weibo.com.cn,weibocdn.com --span-hosts --waitretry 30 --warc-file /grab/data/17890092073f49e2a91c3757bf-7981/c408d7cdebb1da08def11a5071e577c79e61aee1/sinavideo-c408d7cdebb1da08def11a5071e577c79e61aee1-20260910-030007 --warc-header operator: Archive Team --warc-header x-wget-at-project-version: 20260908.01 --warc-header x-wget-at-project-name: sinavideo --warc-dedup-url-agnostic --impersonate firefox148-h1 --header Accept-Encoding: identity --user-agent Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0 --warc-header x-wget-at-project-item-name: video:252619792 item-name://video:252619792 --warc-header sinavideo-video: 252619792 https://api.ivideo.sina.com.cn/public/video/info?video_id=252619792&appname=sinaplayer_pc&appver=V11220.210521.03&applt=web&tags=sinaplayer_pc
+2632040  252768  30  0.3  0.4 Sl+  kimi-code       kimi-code
+   5191       1  30  0.3  0.0 Ss   tmux: server    tmux new
+1221149  395345  13  0.3  0.4 Sl+  kimi-code       kimi-code
+ 198235  198234  22  0.2  0.3 Ssl  nvim            nvim --embed .
+2882696  224533  14  0.2  0.0 Sl+  codex           codex --yolo
+1309380 1309379  29  0.2  0.2 Ssl  nvim            nvim --embed .
+1490696 1490695  21  0.2  0.0 Ssl  nvim            nvim --embed .
+3083261       2   9  0.1  0.0 I    kworker/u130:0- [kworker/u130:0-events_unbound]
+    244       2  22  0.1  0.0 S    kswapd0         [kswapd0]
+3132425       2   9  0.1  0.0 I    kworker/u130:2- [kworker/u130:2-flush-259:0]
+2381033       1  14  0.0  0.0 Ssl  bun             bun build/index.js
+1489627 1435459  30  0.0  0.0 Sl+  codex           codex --yolo
+ 228610  225771  26  0.0  0.0 Sl   codex-code-mode /home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+2987574       2  27  0.0  0.0 I    kworker/u132:0- [kworker/u132:0-events_unbound]
+3139190  227706  19  0.0  0.0 Ss   python3         python3 -B docs/performance/results/change-0491/gate.py boundary-final5 python3 -B tools/check_crate_boundaries.py
+3012631       2  16  0.0  0.0 I    kworker/u131:2- [kworker/u131:2-ext4-rsv-conversion]
+    223       2  23  0.0  0.0 R    kcompactd0      [kcompactd0]
+3070897       2   1  0.0  0.0 I    kworker/u129:3- [kworker/u129:3-ext4-rsv-conversion]
+2955700       2   4  0.0  0.0 I    kworker/u129:0- [kworker/u129:0-writeback]

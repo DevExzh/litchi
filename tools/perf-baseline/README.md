@@ -1,5 +1,25 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+## Historical 2026-09-10 publication scope
+
+The portable historical publication at
+[`docs/performance/results/full-baseline-20260910/`](../../docs/performance/results/full-baseline-20260910/)
+contains one control capture from commit `1b3f2c2d`. It reports 201 normal
+rows across 37 cases and 31 deterministic corpora, with zero normal filesystem
+rows, plus a separate two-row `tmpfs` allocator smoke. The raw report is kept
+immutable; its derived view removes only 25 misaligned per-sample
+`operation_metrics` envelopes while preserving top-level timing and sink
+values. The allocator sidecar failure and manual V1-manifest rerun are
+retained.
+
+This publication is descriptive historical evidence. It makes no causal,
+latency-improvement, scaling, physical-cold-cache, native-producer, or
+production optimization claim. The `cold-requested` label is a requested
+harness state, not proof of cache eviction. The full artifact, transformation
+verifier, lock overlay and contention records are in the linked publication;
+do not treat the historical capture as a measurement of the current feature
+HEAD.
+
 0465 adds the existing materialized `odp_existing_append_lifecycle` case to the
 checked default matrix. Preflight preserves all prior 198 identities; the
 checked identity is 37 default cases, 201 rows and 31 deterministic corpora,

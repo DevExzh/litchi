@@ -1,0 +1,108 @@
+snapshot_kind=pre_run_contention_rerun
+2026-09-10T03:09:22.205573+00:00
+taskset_pid=3305966
+loadavg=
+2.71 7.65 9.30 3/1226 3305966
+
+cpus_allowed_list=
+2
+online_cpus=
+0-31
+
+top_processes=
+    PID    PPID PSR %CPU %MEM STAT COMMAND
+1416416  225771  16 99.9  0.0 Rs   git
+1416559  225771  24 99.9  0.0 Rs   git
+3305956  225771   4 50.0  0.0 Ss   bash
+3305966 3305956   2 50.0  0.0 S    python3
+ 225771  192616  15  2.9  0.8 Sl+  codex
+1511943  198235  11  1.1  0.0 Ssl+ lazygit
+ 227706  188364  13  0.9  0.5 Sl+  codex
+ 127282  127198  21  0.6  0.0 S    run-pipeline3
+3305026  127282  17  0.5  0.0 S    wget-at
+2632040  252768  18  0.3  0.4 Sl+  kimi-code
+   5191       1   0  0.3  0.0 Ss   tmux: server
+1221149  395345  17  0.3  0.4 Sl+  kimi-code
+2882696  224533  14  0.3  0.0 Sl+  codex
+ 198235  198234  25  0.2  0.3 Ssl  nvim
+1309380 1309379   7  0.2  0.2 Ssl  nvim
+1490696 1490695   5  0.2  0.0 Ssl  nvim
+3304073  127282  19  0.1  0.0 S    wget-at
+    244       2  16  0.1  0.0 S    kswapd0
+3083261       2  10  0.1  0.0 I    kworker/u130:0-flush-259:0
+2381033       1   9  0.0  0.0 Ssl  bun
+1489627 1435459  30  0.0  0.0 Sl+  codex
+2955700       2   5  0.0  0.0 I    kworker/u129:0-events_unbound
+ 228610  225771  23  0.0  0.0 Sl   codex-code-mode
+3200998       2   3  0.0  0.0 I    kworker/u129:4-ext4-rsv-conversion
+3132425       2  14  0.0  0.0 I    kworker/u130:2-flush-259:0
+3070897       2   3  0.0  0.0 I    kworker/u129:3-events_unbound
+2987574       2  27  0.0  0.0 I    kworker/u132:0-events_unbound
+    223       2  30  0.0  0.0 S    kcompactd0
+3012631       2  21  0.0  0.0 I    kworker/u131:2-events_power_efficient
+2969378       2  14  0.0  0.0 I    kworker/u130:5-events_power_efficient
+3931915       1  21  0.0  0.0 Ssl  containerd
+2987589       2  26  0.0  0.0 I    kworker/u132:4-events_unbound
+   6112       1  19  0.0  0.0 Ssl  dockerd
+3537993 3537878   5  0.0  0.0 S    sshd-session
+3113103       2  23  0.0  0.0 I    kworker/u131:3-events_unbound
+1400172 1400150  10  0.0  0.0 Sl   code-08d4889f9e
+1402037 1400480  13  0.0  0.1 Sl   MainThread
+3186632       2   4  0.0  0.0 I    kworker/u129:2-events_unbound
+3198696       2  28  0.0  0.0 I    kworker/u132:2-events_unbound
+1400480 1400475  12  0.0  0.1 Sl   MainThread
+     15       2  23  0.0  0.0 I    rcu_sched
+ 229038  227706   1  0.0  0.0 Sl   codex-code-mode
+3931945       1  22  0.0  0.0 Ss   systemd-resolve
+   6319       1  31  0.0  0.0 Sl   containerd-shim
+2876357       2  18  0.0  0.0 I    kworker/18:0-mm_percpu_wq
+2915468       2  31  0.0  0.0 I    kworker/31:0-mm_percpu_wq
+1402049 1400480  11  0.0  0.0 Sl   MainThread
+3280004  127282  22  0.0  0.0 S    wget-at
+2974766       2  26  0.0  0.0 I    kworker/26:2-events
+2871719       2  19  0.0  0.0 I    kworker/19:2-mm_percpu_wq
+ 127174       1  21  0.0  0.0 Sl   containerd-shim
+3129429       2  18  0.0  0.0 I    kworker/u131:4-events_power_efficient
+   6343    6319  12  0.0  0.0 Ssl  watchtower
+2863828       2  23  0.0  0.0 I    kworker/23:0-mm_percpu_wq
+2862378       2  11  0.0  0.0 I    kworker/11:2-mm_percpu_wq
+3187049       2  10  0.0  0.0 I    kworker/10:1-mm_percpu_wq
+3177824  127282  21  0.0  0.0 S    wget-at
+2848465       2   9  0.0  0.0 I    kworker/9:1-events
+2915469       2  13  0.0  0.0 I    kworker/13:2-mm_percpu_wq
+2867230       2  29  0.0  0.0 I    kworker/29:1-mm_percpu_wq
+2853066       2  16  0.0  0.0 I    kworker/16:0-events
+3221133       2  12  0.0  0.0 I    kworker/12:1-events
+    334       2  11  0.0  0.0 S    jbd2/nvme0n1p1-8
+2845358       2  21  0.0  0.0 I    kworker/21:1-events
+2760412       2   0  0.0  0.0 I    kworker/0:2-events
+2839224       2  14  0.0  0.0 I    kworker/14:1-mm_percpu_wq
+1400132 1400014  15  0.0  0.0 S    sshd-session
+ 289090       2  12  0.0  0.0 I    kworker/12:0-rcu_gp
+2829901       2   7  0.0  0.0 I    kworker/7:0-mm_percpu_wq
+2829824       2   5  0.0  0.0 I    kworker/5:2-mm_percpu_wq
+2294342       1  14  0.0  0.0 Ssl  snapd
+2834228       2  24  0.0  0.0 I    kworker/24:0-events
+2825241       2   4  0.0  0.0 I    kworker/4:1-mm_percpu_wq
+2381637 2381032  15  0.0  0.0 Ssl  peculiar_shell
+3931875       1  11  0.0  0.0 Ssl  irqbalance
+   1515       1   4  0.0  0.0 Ssl  amazon-ssm-agen
+2819494       2  17  0.0  0.0 I    kworker/17:1-mm_percpu_wq
+2783540       2   6  0.0  0.0 I    kworker/6:1-events
+2778727       2  20  0.0  0.0 I    kworker/20:2-mm_percpu_wq
+1239800       2  27  0.0  0.0 I    kworker/27:2-mm_percpu_wq
+2756297       2   2  0.0  0.0 I    kworker/2:1-mm_percpu_wq
+1087060       1  10  0.0  0.0 Ssl  code-08d4889f9e
+      1       0  11  0.0  0.0 Ss   systemd
+2689907       2   8  0.0  0.0 I    kworker/8:0-mm_percpu_wq
+3931920       1   1  0.0  0.0 SLsl multipathd
+2681235       2  22  0.0  0.0 I    kworker/22:2-mm_percpu_wq
+2695966       2   1  0.0  0.0 I    kworker/1:1-mm_percpu_wq
+1400925 1400480  11  0.0  0.0 Sl   MainThread
+3056113  127282  13  0.0  0.0 S    wget-at
+2769637       2  25  0.0  0.0 I    kworker/25:1-mm_percpu_wq
+4031378       2   9  0.0  0.0 I    kworker/9:2-cgroup_free
+2381701 2381637  28  0.0  0.0 Sl   peculiar_shell
+1465226 1402037  14  0.0  0.0 Sl   MainThread
+2676698       2   3  0.0  0.0 I    kworker/3:2-mm_percpu_wq
+2381
