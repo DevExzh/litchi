@@ -1352,6 +1352,83 @@ fn source_backed_extension_transition_edit_reopens_and_preserves_opaque_package_
 }
 
 #[test]
+fn source_backed_p14_transition_effects_edit_reopen_and_inverse() {
+    let targets = [
+        TransitionKind::Conveyor(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::Doors(litchi_pptx::transition::Axis::Vertical),
+        TransitionKind::Ferris(litchi_pptx::transition::LeftRight::Left),
+        TransitionKind::Flash,
+        TransitionKind::Flip(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::FlyThrough(litchi_pptx::transition::FlyThrough::new(
+            litchi_pptx::transition::InOut::Out,
+            true,
+        )),
+        TransitionKind::Gallery(litchi_pptx::transition::LeftRight::Left),
+        TransitionKind::Glitter(litchi_pptx::transition::Glitter::new(
+            Side::Down,
+            litchi_pptx::transition::GlitterPattern::Hexagon,
+        )),
+        TransitionKind::Honeycomb,
+        TransitionKind::Pan(Side::Up),
+        TransitionKind::Prism(litchi_pptx::transition::Prism::new(Side::Right, true, true)),
+        TransitionKind::Reveal(litchi_pptx::transition::Reveal::new(
+            litchi_pptx::transition::LeftRight::Right,
+            true,
+        )),
+        TransitionKind::Shred(litchi_pptx::transition::Shred::new(
+            litchi_pptx::transition::ShredPattern::Rectangle,
+            litchi_pptx::transition::InOut::Out,
+        )),
+        TransitionKind::Switch(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::Vortex(Side::Left),
+        TransitionKind::Warp(litchi_pptx::transition::InOut::Out),
+        TransitionKind::WheelReverse(litchi_pptx::transition::Spokes::Eight),
+        TransitionKind::Window(litchi_pptx::transition::Axis::Horizontal),
+    ];
+
+    for kind in targets {
+        let active = litchi_pptx::transition::write(&Transition::new(kind.clone())).unwrap();
+        let source = fixture("", slide_with_tail(PML, "before", &active), false);
+        let editor =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+                .unwrap();
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        let original = snapshot.transition().unwrap().unwrap();
+        let requested = Transition::new(kind)
+            .with_speed(Speed::Slow)
+            .with_click(false)
+            .with_after(Ms::new(1250).unwrap());
+        let mut edit = snapshot.edit();
+        assert!(edit.set_transition(&requested).unwrap());
+        let commit = edit.commit();
+
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert!(
+            restored
+                .transition()
+                .unwrap()
+                .unwrap()
+                .same_semantics(&original)
+        );
+
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        let reopened =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+                .unwrap();
+        let readback = reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .unwrap();
+        assert!(readback.same_semantics(&requested));
+    }
+}
+
+#[test]
 fn transition_choice_edit_resolves_ancestor_namespaces_and_keeps_inactive_bindings() {
     let inactive = r#"<mc:Choice Requires="p159"><p159:future value="keep"/></mc:Choice>"#;
     let owner = format!(
@@ -1441,7 +1518,7 @@ fn transition_extension_prefix_collision_refuses_without_changing_source() {
 
 #[test]
 fn source_backed_extension_transition_timing_edit_retains_typed_effect() {
-    let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p14 p159"><p:transition spd="fast" p14:dur="700"><p159:morph option="byChar"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="fast"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
+    let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p14 p159"><p:transition spd="fast" p14:dur="700.5ms"><p159:morph option="byChar"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="fast"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
     let source = fixture("", slide_with_tail(PML, "before", morph), false);
     let editor =
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
@@ -1466,6 +1543,10 @@ fn source_backed_extension_transition_timing_edit_retains_typed_effect() {
         .unwrap()
         .unwrap();
     assert!(reopened_transition.same_semantics(&requested));
+    assert_eq!(
+        reopened_transition.duration_offset().unwrap().as_str(),
+        "700.5"
+    );
 }
 
 #[test]
