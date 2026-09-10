@@ -1,0 +1,25 @@
+{
+  "gate": "validation/python1.json",
+  "gate_meta": {
+    "bytes": 1717,
+    "sha256": "b22c2e8d53089a809d2005d5dcce875b6cf8824f4cf034e425e5106124fa39a8"
+  },
+  "helpers": {
+    "gate.py": {
+      "bytes": 3283,
+      "sha256": "2a59d7c5610a5dd5cf5b4b88f68fb889945e700e7a179c74696d4cba233a4784"
+    },
+    "measure.py": {
+      "bytes": 95883,
+      "sha256": "1e41b68bf5ffa968aeadfb0b450dbe9fd0ae2b2d7aa3e35960dd935b85e0efbd"
+    },
+    "support.py": {
+      "bytes": 4800,
+      "sha256": "1e986386284778af9894962a0e589cefbce5271d5610fdbed8f615ea4e1c4159"
+    },
+    "test_measure.py": {
+      "bytes": 19166,
+      "sha256": "d4a92946ff74361aca2ed565301730b35553bfee91837680f0ddd56ef196c650"
+    }
+  }
+}

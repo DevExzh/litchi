@@ -1,0 +1,36 @@
+{
+  "earlier_cleanup": {
+    "bytes": 63696,
+    "sha256": "1419d043984bf1b49016876a75e3debf98aecd7561d6b3c07e2c3de0a1f4b38b"
+  },
+  "free_bytes": 537583439872,
+  "removed_bytecode": [
+    {
+      "bytes": 8731,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0492/__pycache__/support.cpython-314.pyc",
+      "sha256": "148f136bb3a59392c17fd6087f711728a74cec48b1f527107eaa3bf254d153a9"
+    },
+    {
+      "bytes": 139439,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0492/__pycache__/measure.cpython-314.pyc",
+      "sha256": "c9b2806e519ddf888f8a70c117208e574afe7a5c5e682c9c069b8d6fe68a112d"
+    }
+  ],
+  "status": "pass",
+  "target_absent": true,
+  "temporary_directories": [
+    "/home/zhuhe/.cache/litchi-goal-0492/final2",
+    "/home/zhuhe/.cache/litchi-goal-0492/final2/normal",
+    "/home/zhuhe/.cache/litchi-goal-0492/final2/allocator"
+  ],
+  "temporary_files": {
+    "/home/zhuhe/.cache/litchi-goal-0492/final2/allocator/litchi-perf-baseline-alloc": {
+      "bytes": 473068080,
+      "sha256": "e7820bc6aae1f6d43b2b17ddbcaac656de6ec08440b53d5e0ca412273bea8a3a"
+    },
+    "/home/zhuhe/.cache/litchi-goal-0492/final2/normal/litchi-perf-baseline": {
+      "bytes": 473393448,
+      "sha256": "8659d4f40f6e11376da186818187488a5ea43c37f19a1cc996307e8618ed5440"
+    }
+  }
+}

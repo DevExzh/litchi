@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0492: bounded range reads remove simulated request service
+
+[0492](changes/0492-docx-bounded-range-read-ahead.md) verifies the range-locality
+hypothesis with 480 formal before/candidate samples. A private 4 KiB forward
+window reduces 19 synthetic transport calls to three, with identical logical
+requests and text. Delayed medians are about 83% lower; normal zero-delay
+repeat 1 p99 regresses 5.20%. Physical bytes increase 37.29%, including 69
+compressed-media bytes. The fixed window is allocated outside the timed region.
+
+Keep this as an opt-in range-source opportunity. The immediate production work
+is OPC-owned physical-fill budget charging and retained-window memory accounting,
+with cancellation, source-version, and exact-publication tests. The benchmark
+wrapper alone does not satisfy those production requirements. See the
+[individual review](results/change-0492/results-review.md) and
+[implementation plan](results/change-0492/production-next.md).
+
 ## 0491: DOCX source-provider and cache-state baseline
 
 [0491](changes/0491-docx-provider-and-cold-baseline.md) adds a formal source-backed

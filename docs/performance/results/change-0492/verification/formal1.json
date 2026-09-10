@@ -1,0 +1,92 @@
+{
+  "attempt": "formal1",
+  "pilot": false,
+  "protocol_sha256": "9c0d7364d44eb97ca6905b1b9b4592acdb1001e58005098dc237a414691af0e2",
+  "raw_receipts": [
+    {
+      "label": "r1-normal-baseline-65536-0us",
+      "report_sha256": "cb0b7ab4f1d999aeee9a9c80acc734a844430b604a07bf1b8ae277085f6afb7f",
+      "terminal_sha256": "311d489bcac22ee5e10b270daf1dadf6584d5cc20ca76752ea7313beaa862e58"
+    },
+    {
+      "label": "r1-normal-candidate-4096-0us",
+      "report_sha256": "bf5c453eecd2eba7fdb1979aa0550b31a769e69f882ab83236c2f80f277ae50c",
+      "terminal_sha256": "662667aa3906160eab3028d5455eb108f42e8e20ff911b536178b9ae141994bc"
+    },
+    {
+      "label": "r1-normal-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "a1698c6c54545dbfe04b6661a493ca8cb3c9d058770966277fa599f25f610077",
+      "terminal_sha256": "49d3758d4b5749a08765c15840250919c83ed0eea60b833404402569db60c711"
+    },
+    {
+      "label": "r1-normal-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "9eaea8f78f608b8c00b256686e9f69305e39ea00136339a00ecd887d878d596b",
+      "terminal_sha256": "69adbad37ff45b0cdc1983a62749283831792aacf9704407c771f9c0a6bf9a92"
+    },
+    {
+      "label": "r1-allocator-baseline-65536-0us",
+      "report_sha256": "39110e66380ebab46cc6576d09e9574fbfdec47f4621241bd43a64ed72848514",
+      "terminal_sha256": "30f89a757ada995684d7f048a3c4ea4b484293abb66c9824db49633634ca60e9"
+    },
+    {
+      "label": "r1-allocator-candidate-4096-0us",
+      "report_sha256": "8a31315808fe14733136d3e591f48a1f819ecb67df8d79551114c61832e44c59",
+      "terminal_sha256": "b9e2d514cbcb64fb647d7a418264cc9f6c6785155eac83d8d6b14baf8a307a3a"
+    },
+    {
+      "label": "r1-allocator-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "ec5ee66fd2475cbd2bfa42e1d29e14db4ca2c1a60ec89db5733c0721f54415d8",
+      "terminal_sha256": "67e6a343a59d90f636468ec8264292a10e402f0e5af9806765463d67ae2de8c4"
+    },
+    {
+      "label": "r1-allocator-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "f4f106c58ab86bee370812120bb0b79e944decdd4cb30065f8c479dc64d5434c",
+      "terminal_sha256": "83494212a23a48e4e7e1f593272a5a58ce1b89f7b9dd7d731ef421883dc4830d"
+    },
+    {
+      "label": "r2-allocator-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "11c663a6a2e608798b411a3dc5a298664d28d48a0fac9a1e3f18b647411d90d0",
+      "terminal_sha256": "99a7bf024601e1a734fdd14ce492e9e5f2260fb52ec1733e2acffd31cde36828"
+    },
+    {
+      "label": "r2-allocator-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "16b724149703a8f5446087f3bacdfe987f5ccaf6521ace355430e825438038f4",
+      "terminal_sha256": "258897f001ca37d128519869c7fbfc74139096ddf4827d055ba5611737850708"
+    },
+    {
+      "label": "r2-allocator-candidate-4096-0us",
+      "report_sha256": "6a0b803601444a755fc3d7a394cc5b7c0e506e6587d9d17dc97d2d8d48708484",
+      "terminal_sha256": "2fa29677a053548db59d860d416cb2110fe1d758661e18538fbf5f46ef28a5af"
+    },
+    {
+      "label": "r2-allocator-baseline-65536-0us",
+      "report_sha256": "df69d41a7ace0c208537c94553e0f9d96c82f35200b1b88d2ea66ce0c91d4282",
+      "terminal_sha256": "f3d68dcb56771bb2aebf7fa98fc935c9ddc6040bcdac9b656948f04cb499c60b"
+    },
+    {
+      "label": "r2-normal-candidate-4096-1000us-104857600bps-minimum-service",
+      "report_sha256": "71203670206afdcc01adc725365e612e35008b880425cbd7bf2e01b280b31b85",
+      "terminal_sha256": "6f152ed8c64adda10d0a470ac6a8f7699dc85f1b8c1c123e4cd6d21d989a6a46"
+    },
+    {
+      "label": "r2-normal-baseline-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "4dcb9fac1dda66de19cc4db78d243119b473b18272107c65f39db6f85b9a7a33",
+      "terminal_sha256": "8cb4ae537fae0d82d36790c00b045c0705cfeff0cc6b93a2537dbe0b9e7d1d9c"
+    },
+    {
+      "label": "r2-normal-candidate-4096-0us",
+      "report_sha256": "022bbc00528162722a90f5fee0aea1e2f90ea83ddabf4fc9a124469a13335acc",
+      "terminal_sha256": "2c44ff572924a813f95db9b721e0d9cfea8f6b87cee9204cfb37f3a98260e127"
+    },
+    {
+      "label": "r2-normal-baseline-65536-0us",
+      "report_sha256": "90844e294beff8cb95fb378ceece10c56bb77ad7632727ff8a2bec858b4a44b3",
+      "terminal_sha256": "d8c40fc7f1facec3556d7c152ac12d33e9bea808d228dc75efa77c793d1eb6d2"
+    }
+  ],
+  "schema": "docx-read-ahead-verification-v1",
+  "status": "pass",
+  "summary_sha256": "74bbaa106158e212b7e5b21f8d0210199584842e52b882f32d5d08b8e1ba1ec6",
+  "verified_utc": "2026-09-10T04:12:30.117839+00:00",
+  "version": 1
+}

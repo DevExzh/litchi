@@ -1,0 +1,7 @@
+{
+  "base_revision": "e44a23396146d504ffc738e0989de896635f02a3",
+  "patch": "build-source.patch",
+  "patch_sha256": "214b254d7f93d34d2eec9ca1a6bbc2c9c26174e6aab858138745ccb013ac2855",
+  "scope": "Full source delta needed to recreate build source manifest from base revision. Keynote formatting is preexisting user work, included solely to reproduce the exact compilation input; it is not part of this batch commit.",
+  "added_source": "tools/perf-baseline/src/docx_read_ahead.rs"
+}

@@ -1,0 +1,1160 @@
+{
+  "media_ranges": [
+    {
+      "start": 4027,
+      "end": 2101824
+    },
+    {
+      "start": 2101891,
+      "end": 4199688
+    },
+    {
+      "start": 4199755,
+      "end": 6297552
+    },
+    {
+      "start": 6297619,
+      "end": 8395416
+    },
+    {
+      "start": 8395483,
+      "end": 10493280
+    },
+    {
+      "start": 10493347,
+      "end": 12591144
+    },
+    {
+      "start": 12591211,
+      "end": 14689008
+    },
+    {
+      "start": 14689075,
+      "end": 16786872
+    }
+  ],
+  "schema": "docx_provider_lifecycle_v2",
+  "provider_scope": "typed-owner source-backed DOCX provider baseline; direct comparison with the high-level filesystem facade is out of scope",
+  "timing_scope": "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside",
+  "setup_scope": "all v1 setup plus fresh bounded read-ahead buffer and wrapper construction outside the clock; fixed window capacity is reported separately; unmanaged benchmark pilot only",
+  "allocation_scope": "operation-scoped allocator region; allocation field omitted for normal binary; fresh read-ahead window allocated during setup and reported separately",
+  "corpus": {
+    "version": "0188-media-v1",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "shape": "200 paragraphs + eight 2 MiB PNG-signature media members",
+    "paragraph_count": 200,
+    "media_member_count": 8,
+    "media_member_bytes": 2097152,
+    "archive_member_count": 20,
+    "archive_bytes": 16793036,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "expected_text_bytes": 10000,
+    "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af"
+  },
+  "source_bytes": 16793036,
+  "source_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+  "requested_source_revision": "e44a23396146d504ffc738e0989de896635f02a3",
+  "limits": {
+    "max_input_bytes": 536870912,
+    "max_archive_members": 100000,
+    "max_archive_member_name_bytes": 4096,
+    "max_archive_metadata_bytes": 67108864,
+    "max_archive_compressed_bytes": 536870912,
+    "max_archive_entry_bytes": 536870912,
+    "max_archive_total_bytes": 2147483648,
+    "max_parts": 100000,
+    "max_part_bytes": 536870912,
+    "max_total_part_bytes": 536870912,
+    "max_content_types_bytes": 8388608,
+    "max_content_type_mappings": 100000,
+    "max_relationship_parts": 100000,
+    "max_relationship_xml_bytes": 8388608,
+    "max_total_relationship_xml_bytes": 67108864,
+    "max_relationships_per_part": 100000,
+    "max_total_relationships": 1000000,
+    "max_relationship_graph_nodes": 100000,
+    "max_xml_events": 1000000,
+    "max_total_relationship_xml_events": 8000000,
+    "max_xml_depth": 256,
+    "max_xml_attribute_bytes": 65536,
+    "max_relationship_target_bytes": 4096,
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128
+  },
+  "provider": {
+    "provider": "range",
+    "max_range_bytes": 65536,
+    "delay_us": 1000,
+    "transfer_bytes_per_second": 104857600,
+    "transfer_delay_policy": "minimum-service",
+    "source_construction": "all provider adapters are constructed outside the operation clock",
+    "file_scope": "FileSource is opened before each iteration and the staged file is recently written; this is a warm-cache/recent-file provider observation, not a filesystem-cold result",
+    "read_counter_scope": "logical ReadAt calls observed by the named wrapper; counters are not physical filesystem or network I/O observations"
+  },
+  "warmup": 1,
+  "samples": 3,
+  "rows": [
+    {
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": false
+      },
+      "sample_index": 1,
+      "latency_ns": 20382628,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 2,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 2,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical_wrapper": {
+          "availability": "available",
+          "scope": "package logical ReadAt calls above read-ahead",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "logical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "physical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "logical_media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        },
+        "wrapper": {
+          "availability": "available",
+          "scope": "physical adapter calls below read-ahead; synthetic transport observations, not disk/network I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "range_adapter": {
+          "availability": "available",
+          "scope": "PptxRangeSource logical adapter counters; generic ReadAt behavior, not physical I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 19,
+          "transfer_paced_calls": 19,
+          "transfer_delay_ns": 37832,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 901,
+        "deallocation_calls": 783,
+        "reallocation_calls": 116,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 653366,
+        "deallocated_bytes": 639798,
+        "live_bytes_before": 18858207,
+        "live_bytes_after": 18871775,
+        "peak_live_bytes_before": 89282079,
+        "peak_live_bytes_after": 89282079,
+        "region_peak_live_bytes": 18997410
+      }
+    },
+    {
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": false
+      },
+      "sample_index": 2,
+      "latency_ns": 20367198,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 3,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 3,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical_wrapper": {
+          "availability": "available",
+          "scope": "package logical ReadAt calls above read-ahead",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "logical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "physical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "logical_media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        },
+        "wrapper": {
+          "availability": "available",
+          "scope": "physical adapter calls below read-ahead; synthetic transport observations, not disk/network I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "range_adapter": {
+          "availability": "available",
+          "scope": "PptxRangeSource logical adapter counters; generic ReadAt behavior, not physical I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 19,
+          "transfer_paced_calls": 19,
+          "transfer_delay_ns": 37832,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 901,
+        "deallocation_calls": 783,
+        "reallocation_calls": 116,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 653366,
+        "deallocated_bytes": 639798,
+        "live_bytes_before": 18859183,
+        "live_bytes_after": 18872751,
+        "peak_live_bytes_before": 89282079,
+        "peak_live_bytes_after": 89282079,
+        "region_peak_live_bytes": 18998386
+      }
+    },
+    {
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": false
+      },
+      "sample_index": 3,
+      "latency_ns": 20382368,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 4,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 4,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical_wrapper": {
+          "availability": "available",
+          "scope": "package logical ReadAt calls above read-ahead",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "logical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "physical_ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 46,
+            "returned": 46
+          },
+          {
+            "offset": 16791709,
+            "requested": 1305,
+            "returned": 1305
+          },
+          {
+            "offset": 0,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 49,
+            "requested": 363,
+            "returned": 363
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 412,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 428,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 469,
+            "requested": 234,
+            "returned": 234
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 703,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2907,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 2965,
+            "requested": 324,
+            "returned": 324
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 3289,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 1420,
+            "requested": 30,
+            "returned": 30
+          },
+          {
+            "offset": 1467,
+            "requested": 1424,
+            "returned": 1424
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          },
+          {
+            "offset": 2891,
+            "requested": 16,
+            "returned": 16
+          }
+        ],
+        "logical_media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        },
+        "wrapper": {
+          "availability": "available",
+          "scope": "physical adapter calls below read-ahead; synthetic transport observations, not disk/network I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 0,
+          "transfer_paced_calls": 0,
+          "transfer_delay_ns": 0,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "range_adapter": {
+          "availability": "available",
+          "scope": "PptxRangeSource logical adapter counters; generic ReadAt behavior, not physical I/O",
+          "logical_calls": 19,
+          "requested_bytes": 3966,
+          "returned_bytes": 3966,
+          "min_request_bytes": 16,
+          "max_request_bytes": 1424,
+          "short_reads": 0,
+          "delayed_calls": 19,
+          "transfer_paced_calls": 19,
+          "transfer_delay_ns": 37832,
+          "request_size_counts": [
+            0,
+            0,
+            0,
+            0,
+            8,
+            5,
+            1,
+            0,
+            1,
+            2,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "media_range_proof": {
+          "availability": "available",
+          "scope": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+          "media_range_count": 8,
+          "observed_call_count": 19,
+          "requested_overlap_bytes": 0,
+          "returned_overlap_bytes": 0,
+          "status": "proved_no_media_overlap",
+          "reason": null
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 901,
+        "deallocation_calls": 783,
+        "reallocation_calls": 116,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 653366,
+        "deallocated_bytes": 639798,
+        "live_bytes_before": 18860159,
+        "live_bytes_after": 18873727,
+        "peak_live_bytes_before": 89282079,
+        "peak_live_bytes_after": 89282079,
+        "region_peak_live_bytes": 18999362
+      }
+    }
+  ]
+}

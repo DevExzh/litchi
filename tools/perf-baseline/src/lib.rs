@@ -12,6 +12,7 @@ mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_plain_paragraph_tail_append;
 pub mod docx_provider_lifecycle;
+mod docx_read_ahead;
 pub mod docx_replayable_tail_append;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;

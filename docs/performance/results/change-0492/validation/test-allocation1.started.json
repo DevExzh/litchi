@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--lib",
+    "--features",
+    "allocator-metrics",
+    "allocation_metrics::tests",
+    "--",
+    "--test-threads=1"
+  ],
+  "attempt": null,
+  "common_sha256": "1e986386284778af9894962a0e589cefbce5271d5610fdbed8f615ea4e1c4159",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "2a59d7c5610a5dd5cf5b4b88f68fb889945e700e7a179c74696d4cba233a4784",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0492",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "label": "test-allocation1",
+  "schema": "docx-stream-append-gate-v1",
+  "source_before": {
+    "files": 7159,
+    "path": "validation-sources/18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b.json",
+    "sha256": "18fbdb0df7adc7a2482fbd9e458bcabd7d79581f8842c8e01038e6aeabb07a2b"
+  },
+  "started_utc": "2026-09-10T03:52:34.241249+00:00"
+}

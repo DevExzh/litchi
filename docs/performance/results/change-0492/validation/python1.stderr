@@ -1,0 +1,19 @@
+test_analyze_exposes_comparisons_and_adverse_tails (test_measure.ReadAheadMatrixTests.test_analyze_exposes_comparisons_and_adverse_tails) ... ok
+test_bootstrap_is_reproducible_and_has_tail_quantiles (test_measure.ReadAheadMatrixTests.test_bootstrap_is_reproducible_and_has_tail_quantiles) ... ok
+test_candidate_fill_conservation_and_bound_are_strict (test_measure.ReadAheadMatrixTests.test_candidate_fill_conservation_and_bound_are_strict) ... ok
+test_command_binds_trace_and_candidate_flags (test_measure.ReadAheadMatrixTests.test_command_binds_trace_and_candidate_flags) ... ok
+test_cpu_lock_is_held_during_capture_callback_and_released_afterward (test_measure.ReadAheadMatrixTests.test_cpu_lock_is_held_during_capture_callback_and_released_afterward) ... ok
+test_frozen_arms_bind_controls_and_candidate_window (test_measure.ReadAheadMatrixTests.test_frozen_arms_bind_controls_and_candidate_window) ... ok
+test_inventory_is_sixteen_processes_and_reverses_order (test_measure.ReadAheadMatrixTests.test_inventory_is_sixteen_processes_and_reverses_order) ... ok
+test_media_overlap_is_measured_without_claiming_zero (test_measure.ReadAheadMatrixTests.test_media_overlap_is_measured_without_claiming_zero) ... ok
+test_private_cleanup_refuses_unknown_files (test_measure.ReadAheadMatrixTests.test_private_cleanup_refuses_unknown_files) ... ok
+test_report_rejects_missing_or_changed_oracle (test_measure.ReadAheadMatrixTests.test_report_rejects_missing_or_changed_oracle) ... ok
+test_report_rejects_source_version_mutation_and_bad_indices (test_measure.ReadAheadMatrixTests.test_report_rejects_source_version_mutation_and_bad_indices) ... ok
+test_report_validates_baseline_and_candidate_v2_shapes (test_measure.ReadAheadMatrixTests.test_report_validates_baseline_and_candidate_v2_shapes) ... ok
+test_source_and_range_conservation_is_strict (test_measure.ReadAheadMatrixTests.test_source_and_range_conservation_is_strict) ... ok
+test_unmanaged_cache_diagnostic_rejects_managed_flag (test_measure.ReadAheadMatrixTests.test_unmanaged_cache_diagnostic_rejects_managed_flag) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.100s
+
+OK
