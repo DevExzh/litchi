@@ -45211,7 +45211,7 @@ fn verify_opc_materialized_package(
             )
             .into());
         }
-        if !part.rels().iter().next().is_none() {
+        if part.rels().iter().next().is_some() {
             return Err(format!(
                 "OPC source materialization Part {} unexpectedly has relationships",
                 expected.name
@@ -45384,7 +45384,7 @@ fn verify_opc_serial_eager_package(
         if part.content_type() != CONTENT_TYPE {
             return Err(format!("serial eager OPC Part {name} content type differs").into());
         }
-        if !part.rels().iter().next().is_none() {
+        if part.rels().iter().next().is_some() {
             return Err(
                 format!("serial eager OPC Part {name} unexpectedly has relationships").into(),
             );
