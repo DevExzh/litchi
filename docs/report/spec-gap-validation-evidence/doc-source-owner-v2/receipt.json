@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "candidate": "/var/tmp/litchi-doc-source-owner-publication-validation-20260910",
+  "publication_base": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "publication_source_manifest": "publication-root-source-v1.json",
+  "publication_source_manifest_sha256": "69081070a2ce237a9be6c04c7942fed3adb34670fd261b5967934fc487926a23",
+  "source_owner_paths": {
+    "crates/litchi-doc/src/embedded_object/tests.rs": "ba8ae340fbfbe7e3663c548e75ce0682d7cf63815e8b6585da2a1fe5b56347f0",
+    "crates/litchi-doc/src/embedded_object/transaction/edit.rs": "033316ae4ae2e0a2e1729c80b468c5aa5d83dccecfdeed78085d27a4ded7682d",
+    "crates/litchi-doc/src/embedded_object/transaction/patch.rs": "6783119c2628b3f3843752986d07dc6794f40a217515779e562309a3d9f5072b",
+    "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs": "2c96f296758c0e0f080ee70c68affe4e3ebc436d21501b91b571035695a44b4d"
+  },
+  "historical_validation": {
+    "base": "6da91778c4003b6c9819e5c25168cfe9a847359e",
+    "receipt": "historical-integration-root-gates-v2.json",
+    "receipt_sha256": "a0fa201e4342e8b266b498c691944390816ea4bf15e2dfc91eaec2b495368f09",
+    "tests_passed": 1204,
+    "doctests_passed": 14,
+    "measured_base": "c4aa19e1930b79bec7db499a9248fe711ac3cf43"
+  },
+  "publication_gate": {
+    "receipt": "publication-root-final-gates-v1.json",
+    "receipt_sha256": "67bc2fe46803f01bd799e673c12722ad58ca285dceaf8e54f6c6f7c73a664e66",
+    "tests_passed": 1226,
+    "doctests_passed": 14,
+    "tests_ignored": 2,
+    "doctests_ignored": 12,
+    "clippy": "pass",
+    "rustdoc": "pass",
+    "format": "pass",
+    "diff_check": "pass",
+    "source_hashes": "pass"
+  },
+  "measurement_bases": {
+    "measured_c4aa": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "validated_6da": "6da91778c4003b6c9819e5c25168cfe9a847359e",
+    "published_ce0": "ce0be842b60a28db142b795389e24be5bde8ae07",
+    "performance_attribution": "No performance result is attributed to published ce0; bounded reports are inherited from c4aa inputs."
+  },
+  "portable_bundle": {
+    "manifest": "portable-bundle-manifest.json",
+    "manifest_sha256": "4fda80f3a4b9fe46d0dd09ec7e016ba66ec0ebcc173ff50b90d90343c5457107",
+    "archive": "source-owner-portable-100-payload-members.tar.gz",
+    "archive_sha256": "ee6f6ab9d6634740b763bf9d3abd1d13a7bef1f7fcf6be9ab17fa29a659e402a",
+    "member_count": 100,
+    "member_bytes_total": 25289668,
+    "targets_and_binaries_included": false,
+    "archive_manifest": "archive-manifest.json",
+    "archive_manifest_sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83",
+    "archive_manifest_bytes": 17925,
+    "archive_bytes": 547363,
+    "tar_member_count": 101,
+    "extraction_verification": {
+      "receipt": "portable-archive-extraction-root-verification.json",
+      "archive_sha256": "ee6f6ab9d6634740b763bf9d3abd1d13a7bef1f7fcf6be9ab17fa29a659e402a",
+      "regular_tar_members": 101,
+      "payload_members_checked": 100,
+      "archive_manifest_sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83",
+      "bytecode_created": false
+    },
+    "build_targets_and_compiled_binaries_included": false,
+    "fixture_binary_payloads_included": true
+  },
+  "fresh_latency": {
+    "source_base": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "report_dir": "fresh-latency",
+    "correctness_checks_per_side": 34,
+    "large_direct_open_paired_median_ratio": 1.0779031303439752,
+    "large_direct_open_percent_delta": 7.790313034397522,
+    "claims": "Bounded c4aa measurement only: direct-open ratio 1.0779031303439752x; open-plus-no-op-finish ratio 0.8069461435313807x; no ce0 performance claim.",
+    "large_open_noop_finish_paired_median_ratio": 0.8069461435313807,
+    "large_open_noop_finish_percent_delta": -19.30538564686193
+  },
+  "fresh_allocation": {
+    "source_base": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "report_dir": "fresh-allocation",
+    "selected_member_count": 13,
+    "correctness_checks_per_side": 32,
+    "rows_per_side": 240,
+    "large_open_allocated_bytes": {
+      "retained_control_median": 12412349,
+      "retained_candidate_median": 10131933,
+      "retained_delta_candidate_minus_control": -2280416,
+      "retained_ratio_candidate_over_control": 0.816278449792219,
+      "fresh_control_median": 12412349,
+      "fresh_candidate_median": 10131933,
+      "fresh_delta_candidate_minus_control": -2280416,
+      "fresh_ratio_candidate_over_control": 0.816278449792219,
+      "paired_feature_delta_unchanged": true
+    },
+    "claims": "Bounded counted allocation evidence only; not RSS, residency, latency, or whole-workflow evidence."
+  },
+  "artifact_files": {
+    "README.md": {
+      "bytes": 8092,
+      "sha256": "a6e3c3b71b4918622256d263cb544d4b3965be64b1391d63c7b9736128c3050e"
+    },
+    "archive-manifest.json": {
+      "bytes": 17925,
+      "sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83"
+    },
+    "fresh-allocation/allocation-candidate.jsonl": {
+      "bytes": 168995,
+      "sha256": "a88ee39aac4186272128eaaf0dffe406da14e7b6e803c964408c2f9b3fbc7a99"
+    },
+    "fresh-allocation/allocation-control.jsonl": {
+      "bytes": 168995,
+      "sha256": "b476839769aa473d15306afcee672fd4a8142584e50f12e92688cdd779092d58"
+    },
+    "fresh-allocation/allocation-receipt.json": {
+      "bytes": 18844,
+      "sha256": "852bff2dbd7ea61155b935f66e3b3fd9aa09a6a3b7ca383fd59776857b408ab3"
+    },
+    "fresh-allocation/bounded-publication-proposal.json": {
+      "bytes": 5354,
+      "sha256": "b9d04414416672ceb6a7725de5e017c621d74c8f2bdfb854ad9361c0c040df75"
+    },
+    "fresh-allocation/cargo-shim-invocations.jsonl": {
+      "bytes": 560,
+      "sha256": "e00be3b3c282997ea58818a81816d4d55c62cffb1934716387eae4448071bb0c"
+    },
+    "fresh-allocation/commands.json": {
+      "bytes": 13424,
+      "sha256": "1ec0e8e85347a2e4c8762d8e33d1cef4a17a15bd9e2ed908907f6a3e9a15a588"
+    },
+    "fresh-allocation/comparison-vs-retained-evidence-v1.json": {
+      "bytes": 151520,
+      "sha256": "1f0cb0218d098cee1ed0d12e9d10c994ab7a3cd2918f0a99c32a7b40b6369f7e"
+    },
+    "fresh-allocation/correctness-candidate.json": {
+      "bytes": 2224,
+      "sha256": "5fa425bb43e7a5cff9be84409540b51cdbb562c820eb25940bc1aae52ebd802b"
+    },
+    "fresh-allocation/correctness-control.json": {
+      "bytes": 2224,
+      "sha256": "5fa425bb43e7a5cff9be84409540b51cdbb562c820eb25940bc1aae52ebd802b"
+    },
+    "fresh-allocation/preflight-copied-source-verification.json": {
+      "bytes": 487,
+      "sha256": "a9d85a3bad53fd0b526507bfdfa995173464f775f490649127d8debaed05adb4"
+    },
+    "fresh-allocation/preflight-source-fixture-verification.json": {
+      "bytes": 487,
+      "sha256": "a9d85a3bad53fd0b526507bfdfa995173464f775f490649127d8debaed05adb4"
+    },
+    "fresh-allocation/publication-manifest-before-provenance-refresh.json": {
+      "bytes": 1778,
+      "sha256": "454f4d2cdafa95713c8ba34b87ffa7edeabee0b4d5d163bf71f711dfe00130cf"
+    },
+    "fresh-allocation/publication-provenance-refresh.json": {
+      "bytes": 2294,
+      "sha256": "0f1a0106f227021d3132d905eb6665fc2c535ed5fe251c5b6a80dbb05bc143f6"
+    },
+    "fresh-allocation/toolchain-version.json": {
+      "bytes": 664,
+      "sha256": "ad25e8b6c280df9b150d59c0dc947d4de319b5e2f4c57339f7dbd57a5891c6fe"
+    },
+    "fresh-latency/fresh-correctness-candidate.json": {
+      "bytes": 2329,
+      "sha256": "1015a2d3f2527e62122b0345065e5de58b472109b9c7fb82b211c505ad461b4e"
+    },
+    "fresh-latency/fresh-correctness-control.json": {
+      "bytes": 2329,
+      "sha256": "1015a2d3f2527e62122b0345065e5de58b472109b9c7fb82b211c505ad461b4e"
+    },
+    "fresh-latency/preflight-copied-source-verification.json": {
+      "bytes": 595,
+      "sha256": "ca8e4966cb8618b6c836196c56125bd00f1a4d32922a972725025d880ba2bddd"
+    },
+    "fresh-latency/preflight-source-fixture-verification.json": {
+      "bytes": 595,
+      "sha256": "ca8e4966cb8618b6c836196c56125bd00f1a4d32922a972725025d880ba2bddd"
+    },
+    "fresh-latency/reports/commands.json": {
+      "bytes": 195411,
+      "sha256": "ecd1ad72b3f06358bbf4f03ff48760ef66be6fee1c3737f37798750c09cab711"
+    },
+    "fresh-latency/reports/correctness-gate.json": {
+      "bytes": 339,
+      "sha256": "44ae6e6849074ced82e87c963de1b3af22e7c7ad0d83f94b6de68904aca111e8"
+    },
+    "fresh-latency/reports/environment.json": {
+      "bytes": 4951,
+      "sha256": "90d540de6f379023bfbf42f3e06bf77848d208de64d93f8c508027a8f7a1b8e4"
+    },
+    "fresh-latency/reports/raw.json": {
+      "bytes": 533590,
+      "sha256": "1f802c29eb7f3e9d7480ab18a35d7ee7a837dda659a7e6c33f89c73ca3370e94"
+    },
+    "fresh-latency/reports/summary.json": {
+      "bytes": 86320,
+      "sha256": "d37ec38fdff60479f64fb62d337ad1a65d590e4246e0af8bd028d8d45203fd85"
+    },
+    "fresh-latency/reproduction.json": {
+      "bytes": 13880,
+      "sha256": "a5a994ad4909e3b671373a7e5b9cca3e5470800daaa643492fe7999b4364fd74"
+    },
+    "historical-integration-Cargo.lock.gz": {
+      "bytes": 33441,
+      "sha256": "29a8c7d3c80fb98d13bb6ab78f17fa145d2184810fd12ddf0317af6c0645f830"
+    },
+    "historical-integration-clippy-v2.log.gz": {
+      "bytes": 1169,
+      "sha256": "e2819a89274c1534d2d832ca0f28510fa4f8edb34c3c4a83b47d365e5156f23d"
+    },
+    "historical-integration-root-gates-v2.json": {
+      "bytes": 2079,
+      "sha256": "a0fa201e4342e8b266b498c691944390816ea4bf15e2dfc91eaec2b495368f09"
+    },
+    "historical-integration-rustdoc-v2.log.gz": {
+      "bytes": 333,
+      "sha256": "7a7f30b2d1f535fc8884781e2f5bab5c2ab359d2c7a68e3d27b7e2522a46dfab"
+    },
+    "historical-integration-tests-v2.log.gz": {
+      "bytes": 21329,
+      "sha256": "f2b2168b3074622b0926a382468f6afc3541365a3803ee07752be7770cc0c685"
+    },
+    "measured-source-freeze-c4aa-v1.json": {
+      "bytes": 695,
+      "sha256": "3b6888f911bd26828baf8d0c93a4f21b2df3c5b34c91d79c4ab218cd329e6fb5"
+    },
+    "portable-archive-extraction-root-verification.json": {
+      "bytes": 442,
+      "sha256": "bc3aa0d07576006e6f94e8a6a7ef2ff31335a5cc1b28089706c76e8148ceac16"
+    },
+    "portable-bundle-manifest.json": {
+      "bytes": 18720,
+      "sha256": "a88a875fe498913b28c3d4a8c3577b41c34ab3551366181de7bb0f350725991b"
+    },
+    "publication-Cargo.lock.gz": {
+      "bytes": 33441,
+      "sha256": "29a8c7d3c80fb98d13bb6ab78f17fa145d2184810fd12ddf0317af6c0645f830"
+    },
+    "publication-clippy-v1.log.gz": {
+      "bytes": 91,
+      "sha256": "55f6513e01b862ac6613da8ce593ef3f00523860553630414443a5e96e03b557"
+    },
+    "publication-root-final-gates-v1.json": {
+      "bytes": 1354,
+      "sha256": "67bc2fe46803f01bd799e673c12722ad58ca285dceaf8e54f6c6f7c73a664e66"
+    },
+    "publication-root-source-v1.json": {
+      "bytes": 685,
+      "sha256": "69081070a2ce237a9be6c04c7942fed3adb34670fd261b5967934fc487926a23"
+    },
+    "publication-rustdoc-v1.log.gz": {
+      "bytes": 157,
+      "sha256": "d90adaef63f0b7ff2f2400e4484219ee6f34204fa08efb12f5a1aae557697573"
+    },
+    "publication-tests-v1.log.gz": {
+      "bytes": 20662,
+      "sha256": "de9dc6d49fcfdeaf7d2979ad11261bb13df2f5b76113307efb4dac300b118fdd"
+    },
+    "source-owner-portable-100-payload-members.tar.gz": {
+      "bytes": 547363,
+      "sha256": "ee6f6ab9d6634740b763bf9d3abd1d13a7bef1f7fcf6be9ab17fa29a659e402a"
+    }
+  },
+  "publication_commands": {
+    "toolchain": "1.95.0",
+    "working_tree": "/var/tmp/litchi-doc-source-owner-publication-validation-20260910",
+    "dedicated_target": "/var/tmp/litchi-doc-source-owner-publication-root-target-195",
+    "executed": {
+      "tests": "cargo +1.95.0 test -p litchi-doc --all-features",
+      "clippy": "cargo +1.95.0 clippy -p litchi-doc --all-targets --all-features -- -D warnings",
+      "rustdoc": "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc -p litchi-doc --all-features --no-deps",
+      "rustfmt": "rustup run 1.95.0 rustfmt --check --edition 2024 --config skip_children=true crates/litchi-doc/src/embedded_object/tests.rs crates/litchi-doc/src/embedded_object/transaction/edit.rs crates/litchi-doc/src/embedded_object/transaction/patch.rs crates/litchi-doc/src/embedded_object/transaction/snapshot.rs",
+      "diff_check": "git diff --check"
+    },
+    "executed_without_offline_or_locked": true,
+    "pinned_format_scope": [
+      "crates/litchi-doc/src/embedded_object/tests.rs",
+      "crates/litchi-doc/src/embedded_object/transaction/edit.rs",
+      "crates/litchi-doc/src/embedded_object/transaction/patch.rs",
+      "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs"
+    ],
+    "optional_locked_replay": {
+      "lock_restore": "gzip -dc docs/report/spec-gap-validation-evidence/doc-source-owner-v2/publication-Cargo.lock.gz > Cargo.lock",
+      "fresh_target_template": "/var/tmp/litchi-doc-source-owner-replay-target-XXXXXX",
+      "commands": "README.md optional lock-bound replay block",
+      "executed": false,
+      "note": "--locked is a replay recipe only; the recorded publication commands did not use --locked or --offline."
+    }
+  }
+}

@@ -125,6 +125,22 @@ fn field_validation_rejects_orphan_and_unclosed_markers() {
     );
 }
 
+#[test]
+fn snapshot_clones_share_the_first_public_source_view_allocation() {
+    let source = Snapshot::open(base_doc(), Limits::default()).unwrap();
+    let bytes_clone = source.clone();
+    let shared_clone = source.clone();
+
+    let bytes = bytes_clone.bytes();
+    let shared = shared_clone.bytes_shared();
+    assert_eq!(bytes, shared.as_ref());
+    assert_eq!(bytes.as_ptr(), shared.as_ptr());
+
+    let bytes_clone_shared = bytes_clone.bytes_shared();
+    assert!(std::sync::Arc::ptr_eq(&bytes_clone_shared, &shared));
+    assert_eq!(shared_clone.bytes().as_ptr(), shared.as_ptr());
+}
+
 fn base_doc() -> Vec<u8> {
     let mut writer = Writer::new();
     writer.add_paragraph("embedded metadata").unwrap();
