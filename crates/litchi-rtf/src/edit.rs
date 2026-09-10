@@ -5,14 +5,16 @@
 //! in bounded atomic commits. Text edits retain a deliberately narrow uniform
 //! formatting closure. Layout edits instead rewrite checked paragraph/run
 //! snapshots and verify every unrelated property after reopening. Both seams
-//! refuse body-anchored opaque syntax, tables, and positioned content.
+//! retain body-anchored opaque syntax at checked source spans while refusing
+//! tables and untyped positioned content; the paragraph-layout seam includes
+//! the typed positioned-frame facet.
 //! Canonical retained-story edits cover checked table cells, headers/footers,
 //! comments, notes, and root shape text frames while refusing unknown
 //! destinations and dependent positioned content.
 
 use crate::{
-    Alignment, CharacterBaseline, CharacterExpansion, Document, HeaderFooterType, RtfError,
-    RtfWriter, TableCellPath, UnderlineStyle,
+    Alignment, CharacterBaseline, CharacterExpansion, Document, HeaderFooterType, ParagraphFrame,
+    RtfError, RtfWriter, TableCellPath, UnderlineStyle,
 };
 use bumpalo::Bump;
 use serde_json::Value;
@@ -164,8 +166,11 @@ pub struct ParagraphTextReplacement {
 
 /// The dependency-free local layout facets of one ordinary body paragraph.
 ///
-/// Values are the effective explicit RTF values after parsing. Zero spacing
-/// or indentation and `false` pagination flags represent the cleared state.
+/// Values are the paragraph's directly stored RTF properties. Style-sheet
+/// inheritance is intentionally not resolved here: a style reference makes a
+/// layout transaction ineligible, so callers can distinguish direct values
+/// from the document's effective style result. Zero spacing or indentation
+/// and `false` pagination flags represent the cleared state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphLayout {
     space_before: i32,
@@ -176,6 +181,7 @@ pub struct ParagraphLayout {
     keep_together: bool,
     keep_with_next: bool,
     page_break_before: bool,
+    frame: Option<ParagraphFrame>,
 }
 
 impl ParagraphLayout {
@@ -189,6 +195,7 @@ impl ParagraphLayout {
             keep_together: paragraph.keep_together,
             keep_with_next: paragraph.keep_next,
             page_break_before: paragraph.page_break_before,
+            frame: paragraph.frame,
         }
     }
 
@@ -239,6 +246,12 @@ impl ParagraphLayout {
     pub const fn page_break_before(self) -> bool {
         self.page_break_before
     }
+
+    /// Positioned frame attached to the paragraph, when present.
+    #[must_use]
+    pub const fn frame(self) -> Option<ParagraphFrame> {
+        self.frame
+    }
 }
 
 /// Typed partial update for dependency-free local paragraph layout.
@@ -255,6 +268,7 @@ pub struct ParagraphLayoutPatch {
     keep_together: Option<bool>,
     keep_with_next: Option<bool>,
     page_break_before: Option<bool>,
+    frame: Option<Option<ParagraphFrame>>,
 }
 
 impl ParagraphLayoutPatch {
@@ -270,6 +284,7 @@ impl ParagraphLayoutPatch {
             keep_together: None,
             keep_with_next: None,
             page_break_before: None,
+            frame: None,
         }
     }
 
@@ -369,8 +384,22 @@ impl ParagraphLayoutPatch {
         self.with_page_break_before(false)
     }
 
+    /// Replaces the positioned frame attached to the paragraph.
+    #[must_use]
+    pub const fn with_frame(mut self, frame: ParagraphFrame) -> Self {
+        self.frame = Some(Some(frame));
+        self
+    }
+
+    /// Removes the positioned frame attached to the paragraph.
+    #[must_use]
+    pub const fn clear_frame(mut self) -> Self {
+        self.frame = Some(None);
+        self
+    }
+
     const fn fields(self) -> LayoutFields {
-        let mut fields = 0u8;
+        let mut fields = 0u16;
         if self.space_before.is_some() {
             fields |= LayoutFields::SPACE_BEFORE;
         }
@@ -394,6 +423,9 @@ impl ParagraphLayoutPatch {
         }
         if self.page_break_before.is_some() {
             fields |= LayoutFields::PAGE_BREAK_BEFORE;
+        }
+        if self.frame.is_some() {
+            fields |= LayoutFields::FRAME;
         }
         LayoutFields(fields)
     }
@@ -423,6 +455,9 @@ impl ParagraphLayoutPatch {
         if let Some(value) = self.page_break_before {
             layout.page_break_before = value;
         }
+        if let Some(value) = self.frame {
+            layout.frame = value;
+        }
     }
 }
 
@@ -451,17 +486,18 @@ impl ParagraphLayoutUpdate {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct LayoutFields(u8);
+struct LayoutFields(u16);
 
 impl LayoutFields {
-    const SPACE_BEFORE: u8 = 1 << 0;
-    const SPACE_AFTER: u8 = 1 << 1;
-    const LEFT_INDENT: u8 = 1 << 2;
-    const RIGHT_INDENT: u8 = 1 << 3;
-    const FIRST_LINE_INDENT: u8 = 1 << 4;
-    const KEEP_TOGETHER: u8 = 1 << 5;
-    const KEEP_WITH_NEXT: u8 = 1 << 6;
-    const PAGE_BREAK_BEFORE: u8 = 1 << 7;
+    const SPACE_BEFORE: u16 = 1 << 0;
+    const SPACE_AFTER: u16 = 1 << 1;
+    const LEFT_INDENT: u16 = 1 << 2;
+    const RIGHT_INDENT: u16 = 1 << 3;
+    const FIRST_LINE_INDENT: u16 = 1 << 4;
+    const KEEP_TOGETHER: u16 = 1 << 5;
+    const KEEP_WITH_NEXT: u16 = 1 << 6;
+    const PAGE_BREAK_BEFORE: u16 = 1 << 7;
+    const FRAME: u16 = 1 << 8;
 
     const fn is_empty(self) -> bool {
         self.0 == 0
@@ -483,6 +519,7 @@ fn layout_effect_keys(position: usize, fields: LayoutFields) -> Vec<String> {
         (LayoutFields::KEEP_TOGETHER, "keep-together"),
         (LayoutFields::KEEP_WITH_NEXT, "keep-with-next"),
         (LayoutFields::PAGE_BREAK_BEFORE, "page-break-before"),
+        (LayoutFields::FRAME, "frame"),
     ] {
         if fields.0 & bit != 0 {
             effects.push(format!("body:paragraph:{position}:layout:{name}"));
@@ -520,14 +557,26 @@ fn ensure_paragraph_layout_source(source: &Snapshot) -> Result<(), Error> {
             "paragraph-layout editing refuses non-ASCII transport encodings",
         ));
     }
-    if !source.opaque().is_empty() {
+    if source.model().unknown_syntax_markers() != 0 {
         return Err(Error::UnsupportedSource(
-            "paragraph-layout editing refuses unknown RTF syntax",
+            "paragraph-layout editing refuses unretained unknown RTF syntax",
         ));
+    }
+    for node in source.opaque() {
+        if let crate::opaque::Anchor::Structural { context, .. } = node.anchor()
+            && !matches!(
+                context,
+                crate::opaque::Context::Metadata | crate::opaque::Context::HeaderFooter
+            )
+        {
+            return Err(Error::UnsupportedSource(
+                "paragraph-layout editing refuses opaque dependent destinations",
+            ));
+        }
     }
     source
         .model()
-        .local_paragraph_property_editability()
+        .positioned_paragraph_property_editability()
         .map_err(Error::UnsupportedSource)?;
     for paragraph in source.body().paragraphs() {
         if paragraph
@@ -2859,6 +2908,9 @@ impl Edit {
                     "paragraph-layout selector cursor became inconsistent",
                 ))?;
                 let fields = update.patch.fields();
+                if let Some(Some(frame)) = update.patch.frame {
+                    frame.validate()?;
+                }
                 if fields.is_empty() {
                     return Err(Error::EmptyParagraphLayoutPatch { position });
                 }
@@ -3775,7 +3827,7 @@ impl Edit {
         if layout_operation {
             self.source
                 .model()
-                .local_paragraph_property_editability()
+                .positioned_paragraph_property_editability()
                 .map_err(Error::UnsupportedSource)?;
         } else if has_bold_operation
             || has_italic_operation
@@ -3839,7 +3891,11 @@ impl Edit {
                 .plain_body_text_editability()
                 .map_err(Error::UnsupportedSource)?;
         }
-        let span = retained_or_located_body_source_span(&self.source, source_bytes)?;
+        let span = if layout_operation {
+            retained_or_located_layout_body_source_span(&self.source, source_bytes)?
+        } else {
+            retained_or_located_body_source_span(&self.source, source_bytes)?
+        };
         let replacement_bytes = if layout_operation {
             if replacement != self.source.text()
                 || has_bold_operation
@@ -3864,6 +3920,7 @@ impl Edit {
                 &self.source,
                 &paragraph_properties,
                 self.source.limits(),
+                &span,
             )?
         } else if property_operation {
             encoded_body_with_properties(
@@ -5383,6 +5440,9 @@ fn apply_layout_to_raw(
     }
     if fields.0 & LayoutFields::PAGE_BREAK_BEFORE != 0 {
         paragraph.page_break_before = layout.page_break_before;
+    }
+    if fields.0 & LayoutFields::FRAME != 0 {
+        paragraph.frame = layout.frame;
     }
 }
 
@@ -7543,7 +7603,27 @@ fn retained_or_located_body_source_span(
         {
             Ok(span)
         },
-        Some(_) | None => ordinary_body_source_span(source_bytes, source.text(), source.limits()),
+        Some(_) | None => {
+            ordinary_body_source_span(source_bytes, source.text(), source.limits(), false)
+        },
+    }
+}
+
+fn retained_or_located_layout_body_source_span(
+    source: &Snapshot,
+    source_bytes: &[u8],
+) -> Result<Range<usize>, Error> {
+    match source.model().ordinary_body_source_span() {
+        Some(span)
+            if source_bytes.is_ascii()
+                && span.start <= span.end
+                && span.end <= source_bytes.len() =>
+        {
+            Ok(span)
+        },
+        Some(_) | None => {
+            ordinary_body_source_span(source_bytes, source.text(), source.limits(), true)
+        },
     }
 }
 
@@ -7551,6 +7631,7 @@ fn ordinary_body_source_span(
     source: &[u8],
     semantic_text: &str,
     limits: crate::ParseLimits,
+    allow_nested_root_groups: bool,
 ) -> Result<Range<usize>, Error> {
     let lexical = if source.is_ascii() {
         std::str::from_utf8(source)
@@ -7568,7 +7649,7 @@ fn ordinary_body_source_span(
     for (token, span) in tokens.iter().zip(&spans) {
         match token {
             crate::lexer::Token::OpenBrace => {
-                if depth == 1 && start.is_some() {
+                if depth == 1 && start.is_some() && !allow_nested_root_groups {
                     return Err(Error::UnsupportedSource(
                         "the body source is not one contiguous root-level span",
                     ));
@@ -7589,7 +7670,7 @@ fn ordinary_body_source_span(
             crate::lexer::Token::Text(_) if depth == 1 && start.is_none() => {
                 start = Some(span.start);
             },
-            crate::lexer::Token::Binary(_) if depth == 1 && start.is_some() => {
+            crate::lexer::Token::Binary(_) if start.is_some() => {
                 return Err(Error::UnsupportedSource(
                     "the body source contains binary data",
                 ));
@@ -8014,8 +8095,13 @@ fn encoded_body_with_paragraph_properties(
     source: &Snapshot,
     properties: &[crate::types::Paragraph],
     limits: crate::ParseLimits,
+    source_span: &Range<usize>,
 ) -> Result<Vec<u8>, Error> {
     let mut output = BoundedVec::new(limits.max_source_bytes());
+    let opaque_nodes = body_opaque_nodes(source, source_span)?;
+    let mut opaque_index = 0usize;
+    let layout_events = body_layout_events(source)?;
+    let mut layout_event_index = 0usize;
     let mut body_position = 0usize;
     let mut paragraph_count = 0usize;
     for (position, paragraph) in source.body().paragraphs().enumerate() {
@@ -8040,11 +8126,32 @@ fn encoded_body_with_paragraph_properties(
             if let Err(error) = result {
                 return Err(output.map_io_error(error));
             }
+            write_text_with_body_opaque(
+                &mut output,
+                source.text(),
+                body_position..paragraph_end,
+                &opaque_nodes,
+                &mut opaque_index,
+                &layout_events,
+                &mut layout_event_index,
+                source.model().bookmarks(),
+            )?;
             if terminated {
                 write_bounded(&mut output, br"\par ")?;
             }
         } else {
+            let mut run_position = body_position;
             while let Some(run) = runs.next() {
+                let run_end =
+                    run_position
+                        .checked_add(run.text().len())
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: limits.max_source_bytes(),
+                        })?;
+                if run_end > paragraph_end {
+                    return Err(Error::StructuralPropertyConflict);
+                }
                 write_bounded(&mut output, br"\plain\pard ")?;
                 let result = {
                     let mut writer = RtfWriter::new(&mut output);
@@ -8056,13 +8163,23 @@ fn encoded_body_with_paragraph_properties(
                     return Err(output.map_io_error(error));
                 }
                 write_bounded(&mut output, b" ")?;
-                match RtfWriter::new(&mut output).write_text(run.text()) {
-                    Ok(()) => {},
-                    Err(error) => return Err(output.map_io_error(error)),
-                }
+                write_text_with_body_opaque(
+                    &mut output,
+                    source.text(),
+                    run_position..run_end,
+                    &opaque_nodes,
+                    &mut opaque_index,
+                    &layout_events,
+                    &mut layout_event_index,
+                    source.model().bookmarks(),
+                )?;
                 if terminated && runs.peek().is_none() {
                     write_bounded(&mut output, br"\par ")?;
                 }
+                run_position = run_end;
+            }
+            if run_position != paragraph_end {
+                return Err(Error::StructuralPropertyConflict);
             }
         }
         body_position = paragraph_end.saturating_add(usize::from(terminated));
@@ -8070,6 +8187,26 @@ fn encoded_body_with_paragraph_properties(
     }
     if paragraph_count != properties.len() {
         return Err(Error::StructuralPropertyConflict);
+    }
+    write_text_with_body_opaque(
+        &mut output,
+        source.text(),
+        source.text().len()..source.text().len(),
+        &opaque_nodes,
+        &mut opaque_index,
+        &layout_events,
+        &mut layout_event_index,
+        source.model().bookmarks(),
+    )?;
+    if opaque_index != opaque_nodes.len() {
+        return Err(Error::UnsupportedSource(
+            "body-anchored opaque syntax was not covered by the source span",
+        ));
+    }
+    if layout_event_index != layout_events.len() {
+        return Err(Error::UnsupportedSource(
+            "body story metadata was not covered by the rewritten body",
+        ));
     }
     Ok(output.into_inner())
 }
@@ -8079,6 +8216,258 @@ fn write_bounded(output: &mut BoundedVec, bytes: &[u8]) -> Result<(), Error> {
         Ok(()) => Ok(()),
         Err(error) => Err(output.map_io_error(error)),
     }
+}
+
+fn body_opaque_nodes<'a>(
+    source: &'a Snapshot,
+    source_span: &Range<usize>,
+) -> Result<Vec<&'a crate::opaque::Node>, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let mut nodes = Vec::new();
+    nodes
+        .try_reserve(source.opaque().len())
+        .map_err(|_error| Error::Write("could not reserve opaque body nodes".to_string()))?;
+    let mut previous = None;
+    let mut source_cursor = 0usize;
+    for node in source.opaque() {
+        if node.source().is_empty() {
+            return Err(Error::UnsupportedSource(
+                "body-anchored opaque syntax has no stable source span",
+            ));
+        }
+        let node_start = source_bytes
+            .get(source_cursor..)
+            .and_then(|remaining| {
+                remaining
+                    .windows(node.source().len())
+                    .position(|window| window == node.source())
+            })
+            .map(|relative| source_cursor.saturating_add(relative))
+            .ok_or(Error::UnsupportedSource(
+                "body-anchored opaque syntax is absent from the source span",
+            ))?;
+        let node_end = node_start.saturating_add(node.source().len());
+        source_cursor = node_end;
+        let crate::opaque::Anchor::Body(offset) = node.anchor() else {
+            continue;
+        };
+        if offset > source.text().len()
+            || !source.text().is_char_boundary(offset)
+            || previous.is_some_and(|value| value > offset)
+        {
+            return Err(Error::UnsupportedSource(
+                "body-anchored opaque syntax has no stable source span",
+            ));
+        }
+        previous = Some(offset);
+        if node_start < source_span.start {
+            if node_end > source_span.start {
+                return Err(Error::UnsupportedSource(
+                    "body-anchored opaque syntax crosses the source span boundary",
+                ));
+            }
+            continue;
+        }
+        if node_end > source_span.end {
+            return Err(Error::UnsupportedSource(
+                "body-anchored opaque syntax exceeds the source span",
+            ));
+        }
+        nodes.push(node);
+    }
+    Ok(nodes)
+}
+
+#[derive(Clone, Copy)]
+enum BodyLayoutEventKind {
+    BookmarkStart(usize),
+    BookmarkEnd(usize),
+    PageBreak,
+    ColumnBreak,
+    SoftBreak(crate::SoftBreak),
+}
+
+#[derive(Clone, Copy)]
+struct BodyLayoutEvent {
+    position: usize,
+    source_order: usize,
+    kind: BodyLayoutEventKind,
+}
+
+fn body_layout_events(source: &Snapshot) -> Result<Vec<BodyLayoutEvent>, Error> {
+    let bookmarks = source.model().bookmarks().bookmarks();
+    let mut events = Vec::new();
+    events
+        .try_reserve(source.model().body_story_events().len())
+        .map_err(|_error| Error::Write("could not reserve bookmark events".to_string()))?;
+    for (source_order, event) in source.model().body_story_events().iter().enumerate() {
+        let (position, kind) = match *event {
+            crate::BodyStoryEvent::BookmarkStart(index) => {
+                let bookmark = bookmarks.get(index).ok_or(Error::UnsupportedSource(
+                    "bookmark metadata references a missing body bookmark",
+                ))?;
+                (bookmark.position, BodyLayoutEventKind::BookmarkStart(index))
+            },
+            crate::BodyStoryEvent::BookmarkEnd(index) => {
+                let bookmark = bookmarks.get(index).ok_or(Error::UnsupportedSource(
+                    "bookmark metadata references a missing body bookmark",
+                ))?;
+                (
+                    bookmark
+                        .position
+                        .checked_add(bookmark.content.len())
+                        .ok_or(Error::UnsupportedSource("bookmark body range overflow"))?,
+                    BodyLayoutEventKind::BookmarkEnd(index),
+                )
+            },
+            crate::BodyStoryEvent::PageBreak(page_break) => {
+                (page_break.position, BodyLayoutEventKind::PageBreak)
+            },
+            crate::BodyStoryEvent::ColumnBreak(column_break) => {
+                (column_break.position, BodyLayoutEventKind::ColumnBreak)
+            },
+            crate::BodyStoryEvent::SoftBreak(soft_break) => (
+                soft_break.position,
+                BodyLayoutEventKind::SoftBreak(soft_break),
+            ),
+            _ => {
+                return Err(Error::UnsupportedSource(
+                    "body contains unsupported positioned structure",
+                ));
+            },
+        };
+        // The retained ordinary-body source span begins at the first literal
+        // body token.  A zero-width event at body offset zero is therefore
+        // serialized in the preserved prefix (its destination group precedes
+        // that literal token); emitting it again in the replacement body
+        // duplicates the marker.  Later events lie inside the retained span.
+        if position == 0 {
+            continue;
+        }
+        if source.text().get(position..position).is_none() {
+            return Err(Error::UnsupportedSource(
+                "bookmark metadata is outside a UTF-8 body boundary",
+            ));
+        }
+        events.push(BodyLayoutEvent {
+            position,
+            source_order,
+            kind,
+        });
+    }
+    events.sort_by_key(|event| (event.position, event.source_order));
+    Ok(events)
+}
+
+fn write_text_with_body_opaque(
+    output: &mut BoundedVec,
+    text: &str,
+    range: Range<usize>,
+    nodes: &[&crate::opaque::Node],
+    node_index: &mut usize,
+    layout_events: &[BodyLayoutEvent],
+    layout_event_index: &mut usize,
+    bookmarks: &crate::BookmarkTable<'_>,
+) -> Result<(), Error> {
+    let mut cursor = range.start;
+    loop {
+        let node_offset = nodes.get(*node_index).map(|node| {
+            let crate::opaque::Anchor::Body(offset) = node.anchor() else {
+                return Err(Error::UnsupportedSource(
+                    "non-body opaque syntax entered body source publication",
+                ));
+            };
+            Ok(offset)
+        });
+        let node_offset = match node_offset.transpose()? {
+            Some(offset) => offset,
+            None => usize::MAX,
+        };
+        let layout_event_offset = layout_events
+            .get(*layout_event_index)
+            .map_or(usize::MAX, |event| event.position);
+        let Some(offset) = (node_offset.min(layout_event_offset) <= range.end)
+            .then_some(node_offset.min(layout_event_offset))
+        else {
+            break;
+        };
+        if offset < range.start {
+            return Err(Error::UnsupportedSource(
+                "body metadata fell outside its source span",
+            ));
+        }
+        write_encoded_fragment(output, text, cursor..offset)?;
+        while layout_events
+            .get(*layout_event_index)
+            .is_some_and(|event| event.position == offset)
+        {
+            let event = *layout_events
+                .get(*layout_event_index)
+                .ok_or(Error::UnsupportedSource(
+                    "body story metadata index became inconsistent",
+                ))?;
+            let result = match event.kind {
+                BodyLayoutEventKind::BookmarkStart(index) => {
+                    let bookmark =
+                        bookmarks
+                            .bookmarks()
+                            .get(index)
+                            .ok_or(Error::UnsupportedSource(
+                                "bookmark metadata references a missing bookmark",
+                            ))?;
+                    let mut writer = RtfWriter::new(&mut *output);
+                    writer.write_bookmark_start(bookmark)
+                },
+                BodyLayoutEventKind::BookmarkEnd(index) => {
+                    let bookmark =
+                        bookmarks
+                            .bookmarks()
+                            .get(index)
+                            .ok_or(Error::UnsupportedSource(
+                                "bookmark metadata references a missing bookmark",
+                            ))?;
+                    let mut writer = RtfWriter::new(&mut *output);
+                    writer.write_bookmark_end(bookmark.name.as_ref())
+                },
+                BodyLayoutEventKind::PageBreak => {
+                    let mut writer = RtfWriter::new(&mut *output);
+                    writer.write_str("\\page ")
+                },
+                BodyLayoutEventKind::ColumnBreak => {
+                    let mut writer = RtfWriter::new(&mut *output);
+                    writer.write_str("\\column ")
+                },
+                BodyLayoutEventKind::SoftBreak(soft_break) => {
+                    let mut writer = RtfWriter::new(&mut *output);
+                    match soft_break.kind {
+                        crate::SoftBreakKind::Page => writer.write_str("\\softpage "),
+                        crate::SoftBreakKind::Column => writer.write_str("\\softcol "),
+                        crate::SoftBreakKind::Line => writer.write_str("\\softline "),
+                        crate::SoftBreakKind::LineHeight(height) => writer
+                            .write_control_word("softlheight", Some(height))
+                            .and_then(|()| writer.write_str(" ")),
+                    }
+                },
+            };
+            if let Err(error) = result {
+                return Err(output.map_io_error(error));
+            }
+            *layout_event_index = layout_event_index.saturating_add(1);
+        }
+        if node_offset == offset {
+            let node = nodes.get(*node_index).ok_or(Error::UnsupportedSource(
+                "body opaque node index became inconsistent",
+            ))?;
+            write_bounded(output, node.source())?;
+            cursor = offset;
+            *node_index = node_index.saturating_add(1);
+        } else {
+            cursor = offset;
+        }
+    }
+    write_encoded_fragment(output, text, cursor..range.end)
 }
 
 struct BoundedVec {

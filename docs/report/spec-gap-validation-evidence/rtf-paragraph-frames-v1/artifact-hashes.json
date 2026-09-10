@@ -1,0 +1,20 @@
+{
+  "self_excluded": "artifact-hashes.json",
+  "files": {
+    "Cargo.lock.gz": "d9ba1ae029095016ba56444c556084a685f9efc070c5f5574dbc960ae89d913b",
+    "README.md": "d710895988d599dd2432974ae4993b2967e993fdfcb4ce014f91d866df8e9ed6",
+    "clippy-v4.log.gz": "dc459ffc99a3e607f562a5440c7cb459ab834eb344032c0cf53fbe9fc6a50704",
+    "clippy.log.gz": "cf169923b94ab4edbd58504c9bd2583177011a38199d84fc2170cced57f9544a",
+    "receipt-v3.json": "508e579d6a27e17b3de76c8b8f465a5aa18829779325da8f6a06dee1939dcef2",
+    "receipt.json": "14c786161dcba6ee75a960d3ccd33cf2a464a88d9fb5a203bc90b0dc7414ae1d",
+    "root-gates-receipt.json": "5ba20f11a6037e7324f0bad8f040ca221e75e6327d96b21f2327d32fb000bd21",
+    "rustdoc-v4.log.gz": "a5d3919e0c37241e416480ca37cc653ad4c431f8b5bd3b700d223d56302f0b98",
+    "rustdoc.log.gz": "78e299a7163633d7143a22ff2ead7e5bde767d7755639a4aa90e51dd8b9b2cfa",
+    "softline-probe.log.gz": "e30b7e7b8300f788ce8d41f5269f121799fc7fb7b6e2ef11992c8e67b7f7234a",
+    "softline-probe.rs": "ee392ce4c1ff7ad3c3aa52a75fbe07062d007a3034b9e77f92b2f2a80fae02e6",
+    "source-manifest-v3.json": "47efd8222d3ce748d662562466607f2593d90580cdd67b015a520e409e592940",
+    "source-manifest.json": "121dd7d32be0fb8b77b05b37f8fa3dbbc78a5dde49919243b23f1ace5e7ea584",
+    "tests-v4.log.gz": "f878fe6258e5051215600b1acf0286c7b7831340b8184864dc8c93ef41a477ec",
+    "tests.log.gz": "b4ceac5ba0ae165a2da4c16775ccb5f5c7771d5258bcb3d7aa3ff4be07ad2f50"
+  }
+}

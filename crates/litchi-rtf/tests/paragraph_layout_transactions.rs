@@ -5,7 +5,10 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, Document, ProtectionType,
+    Alignment, CharacterBaseline, Document, MAX_PARAGRAPH_FRAME_TWIPS, ParagraphFrame,
+    ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
+    ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
+    ProtectionType, RtfDocument,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, Limits, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
@@ -385,6 +388,292 @@ fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
 }
 
 #[test]
+fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
+    let source = Document::parse(r"{\rtf1\ansi One\par Two}").unwrap();
+    let frame = ParagraphFrame {
+        width_twips: Some(720),
+        height_twips: Some(-480),
+        horizontal_reference: ParagraphFrameHorizontalReference::Margin,
+        horizontal_position: ParagraphFrameHorizontalPosition::NegativeOffset(-80),
+        vertical_reference: ParagraphFrameVerticalReference::Page,
+        vertical_position: ParagraphFrameVerticalPosition::Offset(120),
+        anchor_locked: Some(true),
+        no_wrap: true,
+        horizontal_text_distance_twips: Some(40),
+        horizontal_text_offset_twips: Some(10),
+        vertical_text_offset_twips: Some(20),
+        wrap: ParagraphFrameWrap::Around,
+        overlay: true,
+        no_overlap: Some(true),
+        text_flow: ParagraphFrameTextFlow::TopToBottomRightToLeft,
+    };
+    let mut create = source.edit();
+    create
+        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(frame))
+        .unwrap();
+    let created = create.commit().unwrap();
+    assert_eq!(layout(created.snapshot(), 0).frame(), Some(frame));
+    let created_bytes = created.snapshot().to_bytes().unwrap();
+    let created_text = String::from_utf8(created_bytes.clone()).unwrap();
+    assert!(created_text.contains(r"\absw720"));
+    assert!(created_text.contains(r"\posnegx-80"));
+    let reopened = Document::from_bytes(&created_bytes).unwrap();
+    assert_eq!(layout(&reopened, 0).frame(), Some(frame));
+    assert_eq!(reopened.text(), source.text());
+    assert_eq!(
+        created
+            .patch()
+            .inverse()
+            .apply(created.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+
+    let updated_frame = ParagraphFrame {
+        width_twips: Some(960),
+        horizontal_position: ParagraphFrameHorizontalPosition::Right,
+        wrap: ParagraphFrameWrap::Through,
+        ..frame
+    };
+    let mut update = created.snapshot().edit();
+    update
+        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(updated_frame))
+        .unwrap();
+    let updated = update.commit().unwrap();
+    assert_eq!(layout(updated.snapshot(), 0).frame(), Some(updated_frame));
+    assert!(matches!(
+        updated.patch().apply(&source),
+        Err(Error::PatchConflict)
+    ));
+
+    let mut remove = updated.snapshot().edit();
+    remove
+        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().clear_frame())
+        .unwrap();
+    let removed = remove.commit().unwrap();
+    assert_eq!(layout(removed.snapshot(), 0).frame(), None);
+    assert_eq!(removed.snapshot().text(), source.text());
+    assert_eq!(
+        removed
+            .patch()
+            .inverse()
+            .apply(removed.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        updated.snapshot().to_bytes().unwrap()
+    );
+}
+
+#[test]
+fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
+    let source = Document::parse(r"{\rtf1\ansi One\par Two}").unwrap();
+    let before = source.to_bytes().unwrap();
+    let invalid = ParagraphFrame {
+        width_twips: Some(MAX_PARAGRAPH_FRAME_TWIPS as u32 + 1),
+        ..ParagraphFrame::default()
+    };
+    let mut batch = source.edit();
+    assert!(matches!(
+        batch.patch_body_paragraph_layouts(&[
+            ParagraphLayoutUpdate::new(
+                0,
+                ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+            ),
+            ParagraphLayoutUpdate::new(1, ParagraphLayoutPatch::new().with_frame(invalid)),
+        ]),
+        Err(Error::Rtf(_))
+    ));
+    assert_eq!(batch.operation_count(), 0);
+    assert_eq!(source.to_bytes().unwrap(), before);
+
+    let unknown =
+        Document::parse(r"{\rtf1\ansi\future42 One{\*\vendor retained}\par Two}").unwrap();
+    let unknown_before = unknown.to_bytes().unwrap();
+    let mut unknown_edit = unknown.edit();
+    unknown_edit
+        .patch_paragraph_layout(
+            0,
+            ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+        )
+        .unwrap();
+    let unknown_commit = unknown_edit.commit().unwrap();
+    let unknown_after = unknown_commit.snapshot().to_bytes().unwrap();
+    assert!(
+        unknown_after
+            .windows(br"\future42".len())
+            .any(|window| { window == br"\future42" })
+    );
+    assert_eq!(
+        unknown_after
+            .windows(br"\future42".len())
+            .filter(|window| *window == br"\future42")
+            .count(),
+        1
+    );
+    assert!(
+        unknown_after
+            .windows(br"{\*\vendor retained}".len())
+            .any(|window| window == br"{\*\vendor retained}")
+    );
+    assert_eq!(unknown_commit.snapshot().opaque(), unknown.opaque());
+    assert_eq!(unknown_commit.snapshot().text(), unknown.text());
+    assert_eq!(
+        unknown_commit
+            .patch()
+            .inverse()
+            .apply(unknown_commit.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        unknown_before
+    );
+
+    let metadata =
+        Document::parse(r"{\rtf1\ansi{\info{\*\futuremeta vendor-byte-payload}} One}").unwrap();
+    let metadata_before = metadata.to_bytes().unwrap();
+    let mut metadata_edit = metadata.edit();
+    metadata_edit
+        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
+        .unwrap();
+    let metadata_after = metadata_edit
+        .commit()
+        .unwrap()
+        .snapshot()
+        .to_bytes()
+        .unwrap();
+    let metadata_prefix = br"{\rtf1\ansi{\info{\*\futuremeta vendor-byte-payload}}";
+    assert!(metadata_after.starts_with(metadata_prefix));
+    assert!(
+        metadata_after
+            .windows(br"\sb20".len())
+            .any(|window| window == br"\sb20")
+    );
+    assert_eq!(
+        &metadata_before[..metadata_prefix.len()],
+        &metadata_after[..metadata_prefix.len()]
+    );
+}
+
+#[test]
+fn frame_layout_preserves_zero_width_bookmark_events() {
+    let source = Document::parse(r#"{\rtf1\ansi One{\*\bkmkstart bm}two{\*\bkmkend bm}}"#).unwrap();
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        0,
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    assert!(String::from_utf8_lossy(&bytes).contains(r"\bkmkstart bm"));
+    let reopened = RtfDocument::parse_bytes(&bytes).unwrap();
+    assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
+    assert_eq!(reopened.bookmarks().bookmarks()[0].name, "bm");
+    assert_eq!(reopened.bookmarks().bookmarks()[0].position, 3);
+    assert_eq!(reopened.bookmarks().bookmarks()[0].content, "two");
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+}
+
+#[test]
+fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
+    let source =
+        Document::parse(r#"{\rtf1\ansi{\*\bkmkstart leading}One{\*\bkmkend leading}}"#).unwrap();
+    let before = source.to_bytes().unwrap();
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        0,
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    assert_eq!(
+        bytes
+            .windows(br"\bkmkstart leading".len())
+            .filter(|window| *window == br"\bkmkstart leading")
+            .count(),
+        1
+    );
+    let reopened = RtfDocument::parse_bytes(&bytes).unwrap();
+    assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+}
+
+#[test]
+fn frame_layout_preserves_offset_only_break_events() {
+    let source =
+        Document::parse(r#"{\rtf1\ansi One\page Two\column Three\softline Four}"#).unwrap();
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        0,
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    let serialized = String::from_utf8_lossy(&bytes);
+    assert!(serialized.contains(r"\page "));
+    assert!(serialized.contains(r"\column "));
+    assert!(serialized.contains(r"\softline "));
+    let reopened = RtfDocument::parse_bytes(&bytes).unwrap();
+    assert_eq!(reopened.body_story_events().len(), 3);
+    assert_eq!(reopened.text(), "OneTwoThreeFour");
+}
+
+#[test]
+fn frame_layout_preserves_leading_body_opaque_destination() {
+    let source = Document::parse(r#"{\rtf1\ansi{\*\vendor leading}One}"#).unwrap();
+    let before = source.to_bytes().unwrap();
+    assert_eq!(source.opaque().len(), 1);
+    assert!(matches!(
+        source.opaque()[0].anchor(),
+        litchi_rtf::opaque::Anchor::Body(0)
+    ));
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let after = committed.snapshot().to_bytes().unwrap();
+    assert!(
+        after
+            .windows(br"{\*\vendor leading}".len())
+            .any(|window| { window == br"{\*\vendor leading}" })
+    );
+    assert_eq!(committed.snapshot().opaque(), source.opaque());
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(committed.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+}
+
+#[test]
 fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1\sb40 Same}").unwrap();
     let exact = protected.to_bytes().unwrap();
@@ -407,7 +696,6 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     ));
 
     for source in [
-        Document::parse(r"{\rtf1\ansi A\future42 B}").unwrap(),
         Document::parse(r"{\rtf1\ansi{\stylesheet{\s1 Named;}}\s1 Styled}").unwrap(),
         Document::parse(r"{\rtf1\ansi\ls1 Listed}").unwrap(),
         Document::parse(r"{\rtf1\ansi One\line Two}").unwrap(),

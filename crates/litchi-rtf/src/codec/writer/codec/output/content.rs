@@ -11,9 +11,12 @@ use super::super::{
     GeneratedListMarkerKind, IndexPageReference, LegacyParagraphNumberingAlignment,
     LegacyParagraphNumberingBidi, LegacyParagraphNumberingFormat, LegacyParagraphNumberingLevel,
     LegacyParagraphNumberingUnderline, NavigationEntry, Paragraph, ParagraphFontAlignment,
-    ParagraphWrapping, RevisionMetadata, RtfWriter, Shading, ShadingPattern, StyleBlock,
-    TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, io,
+    ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
+    ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
+    ParagraphFrameWrap, ParagraphWrapping, RevisionMetadata, RtfWriter, Shading, ShadingPattern,
+    StyleBlock, TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, io,
 };
+use crate::ParagraphDropCap;
 
 fn explicit_shading_pattern_word(
     pattern: ShadingPattern,
@@ -896,6 +899,141 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
+    pub(super) fn write_paragraph_frame(
+        &mut self,
+        frame: ParagraphFrame,
+        drop_cap: Option<ParagraphDropCap>,
+    ) -> io::Result<()> {
+        frame.validate().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid RTF paragraph frame: {error}"),
+            )
+        })?;
+        if let Some(width) = frame.width_twips {
+            self.write_control_word(
+                "absw",
+                Some(i32::try_from(width).map_err(|_err| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF absw exceeds i32")
+                })?),
+            )?;
+        }
+        if let Some(height) = frame.height_twips {
+            self.write_control_word("absh", Some(height))?;
+        }
+        self.write_control_word(
+            match frame.horizontal_reference {
+                ParagraphFrameHorizontalReference::Margin => "phmrg",
+                ParagraphFrameHorizontalReference::Page => "phpg",
+                ParagraphFrameHorizontalReference::Column => "phcol",
+            },
+            None,
+        )?;
+        match frame.horizontal_position {
+            ParagraphFrameHorizontalPosition::Left => self.write_control_word("posxl", None)?,
+            ParagraphFrameHorizontalPosition::Offset(value) => {
+                self.write_control_word("posx", Some(value))?
+            },
+            ParagraphFrameHorizontalPosition::NegativeOffset(value) => {
+                self.write_control_word("posnegx", Some(value))?
+            },
+            ParagraphFrameHorizontalPosition::Center => self.write_control_word("posxc", None)?,
+            ParagraphFrameHorizontalPosition::Inside => self.write_control_word("posxi", None)?,
+            ParagraphFrameHorizontalPosition::Outside => self.write_control_word("posxo", None)?,
+            ParagraphFrameHorizontalPosition::Right => self.write_control_word("posxr", None)?,
+        }
+        self.write_control_word(
+            match frame.vertical_reference {
+                ParagraphFrameVerticalReference::Margin => "pvmrg",
+                ParagraphFrameVerticalReference::Page => "pvpg",
+                ParagraphFrameVerticalReference::Paragraph => "pvpara",
+            },
+            None,
+        )?;
+        match frame.vertical_position {
+            ParagraphFrameVerticalPosition::Offset(value) => {
+                self.write_control_word("posy", Some(value))?
+            },
+            ParagraphFrameVerticalPosition::NegativeOffset(value) => {
+                self.write_control_word("posnegy", Some(value))?
+            },
+            ParagraphFrameVerticalPosition::Inline => self.write_control_word("posyil", None)?,
+            ParagraphFrameVerticalPosition::Top => self.write_control_word("posyt", None)?,
+            ParagraphFrameVerticalPosition::Center => self.write_control_word("posyc", None)?,
+            ParagraphFrameVerticalPosition::Bottom => self.write_control_word("posyb", None)?,
+            ParagraphFrameVerticalPosition::Inside => self.write_control_word("posyin", None)?,
+            ParagraphFrameVerticalPosition::Outside => self.write_control_word("posyout", None)?,
+        }
+        if let Some(value) = frame.anchor_locked {
+            self.write_control_word("abslock", Some(i32::from(value)))?;
+        }
+        if frame.no_wrap {
+            self.write_control_word("nowrap", None)?;
+        }
+        if let Some(value) = frame.horizontal_text_distance_twips {
+            self.write_control_word(
+                "dxfrtext",
+                Some(i32::try_from(value).map_err(|_err| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF dxfrtext exceeds i32")
+                })?),
+            )?;
+        }
+        if let Some(value) = frame.horizontal_text_offset_twips {
+            self.write_control_word(
+                "dfrmtxtx",
+                Some(i32::try_from(value).map_err(|_err| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF dfrmtxtx exceeds i32")
+                })?),
+            )?;
+        }
+        if let Some(value) = frame.vertical_text_offset_twips {
+            self.write_control_word(
+                "dfrmtxty",
+                Some(i32::try_from(value).map_err(|_err| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF dfrmtxty exceeds i32")
+                })?),
+            )?;
+        }
+        self.write_control_word(
+            match frame.wrap {
+                ParagraphFrameWrap::Default => "wrapdefault",
+                ParagraphFrameWrap::Around => "wraparound",
+                ParagraphFrameWrap::Tight => "wraptight",
+                ParagraphFrameWrap::Through => "wrapthrough",
+            },
+            None,
+        )?;
+        if frame.overlay {
+            self.write_control_word("overlay", None)?;
+        }
+        if let Some(drop_cap) = drop_cap {
+            drop_cap.validate().map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("invalid RTF paragraph drop cap: {error}"),
+                )
+            })?;
+            self.write_control_word("dropcapli", Some(i32::from(drop_cap.line_count())))?;
+            self.write_control_word("dropcapt", Some(drop_cap.kind().as_rtf_value()))?;
+        }
+        self.write_control_word(
+            match frame.text_flow {
+                ParagraphFrameTextFlow::LeftToRightTopToBottom => "frmtxlrtb",
+                ParagraphFrameTextFlow::TopToBottomRightToLeft => "frmtxtbrl",
+                ParagraphFrameTextFlow::BottomToTopLeftToRight => "frmtxbtlr",
+                ParagraphFrameTextFlow::LeftToRightTopToBottomVertical => "frmtxlrtbv",
+                ParagraphFrameTextFlow::TopToBottomRightToLeftVertical => "frmtxtbrlv",
+            },
+            None,
+        )?;
+        // The RTF grammar places the overlap selector after text flow. Keep
+        // this final even though readers generally accept it in either order.
+        if let Some(value) = frame.no_overlap {
+            self.write_control_word("absnoovrlp", Some(i32::from(value)))?;
+        }
+        Ok(())
+    }
+
     /// Write paragraph properties
     pub(crate) fn write_paragraph_properties(&mut self, para: &Paragraph) -> io::Result<()> {
         if let Some(paragraph_style) = para.paragraph_style {
@@ -999,6 +1137,19 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("indmirror", None)?;
         }
 
+        if let Some(frame) = para.frame {
+            self.write_paragraph_frame(frame, para.drop_cap)?;
+        } else if let Some(drop_cap) = para.drop_cap {
+            drop_cap.validate().map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("invalid RTF paragraph drop cap: {error}"),
+                )
+            })?;
+            self.write_control_word("dropcapli", Some(i32::from(drop_cap.line_count())))?;
+            self.write_control_word("dropcapt", Some(drop_cap.kind().as_rtf_value()))?;
+        }
+
         // Borders (if any)
         self.write_borders(&para.borders)?;
 
@@ -1008,17 +1159,6 @@ impl<W: Write> RtfWriter<W> {
         // Custom tab stops, retained in declaration order.
         for tab in &para.tab_stops {
             self.write_tab_stop(*tab)?;
-        }
-
-        if let Some(drop_cap) = para.drop_cap {
-            drop_cap.validate().map_err(|error| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("invalid RTF paragraph drop cap: {error}"),
-                )
-            })?;
-            self.write_control_word("dropcapli", Some(i32::from(drop_cap.line_count())))?;
-            self.write_control_word("dropcapt", Some(drop_cap.kind().as_rtf_value()))?;
         }
 
         // Keep together

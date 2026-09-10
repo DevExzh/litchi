@@ -9,9 +9,10 @@
     clippy::shadow_unrelated,
     reason = "builder-style helpers deliberately rebind a working value as it is refined"
 )]
-use crate::TextDirection;
+use crate::{ParagraphFrame, TextDirection};
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashSet};
+use std::ops::Range;
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_GEOMETRY_TWIPS: i32 = 31_680;
@@ -20,6 +21,57 @@ pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
 pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
 pub const MAX_TABLE_ROW_INDEX: u16 = u16::MAX;
+
+/// Paragraph-level frame metadata retained for one table-cell text span.
+///
+/// Cell text remains a flat string for compatibility with the existing table
+/// API.  These bounded spans provide the paragraph boundaries needed to keep
+/// positioned paragraph frames attached to the correct cell paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellParagraph {
+    start: usize,
+    end: usize,
+    frame: Option<ParagraphFrame>,
+    paragraph_break: bool,
+}
+
+impl CellParagraph {
+    pub(crate) const fn new(
+        start: usize,
+        end: usize,
+        frame: Option<ParagraphFrame>,
+        paragraph_break: bool,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            frame,
+            paragraph_break,
+        }
+    }
+
+    /// UTF-8 byte range containing this paragraph's text.
+    ///
+    /// An in-range newline came from `\line`; a newline immediately following
+    /// the range came from `\par` and is represented by
+    /// [`Self::has_paragraph_break`].
+    #[must_use]
+    pub fn text_range(self) -> Range<usize> {
+        self.start..self.end
+    }
+
+    /// Positioned frame attached to this paragraph, if any.
+    #[must_use]
+    pub const fn frame(self) -> Option<ParagraphFrame> {
+        self.frame
+    }
+
+    /// Whether this paragraph is followed by an RTF `\par` boundary.
+    #[must_use]
+    pub const fn has_paragraph_break(self) -> bool {
+        self.paragraph_break
+    }
+}
 
 #[allow(
     clippy::module_name_repetitions,
@@ -1268,6 +1320,8 @@ impl Default for Row<'_> {
 pub struct Cell<'a> {
     /// Cell text content
     text: Cow<'a, str>,
+    /// Paragraph boundaries and positioned frames within the flat text.
+    paragraphs: Vec<CellParagraph>,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
     layout: TableCellLayout,
@@ -1364,6 +1418,7 @@ impl<'a> Cell<'a> {
     pub fn new(text: Cow<'a, str>) -> Self {
         Self {
             text,
+            paragraphs: Vec::new(),
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             layout: TableCellLayout::default(),
@@ -1388,6 +1443,7 @@ impl<'a> Cell<'a> {
     ) -> Self {
         Self {
             text,
+            paragraphs: Vec::new(),
             padding,
             spacing,
             layout: TableCellLayout::default(),
@@ -1409,6 +1465,14 @@ impl<'a> Cell<'a> {
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
+    }
+    /// Paragraph boundaries and positioned frames retained for this cell.
+    ///
+    /// A manually constructed legacy cell can have an empty slice; writers
+    /// treat that as one unframed paragraph spanning the cell text.
+    #[must_use]
+    pub fn paragraphs(&self) -> &[CellParagraph] {
+        &self.paragraphs
     }
     #[must_use]
     pub fn padding(&self) -> &TableEdgeDistances {
@@ -1945,7 +2009,133 @@ impl<'a> Cell<'a> {
             &self.drawing_order,
             &self.story_events,
         )?;
+        if !self.paragraphs.is_empty() && text.as_ref() == self.text.as_ref() {
+            // A caller may replace the allocation without changing the
+            // semantic text. Keep the parser's distinction between `\\line`
+            // newlines inside a paragraph and `\\par` boundary newlines
+            // without allocating a replacement span vector.
+            Self::validate_paragraphs(text.as_ref(), &self.paragraphs)?;
+            self.text = text;
+            return Ok(());
+        }
+        let paragraphs = if self.paragraphs.is_empty() {
+            Vec::new()
+        } else {
+            let previous = &self.paragraphs;
+            // Existing newline ordinals retain their parsed kind. New newline
+            // ordinals have no source distinction and therefore use the
+            // pre-existing text-edit default: a paragraph boundary.
+            let mut previous_breaks = Vec::new();
+            for paragraph in previous {
+                let fragment = self
+                    .text
+                    .get(paragraph.start..paragraph.end)
+                    .ok_or_else(|| {
+                        crate::RtfError::MalformedDocument(
+                            "RTF table-cell paragraph span is invalid".to_string(),
+                        )
+                    })?;
+                for character in fragment.chars() {
+                    if character == '\n' {
+                        crate::error::try_reserve_one(
+                            &mut previous_breaks,
+                            "table-cell paragraph break metadata",
+                        )?;
+                        previous_breaks.push(false);
+                    }
+                }
+                if paragraph.paragraph_break {
+                    crate::error::try_reserve_one(
+                        &mut previous_breaks,
+                        "table-cell paragraph break metadata",
+                    )?;
+                    previous_breaks.push(true);
+                }
+            }
+            let mut paragraphs = Vec::new();
+            let mut start = 0usize;
+            let mut break_index = 0usize;
+            let mut paragraph_index = 0usize;
+            for (end, character) in text.as_ref().char_indices() {
+                if character != '\n' {
+                    continue;
+                }
+                let paragraph_break = previous_breaks.get(break_index).copied().unwrap_or(true);
+                break_index = break_index.saturating_add(1);
+                if paragraph_break {
+                    crate::error::try_reserve_one(&mut paragraphs, "table-cell paragraphs")?;
+                    let frame = previous
+                        .get(paragraph_index)
+                        .or_else(|| previous.last())
+                        .and_then(|paragraph| paragraph.frame());
+                    paragraphs.push(CellParagraph::new(start, end, frame, true));
+                    start = end.checked_add(character.len_utf8()).ok_or_else(|| {
+                        crate::RtfError::MalformedDocument(
+                            "RTF table-cell paragraph offset overflow".to_string(),
+                        )
+                    })?;
+                    paragraph_index = paragraph_index.saturating_add(1);
+                }
+            }
+            crate::error::try_reserve_one(&mut paragraphs, "table-cell paragraphs")?;
+            let frame = previous
+                .get(paragraph_index)
+                .or_else(|| previous.last())
+                .and_then(|paragraph| paragraph.frame());
+            paragraphs.push(CellParagraph::new(start, text.len(), frame, false));
+            paragraphs
+        };
+        Self::validate_paragraphs(text.as_ref(), &paragraphs)?;
         self.text = text;
+        self.paragraphs = paragraphs;
+        Ok(())
+    }
+
+    pub(crate) fn set_paragraphs(
+        &mut self,
+        paragraphs: Vec<CellParagraph>,
+    ) -> crate::RtfResult<()> {
+        Self::validate_paragraphs(self.text.as_ref(), &paragraphs)?;
+        self.paragraphs = paragraphs;
+        Ok(())
+    }
+
+    fn validate_paragraphs(text: &str, paragraphs: &[CellParagraph]) -> crate::RtfResult<()> {
+        if paragraphs.is_empty() {
+            return Ok(());
+        }
+        let mut expected_start = 0usize;
+        for (index, paragraph) in paragraphs.iter().enumerate() {
+            if paragraph.start != expected_start
+                || paragraph.start > paragraph.end
+                || paragraph.end > text.len()
+                || !text.is_char_boundary(paragraph.start)
+                || !text.is_char_boundary(paragraph.end)
+            {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF table-cell paragraph span is invalid".to_string(),
+                ));
+            }
+            if paragraph.paragraph_break {
+                if text.get(paragraph.end..paragraph.end.saturating_add(1)) != Some("\n") {
+                    return Err(crate::RtfError::MalformedDocument(
+                        "RTF table-cell paragraph break is missing from cell text".to_string(),
+                    ));
+                }
+                expected_start = paragraph.end.saturating_add(1);
+            } else if index + 1 != paragraphs.len() {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF table-cell paragraph without a break is not final".to_string(),
+                ));
+            } else {
+                expected_start = paragraph.end;
+            }
+        }
+        if expected_start != text.len() {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF table-cell paragraph spans do not cover cell text".to_string(),
+            ));
+        }
         Ok(())
     }
     pub fn clear_navigation_entry_references(&mut self) {
@@ -2012,6 +2202,40 @@ impl<'a> Row<'a> {
     pub fn cells_mut(&mut self) -> &mut [Cell<'a>] {
         &mut self.cells
     }
+
+    pub(crate) fn validate_paragraph_frames(&self) -> Result<(), String> {
+        let mut expected = None;
+        let mut has_unframed_paragraph = false;
+        for cell in &self.cells {
+            // A manually constructed cell has no paragraph metadata, but the
+            // RTF table grammar still gives it one implicit unframed
+            // paragraph. It must participate in the row-wide frame rule.
+            if cell.paragraphs.is_empty() {
+                has_unframed_paragraph = true;
+                continue;
+            }
+            for paragraph in &cell.paragraphs {
+                if let Some(frame) = paragraph.frame {
+                    if expected.is_some_and(|existing| existing != frame) {
+                        return Err(
+                            "RTF paragraph frame controls must be identical for every paragraph in a table row"
+                                .to_string(),
+                        );
+                    }
+                    expected = Some(frame);
+                } else {
+                    has_unframed_paragraph = true;
+                }
+            }
+        }
+        if expected.is_some() && has_unframed_paragraph {
+            return Err(
+                "RTF paragraph frame controls must be identical for every paragraph in a table row"
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
 }
 
 impl Table<'_> {
@@ -2064,6 +2288,7 @@ impl Cell<'_> {
     pub fn into_owned(self) -> Cell<'static> {
         Cell {
             text: Cow::Owned(self.text.into_owned()),
+            paragraphs: self.paragraphs,
             padding: self.padding,
             spacing: self.spacing,
             layout: self.layout,

@@ -14,8 +14,10 @@ use super::super::types::{
     Color, ColorRef, ColorTable, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
     FontCharset, FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting,
     MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphDropCap, ParagraphDropCapKind,
-    ParagraphFontAlignment, ParagraphWrapping, RevisionMetadata, StyleBlock, TextDirection,
-    UnderlineStyle,
+    ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
+    ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, RevisionMetadata,
+    StyleBlock, TextDirection, UnderlineStyle,
 };
 use bumpalo::Bump;
 use litchi_codepage::Mbcs;
@@ -1026,6 +1028,9 @@ struct NestedTableBuilder<'a> {
     table: super::super::table::Table<'a>,
     row: super::super::table::Row<'a>,
     cell_text: SmallVec<[u8; 128]>,
+    cell_paragraphs: Vec<crate::CellParagraph>,
+    cell_paragraph_start: usize,
+    cell_paragraph_frame: Option<ParagraphFrame>,
     cell_nested: Vec<crate::CellNestedTable<'a>>,
     cell_drawings: DrawingStoryCapture<'a>,
     cell_story_events: Vec<crate::CellStoryEvent>,
@@ -1037,6 +1042,9 @@ impl NestedTableBuilder<'_> {
             table: super::super::table::Table::new(),
             row: super::super::table::Row::new(),
             cell_text: SmallVec::new(),
+            cell_paragraphs: Vec::new(),
+            cell_paragraph_start: 0,
+            cell_paragraph_frame: None,
             cell_nested: Vec::new(),
             cell_drawings: DrawingStoryCapture::default(),
             cell_story_events: Vec::new(),
@@ -1476,6 +1484,10 @@ pub(crate) struct Parser<'a> {
     current_row: Option<super::super::table::Row<'a>>,
     /// Current cell text buffer
     current_cell_text: SmallVec<[u8; 128]>,
+    /// Paragraph frame spans within the current flattened cell text.
+    current_cell_paragraphs: Vec<crate::CellParagraph>,
+    current_cell_paragraph_start: usize,
+    current_cell_paragraph_frame: Option<ParagraphFrame>,
     current_cell_nested: Vec<crate::CellNestedTable<'a>>,
     current_cell_drawings: DrawingStoryCapture<'a>,
     current_cell_story_events: Vec<crate::CellStoryEvent>,
