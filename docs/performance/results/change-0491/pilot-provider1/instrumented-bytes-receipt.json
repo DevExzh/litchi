@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0491/integrated1/normal/litchi-perf-baseline",
+    "docx-provider-lifecycle",
+    "--provider",
+    "instrumented-bytes",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "59b509a7f9508778b20b428d733fc107ec22f142",
+    "--output",
+    "docs/performance/results/change-0491/pilot-provider1/instrumented-bytes.json"
+  ],
+  "exit_code": 0,
+  "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0491/provider-pilot1"
+}

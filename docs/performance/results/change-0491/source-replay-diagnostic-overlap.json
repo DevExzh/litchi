@@ -1,0 +1,242 @@
+[
+  {
+    "name": "[Content_Types].xml",
+    "compressed_range": [
+      49,
+      412
+    ],
+    "overlap": {
+      "open": 363,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "_rels/.rels",
+    "compressed_range": [
+      469,
+      703
+    ],
+    "overlap": {
+      "open": 234,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "docProps/app.xml",
+    "compressed_range": [
+      765,
+      1129
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "docProps/core.xml",
+    "compressed_range": [
+      1192,
+      1404
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/document.xml",
+    "compressed_range": [
+      1467,
+      2891
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 1424,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/_rels/document.xml.rels",
+    "compressed_range": [
+      2965,
+      3289
+    ],
+    "overlap": {
+      "open": 324,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/fontTable.xml",
+    "compressed_range": [
+      3353,
+      3960
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image1.png",
+    "compressed_range": [
+      4027,
+      2101824
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image2.png",
+    "compressed_range": [
+      2101891,
+      4199688
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image3.png",
+    "compressed_range": [
+      4199755,
+      6297552
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image4.png",
+    "compressed_range": [
+      6297619,
+      8395416
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image5.png",
+    "compressed_range": [
+      8395483,
+      10493280
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image6.png",
+    "compressed_range": [
+      10493347,
+      12591144
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image7.png",
+    "compressed_range": [
+      12591211,
+      14689008
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/media/image8.png",
+    "compressed_range": [
+      14689075,
+      16786872
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/numbering.xml",
+    "compressed_range": [
+      16786936,
+      16787928
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/settings.xml",
+    "compressed_range": [
+      16787991,
+      16788957
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/styles.xml",
+    "compressed_range": [
+      16789018,
+      16789812
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/theme/theme1.xml",
+    "compressed_range": [
+      16789879,
+      16791464
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  },
+  {
+    "name": "word/webSettings.xml",
+    "compressed_range": [
+      16791530,
+      16791693
+    ],
+    "overlap": {
+      "open": 0,
+      "prepare": 0,
+      "query": 0
+    }
+  }
+]

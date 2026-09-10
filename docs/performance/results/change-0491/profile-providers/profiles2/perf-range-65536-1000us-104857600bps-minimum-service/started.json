@@ -1,0 +1,153 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "stat",
+    "-x,",
+    "--no-big-num",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles2/perf-range-65536-1000us-104857600bps-minimum-service/perf.txt",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-references,cache-misses,page-faults,duration_time",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles2/perf-range-65536-1000us-104857600bps-minimum-service/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+    "docx-provider-lifecycle",
+    "--provider",
+    "range",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "1000",
+    "--transfer-bytes-per-second",
+    "104857600",
+    "--transfer-delay-policy",
+    "minimum-service",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "59b509a7f9508778b20b428d733fc107ec22f142",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles2/perf-range-65536-1000us-104857600bps-minimum-service/report.json"
+  ],
+  "arm": {
+    "delay_us": 1000,
+    "max_range_bytes": 65536,
+    "name": "range-65536-1000us-104857600bps-minimum-service",
+    "provider": "range",
+    "transfer_bytes_per_second": 104857600,
+    "transfer_delay_policy": "minimum-service"
+  },
+  "attempt": "profiles2",
+  "binary": {
+    "bytes": 473498888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+    "sha256": "ed763be62c5577f2d4652bea361ad015b9affb2080e98b78e95a367703c9c78d"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/build-normal.json",
+    "sha256": "afe16b7870e1b5b5c3c6d31fa95818081277b69f6482dc2554c73454532e8b51",
+    "source": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    }
+  },
+  "caller_gate": {
+    "driver": "gate.py",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller holds the shared lock for the complete command",
+    "required": true
+  },
+  "cpu": 2,
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles2/perf-range-65536-1000us-104857600bps-minimum-service/tmp"
+  },
+  "helpers": {
+    "gate.py": {
+      "bytes": 3283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/gate.py",
+      "sha256": "f2c1ae53c001dbf9133d1c446d0aa73615557a9e17e5cfa27c40f128469e12a6"
+    },
+    "profile_providers.py": {
+      "bytes": 41243,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile_providers.py",
+      "sha256": "a41efca59c8e3cea136e4f56309b2ed4b3a65c61beb61a9c6f14ebd8e7d625f0"
+    },
+    "provider_matrix.py": {
+      "bytes": 73552,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/provider_matrix.py",
+      "sha256": "ea63571118a4e52ac8a49df982597b2d2c377c7ca0c28ac38ee77f0e98193ee4"
+    },
+    "retain_build.py": {
+      "bytes": 2568,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/retain_build.py",
+      "sha256": "99dbd7597a6fa13fa89c24298d017925e42add4f2fcd220ad2ea131bc62f4898"
+    },
+    "support.py": {
+      "bytes": 4800,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/support.py",
+      "sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a"
+    }
+  },
+  "label": "perf-range-65536-1000us-104857600bps-minimum-service",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "ceda2cd77fc770b3e98e652ffab259feac557e0196324b38ea306ae211b96866"
+  },
+  "operation_attribution_claim": false,
+  "performance_claim": "whole-child profiler counters and resource values are descriptive; they are not attributed to an individual operation and do not establish a speedup",
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "4ff915e37f6a0db13b9de7e8ab5aaa3cfe6bd65aa1eb3b4d283691347650329a"
+  },
+  "run": {
+    "arm": "range-65536-1000us-104857600bps-minimum-service",
+    "kind": "profile",
+    "label": "normal-range-65536-1000us-104857600bps-minimum-service",
+    "provider": "range",
+    "repeat": 1,
+    "role": "normal",
+    "samples": 30,
+    "warmups": 3
+  },
+  "samples": 30,
+  "schema": "docx-provider-whole-child-profile-v1",
+  "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+  "source": {
+    "files": 7158,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+    "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+  },
+  "source_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+  "started_utc": "2026-09-10T03:05:39.407300+00:00",
+  "status": "running",
+  "timeout_seconds": 1800,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles2/perf-range-65536-1000us-104857600bps-minimum-service/tmp",
+  "tool": "perf",
+  "tool_executable": {
+    "bytes": 25221960,
+    "executable": true,
+    "path": "/usr/bin/perf",
+    "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009"
+  },
+  "version": 1,
+  "warmups": 3
+}

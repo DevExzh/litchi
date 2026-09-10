@@ -1,0 +1,167 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+    "--case",
+    "docx_file_source_open_full_text_lifecycle",
+    "--filesystem-cache",
+    "warm",
+    "--filesystem-root",
+    "/home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-formal1/r2-allocator-warm/filesystem",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/corpus-manifest.json"
+  ],
+  "artifacts": {
+    "corpus-manifest.json": {
+      "bytes": 4861,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/corpus-manifest.json",
+      "sha256": "e99dfdc4c83962c52570e897536b0dd560c3020fb774e9c66a30dfb86ee1818e"
+    },
+    "report.json": {
+      "bytes": 193455,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/report.json",
+      "sha256": "b148eca2968f93d1216de4d138b377cbf8e246d7362028eb434c6478441a1684"
+    },
+    "resource.txt": {
+      "bytes": 1295,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/resource.txt",
+      "sha256": "8f3339cf3e4de35e96b2a8110544445d9c5eea09e69933fc008af669178a7f7c"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "cold-formal1",
+  "binary": {
+    "bytes": 473185528,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+    "sha256": "ad14475aeb5ea5cad9ccae1bdfe4ca321d80f8c1861c906ee146ddc2c7a22ddd"
+  },
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc"
+    ],
+    "environment": {
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+      "DEBUGINFOD_URLS": "",
+      "LC_ALL": "C",
+      "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    },
+    "gate": {
+      "bytes": 1807,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation/build-allocator-final5.json",
+      "sha256": "e7bd7f6266805bbdd0d7e14680eba50a76e0240cfe4027766c7f2206e6fe36e9"
+    },
+    "git_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/build-allocator.json",
+    "role": "allocator",
+    "sha256": "ae736c30dfcee8a828492c6606d96975e23af952ec238dad9b6b45782223d0a6",
+    "source_after": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    },
+    "source_before": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    },
+    "source_unchanged": true
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "b220b966ce68665c7e371e92fc1b1167445466aa8c5fed15278df4622aae8329",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T02:55:41.338471+00:00",
+  "machine": {
+    "bytes": 16172,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/machine.json",
+    "sha256": "ceda2cd77fc770b3e98e652ffab259feac557e0196324b38ea306ae211b96866"
+  },
+  "missing_artifacts": [],
+  "process_group": {
+    "start_new_session": true
+  },
+  "process_group_id": 3141013,
+  "process_id": 3141013,
+  "protocol": {
+    "bytes": 5498,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/cold-protocol.json",
+    "sha256": "978899a087b9dc5c54567250f851bb0524507c60968a6aedcbf12d451b905e10"
+  },
+  "replay_root": "/home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-formal1/r2-allocator-warm",
+  "run": {
+    "cache_state": "warm",
+    "case": "docx_file_source_open_full_text_lifecycle",
+    "kind": "formal",
+    "label": "r2-allocator-warm",
+    "repeat": 2,
+    "role": "allocator",
+    "samples": 30,
+    "warmups": 3
+  },
+  "schema": "docx-filesystem-cold-matrix-v1",
+  "source": {
+    "files": 7158,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+    "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+  },
+  "started_artifact": {
+    "bytes": 4755,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-formal1/r2-allocator-warm/started.json",
+    "sha256": "f5584edad7be292900f71167fd068ba2f337425d1276a8d2d1f152d69b61b0e9"
+  },
+  "started_utc": "2026-09-10T02:54:57.249526+00:00",
+  "status": "pass",
+  "support_sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "tool": {
+    "binary": "litchi-perf-baseline-alloc",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "version": 1
+}

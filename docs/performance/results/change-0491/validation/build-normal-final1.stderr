@@ -1,0 +1,15 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0599]: no method named `remaining` found for struct `ZipStr<'a>` in the current scope
+    --> src/filesystem.rs:4405:56
+     |
+4405 |     let eocd_comment_bytes = aligned_archive.comment().remaining();
+     |                                                        ^^^^^^^^^ method not found in `ZipStr<'_>`
+
+error[E0599]: no method named `remaining` found for struct `ZipStr<'a>` in the current scope
+    --> src/filesystem.rs:4406:63
+     |
+4406 |     let unaligned_comment_bytes = unaligned_archive.comment().remaining();
+     |                                                               ^^^^^^^^^ method not found in `ZipStr<'_>`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `litchi-perf-baseline` (lib) due to 2 previous errors

@@ -1,0 +1,18 @@
+// Diagnostic only: test whether the added local section namespace explains the old pin.
+use std::{error::Error, fs};
+use litchi_opc::{OpcPackage, PackURI};
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<_> = std::env::args_os().collect();
+    let bytes = fs::read(&args[1])?;
+    let mut package = OpcPackage::from_bytes(&bytes)?;
+    let part = package.get_part_mut(&PackURI::new("/word/document.xml")?)?;
+    let xml = std::str::from_utf8(part.blob())?;
+    let from = "<w:sectPr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">";
+    if xml.matches(from).count() != 1 { return Err("section shape differs".into()); }
+    let updated = xml.replace(from, "<w:sectPr>").into_bytes();
+    part.set_blob(updated);
+    let mut output = Vec::new();
+    package.to_stream(&mut output)?;
+    fs::write(&args[2], output)?;
+    Ok(())
+}

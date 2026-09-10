@@ -11,6 +11,7 @@ mod cold_verified;
 mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_plain_paragraph_tail_append;
+pub mod docx_provider_lifecycle;
 pub mod docx_replayable_tail_append;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
@@ -14593,7 +14594,40 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     }
     let mut output = Cursor::new(Vec::new());
     package.to_stream(&mut output)?;
-    Ok(output.into_inner())
+    restore_docx_source_edit_v1(output.into_inner())
+}
+
+/// Keep the historical synthetic corpus independent of the producer's new
+/// standalone section namespace spelling. This is fixture construction only:
+/// ordinary document saves retain the producer's namespace declaration.
+fn restore_docx_source_edit_v1(bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
+    const ORIGINAL: &str = "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4";
+    const SECTION_NAMESPACE: &str =
+        "cc3f3f836b0f1568caf24c35a011563eafda546021eba86a833e91b84560491d";
+    match sha256_hex(&bytes).as_str() {
+        ORIGINAL => return Ok(bytes),
+        SECTION_NAMESPACE => {},
+        _ => {
+            return Err(
+                "DOCX v1 fixture producer changed beyond the admitted section namespace".into(),
+            );
+        },
+    }
+    let mut package = OpcPackage::from_bytes(&bytes)?;
+    let part = package.get_part_mut(&PackURI::new("/word/document.xml")?)?;
+    let xml = std::str::from_utf8(part.blob())?;
+    const LOCAL: &str =
+        "<w:sectPr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">";
+    if xml.matches(LOCAL).count() != 1 {
+        return Err("DOCX v1 fixture section namespace shape changed".into());
+    }
+    part.set_blob(xml.replace(LOCAL, "<w:sectPr>").into_bytes());
+    let mut restored = Vec::new();
+    package.to_stream(&mut restored)?;
+    if sha256_hex(&restored) != ORIGINAL {
+        return Err("DOCX v1 fixture restoration changed historical archive bytes".into());
+    }
+    Ok(restored)
 }
 
 fn docx_section_layout_media_payload(index: usize) -> Vec<u8> {
@@ -61581,11 +61615,23 @@ mod tests {
         let corpus = build_docx_source_edit_corpus().unwrap();
         let again = build_docx_source_edit_corpus().unwrap();
         assert_eq!(corpus.archive, again.archive);
-        // Includes the section XML emitted by the writer hardened in a260174e4.
+        // The v1 fixture remains byte-identical across the namespace-aware
+        // section writer change; ordinary producer output is not normalized.
         assert_eq!(
             corpus.manifest.archive_sha256,
-            "cc3f3f836b0f1568caf24c35a011563eafda546021eba86a833e91b84560491d"
+            "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
         );
+        assert_eq!(corpus.manifest.archive_bytes, 16_793_036);
+        assert_eq!(corpus.manifest.uncompressed_payload_bytes, 16_833_643);
+        assert_eq!(corpus.manifest.archive_member_count, 20);
+        assert_eq!(
+            super::restore_docx_source_edit_v1(corpus.archive.clone()).unwrap(),
+            corpus.archive
+        );
+        let mut changed = corpus.archive.clone();
+        let last = changed.len() - 1;
+        changed[last] ^= 1;
+        assert!(super::restore_docx_source_edit_v1(changed).is_err());
         let measured = run_docx_source_backed_one_edit_save(&corpus, 0, 1).unwrap();
         assert_eq!(measured.case, "docx_source_backed_one_edit_save");
         assert_eq!(measured.elapsed_ns.samples.len(), 1);

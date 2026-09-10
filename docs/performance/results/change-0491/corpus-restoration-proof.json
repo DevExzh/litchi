@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "producer_change": "a260174e4",
+  "current_archive": {
+    "bytes": 16793038,
+    "sha256": "cc3f3f836b0f1568caf24c35a011563eafda546021eba86a833e91b84560491d"
+  },
+  "restored_archive": {
+    "bytes": 16793036,
+    "sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+  },
+  "member_order_identical": true,
+  "member_count": 20,
+  "all_member_crcs_verified": true,
+  "changed_members": [
+    {
+      "member": "word/document.xml",
+      "current_bytes": 29098,
+      "legacy_bytes": 29027,
+      "current_sha256": "578fa03acc0baec54319ca5150d360489f39758813b5c9dc3a4157de26cddcb9",
+      "legacy_sha256": "24dbc247cac87f0827d9ed5a88d370f5032c0777ad18f3a9c9cecf2b7179fad0"
+    }
+  ],
+  "scope": "fixture-only compatibility spelling; current production serializer retained"
+}

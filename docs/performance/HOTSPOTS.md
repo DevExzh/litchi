@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## 0491: DOCX source-provider and cache-state baseline
+
+[0491](changes/0491-docx-provider-and-cold-baseline.md) adds a formal source-backed
+full-text baseline: 600 provider samples and 360 fresh-child filesystem samples,
+with four explicit prepared-query cold-ineligible controls. Normal provider
+medians are about 0.27–0.29 ms; the simulated 1 ms-per-request arm is about
+20.3 ms with 19 paced calls. Its first repeat has wider tails, retained in the
+[individual review](results/change-0491/results-review.md). These are baseline
+observations, not before/after improvements.
+
+The actual timed text is now authenticated after its explicit versioned clock.
+Verified-cold alignment retains raw EOCD-tail compressed-payload overlaps and
+proves zero cache loads at open, followed by one main-part materialization.
+Heap peak increments, absolute process memory, source counters and whole-child
+profiles remain separate. No production optimization is included.
+
+Bounded range coalescing is now a measured opportunity; evaluate it against
+these request counts while preserving source identity, resource bounds and
+lossless package semantics. Genuine borrowed lifetimes, concurrency/scaling,
+native producers, publication and broader CRUD intersections remain open.
+
+
 ## 0490: file-store synchronization dominates the tiny route
 
 [The controlled follow-up](changes/0490-file-store-variance-and-sync-attribution.md)

@@ -1,0 +1,5 @@
+{"ranges":[["[Content_Types].xml",49,412],["_rels/.rels",469,703],["docProps/app.xml",765,1129],["docProps/core.xml",1192,1404],["word/document.xml",1467,2891],["word/_rels/document.xml.rels",2965,3289],["word/fontTable.xml",3353,3960],["word/media/image1.png",4027,2101824],["word/media/image2.png",2101891,4199688],["word/media/image3.png",4199755,6297552],["word/media/image4.png",6297619,8395416],["word/media/image5.png",8395483,10493280],["word/media/image6.png",10493347,12591144],["word/media/image7.png",12591211,14689008],["word/media/image8.png",14689075,16786872],["word/numbering.xml",16786936,16787928],["word/settings.xml",16787991,16788957],["word/styles.xml",16789018,16789812],["word/theme/theme1.xml",16789879,16791464],["word/webSettings.xml",16791530,16791693]],
+"open":[[16793014,22],[16791709,46],[16791709,1305],[0,30],[49,363],[412,16],[412,0],[412,16],[428,30],[469,234],[703,16],[703,0],[703,16],[2907,30],[2965,324],[3289,16],[3289,0],[3289,16]],
+"prepare":[[1420,30],[1467,1424],[2891,16],[2891,0],[2891,16]],
+"query":[],
+"text_bytes":10000,"paragraphs":200}

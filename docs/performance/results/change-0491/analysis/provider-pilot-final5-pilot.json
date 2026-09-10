@@ -1,0 +1,2091 @@
+{
+  "arms": [
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "bytes",
+      "provider": "bytes",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "file",
+      "provider": "file",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": 0,
+      "max_range_bytes": 64,
+      "name": "range-64-0us",
+      "provider": "range",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": 1000,
+      "max_range_bytes": 65536,
+      "name": "range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service"
+    }
+  ],
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 473185528,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+        "sha256": "ad14475aeb5ea5cad9ccae1bdfe4ca321d80f8c1861c906ee146ddc2c7a22ddd"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--features",
+          "allocator-metrics",
+          "--bin",
+          "litchi-perf-baseline-alloc"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation/build-allocator-final5.json",
+        "sha256": "e7bd7f6266805bbdd0d7e14680eba50a76e0240cfe4027766c7f2206e6fe36e9",
+        "source": {
+          "files": 7158,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+          "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+        }
+      },
+      "receipt_sha256": "ae736c30dfcee8a828492c6606d96975e23af952ec238dad9b6b45782223d0a6",
+      "source": {
+        "files": 7158,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+        "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 473498888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+        "sha256": "ed763be62c5577f2d4652bea361ad015b9affb2080e98b78e95a367703c9c78d"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation/build-normal-final5.json",
+        "sha256": "4dca9fe6311a4cb6c0cdae87852e51f06047cdef9bc58a1df999b0948a8a351d",
+        "source": {
+          "files": 7158,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+          "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+        }
+      },
+      "receipt_sha256": "afe16b7870e1b5b5c3c6d31fa95818081277b69f6482dc2554c73454532e8b51",
+      "source": {
+        "files": 7158,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+        "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+      }
+    }
+  },
+  "case": "docx_provider_open_full_text_lifecycle",
+  "change": 491,
+  "claim_authorized": false,
+  "corpus": {
+    "archive_bytes": 16793036,
+    "archive_member_count": 20,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "expected_text_bytes": 10000,
+    "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "media_member_bytes": 2097152,
+    "media_member_count": 8,
+    "paragraph_count": 200,
+    "shape": "200 paragraphs + eight 2 MiB PNG-signature media members",
+    "version": "0188-media-v1"
+  },
+  "inventory": {
+    "expected_formal_processes": 5,
+    "expected_measured_samples": 30,
+    "formal_processes": 10,
+    "measured_samples": 30
+  },
+  "performance_claim": "descriptive provider evidence; no cross-arm optimization claim",
+  "pilot": true,
+  "repeat_variance": [],
+  "repeats": [
+    1
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "rows": [
+    {
+      "arm": "bytes",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-bytes",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": {
+          "max": 297261,
+          "mean": 291324.3333333333,
+          "min": 287761,
+          "n": 3,
+          "p50": 288951,
+          "p95": 297261,
+          "p99": 297261
+        },
+        "logical_read_calls": null,
+        "logical_read_requested_bytes": null,
+        "logical_read_returned_bytes": null,
+        "logical_read_short_reads": null,
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94280,
+          "mean": 94280.0,
+          "min": 94280,
+          "n": 1,
+          "p50": 94280,
+          "p95": 94280,
+          "p99": 94280
+        }
+      },
+      "provider": "bytes",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": [
+          297261,
+          287761,
+          288951
+        ],
+        "logical_read_calls": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_requested_bytes": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_returned_bytes": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_short_reads": [
+          null,
+          null,
+          null
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94280
+      },
+      "repeat": 1,
+      "report_sha256": "bf87dbdabd6e5d00e22e01f423853bd2b9408b78b2ebb2fecad4b2c66641fd5a",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider bytes --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-normal-bytes/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 16,
+        "file_system_outputs": 16,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 1,
+        "maximum_resident_set_size_(kbytes)": 94280,
+        "minor_(reclaiming_a_frame)_page_faults": 29476,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "98%",
+        "raw_bytes": 1068,
+        "raw_sha256": "313417947d2226ff12297b6082ff2858023876d355f834497db45e14f055b309",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.54,
+        "voluntary_context_switches": 4
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "e7057533fa399e29d72c344848722b9117765eebac6fb51fe1643d97384ff6bc",
+      "warmups": 1
+    },
+    {
+      "arm": "file",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-file",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": {
+          "max": 321431,
+          "mean": 302874.6666666667,
+          "min": 291491,
+          "n": 3,
+          "p50": 295702,
+          "p95": 321431,
+          "p99": 321431
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94772,
+          "mean": 94772.0,
+          "min": 94772,
+          "n": 1,
+          "p50": 94772,
+          "p95": 94772,
+          "p99": 94772
+        }
+      },
+      "provider": "file",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": [
+          321431,
+          295702,
+          291491
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94772
+      },
+      "repeat": 1,
+      "report_sha256": "7bbfdaaa873652f27afb789f5c58d49605fb25102783458a8f66790b73442138",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider file --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-normal-file/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.58",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32824,
+        "involuntary_context_switches": 3,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94772,
+        "minor_(reclaiming_a_frame)_page_faults": 29480,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "96%",
+        "raw_bytes": 1069,
+        "raw_sha256": "a2092ada72a03d60c63e9d93757d97852ba4bd1bfe475dde74d2a267f98d7d8b",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.03,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 14
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "957b2836af49a0f90ac6654adca36c78a83244190afaa91651bea0a106b6c826",
+      "warmups": 1
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-instrumented-bytes",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": {
+          "max": 295341,
+          "mean": 290157.6666666667,
+          "min": 286491,
+          "n": 3,
+          "p50": 288641,
+          "p95": 295341,
+          "p99": 295341
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94600,
+          "mean": 94600.0,
+          "min": 94600,
+          "n": 1,
+          "p50": 94600,
+          "p95": 94600,
+          "p99": 94600
+        }
+      },
+      "provider": "instrumented-bytes",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": [
+          295341,
+          286491,
+          288641
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94600
+      },
+      "repeat": 1,
+      "report_sha256": "2ea8a822d70ac4684d9585c723123e8da1652f285c63e33c518aff040026d2e3",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider instrumented-bytes --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-normal-instrumented-bytes/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 24,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94600,
+        "minor_(reclaiming_a_frame)_page_faults": 29477,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "98%",
+        "raw_bytes": 1093,
+        "raw_sha256": "0b0bd7c03af7434de568507d3c75f40a27278ccdd2b4602296e313f5bb5bbc05",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 3
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "a305d989efdb9a094119de660438c9d65121074c1606ff172d16b09b3bb6b438",
+      "warmups": 1
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-range-64-0us",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": {
+          "max": 307881,
+          "mean": 301918.0,
+          "min": 293031,
+          "n": 3,
+          "p50": 304842,
+          "p95": 307881,
+          "p99": 307881
+        },
+        "logical_read_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "range_logical_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "range_transfer_delay_ns": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_transfer_paced_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 93508,
+          "mean": 93508.0,
+          "min": 93508,
+          "n": 1,
+          "p50": 93508,
+          "p95": 93508,
+          "p99": 93508
+        }
+      },
+      "provider": "range",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": [
+          307881,
+          304842,
+          293031
+        ],
+        "logical_read_calls": [
+          74,
+          74,
+          74
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": [
+          74,
+          74,
+          74
+        ],
+        "range_logical_calls": [
+          74,
+          74,
+          74
+        ],
+        "range_transfer_delay_ns": [
+          0,
+          0,
+          0
+        ],
+        "range_transfer_paced_calls": [
+          0,
+          0,
+          0
+        ],
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 93508
+      },
+      "repeat": 1,
+      "report_sha256": "843ad12d10486ea5c97fde12363c4312f1ce5f88bba3881df067f447e4124ebb",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider range --max-range 64 --delay-us 0 --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-normal-range-64-0us/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 24,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 93508,
+        "minor_(reclaiming_a_frame)_page_faults": 29509,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "98%",
+        "raw_bytes": 1102,
+        "raw_sha256": "0080dca67709d2eb2d6f411c507579a41321e81a3b6f7547d1cf5506685088d9",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.01,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 3
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "988fe92fcb8f4c61da976d22ba3d2a2bd373eaf0e01927a7f11e37c3c0d929f8",
+      "warmups": 1
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-range-65536-1000us-104857600bps-minimum-service",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": {
+          "max": 20828417,
+          "mean": 20510631.666666668,
+          "min": 20329554,
+          "n": 3,
+          "p50": 20373924,
+          "p95": 20828417,
+          "p99": 20828417
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "range_logical_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "range_transfer_delay_ns": {
+          "max": 37832,
+          "mean": 37832.0,
+          "min": 37832,
+          "n": 3,
+          "p50": 37832,
+          "p95": 37832,
+          "p99": 37832
+        },
+        "range_transfer_paced_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94512,
+          "mean": 94512.0,
+          "min": 94512,
+          "n": 1,
+          "p50": 94512,
+          "p95": 94512,
+          "p99": 94512
+        }
+      },
+      "provider": "range",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": null,
+        "latency_ns": [
+          20373924,
+          20329554,
+          20828417
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": [
+          19,
+          19,
+          19
+        ],
+        "range_logical_calls": [
+          19,
+          19,
+          19
+        ],
+        "range_transfer_delay_ns": [
+          37832,
+          37832,
+          37832
+        ],
+        "range_transfer_paced_calls": [
+          19,
+          19,
+          19
+        ],
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94512
+      },
+      "repeat": 1,
+      "report_sha256": "83ff1bb25f70b9f564cefedd416318b129221350d7ce33061821e44417a6dc47",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider range --max-range 65536 --delay-us 1000 --transfer-bytes-per-second 104857600 --transfer-delay-policy minimum-service --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-normal-range-65536-1000us-104857600bps-minimum-service/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.64",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 24,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94512,
+        "minor_(reclaiming_a_frame)_page_faults": 29480,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "86%",
+        "raw_bytes": 1222,
+        "raw_sha256": "72ecacc241031c0c17ee9c3c646bc2cf79446c7b9f941311dd191f6efee684d8",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 79
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "cfc578eeda8b5a355acee4363eaa93493221a9c42b9c0d9cd09f3a8f46a0e908",
+      "warmups": 1
+    },
+    {
+      "arm": "bytes",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-bytes",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": {
+          "max": 18994560,
+          "mean": 18994496.0,
+          "min": 18994432,
+          "n": 3,
+          "p50": 18994496,
+          "p95": 18994560,
+          "p99": 18994560
+        },
+        "latency_ns": {
+          "max": 306231,
+          "mean": 302028.0,
+          "min": 293922,
+          "n": 3,
+          "p50": 305931,
+          "p95": 306231,
+          "p99": 306231
+        },
+        "logical_read_calls": null,
+        "logical_read_requested_bytes": null,
+        "logical_read_returned_bytes": null,
+        "logical_read_short_reads": null,
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94612,
+          "mean": 94612.0,
+          "min": 94612,
+          "n": 1,
+          "p50": 94612,
+          "p95": 94612,
+          "p99": 94612
+        }
+      },
+      "provider": "bytes",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": [
+          18994432,
+          18994496,
+          18994560
+        ],
+        "latency_ns": [
+          305931,
+          306231,
+          293922
+        ],
+        "logical_read_calls": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_requested_bytes": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_returned_bytes": [
+          null,
+          null,
+          null
+        ],
+        "logical_read_short_reads": [
+          null,
+          null,
+          null
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94612
+      },
+      "repeat": 1,
+      "report_sha256": "4f908d66bdc29bf7aef351700b6c28f3c2a69a83538ca441c12a433a355c4498",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc docx-provider-lifecycle --provider bytes --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-allocator-bytes/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 24,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94612,
+        "minor_(reclaiming_a_frame)_page_faults": 29473,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1079,
+        "raw_sha256": "6be225871ca31d76f831a374d69997df99443e342cf5ffc95bfef2448ac1d26a",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.52,
+        "voluntary_context_switches": 3
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "19754cc882f20d085ac36067f80c986ab86168ff7c39e9a5e7a1163ce9debd0a",
+      "warmups": 1
+    },
+    {
+      "arm": "file",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-file",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": {
+          "max": 18995451,
+          "mean": 18995387.0,
+          "min": 18995323,
+          "n": 3,
+          "p50": 18995387,
+          "p95": 18995451,
+          "p99": 18995451
+        },
+        "latency_ns": {
+          "max": 331101,
+          "mean": 313364.3333333333,
+          "min": 300491,
+          "n": 3,
+          "p50": 308501,
+          "p95": 331101,
+          "p99": 331101
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94764,
+          "mean": 94764.0,
+          "min": 94764,
+          "n": 1,
+          "p50": 94764,
+          "p95": 94764,
+          "p99": 94764
+        }
+      },
+      "provider": "file",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": [
+          18995323,
+          18995387,
+          18995451
+        ],
+        "latency_ns": [
+          331101,
+          308501,
+          300491
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94764
+      },
+      "repeat": 1,
+      "report_sha256": "f976032563edc54164b001c945df9b8d75e8faea7168f6526e5819920e6b91b0",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc docx-provider-lifecycle --provider file --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-allocator-file/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.57",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32824,
+        "involuntary_context_switches": 2,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94764,
+        "minor_(reclaiming_a_frame)_page_faults": 29473,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "96%",
+        "raw_bytes": 1081,
+        "raw_sha256": "076380cd99a9b1851a5578bbbb0e7659e510af4bb2585e62e1c4a8cc106266d5",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.03,
+        "user_time_(seconds)": 0.52,
+        "voluntary_context_switches": 14
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "ba0ff2110d684c42779ff367daee1f9473f06810fc6178dd19e6dc80cacfef09",
+      "warmups": 1
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-instrumented-bytes",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": {
+          "max": 18994983,
+          "mean": 18994919.0,
+          "min": 18994855,
+          "n": 3,
+          "p50": 18994919,
+          "p95": 18994983,
+          "p99": 18994983
+        },
+        "latency_ns": {
+          "max": 318461,
+          "mean": 304428.0,
+          "min": 296441,
+          "n": 3,
+          "p50": 298382,
+          "p95": 318461,
+          "p99": 318461
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94460,
+          "mean": 94460.0,
+          "min": 94460,
+          "n": 1,
+          "p50": 94460,
+          "p95": 94460,
+          "p99": 94460
+        }
+      },
+      "provider": "instrumented-bytes",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": [
+          18994855,
+          18994919,
+          18994983
+        ],
+        "latency_ns": [
+          318461,
+          298382,
+          296441
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": null,
+        "range_logical_calls": null,
+        "range_transfer_delay_ns": null,
+        "range_transfer_paced_calls": null,
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94460
+      },
+      "repeat": 1,
+      "report_sha256": "1b6f828a3f7e67e6d88a094b80e839ba2851c4e463ec7c7e210141e7dedf862c",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc docx-provider-lifecycle --provider instrumented-bytes --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-allocator-instrumented-bytes/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 24,
+        "involuntary_context_switches": 1,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94460,
+        "minor_(reclaiming_a_frame)_page_faults": 29474,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1105,
+        "raw_sha256": "473743580cf2c722ffc15226da0d926e6ba68a574fe1d235f32647ca0c0d9a09",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 3
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "3144cda79e613c3c5b95373557ee0e8655bc414a603d3db60a1cce126f33cc66",
+      "warmups": 1
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-range-64-0us",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": {
+          "max": 18996054,
+          "mean": 18995990.0,
+          "min": 18995926,
+          "n": 3,
+          "p50": 18995990,
+          "p95": 18996054,
+          "p99": 18996054
+        },
+        "latency_ns": {
+          "max": 318620,
+          "mean": 313714.0,
+          "min": 305671,
+          "n": 3,
+          "p50": 316851,
+          "p95": 318620,
+          "p99": 318620
+        },
+        "logical_read_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "range_logical_calls": {
+          "max": 74,
+          "mean": 74.0,
+          "min": 74,
+          "n": 3,
+          "p50": 74,
+          "p95": 74,
+          "p99": 74
+        },
+        "range_transfer_delay_ns": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_transfer_paced_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94572,
+          "mean": 94572.0,
+          "min": 94572,
+          "n": 1,
+          "p50": 94572,
+          "p95": 94572,
+          "p99": 94572
+        }
+      },
+      "provider": "range",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": [
+          18995926,
+          18995990,
+          18996054
+        ],
+        "latency_ns": [
+          318620,
+          316851,
+          305671
+        ],
+        "logical_read_calls": [
+          74,
+          74,
+          74
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": [
+          74,
+          74,
+          74
+        ],
+        "range_logical_calls": [
+          74,
+          74,
+          74
+        ],
+        "range_transfer_delay_ns": [
+          0,
+          0,
+          0
+        ],
+        "range_transfer_paced_calls": [
+          0,
+          0,
+          0
+        ],
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94572
+      },
+      "repeat": 1,
+      "report_sha256": "a6e1e56ca0c304e24d6ba2c5a9526ec0a71fc016930d4031f917b034959147ad",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc docx-provider-lifecycle --provider range --max-range 64 --delay-us 0 --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-allocator-range-64-0us/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.56",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32,
+        "involuntary_context_switches": 1,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94572,
+        "minor_(reclaiming_a_frame)_page_faults": 29473,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1114,
+        "raw_sha256": "db260e8186baa8da223c327a3c79854605460013f59e9f02329546e70929652d",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.52,
+        "voluntary_context_switches": 3
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "305f49ba40f2728ac635056be14b60c7d55a80a57461ab952c2291c0cbee72ec",
+      "warmups": 1
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-range-65536-1000us-104857600bps-minimum-service",
+      "percentiles": {
+        "actual_text_bytes": {
+          "max": 10000,
+          "mean": 10000.0,
+          "min": 10000,
+          "n": 3,
+          "p50": 10000,
+          "p95": 10000,
+          "p99": 10000
+        },
+        "allocation_region_peak_live_bytes": {
+          "max": 18995628,
+          "mean": 18995564.0,
+          "min": 18995500,
+          "n": 3,
+          "p50": 18995564,
+          "p95": 18995628,
+          "p99": 18995628
+        },
+        "latency_ns": {
+          "max": 20381484,
+          "mean": 20360154.666666668,
+          "min": 20347785,
+          "n": 3,
+          "p50": 20351195,
+          "p95": 20381484,
+          "p99": 20381484
+        },
+        "logical_read_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "logical_read_requested_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_returned_bytes": {
+          "max": 3966,
+          "mean": 3966.0,
+          "min": 3966,
+          "n": 3,
+          "p50": 3966,
+          "p95": 3966,
+          "p99": 3966
+        },
+        "logical_read_short_reads": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "range_delayed_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "range_logical_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "range_transfer_delay_ns": {
+          "max": 37832,
+          "mean": 37832.0,
+          "min": 37832,
+          "n": 3,
+          "p50": 37832,
+          "p95": 37832,
+          "p99": 37832
+        },
+        "range_transfer_paced_calls": {
+          "max": 19,
+          "mean": 19.0,
+          "min": 19,
+          "n": 3,
+          "p50": 19,
+          "p95": 19,
+          "p99": 19
+        },
+        "source_version_id": {
+          "max": 4,
+          "mean": 3.0,
+          "min": 2,
+          "n": 3,
+          "p50": 3,
+          "p95": 4,
+          "p99": 4
+        },
+        "source_version_revision": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "whole_child_rss_kbytes": {
+          "max": 94516,
+          "mean": 94516.0,
+          "min": 94516,
+          "n": 1,
+          "p50": 94516,
+          "p95": 94516,
+          "p99": 94516
+        }
+      },
+      "provider": "range",
+      "raw_vectors": {
+        "actual_text_bytes": [
+          10000,
+          10000,
+          10000
+        ],
+        "allocation_region_peak_live_bytes": [
+          18995500,
+          18995564,
+          18995628
+        ],
+        "latency_ns": [
+          20381484,
+          20351195,
+          20347785
+        ],
+        "logical_read_calls": [
+          19,
+          19,
+          19
+        ],
+        "logical_read_requested_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_returned_bytes": [
+          3966,
+          3966,
+          3966
+        ],
+        "logical_read_short_reads": [
+          0,
+          0,
+          0
+        ],
+        "range_delayed_calls": [
+          19,
+          19,
+          19
+        ],
+        "range_logical_calls": [
+          19,
+          19,
+          19
+        ],
+        "range_transfer_delay_ns": [
+          37832,
+          37832,
+          37832
+        ],
+        "range_transfer_paced_calls": [
+          19,
+          19,
+          19
+        ],
+        "source_version_id": [
+          2,
+          3,
+          4
+        ],
+        "source_version_revision": [
+          0,
+          0,
+          0
+        ],
+        "whole_child_rss_kbytes": 94516
+      },
+      "repeat": 1,
+      "report_sha256": "1dfbb7dca3c4ec55c6060c834d8391256a747ebdb4d245012ddc55e52e0a192c",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc docx-provider-lifecycle --provider range --max-range 65536 --delay-us 1000 --transfer-bytes-per-second 104857600 --transfer-delay-policy minimum-service --samples 3 --warmup 1 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final5/pilot-r1-allocator-range-65536-1000us-104857600bps-minimum-service/report.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.64",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32,
+        "involuntary_context_switches": 1,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 94516,
+        "minor_(reclaiming_a_frame)_page_faults": 29470,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "86%",
+        "raw_bytes": 1234,
+        "raw_sha256": "bfef370f4bef5d1972d6a2a69f946a56e9352a2b3a48cd5e889ab6c4545e9999",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.02,
+        "user_time_(seconds)": 0.53,
+        "voluntary_context_switches": 80
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "f525c6c845a2b64a1434dc5f7de6843c22d8f4f732a14c2dcbff7ff3371a11b0",
+      "warmups": 1
+    }
+  ],
+  "samples": 3,
+  "schema": "docx-provider-matrix-analysis-v1",
+  "scope": "same-role/provider repeat variance and raw provider lifecycle evidence",
+  "version": 1,
+  "warmups": 1
+}

@@ -1,0 +1,8 @@
+{
+  "bytes": 27208,
+  "filesystem_magic": 61267,
+  "filesystem_magic_basis": "ext4 from retained machine findmnt observations; EXT4_SUPER_MAGIC 0xef53",
+  "path": "/usr/bin/fincore",
+  "sha256": "5586d15dedd490ce676adb19f2848ce77ecd46ffa5ac74d768396bcac17e021f",
+  "version": "fincore from util-linux 2.41.3"
+}

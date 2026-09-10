@@ -1,0 +1,46 @@
+{
+  "binary": {
+    "bytes": 473690560,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/integrated1/normal/litchi-perf-baseline",
+    "sha256": "b2e6e5e6b3cfce2f7a1ae88c8bb052c4b9ca7209cb31c1b59f1339f3f53b7b29"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "gate": {
+    "bytes": 1764,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation/build-normal-integrated1.json",
+    "sha256": "3fc02f3f96cb2959f38c55bd01ce49e5ce0010dbc7757cfe6d94095a13fbc7ab"
+  },
+  "role": "normal",
+  "scope": "integrated pilot before final lint and tests",
+  "source_after": {
+    "files": 7158,
+    "path": "validation-sources/4baa6f490ba5acfc22e8922adf17ee2e29c084a7013752e6b1f54b4c1b8c7f6f.json",
+    "sha256": "4baa6f490ba5acfc22e8922adf17ee2e29c084a7013752e6b1f54b4c1b8c7f6f"
+  },
+  "source_before": {
+    "files": 7158,
+    "path": "validation-sources/4baa6f490ba5acfc22e8922adf17ee2e29c084a7013752e6b1f54b4c1b8c7f6f.json",
+    "sha256": "4baa6f490ba5acfc22e8922adf17ee2e29c084a7013752e6b1f54b4c1b8c7f6f"
+  },
+  "source_unchanged": true
+}

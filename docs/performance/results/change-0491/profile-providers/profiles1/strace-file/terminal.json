@@ -1,0 +1,317 @@
+{
+  "argv": [
+    "/usr/bin/strace",
+    "-f",
+    "-c",
+    "-e",
+    "trace=read,pread64,statx,write,fsync,fdatasync",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/strace.txt",
+    "--",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+    "docx-provider-lifecycle",
+    "--provider",
+    "file",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "59b509a7f9508778b20b428d733fc107ec22f142",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/report.json"
+  ],
+  "arm": {
+    "delay_us": null,
+    "max_range_bytes": null,
+    "name": "file",
+    "provider": "file",
+    "transfer_bytes_per_second": null,
+    "transfer_delay_policy": "separate-sleeps"
+  },
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 475,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/replay-cleanup.json",
+      "sha256": "fd3982ad36a3ab846fa8aceabad50b1d4807df7359831bfd1b001603ed15a46b"
+    },
+    "report.json": {
+      "bytes": 55615,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/report.json",
+      "sha256": "2cd42f7784b7234d0ff21c888b7b8c2c5bbbe874c8d9596780543da2752b0716"
+    },
+    "resource.txt": {
+      "bytes": 1061,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/resource.txt",
+      "sha256": "e539f7f032bc7a5b76996bce4a6348ee19c577a86372401989191fe110b31e89"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "strace.txt": {
+      "bytes": 538,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/strace.txt",
+      "sha256": "1a8089078260a217b353d8475619f2edd8b86b0ac23cc6b42ff5c09ce7b5812d"
+    }
+  },
+  "attempt": "profiles1",
+  "binary": {
+    "bytes": 473498888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+    "sha256": "ed763be62c5577f2d4652bea361ad015b9affb2080e98b78e95a367703c9c78d"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/build-normal.json",
+    "sha256": "afe16b7870e1b5b5c3c6d31fa95818081277b69f6482dc2554c73454532e8b51",
+    "source": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    }
+  },
+  "caller_gate": {
+    "driver": "gate.py",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller holds the shared lock for the complete command",
+    "required": true
+  },
+  "cleanup": {
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file/tmp",
+      "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file"
+    ],
+    "run_root": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file",
+    "schema": "docx-provider-profile-private-cleanup-v1",
+    "status": "pass",
+    "tmpdir": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file/tmp"
+  },
+  "cpu": 2,
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file/tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T03:03:39.431655+00:00",
+  "helpers": {
+    "gate.py": {
+      "bytes": 3283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/gate.py",
+      "sha256": "f2c1ae53c001dbf9133d1c446d0aa73615557a9e17e5cfa27c40f128469e12a6"
+    },
+    "profile_providers.py": {
+      "bytes": 41214,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile_providers.py",
+      "sha256": "63a8492704175998ee3d8dc7c477c47ddd4950b712b97c7579a8646fabfb3f44"
+    },
+    "provider_matrix.py": {
+      "bytes": 73552,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/provider_matrix.py",
+      "sha256": "ea63571118a4e52ac8a49df982597b2d2c377c7ca0c28ac38ee77f0e98193ee4"
+    },
+    "retain_build.py": {
+      "bytes": 2568,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/retain_build.py",
+      "sha256": "99dbd7597a6fa13fa89c24298d017925e42add4f2fcd220ad2ea131bc62f4898"
+    },
+    "support.py": {
+      "bytes": 4800,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/support.py",
+      "sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a"
+    }
+  },
+  "label": "strace-file",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "ceda2cd77fc770b3e98e652ffab259feac557e0196324b38ea306ae211b96866"
+  },
+  "missing_artifacts": [],
+  "operation_attribution_claim": false,
+  "performance_claim": "whole-child profiler counters and resource values are descriptive; they are not attributed to an individual operation and do not establish a speedup",
+  "profiler": {
+    "raw_bytes": 538,
+    "raw_sha256": "1a8089078260a217b353d8475619f2edd8b86b0ac23cc6b42ff5c09ce7b5812d",
+    "schema": "docx-provider-profile-strace-v1",
+    "selected": [
+      "read",
+      "pread64",
+      "statx",
+      "write",
+      "fsync",
+      "fdatasync"
+    ],
+    "syscalls": {
+      "fdatasync": {
+        "calls": 0,
+        "errors": 0,
+        "status": "missing"
+      },
+      "fsync": {
+        "calls": 2,
+        "errors": 0,
+        "status": "observed"
+      },
+      "pread64": {
+        "calls": 633,
+        "errors": 0,
+        "status": "observed"
+      },
+      "read": {
+        "calls": 9,
+        "errors": 0,
+        "status": "observed"
+      },
+      "statx": {
+        "calls": 627,
+        "errors": 0,
+        "status": "observed"
+      },
+      "write": {
+        "calls": 17572,
+        "errors": 0,
+        "status": "observed"
+      }
+    }
+  },
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "4ff915e37f6a0db13b9de7e8ab5aaa3cfe6bd65aa1eb3b4d283691347650329a"
+  },
+  "report_summary": {
+    "latency_ns": {
+      "max": 553042,
+      "mean": 509666.93333333335,
+      "min": 482253,
+      "n": 30,
+      "p50": 507852.0,
+      "p95": 532352,
+      "p99": 553042
+    },
+    "logical_read_calls": {
+      "max": 19,
+      "mean": 19.0,
+      "min": 19,
+      "n": 30,
+      "p50": 19.0,
+      "p95": 19,
+      "p99": 19
+    },
+    "logical_read_requested_bytes": {
+      "max": 3966,
+      "mean": 3966.0,
+      "min": 3966,
+      "n": 30,
+      "p50": 3966.0,
+      "p95": 3966,
+      "p99": 3966
+    },
+    "logical_read_returned_bytes": {
+      "max": 3966,
+      "mean": 3966.0,
+      "min": 3966,
+      "n": 30,
+      "p50": 3966.0,
+      "p95": 3966,
+      "p99": 3966
+    },
+    "logical_read_short_reads": {
+      "max": 0,
+      "mean": 0.0,
+      "min": 0,
+      "n": 30,
+      "p50": 0.0,
+      "p95": 0,
+      "p99": 0
+    },
+    "samples": 30
+  },
+  "resource": {
+    "average_resident_set_size_(kbytes)": 0,
+    "average_shared_text_size_(kbytes)": 0,
+    "average_stack_size_(kbytes)": 0,
+    "average_total_size_(kbytes)": 0,
+    "average_unshared_data_size_(kbytes)": 0,
+    "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline docx-provider-lifecycle --provider file --samples 30 --warmup 3 --source-revision 59b509a7f9508778b20b428d733fc107ec22f142 --output /home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/report.json\"",
+    "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:00.70",
+    "exit_status": 0,
+    "file_system_inputs": 0,
+    "file_system_outputs": 32912,
+    "involuntary_context_switches": 2,
+    "major_(requiring_i/o)_page_faults": 0,
+    "maximum_resident_set_size_(kbytes)": 93948,
+    "minor_(reclaiming_a_frame)_page_faults": 29488,
+    "page_size_(bytes)": 4096,
+    "percent_of_cpu_this_job_got": "86%",
+    "raw_bytes": 1061,
+    "raw_sha256": "e539f7f032bc7a5b76996bce4a6348ee19c577a86372401989191fe110b31e89",
+    "signals_delivered": 0,
+    "socket_messages_received": 0,
+    "socket_messages_sent": 0,
+    "swaps": 0,
+    "system_time_(seconds)": 0.05,
+    "user_time_(seconds)": 0.56,
+    "voluntary_context_switches": 38367
+  },
+  "run": {
+    "arm": "file",
+    "kind": "profile",
+    "label": "normal-file",
+    "provider": "file",
+    "repeat": 1,
+    "role": "normal",
+    "samples": 30,
+    "warmups": 3
+  },
+  "samples": 30,
+  "schema": "docx-provider-whole-child-profile-terminal-v1",
+  "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+  "source": {
+    "files": 7158,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+    "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+  },
+  "source_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+  "started_artifact": {
+    "bytes": 5449,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/started.json",
+    "sha256": "b6a7cce15934bb0845c84c7eb3bb47a375a6bdd5799679f17a41bb43b1e768b7"
+  },
+  "started_utc": "2026-09-10T03:03:38.664851+00:00",
+  "status": "pass",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0491/provider-profiles/profiles1/strace-file/tmp",
+  "tool": "strace",
+  "tool_executable": {
+    "bytes": 2374392,
+    "executable": true,
+    "path": "/usr/bin/strace",
+    "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5"
+  },
+  "version": 1,
+  "warmups": 3
+}

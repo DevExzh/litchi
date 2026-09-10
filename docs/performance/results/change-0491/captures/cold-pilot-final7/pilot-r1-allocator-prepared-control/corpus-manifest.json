@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "688445103b2a15a8e4d9993b03b78adbb1c80ef597b20823c90c8d876a5fb882",
+  "content_set_sha256": "e735958823c110efaaf6b26b85796da0de1243f5d689dfa62747c9a2b082fef1",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [],
+  "case_bindings": []
+}

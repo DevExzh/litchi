@@ -1,0 +1,25 @@
+
+running 20 tests
+test allocation_metrics::tests::checked_difference_turns_counter_wrap_into_overflow_status ... ok
+test allocation_metrics::tests::concurrent_allocations_retain_the_exact_overlapping_peak ... ok
+test allocation_metrics::tests::concurrent_begin_race_grants_one_region_and_marks_others_unavailable ... ok
+test allocation_metrics::tests::counter_arithmetic_overflow_and_live_underflow_are_sticky ... ok
+test allocation_metrics::tests::disabled_region_publishes_no_sample ... ok
+test allocation_metrics::tests::failed_allocation_does_not_change_live_or_peak_bytes ... ok
+test allocation_metrics::tests::multi_step_counter_state_matches_an_independent_live_reference ... ok
+test allocation_metrics::tests::nested_callback_entry_is_suppressed_and_invalidates_future_regions ... ok
+test allocation_metrics::tests::one_allocation_then_deallocation_retains_peak_live_bytes ... ok
+test allocation_metrics::tests::poisoned_observer_is_recovered_as_unavailable ... ok
+test allocation_metrics::tests::reallocation_growth_and_shrink_update_live_bytes_without_losing_peak ... ok
+test allocation_metrics::tests::reentrant_callback_makes_active_and_future_regions_unavailable ... ok
+test allocation_metrics::tests::region_counts_cross_thread_totals_without_resetting_absolute_counters ... ok
+test allocation_metrics::tests::region_guard_rejects_overlap_without_heap_scope_state ... ok
+test allocation_metrics::tests::region_peak_includes_concurrent_callbacks_before_finish ... ok
+test allocation_metrics::tests::region_peak_is_separate_from_historical_process_peak ... ok
+test allocation_metrics::tests::region_peak_retains_an_entry_allocation_after_it_is_freed ... ok
+test allocation_metrics::tests::region_reallocation_growth_shrink_and_failed_allocations_are_ordered ... ok
+test allocation_metrics::tests::repeated_boundaries_and_dropped_regions_release_only_the_owner ... ok
+test allocation_metrics::tests::sample_status_serialization_is_explicit ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 422 filtered out; finished in 0.00s
+

@@ -1,0 +1,42 @@
+
+running 37 tests
+test filesystem::tests::aligned_probe_accepts_exact_tail_metadata_read_and_raw_overlap ... ok
+test filesystem::tests::aligned_probe_rejects_cache_materialization ... ok
+test filesystem::tests::aligned_probe_rejects_extra_or_misplaced_payload_read ... ok
+test filesystem::tests::aligned_probe_rejects_oversize_tail_read ... ok
+test filesystem::tests::cache_selection_is_explicit_and_additive ... ok
+test filesystem::tests::child_output_keeps_allocation_sample_additive_and_omits_error_path_absence ... ok
+test filesystem::tests::cold_state_labels_are_distinct_from_warm_and_unsupported ... ok
+test filesystem::tests::counting_source_does_not_call_one_range_sequential ... ok
+test filesystem::tests::counting_source_marks_concurrent_observations_unknown ... ok
+test filesystem::tests::counting_source_marks_counter_overflow_unavailable ... ok
+test filesystem::tests::counting_source_marks_noncontiguous_ranges_random_and_short_reads_unknown ... ok
+test filesystem::tests::counting_source_poisoned_metrics_fail_closed ... ok
+test filesystem::tests::counting_source_records_exact_sizes_and_sequential_pattern ... ok
+test filesystem::tests::counting_source_records_failed_attempt_as_requested_only ... ok
+test filesystem::tests::counting_source_rejects_invalid_range_arithmetic ... ok
+test filesystem::tests::counting_source_rejects_over_return_before_recording_returned_bytes ... ok
+test filesystem::tests::docx_replay_coverage_tracks_each_payload_class ... ok
+test filesystem::tests::docx_root_operation_scopes_are_explicit ... ok
+test filesystem::tests::executing_failing_child_exits_without_success_json ... ok
+test filesystem::tests::failing_child_probe ... ok
+test filesystem::tests::filesystem_case_names_are_explicit_and_parseable ... ok
+test filesystem::tests::host_evidence_is_non_path_and_reports_same_device_probe ... ok
+test filesystem::tests::owned_cfb_operation_marks_immutable_ingress_without_read_counters ... ok
+test filesystem::tests::padded_docx_archive_keeps_semantic_corpus_identity ... ok
+test filesystem::tests::padded_xlsx_archive_keeps_typed_semantics_and_reports_aligned_hash ... ok
+test filesystem::tests::parent_rejects_missing_or_altered_timed_docx_text_evidence ... ok
+test filesystem::tests::pinned_filesystem_hash_literals_are_complete ... ok
+test filesystem::tests::pptx_replay_overlap_accounting_is_exact_and_disjoint ... ok
+test filesystem::tests::pptx_root_operation_scopes_are_explicit ... ok
+test filesystem::tests::prepared_query_controls_are_not_cold_verified ... ok
+test filesystem::tests::read_size_buckets_are_fixed_and_boundary_stable ... ok
+test filesystem::tests::source_hash_guard_rejects_mutation_between_samples ... ok
+test filesystem::tests::timed_docx_full_text_oracle_rejects_wrong_observation ... ok
+test filesystem::tests::verified_digest_is_requested_only_for_eligible_save_operations ... ok
+test filesystem::tests::xlsx_filesystem_operations_preserve_open_vs_lifecycle_scopes ... ok
+test filesystem::tests::xlsx_repeated_store_selectors_roundtrip_structural_control_scope ... ok
+test filesystem::tests::xlsx_semantic_oracle_hash_is_deterministic ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 405 filtered out; finished in 0.92s
+

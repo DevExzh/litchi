@@ -1,0 +1,51 @@
+{
+  "attempt": "cold-pilot-final7",
+  "pilot": true,
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-normal-warm",
+      "report_sha256": "c31e01825611c9544a9b2cac65f14ce60c02e853d58ee6dc54f7c7176603f127",
+      "terminal_sha256": "86c5f318e2536870777f92f29a81bcc48c9051ba44d1dffa3733621a02e525d0"
+    },
+    {
+      "label": "pilot-r1-normal-cold-requested",
+      "report_sha256": "28833f2385afcbc0bd78264edc007a3bcd3a5b9712ed0e563cf050a5998c2fab",
+      "terminal_sha256": "19b462e335e03f2631a31a9487f0a1f635da8ca650a2b8c60dc58b6b7916a46e"
+    },
+    {
+      "label": "pilot-r1-normal-cold-verified",
+      "report_sha256": "abc4fcee99f6eee87eb7b765b8cd342c8d2aba5fe8a14a3f5e781a373cc9b976",
+      "terminal_sha256": "722e4e5c215bf24f7491f74df3a9952ca5bd12641e3ea6b546c3bd21536c594d"
+    },
+    {
+      "label": "pilot-r1-normal-prepared-control",
+      "report_sha256": "17831c018347e3ed097c408364044fad45f67ae4bd5546ca209581e6b75c4ad3",
+      "terminal_sha256": "a823f29f14d102fe79cf1a6dc62b91b0afc67d0b399107f3e36bdba2ced966fc"
+    },
+    {
+      "label": "pilot-r1-allocator-warm",
+      "report_sha256": "d7b1ed39080d9c22dd84ff3e57a5e5392bd906e8296fd2dade951d10e239db64",
+      "terminal_sha256": "7bdb2b2718282a0ca46c5c17d1b5a39ddb71209352e5b063d68e715f876fe747"
+    },
+    {
+      "label": "pilot-r1-allocator-cold-requested",
+      "report_sha256": "0c787a5231804b22a4543e049f444d79a7a12653b134deda65d9d913a0080ce2",
+      "terminal_sha256": "3d4cfc01710fbfabce539114e1b52bff94ce7253303ce1a0c7335a2942e0caf6"
+    },
+    {
+      "label": "pilot-r1-allocator-cold-verified",
+      "report_sha256": "a79b04dbea0253b0c154ba30ab010fc6292b99b5812708a065345b2f41f74b7e",
+      "terminal_sha256": "1319304e2bd46f71c957a7f61078998789709d962e64aff5da5ba5c505ef6b0c"
+    },
+    {
+      "label": "pilot-r1-allocator-prepared-control",
+      "report_sha256": "31f715be6962b2b397a6e3c4080e44187eb8c8be9da790f037199c9712a4d392",
+      "terminal_sha256": "d6afbfe9cee33b763253be12429e0fa94d1c9d2843d8ff07411d6f73514a0c13"
+    }
+  ],
+  "schema": "docx-filesystem-cold-matrix-v1-verification",
+  "status": "pass",
+  "summary_sha256": "ab74bc4755c41beab171f25239986649b8943586b485dad6a893d6dcdf781393",
+  "verified_utc": "2026-09-10T02:49:55.187177+00:00",
+  "version": 1
+}

@@ -1,0 +1,91 @@
+{
+  "attempt": "cold-formal1",
+  "pilot": false,
+  "raw_receipts": [
+    {
+      "label": "r1-normal-warm",
+      "report_sha256": "be529f65d324f96eada982c08bb2fcc667154b6e5da729791ab7b5512c1c77e7",
+      "terminal_sha256": "70961b19d34d8aa7979d21351ecb0f3239b7259d79d5af824033982b7e949582"
+    },
+    {
+      "label": "r1-normal-cold-requested",
+      "report_sha256": "1499890a2608b8cd5e17180807d97bee93c4e3ba31b10be8819a699cb05b7c49",
+      "terminal_sha256": "4d8c1a10edaf1765cbdb2793492d31198c16434376fc1747c9e9a1d41e58d50f"
+    },
+    {
+      "label": "r1-normal-cold-verified",
+      "report_sha256": "efbdeef809730a132130a5ccfe4147b59d1417bbb60d808849fc80b78e9e5a05",
+      "terminal_sha256": "9ddcdc622947d920c07bd7523b913fed44b48182c66373b95762afb160ddf757"
+    },
+    {
+      "label": "r1-normal-prepared-control",
+      "report_sha256": "b45a8317caa84ba64066b71038f10ff910ce2442ed99d10012ccbf98ec34495d",
+      "terminal_sha256": "8e2665596942f19a98cd297ad2a27fdc702b7caf687dc39cf57a93b68093a2e7"
+    },
+    {
+      "label": "r1-allocator-warm",
+      "report_sha256": "38b3818f5e945787a737a4c14bce50ea03bc6b02184c3d780a75c2e90e51ea3d",
+      "terminal_sha256": "9b5c84a5d70212aca963f7276bffe80147f9558d68a14414bcf879917959a848"
+    },
+    {
+      "label": "r1-allocator-cold-requested",
+      "report_sha256": "a681caf86c203430856bd98bb6674a019bd6838c2eea94448d597967f95278b3",
+      "terminal_sha256": "8e707c3a0e53fd22e747a8842eac00c3b659dec5c16f595d5d19207340571b12"
+    },
+    {
+      "label": "r1-allocator-cold-verified",
+      "report_sha256": "a65832bbda8d39f25bba08bef4b1fa24ff73c68526e878ba44b40ef6d1194526",
+      "terminal_sha256": "ddd48f819c10c83b7ec3a98c768043e10a14796dc2a0373b9a325c1ad6d1bb1a"
+    },
+    {
+      "label": "r1-allocator-prepared-control",
+      "report_sha256": "f5c1bd5db9cba0b838c26ca51444447a663f930d317c1908428ca8d21dcb3184",
+      "terminal_sha256": "7a454bdedcf15491462c41436158db64122f3cb2cb10ee2cf943e98dbfa10639"
+    },
+    {
+      "label": "r2-allocator-warm",
+      "report_sha256": "b148eca2968f93d1216de4d138b377cbf8e246d7362028eb434c6478441a1684",
+      "terminal_sha256": "c7edfe043e4008c356359d18cda1a821a6e49b0018c38f63f98c9174ca3f9872"
+    },
+    {
+      "label": "r2-allocator-cold-requested",
+      "report_sha256": "2f4420ca2209091efafd59b45c038d536b20f5d72ed7a1ba701c972a435dcd7c",
+      "terminal_sha256": "69eae67ef48bb709d91f2f5ad6d8813656e683bfa5449e841c96356ca58b5ac2"
+    },
+    {
+      "label": "r2-allocator-cold-verified",
+      "report_sha256": "d67b917bc4719bca0346c70b87abed9ebed60d8b0740dcd0bbf9b675941f25b8",
+      "terminal_sha256": "bb9fae13aefad9cf9d8452c2954a2805eee90b0590305a1784e183c480c4a01f"
+    },
+    {
+      "label": "r2-allocator-prepared-control",
+      "report_sha256": "f5c1bd5db9cba0b838c26ca51444447a663f930d317c1908428ca8d21dcb3184",
+      "terminal_sha256": "6aec84a49bb3a4ebaa82a2a317dc8c2d2ce881bb26f53409ef7c033020b5e0f3"
+    },
+    {
+      "label": "r2-normal-warm",
+      "report_sha256": "dc754ec23dc29dd37f45e6e2df582791063f805fda1128e324040d019fb76562",
+      "terminal_sha256": "f713d3cb334386134221505fb6c993742b569b0684dd151d2cd08e4443e6ffd6"
+    },
+    {
+      "label": "r2-normal-cold-requested",
+      "report_sha256": "4afb6f8c00c568536a42249f90acfcf308c50a444e8c7cd86b9224fe3d4dc597",
+      "terminal_sha256": "79ad83203bf4a60820e32fd166ad0c14dab2cd12f74b734dac58ae863da3d403"
+    },
+    {
+      "label": "r2-normal-cold-verified",
+      "report_sha256": "a7ea674d8e24da48aeb295e971537883685da43fbdddafa0bc04aa48abdd9219",
+      "terminal_sha256": "bcf6e2d89b84f20dae996596c2a5ba596e0852880eaf020743069e504aaf3d08"
+    },
+    {
+      "label": "r2-normal-prepared-control",
+      "report_sha256": "b45a8317caa84ba64066b71038f10ff910ce2442ed99d10012ccbf98ec34495d",
+      "terminal_sha256": "553309b6c1193c552ea0cc22b54cd8f5a9421f3292d7371892400f75cf5e4e15"
+    }
+  ],
+  "schema": "docx-filesystem-cold-matrix-v1-verification",
+  "status": "pass",
+  "summary_sha256": "1a5c3a4ac0e3898c4205beb969d36b5a51f58b8aa2e7cd4d8b2b9d66fa175830",
+  "verified_utc": "2026-09-10T02:59:39.894543+00:00",
+  "version": 1
+}
