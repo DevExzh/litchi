@@ -1,0 +1,6 @@
+completed corpus=few-large source=owned capability=managed-after-only workers=1 samples=60 p50=575us p95=586us p99=590us
+1388637964,,cycles,336266400,100.00,,
+1671369265,,instructions,336266400,100.00,,
+145808758,,branches,336266400,100.00,,
+287506,,branch-misses,336266400,100.00,,
+2469097,,cache-misses,336266400,100.00,,

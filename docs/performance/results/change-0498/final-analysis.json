@@ -1,0 +1,4833 @@
+{
+  "adverse_threshold_pct": 5.0,
+  "captures": [
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 563.3263166666667,
+        "p50_us": 575.852,
+        "p95_us": 586.712,
+        "p99_us": 592.942,
+        "sample_count": 60,
+        "throughput_bytes_s": 7445602798.780422
+      },
+      "corpus": "few-large",
+      "csv": "few-large-owned-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 556.5452333333334,
+          "p50_us": 573.832,
+          "p95_us": 585.762,
+          "p99_us": 589.583,
+          "sample_count": 30,
+          "throughput_bytes_s": 7536321845.537922
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 570.1074000000001,
+          "p50_us": 576.812,
+          "p95_us": 586.832,
+          "p99_us": 592.942,
+          "sample_count": 30,
+          "throughput_bytes_s": 7357041848.60607
+        }
+      },
+      "source": "owned",
+      "stem": "few-large-owned-serial-w1",
+      "time": {
+        "receipt": "few-large-owned-serial-w1.time.stderr",
+        "rss_kib": 20264,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 577.4363833333333,
+        "p50_us": 581.662,
+        "p95_us": 589.302,
+        "p99_us": 665.272,
+        "sample_count": 60,
+        "throughput_bytes_s": 7263664225.291427
+      },
+      "corpus": "few-large",
+      "csv": "few-large-owned-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 579.9737,
+          "p50_us": 580.162,
+          "p95_us": 590.802,
+          "p99_us": 665.272,
+          "sample_count": 30,
+          "throughput_bytes_s": 7231886549.338358
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 574.8990666666667,
+          "p50_us": 581.662,
+          "p95_us": 589.302,
+          "p99_us": 591.433,
+          "sample_count": 30,
+          "throughput_bytes_s": 7295722402.749886
+        }
+      },
+      "source": "owned",
+      "stem": "few-large-owned-batch-w1",
+      "time": {
+        "receipt": "few-large-owned-batch-w1.time.stderr",
+        "rss_kib": 20252,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 138.75501666666665,
+        "p50_us": 136.46,
+        "p95_us": 147.57,
+        "p99_us": 172.38,
+        "sample_count": 60,
+        "throughput_bytes_s": 30228125085.20713
+      },
+      "corpus": "few-large",
+      "csv": "few-large-owned-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 140.71916666666667,
+          "p50_us": 137.06,
+          "p95_us": 160.871,
+          "p99_us": 172.38,
+          "sample_count": 30,
+          "throughput_bytes_s": 29806202661.329006
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 136.79086666666666,
+          "p50_us": 135.201,
+          "p95_us": 146.261,
+          "p99_us": 147.57,
+          "sample_count": 30,
+          "throughput_bytes_s": 30662164091.852135
+        }
+      },
+      "source": "owned",
+      "stem": "few-large-owned-batch-w2",
+      "time": {
+        "receipt": "few-large-owned-batch-w2.time.stderr",
+        "rss_kib": 23252,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 90.50631666666666,
+        "p50_us": 82.36,
+        "p95_us": 100.241,
+        "p99_us": 243.481,
+        "sample_count": 60,
+        "throughput_bytes_s": 46342665953.88646
+      },
+      "corpus": "few-large",
+      "csv": "few-large-owned-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 98.70836666666668,
+          "p50_us": 83.66,
+          "p95_us": 239.881,
+          "p99_us": 243.481,
+          "sample_count": 30,
+          "throughput_bytes_s": 42491879276.697586
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82.30426666666668,
+          "p50_us": 81.8,
+          "p95_us": 89.431,
+          "p99_us": 100.241,
+          "sample_count": 30,
+          "throughput_bytes_s": 50960954636.61665
+        }
+      },
+      "source": "owned",
+      "stem": "few-large-owned-batch-w4",
+      "time": {
+        "receipt": "few-large-owned-batch-w4.time.stderr",
+        "rss_kib": 25328,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 92.0805,
+        "p50_us": 82.52,
+        "p95_us": 105.89,
+        "p99_us": 255.291,
+        "sample_count": 60,
+        "throughput_bytes_s": 45550404265.83261
+      },
+      "corpus": "few-large",
+      "csv": "few-large-owned-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 101.50773333333333,
+          "p50_us": 83.76,
+          "p95_us": 237.601,
+          "p99_us": 255.291,
+          "sample_count": 30,
+          "throughput_bytes_s": 41320043924.403786
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82.65326666666667,
+          "p50_us": 81.21,
+          "p95_us": 92.53,
+          "p99_us": 93.741,
+          "sample_count": 30,
+          "throughput_bytes_s": 50745774113.38451
+        }
+      },
+      "source": "owned",
+      "stem": "few-large-owned-batch-w8",
+      "time": {
+        "receipt": "few-large-owned-batch-w8.time.stderr",
+        "rss_kib": 25372,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 567.2483666666667,
+        "p50_us": 578.632,
+        "p95_us": 586.323,
+        "p99_us": 600.762,
+        "sample_count": 60,
+        "throughput_bytes_s": 7394122656.795074
+      },
+      "corpus": "few-large",
+      "csv": "few-large-file-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 565.2077,
+          "p50_us": 575.622,
+          "p95_us": 589.252,
+          "p99_us": 600.762,
+          "sample_count": 30,
+          "throughput_bytes_s": 7420818930.810744
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 569.2890333333332,
+          "p50_us": 579.312,
+          "p95_us": 586.323,
+          "p99_us": 589.002,
+          "sample_count": 30,
+          "throughput_bytes_s": 7367617773.069111
+        }
+      },
+      "source": "file",
+      "stem": "few-large-file-serial-w1",
+      "time": {
+        "receipt": "few-large-file-serial-w1.time.stderr",
+        "rss_kib": 20264,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 566.5640166666667,
+        "p50_us": 577.202,
+        "p95_us": 588.872,
+        "p99_us": 597.112,
+        "sample_count": 60,
+        "throughput_bytes_s": 7403053982.631736
+      },
+      "corpus": "few-large",
+      "csv": "few-large-file-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 566.6186999999999,
+          "p50_us": 577.202,
+          "p95_us": 589.042,
+          "p99_us": 597.112,
+          "sample_count": 30,
+          "throughput_bytes_s": 7402339527.445882
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 566.5093333333333,
+          "p50_us": 576.282,
+          "p95_us": 586.712,
+          "p99_us": 594.342,
+          "sample_count": 30,
+          "throughput_bytes_s": 7403768575.745736
+        }
+      },
+      "source": "file",
+      "stem": "few-large-file-batch-w1",
+      "time": {
+        "receipt": "few-large-file-batch-w1.time.stderr",
+        "rss_kib": 20272,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 157.99138333333335,
+        "p50_us": 146.22,
+        "p95_us": 190.221,
+        "p99_us": 534.712,
+        "sample_count": 60,
+        "throughput_bytes_s": 26547675648.55594
+      },
+      "corpus": "few-large",
+      "csv": "few-large-file-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 170.06896666666668,
+          "p50_us": 148.68,
+          "p95_us": 222.451,
+          "p99_us": 534.712,
+          "sample_count": 30,
+          "throughput_bytes_s": 24662371285.06102
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 145.91379999999998,
+          "p50_us": 145.271,
+          "p95_us": 157.671,
+          "p99_us": 160.671,
+          "sample_count": 30,
+          "throughput_bytes_s": 28745080999.87801
+        }
+      },
+      "source": "file",
+      "stem": "few-large-file-batch-w2",
+      "time": {
+        "receipt": "few-large-file-batch-w2.time.stderr",
+        "rss_kib": 23388,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 99.58888333333333,
+        "p50_us": 91.02,
+        "p95_us": 115.391,
+        "p99_us": 255.821,
+        "sample_count": 60,
+        "throughput_bytes_s": 42116186662.73495
+      },
+      "corpus": "few-large",
+      "csv": "few-large-file-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 108.82646666666666,
+          "p50_us": 92.221,
+          "p95_us": 253.881,
+          "p99_us": 255.821,
+          "sample_count": 30,
+          "throughput_bytes_s": 38541212707.448006
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 90.3513,
+          "p50_us": 89.381,
+          "p95_us": 98.07,
+          "p99_us": 103.46,
+          "sample_count": 30,
+          "throughput_bytes_s": 46422176548.64955
+        }
+      },
+      "source": "file",
+      "stem": "few-large-file-batch-w4",
+      "time": {
+        "receipt": "few-large-file-batch-w4.time.stderr",
+        "rss_kib": 25244,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 98.02643333333334,
+        "p50_us": 91.701,
+        "p95_us": 107.931,
+        "p99_us": 260.041,
+        "sample_count": 60,
+        "throughput_bytes_s": 42787479431.56829
+      },
+      "corpus": "few-large",
+      "csv": "few-large-file-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 103.00373333333333,
+          "p50_us": 91.701,
+          "p95_us": 245.361,
+          "p99_us": 260.041,
+          "sample_count": 30,
+          "throughput_bytes_s": 40719922125.79997
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 93.04913333333334,
+          "p50_us": 91.15,
+          "p95_us": 103.091,
+          "p99_us": 115.791,
+          "sample_count": 30,
+          "throughput_bytes_s": 45076228544.489395
+        }
+      },
+      "source": "file",
+      "stem": "few-large-file-batch-w8",
+      "time": {
+        "receipt": "few-large-file-batch-w8.time.stderr",
+        "rss_kib": 24348,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 82116.11673333333,
+        "p50_us": 82119.565,
+        "p95_us": 82520.216,
+        "p99_us": 82646.327,
+        "sample_count": 60,
+        "throughput_bytes_s": 51077719.78088936
+      },
+      "corpus": "few-large",
+      "csv": "few-large-instrumented-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82200.1233,
+          "p50_us": 82170.975,
+          "p95_us": 82592.316,
+          "p99_us": 82646.327,
+          "sample_count": 30,
+          "throughput_bytes_s": 51025519.56877661
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82032.11016666667,
+          "p50_us": 82040.564,
+          "p95_us": 82431.776,
+          "p99_us": 82520.216,
+          "sample_count": 30,
+          "throughput_bytes_s": 51130026.906272784
+        }
+      },
+      "source": "instrumented",
+      "stem": "few-large-instrumented-serial-w1",
+      "time": {
+        "receipt": "few-large-instrumented-serial-w1.time.stderr",
+        "rss_kib": 20248,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 82361.90060000001,
+        "p50_us": 82474.815,
+        "p95_us": 82566.886,
+        "p99_us": 82760.607,
+        "sample_count": 60,
+        "throughput_bytes_s": 50925293.970207386
+      },
+      "corpus": "few-large",
+      "csv": "few-large-instrumented-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82271.32979999999,
+          "p50_us": 82443.696,
+          "p95_us": 82566.886,
+          "p99_us": 82586.566,
+          "sample_count": 30,
+          "throughput_bytes_s": 50981356.56973421
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 82452.4714,
+          "p50_us": 82493.006,
+          "p95_us": 82605.726,
+          "p99_us": 82760.607,
+          "sample_count": 30,
+          "throughput_bytes_s": 50869354.53580595
+        }
+      },
+      "source": "instrumented",
+      "stem": "few-large-instrumented-batch-w1",
+      "time": {
+        "receipt": "few-large-instrumented-batch-w1.time.stderr",
+        "rss_kib": 20188,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 39980.80998333333,
+        "p50_us": 39924.873,
+        "p95_us": 40228.214,
+        "p99_us": 40303.185,
+        "sample_count": 60,
+        "throughput_bytes_s": 104907929.62294824
+      },
+      "corpus": "few-large",
+      "csv": "few-large-instrumented-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 39997.43716666666,
+          "p50_us": 39922.343,
+          "p95_us": 40248.654,
+          "p99_us": 40303.185,
+          "sample_count": 30,
+          "throughput_bytes_s": 104864318.74428888
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 39964.182799999995,
+          "p50_us": 39924.873,
+          "p95_us": 40218.645,
+          "p99_us": 40274.864,
+          "sample_count": 30,
+          "throughput_bytes_s": 104951576.79040544
+        }
+      },
+      "source": "instrumented",
+      "stem": "few-large-instrumented-batch-w2",
+      "time": {
+        "receipt": "few-large-instrumented-batch-w2.time.stderr",
+        "rss_kib": 23128,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 20090.4304,
+        "p50_us": 20028.232,
+        "p95_us": 20332.733,
+        "p99_us": 20715.604,
+        "sample_count": 60,
+        "throughput_bytes_s": 208771236.677936
+      },
+      "corpus": "few-large",
+      "csv": "few-large-instrumented-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 20121.167233333334,
+          "p50_us": 20067.272,
+          "p95_us": 20674.804,
+          "p99_us": 20715.604,
+          "sample_count": 30,
+          "throughput_bytes_s": 208452320.4524432
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 20059.69356666667,
+          "p50_us": 20006.612,
+          "p95_us": 20258.423,
+          "p99_us": 20332.733,
+          "sample_count": 30,
+          "throughput_bytes_s": 209091130.2338987
+        }
+      },
+      "source": "instrumented",
+      "stem": "few-large-instrumented-batch-w4",
+      "time": {
+        "receipt": "few-large-instrumented-batch-w4.time.stderr",
+        "rss_kib": 25176,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 251658240.0,
+        "mean_us": 20076.829550000002,
+        "p50_us": 20016.392,
+        "p95_us": 20260.522,
+        "p99_us": 20707.005,
+        "sample_count": 60,
+        "throughput_bytes_s": 208912666.69143984
+      },
+      "corpus": "few-large",
+      "csv": "few-large-instrumented-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 20124.804466666665,
+          "p50_us": 20051.521,
+          "p95_us": 20687.374,
+          "p99_us": 20707.005,
+          "sample_count": 30,
+          "throughput_bytes_s": 208414646.06263155
+        },
+        "1": {
+          "logical_bytes": 125829120.0,
+          "mean_us": 20028.854633333332,
+          "p50_us": 20008.072,
+          "p95_us": 20180.572,
+          "p99_us": 20238.623,
+          "sample_count": 30,
+          "throughput_bytes_s": 209413073.1279843
+        }
+      },
+      "source": "instrumented",
+      "stem": "few-large-instrumented-batch-w8",
+      "time": {
+        "receipt": "few-large-instrumented-batch-w8.time.stderr",
+        "rss_kib": 25432,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 95.18466666666667,
+        "p50_us": 94.771,
+        "p95_us": 100.85,
+        "p99_us": 102.74,
+        "sample_count": 60,
+        "throughput_bytes_s": 11016228103.966326
+      },
+      "corpus": "many-small",
+      "csv": "many-small-owned-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 96.11866666666667,
+          "p50_us": 95.751,
+          "p95_us": 102.48,
+          "p99_us": 102.74,
+          "sample_count": 30,
+          "throughput_bytes_s": 10909181705.946815
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 94.25066666666666,
+          "p50_us": 93.4,
+          "p95_us": 100.85,
+          "p99_us": 101.501,
+          "sample_count": 30,
+          "throughput_bytes_s": 11125396106.835672
+        }
+      },
+      "source": "owned",
+      "stem": "many-small-owned-serial-w1",
+      "time": {
+        "receipt": "many-small-owned-serial-w1.time.stderr",
+        "rss_kib": 17240,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 94.49633333333333,
+        "p50_us": 93.92,
+        "p95_us": 98.71,
+        "p99_us": 105.361,
+        "sample_count": 60,
+        "throughput_bytes_s": 11096472879.018234
+      },
+      "corpus": "many-small",
+      "csv": "many-small-owned-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 95.37036666666667,
+          "p50_us": 94.6,
+          "p95_us": 100.48,
+          "p99_us": 105.361,
+          "sample_count": 30,
+          "throughput_bytes_s": 10994777902.709822
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 93.6223,
+          "p50_us": 92.9,
+          "p95_us": 98.411,
+          "p99_us": 98.71,
+          "sample_count": 30,
+          "throughput_bytes_s": 11200066650.787258
+        }
+      },
+      "source": "owned",
+      "stem": "many-small-owned-batch-w1",
+      "time": {
+        "receipt": "many-small-owned-batch-w1.time.stderr",
+        "rss_kib": 17176,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 686.7043333333334,
+        "p50_us": 677.783,
+        "p95_us": 747.873,
+        "p99_us": 768.793,
+        "sample_count": 60,
+        "throughput_bytes_s": 1526968666.281898
+      },
+      "corpus": "many-small",
+      "csv": "many-small-owned-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 698.4945,
+          "p50_us": 687.722,
+          "p95_us": 762.823,
+          "p99_us": 768.793,
+          "sample_count": 30,
+          "throughput_bytes_s": 1501194354.4294193
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 674.9141666666667,
+          "p50_us": 669.072,
+          "p95_us": 714.632,
+          "p99_us": 729.783,
+          "sample_count": 30,
+          "throughput_bytes_s": 1553643487.9990911
+        }
+      },
+      "source": "owned",
+      "stem": "many-small-owned-batch-w2",
+      "time": {
+        "receipt": "many-small-owned-batch-w2.time.stderr",
+        "rss_kib": 17944,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 563.26855,
+        "p50_us": 560.022,
+        "p95_us": 653.393,
+        "p99_us": 694.313,
+        "sample_count": 60,
+        "throughput_bytes_s": 1861591597.8266494
+      },
+      "corpus": "many-small",
+      "csv": "many-small-owned-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 577.0857666666667,
+          "p50_us": 566.672,
+          "p95_us": 662.502,
+          "p99_us": 694.313,
+          "sample_count": 30,
+          "throughput_bytes_s": 1817019341.9545436
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 549.4513333333333,
+          "p50_us": 536.972,
+          "p95_us": 627.502,
+          "p99_us": 669.682,
+          "sample_count": 30,
+          "throughput_bytes_s": 1908405597.3413477
+        }
+      },
+      "source": "owned",
+      "stem": "many-small-owned-batch-w4",
+      "time": {
+        "receipt": "many-small-owned-batch-w4.time.stderr",
+        "rss_kib": 18648,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 481.1497166666667,
+        "p50_us": 480.612,
+        "p95_us": 546.692,
+        "p99_us": 587.762,
+        "sample_count": 60,
+        "throughput_bytes_s": 2179313348.170249
+      },
+      "corpus": "many-small",
+      "csv": "many-small-owned-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 485.3113333333333,
+          "p50_us": 487.441,
+          "p95_us": 538.232,
+          "p99_us": 546.692,
+          "sample_count": 30,
+          "throughput_bytes_s": 2160625412.965148
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 476.9881,
+          "p50_us": 471.601,
+          "p95_us": 557.312,
+          "p99_us": 587.762,
+          "sample_count": 30,
+          "throughput_bytes_s": 2198327379.6558027
+        }
+      },
+      "source": "owned",
+      "stem": "many-small-owned-batch-w8",
+      "time": {
+        "receipt": "many-small-owned-batch-w8.time.stderr",
+        "rss_kib": 19932,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 183.75898333333333,
+        "p50_us": 182.261,
+        "p95_us": 191.481,
+        "p99_us": 195.4,
+        "sample_count": 60,
+        "throughput_bytes_s": 5706257081.853323
+      },
+      "corpus": "many-small",
+      "csv": "many-small-file-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 185.067,
+          "p50_us": 183.351,
+          "p95_us": 195.311,
+          "p99_us": 195.4,
+          "sample_count": 30,
+          "throughput_bytes_s": 5665926394.224794
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 182.4509666666667,
+          "p50_us": 181.55,
+          "p95_us": 189.03,
+          "p99_us": 191.481,
+          "sample_count": 30,
+          "throughput_bytes_s": 5747166042.237102
+        }
+      },
+      "source": "file",
+      "stem": "many-small-file-serial-w1",
+      "time": {
+        "receipt": "many-small-file-serial-w1.time.stderr",
+        "rss_kib": 17240,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 205.00756666666666,
+        "p50_us": 201.81,
+        "p95_us": 235.981,
+        "p99_us": 238.36,
+        "sample_count": 60,
+        "throughput_bytes_s": 5114816087.276128
+      },
+      "corpus": "many-small",
+      "csv": "many-small-file-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 208.37943333333334,
+          "p50_us": 203.491,
+          "p95_us": 237.781,
+          "p99_us": 238.36,
+          "sample_count": 30,
+          "throughput_bytes_s": 5032051307.686635
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 201.63569999999999,
+          "p50_us": 200.361,
+          "p95_us": 206.761,
+          "p99_us": 207.111,
+          "sample_count": 30,
+          "throughput_bytes_s": 5200348946.143962
+        }
+      },
+      "source": "file",
+      "stem": "many-small-file-batch-w1",
+      "time": {
+        "receipt": "many-small-file-batch-w1.time.stderr",
+        "rss_kib": 17116,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 735.09665,
+        "p50_us": 727.712,
+        "p95_us": 823.753,
+        "p99_us": 863.973,
+        "sample_count": 60,
+        "throughput_bytes_s": 1426446440.7503421
+      },
+      "corpus": "many-small",
+      "csv": "many-small-file-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 745.2920333333333,
+          "p50_us": 731.513,
+          "p95_us": 829.903,
+          "p99_us": 863.973,
+          "sample_count": 30,
+          "throughput_bytes_s": 1406933058.5894272
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 724.9012666666666,
+          "p50_us": 721.613,
+          "p95_us": 766.153,
+          "p99_us": 778.872,
+          "sample_count": 30,
+          "throughput_bytes_s": 1446508715.3478096
+        }
+      },
+      "source": "file",
+      "stem": "many-small-file-batch-w2",
+      "time": {
+        "receipt": "many-small-file-batch-w2.time.stderr",
+        "rss_kib": 18204,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 581.3300333333334,
+        "p50_us": 577.152,
+        "p95_us": 633.243,
+        "p99_us": 855.573,
+        "sample_count": 60,
+        "throughput_bytes_s": 1803753358.4622986
+      },
+      "corpus": "many-small",
+      "csv": "many-small-file-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 594.197,
+          "p50_us": 589.012,
+          "p95_us": 669.093,
+          "p99_us": 669.632,
+          "sample_count": 30,
+          "throughput_bytes_s": 1764694200.744871
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 568.4630666666667,
+          "p50_us": 557.202,
+          "p95_us": 617.852,
+          "p99_us": 855.573,
+          "sample_count": 30,
+          "throughput_bytes_s": 1844580697.4736323
+        }
+      },
+      "source": "file",
+      "stem": "many-small-file-batch-w4",
+      "time": {
+        "receipt": "many-small-file-batch-w4.time.stderr",
+        "rss_kib": 18396,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 519.21495,
+        "p50_us": 512.802,
+        "p95_us": 578.923,
+        "p99_us": 754.173,
+        "sample_count": 60,
+        "throughput_bytes_s": 2019541232.3932507
+      },
+      "corpus": "many-small",
+      "csv": "many-small-file-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 527.7069666666666,
+          "p50_us": 521.402,
+          "p95_us": 584.292,
+          "p99_us": 588.312,
+          "sample_count": 30,
+          "throughput_bytes_s": 1987042177.2588563
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 510.72293333333334,
+          "p50_us": 500.931,
+          "p95_us": 568.292,
+          "p99_us": 754.173,
+          "sample_count": 30,
+          "throughput_bytes_s": 2053121039.9271934
+        }
+      },
+      "source": "file",
+      "stem": "many-small-file-batch-w8",
+      "time": {
+        "receipt": "many-small-file-batch-w8.time.stderr",
+        "rss_kib": 19480,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 29594.735833333332,
+        "p50_us": 29572.756,
+        "p95_us": 29662.557,
+        "p99_us": 30144.338,
+        "sample_count": 60,
+        "throughput_bytes_s": 35431166.066329986
+      },
+      "corpus": "many-small",
+      "csv": "many-small-instrumented-serial-w1.csv",
+      "mode": "serial",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 29602.1442,
+          "p50_us": 29578.657,
+          "p95_us": 29662.557,
+          "p99_us": 30144.338,
+          "sample_count": 30,
+          "throughput_bytes_s": 35422298.902253166
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 29587.327466666666,
+          "p50_us": 29568.216,
+          "p95_us": 29733.367,
+          "p99_us": 30047.938,
+          "sample_count": 30,
+          "throughput_bytes_s": 35440037.67090267
+        }
+      },
+      "source": "instrumented",
+      "stem": "many-small-instrumented-serial-w1",
+      "time": {
+        "receipt": "many-small-instrumented-serial-w1.time.stderr",
+        "rss_kib": 17244,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 29655.281766666667,
+        "p50_us": 29600.096,
+        "p95_us": 29994.867,
+        "p99_us": 30074.738,
+        "sample_count": 60,
+        "throughput_bytes_s": 35358827.75454279
+      },
+      "corpus": "many-small",
+      "csv": "many-small-instrumented-batch-w1.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 29577.065733333337,
+          "p50_us": 29569.176,
+          "p95_us": 29653.467,
+          "p99_us": 29673.376,
+          "sample_count": 30,
+          "throughput_bytes_s": 35452333.556477696
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 29733.4978,
+          "p50_us": 29658.466,
+          "p95_us": 30052.958,
+          "p99_us": 30074.738,
+          "sample_count": 30,
+          "throughput_bytes_s": 35265813.89963478
+        }
+      },
+      "source": "instrumented",
+      "stem": "many-small-instrumented-batch-w1",
+      "time": {
+        "receipt": "many-small-instrumented-batch-w1.time.stderr",
+        "rss_kib": 17132,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 1
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 16052.9745,
+        "p50_us": 16040.217,
+        "p95_us": 16056.848,
+        "p99_us": 17043.521,
+        "sample_count": 60,
+        "throughput_bytes_s": 65319732.48945235
+      },
+      "corpus": "many-small",
+      "csv": "many-small-instrumented-batch-w2.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 16035.8104,
+          "p50_us": 16039.307,
+          "p95_us": 16045.168,
+          "p99_us": 16045.257,
+          "sample_count": 30,
+          "throughput_bytes_s": 65389648.15897299
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 16070.1386,
+          "p50_us": 16041.278,
+          "p95_us": 16143.658,
+          "p99_us": 17043.521,
+          "sample_count": 30,
+          "throughput_bytes_s": 65249966.17017354
+        }
+      },
+      "source": "instrumented",
+      "stem": "many-small-instrumented-batch-w2",
+      "time": {
+        "receipt": "many-small-instrumented-batch-w2.time.stderr",
+        "rss_kib": 17048,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 2
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 8043.983116666667,
+        "p50_us": 8016.389,
+        "p95_us": 8155.029,
+        "p99_us": 8418.76,
+        "sample_count": 60,
+        "throughput_bytes_s": 130355320.83942485
+      },
+      "corpus": "many-small",
+      "csv": "many-small-instrumented-batch-w4.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 8065.0062333333335,
+          "p50_us": 8038.449,
+          "p95_us": 8404.43,
+          "p99_us": 8418.76,
+          "sample_count": 30,
+          "throughput_bytes_s": 130015522.57531424
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 8022.96,
+          "p50_us": 8014.479,
+          "p95_us": 8086.709,
+          "p99_us": 8092.259,
+          "sample_count": 30,
+          "throughput_bytes_s": 130696899.89729476
+        }
+      },
+      "source": "instrumented",
+      "stem": "many-small-instrumented-batch-w4",
+      "time": {
+        "receipt": "many-small-instrumented-batch-w4.time.stderr",
+        "rss_kib": 17684,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 4
+    },
+    {
+      "aggregate": {
+        "logical_bytes": 62914560.0,
+        "mean_us": 4192.598666666667,
+        "p50_us": 4190.625,
+        "p95_us": 4250.525,
+        "p99_us": 4290.405,
+        "sample_count": 60,
+        "throughput_bytes_s": 250101687.13183138
+      },
+      "corpus": "many-small",
+      "csv": "many-small-instrumented-batch-w8.csv",
+      "mode": "batch",
+      "repeats": {
+        "0": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 4197.6627,
+          "p50_us": 4192.205,
+          "p95_us": 4255.745,
+          "p99_us": 4290.405,
+          "sample_count": 30,
+          "throughput_bytes_s": 249799966.06206593
+        },
+        "1": {
+          "logical_bytes": 31457280.0,
+          "mean_us": 4187.534633333334,
+          "p50_us": 4188.475,
+          "p95_us": 4231.495,
+          "p99_us": 4265.335,
+          "sample_count": 30,
+          "throughput_bytes_s": 250404137.9510501
+        }
+      },
+      "source": "instrumented",
+      "stem": "many-small-instrumented-batch-w8",
+      "time": {
+        "receipt": "many-small-instrumented-batch-w8.time.stderr",
+        "rss_kib": 17244,
+        "rss_source": "usr-bin-time-v"
+      },
+      "workers": 8
+    }
+  ],
+  "comparisons": [
+    {
+      "batch_csv": "few-large-owned-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p99_us_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 577.4363833333333,
+              "delta_pct": 2.504776760680947,
+              "serial": 563.3263166666667
+            },
+            "p50_us": {
+              "batch": 581.662,
+              "delta_pct": 1.008939797031192,
+              "serial": 575.852
+            },
+            "p95_us": {
+              "batch": 589.302,
+              "delta_pct": 0.44144316121027555,
+              "serial": 586.712
+            },
+            "p99_us": {
+              "batch": 665.272,
+              "delta_pct": 12.198494962407796,
+              "serial": 592.942
+            }
+          },
+          "rss": {
+            "batch_kib": 20252,
+            "delta_pct": -0.05921831819976313,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 7263664225.291427,
+            "delta_pct": -2.4435707679544336,
+            "serial_bytes_s": 7445602798.780422
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p99_us_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 579.9737,
+                "delta_pct": 4.2096248900283975,
+                "serial": 556.5452333333334
+              },
+              "p50_us": {
+                "batch": 580.162,
+                "delta_pct": 1.1031103180024886,
+                "serial": 573.832
+              },
+              "p95_us": {
+                "batch": 590.802,
+                "delta_pct": 0.8604177123132053,
+                "serial": 585.762
+              },
+              "p99_us": {
+                "batch": 665.272,
+                "delta_pct": 12.837717505423338,
+                "serial": 589.583
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 7231886549.338358,
+              "delta_pct": -4.039573978383274,
+              "serial_bytes_s": 7536321845.537922
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 574.8990666666667,
+                "delta_pct": 0.8404849098023685,
+                "serial": 570.1074000000001
+              },
+              "p50_us": {
+                "batch": 581.662,
+                "delta_pct": 0.8408285541909708,
+                "serial": 576.812
+              },
+              "p95_us": {
+                "batch": 589.302,
+                "delta_pct": 0.42090410884205826,
+                "serial": 586.832
+              },
+              "p99_us": {
+                "batch": 591.433,
+                "delta_pct": -0.254493694155586,
+                "serial": 592.942
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 7295722402.749886,
+              "delta_pct": -0.8334796392085514,
+              "serial_bytes_s": 7357041848.60607
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 1
+    },
+    {
+      "batch_csv": "few-large-owned-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 138.75501666666665,
+              "delta_pct": -75.3686251535855,
+              "serial": 563.3263166666667
+            },
+            "p50_us": {
+              "batch": 136.46,
+              "delta_pct": -76.30293894959121,
+              "serial": 575.852
+            },
+            "p95_us": {
+              "batch": 147.57,
+              "delta_pct": -74.84796629351368,
+              "serial": 586.712
+            },
+            "p99_us": {
+              "batch": 172.38,
+              "delta_pct": -70.92801656823096,
+              "serial": 592.942
+            }
+          },
+          "rss": {
+            "batch_kib": 23252,
+            "delta_pct": 14.745361231741018,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 30228125085.20713,
+            "delta_pct": 305.98627004597193,
+            "serial_bytes_s": 7445602798.780422
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 140.71916666666667,
+                "delta_pct": -74.71559214983245,
+                "serial": 556.5452333333334
+              },
+              "p50_us": {
+                "batch": 137.06,
+                "delta_pct": -76.11496047623694,
+                "serial": 573.832
+              },
+              "p95_us": {
+                "batch": 160.871,
+                "delta_pct": -72.53645678620327,
+                "serial": 585.762
+              },
+              "p99_us": {
+                "batch": 172.38,
+                "delta_pct": -70.7623862967555,
+                "serial": 589.583
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 29806202661.329006,
+              "delta_pct": 295.5006602985852,
+              "serial_bytes_s": 7536321845.537922
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 136.79086666666666,
+                "delta_pct": -76.00612329068757,
+                "serial": 570.1074000000001
+              },
+              "p50_us": {
+                "batch": 135.201,
+                "delta_pct": -76.56064714326331,
+                "serial": 576.812
+              },
+              "p95_us": {
+                "batch": 146.261,
+                "delta_pct": -75.0761717152439,
+                "serial": 586.832
+              },
+              "p99_us": {
+                "batch": 147.57,
+                "delta_pct": -75.11223694728996,
+                "serial": 592.942
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 30662164091.852135,
+              "delta_pct": 316.7730009264751,
+              "serial_bytes_s": 7357041848.60607
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 2
+    },
+    {
+      "batch_csv": "few-large-owned-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 90.50631666666666,
+              "delta_pct": -83.93358982370758,
+              "serial": 563.3263166666667
+            },
+            "p50_us": {
+              "batch": 82.36,
+              "delta_pct": -85.69771399595729,
+              "serial": 575.852
+            },
+            "p95_us": {
+              "batch": 100.241,
+              "delta_pct": -82.91478613016267,
+              "serial": 586.712
+            },
+            "p99_us": {
+              "batch": 243.481,
+              "delta_pct": -58.936793143342854,
+              "serial": 592.942
+            }
+          },
+          "rss": {
+            "batch_kib": 25328,
+            "delta_pct": 24.99013028030004,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 46342665953.88646,
+            "delta_pct": 522.4165753440045,
+            "serial_bytes_s": 7445602798.780422
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 98.70836666666668,
+                "delta_pct": -82.2640891063841,
+                "serial": 556.5452333333334
+              },
+              "p50_us": {
+                "batch": 83.66,
+                "delta_pct": -85.42082003094983,
+                "serial": 573.832
+              },
+              "p95_us": {
+                "batch": 239.881,
+                "delta_pct": -59.04804340329349,
+                "serial": 585.762
+              },
+              "p99_us": {
+                "batch": 243.481,
+                "delta_pct": -58.702845909736205,
+                "serial": 589.583
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 42491879276.697586,
+              "delta_pct": 463.82782141736726,
+              "serial_bytes_s": 7536321845.537922
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 82.30426666666668,
+                "delta_pct": -85.56337513481378,
+                "serial": 570.1074000000001
+              },
+              "p50_us": {
+                "batch": 81.8,
+                "delta_pct": -85.81860294168636,
+                "serial": 576.812
+              },
+              "p95_us": {
+                "batch": 89.431,
+                "delta_pct": -84.76037434904708,
+                "serial": 586.832
+              },
+              "p99_us": {
+                "batch": 100.241,
+                "delta_pct": -83.0942992737907,
+                "serial": 592.942
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 50960954636.61665,
+              "delta_pct": 592.6826798772684,
+              "serial_bytes_s": 7357041848.60607
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 4
+    },
+    {
+      "batch_csv": "few-large-owned-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 92.0805,
+              "delta_pct": -83.65414551465271,
+              "serial": 563.3263166666667
+            },
+            "p50_us": {
+              "batch": 82.52,
+              "delta_pct": -85.66992907899946,
+              "serial": 575.852
+            },
+            "p95_us": {
+              "batch": 105.89,
+              "delta_pct": -81.95196280287432,
+              "serial": 586.712
+            },
+            "p99_us": {
+              "batch": 255.291,
+              "delta_pct": -56.945030036664626,
+              "serial": 592.942
+            }
+          },
+          "rss": {
+            "batch_kib": 25372,
+            "delta_pct": 25.20726411369917,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 45550404265.83261,
+            "delta_pct": 511.7759098469998,
+            "serial_bytes_s": 7445602798.780422
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 101.50773333333333,
+                "delta_pct": -81.76109914276509,
+                "serial": 556.5452333333334
+              },
+              "p50_us": {
+                "batch": 83.76,
+                "delta_pct": -85.40339332766384,
+                "serial": 573.832
+              },
+              "p95_us": {
+                "batch": 237.601,
+                "delta_pct": -59.43727998743516,
+                "serial": 585.762
+              },
+              "p99_us": {
+                "batch": 255.291,
+                "delta_pct": -56.69973523659942,
+                "serial": 589.583
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 41320043924.403786,
+              "delta_pct": 448.2786533177111,
+              "serial_bytes_s": 7536321845.537922
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 82.65326666666667,
+                "delta_pct": -85.50215859912242,
+                "serial": 570.1074000000001
+              },
+              "p50_us": {
+                "batch": 81.21,
+                "delta_pct": -85.92088930188693,
+                "serial": 576.812
+              },
+              "p95_us": {
+                "batch": 92.53,
+                "delta_pct": -84.23228453799385,
+                "serial": 586.832
+              },
+              "p99_us": {
+                "batch": 93.741,
+                "delta_pct": -84.19052790998109,
+                "serial": 592.942
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 50745774113.38451,
+              "delta_pct": 589.7578559105144,
+              "serial_bytes_s": 7357041848.60607
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 8
+    },
+    {
+      "batch_csv": "few-large-file-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 566.5640166666667,
+              "delta_pct": -0.12064380264705828,
+              "serial": 567.2483666666667
+            },
+            "p50_us": {
+              "batch": 577.202,
+              "delta_pct": -0.24713462096806782,
+              "serial": 578.632
+            },
+            "p95_us": {
+              "batch": 588.872,
+              "delta_pct": 0.43474330701677716,
+              "serial": 586.323
+            },
+            "p99_us": {
+              "batch": 597.112,
+              "delta_pct": -0.6075617299363105,
+              "serial": 600.762
+            }
+          },
+          "rss": {
+            "batch_kib": 20272,
+            "delta_pct": 0.03947887879984208,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 7403053982.631736,
+            "delta_pct": 0.12078952772650586,
+            "serial_bytes_s": 7394122656.795074
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 566.6186999999999,
+                "delta_pct": 0.24964274195129166,
+                "serial": 565.2077
+              },
+              "p50_us": {
+                "batch": 577.202,
+                "delta_pct": 0.274485686787517,
+                "serial": 575.622
+              },
+              "p95_us": {
+                "batch": 589.042,
+                "delta_pct": -0.03563840258495902,
+                "serial": 589.252
+              },
+              "p99_us": {
+                "batch": 597.112,
+                "delta_pct": -0.6075617299363105,
+                "serial": 600.762
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 7402339527.445882,
+              "delta_pct": -0.24902107890191463,
+              "serial_bytes_s": 7420818930.810744
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 566.5093333333333,
+                "delta_pct": -0.48827569779872243,
+                "serial": 569.2890333333332
+              },
+              "p50_us": {
+                "batch": 576.282,
+                "delta_pct": -0.5230342199022241,
+                "serial": 579.312
+              },
+              "p95_us": {
+                "batch": 586.712,
+                "delta_pct": 0.0663456831814563,
+                "serial": 586.323
+              },
+              "p99_us": {
+                "batch": 594.342,
+                "delta_pct": 0.9066183136899421,
+                "serial": 589.002
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 7403768575.745736,
+              "delta_pct": 0.49067152762413185,
+              "serial_bytes_s": 7367617773.069111
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-file-serial-w1.csv",
+      "source": "file",
+      "workers": 1
+    },
+    {
+      "batch_csv": "few-large-file-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 157.99138333333335,
+              "delta_pct": -72.14775879184256,
+              "serial": 567.2483666666667
+            },
+            "p50_us": {
+              "batch": 146.22,
+              "delta_pct": -74.73005295248102,
+              "serial": 578.632
+            },
+            "p95_us": {
+              "batch": 190.221,
+              "delta_pct": -67.55696092426871,
+              "serial": 586.323
+            },
+            "p99_us": {
+              "batch": 534.712,
+              "delta_pct": -10.994370482820145,
+              "serial": 600.762
+            }
+          },
+          "rss": {
+            "batch_kib": 23388,
+            "delta_pct": 15.416502171338333,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 26547675648.55594,
+            "delta_pct": 259.03753400897494,
+            "serial_bytes_s": 7394122656.795074
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 170.06896666666668,
+                "delta_pct": -69.9103592065949,
+                "serial": 565.2077
+              },
+              "p50_us": {
+                "batch": 148.68,
+                "delta_pct": -74.17054942305889,
+                "serial": 575.622
+              },
+              "p95_us": {
+                "batch": 222.451,
+                "delta_pct": -62.24857955509696,
+                "serial": 589.252
+              },
+              "p99_us": {
+                "batch": 534.712,
+                "delta_pct": -10.994370482820145,
+                "serial": 600.762
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 24662371285.06102,
+              "delta_pct": 232.34029175222832,
+              "serial_bytes_s": 7420818930.810744
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 145.91379999999998,
+                "delta_pct": -74.36911806545135,
+                "serial": 569.2890333333332
+              },
+              "p50_us": {
+                "batch": 145.271,
+                "delta_pct": -74.92352998039054,
+                "serial": 579.312
+              },
+              "p95_us": {
+                "batch": 157.671,
+                "delta_pct": -73.1085084501205,
+                "serial": 586.323
+              },
+              "p99_us": {
+                "batch": 160.671,
+                "delta_pct": -72.72148481668992,
+                "serial": 589.002
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 28745080999.87801,
+              "delta_pct": 290.1543468358259,
+              "serial_bytes_s": 7367617773.069111
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-file-serial-w1.csv",
+      "source": "file",
+      "workers": 2
+    },
+    {
+      "batch_csv": "few-large-file-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 99.58888333333333,
+              "delta_pct": -82.44351342630573,
+              "serial": 567.2483666666667
+            },
+            "p50_us": {
+              "batch": 91.02,
+              "delta_pct": -84.2697949646753,
+              "serial": 578.632
+            },
+            "p95_us": {
+              "batch": 115.391,
+              "delta_pct": -80.31955082778605,
+              "serial": 586.323
+            },
+            "p99_us": {
+              "batch": 255.821,
+              "delta_pct": -57.4172467632773,
+              "serial": 600.762
+            }
+          },
+          "rss": {
+            "batch_kib": 25244,
+            "delta_pct": 24.575602052901697,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 42116186662.73495,
+            "delta_pct": 469.59004627859235,
+            "serial_bytes_s": 7394122656.795074
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 108.82646666666666,
+                "delta_pct": -80.74575653044595,
+                "serial": 565.2077
+              },
+              "p50_us": {
+                "batch": 92.221,
+                "delta_pct": -83.97889587263865,
+                "serial": 575.622
+              },
+              "p95_us": {
+                "batch": 253.881,
+                "delta_pct": -56.91469863487948,
+                "serial": 589.252
+              },
+              "p99_us": {
+                "batch": 255.821,
+                "delta_pct": -57.4172467632773,
+                "serial": 600.762
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 38541212707.448006,
+              "delta_pct": 419.3660304447999,
+              "serial_bytes_s": 7420818930.810744
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 90.3513,
+                "delta_pct": -84.12909880399944,
+                "serial": 569.2890333333332
+              },
+              "p50_us": {
+                "batch": 89.381,
+                "delta_pct": -84.57118098710195,
+                "serial": 579.312
+              },
+              "p95_us": {
+                "batch": 98.07,
+                "delta_pct": -83.2737245511433,
+                "serial": 586.323
+              },
+              "p99_us": {
+                "batch": 103.46,
+                "delta_pct": -82.43469461903355,
+                "serial": 589.002
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 46422176548.64955,
+              "delta_pct": 530.0839427139769,
+              "serial_bytes_s": 7367617773.069111
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-file-serial-w1.csv",
+      "source": "file",
+      "workers": 4
+    },
+    {
+      "batch_csv": "few-large-file-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 98.02643333333334,
+              "delta_pct": -82.71895714581461,
+              "serial": 567.2483666666667
+            },
+            "p50_us": {
+              "batch": 91.701,
+              "delta_pct": -84.15210358224225,
+              "serial": 578.632
+            },
+            "p95_us": {
+              "batch": 107.931,
+              "delta_pct": -81.59188706566175,
+              "serial": 586.323
+            },
+            "p99_us": {
+              "batch": 260.041,
+              "delta_pct": -56.71480553030983,
+              "serial": 600.762
+            }
+          },
+          "rss": {
+            "batch_kib": 24348,
+            "delta_pct": 20.153967627319386,
+            "serial_kib": 20264
+          },
+          "throughput": {
+            "batch_bytes_s": 42787479431.56829,
+            "delta_pct": 478.6687808356454,
+            "serial_bytes_s": 7394122656.795074
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 103.00373333333333,
+                "delta_pct": -81.77595009173913,
+                "serial": 565.2077
+              },
+              "p50_us": {
+                "batch": 91.701,
+                "delta_pct": -84.069232934113,
+                "serial": 575.622
+              },
+              "p95_us": {
+                "batch": 245.361,
+                "delta_pct": -58.36059953975549,
+                "serial": 589.252
+              },
+              "p99_us": {
+                "batch": 260.041,
+                "delta_pct": -56.71480553030983,
+                "serial": 600.762
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 40719922125.79997,
+              "delta_pct": 448.72545072799954,
+              "serial_bytes_s": 7420818930.810744
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 93.04913333333334,
+                "delta_pct": -83.65520361625327,
+                "serial": 569.2890333333332
+              },
+              "p50_us": {
+                "batch": 91.15,
+                "delta_pct": -84.26581876432735,
+                "serial": 579.312
+              },
+              "p95_us": {
+                "batch": 103.091,
+                "delta_pct": -82.41737063018165,
+                "serial": 586.323
+              },
+              "p99_us": {
+                "batch": 115.791,
+                "delta_pct": -80.34115334073569,
+                "serial": 589.002
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 45076228544.489395,
+              "delta_pct": 511.81551395427647,
+              "serial_bytes_s": 7367617773.069111
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-file-serial-w1.csv",
+      "source": "file",
+      "workers": 8
+    },
+    {
+      "batch_csv": "few-large-instrumented-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 82361.90060000001,
+              "delta_pct": 0.29931257887516316,
+              "serial": 82116.11673333333
+            },
+            "p50_us": {
+              "batch": 82474.815,
+              "delta_pct": 0.4326009276839204,
+              "serial": 82119.565
+            },
+            "p95_us": {
+              "batch": 82566.886,
+              "delta_pct": 0.056555838389950715,
+              "serial": 82520.216
+            },
+            "p99_us": {
+              "batch": 82760.607,
+              "delta_pct": 0.13827595750262298,
+              "serial": 82646.327
+            }
+          },
+          "rss": {
+            "batch_kib": 20188,
+            "delta_pct": -0.2963255630185697,
+            "serial_kib": 20248
+          },
+          "throughput": {
+            "batch_bytes_s": 50925293.970207386,
+            "delta_pct": -0.2984193721564803,
+            "serial_bytes_s": 51077719.78088936
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 82271.32979999999,
+                "delta_pct": 0.086625782470068,
+                "serial": 82200.1233
+              },
+              "p50_us": {
+                "batch": 82443.696,
+                "delta_pct": 0.331894564960426,
+                "serial": 82170.975
+              },
+              "p95_us": {
+                "batch": 82566.886,
+                "delta_pct": -0.03078978920994002,
+                "serial": 82592.316
+              },
+              "p99_us": {
+                "batch": 82586.566,
+                "delta_pct": -0.0723093235589267,
+                "serial": 82646.327
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 50981356.56973421,
+              "delta_pct": -0.08655080715615746,
+              "serial_bytes_s": 51025519.56877661
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 82452.4714,
+                "delta_pct": 0.5124349873229778,
+                "serial": 82032.11016666667
+              },
+              "p50_us": {
+                "batch": 82493.006,
+                "delta_pct": 0.5514857260123119,
+                "serial": 82040.564
+              },
+              "p95_us": {
+                "batch": 82605.726,
+                "delta_pct": 0.21102299191030058,
+                "serial": 82431.776
+              },
+              "p99_us": {
+                "batch": 82760.607,
+                "delta_pct": 0.29131164659094355,
+                "serial": 82520.216
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 50869354.53580595,
+              "delta_pct": -0.5098224785695462,
+              "serial_bytes_s": 51130026.906272784
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 1
+    },
+    {
+      "batch_csv": "few-large-instrumented-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 39980.80998333333,
+              "delta_pct": -51.31185987134734,
+              "serial": 82116.11673333333
+            },
+            "p50_us": {
+              "batch": 39924.873,
+              "delta_pct": -51.38202083754341,
+              "serial": 82119.565
+            },
+            "p95_us": {
+              "batch": 40228.214,
+              "delta_pct": -51.25047418683442,
+              "serial": 82520.216
+            },
+            "p99_us": {
+              "batch": 40303.185,
+              "delta_pct": -51.23414861497718,
+              "serial": 82646.327
+            }
+          },
+          "rss": {
+            "batch_kib": 23128,
+            "delta_pct": 14.223627024891348,
+            "serial_kib": 20248
+          },
+          "throughput": {
+            "batch_bytes_s": 104907929.62294824,
+            "delta_pct": 105.3888272087654,
+            "serial_bytes_s": 51077719.78088936
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 39997.43716666666,
+                "delta_pct": -51.34139030340523,
+                "serial": 82200.1233
+              },
+              "p50_us": {
+                "batch": 39922.343,
+                "delta_pct": -51.415517462218254,
+                "serial": 82170.975
+              },
+              "p95_us": {
+                "batch": 40248.654,
+                "delta_pct": -51.2682826329752,
+                "serial": 82592.316
+              },
+              "p99_us": {
+                "batch": 40303.185,
+                "delta_pct": -51.23414861497718,
+                "serial": 82646.327
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 104864318.74428888,
+              "delta_pct": 105.51347566964738,
+              "serial_bytes_s": 51025519.56877661
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 39964.182799999995,
+                "delta_pct": -51.282268956870944,
+                "serial": 82032.11016666667
+              },
+              "p50_us": {
+                "batch": 39924.873,
+                "delta_pct": -51.335204131458674,
+                "serial": 82040.564
+              },
+              "p95_us": {
+                "batch": 40218.645,
+                "delta_pct": -51.20977983053526,
+                "serial": 82431.776
+              },
+              "p99_us": {
+                "batch": 40274.864,
+                "delta_pct": -51.19394258492974,
+                "serial": 82520.216
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 104951576.79040544,
+              "delta_pct": 105.26407502736843,
+              "serial_bytes_s": 51130026.906272784
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 2
+    },
+    {
+      "batch_csv": "few-large-instrumented-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 20090.4304,
+              "delta_pct": -75.53412021997784,
+              "serial": 82116.11673333333
+            },
+            "p50_us": {
+              "batch": 20028.232,
+              "delta_pct": -75.61088883020751,
+              "serial": 82119.565
+            },
+            "p95_us": {
+              "batch": 20332.733,
+              "delta_pct": -75.36030080192712,
+              "serial": 82520.216
+            },
+            "p99_us": {
+              "batch": 20715.604,
+              "delta_pct": -74.9346344212006,
+              "serial": 82646.327
+            }
+          },
+          "rss": {
+            "batch_kib": 25176,
+            "delta_pct": 24.338206242591863,
+            "serial_kib": 20248
+          },
+          "throughput": {
+            "batch_bytes_s": 208771236.677936,
+            "delta_pct": 308.73249153155695,
+            "serial_bytes_s": 51077719.78088936
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 20121.167233333334,
+                "delta_pct": -75.52173108074483,
+                "serial": 82200.1233
+              },
+              "p50_us": {
+                "batch": 20067.272,
+                "delta_pct": -75.57863710391656,
+                "serial": 82170.975
+              },
+              "p95_us": {
+                "batch": 20674.804,
+                "delta_pct": -74.96764226831948,
+                "serial": 82592.316
+              },
+              "p99_us": {
+                "batch": 20715.604,
+                "delta_pct": -74.9346344212006,
+                "serial": 82646.327
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 208452320.4524432,
+              "delta_pct": 308.5256205406653,
+              "serial_bytes_s": 51025519.56877661
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 20059.69356666667,
+                "delta_pct": -75.54653473388544,
+                "serial": 82032.11016666667
+              },
+              "p50_us": {
+                "batch": 20006.612,
+                "delta_pct": -75.61375614141318,
+                "serial": 82040.564
+              },
+              "p95_us": {
+                "batch": 20258.423,
+                "delta_pct": -75.4240124584966,
+                "serial": 82431.776
+              },
+              "p99_us": {
+                "batch": 20332.733,
+                "delta_pct": -75.36030080192712,
+                "serial": 82520.216
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 209091130.2338987,
+              "delta_pct": 308.9399964861876,
+              "serial_bytes_s": 51130026.906272784
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 4
+    },
+    {
+      "batch_csv": "few-large-instrumented-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 20076.829550000002,
+              "delta_pct": -75.55068316832592,
+              "serial": 82116.11673333333
+            },
+            "p50_us": {
+              "batch": 20016.392,
+              "delta_pct": -75.6253068315693,
+              "serial": 82119.565
+            },
+            "p95_us": {
+              "batch": 20260.522,
+              "delta_pct": -75.44780784383794,
+              "serial": 82520.216
+            },
+            "p99_us": {
+              "batch": 20707.005,
+              "delta_pct": -74.94503899731684,
+              "serial": 82646.327
+            }
+          },
+          "rss": {
+            "batch_kib": 25432,
+            "delta_pct": 25.602528644804426,
+            "serial_kib": 20248
+          },
+          "throughput": {
+            "batch_bytes_s": 208912666.69143984,
+            "delta_pct": 309.0093833233412,
+            "serial_bytes_s": 51077719.78088936
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 20124.804466666665,
+                "delta_pct": -75.51730622931235,
+                "serial": 82200.1233
+              },
+              "p50_us": {
+                "batch": 20051.521,
+                "delta_pct": -75.59780567286685,
+                "serial": 82170.975
+              },
+              "p95_us": {
+                "batch": 20687.374,
+                "delta_pct": -74.95242293484058,
+                "serial": 82592.316
+              },
+              "p99_us": {
+                "batch": 20707.005,
+                "delta_pct": -74.94503899731684,
+                "serial": 82646.327
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 208414646.06263155,
+              "delta_pct": 308.45178613362725,
+              "serial_bytes_s": 51025519.56877661
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 20028.854633333332,
+                "delta_pct": -75.58412846793748,
+                "serial": 82032.11016666667
+              },
+              "p50_us": {
+                "batch": 20008.072,
+                "delta_pct": -75.61197653394971,
+                "serial": 82040.564
+              },
+              "p95_us": {
+                "batch": 20180.572,
+                "delta_pct": -75.51845540729342,
+                "serial": 82431.776
+              },
+              "p99_us": {
+                "batch": 20238.623,
+                "delta_pct": -75.47434558339013,
+                "serial": 82520.216
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 209413073.1279843,
+              "delta_pct": 309.5696517270811,
+              "serial_bytes_s": 51130026.906272784
+            }
+          }
+        }
+      },
+      "corpus": "few-large",
+      "serial_csv": "few-large-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 8
+    },
+    {
+      "batch_csv": "many-small-owned-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 94.49633333333333,
+              "delta_pct": -0.7231556903422961,
+              "serial": 95.18466666666667
+            },
+            "p50_us": {
+              "batch": 93.92,
+              "delta_pct": -0.8979540154688661,
+              "serial": 94.771
+            },
+            "p95_us": {
+              "batch": 98.71,
+              "delta_pct": -2.121963311849282,
+              "serial": 100.85
+            },
+            "p99_us": {
+              "batch": 105.361,
+              "delta_pct": 2.551099863733706,
+              "serial": 102.74
+            }
+          },
+          "rss": {
+            "batch_kib": 17176,
+            "delta_pct": -0.37122969837587005,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 11096472879.018234,
+            "delta_pct": 0.7284233250672874,
+            "serial_bytes_s": 11016228103.966326
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 95.37036666666667,
+                "delta_pct": -0.7785168333587653,
+                "serial": 96.11866666666667
+              },
+              "p50_us": {
+                "batch": 94.6,
+                "delta_pct": -1.2020762185251437,
+                "serial": 95.751
+              },
+              "p95_us": {
+                "batch": 100.48,
+                "delta_pct": -1.95160031225605,
+                "serial": 102.48
+              },
+              "p99_us": {
+                "batch": 105.361,
+                "delta_pct": 2.551099863733706,
+                "serial": 102.74
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 10994777902.709822,
+              "delta_pct": 0.7846252731893355,
+              "serial_bytes_s": 10909181705.946815
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 93.6223,
+                "delta_pct": -0.6666973177908536,
+                "serial": 94.25066666666666
+              },
+              "p50_us": {
+                "batch": 92.9,
+                "delta_pct": -0.5353319057815845,
+                "serial": 93.4
+              },
+              "p95_us": {
+                "batch": 98.411,
+                "delta_pct": -2.418443232523543,
+                "serial": 100.85
+              },
+              "p99_us": {
+                "batch": 98.71,
+                "delta_pct": -2.749726603678792,
+                "serial": 101.501
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 11200066650.787258,
+              "delta_pct": 0.6711720035361856,
+              "serial_bytes_s": 11125396106.835672
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 1
+    },
+    {
+      "batch_csv": "many-small-owned-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 686.7043333333334,
+              "delta_pct": 621.4442802412153,
+              "serial": 95.18466666666667
+            },
+            "p50_us": {
+              "batch": 677.783,
+              "delta_pct": 615.1797490793598,
+              "serial": 94.771
+            },
+            "p95_us": {
+              "batch": 747.873,
+              "delta_pct": 641.569657907784,
+              "serial": 100.85
+            },
+            "p99_us": {
+              "batch": 768.793,
+              "delta_pct": 648.2898578937123,
+              "serial": 102.74
+            }
+          },
+          "rss": {
+            "batch_kib": 17944,
+            "delta_pct": 4.083526682134571,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 1526968666.281898,
+            "delta_pct": -86.13891568083886,
+            "serial_bytes_s": 11016228103.966326
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 698.4945,
+                "delta_pct": 626.700155363509,
+                "serial": 96.11866666666667
+              },
+              "p50_us": {
+                "batch": 687.722,
+                "delta_pct": 618.240018381009,
+                "serial": 95.751
+              },
+              "p95_us": {
+                "batch": 762.823,
+                "delta_pct": 644.3628024980484,
+                "serial": 102.48
+              },
+              "p99_us": {
+                "batch": 768.793,
+                "delta_pct": 648.2898578937123,
+                "serial": 102.74
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1501194354.4294193,
+              "delta_pct": -86.23916628310364,
+              "serial_bytes_s": 10909181705.946815
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 674.9141666666667,
+                "delta_pct": 616.0842363626075,
+                "serial": 94.25066666666666
+              },
+              "p50_us": {
+                "batch": 669.072,
+                "delta_pct": 616.3511777301927,
+                "serial": 93.4
+              },
+              "p95_us": {
+                "batch": 714.632,
+                "delta_pct": 608.6088249876053,
+                "serial": 100.85
+              },
+              "p99_us": {
+                "batch": 729.783,
+                "delta_pct": 618.9909459020108,
+                "serial": 101.501
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1553643487.9990911,
+              "delta_pct": -86.03516249597172,
+              "serial_bytes_s": 11125396106.835672
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 2
+    },
+    {
+      "batch_csv": "many-small-owned-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct",
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 563.26855,
+              "delta_pct": 491.76395707992185,
+              "serial": 95.18466666666667
+            },
+            "p50_us": {
+              "batch": 560.022,
+              "delta_pct": 490.92127338531833,
+              "serial": 94.771
+            },
+            "p95_us": {
+              "batch": 653.393,
+              "delta_pct": 547.8859692612792,
+              "serial": 100.85
+            },
+            "p99_us": {
+              "batch": 694.313,
+              "delta_pct": 575.7961845435078,
+              "serial": 102.74
+            }
+          },
+          "rss": {
+            "batch_kib": 18648,
+            "delta_pct": 8.167053364269142,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 1861591597.8266494,
+            "delta_pct": -83.10137026704817,
+            "serial_bytes_s": 11016228103.966326
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 577.0857666666667,
+                "delta_pct": 500.38885960410045,
+                "serial": 96.11866666666667
+              },
+              "p50_us": {
+                "batch": 566.672,
+                "delta_pct": 491.81836221031637,
+                "serial": 95.751
+              },
+              "p95_us": {
+                "batch": 662.502,
+                "delta_pct": 546.4695550351288,
+                "serial": 102.48
+              },
+              "p99_us": {
+                "batch": 694.313,
+                "delta_pct": 575.7961845435078,
+                "serial": 102.74
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1817019341.9545436,
+              "delta_pct": -83.34412799299099,
+              "serial_bytes_s": 10909181705.946815
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 549.4513333333333,
+                "delta_pct": 482.9681133997284,
+                "serial": 94.25066666666666
+              },
+              "p50_us": {
+                "batch": 536.972,
+                "delta_pct": 474.91648822269804,
+                "serial": 93.4
+              },
+              "p95_us": {
+                "batch": 627.502,
+                "delta_pct": 522.2131879028259,
+                "serial": 100.85
+              },
+              "p99_us": {
+                "batch": 669.682,
+                "delta_pct": 559.7787213919075,
+                "serial": 101.501
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1908405597.3413477,
+              "delta_pct": -82.84640313913151,
+              "serial_bytes_s": 11125396106.835672
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 4
+    },
+    {
+      "batch_csv": "many-small-owned-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct",
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 481.1497166666667,
+              "delta_pct": 405.4907828291672,
+              "serial": 95.18466666666667
+            },
+            "p50_us": {
+              "batch": 480.612,
+              "delta_pct": 407.1298181933292,
+              "serial": 94.771
+            },
+            "p95_us": {
+              "batch": 546.692,
+              "delta_pct": 442.08428358948936,
+              "serial": 100.85
+            },
+            "p99_us": {
+              "batch": 587.762,
+              "delta_pct": 472.0868211018104,
+              "serial": 102.74
+            }
+          },
+          "rss": {
+            "batch_kib": 19932,
+            "delta_pct": 15.614849187935034,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 2179313348.170249,
+            "delta_pct": -80.21724561616875,
+            "serial_bytes_s": 11016228103.966326
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 485.3113333333333,
+                "delta_pct": 404.9085158623368,
+                "serial": 96.11866666666667
+              },
+              "p50_us": {
+                "batch": 487.441,
+                "delta_pct": 409.0714457290262,
+                "serial": 95.751
+              },
+              "p95_us": {
+                "batch": 538.232,
+                "delta_pct": 425.2068696330991,
+                "serial": 102.48
+              },
+              "p99_us": {
+                "batch": 546.692,
+                "delta_pct": 432.1121277009928,
+                "serial": 102.74
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 2160625412.965148,
+              "delta_pct": -80.19443189045656,
+              "serial_bytes_s": 10909181705.946815
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 476.9881,
+                "delta_pct": 406.0845900294251,
+                "serial": 94.25066666666666
+              },
+              "p50_us": {
+                "batch": 471.601,
+                "delta_pct": 404.9261241970022,
+                "serial": 93.4
+              },
+              "p95_us": {
+                "batch": 557.312,
+                "delta_pct": 452.61477441745166,
+                "serial": 100.85
+              },
+              "p99_us": {
+                "batch": 587.762,
+                "delta_pct": 479.0701569442665,
+                "serial": 101.501
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 2198327379.6558027,
+              "delta_pct": -80.24045743139784,
+              "serial_bytes_s": 11125396106.835672
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-owned-serial-w1.csv",
+      "source": "owned",
+      "workers": 8
+    },
+    {
+      "batch_csv": "many-small-file-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 205.00756666666666,
+              "delta_pct": 11.563289558905007,
+              "serial": 183.75898333333333
+            },
+            "p50_us": {
+              "batch": 201.81,
+              "delta_pct": 10.725827247738136,
+              "serial": 182.261
+            },
+            "p95_us": {
+              "batch": 235.981,
+              "delta_pct": 23.239903698017038,
+              "serial": 191.481
+            },
+            "p99_us": {
+              "batch": 238.36,
+              "delta_pct": 21.985670419652,
+              "serial": 195.4
+            }
+          },
+          "rss": {
+            "batch_kib": 17116,
+            "delta_pct": -0.7192575406032483,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 5114816087.276128,
+            "delta_pct": -10.364780031696403,
+            "serial_bytes_s": 5706257081.853323
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 208.37943333333334,
+                "delta_pct": 12.596753247922821,
+                "serial": 185.067
+              },
+              "p50_us": {
+                "batch": 203.491,
+                "delta_pct": 10.984396049108003,
+                "serial": 183.351
+              },
+              "p95_us": {
+                "batch": 237.781,
+                "delta_pct": 21.74480700011776,
+                "serial": 195.311
+              },
+              "p99_us": {
+                "batch": 238.36,
+                "delta_pct": 21.985670419652,
+                "serial": 195.4
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 5032051307.686635,
+              "delta_pct": -11.187492431674722,
+              "serial_bytes_s": 5665926394.224794
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 201.63569999999999,
+                "delta_pct": 10.515007776518566,
+                "serial": 182.4509666666667
+              },
+              "p50_us": {
+                "batch": 200.361,
+                "delta_pct": 10.361332966125023,
+                "serial": 181.55
+              },
+              "p95_us": {
+                "batch": 206.761,
+                "delta_pct": 9.379992593768183,
+                "serial": 189.03
+              },
+              "p99_us": {
+                "batch": 207.111,
+                "delta_pct": 8.162689770786656,
+                "serial": 191.481
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 5200348946.143962,
+              "delta_pct": -9.514551903920449,
+              "serial_bytes_s": 5747166042.237102
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-file-serial-w1.csv",
+      "source": "file",
+      "workers": 1
+    },
+    {
+      "batch_csv": "many-small-file-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct",
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 735.09665,
+              "delta_pct": 300.03304146853947,
+              "serial": 183.75898333333333
+            },
+            "p50_us": {
+              "batch": 727.712,
+              "delta_pct": 299.2691799123236,
+              "serial": 182.261
+            },
+            "p95_us": {
+              "batch": 823.753,
+              "delta_pct": 330.20090766185683,
+              "serial": 191.481
+            },
+            "p99_us": {
+              "batch": 863.973,
+              "delta_pct": 342.1560900716479,
+              "serial": 195.4
+            }
+          },
+          "rss": {
+            "batch_kib": 18204,
+            "delta_pct": 5.591647331786543,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 1426446440.7503421,
+            "delta_pct": -75.00206492121364,
+            "serial_bytes_s": 5706257081.853323
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 745.2920333333333,
+                "delta_pct": 302.7147105282591,
+                "serial": 185.067
+              },
+              "p50_us": {
+                "batch": 731.513,
+                "delta_pct": 298.9686448396791,
+                "serial": 183.351
+              },
+              "p95_us": {
+                "batch": 829.903,
+                "delta_pct": 324.91359933644287,
+                "serial": 195.311
+              },
+              "p99_us": {
+                "batch": 863.973,
+                "delta_pct": 342.1560900716479,
+                "serial": 195.4
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1406933058.5894272,
+              "delta_pct": -75.16852566204362,
+              "serial_bytes_s": 5665926394.224794
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 724.9012666666666,
+                "delta_pct": 297.31292188275603,
+                "serial": 182.4509666666667
+              },
+              "p50_us": {
+                "batch": 721.613,
+                "delta_pct": 297.47342329936663,
+                "serial": 181.55
+              },
+              "p95_us": {
+                "batch": 766.153,
+                "delta_pct": 305.30762312860395,
+                "serial": 189.03
+              },
+              "p99_us": {
+                "batch": 778.872,
+                "delta_pct": 306.76202860858257,
+                "serial": 191.481
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1446508715.3478096,
+              "delta_pct": -74.83092180185642,
+              "serial_bytes_s": 5747166042.237102
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-file-serial-w1.csv",
+      "source": "file",
+      "workers": 2
+    },
+    {
+      "batch_csv": "many-small-file-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct",
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 581.3300333333334,
+              "delta_pct": 216.35461994193668,
+              "serial": 183.75898333333333
+            },
+            "p50_us": {
+              "batch": 577.152,
+              "delta_pct": 216.6623688007857,
+              "serial": 182.261
+            },
+            "p95_us": {
+              "batch": 633.243,
+              "delta_pct": 230.70800758299782,
+              "serial": 191.481
+            },
+            "p99_us": {
+              "batch": 855.573,
+              "delta_pct": 337.8572159672467,
+              "serial": 195.4
+            }
+          },
+          "rss": {
+            "batch_kib": 18396,
+            "delta_pct": 6.705336426914153,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 1803753358.4622986,
+            "delta_pct": -68.38990370415522,
+            "serial_bytes_s": 5706257081.853323
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 594.197,
+                "delta_pct": 221.07128769580746,
+                "serial": 185.067
+              },
+              "p50_us": {
+                "batch": 589.012,
+                "delta_pct": 221.24831607136036,
+                "serial": 183.351
+              },
+              "p95_us": {
+                "batch": 669.093,
+                "delta_pct": 242.5782470009369,
+                "serial": 195.311
+              },
+              "p99_us": {
+                "batch": 669.632,
+                "delta_pct": 242.69805527123847,
+                "serial": 195.4
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1764694200.744871,
+              "delta_pct": -68.85426887042512,
+              "serial_bytes_s": 5665926394.224794
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 568.4630666666667,
+                "delta_pct": 211.5703232777245,
+                "serial": 182.4509666666667
+              },
+              "p50_us": {
+                "batch": 557.202,
+                "delta_pct": 206.91379785183142,
+                "serial": 181.55
+              },
+              "p95_us": {
+                "batch": 617.852,
+                "delta_pct": 226.8539385282759,
+                "serial": 189.03
+              },
+              "p99_us": {
+                "batch": 855.573,
+                "delta_pct": 346.81874441850624,
+                "serial": 191.481
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1844580697.4736323,
+              "delta_pct": -67.90451704514138,
+              "serial_bytes_s": 5747166042.237102
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-file-serial-w1.csv",
+      "source": "file",
+      "workers": 4
+    },
+    {
+      "batch_csv": "many-small-file-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [
+            "latency_p50_us_regression_gt_5pct",
+            "latency_p95_us_regression_gt_5pct",
+            "latency_p99_us_regression_gt_5pct",
+            "latency_mean_us_regression_gt_5pct",
+            "throughput_regression_gt_5pct",
+            "rss_regression_gt_5pct"
+          ],
+          "latency": {
+            "mean_us": {
+              "batch": 519.21495,
+              "delta_pct": 182.5521455232257,
+              "serial": 183.75898333333333
+            },
+            "p50_us": {
+              "batch": 512.802,
+              "delta_pct": 181.3558578083079,
+              "serial": 182.261
+            },
+            "p95_us": {
+              "batch": 578.923,
+              "delta_pct": 202.33965772060935,
+              "serial": 191.481
+            },
+            "p99_us": {
+              "batch": 754.173,
+              "delta_pct": 285.96366427840326,
+              "serial": 195.4
+            }
+          },
+          "rss": {
+            "batch_kib": 19480,
+            "delta_pct": 12.993039443155453,
+            "serial_kib": 17240
+          },
+          "throughput": {
+            "batch_bytes_s": 2019541232.3932507,
+            "delta_pct": -64.60830272061055,
+            "serial_bytes_s": 5706257081.853323
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 527.7069666666666,
+                "delta_pct": 185.14374073533725,
+                "serial": 185.067
+              },
+              "p50_us": {
+                "batch": 521.402,
+                "delta_pct": 184.3736876264651,
+                "serial": 183.351
+              },
+              "p95_us": {
+                "batch": 584.292,
+                "delta_pct": 199.15980154727586,
+                "serial": 195.311
+              },
+              "p99_us": {
+                "batch": 588.312,
+                "delta_pct": 201.0808597748209,
+                "serial": 195.4
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 1987042177.2588563,
+              "delta_pct": -64.9299683934436,
+              "serial_bytes_s": 5665926394.224794
+            }
+          },
+          "1": {
+            "adverse_flags": [
+              "latency_p50_us_regression_gt_5pct",
+              "latency_p95_us_regression_gt_5pct",
+              "latency_p99_us_regression_gt_5pct",
+              "latency_mean_us_regression_gt_5pct",
+              "throughput_regression_gt_5pct"
+            ],
+            "latency": {
+              "mean_us": {
+                "batch": 510.72293333333334,
+                "delta_pct": 179.92339128923953,
+                "serial": 182.4509666666667
+              },
+              "p50_us": {
+                "batch": 500.931,
+                "delta_pct": 175.91903057009085,
+                "serial": 181.55
+              },
+              "p95_us": {
+                "batch": 568.292,
+                "delta_pct": 200.6358779029784,
+                "serial": 189.03
+              },
+              "p99_us": {
+                "batch": 754.173,
+                "delta_pct": 293.8630986886427,
+                "serial": 191.481
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 2053121039.9271934,
+              "delta_pct": -64.27594009224049,
+              "serial_bytes_s": 5747166042.237102
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-file-serial-w1.csv",
+      "source": "file",
+      "workers": 8
+    },
+    {
+      "batch_csv": "many-small-instrumented-batch-w1.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 29655.281766666667,
+              "delta_pct": 0.2045834559034658,
+              "serial": 29594.735833333332
+            },
+            "p50_us": {
+              "batch": 29600.096,
+              "delta_pct": 0.0924499563043774,
+              "serial": 29572.756
+            },
+            "p95_us": {
+              "batch": 29994.867,
+              "delta_pct": 1.1203012606094533,
+              "serial": 29662.557
+            },
+            "p99_us": {
+              "batch": 30074.738,
+              "delta_pct": -0.23088913082117957,
+              "serial": 30144.338
+            }
+          },
+          "rss": {
+            "batch_kib": 17132,
+            "delta_pct": -0.6495012758060775,
+            "serial_kib": 17244
+          },
+          "throughput": {
+            "batch_bytes_s": 35358827.75454279,
+            "delta_pct": -0.20416576652253662,
+            "serial_bytes_s": 35431166.066329986
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 29577.065733333337,
+                "delta_pct": -0.0847184126164154,
+                "serial": 29602.1442
+              },
+              "p50_us": {
+                "batch": 29569.176,
+                "delta_pct": -0.03205351750757233,
+                "serial": 29578.657
+              },
+              "p95_us": {
+                "batch": 29653.467,
+                "delta_pct": -0.03064469458920937,
+                "serial": 29662.557
+              },
+              "p99_us": {
+                "batch": 29673.376,
+                "delta_pct": -1.5623564199684847,
+                "serial": 30144.338
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 35452333.556477696,
+              "delta_pct": 0.08479024556652758,
+              "serial_bytes_s": 35422298.902253166
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 29733.4978,
+                "delta_pct": 0.4940302009298137,
+                "serial": 29587.327466666666
+              },
+              "p50_us": {
+                "batch": 29658.466,
+                "delta_pct": 0.3052263958028445,
+                "serial": 29568.216
+              },
+              "p95_us": {
+                "batch": 30052.958,
+                "delta_pct": 1.074856406272456,
+                "serial": 29733.367
+              },
+              "p99_us": {
+                "batch": 30074.738,
+                "delta_pct": 0.08919081236124393,
+                "serial": 30047.938
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 35265813.89963478,
+              "delta_pct": -0.4916015408497544,
+              "serial_bytes_s": 35440037.67090267
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 1
+    },
+    {
+      "batch_csv": "many-small-instrumented-batch-w2.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 16052.9745,
+              "delta_pct": -45.757331336206384,
+              "serial": 29594.735833333332
+            },
+            "p50_us": {
+              "batch": 16040.217,
+              "delta_pct": -45.76015505622811,
+              "serial": 29572.756
+            },
+            "p95_us": {
+              "batch": 16056.848,
+              "delta_pct": -45.868294496661235,
+              "serial": 29662.557
+            },
+            "p99_us": {
+              "batch": 17043.521,
+              "delta_pct": -43.460290950824664,
+              "serial": 30144.338
+            }
+          },
+          "rss": {
+            "batch_kib": 17048,
+            "delta_pct": -1.1366272326606355,
+            "serial_kib": 17244
+          },
+          "throughput": {
+            "batch_bytes_s": 65319732.48945235,
+            "delta_pct": 84.35671117108754,
+            "serial_bytes_s": 35431166.066329986
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 16035.8104,
+                "delta_pct": -45.8288889762249,
+                "serial": 29602.1442
+              },
+              "p50_us": {
+                "batch": 16039.307,
+                "delta_pct": -45.77405255417783,
+                "serial": 29578.657
+              },
+              "p95_us": {
+                "batch": 16045.168,
+                "delta_pct": -45.90767073789357,
+                "serial": 29662.557
+              },
+              "p99_us": {
+                "batch": 16045.257,
+                "delta_pct": -46.7719045613143,
+                "serial": 30144.338
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 65389648.15897299,
+              "delta_pct": 84.60023822681266,
+              "serial_bytes_s": 35422298.902253166
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 16070.1386,
+                "delta_pct": -45.685737861573486,
+                "serial": 29587.327466666666
+              },
+              "p50_us": {
+                "batch": 16041.278,
+                "delta_pct": -45.74823858159045,
+                "serial": 29568.216
+              },
+              "p95_us": {
+                "batch": 16143.658,
+                "delta_pct": -45.705247575896806,
+                "serial": 29733.367
+              },
+              "p99_us": {
+                "batch": 17043.521,
+                "delta_pct": -43.2788998699345,
+                "serial": 30047.938
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 65249966.17017354,
+              "delta_pct": 84.11370432527987,
+              "serial_bytes_s": 35440037.67090267
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 2
+    },
+    {
+      "batch_csv": "many-small-instrumented-batch-w4.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 8043.983116666667,
+              "delta_pct": -72.81954749666487,
+              "serial": 29594.735833333332
+            },
+            "p50_us": {
+              "batch": 8016.389,
+              "delta_pct": -72.89265498284976,
+              "serial": 29572.756
+            },
+            "p95_us": {
+              "batch": 8155.029,
+              "delta_pct": -72.50732969514394,
+              "serial": 29662.557
+            },
+            "p99_us": {
+              "batch": 8418.76,
+              "delta_pct": -72.07183650873343,
+              "serial": 30144.338
+            }
+          },
+          "rss": {
+            "batch_kib": 17684,
+            "delta_pct": 2.5516121549524473,
+            "serial_kib": 17244
+          },
+          "throughput": {
+            "batch_bytes_s": 130355320.83942485,
+            "delta_pct": 267.9114613258543,
+            "serial_bytes_s": 35431166.066329986
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 8065.0062333333335,
+                "delta_pct": -72.75533090155903,
+                "serial": 29602.1442
+              },
+              "p50_us": {
+                "batch": 8038.449,
+                "delta_pct": -72.82348214795553,
+                "serial": 29578.657
+              },
+              "p95_us": {
+                "batch": 8404.43,
+                "delta_pct": -71.66653569346703,
+                "serial": 29662.557
+              },
+              "p99_us": {
+                "batch": 8418.76,
+                "delta_pct": -72.07183650873343,
+                "serial": 30144.338
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 130015522.57531424,
+              "delta_pct": 267.0442817223365,
+              "serial_bytes_s": 35422298.902253166
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 8022.96,
+                "delta_pct": -72.88379625013873,
+                "serial": 29587.327466666666
+              },
+              "p50_us": {
+                "batch": 8014.479,
+                "delta_pct": -72.89495247193811,
+                "serial": 29568.216
+              },
+              "p95_us": {
+                "batch": 8086.709,
+                "delta_pct": -72.80257900156413,
+                "serial": 29733.367
+              },
+              "p99_us": {
+                "batch": 8092.259,
+                "delta_pct": -73.0688375355407,
+                "serial": 30047.938
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 130696899.89729476,
+              "delta_pct": 268.7831855906881,
+              "serial_bytes_s": 35440037.67090267
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 4
+    },
+    {
+      "batch_csv": "many-small-instrumented-batch-w8.csv",
+      "comparison": {
+        "aggregate": {
+          "adverse_flags": [],
+          "latency": {
+            "mean_us": {
+              "batch": 4192.598666666667,
+              "delta_pct": -85.83329585951421,
+              "serial": 29594.735833333332
+            },
+            "p50_us": {
+              "batch": 4190.625,
+              "delta_pct": -85.82944044849928,
+              "serial": 29572.756
+            },
+            "p95_us": {
+              "batch": 4250.525,
+              "delta_pct": -85.67040258869118,
+              "serial": 29662.557
+            },
+            "p99_us": {
+              "batch": 4290.405,
+              "delta_pct": -85.76712814194163,
+              "serial": 30144.338
+            }
+          },
+          "rss": {
+            "batch_kib": 17244,
+            "delta_pct": 0.0,
+            "serial_kib": 17244
+          },
+          "throughput": {
+            "batch_bytes_s": 250101687.13183138,
+            "delta_pct": 605.8804857385189,
+            "serial_bytes_s": 35431166.066329986
+          }
+        },
+        "repeats": {
+          "0": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 4197.6627,
+                "delta_pct": -85.81973430154427,
+                "serial": 29602.1442
+              },
+              "p50_us": {
+                "batch": 4192.205,
+                "delta_pct": -85.82692581343365,
+                "serial": 29578.657
+              },
+              "p95_us": {
+                "batch": 4255.745,
+                "delta_pct": -85.65280464526373,
+                "serial": 29662.557
+              },
+              "p99_us": {
+                "batch": 4290.405,
+                "delta_pct": -85.76712814194163,
+                "serial": 30144.338
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 249799966.06206593,
+              "delta_pct": 605.2054039501554,
+              "serial_bytes_s": 35422298.902253166
+            }
+          },
+          "1": {
+            "adverse_flags": [],
+            "latency": {
+              "mean_us": {
+                "batch": 4187.534633333334,
+                "delta_pct": -85.84686420883723,
+                "serial": 29587.327466666666
+              },
+              "p50_us": {
+                "batch": 4188.475,
+                "delta_pct": -85.83453597606295,
+                "serial": 29568.216
+              },
+              "p95_us": {
+                "batch": 4231.495,
+                "delta_pct": -85.76853068809865,
+                "serial": 29733.367
+              },
+              "p99_us": {
+                "batch": 4265.335,
+                "delta_pct": -85.80489949094012,
+                "serial": 30047.938
+              }
+            },
+            "throughput": {
+              "batch_bytes_s": 250404137.9510501,
+              "delta_pct": 606.5572002950759,
+              "serial_bytes_s": 35440037.67090267
+            }
+          }
+        }
+      },
+      "corpus": "many-small",
+      "serial_csv": "many-small-instrumented-serial-w1.csv",
+      "source": "instrumented",
+      "workers": 8
+    }
+  ],
+  "expected_csv_count": 30,
+  "final_dir": "/home/zhuhe/code/litchi/docs/performance/results/change-0498/final",
+  "flag_summary": {
+    "aggregate_comparison_rows": 24,
+    "aggregate_flags": {
+      "latency_mean_us_regression_gt_5pct": 7,
+      "latency_p50_us_regression_gt_5pct": 7,
+      "latency_p95_us_regression_gt_5pct": 7,
+      "latency_p99_us_regression_gt_5pct": 8,
+      "rss_regression_gt_5pct": 14,
+      "throughput_regression_gt_5pct": 7
+    },
+    "per_repeat_comparison_rows": 48,
+    "per_repeat_flags_excluding_rss": {
+      "latency_mean_us_regression_gt_5pct": 14,
+      "latency_p50_us_regression_gt_5pct": 14,
+      "latency_p95_us_regression_gt_5pct": 14,
+      "latency_p99_us_regression_gt_5pct": 15,
+      "throughput_regression_gt_5pct": 14
+    },
+    "rss_scope": "aggregate comparison rows only; one whole-child receipt per capture"
+  },
+  "found_csv_count": 30,
+  "generated_at_utc": "2026-09-10T19:46:36+00:00",
+  "historical_baseline_note": "The retained before executable used data_with_accounting on its primary serial path, while the final serial control uses plain data() by default. Any before-versus-final latency comparison is therefore descriptive and has an accounting-path confound; this script does not merge historical baseline numbers into the matched batch/scaling tables.",
+  "measured_indexes": [
+    3,
+    32
+  ],
+  "repeats": [
+    0,
+    1
+  ],
+  "scaling": [
+    {
+      "baseline_csv": "few-large-owned-batch-w1.csv",
+      "batch_csv": "few-large-owned-batch-w2.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.5307927971914961,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 2.1312545800967317,
+          "efficiency": 2.1312545800967317,
+          "p50_speedup": 4.2625091601934635,
+          "throughput_speedup": 4.161553197896389
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.527511281331766,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 2.1164526484751205,
+            "efficiency": 2.1164526484751205,
+            "p50_speedup": 4.232905296950241,
+            "throughput_speedup": 4.121497545347411
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.5351217717506043,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 2.151100953395315,
+            "efficiency": 2.151100953395315,
+            "p50_speedup": 4.30220190679063,
+            "throughput_speedup": 4.202759151073926
+          }
+        },
+        "selected_parts": 4,
+        "workers": 2
+      },
+      "source": "owned",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "few-large-owned-batch-w1.csv",
+      "batch_csv": "few-large-owned-batch-w4.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.14454098772139146,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 1.7656083050024285,
+          "efficiency": 1.7656083050024285,
+          "p50_speedup": 7.062433220009714,
+          "throughput_speedup": 6.380067210778474
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.14106519673240694,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.7336899354530244,
+            "efficiency": 1.7336899354530244,
+            "p50_speedup": 6.934759741812098,
+            "throughput_speedup": 5.875628577246576
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.14582466564201665,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.7776955990220051,
+            "efficiency": 1.7776955990220051,
+            "p50_speedup": 7.1107823960880205,
+            "throughput_speedup": 6.985045732744516
+          }
+        },
+        "selected_parts": 4,
+        "workers": 4
+      },
+      "source": "owned",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "few-large-owned-batch-w1.csv",
+      "batch_csv": "few-large-owned-batch-w8.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": 0.01927923777038898,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+          "effective_efficiency": 1.7621849248666992,
+          "efficiency": 0.8810924624333496,
+          "p50_speedup": 7.048739699466797,
+          "throughput_speedup": 6.270995306642919
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.022141106400330544,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.731620105062082,
+            "efficiency": 0.865810052531041,
+            "p50_speedup": 6.926480420248328,
+            "throughput_speedup": 5.713591279744859
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.01670533255199261,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.7906107622214016,
+            "efficiency": 0.8953053811107008,
+            "p50_speedup": 7.162443048885606,
+            "throughput_speedup": 6.955551666036188
+          }
+        },
+        "selected_parts": 4,
+        "workers": 8
+      },
+      "source": "owned",
+      "workers": 8
+    },
+    {
+      "baseline_csv": "few-large-file-batch-w1.csv",
+      "batch_csv": "few-large-file-batch-w2.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.49334894889484093,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 1.9737450417179592,
+          "efficiency": 1.9737450417179592,
+          "p50_speedup": 3.9474900834359183,
+          "throughput_speedup": 3.5860437747501632
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.48482506990620267,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.9410882432068872,
+            "efficiency": 1.9410882432068872,
+            "p50_speedup": 3.8821764864137744,
+            "throughput_speedup": 3.3316995516916763
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.49583363700410565,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.9834722690695323,
+            "efficiency": 1.9834722690695323,
+            "p50_speedup": 3.9669445381390647,
+            "throughput_speedup": 3.882493179763212
+          }
+        },
+        "selected_parts": 4,
+        "workers": 2
+      },
+      "source": "file",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "few-large-file-batch-w1.csv",
+      "batch_csv": "few-large-file-batch-w4.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.12307765161358879,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 1.5853713469567128,
+          "efficiency": 1.5853713469567128,
+          "p50_speedup": 6.341485387826851,
+          "throughput_speedup": 5.689028711872627
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.12030334845224604,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.5647249541861397,
+            "efficiency": 1.5647249541861397,
+            "p50_speedup": 6.258899816744559,
+            "throughput_speedup": 5.2066259004396604
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.126534115820611,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.6118694129624866,
+            "efficiency": 1.6118694129624866,
+            "p50_speedup": 6.447477651849947,
+            "throughput_speedup": 6.270073959459724
+          }
+        },
+        "selected_parts": 4,
+        "workers": 4
+      },
+      "source": "file",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "few-large-file-batch-w1.csv",
+      "batch_csv": "few-large-file-batch-w8.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": 0.03871038957888968,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+          "effective_efficiency": 1.573597888790744,
+          "efficiency": 0.786798944395372,
+          "p50_speedup": 6.294391555162976,
+          "throughput_speedup": 5.779706528137139
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.03871038957888968,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.573597888790744,
+            "efficiency": 0.786798944395372,
+            "p50_speedup": 6.294391555162976,
+            "throughput_speedup": 5.500953039889817
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.03790753237378329,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.5805869445968184,
+            "efficiency": 0.7902934722984092,
+            "p50_speedup": 6.3223477783872735,
+            "throughput_speedup": 6.0882816748427535
+          }
+        },
+        "selected_parts": 4,
+        "workers": 8
+      },
+      "source": "file",
+      "workers": 8
+    },
+    {
+      "baseline_csv": "few-large-instrumented-batch-w1.csv",
+      "batch_csv": "few-large-instrumented-batch-w2.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.0318287346264432,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 1.0328751077054146,
+          "efficiency": 1.0328751077054146,
+          "p50_speedup": 2.065750215410829,
+          "throughput_speedup": 2.0600358180420537
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.031524666240096755,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.0325508199756712,
+            "efficiency": 1.0325508199756712,
+            "p50_speedup": 2.0651016399513424,
+            "throughput_speedup": 2.056915033260277
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.03204223155596975,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.0331029230825606,
+            "efficiency": 1.0331029230825606,
+            "p50_speedup": 2.066205846165121,
+            "throughput_speedup": 2.0631591996421355
+          }
+        },
+        "selected_parts": 4,
+        "workers": 2
+      },
+      "source": "instrumented",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "few-large-instrumented-batch-w1.csv",
+      "batch_csv": "few-large-instrumented-batch-w4.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": -0.009545891878225743,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+          "effective_efficiency": 1.0294819707500893,
+          "efficiency": 1.0294819707500893,
+          "p50_speedup": 4.117927883000357,
+          "throughput_speedup": 4.099558792926606
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.008792295451350593,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.0270914751143054,
+            "efficiency": 1.0270914751143054,
+            "p50_speedup": 4.108365900457222,
+            "throughput_speedup": 4.0887950905604935
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": -0.009966735846672847,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "superlinear_observed_simple_amdahl_invalid",
+            "effective_efficiency": 1.030821785317774,
+            "efficiency": 1.030821785317774,
+            "p50_speedup": 4.123287141271096,
+            "throughput_speedup": 4.110355481053402
+          }
+        },
+        "selected_parts": 4,
+        "workers": 4
+      },
+      "source": "instrumented",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "few-large-instrumented-batch-w1.csv",
+      "batch_csv": "few-large-instrumented-batch-w8.csv",
+      "corpus": "few-large",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": 0.1345108824173433,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+          "effective_efficiency": 1.0300909249778882,
+          "efficiency": 0.5150454624889441,
+          "p50_speedup": 4.120363699911553,
+          "throughput_speedup": 4.102335998564076
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.13510254492783952,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.0278982826290335,
+            "efficiency": 0.5139491413145167,
+            "p50_speedup": 4.111593130516134,
+            "throughput_speedup": 4.088056106893785
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": 0.13433445324010693,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "parallel_work_cap_simple_amdahl_invalid",
+            "effective_efficiency": 1.030746565686089,
+            "efficiency": 0.5153732828430445,
+            "p50_speedup": 4.122986262744356,
+            "throughput_speedup": 4.116684299199875
+          }
+        },
+        "selected_parts": 4,
+        "workers": 8
+      },
+      "source": "instrumented",
+      "workers": 8
+    },
+    {
+      "baseline_csv": "many-small-owned-batch-w1.csv",
+      "batch_csv": "many-small-owned-batch-w2.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.06928471206861193,
+          "efficiency": 0.06928471206861193,
+          "p50_speedup": 0.13856942413722387,
+          "throughput_speedup": 0.13760847099163975
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.06877779102602505,
+            "efficiency": 0.06877779102602505,
+            "p50_speedup": 0.1375555820520501,
+            "throughput_speedup": 0.13653703309999815
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.06942451634502715,
+            "efficiency": 0.06942451634502715,
+            "p50_speedup": 0.1388490326900543,
+            "throughput_speedup": 0.13871734306955083
+          }
+        },
+        "selected_parts": 64,
+        "workers": 2
+      },
+      "source": "owned",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "many-small-owned-batch-w1.csv",
+      "batch_csv": "many-small-owned-batch-w4.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.04192692429940252,
+          "efficiency": 0.04192692429940252,
+          "p50_speedup": 0.16770769719761008,
+          "throughput_speedup": 0.1677642633044812
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.04173490131857582,
+            "efficiency": 0.04173490131857582,
+            "p50_speedup": 0.1669396052743033,
+            "throughput_speedup": 0.16526203239691753
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.04325178966501047,
+            "efficiency": 0.04325178966501047,
+            "p50_speedup": 0.17300715866004188,
+            "throughput_speedup": 0.17039234290692412
+          }
+        },
+        "selected_parts": 64,
+        "workers": 4
+      },
+      "source": "owned",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "many-small-owned-batch-w1.csv",
+      "batch_csv": "many-small-owned-batch-w8.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.024427188667781912,
+          "efficiency": 0.024427188667781912,
+          "p50_speedup": 0.1954175093422553,
+          "throughput_speedup": 0.1963969426979814
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 8,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.024259346259342156,
+            "efficiency": 0.024259346259342156,
+            "p50_speedup": 0.19407477007473725,
+            "throughput_speedup": 0.19651378427868293
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.024623569500488763,
+            "efficiency": 0.024623569500488763,
+            "p50_speedup": 0.1969885560039101,
+            "throughput_speedup": 0.19627806228289554
+          }
+        },
+        "selected_parts": 64,
+        "workers": 8
+      },
+      "source": "owned",
+      "workers": 8
+    },
+    {
+      "baseline_csv": "many-small-file-batch-w1.csv",
+      "batch_csv": "many-small-file-batch-w2.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.1386606239831142,
+          "efficiency": 0.1386606239831142,
+          "p50_speedup": 0.2773212479662284,
+          "throughput_speedup": 0.2788851869569351
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.13908912076750515,
+            "efficiency": 0.13908912076750515,
+            "p50_speedup": 0.2781782415350103,
+            "throughput_speedup": 0.27959433888130025
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.13882856877578423,
+            "efficiency": 0.13882856877578423,
+            "p50_speedup": 0.27765713755156846,
+            "throughput_speedup": 0.2781560872795642
+          }
+        },
+        "selected_parts": 64,
+        "workers": 2
+      },
+      "source": "file",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "many-small-file-batch-w1.csv",
+      "batch_csv": "many-small-file-batch-w4.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.08741631320691949,
+          "efficiency": 0.08741631320691949,
+          "p50_speedup": 0.34966525282767796,
+          "throughput_speedup": 0.3526526326038204
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.0863696325371979,
+            "efficiency": 0.0863696325371979,
+            "p50_speedup": 0.3454785301487916,
+            "throughput_speedup": 0.3506908202722891
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.08989603411330181,
+            "efficiency": 0.08989603411330181,
+            "p50_speedup": 0.35958413645320725,
+            "throughput_speedup": 0.35470325483473214
+          }
+        },
+        "selected_parts": 64,
+        "workers": 4
+      },
+      "source": "file",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "many-small-file-batch-w1.csv",
+      "batch_csv": "many-small-file-batch-w8.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": false,
+          "amdahl_raw_serial_fraction": null,
+          "amdahl_serial_fraction": null,
+          "amdahl_status": "no_speedup_simple_amdahl_invalid",
+          "effective_efficiency": 0.04919296336597751,
+          "efficiency": 0.04919296336597751,
+          "p50_speedup": 0.3935437069278201,
+          "throughput_speedup": 0.3948414171561637
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 8,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.048784575049577866,
+            "efficiency": 0.048784575049577866,
+            "p50_speedup": 0.39027660039662293,
+            "throughput_speedup": 0.3948771695200285
+          },
+          "1": {
+            "amdahl_meaningful": false,
+            "amdahl_raw_serial_fraction": null,
+            "amdahl_serial_fraction": null,
+            "amdahl_status": "no_speedup_simple_amdahl_invalid",
+            "effective_efficiency": 0.049997155296837285,
+            "efficiency": 0.049997155296837285,
+            "p50_speedup": 0.3999772423746983,
+            "throughput_speedup": 0.3948044758514858
+          }
+        },
+        "selected_parts": 64,
+        "workers": 8
+      },
+      "source": "file",
+      "workers": 8
+    },
+    {
+      "baseline_csv": "many-small-instrumented-batch-w1.csv",
+      "batch_csv": "many-small-instrumented-batch-w2.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": true,
+          "amdahl_raw_serial_fraction": 0.08379493093535917,
+          "amdahl_serial_fraction": 0.08379493093535917,
+          "amdahl_status": "descriptive_valid_range",
+          "effective_efficiency": 0.92268377665963,
+          "efficiency": 0.92268377665963,
+          "p50_speedup": 1.84536755331926,
+          "throughput_speedup": 1.847338745019913
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 2,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.08486668684984666,
+            "amdahl_serial_fraction": 0.08486668684984666,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.9217722436511752,
+            "efficiency": 0.9217722436511752,
+            "p50_speedup": 1.8435444873023503,
+            "throughput_speedup": 1.8444384783530077
+          },
+          "1": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.08173349221770265,
+            "amdahl_serial_fraction": 0.08173349221770265,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.9244421173923923,
+            "efficiency": 0.9244421173923923,
+            "p50_speedup": 1.8488842347847847,
+            "throughput_speedup": 1.8502328162869732
+          }
+        },
+        "selected_parts": 64,
+        "workers": 2
+      },
+      "source": "instrumented",
+      "workers": 2
+    },
+    {
+      "baseline_csv": "many-small-instrumented-batch-w1.csv",
+      "batch_csv": "many-small-instrumented-batch-w4.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": true,
+          "amdahl_raw_serial_fraction": 0.02776409914346223,
+          "amdahl_serial_fraction": 0.02776409914346223,
+          "amdahl_status": "descriptive_valid_range",
+          "effective_efficiency": 0.9231118899045443,
+          "efficiency": 0.9231118899045443,
+          "p50_speedup": 3.692447559618177,
+          "throughput_speedup": 3.6866414730809964
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 4,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.02913642233385194,
+            "amdahl_serial_fraction": 0.02913642233385194,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.9196169559575486,
+            "efficiency": 0.9196169559575486,
+            "p50_speedup": 3.678467823830194,
+            "throughput_speedup": 3.66733327633262
+          },
+          "1": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.02696756692226317,
+            "amdahl_serial_fraction": 0.02696756692226317,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.9251526518442433,
+            "efficiency": 0.9251526518442433,
+            "p50_speedup": 3.7006106073769733,
+            "throughput_speedup": 3.7060508590345704
+          }
+        },
+        "selected_parts": 64,
+        "workers": 4
+      },
+      "source": "instrumented",
+      "workers": 4
+    },
+    {
+      "baseline_csv": "many-small-instrumented-batch-w1.csv",
+      "batch_csv": "many-small-instrumented-batch-w8.csv",
+      "corpus": "many-small",
+      "scaling": {
+        "aggregate": {
+          "amdahl_meaningful": true,
+          "amdahl_raw_serial_fraction": 0.018942525437369247,
+          "amdahl_serial_fraction": 0.018942525437369247,
+          "amdahl_status": "descriptive_valid_range",
+          "effective_efficiency": 0.8829260551826995,
+          "efficiency": 0.8829260551826995,
+          "p50_speedup": 7.063408441461596,
+          "throughput_speedup": 7.073246004307909
+        },
+        "baseline_workers": 1,
+        "effective_parallel_width": 8,
+        "interpretation": "Descriptive same corpus/source comparison. Amdahl is reported only when p50 latency improves; it is not a causal attribution.",
+        "repeats": {
+          "0": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.01917278413748929,
+            "amdahl_serial_fraction": 0.01917278413748929,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.8816713400227326,
+            "efficiency": 0.8816713400227326,
+            "p50_speedup": 7.053370720181861,
+            "throughput_speedup": 7.046079651262437
+          },
+          "1": {
+            "amdahl_meaningful": true,
+            "amdahl_raw_serial_fraction": 0.018541244079948616,
+            "amdahl_serial_fraction": 0.018541244079948616,
+            "amdahl_status": "descriptive_valid_range",
+            "effective_efficiency": 0.8851212553495007,
+            "efficiency": 0.8851212553495007,
+            "p50_speedup": 7.080970042796006,
+            "throughput_speedup": 7.1004780625137744
+          }
+        },
+        "selected_parts": 64,
+        "workers": 8
+      },
+      "source": "instrumented",
+      "workers": 8
+    }
+  ],
+  "unexpected_csv_files": [],
+  "warmup_indexes_excluded": [
+    0,
+    1,
+    2
+  ]
+}

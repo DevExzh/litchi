@@ -53,6 +53,8 @@ pub use splice::{
     SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
     SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
 };
+mod batch;
+pub use batch::PartBatch;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 /// Fixed part of the ZIP preservation writer's bounded generated-member
@@ -5787,6 +5789,33 @@ impl SourceBackedPackage {
         })
     }
 
+    /// Read an explicitly requested set of Parts in input order.
+    ///
+    /// This is an opt-in, source-backed operation.  A managed execution
+    /// context may admit bounded local worker waves when the prepared request
+    /// is large enough for its policy; the existing one-Part path remains the
+    /// serial fallback.  Every admitted read still enters the ordinary cache,
+    /// source-freshness, ZIP-validation, and budgeted `PartData` path.
+    ///
+    /// The request count is capped by [`ReadLimits::max_parts`]; duplicate
+    /// occurrences count toward that cap.  Managed calls preflight declared
+    /// sizes once and reuse them for cache admission and scheduling.  Calls
+    /// without a context retain the existing serial one-Part behavior and do
+    /// not acquire scheduler reservations.
+    ///
+    /// The returned collection retains the bounded reservation for its own
+    /// `PartData` slots until the [`PartBatch`] is dropped.  Repeated names
+    /// remain repeated in the result and may share one cached payload.  A
+    /// failed or cancelled operation joins all admitted workers and returns no
+    /// partial collection.  Cumulative `InputBytes` and `Work` record actual
+    /// physical work and are not rolled back to simulate serial execution;
+    /// clean payloads successfully admitted before a later failure may remain
+    /// in the ordinary cache.  Source freshness and cancellation are final
+    /// fences before any result or error is exposed.
+    pub fn read_parts_ordered(&self, partnames: &[PackURI]) -> Result<PartBatch> {
+        batch::read_parts_ordered(self, partnames)
+    }
+
     /// Return the exact ZIP member names retained by the indexed source.
     ///
     /// This metadata-only iterator is intended for low-level physical-name
@@ -6185,6 +6214,7 @@ impl SourceBackedPackage {
                     None,
                     &mut observer,
                     Some(&mut captured),
+                    None,
                 )?;
                 // Cache admission charges decoded work for elected loaders.
                 // Hits/waiters require a fresh verification decode instead.
@@ -9743,6 +9773,27 @@ impl SourceBackedPackage {
         self.read_part_with_observer(index, None, None, &mut observer)
     }
 
+    /// Read one prepared request without looking up central-directory
+    /// metadata a second time.  The batch planner owns the metadata lookup;
+    /// this entry point keeps the existing cache, source, ZIP, and budget
+    /// fences authoritative while consuming that immutable prepared record.
+    pub(crate) fn read_part_prepared(
+        &self,
+        index: usize,
+        entry_id: EntryId,
+        declared_bytes: u64,
+    ) -> Result<PartData> {
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer_and_capture(
+            index,
+            None,
+            None,
+            &mut observer,
+            None,
+            Some((entry_id, declared_bytes)),
+        )
+    }
+
     fn read_part_with_session(
         &self,
         index: usize,
@@ -9772,7 +9823,7 @@ impl SourceBackedPackage {
     where
         O: DiagnosticObserver,
     {
-        self.read_part_with_observer_and_capture(index, accounting, session, observer, None)
+        self.read_part_with_observer_and_capture(index, accounting, session, observer, None, None)
     }
 
     fn read_part_with_observer_and_capture<O>(
@@ -9782,26 +9833,33 @@ impl SourceBackedPackage {
         mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
         observer: &mut O,
         capture: Option<&mut Option<soapberry_zip::office::VerifiedPrecompressedEntry>>,
+        prepared: Option<(EntryId, u64)>,
     ) -> Result<PartData>
     where
         O: DiagnosticObserver,
     {
         self.cache.check_context().map_err(map_execution_error)?;
-        let entry_id = self
+        let catalog_entry = self
             .parts
             .get(index)
-            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?
-            .entry_id;
-        let declared_bytes = if self.cache.is_managed() {
-            let declared = self.archive.metadata_for(entry_id)?.uncompressed_size();
-            self.limits.check(
-                ReadResource::PartBytes,
-                declared,
-                self.limits.max_part_bytes(),
-            )?;
-            Some(declared)
-        } else {
-            None
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        let (entry_id, declared_bytes) = match prepared {
+            Some((entry_id, declared)) => (entry_id, Some(declared)),
+            None => {
+                let entry_id = catalog_entry.entry_id;
+                let declared = if self.cache.is_managed() {
+                    let declared = self.archive.metadata_for(entry_id)?.uncompressed_size();
+                    self.limits.check(
+                        ReadResource::PartBytes,
+                        declared,
+                        self.limits.max_part_bytes(),
+                    )?;
+                    Some(declared)
+                } else {
+                    None
+                };
+                (entry_id, declared)
+            },
         };
         loop {
             self.source.ensure_current()?;
@@ -9883,8 +9941,7 @@ impl SourceBackedPackage {
     {
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = (|| {
-            let part = self
-                .parts
+            self.parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
             let bytes = if let Some(capture) = capture {
@@ -9904,13 +9961,13 @@ impl SourceBackedPackage {
             } else {
                 let bytes = match (accounting.as_deref_mut(), session) {
                     (Some(_), Some(session)) => {
-                        session.read_entry_with_accounting(part.entry_id, &mut zip_accounting)
+                        session.read_entry_with_accounting(entry_id, &mut zip_accounting)
                     },
                     (Some(_), None) => self
                         .archive
-                        .read_entry_with_accounting(part.entry_id, &mut zip_accounting),
-                    (None, Some(session)) => session.read_entry(part.entry_id),
-                    (None, None) => self.archive.read_entry(part.entry_id),
+                        .read_entry_with_accounting(entry_id, &mut zip_accounting),
+                    (None, Some(session)) => session.read_entry(entry_id),
+                    (None, None) => self.archive.read_entry(entry_id),
                 };
                 match bytes {
                     Ok(bytes) => bytes,

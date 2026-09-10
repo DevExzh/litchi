@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0498 adds explicit bounded Part batches; the full goal remains open
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) adds an owning ordered
+OPC Part batch with caller-controlled worker, task, byte, cancellation, and
+memory limits. The 30-child same-executable matrix has 1,800 measured samples
+and 180 warmups with byte/budget/cleanup checks. Delayed-source scaling is
+useful, while many-small owned/file reads regress materially. Apparent
+superlinear few-large observations remain unexplained; no scheduler-only or
+program-wide speedup claim follows. Broad CRUD, native producers, controlled
+cold behavior, allocation attribution, and history requirements remain open.
+
 ## Current audit: 0497 adds an atomic DOCX publication capability; formal analysis is verified
 
 [0497](changes/0497-docx-atomic-publication.md) adds consuming

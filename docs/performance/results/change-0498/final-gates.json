@@ -1,0 +1,65 @@
+{
+  "candidate_source_sha256": "9bc030c779285170c9b621e63bf7808d213856c1958fe3291029c2debf16f0ce",
+  "gates": [
+    {
+      "name": "focused",
+      "receipt": "checks/focused.json",
+      "tests_passed": 14,
+      "tests_ignored": 0
+    },
+    {
+      "name": "opc-default",
+      "receipt": "checks/opc-default.json",
+      "tests_passed": 619,
+      "tests_ignored": 1
+    },
+    {
+      "name": "opc-features",
+      "receipt": "checks/opc-features.json",
+      "tests_passed": 641,
+      "tests_ignored": 1
+    },
+    {
+      "name": "opc-doctests",
+      "receipt": "checks/opc-doctests.json",
+      "tests_passed": 5,
+      "tests_ignored": 0
+    },
+    {
+      "name": "opc-clippy",
+      "receipt": "checks/opc-clippy.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    },
+    {
+      "name": "opc-rustdoc",
+      "receipt": "checks/opc-rustdoc.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    },
+    {
+      "name": "opc-fmt",
+      "receipt": "checks/opc-fmt.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    },
+    {
+      "name": "downstream-check",
+      "receipt": "checks/downstream-check.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    },
+    {
+      "name": "benchmark-build",
+      "receipt": "checks/benchmark-build.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    },
+    {
+      "name": "boundaries",
+      "receipt": "checks/boundaries.json",
+      "tests_passed": 0,
+      "tests_ignored": 0
+    }
+  ]
+}

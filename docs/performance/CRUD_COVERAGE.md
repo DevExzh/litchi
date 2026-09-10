@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 0498: low-level ordered OPC multi-Part reads
+
+[0498](changes/0498-bounded-source-backed-part-batch.md) adds explicit ordered
+source-backed Part reads with finite managed reservations and caller execution
+limits. It is a low-level read enabler with measured provider/workload tradeoffs,
+not a new format-level CRUD selector or representative end-to-end scenario.
+No broad CRUD checklist row, native-producer, cold-cache, or preservation
+requirement is closed solely by the batch benchmark.
+
 ## 0497: atomic logical-tail publication capability; no new CRUD row
 
 [0497](changes/0497-docx-atomic-publication.md) adds consuming filesystem

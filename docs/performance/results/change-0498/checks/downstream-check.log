@@ -1,0 +1,67 @@
+   Compiling syn v2.0.114
+   Compiling generic-array v0.14.9
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_normalizer_data v1.5.1
+    Checking stable_deref_trait v1.2.1
+    Checking litemap v0.7.3
+    Checking writeable v0.5.5
+    Checking smallvec v1.16.0
+    Checking block-buffer v0.12.1
+    Checking digest v0.11.3
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+    Checking num-traits v0.2.19
+   Compiling synstructure v0.13.2
+    Checking write16 v1.0.0
+    Checking utf16_iter v1.0.5
+    Checking utf8_iter v1.0.4
+    Checking chrono v0.4.45
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerovec-derive v0.10.4
+   Compiling displaydoc v0.2.6
+   Compiling icu_provider_macros v1.5.0
+   Compiling thiserror-impl v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking zerofrom v0.1.4
+    Checking yoke v0.7.4
+    Checking zerovec v0.10.4
+    Checking thiserror v2.0.18
+    Checking digest v0.10.7
+    Checking sha2 v0.11.0
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking icu_collections v1.5.0
+    Checking icu_provider v1.5.0
+    Checking bitflags v2.13.1
+    Checking zerocopy v0.8.56
+    Checking icu_locid_transform v1.5.0
+    Checking icu_properties v1.5.1
+    Checking icu_normalizer v1.5.0
+    Checking tinyvec_macros v0.1.1
+    Checking rustix v1.1.4
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking tinyvec v1.12.0
+    Checking sha2 v0.10.9
+    Checking idna_adapter v1.2.0
+    Checking percent-encoding v2.3.2
+    Checking tempfile v3.27.0
+    Checking form_urlencoded v1.2.2
+    Checking idna v1.1.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking unicode-normalization v0.1.25
+    Checking caseless v0.2.2
+    Checking url v2.5.8
+    Checking ryu v1.0.22
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Finished `release` profile [optimized] target(s) in 59.88s

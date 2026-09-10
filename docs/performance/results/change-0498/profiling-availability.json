@@ -1,0 +1,13 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses",
+    "--",
+    "true"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "\n Performance counter stats for 'true':\n\n            916761      cycles                                                                \n            741947      instructions                                                          \n            136493      branches                                                              \n              6980      branch-misses                                                         \n             22768      cache-misses                                                          \n\n       0.034578229 seconds time elapsed\n\n       0.000000000 seconds user\n       0.032865000 seconds sys\n\n\n"
+}

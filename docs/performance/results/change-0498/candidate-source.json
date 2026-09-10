@@ -1,0 +1,33 @@
+{
+  "base_revision": "56e8ddbcaee534b1dc1f8e864d0394fec100348f",
+  "files": [
+    {
+      "path": "crates/litchi-opc/src/error.rs",
+      "sha256": "e983e816091de0640018fbcc9e507e45f52663f4cde198d77d7dd96df9492fe2"
+    },
+    {
+      "path": "crates/litchi-opc/src/lib.rs",
+      "sha256": "fd9841c5a48911d750f37910422f45ac57f1a9d5cc2bd32791e40d0859320f0d"
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "257421aceace5f51c34e3f43c380a4e95be92a521dfce72f316491425cc803f2"
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed/batch.rs",
+      "sha256": "6f0562339151dca9dda0bbb695353576c154a180aa7a693b0d9b4a7fc216b410"
+    },
+    {
+      "path": "crates/litchi-opc/tests/source_backed_batch.rs",
+      "sha256": "ba1c7e5148606e4c5b1a910989363e35e2d5d04b8289e111bd8396462abcb900"
+    },
+    {
+      "path": "crates/litchi-opc/examples/source_backed_batch_perf.rs",
+      "sha256": "d5e38b4ff99451d35cc546a356b4a3afcb79b83852cea579c24a06ada29d7662"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+    }
+  ]
+}

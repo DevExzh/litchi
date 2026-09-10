@@ -1,0 +1,9 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 8.58s
+     Running tests/source_backed_batch.rs (/home/zhuhe/.cache/litchi-goal-0498/target/release/deps/source_backed_batch-c13c81c6f18772d8)
+
+running 14 tests
+test batch_below_parallel_threshold_uses_serial_fallback ... error: test failed, to rerun pass `-p litchi-opc --test source_backed_batch`
+
+Caused by:
+  process didn't exit successfully: `/home/zhuhe/.cache/litchi-goal-0498/target/release/deps/source_backed_batch-c13c81c6f18772d8 --test-threads=1` (signal: 15, SIGTERM: termination signal)

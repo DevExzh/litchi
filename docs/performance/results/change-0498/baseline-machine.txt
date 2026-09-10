@@ -1,0 +1,28 @@
+Change 0498 baseline capture identity
+=====================================
+
+Captured at: 2026-09-10T19:16:05Z
+Host: Linux ip-172-31-39-190 7.0.0-1011-aws #11-Ubuntu SMP PREEMPT Thu Aug 6 15:41:35 UTC 2026 x86_64 GNU/Linux
+CPU: AuthenticAMD AMD EPYC 9R45, 32 single-threaded cores, 128 MiB L3
+Online CPUs: 0-31
+Measured affinity: taskset -c 0-7
+Host note: shared virtualized host; no isolated-host or exclusive-cache claim.
+
+Rust: rustc 1.98.1 (48a229cea 2026-09-01)
+Cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+Workspace HEAD: 56e8ddbcaee534b1dc1f8e864d0394fec100348f
+Target directory: /home/zhuhe/.cache/litchi-goal-0498/target
+Build environment: CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_BUILD_JOBS=2
+RUSTFLAGS: unset; no custom compiler flags
+
+Retained pre-edit executable:
+  /home/zhuhe/.cache/litchi-goal-0498/source_backed_batch_perf.before
+  SHA-256 95d8854f11a339be26e16c88d03e54cd556d57c8cba9ccb8d0c05024067f1592
+
+Benchmark source at capture:
+  crates/litchi-opc/examples/source_backed_batch_perf.rs
+  SHA-256 e331f0f90eb64ac905aa2d9349bb4bcf47bcd41aaf9319db07a8b24db9d24dca
+
+The source tree also contained unrelated untracked work and the concurrently
+developed source-backed batch test. The retained executable was built before
+any production batch implementation and is the control for later matched runs.

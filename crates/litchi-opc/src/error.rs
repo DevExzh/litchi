@@ -237,6 +237,25 @@ pub enum OpcError {
     #[error("managed source-backed OPC package cannot be materialized into an owning package")]
     ManagedPackageMaterialization,
 
+    /// A local source-backed batch worker panicked after the operation had
+    /// admitted it.  All ordinary provider and execution errors retain their
+    /// original variants; this marker is reserved for an internal worker
+    /// boundary that cannot return an [`OpcError`] directly.
+    #[error("source-backed batch worker {ordinal} panicked")]
+    SourceBackedBatchWorkerPanic {
+        /// Input ordinal assigned to the worker.
+        ordinal: usize,
+    },
+
+    /// A bounded source-backed batch could not maintain one of its internal
+    /// checked scheduling invariants.  This is distinct from a physical Part
+    /// overlay refusal and does not rewrite provider or execution errors.
+    #[error("source-backed batch invariant refused: {reason}")]
+    SourceBackedBatchInvariant {
+        /// Content-free invariant or checked-arithmetic reason.
+        reason: &'static str,
+    },
+
     /// The destination was atomically replaced, but its parent directory
     /// could not be synchronized. Callers must not blindly retry as if the
     /// old destination were still present.
@@ -444,7 +463,9 @@ impl From<OpcError> for litchi_core::Error {
             error @ (OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::PreservationUnavailable { .. }
             | OpcError::SignedSourceRequiresExplicitPolicy
-            | OpcError::SourceArtifactMismatch { .. }) => {
+            | OpcError::SourceArtifactMismatch { .. }
+            | OpcError::SourceBackedBatchWorkerPanic { .. }
+            | OpcError::SourceBackedBatchInvariant { .. }) => {
                 litchi_core::Error::Unsupported(error.to_string())
             },
             OpcError::InvalidReadLimit { .. }

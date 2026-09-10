@@ -74,8 +74,8 @@ pub use pkgreader::{
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
-    AuthorizedPrecompressedPart, PartData, PartView, RetainedPrecompressedPart, SourceArtifact,
-    SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
+    AuthorizedPrecompressedPart, PartBatch, PartData, PartView, RetainedPrecompressedPart,
+    SourceArtifact, SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
     SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
     SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
     SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
