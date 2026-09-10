@@ -1,0 +1,29 @@
+{
+  "source_manifest": "/var/tmp/litchi-xldm-extraction-root-source-v4-20260910.json",
+  "source_manifest_sha256": "510ed7d0bfcf118c8adfd295180e82eb15467c13a045517f955a0c04ae5c164a",
+  "source_paths": 46,
+  "root_checks": {
+    "api": {
+      "log": "/var/tmp/litchi-xldm-extraction-root-api-v4.log",
+      "sha256": "4f1226c194a1ca6e4c3819f8e2e64e6dfca3ed7740efa0baf1cf7d12cc7ae952",
+      "exit_code": 0
+    },
+    "clippy": {
+      "log": "/var/tmp/litchi-xldm-extraction-root-clippy-v4.log",
+      "sha256": "b1aa189ea576d7e249145b102ecd4daf0af8aa17830d9b6a70d5525e3a8dcc35",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "log": "/var/tmp/litchi-xldm-extraction-root-rustdoc-v4.log",
+      "sha256": "b00114299453f9fc3fa276e7e385edb554b2cbfdf70ff87c2cfb4a04c3050f40",
+      "exit_code": 0
+    }
+  },
+  "format": "Rust1.95 all present owned .rs --check edition2024 skip_children=true pass",
+  "diff_check": "pass",
+  "v4_delta": [
+    "crates/litchi-xlsx/src/package.rs",
+    "crates/litchi-xlsx/tests/xldm_native_storage.rs"
+  ],
+  "v3_full_gate_retained": true
+}

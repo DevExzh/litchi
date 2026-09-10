@@ -238,6 +238,15 @@ impl Storage<'_> {
         self.bytes
     }
 
+    /// Return the exact source buffer retained by this borrowed inspection.
+    ///
+    /// The slice points into the caller-owned input; this owner never takes
+    /// ownership of or copies the source during inspection.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        self.bytes
+    }
+
     /// Return one member's bytes without its CRC marker. The returned bytes
     /// remain compressed, encrypted, or otherwise encoded exactly as stored.
     #[must_use]

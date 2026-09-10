@@ -4,7 +4,7 @@ use super::codec::{crc32, decode_xml, utf16le};
 use super::model::{BOM, CRC_SIZE, MAX_DIRECTORY_BYTES};
 use super::{
     FileGroupClass, FileKind, GeneratedNameKind, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
-    classify_generated_path, inspect, write,
+    classify_generated_path, inspect, inspect_shared, write,
 };
 
 #[test]
@@ -85,6 +85,15 @@ pub(crate) fn test_xldm_bytes() -> Vec<u8> {
         ("Model.1.db.xml", payload),
         ("BackupLog", log.as_bytes()),
     ])
+}
+
+#[test]
+fn shared_inspection_retains_the_caller_source_buffer() {
+    let bytes = test_xldm_bytes();
+    let source = bytes.as_ptr();
+    let storage = inspect_shared(&bytes).unwrap();
+    assert_eq!(storage.source_bytes().as_ptr(), source);
+    assert_eq!(storage.source_bytes(), bytes.as_slice());
 }
 
 #[test]

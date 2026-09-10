@@ -1,0 +1,189 @@
+{
+  "root": "/var/tmp/litchi-xldm-extraction-validation-20260910",
+  "paths": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8"
+    },
+    {
+      "path": "crates/litchi-xldm/Cargo.toml",
+      "sha256": "4ae553d9fa4724d524d63a8760295327976a2c2f71bd40bc5538f9b7db957b9d"
+    },
+    {
+      "path": "crates/litchi-xldm/src/codec.rs",
+      "sha256": "8a579df7e84342012c3a494750909c2687a4608db2558364d29fe5e05c00cce6"
+    },
+    {
+      "path": "crates/litchi-xldm/src/compression.rs",
+      "sha256": "d70f54ab8f83190120a4012c9df0f2fa39ba2287d497b06eba781693f096a387"
+    },
+    {
+      "path": "crates/litchi-xldm/src/compression/xpress_stream.rs",
+      "sha256": "28a17e3b085d0a44a62171070e62002fe13651ebd1a9d8c6f822fb3caad2e4b4"
+    },
+    {
+      "path": "crates/litchi-xldm/src/crypt.rs",
+      "sha256": "8c3d1e5e4cdf6a062b363f3ae857e69b45d39335dbddf3a7376bfccdf1b47322"
+    },
+    {
+      "path": "crates/litchi-xldm/src/error.rs",
+      "sha256": "0168baf4e2c2ff94d04735da6baf823b72e7a317e9e82f33e4ed00e0ccaa5b8c"
+    },
+    {
+      "path": "crates/litchi-xldm/src/generated.rs",
+      "sha256": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba"
+    },
+    {
+      "path": "crates/litchi-xldm/src/lib.rs",
+      "sha256": "4977cf04f1fa30c973ae1d4a5699f93387db392bcc80e897aae79dc4584660cb"
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/codec.rs",
+      "sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a"
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/mod.rs",
+      "sha256": "e74d663d315382602a77fa0193107101857076418d20ae101bba068b23528e59"
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/model.rs",
+      "sha256": "f8a6464e86c19a689cd415411846a45ae1fbbf71e3eb7153cccaca90709839f4"
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/tests.rs",
+      "sha256": "22c7131e171b04704daf94f4463102c016c4d8eeb88bff2ba3fe20bbd2aeb681"
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/validation.rs",
+      "sha256": "5b3073e96a84b5cce7666efa39c80d235eb19d3cc378c1386ac307fdf17fb05b"
+    },
+    {
+      "path": "crates/litchi-xldm/src/model.rs",
+      "sha256": "a4cc83820321407bc417fb9f24d2b15c888614a72b448e9594dc9320c1586626"
+    },
+    {
+      "path": "crates/litchi-xldm/src/native.rs",
+      "sha256": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07"
+    },
+    {
+      "path": "crates/litchi-xldm/src/olap.rs",
+      "sha256": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740"
+    },
+    {
+      "path": "crates/litchi-xldm/src/semantic.rs",
+      "sha256": "7dcc83f633c0abb8f129af68acbfa35ce86667bcf1a0121c668b3928765f4adb"
+    },
+    {
+      "path": "crates/litchi-xldm/src/tabular_paths.rs",
+      "sha256": "a54233efad8b34cba55e9c21c85dea311bbd3c20debb9e6a2c39aaf1075a1244"
+    },
+    {
+      "path": "crates/litchi-xldm/src/tests.rs",
+      "sha256": "7ee96415ec8e9d2cabb14ff28146e70dc3fc5548a918e7b7298b499dab7724e5"
+    },
+    {
+      "path": "crates/litchi-xldm/src/validation.rs",
+      "sha256": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502"
+    },
+    {
+      "path": "crates/litchi-xlsx/Cargo.toml",
+      "sha256": "8f3f5b6f05a744f35fd617171fbdcf81d102759dc37ef596f47587f0b5353a89"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package.rs",
+      "sha256": "cf1a15d1fe57003b653aa66c26fb684d0c92c90231a165a9ed29a181f0cd8246"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/codec.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/compression.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/compression/xpress_stream.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/crypt.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/generated.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/metadata/codec.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/metadata/mod.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/metadata/model.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/metadata/tests.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/metadata/validation.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/mod.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/model.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/native.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/olap.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/semantic.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/tabular_paths.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/tests.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm/validation.rs",
+      "sha256": null
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package/xldm_test_support.rs",
+      "sha256": "70455e64dba5bf321b6a78ab4dd13da868e853efe1229a316c0a1e167e11dff1"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+      "sha256": "9b99a601804a97d00402a53fdd6edc49375bdd77a6bd65fd692c10757529c189"
+    },
+    {
+      "path": "crates/litchi-xlsx/tests/xldm_native_storage.rs",
+      "sha256": "185f308ae893434c9148ab3d571af60bf94d1ea240c202c41014de2c86904143"
+    },
+    {
+      "path": "tools/native-resave/Cargo.lock",
+      "sha256": "ce814d44ac005c15e5fac5fac842c35a93c2424eff26eacf38a5aab55580211b"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "sha256": "3509994602d90b8f57f636b4728c5987b367a57b4c260077c151cc11ebfdfce8"
+    }
+  ]
+}

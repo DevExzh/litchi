@@ -31,6 +31,7 @@ litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
+litchi-xldm = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }
