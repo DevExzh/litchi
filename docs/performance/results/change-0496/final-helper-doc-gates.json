@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "source_hashes": {
+    "seal.py": "7844f3ecef3876ed5a57240689bdd4ba739a4c0c21106ba3ccdb4240034b0cfb",
+    "test_seal.py": "36bde7eb1cabe307624bfbcc348850bb6beba690102b3bd31cbb09824b0082e6"
+  },
+  "source_unchanged": true,
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0496/test_seal.py"
+      ],
+      "started_ns": 1789050819323747490,
+      "finished_ns": 1789050819366256229,
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ".......\n----------------------------------------------------------------------\nRan 7 tests in 0.004s\n\nOK\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py"
+      ],
+      "started_ns": 1789050819366261680,
+      "finished_ns": 1789050819415092702,
+      "exit_code": 0,
+      "stdout": "OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/validate_crud_coverage_index.py"
+      ],
+      "started_ns": 1789050819415097462,
+      "finished_ns": 1789050819460115281,
+      "exit_code": 0,
+      "stdout": "validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)\n",
+      "stderr": ""
+    }
+  ]
+}

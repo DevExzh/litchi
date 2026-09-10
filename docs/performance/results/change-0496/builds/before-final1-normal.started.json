@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0496/before",
+  "driver": {
+    "bytes": 5025,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/build.py",
+    "sha256": "a3e5b68bc5ae8489c1c1816b317c3aed8ae43f56ca198321093016f063ec0d80"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0496/target",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTDOCFLAGS": "-Dwarnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0496/tmp"
+  },
+  "source_manifest": {
+    "bytes": 1936495,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-source.json",
+    "sha256": "3f7f9ed5f8c74c7c83cf3b4752b769c3a39a22999ca252ea8891968cc38266e9"
+  },
+  "started_ns": 1789047425716958794
+}

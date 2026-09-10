@@ -1,0 +1,17 @@
+{
+  "status": "failed",
+  "observed_ns": 1789050909381078503,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0496/seal.py",
+    "seal"
+  ],
+  "exit_code": 1,
+  "error": "NameError: name '_now' is not defined at seal.py:_manifest after _evidence completed",
+  "source_hashes": {
+    "seal.py": "7844f3ecef3876ed5a57240689bdd4ba739a4c0c21106ba3ccdb4240034b0cfb",
+    "test_seal.py": "36bde7eb1cabe307624bfbcc348850bb6beba690102b3bd31cbb09824b0082e6"
+  },
+  "seal_created": false
+}

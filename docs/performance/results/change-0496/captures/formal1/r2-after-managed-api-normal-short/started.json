@@ -1,0 +1,103 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-short/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+    "docx-managed-edit",
+    "--edit-api",
+    "managed-api",
+    "--provider",
+    "short",
+    "--phase-diagnostics",
+    "--max-range",
+    "4096",
+    "--trace-ranges",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "44a4710699ef17041d5969240c30984dffbc3319",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-short/report.json"
+  ],
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 478180360,
+    "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+    "sha256": "76de79d1bf97d0af3eed95d83fa371c65996fc2a0cc568017327d330eec32394"
+  },
+  "build": {
+    "binary": {
+      "bytes": 478180360,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+      "sha256": "76de79d1bf97d0af3eed95d83fa371c65996fc2a0cc568017327d330eec32394"
+    },
+    "gate": {
+      "bytes": 1726,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-normal.json",
+      "sha256": "79859934a1f09caba1413232aee24592304a723af4dbd04d0c44e177d0e0374e"
+    },
+    "git_revision": "44a4710699ef17041d5969240c30984dffbc3319",
+    "key": "after/normal",
+    "phase": "after",
+    "role": "normal",
+    "source_manifest": {
+      "bytes": 1929846,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+      "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+    }
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture.py",
+    "sha256": "4fb29fd12079330ac6557cebc8632d8ef3a35ed303eb69f4e398907b3b68554c"
+  },
+  "environment": {
+    "DEBUGINFOD_URLS": "https://debuginfod.ubuntu.com ",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-short/tmp",
+    "USER": "zhuhe"
+  },
+  "file_root": null,
+  "machine": {
+    "bytes": 1235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/machine.json",
+    "sha256": "4938b17fc6764cb76f7a099c3b1ede6a3e2945c7003cfaa6e90141d1871e525b"
+  },
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "0f47e734991e9dc7491581b630fc4edcd7882458fec94d0d604ddf1756cd3545"
+  },
+  "run": {
+    "api": "managed-api",
+    "arm": "short",
+    "label": "r2-after-managed-api-normal-short",
+    "ordinal": 18,
+    "phase": "after",
+    "provider": "short",
+    "repeat": 2,
+    "role": "normal",
+    "samples": 30,
+    "warmups": 3
+  },
+  "schema": "docx-phase-diagnostic-capture-v1",
+  "source_manifest": {
+    "bytes": 1929846,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+    "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+  },
+  "started_utc": "2026-09-10T14:21:57.398544Z",
+  "status": "running",
+  "timeout_seconds": 180,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-short/tmp",
+  "version": 1
+}

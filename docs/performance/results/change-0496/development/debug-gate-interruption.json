@@ -1,0 +1,7 @@
+{
+  "reason": "0495 final4-gate-3 authoritative command uses cargo test --release; 0496 orchestration mistakenly used debug. Repeat full suite in matching release profile, without narrowing test scope.",
+  "cargo_pid": 3469298,
+  "test_pid": 3474805,
+  "signal": "SIGTERM",
+  "reference": "../change-0495/validation/final4-gate-3.json"
+}

@@ -1,0 +1,103 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-before-unmanaged-api-normal-short/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0496/retained/before/normal/litchi-perf-baseline",
+    "docx-managed-edit",
+    "--edit-api",
+    "unmanaged-api",
+    "--provider",
+    "short",
+    "--phase-diagnostics",
+    "--max-range",
+    "4096",
+    "--trace-ranges",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-before-unmanaged-api-normal-short/report.json"
+  ],
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 476641232,
+    "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/before/normal/litchi-perf-baseline",
+    "sha256": "a18b539cdc02a4f5b5ab05a625bc3468ddb6c9468df4130937d7a6646752335c"
+  },
+  "build": {
+    "binary": {
+      "bytes": 476641232,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/before/normal/litchi-perf-baseline",
+      "sha256": "a18b539cdc02a4f5b5ab05a625bc3468ddb6c9468df4130937d7a6646752335c"
+    },
+    "gate": {
+      "bytes": 1730,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-normal.json",
+      "sha256": "88a9a435610a43bf8b066b44358d494db531baa9725c9376660abcf666b155cc"
+    },
+    "git_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "key": "before/normal",
+    "phase": "before",
+    "role": "normal",
+    "source_manifest": {
+      "bytes": 1936495,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-source.json",
+      "sha256": "3f7f9ed5f8c74c7c83cf3b4752b769c3a39a22999ca252ea8891968cc38266e9"
+    }
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture.py",
+    "sha256": "4fb29fd12079330ac6557cebc8632d8ef3a35ed303eb69f4e398907b3b68554c"
+  },
+  "environment": {
+    "DEBUGINFOD_URLS": "https://debuginfod.ubuntu.com ",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-before-unmanaged-api-normal-short/tmp",
+    "USER": "zhuhe"
+  },
+  "file_root": null,
+  "machine": {
+    "bytes": 1235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/machine.json",
+    "sha256": "4938b17fc6764cb76f7a099c3b1ede6a3e2945c7003cfaa6e90141d1871e525b"
+  },
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "0f47e734991e9dc7491581b630fc4edcd7882458fec94d0d604ddf1756cd3545"
+  },
+  "run": {
+    "api": "unmanaged-api",
+    "arm": "short",
+    "label": "r2-before-unmanaged-api-normal-short",
+    "ordinal": 29,
+    "phase": "before",
+    "provider": "short",
+    "repeat": 2,
+    "role": "normal",
+    "samples": 30,
+    "warmups": 3
+  },
+  "schema": "docx-phase-diagnostic-capture-v1",
+  "source_manifest": {
+    "bytes": 1936495,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-source.json",
+    "sha256": "3f7f9ed5f8c74c7c83cf3b4752b769c3a39a22999ca252ea8891968cc38266e9"
+  },
+  "started_utc": "2026-09-10T14:22:44.488302Z",
+  "status": "running",
+  "timeout_seconds": 180,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-before-unmanaged-api-normal-short/tmp",
+  "version": 1
+}

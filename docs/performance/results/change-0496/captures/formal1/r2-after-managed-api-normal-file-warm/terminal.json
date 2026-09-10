@@ -1,0 +1,150 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+    "docx-managed-edit",
+    "--edit-api",
+    "managed-api",
+    "--provider",
+    "file",
+    "--phase-diagnostics",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "44a4710699ef17041d5969240c30984dffbc3319",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 404,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/replay-cleanup.json",
+      "sha256": "444ec571f06f6ba37c9e221e41c3a1d0718eb5294a329b8c64956c038df53993"
+    },
+    "report.json": {
+      "bytes": 1675699,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/report.json",
+      "sha256": "ce1132f582021142960ef2ca19a55bb19cab6a12f1f3e0d47dc39152da178e55"
+    },
+    "resource.txt": {
+      "bytes": 1121,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/resource.txt",
+      "sha256": "6825d5356200d46239f02411d4d2fccec509bfa63305002740c59f8437d1d0dd"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 478180360,
+    "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+    "sha256": "76de79d1bf97d0af3eed95d83fa371c65996fc2a0cc568017327d330eec32394"
+  },
+  "build": {
+    "binary": {
+      "bytes": 478180360,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+      "sha256": "76de79d1bf97d0af3eed95d83fa371c65996fc2a0cc568017327d330eec32394"
+    },
+    "gate": {
+      "bytes": 1726,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-normal.json",
+      "sha256": "79859934a1f09caba1413232aee24592304a723af4dbd04d0c44e177d0e0374e"
+    },
+    "git_revision": "44a4710699ef17041d5969240c30984dffbc3319",
+    "key": "after/normal",
+    "phase": "after",
+    "role": "normal",
+    "source_manifest": {
+      "bytes": 1929846,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+      "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+    }
+  },
+  "cleanup": {
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-file-warm",
+      "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1",
+      "/home/zhuhe/.cache/litchi-goal-0496/runs"
+    ],
+    "root": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-file-warm",
+    "schema": "docx-phase-private-cleanup-v1",
+    "status": "pass"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture.py",
+    "sha256": "4fb29fd12079330ac6557cebc8632d8ef3a35ed303eb69f4e398907b3b68554c"
+  },
+  "environment": {
+    "DEBUGINFOD_URLS": "https://debuginfod.ubuntu.com ",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-file-warm/file",
+    "USER": "zhuhe"
+  },
+  "exit_code": 0,
+  "file_root": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-file-warm/file",
+  "finished_utc": "2026-09-10T14:22:07.368093Z",
+  "launch_error": null,
+  "machine": {
+    "bytes": 1235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/machine.json",
+    "sha256": "4938b17fc6764cb76f7a099c3b1ede6a3e2945c7003cfaa6e90141d1871e525b"
+  },
+  "missing_artifacts": [],
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "0f47e734991e9dc7491581b630fc4edcd7882458fec94d0d604ddf1756cd3545"
+  },
+  "run": {
+    "api": "managed-api",
+    "arm": "file-warm",
+    "label": "r2-after-managed-api-normal-file-warm",
+    "ordinal": 19,
+    "phase": "after",
+    "provider": "file",
+    "repeat": 2,
+    "role": "normal",
+    "samples": 30,
+    "warmups": 3
+  },
+  "schema": "docx-phase-diagnostic-terminal-v1",
+  "source_manifest": {
+    "bytes": 1929846,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+    "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+  },
+  "started_artifact": {
+    "bytes": 4096,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-normal-file-warm/started.json",
+    "sha256": "9c8fa2cbf867febf2694c22fed1eba77526613999095de17c9b13e57aafdc507"
+  },
+  "started_utc": "2026-09-10T14:22:04.281701Z",
+  "status": "pass",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 180,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-normal-file-warm/file",
+  "validation_error": null,
+  "version": 1
+}

@@ -1,0 +1,11 @@
+{
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r1-after-unmanaged-api-normal-file-warm",
+    "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1",
+    "/home/zhuhe/.cache/litchi-goal-0496/runs"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r1-after-unmanaged-api-normal-file-warm",
+  "schema": "docx-phase-private-cleanup-v1",
+  "status": "pass"
+}

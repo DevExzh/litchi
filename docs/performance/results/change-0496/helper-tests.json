@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/test_capture.py"
+  ],
+  "started_ns": 1789048888998391527,
+  "finished_ns": 1789048889214919427,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "............\n----------------------------------------------------------------------\nRan 12 tests in 0.143s\n\nOK\n",
+  "source_hashes": {
+    "capture.py": "0c71d5fad955c2d662f0e41511f21ab440c1c98e1fbd532b0495a3310471e890",
+    "test_capture.py": "a3d30f0d8e6a7b834ed3df3e4c62ad165d5628fc3e9788380521bf2ea477a71c"
+  },
+  "source_unchanged": true
+}

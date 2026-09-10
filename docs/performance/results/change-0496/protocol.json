@@ -1,0 +1,559 @@
+{
+  "builds": {
+    "after/allocator": {
+      "binary": {
+        "bytes": 477930104,
+        "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/allocator/litchi-perf-baseline-alloc",
+        "sha256": "b68062c0bc036f7bac7efefd1b0730596610f64cf7896d0a09eb1c3b18c09cde"
+      },
+      "gate": {
+        "bytes": 1780,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-allocator.json",
+        "sha256": "07eee264fbdff773bb9ed70e2c293287ae7c285458aa4c7eb26da36789323c78"
+      },
+      "git_revision": "44a4710699ef17041d5969240c30984dffbc3319",
+      "key": "after/allocator",
+      "phase": "after",
+      "role": "allocator",
+      "source_manifest": {
+        "bytes": 1929846,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+        "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+      }
+    },
+    "after/normal": {
+      "binary": {
+        "bytes": 478180360,
+        "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/normal/litchi-perf-baseline",
+        "sha256": "76de79d1bf97d0af3eed95d83fa371c65996fc2a0cc568017327d330eec32394"
+      },
+      "gate": {
+        "bytes": 1726,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-normal.json",
+        "sha256": "79859934a1f09caba1413232aee24592304a723af4dbd04d0c44e177d0e0374e"
+      },
+      "git_revision": "44a4710699ef17041d5969240c30984dffbc3319",
+      "key": "after/normal",
+      "phase": "after",
+      "role": "normal",
+      "source_manifest": {
+        "bytes": 1929846,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+        "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+      }
+    },
+    "before/allocator": {
+      "binary": {
+        "bytes": 476378696,
+        "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/before/allocator/litchi-perf-baseline-alloc",
+        "sha256": "1a27a41be455d7af77d6dd58e35528d31ccb9d04915a287203ef86cab2c007e7"
+      },
+      "gate": {
+        "bytes": 1784,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-allocator.json",
+        "sha256": "1238d60d020eb11ad95434f4a74c5d9316d440f9827f2152797ba8abfde67a9e"
+      },
+      "git_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+      "key": "before/allocator",
+      "phase": "before",
+      "role": "allocator",
+      "source_manifest": {
+        "bytes": 1936495,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-source.json",
+        "sha256": "3f7f9ed5f8c74c7c83cf3b4752b769c3a39a22999ca252ea8891968cc38266e9"
+      }
+    },
+    "before/normal": {
+      "binary": {
+        "bytes": 476641232,
+        "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/before/normal/litchi-perf-baseline",
+        "sha256": "a18b539cdc02a4f5b5ab05a625bc3468ddb6c9468df4130937d7a6646752335c"
+      },
+      "gate": {
+        "bytes": 1730,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-normal.json",
+        "sha256": "88a9a435610a43bf8b066b44358d494db531baa9725c9376660abcf666b155cc"
+      },
+      "git_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+      "key": "before/normal",
+      "phase": "before",
+      "role": "normal",
+      "source_manifest": {
+        "bytes": 1936495,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/before-final1-source.json",
+        "sha256": "3f7f9ed5f8c74c7c83cf3b4752b769c3a39a22999ca252ea8891968cc38266e9"
+      }
+    }
+  },
+  "builds_input": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds.json",
+    "sha256": "188ed4727ec7a995b90edf7e11e95c5b17a40aaff37e45e1acc13717e4134718"
+  },
+  "capture_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures",
+  "case": "docx_opened_document_managed_vs_unmanaged_one_paragraph_edit_save",
+  "claims": {
+    "managed_after_is_capability_only": true,
+    "no_historical_flags_resolved": true,
+    "scope": "descriptive opt-in phase diagnostics with paired before/after unmanaged review"
+  },
+  "cpu": 2,
+  "cpu_lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture.py",
+    "sha256": "4fb29fd12079330ac6557cebc8632d8ef3a35ed303eb69f4e398907b3b68554c"
+  },
+  "environment": {
+    "DEBUGINFOD_URLS": "https://debuginfod.ubuntu.com ",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "USER": "zhuhe"
+  },
+  "expected_children": 32,
+  "expected_samples": 960,
+  "formal_runs": [
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r1-before-unmanaged-api-normal-owned",
+      "ordinal": 0,
+      "phase": "before",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r1-before-unmanaged-api-normal-file-warm",
+      "ordinal": 1,
+      "phase": "before",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r1-before-unmanaged-api-normal-short",
+      "ordinal": 2,
+      "phase": "before",
+      "provider": "short",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r1-before-unmanaged-api-allocator-owned",
+      "ordinal": 3,
+      "phase": "before",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r1-before-unmanaged-api-allocator-file-warm",
+      "ordinal": 4,
+      "phase": "before",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r1-before-unmanaged-api-allocator-short",
+      "ordinal": 5,
+      "phase": "before",
+      "provider": "short",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r1-after-unmanaged-api-normal-owned",
+      "ordinal": 6,
+      "phase": "after",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r1-after-unmanaged-api-normal-file-warm",
+      "ordinal": 7,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r1-after-unmanaged-api-normal-short",
+      "ordinal": 8,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r1-after-unmanaged-api-allocator-owned",
+      "ordinal": 9,
+      "phase": "after",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r1-after-unmanaged-api-allocator-file-warm",
+      "ordinal": 10,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r1-after-unmanaged-api-allocator-short",
+      "ordinal": 11,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "file-warm",
+      "label": "r1-after-managed-api-normal-file-warm",
+      "ordinal": 12,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "short",
+      "label": "r1-after-managed-api-normal-short",
+      "ordinal": 13,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "file-warm",
+      "label": "r1-after-managed-api-allocator-file-warm",
+      "ordinal": 14,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "short",
+      "label": "r1-after-managed-api-allocator-short",
+      "ordinal": 15,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "short",
+      "label": "r2-after-managed-api-allocator-short",
+      "ordinal": 16,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "file-warm",
+      "label": "r2-after-managed-api-allocator-file-warm",
+      "ordinal": 17,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "short",
+      "label": "r2-after-managed-api-normal-short",
+      "ordinal": 18,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "managed-api",
+      "arm": "file-warm",
+      "label": "r2-after-managed-api-normal-file-warm",
+      "ordinal": 19,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r2-after-unmanaged-api-allocator-short",
+      "ordinal": 20,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r2-after-unmanaged-api-allocator-file-warm",
+      "ordinal": 21,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r2-after-unmanaged-api-allocator-owned",
+      "ordinal": 22,
+      "phase": "after",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r2-after-unmanaged-api-normal-short",
+      "ordinal": 23,
+      "phase": "after",
+      "provider": "short",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r2-after-unmanaged-api-normal-file-warm",
+      "ordinal": 24,
+      "phase": "after",
+      "provider": "file",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r2-after-unmanaged-api-normal-owned",
+      "ordinal": 25,
+      "phase": "after",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r2-before-unmanaged-api-allocator-short",
+      "ordinal": 26,
+      "phase": "before",
+      "provider": "short",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r2-before-unmanaged-api-allocator-file-warm",
+      "ordinal": 27,
+      "phase": "before",
+      "provider": "file",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r2-before-unmanaged-api-allocator-owned",
+      "ordinal": 28,
+      "phase": "before",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "short",
+      "label": "r2-before-unmanaged-api-normal-short",
+      "ordinal": 29,
+      "phase": "before",
+      "provider": "short",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "file-warm",
+      "label": "r2-before-unmanaged-api-normal-file-warm",
+      "ordinal": 30,
+      "phase": "before",
+      "provider": "file",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "api": "unmanaged-api",
+      "arm": "owned",
+      "label": "r2-before-unmanaged-api-normal-owned",
+      "ordinal": 31,
+      "phase": "before",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    }
+  ],
+  "machine": {
+    "bytes": 1235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/machine.json",
+    "sha256": "4938b17fc6764cb76f7a099c3b1ede6a3e2945c7003cfaa6e90141d1871e525b"
+  },
+  "provenance": {
+    "bytes": 4510,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/provenance.json",
+    "sha256": "82acbbcd44790f1c8eceb61e7d8078189ddd2fe93f9cf0fc7229fa29021db7e6"
+  },
+  "report_contract": {
+    "canonical_validator": "change-0495/measure.py:validate_report",
+    "phase_field": "phase_diagnostics",
+    "phase_fields": [
+      "schema",
+      "timing_scope",
+      "open_ns",
+      "edit_staging_ns",
+      "commit_ns",
+      "diagnostics_xml_identity_ns",
+      "publication_ns",
+      "published_snapshot_drop_ns",
+      "commit_drop_ns",
+      "phase_sum_ns",
+      "lifecycle_residual_ns",
+      "residual_scope",
+      "instrumentation_overhead_ns",
+      "instrumentation_scope",
+      "allocation_scope"
+    ],
+    "phase_schema": "docx_managed_edit_phase_diagnostics_v1",
+    "projection": "remove phase_diagnostics from every row in memory before 0495 validation"
+  },
+  "samples": 30,
+  "schema": "docx-phase-diagnostic-protocol-v1",
+  "temporary_root": "/home/zhuhe/.cache/litchi-goal-0496",
+  "term_grace_seconds": 10,
+  "tests": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/test_capture.py",
+    "sha256": "583ae7772c716c29e9874d8d4de1e33d2c54c52c1e650170eed406cf50b91d6c"
+  },
+  "timeout_seconds": 180,
+  "validator": {
+    "measure": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/measure.py",
+      "sha256": "5896ccb1ab119b427c33febc8e5ee4df173465b5c46b993eac231f14d9e01ec0"
+    },
+    "seal": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/seal.json",
+      "sha256": "bed878c517ba2aeac8dca25bcb78b19d82a259811abebfe6fa1c8cfd3b024a13"
+    },
+    "support": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/support.py",
+      "sha256": "029beb6ea92bc5a03244d4908cfba17370736fbee972906abb67513d533d9462"
+    }
+  },
+  "version": 1,
+  "warmups": 3
+}

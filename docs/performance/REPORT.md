@@ -1,5 +1,69 @@
 # Performance program phase report
 
+## 0496: verified descriptive DOCX edit phase attribution
+
+[0496](changes/0496-docx-edit-phase-attribution.md) adds an opt-in diagnostic
+field to the existing 0495 `docx-managed-edit` harness. It is a harness-only
+follow-up to the unresolved 0495 whole-child RSS and latency flags; production
+code and the 0495 correctness path are unchanged. The verified formal run has
+32 processes and 960 samples: 12 before-unmanaged, 12 after-unmanaged, and 8
+after-managed, over owned, warm-file, and short-range providers in normal and
+allocator roles, with two reversed repeats.
+The paired unmanaged review contains 294 comparison cells, with 74 threshold
+flags retained and classified by phase, allocation, RSS, and lifecycle scope.
+
+Normal unmanaged lifecycle p50 latency is milliseconds and remains paired by
+repeat:
+
+| Arm | Before R1 | After R1 | Before R2 | After R2 |
+| --- | ---: | ---: | ---: | ---: |
+| owned | 2.221 | 2.153 | 2.126 | 2.176 |
+| file-warm | 4.794 | 2.302 | 2.279 | 2.326 |
+| short | 5.359 | 5.340 | 5.238 | 5.419 |
+
+Publication is the largest named phase by p50 in all 16 normal children. The
+after-managed normal file-warm lifecycle/publication p50s are 3.563/2.465 ms
+and 3.553/2.453 ms; short is 6.509/5.406 ms and 4.092/2.993 ms. The short
+repeat spread is retained as instability. Phase intervals are wall-clock
+`Instant` measurements, not CPU time. Publication copies the 16,793,048-byte
+output into a preallocated retention sink; output hashing and semantic/media
+verification follow `execute_api` and its timed interval. The allocator observer covers one
+full lifecycle, and whole-child RSS remains separate.
+
+The 74 retained threshold flags comprise 60 phase rows (18 commit-drop, 18
+published-snapshot-drop, 10 diagnostics/XML identity, 7 open, 6 publication,
+and 1 phase-sum), 9 allocator-reallocation rows, 4 whole-child RSS rows, and 1
+full-lifecycle latency row. The rows are descriptive flags, not independent
+production regressions; `historical_flags_resolved` remains false and managed
+after remains capability-only.
+
+Full-lifecycle allocator p50 values are:
+
+| API/phase | Allocation calls | Reallocation calls | Allocated bytes | Peak increment bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Before unmanaged | 22,859 | 185 | 5,721,334 | 606,959 |
+| After unmanaged | 9,696 | 228 | 1,623,696 | 609,903 |
+| After managed | 20,535 | 328 | 4,270,196 | 622,454 |
+
+Unmanaged before-to-after changes are −57.583% calls, −71.620% allocated
+bytes, +23.243% reallocations, and +0.485% peak increment. Managed-after
+versus after-unmanaged changes are +111.788% calls, +162.992% allocated bytes,
++43.860% reallocations, and +2.058% peak increment. Allocated bytes equal
+deallocated bytes, live bytes return to their entry values, and failed
+allocation calls are zero in allocator rows. No phase allocation or
+operation-local CPU value is available.
+
+Formal verification passes all 32 children and 960 samples; cleanup passes
+source-manifest and protected-file checks after removing 10.709 GiB of
+disposable custody data and retaining four replay binaries. The final helper
+gate passes 8/8 seal-helper tests; the final evidence seal is a separate
+custody gate. See the [formal analysis](results/change-0496/analysis/formal1.json),
+[scalar cross-check](results/change-0496/scalar-review.json),
+[verification](results/change-0496/verification/formal1.json), and
+[final review](results/change-0496/review-final.md). The full non-iWork goal
+remains open, and no speed, optimization, provider-ranking, or causal claim is
+made.
+
 ## 0495: verified ordinary managed DOCX edit/save enabler
 
 [0495](changes/0495-docx-managed-document-edits.md) implements and measures
