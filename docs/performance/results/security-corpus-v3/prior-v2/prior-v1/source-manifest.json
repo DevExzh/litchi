@@ -1,0 +1,107 @@
+{
+  "schema": "litchi-security-corpus-source-manifest-v1",
+  "artifact": "security-corpus-v1",
+  "base_commit": "0201c716e6005ad26712895db409b807cdbca5b0",
+  "candidate_worktree": "/var/tmp/litchi-security-corpus-validation-20260910",
+  "primary_worktree_modified": false,
+  "timed_runs": false,
+  "source_paths": [
+    {
+      "path": "tools/generate_security_corpus_catalog.py",
+      "bytes": 43016,
+      "sha256": "12bac7868dbddb27eca651ea1113980b8459c1c7285c34d498665b19e54c850f"
+    },
+    {
+      "path": "tools/validate_security_corpus_catalog.py",
+      "bytes": 14508,
+      "sha256": "3c7df432616ba762d4886902df9850cac5bd1d3676bfde8054ea459b70cd3489"
+    },
+    {
+      "path": "tools/test_security_corpus_catalog.py",
+      "bytes": 1924,
+      "sha256": "6e7883c5cf64cf147fc997ae7c87f41f59d1cb9a67a984ce1380e2cb6c26218c"
+    },
+    {
+      "path": "tools/perf-baseline/README.md",
+      "bytes": 266198,
+      "sha256": "14e9c17fea72aa47d9217461e34c904f9fe788e9f6ef151aa68cb05b283c8af7"
+    },
+    {
+      "path": "tools/perf-baseline/src/security_corpus.rs",
+      "bytes": 17566,
+      "sha256": "5572493f9c51a78c243c0c753df04d0129a160f00cd91d7d35f1bbfc324f7826"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 56259,
+      "sha256": "3509994602d90b8f57f636b4728c5987b367a57b4c260077c151cc11ebfdfce8"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/README.md",
+      "bytes": 3576,
+      "sha256": "77c3039bf1c4c691845de2da1e487122421a5d2c1bf731193d3935a79b5ca030"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/catalog.json",
+      "bytes": 174749,
+      "sha256": "6c6d01e1cfda59f78f497ded3315fa6053aae9f93fd03edb880eb0d0642ff33e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/oracles.json",
+      "bytes": 12884,
+      "sha256": "2209d0d3069e61c338316d142fe45e89d6812658fd06287e464a82e203d65e4e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/profile.json",
+      "bytes": 501,
+      "sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/prior-receipts/xls-embedded-payload-v1-receipt.json",
+      "bytes": 2149,
+      "sha256": "a8e3c3bcf8eb1f930621eed6dcb3971233ed0e6d957603da8243b6ba4f34ac1f"
+    }
+  ],
+  "evidence_paths": [
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/catalog-build.log.gz",
+      "bytes": 38,
+      "sha256": "a5b5fd1eb4a117ecd00eea4fcdd3fdae57a592384d00015a12f548d794116dd7"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/catalog-module-validation.log.gz",
+      "bytes": 160,
+      "sha256": "57d9cba77b875160098bbd94fbdb4985b50e2bd6756cd012994d6e86291f6e3e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/catalog-test-compile.log.gz",
+      "bytes": 45,
+      "sha256": "7ae24045b18b067d4e98c2c5a38820b00704dd6c17958756efa1136abb63940d"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/catalog-unit-tests.log.gz",
+      "bytes": 216,
+      "sha256": "e5d28ee6b7e6998be06b25a189304657bbbad9e027e62f6be57d5d65895ec34e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/catalog-validation.log.gz",
+      "bytes": 153,
+      "sha256": "d5db7d0595eee66f24f37956a2a95d12808a093dbd7ab055a59f2368c1d77b06"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/ooxml-interoperability.log.gz",
+      "bytes": 1692,
+      "sha256": "a0ead7007cc3e9f2fb8855cbe23f939d7d9955176eb2c9ab2ba9780cefdf9ddd"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/python-compile.log.gz",
+      "bytes": 39,
+      "sha256": "3ff7f9d8ab013a8c696295c2f1a425f31149592ab5e0715313684cb812e9f6d9"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v1/logs/security-corpus-tests.log.gz",
+      "bytes": 316,
+      "sha256": "07a01da1a96588993e56763300b64b664c287fd71a841fd2c9ae9d475fdf0365"
+    }
+  ]
+}

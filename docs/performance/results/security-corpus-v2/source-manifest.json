@@ -1,0 +1,194 @@
+{
+  "artifact": "litchi-security-corpus-v2",
+  "base_revision": "cab92a6bbc2f2eb09081c69ce90ba7bb29509155",
+  "default_bindings_unchanged": 201,
+  "oracle_bindings": {
+    "fixtures": 22,
+    "operations_per_fixture": 3,
+    "rows": 66
+  },
+  "policy": {
+    "external_reference_resolution": false,
+    "host_code_execution": false,
+    "producer_claim": "unknown unless independently recorded; synthetic vectors remain synthetic"
+  },
+  "schema": "litchi-security-corpus-source-manifest-v2",
+  "source_paths": [
+    {
+      "bytes": 72075,
+      "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+      "sha256": "c5358d8e6be8698fe45826f748154ea25e7883092ab6ffcb19227171d27f867d"
+    },
+    {
+      "bytes": 2101,
+      "path": "tools/perf-baseline/Cargo.toml",
+      "sha256": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470"
+    },
+    {
+      "bytes": 56378,
+      "path": "tools/perf-baseline/Cargo.lock",
+      "sha256": "2e0ccf57a6b1f69d9fc817bd51e9a6c76f816c936695ff2fe648693c74b7ce04"
+    },
+    {
+      "bytes": 21533,
+      "path": "tools/perf-baseline/src/security_corpus.rs",
+      "sha256": "d19cde3db94c83c59046ba531ff9aa14360afe7c93bc7c580f63509084f3c370"
+    },
+    {
+      "bytes": 3631,
+      "path": "crates/litchi-crypto/tests/ooxml_interoperability.rs",
+      "sha256": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf"
+    },
+    {
+      "bytes": 1169,
+      "path": "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json",
+      "sha256": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5"
+    },
+    {
+      "bytes": 1076,
+      "path": "crates/litchi-crypto/tests/data/ooxml/agile-mixed-manifest.json",
+      "sha256": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9"
+    },
+    {
+      "bytes": 1053,
+      "path": "crates/litchi-crypto/tests/data/ooxml/native-agile-manifest.json",
+      "sha256": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520"
+    },
+    {
+      "bytes": 1314,
+      "path": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json",
+      "sha256": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a"
+    },
+    {
+      "bytes": 34145,
+      "path": "crates/litchi-crypto/src/ooxml/mod.rs",
+      "sha256": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece"
+    },
+    {
+      "bytes": 27612,
+      "path": "crates/litchi-crypto/src/ooxml/container.rs",
+      "sha256": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db"
+    },
+    {
+      "bytes": 23654,
+      "path": "crates/litchi-crypto/src/ooxml/standard.rs",
+      "sha256": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964"
+    },
+    {
+      "bytes": 75151,
+      "path": "crates/litchi-crypto/src/ooxml/agile.rs",
+      "sha256": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0"
+    },
+    {
+      "bytes": 170707,
+      "path": "crates/litchi-cfb/src/file.rs",
+      "sha256": "334b3f9a0a6a59d1d4f511eaa5ee292eb614b219861e004caf03f5674fab38f9"
+    },
+    {
+      "bytes": 28006,
+      "path": "crates/litchi-cfb/src/allocation_validation_tests.rs",
+      "sha256": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f"
+    },
+    {
+      "bytes": 17097,
+      "path": "crates/litchi-doc/src/package/codec.rs",
+      "sha256": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9"
+    },
+    {
+      "bytes": 110603,
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "sha256": "8557c29f54d175563e582366edba1c8c202136e4a5da3594ba7ca52cecf2f645"
+    },
+    {
+      "bytes": 106539,
+      "path": "crates/litchi-opc/src/pkgreader.rs",
+      "sha256": "85bb29e62bdcf58c813a7d44c590c2bbe7ae6e2dbf64393f033dec0b7c049c3c"
+    },
+    {
+      "bytes": 137248,
+      "path": "crates/litchi-opc/src/package.rs",
+      "sha256": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1"
+    },
+    {
+      "bytes": 749864,
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "c56d1d0dd21ca97528982085560d292f6caf6b0594d095f0f4fc65664e8310bd"
+    },
+    {
+      "bytes": 43581,
+      "path": "crates/litchi-ooxml-common/src/properties/read.rs",
+      "sha256": "57b393b460623f89b75c7761ab4f39672fe7ccad221253fb47c7eabc0e46c205"
+    },
+    {
+      "bytes": 80505,
+      "path": "crates/litchi-sign/src/xml.rs",
+      "sha256": "187ec1f6a926e87f0e817af4f778861d6eb746053d0ec71b144b672460f1f4a2"
+    },
+    {
+      "bytes": 17515,
+      "path": "crates/litchi-xls/src/workbook/package.rs",
+      "sha256": "3ee906f6e96a1851347408b88205e2f18de6ddd9eb294b672f95390e6dc5e054"
+    },
+    {
+      "bytes": 23830,
+      "path": "crates/litchi-xls/src/vba.rs",
+      "sha256": "a3e4fe975485269a36341d0accc961cda7601f78561599c7dba2cf980a80393e"
+    },
+    {
+      "bytes": 56918,
+      "path": "crates/litchi-xlsx/src/workbook/model.rs",
+      "sha256": "345c517288661ae41553f72a98594476531e7464d51df692333d2a2bb1d59612"
+    },
+    {
+      "bytes": 1332,
+      "path": "crates/litchi-xlsx/tests/reader_tolerance.rs",
+      "sha256": "71292ec5da0a78e64d55d73c7de251e7c4a0959838ea89ddc21b77ec2967bb8a"
+    },
+    {
+      "bytes": 19983,
+      "path": "crates/litchi-xlsx/src/xml_maps/tests.rs",
+      "sha256": "cb73a9f5874d367af9fb1c54907e8597affe3ea912da2ee364654a2002a4117f"
+    },
+    {
+      "bytes": 555184,
+      "path": "crates/soapberry-zip/src/office.rs",
+      "sha256": "f5ea04b22ea6655a592b1ed77896091250c3c6505bb911fc30b45268808f635f"
+    },
+    {
+      "bytes": 226279,
+      "path": "crates/soapberry-zip/src/preserve.rs",
+      "sha256": "48bc63a2197f6c17801acd0f82db8fb8a2062d4c590ab6e62531b7dc7d38321f"
+    },
+    {
+      "bytes": 139640,
+      "path": "docs/adr/0005-io-memory-and-performance.md",
+      "sha256": "34a6148a8fe77b3e90212810996667b654e25209fb49c56aaecd8d8fbe83f770"
+    },
+    {
+      "bytes": 6694,
+      "path": "docs/adr/0006-validation-security-and-compatibility.md",
+      "sha256": "b686465f342b2e051f856f094e38c2333aa05a2768bb255fc5b223cbba1f3381"
+    },
+    {
+      "bytes": 134726,
+      "path": "docs/performance/results/security-corpus-v2/catalog.json",
+      "sha256": "52c9b13976614004d2b80a8a7941763c04ea18528cfb8e63352ce270f0967e76"
+    },
+    {
+      "bytes": 27903,
+      "path": "docs/performance/results/security-corpus-v2/oracles.json",
+      "sha256": "57441f97e2a070ff89aad2268cf7f97f18a1989cf11895da7529aa32f44dd36b"
+    },
+    {
+      "bytes": 1033,
+      "path": "docs/performance/results/security-corpus-v2/profile.json",
+      "sha256": "ad8b200df07a7161c3b288345e345b3341759350d5ca5d65d26ca58870fdcf12"
+    },
+    {
+      "bytes": 2354,
+      "path": "docs/performance/results/security-corpus-v2/README.md",
+      "sha256": "c9cb2590957bf882eea04073697790e3b89cdf3b529e0ad376d91f9205134d24"
+    }
+  ],
+  "timed_captures_recorded": false
+}

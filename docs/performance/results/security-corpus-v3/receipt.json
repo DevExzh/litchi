@@ -1,0 +1,113 @@
+{
+  "schema": "litchi-security-corpus-receipt-v3",
+  "artifact": "security-corpus-v3",
+  "base_commit": "cab92a6bbc2f2eb09081c69ce90ba7bb29509155",
+  "candidate_worktree": "/var/tmp/litchi-security-corpus-v3-real-20260910",
+  "primary_worktree_modified": false,
+  "owned_scope": [
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/Cargo.lock",
+    "tools/perf-baseline/src/bin/security_corpus.rs",
+    "tools/perf-baseline/src/security_corpus.rs",
+    "crates/litchi-ole-common/src/object/editor.rs",
+    "crates/litchi-xls/src/cell_values/mod.rs",
+    "crates/litchi-opc/src/limits.rs",
+    "crates/litchi-opc/src/phys_pkg.rs",
+    "docs/performance/results/security-corpus-v3/"
+  ],
+  "shared_provider_scope": "shared security corpus harness changed in tools/perf-baseline/src/security_corpus.rs; explicit CFB admission API added for its XLS snapshot path; default 201 provider bindings remain unchanged; no cfb_boundary_tests source edits",
+  "catalog": {
+    "catalog_sha256": "88df805c327d3edba9691263adc698e53fc184fdfcc0ddf3c618e87fcdd42447",
+    "catalog_file_sha256": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797",
+    "oracles_sha256": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6",
+    "profile_sha256": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1",
+    "source_manifest_sha256": "5d123954ea614f9bb9a011628fd8336293764618ab1b45f8d866577812746493",
+    "fixtures": 22,
+    "operation_rows": 66,
+    "default_bindings_unchanged": 201,
+    "timed_operation_definitions": 3,
+    "timed_captures_recorded": false,
+    "content_binding": "catalog corpus ids are SHA-256 identities of the admitted fixture bytes; each executable row reports the same source digest"
+  },
+  "api_scope": {
+    "bounded_read": "soapberry_zip::office::ArchiveReader::read; litchi_cfb::OleFile::open_with_limits; litchi_crypto::ooxml::open_with",
+    "validate": "litchi_opc::OpcPackage::from_bytes_with_limits (shared harness) and from_vec_with_limits (corpus binary), plus bounded ArchiveReader, CFB, DOC, XLS, XLSX, signature, and crypto oracle paths",
+    "preserve": "soapberry_zip::ZipArchive::from_seekable plus PreservationIndex::new_with_limits for ZIP; bounded validate and exact byte copy for CFB/crypto",
+    "admission": "filesystem metadata and fallible reserve before bounded reads; ZIP central-directory preflight counts declared and actual total entries before high-level ownership; CFB limits precede index allocation"
+  },
+  "source_closure": {
+    "manifest": "docs/performance/results/security-corpus-v3/source-manifest.json",
+    "path_count": 49,
+    "strategy": "implementation/oracle sources plus dep-info-checked bounded-reader closure",
+    "required_paths": [
+      "crates/litchi-crypto/src/spaces.rs",
+      "crates/litchi-opc/src/limits.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-doc/src/document/package.rs"
+    ]
+  },
+  "commands": {
+    "compile": "TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 check --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus",
+    "unit_tests": "TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus",
+    "shared_harness": "TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --lib security_corpus --no-default-features -- --ignored",
+    "clippy": "TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +stable clippy --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus --all-targets -- -D warnings",
+    "default_baseline": "TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 check --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+    "opc_tests": [
+      "CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --offline --manifest-path crates/litchi-opc/Cargo.toml --lib limits::tests",
+      "CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --offline --manifest-path crates/litchi-opc/Cargo.toml --lib phys_pkg::tests::maps_zip_member_limit_to_opc_resource",
+      "CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --offline --manifest-path crates/litchi-opc/Cargo.toml --lib phys_pkg::tests::total_archive_entry_limit_includes_directory_records"
+    ],
+    "crypto_interoperability": "CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --offline --manifest-path crates/litchi-crypto/Cargo.toml --features ooxml --test ooxml_interoperability ooxml_read_compatibility_normalizes_msoffcrypto_zero_block_graph",
+    "correctness_rows": "LITCHI_SECURITY_CORPUS_REVISION=cab92a6bbc2f2eb09081c69ce90ba7bb29509155 TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 run --locked --offline --quiet --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus -- --json /var/tmp/litchi-security-corpus-v3-tmp/all-final-v3.json",
+    "catalog_build": "LITCHI_SECURITY_CORPUS_REVISION=cab92a6bbc2f2eb09081c69ce90ba7bb29509155 TMPDIR=/var/tmp/litchi-security-corpus-v3-tmp CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v3-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 run --locked --offline --quiet --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus -- --operation validate --catalog-dir docs/performance/results/security-corpus-v3",
+    "measure_gate": "cargo +1.95.0 run --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus -- --measure --fixture crypto-msoffcrypto-agile-valid-graph --json /var/tmp/litchi-security-corpus-v3-tmp/measure-denied.json"
+  },
+  "results": {
+    "compile": "pass",
+    "unit_tests": "7 passed, 0 failed",
+    "shared_harness": "1 ignored real-producer corpus test passed",
+    "clippy": "pass",
+    "default_baseline": "pass; litchi-perf-baseline compiled",
+    "opc_tests": "targeted ReadLimits, physical ZIP member-limit, and adversarial total-entry tests passed",
+    "crypto_interoperability": "1 targeted zero-DataSpaces-block compatibility test passed",
+    "correctness_rows": "66 executable rows passed; 22 fixtures x 3 operations; every row timed=false",
+    "catalog_build": "pass: 22 content-addressed corpora and 22 oracle bindings",
+    "measure_gate": "status 1 with explicit capture-gate refusal; no timed operation ran",
+    "v2_preservation": "docs/performance/results/security-corpus-v3/prior-v2/ is byte-identical to the V2 artifact tree (21 files)"
+  },
+  "policy": {
+    "input_limit_bytes": 67108864,
+    "zip_non_directory_limit": 4096,
+    "zip_total_entry_limit": 4096,
+    "opc_zip_total_entry_limit": 4096,
+    "cfb_directory_limit_bytes": 524288,
+    "cfb_allocation_table_limit_bytes": 67108864,
+    "timed_runs": false,
+    "capture_gate": "LITCHI_SECURITY_CORPUS_CAPTURE=approved plus --measure",
+    "host_code_execution": false,
+    "external_reference_resolution": false,
+    "native_acceptance_claim": false,
+    "producer_policy": "document_producer is null unless independently recorded; synthetic vectors remain non-native",
+    "macro_policy": "inventory and inert preservation only; never execute",
+    "zero_block_crypto_policy": "strict spaces inspection refuses the advisory zero block size; compatibility OOXML reader accepts, decrypts, authenticates, and matches the clear digest"
+  },
+  "preserved_prior_artifacts": [
+    {
+      "artifact": "security-corpus-v2",
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/",
+      "status": "retained verbatim for audit comparison"
+    },
+    {
+      "artifact": "security-corpus-v2 sibling",
+      "path": "docs/performance/results/security-corpus-v2/",
+      "status": "retained unchanged alongside V3"
+    }
+  ],
+  "not_run": [
+    "timed performance capture",
+    "allocator or latency measurement",
+    "native Office host round-trip",
+    "macro execution or external network resolution"
+  ]
+}

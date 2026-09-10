@@ -25,20 +25,21 @@
 use std::{
     collections::BTreeMap,
     error::Error,
-    fs,
-    io::Cursor,
+    fs::{self, File},
+    io::{Cursor, Read},
     num::{NonZeroU64, NonZeroUsize},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_doc::{Error as DocError, OpenOptions, Package as DocPackage};
+use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
+use litchi_ole_common::object::Limits as ObjectLimits;
 use litchi_opc::{OpcError, OpcPackage, ReadLimits, ReadResource, SourceBackedPackage, TargetMode};
 use litchi_sign::{Policy, Status};
 use litchi_xls::{Workbook as XlsWorkbook, cell_values::Snapshot as XlsSnapshot};
@@ -62,6 +63,11 @@ const BINARY_RC4_SEMANTIC_SHA256: &str =
     "5c5c945257fcd1569b5161722e15a9d73283daf786aca1daf04d0029d3736b78";
 const EXTERNAL_INVENTORY_SHA256: &str =
     "16a2466d394b25d4a465c4db740fca842b9627e98a91c37163312b9585b80beb";
+const SECURITY_MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+const SECURITY_MAX_MEMBERS: usize = 4_096;
+const SECURITY_MAX_RELATIONSHIPS: usize = 8_192;
+const SECURITY_MAX_MEMBER_NAME_BYTES: u64 = 4 * 1024;
+const SECURITY_CFB_DIRECTORY_ENTRY_BYTES: u64 = 128;
 
 const SIGNED_DOCX_PATH: &str = "../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx";
 const SIGNED_XLSX_PATH: &str = "../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx";
@@ -124,7 +130,7 @@ fn real_producer_security_corpus_is_bounded_and_deterministic() -> Result<(), Bo
 fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
     for fixture in SIGNED_FIXTURES {
         let bytes = load_fixture(*fixture)?;
-        let package = OpcPackage::from_bytes(&bytes)?;
+        let package = OpcPackage::from_bytes_with_limits(&bytes, security_read_limits()?)?;
         assert!(
             package.is_signed(),
             "{} lost its signature graph",
@@ -140,12 +146,13 @@ fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
             report.integrity() == Status::Valid && report.signature() == Status::Valid
         }));
 
-        let source = SourceBackedPackage::from_vec(bytes.clone())?;
+        let source =
+            SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
         let mut no_op = Vec::new();
         source.write_part_overlays_to_stream(&mut no_op, Vec::new())?;
         assert_eq!(no_op, bytes, "{} changed on exact no-op", fixture.id);
 
-        let source = SourceBackedPackage::from_vec(bytes)?;
+        let source = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
         let (target, replacement) = {
             let main = source.main_document_part()?;
             let target = main.partname().clone();
@@ -174,7 +181,8 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     };
     let bytes = load_fixture(fixture)?;
 
-    let package = SourceBackedPackage::from_vec(bytes.clone())?;
+    let package =
+        SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let no_op = docx.edit_document_variables()?.commit()?;
     assert!(!no_op.changed());
@@ -182,7 +190,7 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     docx.publish_document_variables_commit_to_stream(&mut no_op_output, &no_op)?;
     assert_eq!(no_op_output, bytes);
 
-    let package = SourceBackedPackage::from_vec(bytes)?;
+    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let mut edit = docx.edit_document_variables()?;
     edit.set_variable("security_matrix", "must-refuse")?;
@@ -206,13 +214,13 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
             sha256,
         })?;
 
-        let mut package = DocPackage::from_reader(Cursor::new(bytes.clone()))?;
+        let mut package = open_doc_package(&bytes)?;
         assert!(matches!(
             package.document(),
             Err(DocError::PasswordRequired)
         ));
 
-        let mut package = DocPackage::from_reader(Cursor::new(bytes.clone()))?;
+        let mut package = open_doc_package(&bytes)?;
         assert!(matches!(
             package.document_with_options(
                 OpenOptions::default().with_password("wrong".to_owned().into())
@@ -225,7 +233,7 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
         } else {
             "tika"
         };
-        let mut package = DocPackage::from_reader(Cursor::new(bytes))?;
+        let mut package = open_doc_package(&bytes)?;
         let document = package.document_with_options(
             OpenOptions::default().with_password(password.to_owned().into()),
         )?;
@@ -239,11 +247,12 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
         };
         assert_eq!(semantic_digest, expected, "{id} semantic digest changed");
 
-        let mut package = DocPackage::from_reader(Cursor::new(load_fixture(Fixture {
+        let second_bytes = load_fixture(Fixture {
             id,
             relative_path,
             sha256,
-        })?))?;
+        })?;
+        let mut package = open_doc_package(&second_bytes)?;
         let document = package.document_with_options(
             OpenOptions::default().with_password(password.to_owned().into()),
         )?;
@@ -260,7 +269,10 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
     })?;
     let before_macro_digest = macro_stream_digest(&bytes)?;
 
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes.clone()))?;
+    let mut workbook = XlsWorkbook::from_ole_file(OleFile::open_with_limits(
+        Cursor::new(bytes.clone()),
+        security_ole_limits()?,
+    )?)?;
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_project_storage());
@@ -277,7 +289,11 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|module| { module.source().text().contains("Sub ") })
     );
-    let source = XlsSnapshot::from_bytes(bytes.clone())?;
+    let source = XlsSnapshot::from_bytes_with_limits_and_cfb(
+        bytes.clone(),
+        security_object_limits(),
+        security_ole_limits()?,
+    )?;
     let no_op = source.edit().commit()?;
     assert_eq!(no_op.snapshot().bytes(), bytes.as_slice());
     assert_eq!(
@@ -299,7 +315,7 @@ fn external_target_inventory() -> Result<(), Box<dyn Error>> {
         relative_path: EXTERNAL_XLSX_PATH,
         sha256: EXTERNAL_XLSX_SHA256,
     })?;
-    let package = SourceBackedPackage::from_vec(bytes)?;
+    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
     let inventory = collect_external_targets(&package);
     assert_eq!(
         inventory,
@@ -357,7 +373,7 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        security_read_limits()?,
         context,
     )?;
     let artifact = package.source_artifact();
@@ -380,7 +396,40 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
 
 fn load_fixture(fixture: Fixture) -> Result<Vec<u8>, Box<dyn Error>> {
     let path = fixture_path(fixture.relative_path);
-    let bytes = fs::read(&path)?;
+    let declared = fs::metadata(&path)?.len();
+    if declared > SECURITY_MAX_INPUT_BYTES {
+        return Err(format!(
+            "fixture {} exceeds the bounded input profile: {} > {}",
+            fixture.id, declared, SECURITY_MAX_INPUT_BYTES
+        )
+        .into());
+    }
+    let capacity = usize::try_from(declared)?;
+    let mut file = File::open(&path)?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(capacity)?;
+    let mut buffer = [0_u8; 16 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        let next = bytes
+            .len()
+            .checked_add(count)
+            .ok_or("fixture length overflow")?;
+        if next > capacity {
+            return Err(format!("fixture {} grew after bounded admission", fixture.id).into());
+        }
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    if bytes.len() != capacity {
+        return Err(format!(
+            "fixture {} changed length after bounded admission",
+            fixture.id
+        )
+        .into());
+    }
     let actual = sha256_hex(&bytes);
     if actual != fixture.sha256 {
         return Err(format!(
@@ -397,6 +446,69 @@ fn load_fixture(fixture: Fixture) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn fixture_path(relative_path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_path)
+}
+
+fn security_ole_limits() -> Result<OleFileLimits, Box<dyn Error>> {
+    Ok(OleFileLimits::new(SECURITY_MAX_INPUT_BYTES)?
+        .with_max_directory_bytes(SECURITY_MAX_MEMBERS as u64 * SECURITY_CFB_DIRECTORY_ENTRY_BYTES)?
+        .with_max_allocation_table_bytes(SECURITY_MAX_INPUT_BYTES)?)
+}
+
+fn security_doc_limits() -> Result<DocLimits, Box<dyn Error>> {
+    Ok(DocLimits::try_new(
+        SECURITY_MAX_INPUT_BYTES as usize,
+        SECURITY_MAX_INPUT_BYTES as usize,
+        SECURITY_MAX_INPUT_BYTES as usize,
+    )?)
+}
+
+fn security_object_limits() -> ObjectLimits {
+    ObjectLimits {
+        max_objects: 1,
+        max_storage_depth: 32,
+        max_streams_per_object: SECURITY_MAX_MEMBERS,
+        max_streams: SECURITY_MAX_MEMBERS,
+        max_stream_size: SECURITY_MAX_INPUT_BYTES,
+        max_object_size: SECURITY_MAX_INPUT_BYTES,
+        max_total_size: SECURITY_MAX_INPUT_BYTES,
+    }
+}
+
+fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn Error>> {
+    let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
+    Ok(DocPackage::from_ole_file_with_limits(
+        ole,
+        security_doc_limits()?,
+    )?)
+}
+
+fn security_read_limits() -> Result<ReadLimits, Box<dyn Error>> {
+    Ok(ReadLimits::builder()
+        .max_input_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_archive_members(SECURITY_MAX_MEMBERS)?
+        .max_archive_total_entries(SECURITY_MAX_MEMBERS)?
+        .max_archive_member_name_bytes(SECURITY_MAX_MEMBER_NAME_BYTES)?
+        .max_archive_metadata_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_archive_compressed_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_archive_entry_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_archive_total_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_parts(SECURITY_MAX_MEMBERS)?
+        .max_part_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_total_part_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_content_types_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_content_type_mappings(SECURITY_MAX_MEMBERS)?
+        .max_relationship_parts(SECURITY_MAX_MEMBERS)?
+        .max_relationship_xml_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_total_relationship_xml_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_relationships_per_part(SECURITY_MAX_RELATIONSHIPS)?
+        .max_total_relationships(SECURITY_MAX_RELATIONSHIPS)?
+        .max_relationship_graph_nodes(SECURITY_MAX_MEMBERS)?
+        .max_xml_events(SECURITY_MAX_RELATIONSHIPS)?
+        .max_total_relationship_xml_events(SECURITY_MAX_RELATIONSHIPS)?
+        .max_xml_depth(256)?
+        .max_xml_attribute_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_relationship_target_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .build()?)
 }
 
 fn collect_external_targets(package: &SourceBackedPackage) -> Vec<String> {
@@ -435,7 +547,7 @@ fn format_relationship(owner: &str, relationship: &litchi_opc::Relationship) -> 
 }
 
 fn macro_stream_digest(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), security_ole_limits()?)?;
     let mut streams = BTreeMap::new();
     for path in ole.list_streams() {
         if !path

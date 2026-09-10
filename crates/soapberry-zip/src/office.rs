@@ -2169,6 +2169,7 @@ impl<'data> ArchiveReader<'data> {
             ordered_names.push((local_header_offset, name));
         }
 
+        validate_declared_entry_count(layout.len(), declared_entry_count)?;
         ordered_names.sort_by_key(|(offset, _)| *offset);
         let order = collect_order_fallibly(ordered_names, "archive reader file order")?;
         layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
@@ -3343,6 +3344,7 @@ where
             }
         }
 
+        validate_declared_entry_count(layout.len(), declared_entry_count)?;
         if matches!(policy, ArchiveValidationPolicy::StrictPackage) {
             validate_strict_mimetype(&archive, strict_mimetype)?;
         }
@@ -4622,6 +4624,17 @@ fn collect_order_fallibly<T>(
 }
 
 const CENTRAL_FIXED_RECORD_BYTES: u64 = 46;
+fn validate_declared_entry_count(actual: usize, declared: usize) -> Result<(), Error> {
+    if actual != declared {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: format!(
+                "central directory contains {actual} records but EOCD declares {declared}"
+            ),
+        }));
+    }
+    Ok(())
+}
+
 fn physical_entry_bound(
     central_directory_size: u64,
     entry_count: u64,
@@ -12587,6 +12600,46 @@ mod tests {
         let error = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED)
             .expect_err("inflated EOCD count must be rejected");
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn rejects_understated_or_overstated_entry_count_after_bounded_walk() {
+        let mut understated = fixture(&[
+            FixtureEntry::stored(b"first", b"data"),
+            FixtureEntry::stored(b"second", b"data"),
+        ]);
+        let eocd_offset = understated.len() - 22;
+        understated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&1u16.to_le_bytes());
+        understated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1u16.to_le_bytes());
+        assert!(matches!(
+            ArchiveReader::new_with_limits(&understated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            indexed_archive_result(understated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+
+        let comment = vec![0xa5; 46];
+        let mut overstated = fixture(&[FixtureEntry {
+            name: b"one",
+            extra: b"",
+            comment: &comment,
+            compressed_size: 0,
+            uncompressed_size: 0,
+            data: b"",
+        }]);
+        let eocd_offset = overstated.len() - 22;
+        overstated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&2u16.to_le_bytes());
+        overstated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&2u16.to_le_bytes());
+        assert!(matches!(
+            ArchiveReader::new_with_limits(&overstated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            indexed_archive_result(overstated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
     }
 
     fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {

@@ -1,0 +1,23 @@
+{
+  "artifact": "xls-embedded-payload-v1",
+  "toolchain": "1.95.0",
+  "cpu_affinity": "8-31",
+  "target_dir": "/var/tmp/litchi-xls-embedded-payload-target-20260910",
+  "commands": {
+    "tests": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test -p litchi-xls --lib ole_object::tests -- --nocapture",
+    "clippy": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 clippy -p litchi-xls --lib --tests --all-features -- -D warnings",
+    "rustdoc": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 RUSTDOCFLAGS=-D warnings taskset -c 8-31 cargo +1.95.0 doc -p litchi-xls --all-features --no-deps",
+    "rustfmt": "rustup run stable rustfmt --edition 2024 --check crates/litchi-xls/src/lib.rs crates/litchi-xls/src/ole_object/semantic/mod.rs crates/litchi-xls/src/ole_object/semantic/payload.rs crates/litchi-xls/src/ole_object/package/transaction.rs crates/litchi-xls/src/ole_object/edit/transaction.rs crates/litchi-xls/src/ole_object/tests/transaction.rs"
+  },
+  "results": {
+    "tests": "pass: 29 passed, 0 failed",
+    "clippy": "pass",
+    "rustdoc": "pass",
+    "rustfmt": "pass"
+  },
+  "limitations": [
+    "The full litchi-xls library run was not used as the focused receipt: two unrelated pre-existing filesystem tests failed in the concurrent shared environment (a temp-directory save test and a source-backed numeric temp-directory test).",
+    "Protected or signed/encrypted/DRM CFB components are refused by the shared mutation boundary; this batch does not implement signature stripping or resigning.",
+    "Payload-internal OLE semantics, ActiveX/control streams, DDE/link authoring, macro execution, and network/runtime activation remain unsupported."
+  ]
+}

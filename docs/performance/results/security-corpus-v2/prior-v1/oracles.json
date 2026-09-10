@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "catalog_id": "litchi-security-corpus-v1",
+  "profile_id": "security-corpus-bounded-read-v1",
+  "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+  "rows": [
+    {
+      "case": "security-cfb-boundary-read",
+      "role": "guard",
+      "fixture_ids": [
+        "cfb-short-final-sector",
+        "cfb-uninitialized-size-high-word"
+      ],
+      "corpus_ids": [
+        "cfb-ole2:sha256:f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+        "cfb-ole2:sha256:d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "cfb-short-final-sector",
+          "expected": {
+            "open": "accept",
+            "stream": "WordDocument",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "cfb-uninitialized-size-high-word",
+          "expected": {
+            "open": "accept",
+            "stream": "WordDocument",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-encrypted-ole-password-readback",
+      "role": "guard",
+      "fixture_ids": [
+        "poi-cryptoapi-encrypted-doc",
+        "poi-binaryrc4-encrypted-doc"
+      ],
+      "corpus_ids": [
+        "cfb-ole2:sha256:f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+        "cfb-ole2:sha256:9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "poi-cryptoapi-encrypted-doc",
+          "expected": {
+            "password_required": true,
+            "wrong_password": "invalid",
+            "password": "password",
+            "semantic_sha256": "6dd4273bea0a8f70f4b6d8448e0ea1cb22b54713ad78d177394bd8b496e0aea6",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "poi-binaryrc4-encrypted-doc",
+          "expected": {
+            "password_required": true,
+            "wrong_password": "invalid",
+            "password": "tika",
+            "semantic_sha256": "5c5c945257fcd1569b5161722e15a9d73283daf786aca1daf04d0029d3736b78",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-external-xlsx-inventory-no-fetch",
+      "role": "inventory-only",
+      "fixture_ids": [
+        "ooxml-external-startup-xlsx"
+      ],
+      "corpus_ids": [
+        "ooxml-zip:sha256:e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "ooxml-external-startup-xlsx",
+          "expected": {
+            "external_target_inventory_sha256": "16a2466d394b25d4a465c4db740fca842b9627e98a91c37163312b9585b80beb",
+            "external_resolution": false,
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-macro-xls-inert-preservation",
+      "role": "guard",
+      "fixture_ids": [
+        "poi-simple-macro-xls"
+      ],
+      "corpus_ids": [
+        "cfb-ole2:sha256:0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "poi-simple-macro-xls",
+          "expected": {
+            "macro_inventory": "present",
+            "macro_execution": false,
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-ooxml-encryption-advisory-compatibility",
+      "role": "guard",
+      "fixture_ids": [
+        "crypto-msoffcrypto-agile-zero-block-graph"
+      ],
+      "corpus_ids": [
+        "ooxml-encrypted-cfb:sha256:4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "crypto-msoffcrypto-agile-zero-block-graph",
+          "expected": {
+            "strict_dataspaces": "refuse",
+            "compatibility_read": "accept",
+            "mode": "AgileAes256Sha512",
+            "integrity": "Authenticated",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "role": "guard",
+      "fixture_ids": [
+        "crypto-component-standard-aes192",
+        "crypto-component-standard-aes256",
+        "crypto-component-agile-mixed-key-size",
+        "crypto-msoffcrypto-agile-valid-graph",
+        "crypto-rust-standard-aes192",
+        "crypto-rust-standard-aes256",
+        "crypto-rust-agile-aes256-sha512"
+      ],
+      "corpus_ids": [
+        "ooxml-encrypted-cfb:sha256:40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+        "ooxml-encrypted-cfb:sha256:5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+        "ooxml-encrypted-cfb:sha256:d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+        "ooxml-encrypted-cfb:sha256:65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+        "ooxml-encrypted-cfb:sha256:83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+        "ooxml-encrypted-cfb:sha256:b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+        "ooxml-encrypted-cfb:sha256:7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "crypto-component-standard-aes192",
+          "expected": {
+            "mode": "StandardAes192",
+            "integrity": "Unauthenticated",
+            "readback": "clear-package-byte-equality",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-component-standard-aes256",
+          "expected": {
+            "mode": "StandardAes256",
+            "integrity": "Unauthenticated",
+            "readback": "clear-package-byte-equality",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-component-agile-mixed-key-size",
+          "expected": {
+            "mode": "AgileAes256Sha512",
+            "integrity": "Authenticated",
+            "readback": "clear-package-byte-equality",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-msoffcrypto-agile-valid-graph",
+          "expected": {
+            "mode": "AgileAes256Sha512",
+            "integrity": "Authenticated",
+            "readback": "clear-package-byte-equality",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-rust-standard-aes192",
+          "expected": {
+            "mode": "StandardAes192",
+            "integrity": "Unauthenticated",
+            "external_verifier": "msoffcrypto-tool",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-rust-standard-aes256",
+          "expected": {
+            "mode": "StandardAes256",
+            "integrity": "Unauthenticated",
+            "external_verifier": "msoffcrypto-tool",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "crypto-rust-agile-aes256-sha512",
+          "expected": {
+            "mode": "AgileAes256Sha512",
+            "integrity": "Authenticated",
+            "external_verifier": "msoffcrypto-tool",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-opc-malformed-refusal",
+      "role": "guard",
+      "fixture_ids": [
+        "poi-opc-multiple-core-properties",
+        "poi-opc-derived-part-name"
+      ],
+      "corpus_ids": [
+        "ooxml-zip:sha256:e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+        "ooxml-zip:sha256:a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "poi-opc-multiple-core-properties",
+          "expected": {
+            "open": "refuse",
+            "output_bytes": 0,
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "poi-opc-derived-part-name",
+          "expected": {
+            "open": "refuse",
+            "output_bytes": 0,
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-protected-docx-noop-refusal",
+      "role": "guard",
+      "fixture_ids": [
+        "ooxml-protected-docx"
+      ],
+      "corpus_ids": [
+        "ooxml-zip:sha256:5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "ooxml-protected-docx",
+          "expected": {
+            "document_protection": "present",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "role": "guard",
+      "fixture_ids": [
+        "poi-signed-docx",
+        "poi-signed-xlsx",
+        "poi-signed-pptx"
+      ],
+      "corpus_ids": [
+        "ooxml-zip:sha256:bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+        "ooxml-zip:sha256:4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+        "ooxml-zip:sha256:4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "poi-signed-docx",
+          "expected": {
+            "signature": "valid",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "poi-signed-xlsx",
+          "expected": {
+            "signature": "valid",
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "poi-signed-pptx",
+          "expected": {
+            "signature": "valid",
+            "document_producer": null
+          }
+        }
+      ]
+    },
+    {
+      "case": "security-xlsx-adversarial-inert-read",
+      "role": "inventory-only",
+      "fixture_ids": [
+        "poi-xxe-schema-inert-xlsx",
+        "ooxml-malformed-shared-string-hints"
+      ],
+      "corpus_ids": [
+        "ooxml-zip:sha256:95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+        "ooxml-zip:sha256:c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462"
+      ],
+      "operation": {
+        "timed": false,
+        "read_only_or_guarded": true,
+        "host_code_execution": false,
+        "external_reference_resolution": false
+      },
+      "fixture_expectations": [
+        {
+          "fixture_id": "poi-xxe-schema-inert-xlsx",
+          "expected": {
+            "opaque_schema_preserved": true,
+            "external_resolution": false,
+            "document_producer": null
+          }
+        },
+        {
+          "fixture_id": "ooxml-malformed-shared-string-hints",
+          "expected": {
+            "open": "accept",
+            "nonempty_workbook": true,
+            "document_producer": null
+          }
+        }
+      ]
+    }
+  ],
+  "policy": {
+    "default_catalog_bindings": 201,
+    "timed_rows": 0,
+    "macros": "inspect-and-preserve-inertly; never execute",
+    "external_links": "inventory only; never resolve or fetch",
+    "producer_claim": "fixture repository only; document producer is unknown unless independently recorded"
+  }
+}

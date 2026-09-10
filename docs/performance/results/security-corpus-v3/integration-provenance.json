@@ -1,0 +1,176 @@
+{
+  "schema": "litchi-security-corpus-integration-provenance-v2",
+  "created_utc": "2026-09-10T11:37:38Z",
+  "authoritative_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "authoritative_head": "9821676451bf098cd0794fd177702bd82f27d826",
+  "overlay_worktree": "/var/tmp/litchi-security-corpus-v3-integration-982-20260910",
+  "overlay_head": "9821676451bf098cd0794fd177702bd82f27d826",
+  "historical_candidate": {
+    "base_commit": "cab92a6bbc2f2eb09081c69ce90ba7bb29509155",
+    "worktree": "/var/tmp/litchi-security-corpus-v3-real-20260910",
+    "artifact": "docs/performance/results/security-corpus-v3/",
+    "source_manifest": "docs/performance/results/security-corpus-v3/source-manifest.json",
+    "source_manifest_sha256": "5d123954ea614f9bb9a011628fd8336293764618ab1b45f8d866577812746493",
+    "status": "immutable historical candidate evidence; preserved unchanged",
+    "timing_definitions": 3,
+    "rows_timed": false,
+    "timed_captures_recorded": false
+  },
+  "current_integration": {
+    "status": "clean overlay from authoritative 982 HEAD with combined bounded CFB/OLE merge, feature payload, and concrete integration evidence",
+    "source_manifest": "docs/performance/results/security-corpus-v3/integration-source-manifest.json",
+    "source_manifest_sha256": "a9216e527e14e4b38d22f35690959c139f36ee2348eece646d9b24e4c91e7ab9",
+    "source_manifest_path_count": 49,
+    "source_head_delta_paths": [
+      "tools/perf-baseline/Cargo.lock",
+      "crates/litchi-cfb/src/file.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-ole-common/src/object/model.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/soapberry-zip/src/office.rs"
+    ],
+    "preimages_manifest": "docs/performance/results/security-corpus-v3/integration-preimages.json",
+    "preimages_manifest_sha256": "8ce5b6b246d14e3cbff93194ab20282a6338bff7218365b59eba8b7e7cfa205b",
+    "correctness_json": "/var/tmp/litchi-security-corpus-v3-integration-982-correctness.json",
+    "correctness_json_sha256": "03d655e44b3182c30f7a928f38d7252826415f59063305eb8d8bfb32f93057d9",
+    "correctness_rows": 66,
+    "operations": {
+      "bounded_read": 22,
+      "validate": 22,
+      "preserve": 22
+    },
+    "rows_timed": false,
+    "timed_captures_recorded": false,
+    "no_capture_run": true,
+    "reconciliation_manifest": "/var/tmp/litchi-security-corpus-v3-current982-mixed-primary-reconciliation-20260910.json",
+    "publication_receipt": "/var/tmp/litchi-security-corpus-v3-integration-982-publication-r1.json",
+    "publication_receipt_revision": 1
+  },
+  "feature_scope": {
+    "tracked_paths_changed": 8,
+    "added_feature_paths": 50,
+    "payload_paths": 58,
+    "publication_evidence_paths": 2,
+    "concrete_publication_paths": 60,
+    "unrelated_authoritative_pending_edits_in_overlay": false,
+    "primary_worktree_modified_by_agent": false
+  },
+  "diff_and_hashes": {
+    "tracked_patch_path": "/var/tmp/litchi-security-corpus-v3-integration-982.patch",
+    "tracked_patch_sha256": "d82cc841df6f0ac3d3c4ffaf8c823a32e1d7461c969ddd9b9945acb52c9bfa6e",
+    "tracked_patch_bytes": 29169,
+    "payload_manifest_sha256": "6b11e461d3bf61a4fbd4be3008ea0795139f38af59968e393a615438e4695a84",
+    "preimages_manifest_path": "/var/tmp/litchi-security-corpus-v3-integration-982-20260910/docs/performance/results/security-corpus-v3/integration-preimages.json",
+    "preimages_manifest_sha256": "8ce5b6b246d14e3cbff93194ab20282a6338bff7218365b59eba8b7e7cfa205b",
+    "source_manifest_sha256": "a9216e527e14e4b38d22f35690959c139f36ee2348eece646d9b24e4c91e7ab9"
+  },
+  "required_paths": {
+    "manifest_path_count": 49,
+    "paths": [
+      "crates/litchi-crypto/src/spaces.rs",
+      "crates/litchi-opc/src/limits.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-doc/src/document/package.rs"
+    ],
+    "coverage": {
+      "crates/litchi-crypto/src/spaces.rs": true,
+      "crates/litchi-opc/src/limits.rs": true,
+      "crates/litchi-opc/src/phys_pkg.rs": true,
+      "crates/litchi-doc/src/package/model.rs": true,
+      "crates/litchi-doc/src/document/package.rs": true
+    },
+    "current_head_delta_paths": [
+      "tools/perf-baseline/Cargo.lock",
+      "crates/litchi-cfb/src/file.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-ole-common/src/object/model.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/soapberry-zip/src/office.rs"
+    ]
+  },
+  "lockfile": {
+    "path": "tools/perf-baseline/Cargo.lock",
+    "sha256": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562",
+    "bytes": 56394,
+    "delta_from_authoritative_head": "10 inserted dependency edges only",
+    "unavoidable_graph_edge": "litchi-xlsx -> litchi-xldm required by authoritative HEAD commit 1230",
+    "registry_version_upgrades": false,
+    "generated_lock_rejected": "the 69-record offline regeneration was not retained because it upgraded unrelated registry packages"
+  },
+  "validation": {
+    "cargo_check": {
+      "status": "passed",
+      "toolchain": "1.95.0",
+      "locked": true,
+      "offline": true,
+      "scope": "tools/perf-baseline --bin security_corpus",
+      "target_dir": "/var/tmp/litchi-security-corpus-v3-integration-982-target"
+    },
+    "unit_tests": {
+      "status": "passed",
+      "toolchain": "1.95.0",
+      "tests": 7,
+      "scope": "security_corpus binary unit tests"
+    },
+    "correctness_gate": {
+      "status": "passed",
+      "toolchain": "1.95.0",
+      "rows": 66,
+      "operations": {
+        "bounded_read": 22,
+        "validate": 22,
+        "preserve": 22
+      },
+      "rows_timed": false,
+      "json_sha256": "03d655e44b3182c30f7a928f38d7252826415f59063305eb8d8bfb32f93057d9"
+    },
+    "shared_harness_test": {
+      "status": "passed",
+      "toolchain": "1.95.0",
+      "tests": 1,
+      "scope": "ignored real_producer_security_corpus_is_bounded_and_deterministic"
+    },
+    "clippy": {
+      "status": "passed",
+      "toolchain": "stable",
+      "warnings_as_errors": true,
+      "scope": "security_corpus --all-targets"
+    },
+    "timing_capture": {
+      "status": "not_run",
+      "reason": "integration validation is correctness-only; no timed capture authorized"
+    }
+  },
+  "notes": [
+    "This is a fresh current-982 overlay; the older ff954 integration overlay and its evidence remain immutable.",
+    "The current 982 source closure rehash differs from the historical candidate at: tools/perf-baseline/Cargo.lock, crates/litchi-cfb/src/file.rs, crates/litchi-doc/src/package/model.rs, crates/litchi-opc/src/phys_pkg.rs, crates/litchi-ole-common/src/object/model.rs, crates/litchi-ole-common/src/object/editor.rs, crates/soapberry-zip/src/office.rs.",
+    "integration-preimages.json and integration-provenance.json are concrete publication files in this overlay; their final hashes are recorded by the external publication receipt.",
+    "No primary worktree, index, stage, ref, timing capture, or measured workload was modified or run by this review.",
+    "The litchi-ole-common editor payload was merged three-way from the clean ff954 base, the security payload, and 982; the 982 OLE directory/object admission calls are retained. XLS cell_values was byte-identical between 21d5 and 982; pending user_names work was excluded.",
+    "The litchi-ole-common editor payload was merged three-way from clean ff954 base, the security 21d5 payload, and current 982; current 982 OLE directory/object admission calls remain. XLS cell_values was byte-identical between 21d5 and 982; pending user_names work was excluded.",
+    "Publication revision 1 supersedes the preserved r0 receipt: r0 recorded a stale 6968-byte provenance preimage (813d3b...), while the observed pre-revision overlay file was 7676 bytes (f08ad8...); r1 binds the final metadata after this correction."
+  ],
+  "publication_revision": {
+    "revision": 1,
+    "revised_utc": "2026-09-10T11:46:15Z",
+    "reason": "Root exact-60 preflight found the r0 receipt entry for integration-provenance.json did not bind the observed overlay bytes.",
+    "supersedes": {
+      "receipt": "/var/tmp/litchi-security-corpus-v3-integration-982-publication-r0-mismatched.json",
+      "receipt_sha256": "a456d59668fbe3ad5d8b00e767b47ef376380402741553c8edc8afa98c227e75",
+      "observed_provenance_before_revision_sha256": "f08ad864c3259bf75ce7c613fd9fc2e75361a0c8f03b5f9f3e84ce8081cb5b7d",
+      "observed_provenance_before_revision_bytes": 7676,
+      "mismatch_audit": "/var/tmp/litchi-security-corpus-v3-integration-982-publication-r0-mismatch-audit.json",
+      "mismatch_audit_sha256": "f05cf67a166e2bde06b97beb17f0177553f57d5c16d7f0d7172e8e7fe4af59b5"
+    },
+    "changed_metadata": [
+      "current_integration.publication_receipt",
+      "current_integration.publication_receipt_revision",
+      "publication_revision",
+      "notes"
+    ],
+    "binding_rule": "The r1 receipt was generated only after this provenance file was final and hashes every concrete overlay path from disk."
+  }
+}

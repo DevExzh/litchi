@@ -1,0 +1,20 @@
+{
+  "allocation_order": {
+    "cfb": "source length, header counts, directory, and allocation-table ceilings are checked before CFB index allocation",
+    "filesystem": "metadata length is admitted before Vec reservation and bounded chunk reads",
+    "opc": "ReadLimits are applied through SourceBackedPackage/OpcPackage before part payload reads",
+    "zip": "central-directory metadata, member count, declared compressed/uncompressed sizes, and aggregate sizes are checked by bounded Rust APIs before index ownership"
+  },
+  "external_reference_resolution": false,
+  "host_code_execution": false,
+  "max_input_bytes": 67108864,
+  "max_materialized_bytes": 67108864,
+  "max_member_bytes": 67108864,
+  "max_members": 4096,
+  "max_output_bytes": 67108864,
+  "max_relationships": 8192,
+  "notes": "Rows are executable correctness operations. Timing is opt-in and intentionally not captured by this candidate.",
+  "profile_id": "security-corpus-bounded-read-v2",
+  "timed_captures_recorded": false,
+  "timed_operation_definitions": 3
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "gate": "unit",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "security_corpus"
+    ],
+    "log": "/var/tmp/litchi-security-corpus-root-982-v3-20260910-unit.log",
+    "sha256": "3d192693d2c064b6927355ad68dff205ef25958b26c6742844f1c818bb0ef86c"
+  },
+  {
+    "gate": "correctness",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "run",
+      "--locked",
+      "--offline",
+      "--quiet",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "security_corpus",
+      "--",
+      "--json",
+      "/var/tmp/litchi-security-corpus-root-982-v3-20260910-rows.json"
+    ],
+    "log": "/var/tmp/litchi-security-corpus-root-982-v3-20260910-correctness.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "security_corpus",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-security-corpus-root-982-v3-20260910-clippy.log",
+    "sha256": "1dd9e1940cb44fe5f026ab8bd9f11f6fa968ea94ca01442c4a4a24f0dace784d"
+  }
+]
