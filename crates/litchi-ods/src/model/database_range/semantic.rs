@@ -121,6 +121,12 @@ pub enum DataType {
     Text,
     /// Numeric comparison.
     Number,
+    /// Text-color comparison.
+    TextColor,
+    /// Data-style-color comparison.
+    DataStyleColor,
+    /// Background-color comparison.
+    BackgroundColor,
 }
 
 /// A leaf filter comparison.

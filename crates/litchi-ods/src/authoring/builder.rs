@@ -1,3 +1,4 @@
+use crate::model::database_range::Range as DatabaseRange;
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
@@ -137,6 +138,54 @@ impl Builder {
         let commit = edit.commit()?;
         if commit.changed() {
             self.content_xml = commit.snapshot().source_xml().to_owned();
+        }
+        Ok(self)
+    }
+
+    /// Borrow the inert database-range declarations currently staged in the
+    /// builder's content XML.
+    pub fn database_ranges(&self) -> Result<Vec<DatabaseRange>> {
+        crate::database_range::parse_content(&self.content_xml).map(|(ranges, _)| ranges)
+    }
+
+    /// Replace the complete database-range catalog while preserving whether
+    /// an existing empty owner is physical.
+    pub fn set_database_ranges(&mut self, ranges: Vec<DatabaseRange>) -> Result<&mut Self> {
+        let (_, present) = crate::database_range::parse_content(&self.content_xml)?;
+        let candidate = if present || !ranges.is_empty() {
+            Some(ranges.as_slice())
+        } else {
+            None
+        };
+        let updated = crate::database_range::replace_content(&self.content_xml, candidate)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Append one inert database-range declaration atomically.
+    pub fn add_database_range(&mut self, range: DatabaseRange) -> Result<&mut Self> {
+        let mut ranges = self.database_ranges()?;
+        ranges.push(range);
+        self.set_database_ranges(ranges)
+    }
+
+    /// Remove the physical database-range owner from the next package.
+    pub fn clear_database_ranges(&mut self) -> Result<&mut Self> {
+        let updated = crate::database_range::replace_content(&self.content_xml, None)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Stage source-checked inert database-range CRUD in the builder.
+    pub fn edit_database_ranges<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::database_range::ContentEdit) -> Result<()>,
+    {
+        let mut edit = crate::database_range::ContentEdit::from_source(&self.content_xml)?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.into_source_xml();
         }
         Ok(self)
     }

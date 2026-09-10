@@ -382,6 +382,40 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Discover inert database-range declarations in the current package.
+    ///
+    /// No database, query, refresh, or filter execution occurs.
+    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
+        self.spreadsheet.database_ranges()
+    }
+
+    /// Capture an immutable, exact-source database-range snapshot.
+    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.spreadsheet.database_range_snapshot()
+    }
+
+    /// Alias for [`Self::database_range_snapshot`].
+    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.database_range_snapshot()
+    }
+
+    /// Apply an exact-source database-range patch and rehydrate the facade.
+    pub fn apply_database_range_patch(
+        &mut self,
+        patch: &crate::database_range::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_database_range_patch(patch)
+    }
+
+    /// Clone-stage inert database-range CRUD and publish one atomic package
+    /// edit.
+    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+    {
+        self.spreadsheet.edit_database_ranges(edit)
+    }
+
     /// Find a worksheet by its exact ODF name.
     #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {

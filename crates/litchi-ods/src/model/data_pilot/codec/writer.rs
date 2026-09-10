@@ -1,6 +1,8 @@
 //! ODF data-pilot XML writer.
 
-use crate::model::database_range::{write_database_source, write_filter};
+use crate::model::database_range::{
+    validate_filter_for_output, validate_source_for_output, write_database_source, write_filter,
+};
 use litchi_core::{Result, xml::escape_xml};
 
 use super::super::{
@@ -33,6 +35,17 @@ pub(crate) fn write_data_pilot_table_fragment(table: &Table) -> Result<String> {
 
 fn write_table(out: &mut String, table: &Table) -> Result<()> {
     table.validate()?;
+    if let Some(source) = &table.source {
+        match source {
+            Source::Database(source) => validate_source_for_output(source)?,
+            Source::CellRange { filter, .. } => {
+                if let Some(filter) = filter {
+                    validate_filter_for_output(filter)?;
+                }
+            },
+            Source::Service { .. } => {},
+        }
+    }
     out.push_str(
         "<table:data-pilot-table xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"",
     );
@@ -70,7 +83,7 @@ fn write_table(out: &mut String, table: &Table) -> Result<()> {
         out.push_str("/>");
     }
     if let Some(source) = &table.source {
-        write_source(out, source);
+        write_source(out, source)?;
     }
     for field in &table.fields {
         write_field(out, field)?;
@@ -79,9 +92,9 @@ fn write_table(out: &mut String, table: &Table) -> Result<()> {
     Ok(())
 }
 
-fn write_source(out: &mut String, source: &Source) {
+fn write_source(out: &mut String, source: &Source) -> Result<()> {
     match source {
-        Source::Database(source) => write_database_source(out, source),
+        Source::Database(source) => write_database_source(out, source)?,
         Source::Service {
             name,
             source_name,
@@ -107,13 +120,14 @@ fn write_source(out: &mut String, source: &Source) {
             attr(out, "table:cell-range-address", Some(cell_range_address));
             if let Some(filter) = filter {
                 out.push('>');
-                write_filter(out, filter);
+                write_filter(out, filter)?;
                 out.push_str("</table:source-cell-range>");
             } else {
                 out.push_str("/>");
             }
         },
     }
+    Ok(())
 }
 
 fn write_field(out: &mut String, field: &Field) -> Result<()> {
