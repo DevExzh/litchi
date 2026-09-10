@@ -14,6 +14,8 @@ use super::codec::{
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
+use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::fib::FileInformationBlock;
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
     SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
@@ -24,11 +26,17 @@ use crate::sprm_operations::{
     SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::property_set::{
+    DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
+    document_summary::DIGITAL_SIGNATURE,
+};
+use litchi_ole_common::vba_signature;
 use smallvec::SmallVec;
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -897,6 +905,11 @@ pub struct RevisionEditor {
     cp_tables: Vec<CpTable>,
     unmodeled_cp_tables: Vec<usize>,
     main_ccp: u32,
+    /// Exact bytes admitted before this editor was exposed. The lower owner
+    /// uses this source for publication-time signature checks, including a
+    /// rendered candidate that happens to clear the sticky changed bit.
+    source: Arc<Vec<u8>>,
+    signed: bool,
     data_changed: bool,
     changed: bool,
 }
@@ -910,9 +923,10 @@ impl RevisionEditor {
         bytes: Vec<u8>,
         limits: Limits,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, ole) = ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
-            .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package)?;
+        let (package, mut ole) =
+            ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
+                .map_err(PackageError::from)?;
+        let editor = Self::open_from_package(package, &mut ole)?;
         Ok((editor, ole))
     }
 
@@ -922,14 +936,17 @@ impl RevisionEditor {
         limits: Limits,
         observer: impl FnMut(CfbParseEvent),
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, ole) =
+        let (package, mut ole) =
             ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
                 .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package)?;
+        let editor = Self::open_from_package(package, &mut ole)?;
         Ok((editor, ole))
     }
 
-    fn open_from_package(package: ObjectEditor) -> Result<Self> {
+    fn open_from_package(
+        package: ObjectEditor,
+        ole: &mut OleFile<Cursor<Vec<u8>>>,
+    ) -> Result<Self> {
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)
@@ -960,6 +977,7 @@ impl RevisionEditor {
         let data = package
             .stream(&data_path)
             .map_or_else(Vec::new, <[u8]>::to_vec);
+        let signed = package_has_binary_signature(ole) || word_vba_signature_state(&word, &table);
         reject_protection(&word, &table)?;
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
         let pieces = parse_clx(&word, &table)?;
@@ -1020,6 +1038,7 @@ impl RevisionEditor {
                     .transpose()
             })
             .collect::<Result<Vec<_>>>()?;
+        let source = package.source_shared();
         let editor = Self {
             package,
             word_path,
@@ -1035,6 +1054,10 @@ impl RevisionEditor {
             cp_tables,
             unmodeled_cp_tables,
             main_ccp,
+            // The common owner already retains the admitted source allocation;
+            // keep a handle to that same immutable bytes without copying it.
+            source,
+            signed,
             data_changed: false,
             changed: false,
         };
@@ -1052,6 +1075,62 @@ impl RevisionEditor {
     #[must_use]
     pub fn authors(&self) -> &[String] {
         &self.authors
+    }
+
+    /// Parses the optional frame-set/list record array from this exact editor
+    /// state without exposing raw FIB offsets or mutable streams.
+    pub(crate) fn dofr_records(&self) -> Result<Option<DofrArray>> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        DofrArray::parse(&fib, &self.table)
+    }
+
+    /// Validate a DOFR patch against the current FIB-selected range before a
+    /// candidate table stream is cloned. Exact byte no-ops are accepted even
+    /// when the source carries a VBA signature.
+    pub(crate) fn preflight_dofr_patch(&self, patch: &DofrPatch) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        Ok(patch.changed())
+    }
+
+    /// Whether this source carries inert binary VBA signature metadata in
+    /// PIDDSI or `StwUser`. The marker is read once at editor admission and
+    /// is never interpreted as executable or trusted signature content.
+    #[must_use]
+    pub(crate) const fn dofr_source_is_signed(&self) -> bool {
+        self.signed
+    }
+
+    /// Applies a source-checked, same-length `RgDofr` patch through the DOC
+    /// package owner. The caller never handles a mutable table stream.
+    pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        if !patch.changed() {
+            return Ok(false);
+        }
+        if self.signed {
+            return Err(corrupted("signed DOC cannot accept a changed RgDofr patch"));
+        }
+        let mut table = self.table.clone();
+        patch.apply_to_table_stream(&fib, &mut table)?;
+        self.replace_table_stream(table)
+    }
+
+    fn replace_table_stream(&mut self, replacement: Vec<u8>) -> Result<bool> {
+        if replacement == self.table {
+            return Ok(false);
+        }
+        if replacement.len() != self.table.len() {
+            return Err(corrupted(
+                "DOC auxiliary table replacement must preserve stream length",
+            ));
+        }
+        let mut candidate = self.clone();
+        candidate.table = replacement;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(true)
     }
 
     /// Returns the exact main-story text after strict piece-table decoding.
@@ -2295,6 +2374,24 @@ impl RevisionEditor {
     }
 
     pub fn finish(self) -> Result<Vec<u8>> {
+        let source = Arc::clone(&self.source);
+        let signed = self.signed;
+        let bytes = self.finish_unchecked()?;
+        if signed && bytes.as_slice() != source.as_slice() {
+            return Err(corrupted(
+                "signed DOC cannot publish changed bytes through RevisionEditor",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    /// Renders the current package without the public signed-source guard.
+    ///
+    /// The body transaction uses this narrow seam so it can compare the
+    /// rendered bytes with its retained source and preserve its typed
+    /// [`crate::body_text::Refusal::SignedSource`] diagnostic. Callers of the
+    /// public editor use [`Self::finish`], which always applies the guard.
+    pub(crate) fn finish_unchecked(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(PackageError::from)
     }
 
@@ -2669,6 +2766,151 @@ impl RevisionEditor {
     }
 }
 
+fn package_has_binary_signature(ole: &mut OleFile<Cursor<Vec<u8>>>) -> bool {
+    let Some(stream_name) = ole.list_directory_entries(&[]).ok().and_then(|entries| {
+        entries
+            .into_iter()
+            .find(|entry| directory_names_equal(&entry.name, "\u{0005}DocumentSummaryInformation"))
+            .map(|entry| entry.name.clone())
+    }) else {
+        return false;
+    };
+    let Ok(bytes) = ole.open_stream(&[stream_name.as_str()]) else {
+        return true;
+    };
+    let Ok(stream) = PropertySetStream::parse(&bytes) else {
+        // Preserve the established permissive reader admission. An opaque or
+        // malformed PIDDSI cannot prove that a changed DOFR edit is safe, so
+        // classify it conservatively as signed for the mutation gate.
+        return true;
+    };
+    stream
+        .section(DOCUMENT_SUMMARY_INFORMATION_FMTID)
+        .is_some_and(|section| section.property(DIGITAL_SIGNATURE).is_some())
+}
+
+const FIB_INDEX_STW_USER: usize = 60;
+const MAX_STW_USER_BYTES: usize = 16 * 1024 * 1024;
+
+/// Detect a valid legacy Word VBA signature variable without making optional
+/// `StwUser` metadata part of ordinary DOC admission. A malformed selected
+/// table is classified conservatively so a changed DOFR edit cannot silently
+/// invalidate an opaque signature value; exact no-op edits still pass the
+/// normal source checks before this marker is consulted.
+fn word_vba_signature_state(word: &[u8], table: &[u8]) -> bool {
+    let Ok(fib) = FileInformationBlock::parse(word) else {
+        return true;
+    };
+    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_STW_USER) else {
+        return false;
+    };
+    if length == 0 {
+        return false;
+    }
+    let Ok(offset) = usize::try_from(offset) else {
+        return true;
+    };
+    let Ok(length) = usize::try_from(length) else {
+        return true;
+    };
+    let Some(end) = offset.checked_add(length) else {
+        return true;
+    };
+    let Some(data) = table.get(offset..end) else {
+        return true;
+    };
+    stw_user_contains_signature(data).unwrap_or(true)
+}
+
+fn stw_user_contains_signature(data: &[u8]) -> Result<bool> {
+    if data.len() > MAX_STW_USER_BYTES {
+        return Err(corrupted("StwUser exceeds its bounded table size"));
+    }
+    if u16_at(data, 0)? != 0xFFFF {
+        return Err(corrupted("StwUser fExtend is not 0xFFFF"));
+    }
+    let count = usize::from(u16_at(data, 2)?);
+    if u16_at(data, 4)? != 4 {
+        return Err(corrupted("StwUser cbExtra is not 4"));
+    }
+
+    let mut signature_names = Vec::new();
+    signature_names
+        .try_reserve_exact(count)
+        .map_err(|error| corrupted(format!("StwUser name allocation failed: {error}")))?;
+    let mut seen_names = HashSet::<&[u8]>::new();
+    seen_names
+        .try_reserve(count)
+        .map_err(|error| corrupted(format!("StwUser name allocation failed: {error}")))?;
+    let mut cursor = 6usize;
+    for _ in 0..count {
+        let cch = usize::from(u16_at(data, cursor)?);
+        let chars_start = cursor
+            .checked_add(2)
+            .ok_or_else(|| corrupted("StwUser name offset overflows"))?;
+        let chars_len = cch
+            .checked_mul(2)
+            .ok_or_else(|| corrupted("StwUser name length overflows"))?;
+        let chars_end = chars_start
+            .checked_add(chars_len)
+            .ok_or_else(|| corrupted("StwUser name range overflows"))?;
+        let chars = data
+            .get(chars_start..chars_end)
+            .ok_or_else(|| corrupted("StwUser name is truncated"))?;
+        if !seen_names.insert(chars) {
+            return Err(corrupted("StwUser names are not unique"));
+        }
+        let is_signature = ["Sign", "SigAgile", "SigV3"]
+            .into_iter()
+            .any(|name| utf16_name_equals(chars, name));
+        signature_names.push(is_signature);
+        cursor = chars_end
+            .checked_add(4)
+            .ok_or_else(|| corrupted("StwUser name extra offset overflows"))?;
+        if cursor > data.len() {
+            return Err(corrupted("StwUser name extra is truncated"));
+        }
+    }
+
+    let mut signed = false;
+    for is_signature in signature_names {
+        let cch = usize::from(u16_at(data, cursor)?);
+        let chars_start = cursor
+            .checked_add(2)
+            .ok_or_else(|| corrupted("StwUser value offset overflows"))?;
+        let chars_len = cch
+            .checked_mul(2)
+            .ok_or_else(|| corrupted("StwUser value length overflows"))?;
+        let chars_end = chars_start
+            .checked_add(chars_len)
+            .ok_or_else(|| corrupted("StwUser value range overflows"))?;
+        let value = data
+            .get(cursor..chars_end)
+            .ok_or_else(|| corrupted("StwUser value is truncated"))?;
+        if is_signature {
+            vba_signature::Snapshot::parse_word(value)
+                .map_err(|error| corrupted(format!("invalid StwUser WordSigBlob: {error}")))?;
+            signed = true;
+        }
+        cursor = chars_end;
+    }
+    if cursor != data.len() {
+        return Err(corrupted("StwUser has trailing bytes"));
+    }
+    Ok(signed)
+}
+
+fn utf16_name_equals(bytes: &[u8], expected: &str) -> bool {
+    let mut units = expected.encode_utf16();
+    let mut chunks = bytes.chunks_exact(2);
+    chunks.all(|bytes| {
+        units
+            .next()
+            .is_some_and(|unit| u16::from_le_bytes([bytes[0], bytes[1]]) == unit)
+    }) && chunks.remainder().is_empty()
+        && units.next().is_none()
+}
+
 #[cfg(test)]
 mod containment_tests {
     use super::*;
@@ -2841,6 +3083,13 @@ mod papx_cache_tests {
             [original, table_sprm(0).to_vec()].concat()
         );
         assert!(!editor.papx[0].in_table());
+    }
+
+    #[test]
+    fn editor_source_shares_the_common_admitted_allocation() {
+        let editor = RevisionEditor::open(doc_with_table_state(true), Limits::default())
+            .expect("table-state fixture should open");
+        assert!(Arc::ptr_eq(&editor.source, &editor.package.source_shared()));
     }
 
     #[test]
