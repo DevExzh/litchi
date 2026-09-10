@@ -1,0 +1,33 @@
+{
+  "publication_head": "02fc6699ec7fee824f0cbb06af284a9387991b6c",
+  "preimages": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "d3353047a918002a01972cb5de425e695a60e1964ec8cdcfa6d56ed80c2cfcbb",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb216659affe6788dc451abb95f53e98a02c654ba3be634b3c1936ee5d5e4f08",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "328adb7780553627efb7cab693d776c46c2e044267799f14e87195a6b3fd9243",
+    "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs": "c2b530f259880b45de2099025e645e267a6ef97cebb360815fd76b60e60850da"
+  },
+  "final": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "2ef75bd03b903bbfd53067ca20188c2d5e71b6af4d2f3257699c25a81d5ac05c",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb4af25f365a84ba85316e4fb22326e467138098b3786f5ed7d51bdf7bf13ba9",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "360e6dad8acce3beed883b6cc6c6225841a918538abd323723cb1a46eb53f086",
+    "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs": "bb52c385713104fd6dd993ec49adae5a97581c452f54303d3c886ee3e03576c2"
+  },
+  "evidence": {
+    "current-gates.json.gz": "c8f9f8951072a791bcee576da6754699adfef1331d7d47f2b4e36fc9fe7c032a",
+    "verified-portable-verification.md.gz": "0e3ad07d079c05a1f9862a88bc8ea2e12ef2a843e8b06b90fba42340dcc90248",
+    "current-clippy.log.gz": "2d0f779c8c6a1d3c1595f997e4ff7d8cd0f6b17fcce1f4f76ed02f60328bd93b",
+    "current-source-before.json.gz": "c55b1b3cbd8d8544bb644048cda10ee6eefe0aec8698da7ce9bbb243b93a538c",
+    "README.md": "3916d1a45a1c5cdbc558ef8da52103c5a4a89075abf77d220cb957c36a4f8804",
+    "historical-publication.json": "0b64b68ffa35b1922c36d37a56c5fc3c745c463014034833f4d56e6fe7253d4f",
+    "root-portable-receipt.json": "438297559d9e1e1e5039ba0b69c056696a181cb0808d30f984705755bc1b9668",
+    "integration-manifest.json": "a667a79d2e6d391a408d116e04b16de7d40597995253e905dbd528754425549f",
+    "verified-portable-verification.json.gz": "36acc69077d4566cc7ee9d5cda4b5655a91d4cee365dc56470f8c41dcff9c61f",
+    "root-build-Cargo.lock.gz": "25230a3ef600e690e686929c05c1e3cc61ae2a62e0e60b3f4c237ee719334c0c",
+    "current-test.log.gz": "c0682918d2f5260e5add250a394f0c85f15e2d340fc442cd8698c601605cda9a",
+    "verified-portable-verification-receipt.json.gz": "9136190333f1aa1c68c974fcb92f6f55e82a2dc32df3ea7dfcf5f2b8bccd90a3",
+    "current-source-after.json.gz": "c55b1b3cbd8d8544bb644048cda10ee6eefe0aec8698da7ce9bbb243b93a538c",
+    "current-rustdoc.log.gz": "dc7a784e5a7859c12a0c9966d3c2d33ea691d32eaee537dfeeeded6668cf655d",
+    "current-test-counts.json.gz": "c52738d11c6b0985bfc20f3cfec544286f003a7401e25d202da88a797f8cea67",
+    "historical-portable-bundle.tar.zst": "a7bd6bdc48312f90391871f4d0594a34e3c9dbe148e5f94d7fa6f2c7477afd31"
+  }
+}

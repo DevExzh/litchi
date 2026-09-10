@@ -8,6 +8,7 @@ mod snapshot;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::sync::Arc;
 
+use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
 use litchi_ooxml_common::web as common_web;
 use litchi_opc::{Part, Relationship, Relationships, TargetMode};
 use litchi_sheet::{
@@ -54,11 +55,149 @@ const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
 const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
 const MAX_VALIDATED_STORE_HANDOFF_BYTES: usize = 1_048_576;
 const MAX_HYPERLINK_EDITS: usize = 4_096;
+const MAX_SPARSE_VERIFICATION_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
 enum CellTransfer {
     Copy,
     Move,
+}
+
+/// Verify a large worksheet's sparse cell rewrite without materializing every
+/// unchanged cell a second time.
+///
+/// Ok(false) means the worksheet is outside the scanner's first semantic
+/// slice, so the caller must retain the full materialized-parser fallback.
+fn verify_sparse_changed_cells(
+    content: &[u8],
+    targets: &[Address],
+    changes: &[Change],
+) -> Result<bool> {
+    if content.is_empty() || content.len() > MAX_SPARSE_VERIFICATION_BYTES {
+        return Ok(false);
+    }
+    if changes
+        .iter()
+        .any(|change| !matches!(change, Change::Cell { .. }))
+    {
+        return Ok(false);
+    }
+    if changes.iter().any(|change| {
+        matches!(
+            change,
+            Change::Cell {
+                after: State::Cell {
+                    style: crate::StyleState::Shared(_),
+                    ..
+                },
+                ..
+            }
+        )
+    }) {
+        return Ok(false);
+    }
+
+    let mut limits = StreamLimits::default();
+    limits.processing.max_input_bytes = content.len();
+    limits.processing.max_output_bytes = content.len();
+    let outcome = raw::worksheet::selected::scan_targets_bytes(
+        content,
+        &Capabilities::default(),
+        &limits,
+        targets,
+    )
+    .map_err(map_sparse_stream_error)?;
+    let selected = match outcome {
+        raw::selected_worksheet::RangeScanOutcome::Eligible(selected) => selected,
+        raw::selected_worksheet::RangeScanOutcome::NotEligible(_) => return Ok(false),
+    };
+    // Shared strings and direct styles need workbook-level resolution. The
+    // source store was already parsed, but this sparse verifier intentionally
+    // does not rebuild those dependency tables; retain the existing full-
+    // parser fallback whenever the output still contains one.
+    if selected.dependencies.max_shared_string_index.is_some()
+        || selected.dependencies.max_direct_style_index.is_some()
+    {
+        return Ok(false);
+    }
+
+    for change in changes {
+        let Change::Cell { address, after, .. } = change else {
+            return Ok(false);
+        };
+        let record = selected
+            .cells
+            .binary_search_by_key(address, |record| record.address)
+            .ok()
+            .and_then(|index| selected.cells.get(index));
+        match after {
+            State::Missing => {
+                if record.is_some() {
+                    return Err(invalid(format!(
+                        "sparse worksheet verification retained removed cell {address}"
+                    )));
+                }
+            },
+            State::Cell {
+                content: expected,
+                style,
+                shared_string,
+            } => {
+                if !matches!(style, crate::StyleState::Default) || shared_string.is_some() {
+                    return Ok(false);
+                }
+                let record = record.ok_or_else(|| {
+                    invalid(format!(
+                        "sparse worksheet verification lost changed cell {address}"
+                    ))
+                })?;
+                if record.shared_string_index.is_some() || record.cell.as_ref() != Some(expected) {
+                    return Err(invalid(format!(
+                        "sparse worksheet edit verification failed at {address}"
+                    )));
+                }
+            },
+        }
+    }
+    Ok(true)
+}
+
+fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
+    match error {
+        StreamError::Input {
+            raw_error: Some(error),
+            ..
+        }
+        | StreamError::Mce {
+            raw_error: Some(error),
+            ..
+        }
+        | StreamError::Callback {
+            raw_error: Some(error),
+            ..
+        } => error,
+        StreamError::Callback {
+            raw_error: None,
+            active_error: Some(error),
+        }
+        | StreamError::Input {
+            raw_error: None,
+            active_error: Some(error),
+            ..
+        }
+        | StreamError::Mce {
+            raw_error: None,
+            active_error: Some(error),
+            ..
+        } => error,
+        StreamError::Input { error, .. } => Error::Package(litchi_opc::OpcError::IoError(error)),
+        StreamError::Mce { error, .. } => Error::MarkupCompatibility(error),
+        StreamError::Callback {
+            raw_error: None,
+            active_error: None,
+        } => invalid("sparse worksheet stream failed without a callback error"),
+        _ => invalid("unknown sparse worksheet stream error"),
+    }
 }
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
@@ -1577,6 +1716,28 @@ impl Edit {
                 rows: effective_rows,
                 columns: effective_columns,
             };
+            // A sparse payload-only edit on a large, plain worksheet can
+            // validate its rewritten cells through the streaming worksheet
+            // scanner. Keep the target list before ordinary takes ownership
+            // of the cell map; the scanner retains only these records while
+            // still validating the complete XML/MCE stream.
+            let sparse_cell_targets = if ordinary.defaults.is_none()
+                && ordinary.rows.is_empty()
+                && ordinary.columns.is_empty()
+                && effective_web.is_none()
+                && effective_page_breaks.is_none()
+                && effective_page_margins.is_none()
+                && effective_page_setup.is_none()
+                && effective_print_options.is_none()
+                && effective_hyperlinks.is_none()
+                && add.is_empty()
+                && !has_merge_removes
+                && drawing.is_none()
+            {
+                ordinary.cells.keys().copied().collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
             // Metadata-only worksheet edits already validate the source store
             // above and each metadata codec validates its own complete XML
             // surface. Keep the unchanged grid cold in the newly published
@@ -1670,9 +1831,21 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
-            let parsed = requires_store_verification
-                .then(|| raw::worksheet::parse(compacted.bytes(), || base.inner.shared_strings()))
-                .transpose()?;
+            let sparse_verified = !sparse_cell_targets.is_empty()
+                && store.stored_cell_count() > MAX_VALIDATED_STORE_HANDOFF_CELLS
+                && store.merge_ranges().is_empty()
+                && verify_sparse_changed_cells(
+                    compacted.bytes(),
+                    &sparse_cell_targets,
+                    &changes[change_start..],
+                )?;
+            let parsed = if requires_store_verification && !sparse_verified {
+                Some(raw::worksheet::parse(compacted.bytes(), || {
+                    base.inner.shared_strings()
+                })?)
+            } else {
+                None
+            };
             // Resolve web validation after grid parsing to preserve error order.
             // Compaction may already prove that an ordinary worksheet has no bindings.
             let (after, parsed_web) = compacted.into_bytes_and_web()?;
@@ -1729,14 +1902,17 @@ impl Edit {
                         after,
                         ..
                     } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet cell verification lost the parsed store")
-                        })?;
-                        let actual = State::read(parsed.entry(*address), &base);
-                        if actual != *after {
-                            return Err(invalid(format!(
-                                "worksheet edit verification failed at {sheet}!{address}"
-                            )));
+                        if let Some(parsed) = parsed.as_ref() {
+                            let actual = State::read(parsed.entry(*address), &base);
+                            if actual != *after {
+                                return Err(invalid(format!(
+                                    "worksheet edit verification failed at {sheet}!{address}"
+                                )));
+                            }
+                        } else if !sparse_verified {
+                            return Err(invalid(
+                                "worksheet cell verification lost the parsed store",
+                            ));
                         }
                     },
                     Change::Row {
