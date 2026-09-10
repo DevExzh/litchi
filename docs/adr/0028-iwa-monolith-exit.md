@@ -11643,3 +11643,43 @@ its named chart and Region 1/Region 2 series; Numbers retained its named chart
 and North/South series; Keynote retained the untitled chart and its two region
 series. Native accessibility readback confirmed April data points of 17 and
 55. Repository fixtures were not modified.
+
+## 2026-09-10 Shared chart metadata and focused readers
+
+The common `chart::metadata::ChartMetadata` owns chart kind, optional visible
+title, row and column labels, series count, and default-data state. It has no
+archive identities or generated protobuf values. Unknown native chart kinds
+remain lossless, and title presence is distinct from an absent title.
+
+The concrete package entrypoints are `Pages::body_chart_metadata`,
+`Numbers::sheet_chart_metadata`, and `Keynote::slide_chart_metadata` (methods
+on each format's `Package`). They select charts through existing body, sheet,
+and slide selectors and keep graph resolution and resource limits inside
+their format owners.
+
+`litchi-iwa-protos::chart_metadata_codec` owns the narrow wire projection.
+Modern type-5021 metadata lives in extension 10000, whose field 7 is an
+embedded chart grid. Legacy type-5000 metadata has an embedded model at field
+2 and an optional inline grid at model field 5. Legacy series counts come
+only from inline grid rows; an absent inline grid still means empty labels
+and zero series, without an invented external-grid fallback. Numeric grid
+values and unrelated chart properties remain opaque to this metadata reader.
+Visible modern titles continue through the separate strict title codec.
+
+The host extractor now consumes this shared projection and returns the common
+semantic result. Its former raw object-identity field and obsolete chart
+inspection example are removed. The host still scans all legacy charts before
+all modern charts in physical-index order and includes unrooted charts. That
+inventory behavior remains separate migration debt from the focused rooted
+readers; this slice does not claim the host facade is retired.
+
+Native verification used scratch copies of the existing Pages and Numbers
+chart-arrangement controls and the Keynote chart-caption control. All three
+were opened, saved, closed, and reopened in their applications. Their titles,
+two series, April–July labels, and data remained visible; the Keynote caption
+remained separate from its absent chart title. Tracked fixtures were unchanged.
+The new focused APIs also read those application-saved scratch files and
+matched all three titles, chart kinds, series counts, row labels, and category
+labels. Pages' native title reference crosses components; its declared
+reference path and unique typed resolution are validated without requiring
+the chart and title to share one component.

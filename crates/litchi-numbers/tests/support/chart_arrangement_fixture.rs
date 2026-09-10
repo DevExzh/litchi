@@ -880,6 +880,71 @@ pub(crate) fn with_duplicate_sheet_owner(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+/// Give both rooted sheets the same visible name.  Name selectors must reject
+/// this before chart metadata can expose either native owner.
+pub(crate) fn with_duplicate_sheet_name(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_component(source, DOCUMENT_MEMBER, |archive| {
+        let object = archive
+            .object_mut(SHEETS[1])
+            .ok_or_else(|| io::Error::other("second sheet is missing"))?;
+        let message = object
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("second sheet payload is missing"))?;
+        let mut sheet = tn::SheetArchive::decode(message.data.as_slice())?;
+        sheet.name = "Sheet 1".to_owned();
+        message.data = sheet.encode_to_vec();
+        object.archive_info.message_infos[0].length = u32::try_from(message.data.len())
+            .map_err(|_| io::Error::other("sheet payload exceeds u32"))?;
+        Ok(())
+    })
+}
+
+/// Point one chart's semantic non-style reference at another chart's object.
+/// The archive remains parseable, while a rooted metadata read must reject the
+/// reference because the selected chart's message metadata does not own it.
+pub(crate) fn with_foreign_chart_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
+    let original = chart_payload_from_source(source, 0)?;
+    let mut chart = None;
+    for field in WireView::parse(&original)?.fields() {
+        if field.number() == CHART_EXTENSION_FIELD {
+            chart = Some(tsch::ChartArchive::decode(field.payload())?);
+            break;
+        }
+    }
+    let mut chart = chart.ok_or_else(|| io::Error::other("chart extension is missing"))?;
+    let foreign_identifier = ids(1).chart_non_style;
+    chart.chart_non_style = Some(reference(foreign_identifier));
+    let replacement = chart.encode_to_vec();
+    let mut rewritten = Vec::new();
+    let mut replaced = false;
+    for field in WireView::parse(&original)?.fields() {
+        if !replaced && field.number() == CHART_EXTENSION_FIELD {
+            append_length_delimited_field(&mut rewritten, CHART_EXTENSION_FIELD, &replacement)?;
+            replaced = true;
+        } else {
+            rewritten.extend_from_slice(field.raw());
+        }
+    }
+    let rewritten = with_chart_payload(source, 0, rewritten)?;
+    rewrite_component(&rewritten, CALCULATION_MEMBER, |archive| {
+        let object = archive
+            .object_mut(ids(0).drawable)
+            .ok_or_else(|| io::Error::other("first chart is missing"))?;
+        let info = object
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("first chart metadata is missing"))?;
+        info.object_references.push(foreign_identifier);
+        let mut field = FieldInfo::new(FieldPath::new(vec![1, 2]));
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references.push(foreign_identifier);
+        info.field_infos.push(field);
+        Ok(())
+    })
+}
+
 /// Repeat the same chart reference in one sheet's drawable list.  The
 /// semantic selector must reject this before exposing two positions for the
 /// same native owner.

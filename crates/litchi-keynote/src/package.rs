@@ -21,6 +21,7 @@ mod slide_chart_arrangement;
 mod slide_chart_axis_title;
 mod slide_chart_caption;
 mod slide_chart_legend;
+mod slide_chart_metadata;
 mod slide_chart_title;
 mod slide_chart_value_axis;
 pub(crate) mod slide_delete;
@@ -148,6 +149,7 @@ pub use slide_chart_legend::{
     ChartLegendVisibilityCommit, ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit,
     ChartLegendVisibilityError, ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch,
 };
+pub use slide_chart_metadata::{SlideChartMetadataError, SlideChartMetadataLimitKind};
 pub use slide_chart_title::{
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
     ChartTitlePatch,

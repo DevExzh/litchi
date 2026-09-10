@@ -6,6 +6,7 @@
 //! historical umbrella facade.
 
 mod chart_arrangement;
+mod chart_metadata;
 pub mod comments;
 #[allow(
     dead_code,
@@ -120,6 +121,7 @@ pub use chart_arrangement::{
     SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit,
     SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch,
 };
+pub use chart_metadata::{ChartMetadataError, ChartMetadataLimitKind};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};

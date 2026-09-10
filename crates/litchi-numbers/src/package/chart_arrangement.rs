@@ -34,6 +34,7 @@ use litchi_iwa_protos::chart_arrangement_codec::{
     self as codec, ChartArrangementWrite, DecodeLimit, DecodeOptions, DecodeReport,
     RewriteExecutionRequirements,
 };
+use litchi_iwa_protos::chart_metadata_codec;
 use litchi_iwa_protos::numbers_sheet_order_codec;
 use thiserror::Error;
 
@@ -55,6 +56,7 @@ const MAX_TRANSACTION_ALLOCATIONS: usize = 64;
 // validation error after admission has already succeeded.
 const MAX_CODEC_LIMIT: usize = 64 * 1024 * 1024;
 const MAX_CODEC_NESTING: u32 = 64;
+const MAX_METADATA_LABEL_COUNT: usize = 1_000_000;
 // snap 1.1.2 grows Encoder::big to 16,384 u16 entries for a nontrivial
 // block. Keep the full 32 KiB workspace in the focused ledger even when the
 // input happens to stay below that implementation's private threshold.
@@ -424,14 +426,14 @@ pub type SheetChartArrangementError = ChartArrangementError;
 pub type SheetChartArrangementLimitKind = ChartArrangementLimitKind;
 
 #[derive(Clone, PartialEq, Eq)]
-struct ChartSelection {
+pub(super) struct ChartSelection {
+    pub(super) component_index: usize,
+    pub(super) object_index: usize,
+    pub(super) message_index: usize,
     sheet_position: Position,
     chart_position: Position,
     sheet_identifier: u64,
     chart_identifier: u64,
-    component_index: usize,
-    object_index: usize,
-    message_index: usize,
     component_name: Arc<str>,
     before: ChartArrangement,
 }
@@ -447,7 +449,7 @@ impl fmt::Debug for ChartSelection {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ChartBudget {
+pub(super) struct ChartBudget {
     max_input: usize,
     max_output: usize,
     max_fields: usize,
@@ -469,7 +471,7 @@ struct ChartBudget {
 }
 
 impl ChartBudget {
-    fn for_package(package: &Package) -> Result<Self, ChartArrangementError> {
+    pub(super) fn for_package(package: &Package) -> Result<Self, ChartArrangementError> {
         let archive = package.state.options.archive();
         let core = archive
             .effective_archive_limits()
@@ -612,7 +614,7 @@ impl ChartBudget {
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.allocations,
             amount,
@@ -621,7 +623,7 @@ impl ChartBudget {
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn retained(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.retained,
             amount,
@@ -699,7 +701,7 @@ impl ChartBudget {
         Ok(())
     }
 
-    fn preflight_allocations(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_allocations(&self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::preflight(
             self.allocations,
             amount,
@@ -708,7 +710,7 @@ impl ChartBudget {
         )
     }
 
-    fn preflight_retained(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_retained(&self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::preflight(
             self.retained,
             amount,
@@ -744,7 +746,7 @@ impl ChartBudget {
         )
     }
 
-    fn residual_wire_limits(&self) -> Result<WireLimits, ChartArrangementError> {
+    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, ChartArrangementError> {
         let input = self
             .max_input
             .checked_sub(self.input)
@@ -801,6 +803,131 @@ impl ChartBudget {
             .with_max_allocations(max_allocations)
             .with_max_retained_bytes(max_retained)
             .with_max_scratch_bytes(max_scratch))
+    }
+
+    /// Build the residual limits for the borrowed chart-metadata projection.
+    ///
+    /// Chart metadata is a read-only sibling of the Arrange projection, but
+    /// both operations must consume the same selector traversal ledger.  Keep
+    /// this conversion here so a future metadata caller cannot accidentally
+    /// reset the package-wide wire ceilings when it enters its codec.
+    pub(super) fn metadata_codec_options(
+        &self,
+    ) -> Result<chart_metadata_codec::DecodeOptions, ChartArrangementError> {
+        let limits = self.residual_wire_limits()?;
+        let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
+            .unwrap_or(MAX_CODEC_NESTING);
+        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
+        // Labels are projection output, not native graph edges. Keep their
+        // codec ceiling independent from the selector's reference ledger;
+        // the decoded strings and vector slots are charged separately by the
+        // retained/allocation counters in the metadata adapter.
+        let max_labels = limits
+            .max_fields()
+            .min(MAX_METADATA_LABEL_COUNT)
+            .clamp(1, MAX_CODEC_LIMIT);
+        let max_text = self
+            .max_retained
+            .saturating_sub(self.retained)
+            .clamp(1, MAX_CODEC_LIMIT);
+        Ok(chart_metadata_codec::DecodeOptions::new(
+            max_input, max_fields, max_work, depth, max_labels, max_text,
+        ))
+    }
+
+    /// Charge one borrowed metadata decode, including work spent before a
+    /// rejected source is returned by the codec.
+    pub(super) fn metadata_codec_report(
+        &mut self,
+        report: chart_metadata_codec::DecodeReport,
+    ) -> Result<(), ChartArrangementError> {
+        self.source(report.source_bytes())?;
+        self.fields(report.fields())?;
+        self.work(
+            report
+                .work_bytes()
+                .checked_add(report.failure_work_bytes())
+                .ok_or(ChartArrangementError::InvalidSource)?,
+        )?;
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(ChartArrangementError::LimitExceeded {
+                kind: ChartArrangementLimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.nesting = self.nesting.max(depth);
+        self.retained(report.text_bytes())?;
+        self.retained(report.retained_bytes())?;
+        self.allocations(report.allocations())
+    }
+
+    /// Build the title codec's residual options from the same aggregate
+    /// ledger used by chart metadata and chart Arrange reads.
+    pub(super) fn title_codec_options(
+        &self,
+        source: &[u8],
+    ) -> Result<litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions, ChartArrangementError>
+    {
+        let limits = self.residual_wire_limits()?;
+        let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
+            .unwrap_or(MAX_CODEC_NESTING);
+        let max_input = limits
+            .max_input_bytes()
+            .min(source.len().max(1))
+            .min(MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
+        let max_text = self
+            .max_retained
+            .saturating_sub(self.retained)
+            .clamp(1, MAX_CODEC_LIMIT);
+        Ok(
+            litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions::new(
+                max_input, max_fields, max_work, depth,
+            )
+            .with_max_output_bytes(max_text)
+            .with_max_title_bytes(max_text),
+        )
+    }
+
+    /// Charge a successful title projection against the shared wire ledger.
+    pub(super) fn title_codec_report(
+        &mut self,
+        report: litchi_iwa_protos::keynote_chart_title_codec::DecodeReport,
+    ) -> Result<(), ChartArrangementError> {
+        self.source(report.source_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(ChartArrangementError::LimitExceeded {
+                kind: ChartArrangementLimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.nesting = self.nesting.max(depth);
+        Ok(())
+    }
+
+    /// Charge a conservative failed title decode when the title codec cannot
+    /// return its final report. The selected extension has already passed the
+    /// outer wire-view ledger; this reservation covers the title codec's
+    /// strict scan and Buffa attempt without allowing an error path to bypass
+    /// the aggregate budget.
+    pub(super) fn title_codec_failure(
+        &mut self,
+        source: &[u8],
+    ) -> Result<(), ChartArrangementError> {
+        let fields = source.len().saturating_mul(2).max(1);
+        let work = source.len().saturating_mul(4).max(1);
+        self.source(source.len())?;
+        self.fields(fields)?;
+        self.work(work)
     }
 
     fn codec_report(&mut self, report: DecodeReport) -> Result<(), ChartArrangementError> {
@@ -1007,7 +1134,7 @@ fn resolve_sheet_position(
     }
 }
 
-fn select_chart_with_budget(
+pub(super) fn select_chart_with_budget(
     package: &Package,
     sheet_selector: SheetSelector<'_>,
     chart_selector: ChartSelector,
@@ -1339,7 +1466,7 @@ fn sheet_drawable_identifiers(
     Ok(identifiers)
 }
 
-fn object_from_resolved<'a>(
+pub(super) fn object_from_resolved<'a>(
     package: &'a Package,
     resolved: crate::package::index::Resolved<'a>,
 ) -> Result<&'a ArchiveObject, ChartArrangementError> {
@@ -1352,7 +1479,7 @@ fn object_from_resolved<'a>(
         .ok_or(ChartArrangementError::InvalidSource)
 }
 
-fn unique_typed_message(
+pub(super) fn unique_typed_message(
     object: &ArchiveObject,
     message_type: u32,
 ) -> Result<Option<(usize, &RawMessage)>, ChartArrangementError> {
@@ -1368,7 +1495,9 @@ fn unique_typed_message(
     Ok(selected)
 }
 
-fn validate_message_metadata(object: &ArchiveObject) -> Result<(), ChartArrangementError> {
+pub(super) fn validate_message_metadata(
+    object: &ArchiveObject,
+) -> Result<(), ChartArrangementError> {
     if object.messages.len() != object.archive_info.message_infos.len() {
         return Err(ChartArrangementError::InvalidSource);
     }
@@ -1498,7 +1627,7 @@ fn chart_parent_identifier(
     identifier.ok_or(ChartArrangementError::InvalidSource)
 }
 
-fn parse_wire_view_with_budget<'source>(
+pub(super) fn parse_wire_view_with_budget<'source>(
     payload: &'source [u8],
     depth: usize,
     budget: &mut ChartBudget,
@@ -2075,7 +2204,7 @@ fn package_component(
         .ok_or(ChartArrangementError::InvalidSource)
 }
 
-fn selected_chart_payload<'source>(
+pub(super) fn selected_chart_payload<'source>(
     package: &'source Package,
     selection: &ChartSelection,
 ) -> Result<&'source [u8], ChartArrangementError> {

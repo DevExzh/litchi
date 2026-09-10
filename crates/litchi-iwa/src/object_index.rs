@@ -447,6 +447,7 @@ impl ObjectIndex {
         let object = indexed_object(archive, &entry, object_id, fragment_name)?;
 
         Ok(Some(ResolvedObjectRef {
+            #[cfg(test)]
             id: object_id,
             messages: &object.messages,
         }))
@@ -575,6 +576,7 @@ impl ObjectIndex {
                     let object_id = request.entry.id();
                     let object = indexed_object(archive, &request.entry, object_id, fragment_name)?;
                     let resolved_object = ResolvedObjectRef {
+                        #[cfg(test)]
                         id: object_id,
                         messages: &object.messages,
                     };
@@ -857,11 +859,11 @@ fn indexed_object<'a>(
 /// A borrowed view of an indexed object and its immutable payloads.
 ///
 /// The view is tied to the private bundle used for resolution. It is the
-/// allocation-free read path for traversal and extraction; callers that need
-/// an owned value can consume it with [`Self::into_owned`].
+/// allocation-free read path for extraction and physical inventory.
 #[derive(Debug, Clone, Copy)]
 pub struct ResolvedObjectRef<'a> {
     /// Validated object identifier.
+    #[cfg(test)]
     id: ObjectId,
     /// Borrowed raw message data.
     pub messages: &'a [RawMessage],
@@ -869,6 +871,7 @@ pub struct ResolvedObjectRef<'a> {
 
 impl ResolvedObjectRef<'_> {
     /// Return the validated object identity.
+    #[cfg(test)]
     pub const fn id(&self) -> ObjectId {
         self.id
     }
