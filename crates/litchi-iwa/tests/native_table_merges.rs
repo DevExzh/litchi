@@ -33,6 +33,21 @@ fn native_pages_merge_reads_match_and_preserve_source() -> TestResult {
     assert_eq!(host.table_cell_merges(tables[0].model_object_id)?, expected);
     let table = host.table(tables[0].model_object_id)?;
     assert_eq!(table.merges(), expected);
+    let focused_second = focused.body_table_merges(1)?;
+    assert!(focused_second.is_empty());
+    assert_eq!(
+        host.table_cell_merges(tables[1].model_object_id)?,
+        focused_second
+    );
+    assert_eq!(host.table(tables[1].model_object_id)?.merges(), &[]);
+    let invalid_error = host
+        .table_cell_merges(u64::MAX)
+        .expect_err("an unknown Pages model identifier must be rejected");
+    assert!(
+        invalid_error
+            .to_string()
+            .contains("is not attached to the body")
+    );
     assert_eq!(
         table.get_cell(1, 3),
         Some(&litchi_iwa::pages::PagesCellValue::Text("北京".into()))
@@ -59,6 +74,18 @@ fn native_keynote_merge_reads_match_and_preserve_source() -> TestResult {
     );
     let table = host.slide_table(0, tables[0].model_object_id)?;
     assert_eq!(table.merges(), expected);
+    let invalid_error = host
+        .slide_table_cell_merges(0, u64::MAX)
+        .expect_err("an unknown Keynote model identifier must be rejected");
+    assert!(
+        invalid_error
+            .to_string()
+            .contains("is not owned by slide 0")
+    );
+    let invalid_slide_error = host
+        .slide_table_cell_merges(1, tables[0].model_object_id)
+        .expect_err("a table owned by another or missing slide must be rejected");
+    assert!(invalid_slide_error.to_string().contains("slide index 1"));
     assert_eq!(host.to_bytes()?, KEYNOTE);
     Ok(())
 }

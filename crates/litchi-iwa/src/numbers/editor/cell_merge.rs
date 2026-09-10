@@ -1784,6 +1784,74 @@ mod tests {
         );
     }
 
+    #[test]
+    fn scratch_keynote_legacy_table_model_merge_read_uses_compatibility_fallback() {
+        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = editor
+            .add_slide_table(
+                0,
+                "Legacy merge",
+                4,
+                5,
+                DrawablePoint { x: 100.0, y: 150.0 },
+                DrawableSize {
+                    width: 800.0,
+                    height: 400.0,
+                },
+            )
+            .unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
+        editor
+            .merge_slide_table_cells(0, table.model_object_id, region)
+            .unwrap();
+
+        let mut package = editor.into_package();
+        let archive_name = super::super::object_locations(&package)
+            .unwrap()
+            .remove(&table.model_object_id)
+            .unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive
+                    .object_mut(table.model_object_id)
+                    .expect("Keynote table model object");
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == 6_001)
+                    .expect("canonical Keynote table model payload");
+                let message = object.messages[message_index].clone();
+                object
+                    .replace_message(
+                        message_index,
+                        RawMessage {
+                            type_: 6_000,
+                            data: message.data,
+                        },
+                    )
+                    .expect("retag legacy Keynote table model payload");
+                Ok(())
+            })
+            .unwrap();
+
+        let source = package.to_bytes().unwrap();
+        let focused = litchi_keynote::Package::from_bytes(&source).unwrap();
+        assert!(matches!(
+            focused.slide_table_merges(0, 0),
+            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency)
+        ));
+
+        let legacy = KeynoteEditor::from_bytes(&source).unwrap();
+        let before = legacy.to_bytes().unwrap();
+        assert_eq!(
+            legacy
+                .slide_table_cell_merges(0, table.model_object_id)
+                .unwrap(),
+            vec![region]
+        );
+        assert_eq!(legacy.to_bytes().unwrap(), before);
+    }
+
     fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
         data.extend(litchi_iwa_common::varint::encode_varint(
             u64::from(field) << 3,

@@ -47956,6 +47956,216 @@ fn rewrite_movie_title_operation(
         )
         self.assertEqual(boundaries.audit_pages_table_merge_source_topology(), [])
         self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(), [])
+        self.assertEqual(
+            boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(), []
+        )
+
+    def test_host_table_merge_read_delegation_rejects_legacy_numbers_reader(self) -> None:
+        for delegation in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+            with self.subTest(format=delegation["format_name"]):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source_path = root / delegation["source"]
+                    source_path.parent.mkdir(parents=True, exist_ok=True)
+                    source = (boundaries.ROOT / delegation["source"]).read_text(
+                        encoding="utf-8"
+                    )
+                    signature = (
+                        "(self, model_object_id: u64)"
+                        if delegation["format_name"] == "Pages"
+                        else "(self, slide_index: usize, model_object_id: u64)"
+                    )
+                    source += (
+                        f"\nimpl {delegation['impl_type']} {{\n"
+                        f"    pub fn {delegation['method']}{signature} "
+                        "-> Result<Vec<Region>> {\n"
+                        "        crate::numbers::editor::table_cell_merges_in_package("
+                        "self.package(), model_object_id)\n"
+                        "    }\n}\n"
+                    )
+                    source_path.write_text(source, encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(
+                            "must not call the monolith Numbers table-merge reader"
+                            in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_keynote_table_merge_read_allows_only_typed_unsupported_fallback(self) -> None:
+        delegation = next(
+            item
+            for item in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS
+            if item["format_name"] == "Keynote"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_path = root / delegation["source"]
+            source_path.parent.mkdir(parents=True, exist_ok=True)
+            source = (boundaries.ROOT / delegation["source"]).read_text(
+                encoding="utf-8"
+            )
+            source += """
+impl KeynoteEditor {
+    pub fn slide_table_cell_merges(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+    ) -> Result<Vec<Region>> {
+        match focused_table_package(self)?.slide_table_merges(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        ) {
+            Ok(regions) => Ok(regions),
+            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
+                crate::numbers::editor::table_cell_merges_in_package(
+                    self.package(), model_object_id,
+                ),
+            Err(error) => Err(map_focused_keynote_merges_error(error)),
+        }
+    }
+}
+"""
+            source_path.write_text(source, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_host_table_merge_read_rejects_catchall_and_pages_fallbacks(self) -> None:
+        keynote = next(
+            item
+            for item in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS
+            if item["format_name"] == "Keynote"
+        )
+        pages = next(
+            item
+            for item in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS
+            if item["format_name"] == "Pages"
+        )
+        for delegation, fallback in (
+            (
+                keynote,
+                """
+            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
+                Err(map_focused_keynote_merges_error(error)),
+            Err(error) =>
+                crate::numbers::editor::table_cell_merges_in_package(
+                    self.package(), model_object_id,
+                ),
+""",
+            ),
+            (
+                pages,
+                """
+            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
+                crate::numbers::editor::table_cell_merges_in_package(
+                    self.package(), model_object_id,
+                ),
+""",
+            ),
+        ):
+            with self.subTest(format=delegation["format_name"]):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source_path = root / delegation["source"]
+                    source_path.parent.mkdir(parents=True, exist_ok=True)
+                    source = (boundaries.ROOT / delegation["source"]).read_text(
+                        encoding="utf-8"
+                    )
+                    signature = (
+                        "(self, model_object_id: u64)"
+                        if delegation["format_name"] == "Pages"
+                        else "(self, slide_index: usize, model_object_id: u64)"
+                    )
+                    focused_call = (
+                        "focused.body_table_merges("
+                        "BodyTableSelector::index(table_position))"
+                        if delegation["format_name"] == "Pages"
+                        else "focused_table_package(self)?.slide_table_merges("
+                        "litchi_keynote::SlideSelector::index(slide_index), "
+                        "litchi_keynote::TableSelector::index(table_index))"
+                    )
+                    source += (
+                        f"\nimpl {delegation['impl_type']} {{\n"
+                        f"    pub fn {delegation['method']}{signature} "
+                        "-> Result<Vec<Region>> {\n"
+                        f"        match {focused_call} {{\n"
+                        "            Ok(regions) => Ok(regions),\n"
+                        f"{fallback}"
+                        "            Err(error) => Err(map_focused_merges_error(error)),\n"
+                        "        }\n"
+                        "    }\n}\n"
+                    )
+                    source_path.write_text(source, encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(
+                            "must not call the monolith Numbers table-merge reader"
+                            in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_host_table_merge_read_delegation_requires_focused_selectors(self) -> None:
+        for delegation in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+            with self.subTest(format=delegation["format_name"]):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source_path = root / delegation["source"]
+                    source_path.parent.mkdir(parents=True, exist_ok=True)
+                    source = (boundaries.ROOT / delegation["source"]).read_text(
+                        encoding="utf-8"
+                    )
+                    signature = (
+                        "(self, model_object_id: u64)"
+                        if delegation["format_name"] == "Pages"
+                        else "(self, slide_index: usize, model_object_id: u64)"
+                    )
+                    focused_call = (
+                        "focused.body_table_merges()"
+                        if delegation["format_name"] == "Pages"
+                        else "focused_table_package(self)?.slide_table_merges()"
+                    )
+                    source += (
+                        f"\nimpl {delegation['impl_type']} {{\n"
+                        f"    pub fn {delegation['method']}{signature} "
+                        "-> Result<Vec<Region>> {\n"
+                        f"        {focused_call}\n"
+                        "        Ok(Vec::new())\n"
+                        "    }\n}\n"
+                    )
+                    source_path.write_text(source, encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                            root
+                        )
+                    )
+                    for selector_name, _selector_pattern in delegation["selectors"]:
+                        self.assertTrue(
+                            any(
+                                f"must forward {selector_name}::index" in item
+                                for item in violations
+                            ),
+                            violations,
+                        )
 
     def test_common_table_merge_boundary_rejects_peer_import_and_duplicate_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -49081,6 +49291,7 @@ fn rewrite_movie_title_operation(
             "audit_iwa_numbers_wire_table_merges_source_topology",
             "audit_pages_table_merge_source_topology",
             "audit_keynote_table_merge_source_topology",
+            "audit_iwa_table_merge_host_read_delegation_source_topology",
         ):
             self.assertIn(f"+ {name}()", main_source)
 

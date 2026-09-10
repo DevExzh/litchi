@@ -449,8 +449,29 @@ impl KeynoteEditor {
         slide_index: usize,
         model_object_id: u64,
     ) -> Result<Vec<Region>> {
-        require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
+        let tables = self.slide_tables(slide_index)?;
+        let table_index = focused_table_index(&tables, slide_index, model_object_id)?;
+        let focused = focused_table_package(self)?.slide_table_merges(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        );
+        match focused {
+            Ok(regions) => Ok(regions),
+            // Keynote's focused graph currently admits only canonical 6001
+            // table models. Preserve the migration-host reader for legacy
+            // 6000 models and merge-compatible dependency variants until
+            // their focused ownership proofs are implemented. The host
+            // catalog above still proves slide ownership, and the bounded
+            // fallback validates the selected merge payload. InvalidSource,
+            // UnsupportedTopology, and limit errors remain focused errors.
+            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {
+                crate::numbers::editor::table_cell_merges_in_package(
+                    self.package(),
+                    model_object_id,
+                )
+            },
+            Err(error) => Err(map_focused_keynote_merges_error(error)),
+        }
     }
 
     /// Merge one non-overlapping slide-table rectangle transactionally.
