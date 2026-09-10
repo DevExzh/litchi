@@ -1,0 +1,62 @@
+{
+  "test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx": {
+    "bytes": 26014,
+    "sha256": "9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89"
+  },
+  "test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx": {
+    "bytes": 21260,
+    "sha256": "06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx": {
+    "bytes": 25636,
+    "sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx": {
+    "bytes": 25741,
+    "sha256": "8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx": {
+    "bytes": 18470,
+    "sha256": "3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx": {
+    "bytes": 77621,
+    "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx": {
+    "bytes": 2344,
+    "sha256": "9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx": {
+    "bytes": 22007,
+    "sha256": "d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx": {
+    "bytes": 66189,
+    "sha256": "4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx": {
+    "bytes": 17713,
+    "sha256": "27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98"
+  },
+  "test-data/ooxml/docx/Hyperlink.docx": {
+    "bytes": 11478,
+    "sha256": "ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66"
+  },
+  "test-data/ooxml/docx/footnotes.docx": {
+    "bytes": 12823,
+    "sha256": "9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1"
+  },
+  "test-data/poi/test-data/document/61745.docx": {
+    "bytes": 37030,
+    "sha256": "ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2"
+  },
+  "test-data/poi/test-data/document/Bug54849.docx": {
+    "bytes": 27566,
+    "sha256": "f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3"
+  },
+  "test-data/poi/test-data/document/testComment.docx": {
+    "bytes": 65298,
+    "sha256": "06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97"
+  }
+}

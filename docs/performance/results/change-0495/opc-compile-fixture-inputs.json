@@ -1,0 +1,30 @@
+{
+  "test-data/poi/test-data/xmldsign/hello-world-signed.xlsx": {
+    "bytes": 13072,
+    "sha256": "22e2d0f6f1a413d011fbdeba4c386ce842570f1cffc66c4f85956137d86a8f1d"
+  },
+  "test-data/poi/test-data/xmldsign/hello-world-signed.pptx": {
+    "bytes": 36107,
+    "sha256": "d119d8160dc912d639cbe8047c526c6dc58ca9dcd6b51bd5870c247d64413163"
+  },
+  "test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx": {
+    "bytes": 12180,
+    "sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45"
+  },
+  "test-data/poi/test-data/xmldsign/ms-office-2010-signed.pptx": {
+    "bytes": 38874,
+    "sha256": "4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1"
+  },
+  "docs/performance/results/change-0416/corpus/opc-local-only-signed.zip": {
+    "bytes": 1348,
+    "sha256": "6c534b529d6546bac4f9c7d1e9a0a18991751101d0e6b1b1488547b1f8d2d51a"
+  },
+  "test-data/poi/test-data/slideshow/EmbeddedVideo.pptx": {
+    "bytes": 201418,
+    "sha256": "7940e3b1a339db11f00b65399a2fe77e0e85a5da3a30ac8d6c8a0a77527b2ab2"
+  },
+  "test-data/poi/test-data/slideshow/bug62513.pptx": {
+    "bytes": 384775,
+    "sha256": "cd841112bd5b53f21e8434d080af8b2eeca78a07bc820e9ea0b97a0962c85c79"
+  }
+}

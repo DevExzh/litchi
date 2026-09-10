@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "attempt": null,
+  "common_sha256": "66675085d48cde045c1521af153766521f5df36a7bbea6f9697a70b81fd53587",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "label": "candidate-boundaries1",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_before": {
+    "files": 7139,
+    "path": "validation-sources/f669220cff132f625ed5af3c205b0ffebb1b53445b2ad68670aaf1a88881cf5c.json",
+    "sha256": "f669220cff132f625ed5af3c205b0ffebb1b53445b2ad68670aaf1a88881cf5c"
+  },
+  "started_utc": "2026-09-10T10:28:40.566432+00:00",
+  "timeout_seconds": 1800
+}

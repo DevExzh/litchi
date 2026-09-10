@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.08s
+     Running tests/source_backed_managed_document_edit.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed_document_edit-c782f9f186ad39d3)
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_managed_document_edit`

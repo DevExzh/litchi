@@ -25,6 +25,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
+        let _parser_admission = self.parser_admission()?;
         let mut run_ranges = Vec::new();
         scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
             let start = start as usize;
@@ -93,6 +94,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn images(&self) -> Result<SmallVec<[InlineImage; 4]>> {
+        let _parser_admission = self.parser_admission()?;
         parse_inline_images(self.xml_bytes())
     }
 
@@ -122,6 +124,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn drawing_objects(&self) -> Result<SmallVec<[Object; 4]>> {
+        let _parser_admission = self.parser_admission()?;
         parse(self.xml_bytes())
     }
 
@@ -137,6 +140,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn legacy_anchors(&self) -> Result<SmallVec<[LegacyAnchor; 4]>> {
+        let _parser_admission = self.parser_admission()?;
         parse_legacy(self.xml_bytes())
     }
 
@@ -164,6 +168,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<SmallVec<[Revision; 4]>> {
+        let _parser_admission = self.parser_admission()?;
         parse_revisions(self.xml_bytes())
     }
 
@@ -185,6 +190,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
+        let _parser_admission = self.parser_admission()?;
         let mut run_ranges = Vec::new();
         scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
             let start = start as usize;

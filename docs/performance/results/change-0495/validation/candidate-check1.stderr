@@ -1,0 +1,182 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: unnecessary qualification
+    --> crates/litchi-docx/src/source_backed.rs:2791:17
+     |
+2791 |                 litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+     |
+2791 -                 litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+2791 +                 ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+     |
+
+error[E0624]: associated function `from_managed_range` is private
+   --> crates/litchi-docx/src/document/transaction.rs:788:56
+    |
+788 |                 XmlStorage::Managed(xml) => Paragraph::from_managed_range(
+    |                                                        ^^^^^^^^^^^^^^^^^^ private associated function
+    |
+   ::: crates/litchi-docx/src/paragraph/model.rs:384:5
+    |
+384 |     pub(super) fn from_managed_range(owner: Arc<PartData>, start: u32, len: u32) -> Self {
+    |     ------------------------------------------------------------------------------------ private associated function defined here
+
+error[E0624]: associated function `from_source_range` is private
+   --> crates/litchi-docx/src/document/transaction.rs:794:32
+    |
+794 |                     Paragraph::from_source_range(Arc::clone(xml), range.start, range.length)
+    |                                ^^^^^^^^^^^^^^^^^ private associated function
+    |
+   ::: crates/litchi-docx/src/paragraph/model.rs:394:5
+    |
+394 |     pub(super) fn from_source_range(owner: Arc<SourceXmlPart>, start: u32, len: u32) -> Self {
+    |     ---------------------------------------------------------------------------------------- private associated function defined here
+
+error[E0624]: associated function `from_managed_range` is private
+   --> crates/litchi-docx/src/document/transaction.rs:809:56
+    |
+809 |                 XmlStorage::Managed(xml) => Paragraph::from_managed_range(
+    |                                                        ^^^^^^^^^^^^^^^^^^ private associated function
+    |
+   ::: crates/litchi-docx/src/paragraph/model.rs:384:5
+    |
+384 |     pub(super) fn from_managed_range(owner: Arc<PartData>, start: u32, len: u32) -> Self {
+    |     ------------------------------------------------------------------------------------ private associated function defined here
+
+error[E0624]: associated function `from_source_range` is private
+   --> crates/litchi-docx/src/document/transaction.rs:815:32
+    |
+815 |                     Paragraph::from_source_range(Arc::clone(xml), range.start, range.length)
+    |                                ^^^^^^^^^^^^^^^^^ private associated function
+    |
+   ::: crates/litchi-docx/src/paragraph/model.rs:394:5
+    |
+394 |     pub(super) fn from_source_range(owner: Arc<SourceXmlPart>, start: u32, len: u32) -> Self {
+    |     ---------------------------------------------------------------------------------------- private associated function defined here
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+    --> crates/litchi-docx/src/source_backed.rs:1731:25
+     |
+1731 |                           Snapshot::from_source_xml(
+     |  _________________________^^^^^^^^^^^^^^^^^^^^^^^^^-
+1732 | |                             source,
+1733 | |                             source_lineage.clone(),
+1734 | |                             source_version,
+1735 | |                             partname.clone(),
+     | |                             ---------------- expected `&PackURI`, found `PackURI`
+1736 | |                         )?
+     | |_________________________- argument #5 of type `ExecutionContext` is missing
+     |
+note: associated function defined here
+    --> crates/litchi-docx/src/document/transaction.rs:669:19
+     |
+ 669 |     pub(crate) fn from_source_xml(
+     |                   ^^^^^^^^^^^^^^^
+...
+ 673 |         partname: &PackURI,
+     |         ------------------
+ 674 |         context: ExecutionContext,
+     |         -------------------------
+help: consider borrowing here
+     |
+1735 |                             &partname.clone(),
+     |                             +
+help: provide the argument
+     |
+1731 ~                         Snapshot::from_source_xml(
+1732 +                             source,
+1733 +                             source_lineage.clone(),
+1734 +                             source_version,
+1735 +                             /* &PackURI */,
+1736 +                             /* ExecutionContext */,
+1737 ~                         )?
+     |
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+    --> crates/litchi-docx/src/source_backed.rs:1741:25
+     |
+1741 |                           Snapshot::from_managed_part(
+     |  _________________________^^^^^^^^^^^^^^^^^^^^^^^^^^^-
+1742 | |                             data,
+1743 | |                             source_lineage.clone(),
+1744 | |                             source_version,
+1745 | |                             partname.clone(),
+     | |                             ---------------- expected `&PackURI`, found `PackURI`
+1746 | |                         )?
+     | |_________________________- argument #5 of type `ExecutionContext` is missing
+     |
+note: associated function defined here
+    --> crates/litchi-docx/src/document/transaction.rs:627:19
+     |
+ 627 |     pub(crate) fn from_managed_part(
+     |                   ^^^^^^^^^^^^^^^^^
+...
+ 631 |         partname: &PackURI,
+     |         ------------------
+ 632 |         context: ExecutionContext,
+     |         -------------------------
+help: consider borrowing here
+     |
+1745 |                             &partname.clone(),
+     |                             +
+help: provide the argument
+     |
+1741 ~                         Snapshot::from_managed_part(
+1742 +                             data,
+1743 +                             source_lineage.clone(),
+1744 +                             source_version,
+1745 +                             /* &PackURI */,
+1746 +                             /* ExecutionContext */,
+1747 ~                         )?
+     |
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+    --> crates/litchi-docx/src/source_backed.rs:1753:17
+     |
+1753 |                   Snapshot::from_managed_part(
+     |  _________________^^^^^^^^^^^^^^^^^^^^^^^^^^^-
+1754 | |                     data,
+1755 | |                     source_lineage.clone(),
+1756 | |                     source_version,
+1757 | |                     partname.clone(),
+     | |                     ---------------- expected `&PackURI`, found `PackURI`
+1758 | |                 )?
+     | |_________________- argument #5 of type `ExecutionContext` is missing
+     |
+note: associated function defined here
+    --> crates/litchi-docx/src/document/transaction.rs:627:19
+     |
+ 627 |     pub(crate) fn from_managed_part(
+     |                   ^^^^^^^^^^^^^^^^^
+...
+ 631 |         partname: &PackURI,
+     |         ------------------
+ 632 |         context: ExecutionContext,
+     |         -------------------------
+help: consider borrowing here
+     |
+1757 |                     &partname.clone(),
+     |                     +
+help: provide the argument
+     |
+1753 ~                 Snapshot::from_managed_part(
+1754 +                     data,
+1755 +                     source_lineage.clone(),
+1756 +                     source_version,
+1757 +                     /* &PackURI */,
+1758 +                     /* ExecutionContext */,
+1759 ~                 )?
+     |
+
+Some errors have detailed explanations: E0061, E0624.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `litchi-docx` (lib) due to 8 previous errors

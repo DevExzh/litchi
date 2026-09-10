@@ -1,0 +1,61 @@
+{
+  "attempt": "final1",
+  "binary": {
+    "bytes": 476401240,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0495/retained/final1/before/allocator/litchi-perf-baseline-alloc",
+    "sha256": "4893309b477d0aaddeb1f8c84a7d998671df732e1e929a886436e6e86021fc54"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "copied_utc": "2026-09-10T09:41:56.880347+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation/before-allocator1.json",
+    "sha256": "72a4077e57c1cef5d5c8f3a9bfacaec65231cfe48fdbc6fc97f1a481f5128923"
+  },
+  "git_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "original_binary": {
+    "bytes": 476401240,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-build-0495/release/litchi-perf-baseline-alloc",
+    "sha256": "4893309b477d0aaddeb1f8c84a7d998671df732e1e929a886436e6e86021fc54"
+  },
+  "phase": "before",
+  "retainer_sha256": "506b4eb7166d29e979cd3043320b9bc5eca7058e37c6b9fbf20add723a86921a",
+  "role": "allocator",
+  "schema": "docx-provider-managed-build-v1",
+  "source_after": {
+    "files": 7122,
+    "path": "validation-sources/96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f.json",
+    "sha256": "96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f"
+  },
+  "source_before": {
+    "files": 7122,
+    "path": "validation-sources/96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f.json",
+    "sha256": "96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

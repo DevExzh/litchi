@@ -48,14 +48,24 @@ struct Layout {
 
 /// Read the direct Word 2012 collapse marker from a paragraph.
 pub(crate) fn read(xml_bytes: &[u8]) -> Result<Option<Collapsed>> {
-    let (_, value) = locate(xml_bytes)?;
+    let (_, value) = locate(xml_bytes, None)?;
+    Ok(value)
+}
+
+/// Read a paragraph fragment with the namespace bindings inherited by its
+/// retained source range.
+pub(crate) fn read_with_resolver(
+    xml_bytes: &[u8],
+    resolver: &NamespaceResolver,
+) -> Result<Option<Collapsed>> {
+    let (_, value) = locate(xml_bytes, Some(resolver))?;
     Ok(value)
 }
 
 /// Replace the direct collapse marker while preserving every unrelated byte.
 pub(crate) fn rewrite(xml_bytes: &[u8], value: Option<Collapsed>) -> Result<Vec<u8>> {
     validate(value)?;
-    let (layout, current) = locate(xml_bytes)?;
+    let (layout, current) = locate(xml_bytes, None)?;
     if current == value {
         return Ok(xml_bytes.to_vec());
     }
@@ -101,7 +111,10 @@ pub(crate) fn append_xml(xml: &mut String, value: Collapsed) -> Result<()> {
     Ok(())
 }
 
-fn locate(xml_bytes: &[u8]) -> Result<(Layout, Option<Collapsed>)> {
+fn locate(
+    xml_bytes: &[u8],
+    initial_resolver: Option<&NamespaceResolver>,
+) -> Result<(Layout, Option<Collapsed>)> {
     if xml_bytes.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "paragraph XML exceeds {MAX_XML_BYTES} bytes"
@@ -109,6 +122,9 @@ fn locate(xml_bytes: &[u8]) -> Result<(Layout, Option<Collapsed>)> {
     }
 
     let mut reader = NsReader::from_reader(xml_bytes);
+    if let Some(initial_resolver) = initial_resolver {
+        *reader.resolver_mut() = initial_resolver.clone();
+    }
     reader.config_mut().trim_text(false);
     let mut layout = Layout::default();
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;

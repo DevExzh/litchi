@@ -1,0 +1,16 @@
+
+running 11 tests
+test strict_xml_rejects_duplicate_attributes_and_mismatched_end_names ... ok
+test nested_mce_and_processing_instructions_are_refused ... ok
+test managed_story_reads_are_bounded_and_edits_are_typed_refusals ... ok
+test selected_story_noop_copies_the_complete_source_byte_for_byte ... ok
+test patches_reject_foreign_and_stale_snapshots_and_cancel_before_output ... ok
+test selected_story_snapshot_reads_main_header_and_footer ... ok
+test namespace_aliases_are_resolved_and_wrong_bindings_are_refused ... ok
+test hostile_publication_writer_is_rejected_without_panicking ... ok
+test trailing_source_bytes_are_preserved_by_an_exact_noop ... ok
+test selected_story_edit_publishes_one_part_and_restores_exact_source ... ok
+test story_scan_enforces_paragraph_depth_and_output_limits ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

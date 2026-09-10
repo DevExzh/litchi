@@ -1,0 +1,126 @@
+{
+  "crates/litchi-docx/src/document/mod.rs": {
+    "bytes": 1195,
+    "sha256": "f6ba275aaaf61f761ae8f8a6e1d07db9cae15a05153319738e14d5427b6b8461"
+  },
+  "crates/litchi-docx/src/document/transaction.rs": {
+    "bytes": 300192,
+    "sha256": "890d5ae4df9a22a6c85ad65bbf7e50e34b751770010758af13c5ab6c09f41769"
+  },
+  "crates/litchi-docx/src/document/transaction/durable.rs": {
+    "bytes": 79842,
+    "sha256": "2b586402e64f51276ee621d553c87fc5304781de73427e0b67a768efd953521c"
+  },
+  "crates/litchi-docx/src/paragraph/codec/content.rs": {
+    "bytes": 8662,
+    "sha256": "057611839de3623324219bb1819c845659ac93be6ebecc851cbd98b87f3919c9"
+  },
+  "crates/litchi-docx/src/paragraph/codec/editing.rs": {
+    "bytes": 17779,
+    "sha256": "4d867235ea039931a10ad248eaf5c5997718cf2317b591464e0d194bb3ee97f6"
+  },
+  "crates/litchi-docx/src/paragraph/codec/inlines.rs": {
+    "bytes": 9855,
+    "sha256": "c3d39714c616e2cbcca2259ae9b5566554e620549d4354701f77d4d2bf65a9ba"
+  },
+  "crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs": {
+    "bytes": 19512,
+    "sha256": "61f03f2e39c1c818706faf56d3041f00b6116026a0e15c82db290e60818d5c2b"
+  },
+  "crates/litchi-docx/src/paragraph/codec/run.rs": {
+    "bytes": 24373,
+    "sha256": "3c16685ca4b13ebdf8451c33b0e13b89047ec33316daaf33b32b88780b214336"
+  },
+  "crates/litchi-docx/src/paragraph/codec/run_contents.rs": {
+    "bytes": 13763,
+    "sha256": "a1a17200fa439b48183624dd6b24f9eb6da04d24e7013bbfdcd4c414e7d92002"
+  },
+  "crates/litchi-docx/src/paragraph/codec/run_properties.rs": {
+    "bytes": 11960,
+    "sha256": "f2181d9f0623ab246bb5a6406c5fb69fe46b7d318ea0de85064f7a0cccb79c3a"
+  },
+  "crates/litchi-docx/src/paragraph/codec/runs.rs": {
+    "bytes": 12903,
+    "sha256": "68cd1fe282633d876cbab58b581394ea6592f6a1d49eb22bac4a27f73e1fe74e"
+  },
+  "crates/litchi-docx/src/paragraph/codec/text.rs": {
+    "bytes": 66873,
+    "sha256": "37d8a449816f28c160fe12681c576bc3acc4746476f4843714583551d254ad02"
+  },
+  "crates/litchi-docx/src/paragraph/collapsed/codec.rs": {
+    "bytes": 17384,
+    "sha256": "76056ef8e718ba8975a480c0a018b71100263dc3afd9a26cb939eb3497995671"
+  },
+  "crates/litchi-docx/src/paragraph/collapsed/package.rs": {
+    "bytes": 6032,
+    "sha256": "c36571961e2dd3e611b99bc12ae036552cc8c833397535c9403d98d34ba9ce92"
+  },
+  "crates/litchi-docx/src/paragraph/extensions/codec.rs": {
+    "bytes": 9739,
+    "sha256": "05c317311bed42ded22ce6a0b342d6ac2e30d0a43bcef7c6482a1cae0d631687"
+  },
+  "crates/litchi-docx/src/paragraph/extensions/package.rs": {
+    "bytes": 4121,
+    "sha256": "d461705e37bf834b4725e06bab23aa602cd1d9074a84e7071bb7efe1c592c036"
+  },
+  "crates/litchi-docx/src/paragraph/model.rs": {
+    "bytes": 28999,
+    "sha256": "d291520bc05ab25b85a289ae702b4844e38539a4fa2bb9f0eb18c555853d08ad"
+  },
+  "crates/litchi-docx/src/paragraph/package.rs": {
+    "bytes": 8764,
+    "sha256": "10512eb52cb406a7a4316cb222cefb4b85009e4740c378e0422f4abca060ff07"
+  },
+  "crates/litchi-docx/src/run_symbols/codec.rs": {
+    "bytes": 16353,
+    "sha256": "f69803d512318a48c62d6fd7b06b2cd39839fd75f8352f8c33f8c8bada92682b"
+  },
+  "crates/litchi-docx/src/run_symbols/package.rs": {
+    "bytes": 5558,
+    "sha256": "6aa4e2978b9e20a16e2fcd37abe341c728dc9f470fba82c1e3763dc7b3a06f75"
+  },
+  "crates/litchi-docx/src/source_backed.rs": {
+    "bytes": 127523,
+    "sha256": "0d3e29d545381ed39c41c81b32483afb619d1474e1be525ba484fa6584260ab6"
+  },
+  "crates/litchi-docx/src/source_backed/document_policy.rs": {
+    "bytes": 23989,
+    "sha256": "61a48bb691f081e31808b3f920303f4e327c0d42aea0b61cdc10f0f1da6b9d8d"
+  },
+  "crates/litchi-docx/src/source_backed/story_text.rs": {
+    "bytes": 213577,
+    "sha256": "e24696d291b260923627a500709395d4827a6ff3a372292ac5dcd8edadab1ca6"
+  },
+  "crates/litchi-docx/tests/source_backed_managed.rs": {
+    "bytes": 14887,
+    "sha256": "ca38bd6dad450a21da6938c6412d37582ef1a35cb99ea0f1ab4a3cf3a9068dc8"
+  },
+  "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": {
+    "bytes": 68113,
+    "sha256": "15b539fff492ea4b6d164fa1341a4ce0383a1f79a7f1e757a0fd5dfe0ea36480"
+  },
+  "crates/litchi-docx/tests/source_backed_semantic.rs": {
+    "bytes": 29440,
+    "sha256": "9ce3449be9470f9d1bdc015cd23a1fde80cf20ec1862f4e35efc6a3e663d9169"
+  },
+  "crates/litchi-opc/src/xml_splice.rs": {
+    "bytes": 63946,
+    "sha256": "466e577c38b424e02ea9f104418c7052f8ee32ac4e4db4c0d411c984f18876f5"
+  },
+  "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": {
+    "bytes": 2169,
+    "sha256": "d895986f85e12bec5a30d728bfda2985efd2b0b897e97970e9fa45b2568ae3db"
+  },
+  "tools/perf-baseline/src/docx_managed_edit.rs": {
+    "bytes": 76485,
+    "sha256": "4b1258a157f95935be1ea2d7011a47ed7d5af1ca617362554419f5d0f16cf5bd"
+  },
+  "tools/perf-baseline/src/lib.rs": {
+    "bytes": 2834782,
+    "sha256": "1920c807f2efd30dc39625beaa83a8186f153563c6b88967b308d3528eb82cb8"
+  },
+  "tools/perf-baseline/src/main.rs": {
+    "bytes": 2079,
+    "sha256": "2327bc6430ec6ed125396823a0ce1a9315358cf861ad6458513ac7772ed0f54b"
+  }
+}

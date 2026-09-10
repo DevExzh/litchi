@@ -51,6 +51,14 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn set_spacing(&mut self, spacing: Option<ParagraphSpacing>) -> Result<&mut Self> {
+        if self.xml_data.is_managed() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "paragraph.set_spacing",
+                reason: "managed paragraph views cannot detach source-owned XML",
+            });
+        }
+        let _parser_admission = self.parser_admission()?;
         let original = self.xml_bytes();
         let rewritten = rewrite_spacing(original, spacing)?;
         if rewritten.as_slice() != original {
@@ -119,7 +127,7 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
             Error::InvalidFormat("paragraph XML offset does not fit usize".into())
@@ -166,11 +174,8 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
                         }
                         spacing_depth = Some(depth);
                         spacing_start = Some(event_start);
-                        if spacing_has_unsupported_attributes(
-                            &element,
-                            &resolver,
-                            &fragment_prefix,
-                        )? {
+                        if spacing_has_unsupported_attributes(&element, resolver, &fragment_prefix)?
+                        {
                             layout.spacing_has_unsupported_content = true;
                         }
                     } else if spacing_depth.is_some() {
@@ -226,11 +231,8 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
                             start: event_start,
                             end: event_end,
                         });
-                        if spacing_has_unsupported_attributes(
-                            &element,
-                            &resolver,
-                            &fragment_prefix,
-                        )? {
+                        if spacing_has_unsupported_attributes(&element, resolver, &fragment_prefix)?
+                        {
                             layout.spacing_has_unsupported_content = true;
                         }
                     } else if spacing_depth.is_some() {

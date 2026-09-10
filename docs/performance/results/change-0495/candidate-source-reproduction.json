@@ -1,0 +1,48 @@
+{
+  "base_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "instructions": "Check out base revision, apply candidate-source.patch, copy workspace-Cargo.lock to Cargo.lock, restore exact fixture inputs from their receipts, and use support.ENV. Candidate patch includes frozen harness and production changes; baseline-tracked.patch is the separate before harness overlay.",
+  "patch": {
+    "bytes": 405420,
+    "sha256": "95d42dc2d139b55ecb0d5eeecce88423f0ba353bc6ad74034de016d2465fb057"
+  },
+  "patch_path": "candidate-source.patch",
+  "reverse_apply_check": "passed in isolated source",
+  "source": {
+    "files": 7198,
+    "path": "validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_paths": [
+    "crates/litchi-docx/src/document/mod.rs",
+    "crates/litchi-docx/src/document/transaction.rs",
+    "crates/litchi-docx/src/document/transaction/durable.rs",
+    "crates/litchi-docx/src/paragraph/codec/content.rs",
+    "crates/litchi-docx/src/paragraph/codec/editing.rs",
+    "crates/litchi-docx/src/paragraph/codec/inlines.rs",
+    "crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs",
+    "crates/litchi-docx/src/paragraph/codec/run.rs",
+    "crates/litchi-docx/src/paragraph/codec/run_contents.rs",
+    "crates/litchi-docx/src/paragraph/codec/run_properties.rs",
+    "crates/litchi-docx/src/paragraph/codec/runs.rs",
+    "crates/litchi-docx/src/paragraph/codec/text.rs",
+    "crates/litchi-docx/src/paragraph/collapsed/codec.rs",
+    "crates/litchi-docx/src/paragraph/collapsed/package.rs",
+    "crates/litchi-docx/src/paragraph/extensions/codec.rs",
+    "crates/litchi-docx/src/paragraph/extensions/package.rs",
+    "crates/litchi-docx/src/paragraph/model.rs",
+    "crates/litchi-docx/src/paragraph/package.rs",
+    "crates/litchi-docx/src/run_symbols/codec.rs",
+    "crates/litchi-docx/src/run_symbols/package.rs",
+    "crates/litchi-docx/src/source_backed.rs",
+    "crates/litchi-docx/src/source_backed/document_policy.rs",
+    "crates/litchi-docx/src/source_backed/story_text.rs",
+    "crates/litchi-docx/tests/source_backed_managed.rs",
+    "crates/litchi-docx/tests/source_backed_managed_document_edit.rs",
+    "crates/litchi-docx/tests/source_backed_semantic.rs",
+    "crates/litchi-opc/src/xml_splice.rs",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+    "tools/perf-baseline/src/docx_managed_edit.rs",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/main.rs"
+  ]
+}

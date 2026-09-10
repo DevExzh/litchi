@@ -6,7 +6,7 @@ use litchi_opc::rel::Relationships;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 
-use super::model::{Inline, InlineHyperlink, Paragraph, Run};
+use super::model::{Inline, InlineHyperlink, Paragraph, Run, XmlRef};
 
 impl Paragraph {
     /// Return ordered direct paragraph children with hyperlinks resolved.
@@ -26,11 +26,13 @@ impl Paragraph {
         reason = "non-exhaustive public Inline values must pass through unchanged"
     )]
     pub fn inlines_with_relationships(&self, rels: &Relationships) -> Result<Vec<Inline>> {
-        self.inlines()?
+        let inlines = self.inlines()?;
+        let _parser_admission = self.parser_admission()?;
+        inlines
             .into_iter()
             .map(|candidate| match candidate {
                 Inline::Unknown(opaque) if opaque.is_word_hyperlink() => Ok(Inline::Hyperlink(
-                    Box::new(parse_hyperlink(opaque.xml_bytes(), rels)?),
+                    Box::new(parse_hyperlink(opaque.xml_ref(), rels)?),
                 )),
                 other => Ok(other),
             })
@@ -61,11 +63,13 @@ impl Paragraph {
     /// Returns an error when the paragraph XML or hyperlink attributes are
     /// malformed.
     pub fn hyperlinks(&self, rels: &Relationships) -> Result<Vec<Hyperlink>> {
+        let _parser_admission = self.parser_admission()?;
         Hyperlink::extract_from_paragraph(self.xml_bytes(), rels)
     }
 }
 
-fn parse_hyperlink(xml: &[u8], rels: &Relationships) -> Result<InlineHyperlink> {
+fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperlink> {
+    let xml = source.bytes();
     let mut links = Hyperlink::extract_from_paragraph(xml, rels)?;
     if links.len() != 1 {
         return Err(crate::Error::InvalidFormat(format!(
@@ -136,7 +140,7 @@ fn parse_hyperlink(xml: &[u8], rels: &Relationships) -> Result<InlineHyperlink> 
                 })?;
                 if child_depth == 2 {
                     if element.local_name().as_ref() == b"r" {
-                        runs.push(Run::new(xml[start..end].to_vec()));
+                        runs.push(retained_run(source, start, end)?);
                     } else {
                         has_unmodeled_content = true;
                     }
@@ -146,7 +150,7 @@ fn parse_hyperlink(xml: &[u8], rels: &Relationships) -> Result<InlineHyperlink> 
                 if let Some((run_start, run_depth)) = capture
                     && depth == run_depth
                 {
-                    runs.push(Run::new(xml[run_start..end].to_vec()));
+                    runs.push(retained_run(source, run_start, end)?);
                     capture = None;
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
@@ -190,6 +194,22 @@ fn parse_hyperlink(xml: &[u8], rels: &Relationships) -> Result<InlineHyperlink> 
         document_location,
         has_unmodeled_content,
     ))
+}
+
+fn retained_run(source: &XmlRef, start: usize, end: usize) -> Result<Run> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| crate::Error::InvalidFormat("hyperlink run range is inverted".into()))?;
+    let start = u32::try_from(start).map_err(|_conversion_error| {
+        crate::Error::InvalidFormat("hyperlink run offset does not fit u32".into())
+    })?;
+    let length = u32::try_from(length).map_err(|_conversion_error| {
+        crate::Error::InvalidFormat("hyperlink run length does not fit u32".into())
+    })?;
+    let range = source.subrange(start, length).ok_or_else(|| {
+        crate::Error::InvalidFormat("hyperlink run range exceeds source XML".into())
+    })?;
+    Ok(Run::from_xml_ref(range))
 }
 
 fn set_once(slot: &mut Option<String>, value: String, name: &str) -> Result<()> {

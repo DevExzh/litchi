@@ -1,0 +1,4 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 24.75s
+     Running tests/source_backed_managed.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed-626c2823f77cf34c)
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_managed`

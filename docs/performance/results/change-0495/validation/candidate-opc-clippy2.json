@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "artifacts": {
+    "candidate-opc-clippy2.stderr": {
+      "bytes": 168,
+      "sha256": "cd401d39ea15ad0e67c8fb9829f686340ef625279d7db0c95455a0dd47be9ee8"
+    },
+    "candidate-opc-clippy2.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "66675085d48cde045c1521af153766521f5df36a7bbea6f9697a70b81fd53587",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T11:13:53.383373+00:00",
+  "label": "candidate-opc-clippy2",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7193,
+    "path": "validation-sources/60eeb5d0ca780624eef80f0280bc0646eda6104470f5d3271ad50ef4b9539889.json",
+    "sha256": "60eeb5d0ca780624eef80f0280bc0646eda6104470f5d3271ad50ef4b9539889"
+  },
+  "source_before": {
+    "files": 7193,
+    "path": "validation-sources/60eeb5d0ca780624eef80f0280bc0646eda6104470f5d3271ad50ef4b9539889.json",
+    "sha256": "60eeb5d0ca780624eef80f0280bc0646eda6104470f5d3271ad50ef4b9539889"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T11:13:52.488042+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

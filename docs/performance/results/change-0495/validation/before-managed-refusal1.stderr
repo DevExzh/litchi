@@ -1,0 +1,1 @@
+Error: "managed-api unsupported at current source-backed edit boundary; refusal is not a timed sample: unsafe DOCX edit 'document_snapshot' rejected: managed source-backed document transactions require an owned edit snapshot; use the selective read facade or an unmanaged compatibility constructor"

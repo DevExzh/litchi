@@ -8,6 +8,8 @@
 //! transactions retain the raw XML and may be published to a sequential sink
 //! while raw-copying every unselected ZIP member.
 
+mod document_policy;
+
 pub mod paragraph_copy;
 pub mod paragraph_remove;
 pub mod story_text;
@@ -82,11 +84,11 @@ use crate::settings::DocumentSettings;
 use crate::variables;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
+use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, PackURI, Part, PartData, SourceArtifact, SourceArtifactFingerprint,
-    SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, SourceTopologyPlan,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -150,6 +152,48 @@ impl DocumentVariablesPublication {
     #[must_use]
     pub const fn snapshot(&self) -> &variables::Snapshot {
         &self.snapshot
+    }
+}
+
+/// A completed main-document publication with authority to restore its exact
+/// original package, including unchanged ZIP framing and opaque members.
+///
+/// Clones retain immutable source and snapshot owners. The inverse accepts only
+/// the complete artifact emitted by this publication, even after reopening it
+/// through a different caller-supplied source.
+#[derive(Clone)]
+pub struct DocumentPublication {
+    snapshot: Snapshot,
+    original_snapshot: Snapshot,
+    original_artifact: SourceArtifact,
+    proof: litchi_opc::SourceArtifactRestoreProof,
+}
+
+impl DocumentPublication {
+    /// Borrow the committed main-document snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+}
+
+struct DocumentPublicationWriter<W> {
+    inner: FingerprintingWriter<W>,
+    written: u64,
+}
+
+impl<W: Write> Write for DocumentPublicationWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        self.written = self
+            .written
+            .checked_add(written as u64)
+            .ok_or_else(|| std::io::Error::other("document publication byte count overflow"))?;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
     }
 }
 
@@ -596,19 +640,32 @@ impl Package {
         let data = main.data()?;
         let managed = self.package.cache_diagnostics().budget_managed;
         let document: Result<Document> = (|| {
-            let (xml, paragraph_index) = if managed {
-                ensure_source_document_xml(data.as_bytes())?;
+            let (xml, paragraph_index, index_admission) = if managed {
+                ensure_source_document_xml(
+                    data.as_bytes(),
+                    self.package.execution_context().as_ref(),
+                )?;
+                let context = self.package.execution_context().ok_or_else(|| {
+                    Error::InvalidFormat("managed document context is unavailable".into())
+                })?;
+                let index_admission = DocumentIndexAdmission::new(&context, data.as_bytes().len())?;
+                let _parser = admit_document_query_parser(Some(&context), data.as_bytes().len())?;
                 let paragraph_index = ParagraphIndex::from_xml(data.as_bytes()).ok().map(Arc::new);
-                (DocumentPayload::Managed(data), paragraph_index)
+                (
+                    DocumentPayload::Managed(data),
+                    paragraph_index,
+                    Some(index_admission),
+                )
             } else {
                 let xml = visible_document_xml(data.into_arc()?)?;
                 let paragraph_index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
-                (DocumentPayload::Owned(xml), paragraph_index)
+                (DocumentPayload::Owned(xml), paragraph_index, None)
             };
             let source_version = self.package.source_version()?;
             Ok(Document {
                 xml,
                 paragraph_index,
+                _index_admission: index_admission,
                 source_version,
                 execution: self.execution.clone(),
             })
@@ -678,8 +735,11 @@ impl Package {
                 .map_err(|source| writer.document_error(source.into()))?;
             let managed = self.package.cache_diagnostics().budget_managed;
             let visible: Cow<'_, [u8]> = if managed {
-                ensure_source_document_xml(data.as_bytes())
-                    .map_err(|source| writer.document_error(source))?;
+                ensure_source_document_xml(
+                    data.as_bytes(),
+                    self.package.execution_context().as_ref(),
+                )
+                .map_err(|source| writer.document_error(source))?;
                 Cow::Borrowed(data.as_bytes())
             } else {
                 let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
@@ -868,7 +928,7 @@ impl Package {
     ///
     /// Returns a typed package, document, resource-limit, or unsafe-edit error.
     pub fn document_snapshot(&self) -> TransactionResult<Snapshot> {
-        let (_, snapshot) = self.main_document_snapshot("document_snapshot")?;
+        let (_, snapshot) = self.main_document_snapshot("document_snapshot", true)?;
         Ok(snapshot)
     }
 
@@ -878,7 +938,8 @@ impl Package {
     ///
     /// Returns the same failures as [`Self::document_snapshot`].
     pub fn edit_document(&self) -> TransactionResult<Edit> {
-        Ok(self.document_snapshot()?.edit())
+        let (_, snapshot) = self.main_document_snapshot("edit_document", true)?;
+        Ok(snapshot.edit())
     }
 
     /// Capture document variables from the existing internal settings Part.
@@ -1101,7 +1162,7 @@ impl Package {
         limits: sanitize::Limits,
     ) -> Result<sanitize::Snapshot> {
         let (_, document) = self
-            .main_document_snapshot("external_hyperlink_sanitization_snapshot")
+            .main_document_snapshot("external_hyperlink_sanitization_snapshot", false)
             .map_err(transaction_error_to_document)?;
         self.refuse_protected_external_hyperlink_detachment()?;
         let main = self.package.main_document_part()?;
@@ -1120,7 +1181,13 @@ impl Package {
                 relationship.is_external(),
             ));
         }
-        sanitize::Snapshot::from_source(document.shared_xml(), relationships, limits)
+        sanitize::Snapshot::from_source(
+            document
+                .shared_xml()
+                .map_err(transaction_error_to_document)?,
+            relationships,
+            limits,
+        )
     }
 
     /// Build a non-mutating plan that detaches all external main-document
@@ -1167,7 +1234,7 @@ impl Package {
         limits: sanitize::Limits,
     ) -> Result<redact::Snapshot> {
         let (_, document) = self
-            .main_document_snapshot("external_hyperlink_redaction_snapshot")
+            .main_document_snapshot("external_hyperlink_redaction_snapshot", false)
             .map_err(transaction_error_to_document)?;
         self.refuse_protected_external_hyperlink_detachment()?;
         self.refuse_external_hyperlink_redaction_topology()?;
@@ -1190,7 +1257,9 @@ impl Package {
         let source_version = self.package.source_version()?;
         let source_fingerprint = self.package.source_artifact().fingerprint()?;
         redact::Snapshot::from_source(
-            document.shared_xml(),
+            document
+                .shared_xml()
+                .map_err(transaction_error_to_document)?,
             relationships,
             source_version,
             source_fingerprint,
@@ -1226,7 +1295,10 @@ impl Package {
         writer: W,
         commit: &Commit,
     ) -> TransactionResult<Snapshot> {
-        let (main, current) = self.main_document_snapshot("publish_document_commit_to_stream")?;
+        let (main, current) = self.main_document_snapshot(
+            "publish_document_commit_to_stream",
+            commit.patch().changed(),
+        )?;
         let target = commit.patch().apply(&current)?;
         if commit
             .patch()
@@ -1247,16 +1319,103 @@ impl Package {
         // byte-identity check is allowed to select the exact-source path;
         // this also avoids asking a rewritten target to stand in for an
         // unsupported source payload.
+        if commit.patch().changed() {
+            document_policy::validate_changed_document(&self)?;
+        }
         if !commit.patch().changed() {
             self.package
                 .write_part_overlays_shared_to_stream(writer, Vec::new())
                 .map_err(Error::from)?;
+        } else if let Some(source_xml) = target.source_xml() {
+            let mut plan = SourceTopologyPlan::new();
+            plan.try_replace_source_xml_part(main, source_xml)
+                .map_err(Error::from)?;
+            self.package
+                .write_topology_to_stream(writer, plan)
+                .map_err(Error::from)?;
         } else {
             self.package
-                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())
+                .write_part_overlay_shared_to_stream(
+                    writer,
+                    &main,
+                    target.shared_xml().map_err(transaction_error_to_document)?,
+                )
                 .map_err(Error::from)?;
         }
         Ok(target)
+    }
+
+    /// Publish an ordinary main-document commit and retain its exact inverse.
+    ///
+    /// This performs the same semantic and physical publication as
+    /// [`Self::publish_document_commit_to_stream`]. In addition, it fingerprints
+    /// the original artifact before output and the accepted output bytes while
+    /// writing. The returned handle pins the original positional source without
+    /// materializing the package. Fingerprinting uses the source's execution
+    /// context and bounded workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns the ordinary publication errors, or a typed source, budget, or
+    /// cancellation error while authenticating the original artifact.
+    pub fn publish_document_commit_with_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &Commit,
+    ) -> TransactionResult<DocumentPublication> {
+        let original_artifact = self.package.source_artifact();
+        let original_sha256 = original_artifact.fingerprint().map_err(Error::from)?;
+        let original_len = original_artifact.len();
+        let mut output = DocumentPublicationWriter {
+            inner: FingerprintingWriter {
+                inner: writer,
+                hasher: Sha256::new(),
+            },
+            written: 0,
+        };
+        let snapshot = self.publish_document_commit_to_stream(&mut output, commit)?;
+        let proof = litchi_opc::SourceArtifactRestoreProof {
+            current_len: output.written,
+            current_sha256: SourceArtifactFingerprint::from_sha256(
+                output.inner.hasher.finalize().into(),
+            ),
+            original_len,
+            original_sha256,
+        };
+        Ok(DocumentPublication {
+            snapshot,
+            original_snapshot: commit.patch().source().clone(),
+            original_artifact,
+            proof,
+        })
+    }
+
+    /// Restore the byte-exact original package of an ordinary document edit.
+    ///
+    /// The current complete artifact and the retained original are both
+    /// authenticated before output. A foreign artifact with identical document
+    /// XML is still refused. Source versions and cancellation are checked during
+    /// authentication and streaming; output uses the current package's execution
+    /// budget. Failure after accepted output retains the typed partial count.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed artifact mismatch, source-change, cancellation, resource,
+    /// allocation, or incomplete-output error.
+    pub fn publish_document_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        publication: &DocumentPublication,
+    ) -> TransactionResult<Snapshot> {
+        self.package
+            .restore_source_artifact_to_stream(
+                &publication.original_artifact,
+                publication.proof,
+                publication.proof.original_len,
+                writer,
+            )
+            .map_err(Error::from)?;
+        Ok(publication.original_snapshot.clone())
     }
 
     /// Replace the opaque payload behind one existing main-story altChunk.
@@ -1577,36 +1736,101 @@ impl Package {
     fn main_document_snapshot(
         &self,
         operation: &'static str,
+        source_authorized: bool,
     ) -> TransactionResult<(PackURI, Snapshot)> {
-        self.package.check_execution().map_err(Error::from)?;
-        let main = self.package.main_document_part().map_err(Error::from)?;
-        validate_document_main_content_type(main.content_type())?;
-        let partname = main.partname().clone();
-        if self.package.cache_diagnostics().budget_managed {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "managed source-backed document transactions require an owned edit snapshot; use the selective read facade or an unmanaged compatibility constructor",
-            }
-            .into());
-        }
-        let data = main.data().map_err(Error::from)?;
-        let raw = data.into_arc().map_err(Error::from)?;
-        let snapshot: TransactionResult<Snapshot> = (|| {
-            let visible = visible_document_xml(Arc::clone(&raw))?;
-            if !Arc::ptr_eq(&raw, &visible) {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation,
-                    reason: "source-backed document transactions do not support markup-compatibility branch selection",
+        self.package.source_version().map_err(Error::from)?;
+        let result = (|| {
+            self.package.check_execution().map_err(Error::from)?;
+            let main = self.package.main_document_part().map_err(Error::from)?;
+            validate_document_main_content_type(main.content_type())?;
+            let partname = main.partname();
+            let context = self.package.execution_context();
+            let managed = self.package.cache_diagnostics().budget_managed;
+            let source_version = self.package.source_version().map_err(Error::from)?;
+            let source_lineage = self.package.source_lineage();
+            let snapshot = if managed {
+                if source_authorized {
+                    match main.source_xml() {
+                        Ok(source) => {
+                            ensure_source_document_xml(
+                                source.bytes(),
+                                self.package.execution_context().as_ref(),
+                            )?;
+                            Snapshot::from_source_xml(
+                                source,
+                                source_lineage.clone(),
+                                source_version,
+                                partname,
+                                context.clone().ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "managed document context is unavailable".into(),
+                                    )
+                                })?,
+                            )?
+                        },
+                        Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy) => {
+                            let data = main.data().map_err(Error::from)?;
+                            ensure_source_document_xml(
+                                data.as_bytes(),
+                                self.package.execution_context().as_ref(),
+                            )?;
+                            Snapshot::from_managed_part(
+                                data,
+                                source_lineage.clone(),
+                                source_version,
+                                partname,
+                                context.clone().ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "managed document context is unavailable".into(),
+                                    )
+                                })?,
+                            )?
+                        },
+                        Err(error) => return Err(Error::from(error).into()),
+                    }
+                } else {
+                    let data = main.data().map_err(Error::from)?;
+                    ensure_source_document_xml(
+                        data.as_bytes(),
+                        self.package.execution_context().as_ref(),
+                    )?;
+                    Snapshot::from_managed_part(
+                        data,
+                        source_lineage.clone(),
+                        source_version,
+                        partname,
+                        context.clone().ok_or_else(|| {
+                            Error::InvalidFormat("managed document context is unavailable".into())
+                        })?,
+                    )?
                 }
-                .into());
-            }
-            Snapshot::from_shared_xml(raw)
+            } else {
+                let data = main.data().map_err(Error::from)?;
+                let raw = data.into_arc().map_err(Error::from)?;
+                let snapshot: TransactionResult<Snapshot> = (|| {
+                    let visible = visible_document_xml(Arc::clone(&raw))?;
+                    if !Arc::ptr_eq(&raw, &visible) {
+                        return Err(Error::UnsafeEdit {
+                        format: "DOCX",
+                        operation,
+                        reason: "source-backed document transactions do not support markup-compatibility branch selection",
+                    }
+                    .into());
+                    }
+                    Snapshot::from_shared_xml_with_source_identity(
+                        raw,
+                        source_lineage.clone(),
+                        source_version,
+                        partname,
+                    )
+                })();
+                snapshot?
+            };
+            Ok((partname.clone(), snapshot))
         })();
         self.package.source_version().map_err(Error::from)?;
         self.package.check_execution().map_err(Error::from)?;
-        Ok((partname, snapshot?))
+        result
     }
 
     fn main_section_layout_snapshot(
@@ -1898,13 +2122,36 @@ const SOURCE_DOCUMENT_SCAN_MAX_EVENTS: usize = 1_000_000;
 const SOURCE_DOCUMENT_SCAN_MAX_DEPTH: usize = 256;
 const SOURCE_DOCUMENT_SCAN_MAX_NAME_BYTES: usize = 64 * 1024;
 
-fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
+fn source_document_execution_error(error: ExecutionError) -> Error {
+    match error {
+        ExecutionError::Cancelled => Error::Opc(litchi_opc::OpcError::Cancelled),
+        error => Error::Opc(litchi_opc::OpcError::Execution(error)),
+    }
+}
+
+fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) -> Result<()> {
     if xml.len() > SOURCE_DOCUMENT_SCAN_MAX_BYTES {
         return Err(Error::InvalidFormat(
             "source-backed document XML exceeds the bounded MCE scan byte limit".into(),
         ));
     }
 
+    // Admit a conservative envelope before quick-xml or the topology stack
+    // allocates. Namespace buffers and their per-event clone are bounded by
+    // the input, with headroom for collection capacity and descriptor storage.
+    // These are scoped reservations, not a claim about measured peak usage.
+    let _workspace = context
+        .map(|context| {
+            let bytes = (xml.len() as u64)
+                .saturating_mul(32)
+                .saturating_add(131_072);
+            let memory = context.reserve(Resource::Memory, bytes)?;
+            let objects = context.reserve(Resource::Objects, xml.len() as u64 + 1024)?;
+            let depth = context.reserve(Resource::Depth, SOURCE_DOCUMENT_SCAN_MAX_DEPTH as u64)?;
+            Ok::<_, ExecutionError>((memory, objects, depth))
+        })
+        .transpose()
+        .map_err(source_document_execution_error)?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     // Namespace resolution is all this pass needs. Disable quick-xml's own
@@ -1933,6 +2180,13 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
             return Err(Error::InvalidFormat(
                 "source-backed document XML exceeds the bounded MCE scan event limit".into(),
             ));
+        }
+        if let Some(context) = context {
+            // Resolver cloning can revisit the complete namespace buffer on
+            // each event. Charge its input-sized upper bound before that work.
+            context
+                .consume(Resource::Work, xml.len() as u64 + 1)
+                .map_err(source_document_execution_error)?;
         }
         let decoder = reader.decoder();
         let event = reader
@@ -2567,6 +2821,69 @@ impl DocumentPayload {
     }
 }
 
+/// Shared reservation for the read-only paragraph index, including the brief
+/// Vec-to-Arc overlap during construction. Each XML element needs at least
+/// four bytes; three range arrays cover geometric Vec capacity plus Arc output.
+struct DocumentIndexAdmission {
+    _memory: Reservation,
+    _objects: Reservation,
+}
+
+impl DocumentIndexAdmission {
+    fn new(context: &ExecutionContext, xml_len: usize) -> Result<Arc<Self>> {
+        let ranges = xml_len as u64 / 4 + 1;
+        let bytes = ranges.saturating_mul(24).saturating_add(1024);
+        let memory = context
+            .reserve(Resource::Memory, bytes)
+            .map_err(source_document_execution_error)?;
+        let objects = context
+            .reserve(Resource::Objects, ranges + 3)
+            .map_err(source_document_execution_error)?;
+        Ok(Arc::new(Self {
+            _memory: memory,
+            _objects: objects,
+        }))
+    }
+}
+
+struct DocumentQueryAdmission {
+    _memory: Reservation,
+    _objects: Reservation,
+    _depth: Reservation,
+}
+
+fn admit_document_query_parser(
+    context: Option<&ExecutionContext>,
+    xml_len: usize,
+) -> Result<Option<DocumentQueryAdmission>> {
+    context
+        .map(|context| {
+            let bytes = xml_len as u64;
+            let memory = context.reserve(
+                Resource::Memory,
+                bytes.saturating_mul(32).saturating_add(131_072),
+            )?;
+            let objects = context.reserve(Resource::Objects, bytes.saturating_add(1024))?;
+            let depth = context.reserve(Resource::Depth, SOURCE_DOCUMENT_SCAN_MAX_DEPTH as u64)?;
+            // Existing namespace scanners can revisit all active binding bytes per
+            // event. Prepay the bounded input-by-event envelope before entering
+            // those parsers; this is a work ceiling, not a measured operation count.
+            context.consume(
+                Resource::Work,
+                bytes
+                    .saturating_add(1)
+                    .saturating_mul(bytes.saturating_add(1)),
+            )?;
+            Ok(DocumentQueryAdmission {
+                _memory: memory,
+                _objects: objects,
+                _depth: depth,
+            })
+        })
+        .transpose()
+        .map_err(source_document_execution_error)
+}
+
 /// A pinned read-only view of a DOCX main document.
 ///
 /// This view owns the main-document bytes loaded by [`Package::document`].
@@ -2575,10 +2892,9 @@ impl DocumentPayload {
 #[derive(Clone)]
 pub struct Document {
     xml: DocumentPayload,
-    /// Bounded offsets into the pinned XML. The index owns no payload bytes;
-    /// managed documents therefore retain the same `PartData` ownership and
-    /// budget reservations as the uncached selective facade.
+    /// Bounded offsets into the pinned XML, admitted separately from its payload.
     paragraph_index: Option<Arc<ParagraphIndex>>,
+    _index_admission: Option<Arc<DocumentIndexAdmission>>,
     source_version: SourceVersion,
     execution: Option<ExecutionContext>,
 }
@@ -2590,7 +2906,7 @@ impl Document {
         };
         context.check().map_err(|error| {
             Error::Opc(match error {
-                litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
                 other => litchi_opc::OpcError::Execution(other),
             })
         })
@@ -2617,7 +2933,11 @@ impl Document {
     /// Extract all visible paragraph text from the pinned document.
     pub fn extract_text(&self) -> Result<String> {
         self.check_execution()?;
-        crate::paragraph::extract_word_text(self.xml.as_bytes())
+        let _parser =
+            admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
+        let result = crate::paragraph::extract_word_text(self.xml.as_bytes());
+        self.check_execution()?;
+        result
     }
 
     /// Count visible paragraphs in the pinned document.
@@ -2626,7 +2946,11 @@ impl Document {
         if let Some(index) = self.paragraph_index.as_deref() {
             return Ok(index.len());
         }
-        document_paragraph_count(self.xml.as_bytes())
+        let _parser =
+            admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
+        let result = document_paragraph_count(self.xml.as_bytes());
+        self.check_execution()?;
+        result
     }
 
     /// Extract one direct body paragraph's visible text without constructing
@@ -2643,6 +2967,8 @@ impl Document {
         let (start, length) = if let Some(selected) = selected {
             selected
         } else {
+            let _parser =
+                admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
             let mut position = 0usize;
             let mut selected = None;
             scan_word_element_ranges(self.xml.as_bytes(), &[b"p"], |_, start, length| {
@@ -2669,6 +2995,7 @@ impl Document {
         let xml = self.xml.as_bytes().get(start..end).ok_or_else(|| {
             Error::InvalidFormat("document paragraph range is outside XML".into())
         })?;
+        let _parser = admit_document_query_parser(self.execution.as_ref(), xml.len())?;
         let text = crate::paragraph::extract_word_text(xml)?;
         self.check_execution()?;
         Ok(Some(text))

@@ -1,5 +1,59 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0495 enables and measures ordinary managed DOCX edit/save; the full goal remains open
+
+[0495](changes/0495-docx-managed-document-edits.md) closes the finite-owner
+and source-authority seam that 0494 identified as a prerequisite for an
+ordinary managed opened-document edit. Its verified formal run retains 72
+processes and 2,160 samples; pilot2 retains 36 processes and 108 samples. The
+matrix covers six providers (`owned`, `instrumented`, `file-warm`, 4 KiB
+`short`, delayed 64 KiB `delayed`, and zero-fixed-delay `range-zero`) in normal
+and allocator roles over a 200-paragraph, 20-member DOCX with eight 2 MiB media
+members. Every formal row emits the expected 16,793,048-byte artifact and
+passes source, sink, semantic, and untouched-media checks. Managed rows also
+pass their finite-budget checks, while allocator-role rows pass
+allocator-conservation checks; normal and unmanaged rows do not expose those
+allocator fields.
+
+The normal managed p50 observations in milliseconds are 5.592/5.556 (owned),
+3.277/3.298 (instrumented), 5.682/5.853 (file-warm), 4.066/4.060 (short),
+572.748/576.147 (delayed), and 182.327/181.990 (range-zero) for repeats one
+and two. These are managed capability and budget observations. The protocol has
+no managed-before baseline, so they do not authorize a managed speed, RSS,
+allocation, or provider-ranking claim. The only performance comparison is the
+paired unmanaged before/after review, which retains eight whole-child RSS flags
+and three latency flags above the five-percent threshold. Their causality is
+unresolved, and repeat instability remains visible rather than being dismissed
+as host noise.
+
+All 720 managed formal rows report zero reservation failures and release
+resource memory, objects, and depth to baseline. The lifecycle labels are
+separate: `cache_before` is post-open, `cache_live` is post-edit/pre-publication,
+resource `live` is post-publication, and `after_drop` follows package
+consumption plus returned-snapshot/commit release. No post-publication cache
+gauge exists. The profile review is whole-child evidence that includes setup,
+output verification, and serialization; it does not attribute CPU or RSS to the
+timed operation. The next measured follow-up is phase-local CPU and whole-child
+RSS attribution, with repeats of the unstable file-warm and short/allocator
+arms, plus a distinct post-publication cache observation if retention is being
+claimed.
+
+| Goal area | Current evidence | Audit status and boundary |
+| --- | --- | --- |
+| Opened-document edit/save | 0495 verified managed capability/budget baseline plus paired unmanaged before/after review | Descriptive evidence only; no broad speedup or managed-before comparison; atomic filesystem save remains open |
+| Managed ownership and source authority | Owner-retained snapshots/views, finite admission, source-checked publication and complete-artifact inverse tests | Necessary ordinary-edit enabler; durable history, composition, broad mutators, and dependency-bearing edits remain open |
+| Provider and cache boundaries | Six explicit provider arms, two roles, two repeats, and distinct cache/resource lifecycle gauges | Cache diagnostic is pre-publication; release gauge is post-publication/drop; no cache-after-drop or provider ranking claim |
+| CPU/RSS attribution | Core counters, syscall traces, and owned stack captures in the profile bundle | Whole-child diagnostics only; phase-local operation attribution remains the follow-up |
+| Borrowed and independent-producer coverage | No genuine borrowed source or native producer round trip | Open |
+| Concurrency and scaling | One worker and serial lifecycle execution | Open; bounded 1/2/4/8-worker evidence and Amdahl analysis remain required |
+| Complete non-iWork CRUD checklist | 0495 adds no representative selector or default row | Open; structural/deletion, cross-document, merge/split, patch, repair, dynamic-content, security, and broader format rows remain |
+
+The final validation bundle records 478 harness tests (one ignored), 937 DOCX
+unit tests, 119 DOCX integration tests, 388 OPC unit tests, 79 doctests (31
+ignored), and 58 Python helper tests. These are scoped correctness, custody,
+and measurement gates; they do not turn 0495 into a broad performance claim.
+The full non-iWork goal remains open, and iWork is untouched.
+
 ## Current audit: 0494 adds opened-edit provider baselines; the full goal remains open
 
 0494 supplies the missing descriptive baseline for one opened DOCX paragraph

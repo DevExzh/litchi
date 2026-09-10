@@ -91,7 +91,7 @@ pub(super) fn parse_run_underline(xml_bytes: &[u8]) -> Result<Option<RunUnderlin
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
 
         if fragment_prefix.is_none()
@@ -142,7 +142,7 @@ pub(super) fn parse_run_underline(xml_bytes: &[u8]) -> Result<Option<RunUnderlin
                         &mut underline,
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         &fragment_prefix,
                     )?;
                 }
@@ -180,7 +180,7 @@ pub(super) fn parse_run_underline(xml_bytes: &[u8]) -> Result<Option<RunUnderlin
                         &mut underline,
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         &fragment_prefix,
                     )?;
                 }

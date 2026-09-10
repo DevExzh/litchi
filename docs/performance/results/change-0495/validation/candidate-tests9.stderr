@@ -1,0 +1,39 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:640:22
+    |
+640 |     context: Option<&litchi_core::ExecutionContext>,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+640 -     context: Option<&litchi_core::ExecutionContext>,
+640 +     context: Option<&ExecutionContext>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:804:22
+    |
+804 |     context: Option<&litchi_core::ExecutionContext>,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+804 -     context: Option<&litchi_core::ExecutionContext>,
+804 +     context: Option<&ExecutionContext>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:952:22
+    |
+952 |     context: Option<&litchi_core::ExecutionContext>,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+952 -     context: Option<&litchi_core::ExecutionContext>,
+952 +     context: Option<&ExecutionContext>,
+    |
+
+error: could not compile `litchi-opc` (lib) due to 3 previous errors

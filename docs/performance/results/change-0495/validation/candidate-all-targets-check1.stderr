@@ -1,0 +1,356 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling syn v2.0.114
+   Compiling libc v0.2.189
+    Checking zeroize v1.9.0
+   Compiling generic-array v0.14.9
+    Checking cfg-if v1.0.4
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+    Checking typenum v1.20.1
+   Compiling pkg-config v0.3.34
+   Compiling find-msvc-tools v0.1.11
+   Compiling shlex v2.0.1
+   Compiling vcpkg v0.2.15
+   Compiling cc v1.4.4
+    Checking hybrid-array v0.4.14
+    Checking const-oid v0.9.6
+    Checking subtle v2.6.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling semver v1.0.28
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+   Compiling libz-sys v1.1.29
+   Compiling rustc_version v0.4.1
+   Compiling pathfinder_simd v0.5.6
+    Checking getrandom v0.2.17
+    Checking serde_core v1.0.229
+   Compiling synstructure v0.13.2
+    Checking rand_core v0.6.4
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+   Compiling proc-macro2-diagnostics v0.10.1
+    Checking smallvec v1.16.0
+    Checking base64ct v1.6.0
+    Checking pem-rfc7468 v0.7.0
+    Checking digest v0.10.7
+   Compiling freetype-sys v0.20.1
+   Compiling zerofrom-derive v0.1.6
+   Compiling der_derive v0.7.3
+   Compiling yoke-derive v0.7.5
+   Compiling zerovec-derive v0.10.4
+   Compiling displaydoc v0.2.6
+   Compiling thiserror-impl v2.0.18
+   Compiling icu_provider_macros v1.5.0
+   Compiling zerocopy-derive v0.8.56
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier-macros)
+   Compiling yeslogic-fontconfig-sys v6.0.1
+    Checking flagset v0.4.7
+   Compiling yansi v1.0.1
+    Checking cmov v0.5.4
+    Checking cpufeatures v0.3.1
+    Checking ctutils v0.4.2
+    Checking der v0.7.10
+    Checking zerofrom v0.1.4
+   Compiling unicode-general-category v1.1.0
+    Checking stable_deref_trait v1.2.1
+    Checking const-oid v0.10.2
+   Compiling unicode-canonical-combining-class v1.0.0
+   Compiling heck v0.4.1
+   Compiling unicode-joining-type v1.0.0
+   Compiling ouroboros_macro v0.18.5
+    Checking spki v0.7.3
+    Checking digest v0.11.3
+    Checking yoke v0.7.4
+   Compiling enumflags2_derive v0.7.12
+    Checking crossbeam-utils v0.8.22
+    Checking once_cell v1.21.4
+    Checking either v1.18.0
+    Checking rand_core v0.10.1
+    Checking memchr v2.8.3
+    Checking crossbeam-epoch v0.9.20
+    Checking zerovec v0.10.4
+   Compiling font-kit v0.14.3
+    Checking crossbeam-deque v0.8.7
+    Checking getrandom v0.4.3
+    Checking chacha20 v0.10.2
+    Checking pkcs8 v0.10.2
+    Checking serde v1.0.229
+    Checking zmij v1.0.19
+    Checking itoa v1.0.18
+    Checking iana-time-zone v0.1.65
+    Checking tinystr v0.7.6
+    Checking serde_json v1.0.149
+    Checking rand v0.10.2
+    Checking rayon-core v1.13.0
+    Checking chrono v0.4.45
+    Checking sha2 v0.11.0
+    Checking thiserror v2.0.18
+    Checking litemap v0.7.3
+    Checking base64 v0.22.1
+    Checking spin v0.9.9
+    Checking fast-float2 v0.2.4
+    Checking writeable v0.5.5
+    Checking lazy_static v1.5.0
+    Checking rayon v1.12.0
+    Checking icu_locid v1.5.0
+    Checking ff v0.13.1
+    Checking base16ct v0.2.0
+    Checking cpufeatures v0.2.17
+    Checking litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-core)
+    Checking sec1 v0.7.3
+    Checking group v0.13.0
+    Checking icu_provider v1.5.0
+    Checking ppv-lite86 v0.2.21
+    Checking bitflags v2.13.1
+    Checking crypto-bigint v0.5.5
+    Checking icu_locid_transform_data v1.5.1
+    Checking encoding_rs v0.8.35
+    Checking fixedbitset v0.5.7
+    Checking elliptic-curve v0.13.8
+    Checking icu_locid_transform v1.5.0
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-cfb)
+    Checking rand_chacha v0.3.1
+    Checking sha2 v0.10.9
+    Checking icu_collections v1.5.0
+    Checking quick-xml v0.41.0
+    Checking signature v2.2.0
+    Checking hmac v0.12.1
+    Checking num-integer v0.1.47
+    Checking icu_properties_data v1.5.1
+    Checking crc32fast v1.5.1
+    Checking zlib-rs v0.6.7
+    Checking tinyvec_macros v0.1.1
+    Checking tinyvec v1.12.0
+    Checking icu_properties v1.5.1
+    Checking num-iter v0.1.46
+    Checking rfc6979 v0.4.0
+    Checking rand v0.8.8
+    Checking icu_normalizer_data v1.5.1
+    Checking block-padding v0.4.2
+    Checking flate2 v1.1.10
+    Checking utf16_iter v1.0.5
+    Checking utf8_iter v1.0.4
+    Checking write16 v1.0.0
+    Checking inout v0.2.2
+    Checking ecdsa v0.16.9
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-codepage)
+    Checking primeorder v0.13.6
+    Checking sha1 v0.10.7
+    Checking pkcs1 v0.7.5
+    Checking linux-raw-sys v0.12.1
+    Checking p256 v0.13.2
+    Checking rustix v1.1.4
+    Checking icu_normalizer v1.5.0
+    Checking rsa v0.9.10
+    Checking cipher v0.5.2
+    Checking x509-cert v0.2.5
+    Checking idna_adapter v1.2.0
+    Checking getrandom v0.3.4
+    Checking libloading v0.8.8
+    Checking option-ext v0.2.0
+    Checking debug_unsafe v0.1.4
+    Checking log v0.4.29
+    Checking fastrand v2.5.0
+    Checking percent-encoding v2.3.2
+    Checking alloc-no-stdlib v2.0.4
+    Checking byteorder v1.5.0
+    Checking alloc-stdlib v0.2.4
+    Checking form_urlencoded v1.2.2
+    Checking pathfinder_geometry v0.5.1
+    Checking atoi_simd v0.18.1
+    Checking dirs-sys v0.5.0
+    Checking dlib v0.5.3
+    Checking idna v1.1.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/soapberry-zip)
+    Checking tempfile v3.27.0
+    Checking litchi-sign v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-sign)
+    Checking unicode-normalization v0.1.25
+    Checking xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier)
+    Checking same-file v1.0.6
+    Checking aliasable v0.1.3
+    Checking static_assertions v1.1.0
+    Checking walkdir v2.5.0
+    Checking ouroboros v0.18.5
+    Checking caseless v0.2.2
+    Checking url v2.5.8
+    Checking dirs v6.0.0
+    Checking brotli-decompressor v5.0.3
+    Checking litchi-vba v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-vba)
+    Checking itertools v0.14.0
+    Checking enumflags2 v0.7.12
+    Checking bitreader v0.3.11
+    Checking bytemuck v1.25.2
+    Checking cpubits v0.1.1
+    Checking float-ord v0.3.2
+    Checking litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+    Checking glyph-names v0.2.0
+    Checking ryu v1.0.22
+    Checking rustc-hash v2.1.3
+    Checking ucd-trie v0.1.7
+    Checking roaring v0.11.1
+    Checking allsorts v0.17.0
+    Checking aes v0.9.3
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ole-common)
+    Checking sha1 v0.11.0
+    Checking hmac v0.13.0
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-crypto)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-fonts)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: couldn't read `crates/litchi-docx/src/bibliography/../../../../test-data/ooxml/docx/footnotes.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/bibliography/writer.rs:973:32
+    |
+973 |         const FIXTURE: &[u8] = include_bytes!("../../../../test-data/ooxml/docx/footnotes.docx");
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `crates/litchi-docx/src/chart/../../../../test-data/poi/test-data/document/61745.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/src/chart/tests.rs:11:20
+   |
+11 | const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/document/61745.docx");
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `crates/litchi-docx/src/chart/../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/src/chart/tests.rs:12:28
+   |
+12 |   const LO_INTERNAL: &[u8] = include_bytes!(
+   |  ____________________________^
+13 | |     "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
+14 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/src/chart/../../../../test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/src/chart/tests.rs:15:28
+   |
+15 |   const LO_EXTERNAL: &[u8] = include_bytes!(
+   |  ____________________________^
+16 | |     "../../../../test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx"
+17 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/src/glossary/../../../../test-data/poi/test-data/document/Bug54849.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/src/glossary/tests.rs:79:32
+   |
+79 |       let (catalog, _) = fixture(include_bytes!(
+   |  ________________________________^
+80 | |         "../../../../test-data/poi/test-data/document/Bug54849.docx"
+81 | |     ));
+   | |_____^
+
+error: couldn't read `crates/litchi-docx/src/glossary/../../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/src/glossary/tests.rs:95:32
+   |
+95 |       let (catalog, _) = fixture(include_bytes!(
+   |  ________________________________^
+96 | |         "../../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx"
+97 | |     ));
+   | |_____^
+
+error: couldn't read `crates/litchi-docx/src/glossary/../../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/glossary/tests.rs:107:42
+    |
+107 |       let (catalog, conformance) = fixture(include_bytes!(
+    |  __________________________________________^
+108 | |         "../../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
+109 | |     ));
+    | |_____^
+
+error: couldn't read `crates/litchi-docx/src/modern_comments/../../../../test-data/poi/test-data/document/testComment.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/modern_comments/package.rs:323:9
+    |
+323 |         include_bytes!("../../../../test-data/poi/test-data/document/testComment.docx");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `crates/litchi-docx/src/modern_comments/../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/modern_comments/package.rs:324:28
+    |
+324 |       const LO_DOCX: &[u8] = include_bytes!(
+    |  ____________________________^
+325 | |         "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx"
+326 | |     );
+    | |_____^
+
+error: couldn't read `crates/litchi-docx/src/package/tests/../../../../../test-data/ooxml/docx/Hyperlink.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/package/tests/graph.rs:270:19
+    |
+270 |     let fixture = include_bytes!("../../../../../test-data/ooxml/docx/Hyperlink.docx");
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: couldn't read `crates/litchi-docx/src/../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/smartart.rs:646:32
+    |
+646 |       const STRICT_DOCX: &[u8] = include_bytes!(
+    |  ________________________________^
+647 | |         "../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"
+648 | |     );
+    | |_____^
+
+error: couldn't read `crates/litchi-docx/src/../../../test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`: No such file or directory (os error 2)
+   --> crates/litchi-docx/src/textbox.rs:741:37
+    |
+741 |       const TEXT_BOX_FIXTURE: &[u8] = include_bytes!(
+    |  _____________________________________^
+742 | |         "../../../test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx"
+743 | |     );
+    | |_____^
+
+error[E0308]: arguments to this function are incorrect
+    --> crates/litchi-docx/src/document/transaction.rs:6344:17
+     |
+6344 |         assert!(Arc::ptr_eq(&source.xml, &commit.snapshot().xml));
+     |                 ^^^^^^^^^^^
+     |
+note: expected `&Arc<_, _>`, found `&XmlStorage`
+    --> crates/litchi-docx/src/document/transaction.rs:6344:29
+     |
+6344 |         assert!(Arc::ptr_eq(&source.xml, &commit.snapshot().xml));
+     |                             ^^^^^^^^^^^
+     = note: expected reference `&std::sync::Arc<_, _>`
+                found reference `&document::transaction::XmlStorage`
+note: expected `&Arc<_, _>`, found `&XmlStorage`
+    --> crates/litchi-docx/src/document/transaction.rs:6344:42
+     |
+6344 |         assert!(Arc::ptr_eq(&source.xml, &commit.snapshot().xml));
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^
+     = note: expected reference `&std::sync::Arc<_, _>`
+                found reference `&document::transaction::XmlStorage`
+note: associated function defined here
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/sync.rs:2166:11
+
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:10:29
+   |
+10 |   const HTML_FIXTURE: &[u8] = include_bytes!(
+   |  _____________________________^
+11 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx"
+12 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:13:29
+   |
+13 |   const DOCX_FIXTURE: &[u8] = include_bytes!(
+   |  _____________________________^
+14 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx"
+15 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:16:31
+   |
+16 |   const HEADER_FIXTURE: &[u8] = include_bytes!(
+   |  _______________________________^
+17 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
+18 | | );
+   | |_^
+
+error: could not compile `litchi-docx` (test "alt_chunk_authoring") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-docx` (lib test) due to 13 previous errors

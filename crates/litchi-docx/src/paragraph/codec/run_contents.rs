@@ -1,14 +1,12 @@
 //! Ordered, lossless direct run-child traversal.
 
-use std::sync::Arc;
-
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
 use crate::image::parse_inline_images;
 
-use super::super::model::{OpaqueRunContent, Run, RunContent};
+use super::super::model::{OpaqueRunContent, Run, RunContent, XmlRef};
 use super::text::extract_word_text;
 use super::xml::{is_fragment_word_name, word_attribute_value};
 
@@ -45,7 +43,8 @@ impl Run {
     /// run XML, or for invalid typed break/note/image content.
     pub fn contents(&self) -> Result<Vec<RunContent>> {
         let xml = self.xml_bytes();
-        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut run_depth = None;
@@ -64,7 +63,7 @@ impl Run {
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
                 .into_owned();
-            let resolver = reader.resolver().clone();
+            let resolver = reader.resolver();
             let (namespace, event) = resolver.resolve_event(raw_event);
             let event_end =
                 usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
@@ -155,7 +154,6 @@ impl Run {
                         push_content(
                             &mut contents,
                             &source,
-                            base_offset,
                             classify(&namespace, element.name(), &fragment_prefix),
                             event_start,
                             event_end,
@@ -170,7 +168,6 @@ impl Run {
                         push_content(
                             &mut contents,
                             &source,
-                            base_offset,
                             kind,
                             start,
                             event_end,
@@ -246,8 +243,7 @@ fn classify(
 )]
 fn push_content(
     contents: &mut Vec<RunContent>,
-    source: &Arc<Vec<u8>>,
-    base_offset: u32,
+    source: &XmlRef,
     kind: Kind,
     start: usize,
     end: usize,
@@ -263,15 +259,10 @@ fn push_content(
     .map_err(|_conversion_error| {
         Error::InvalidFormat("Word run-child length exceeds u32".into())
     })?;
-    let absolute_start = base_offset
-        .checked_add(relative_start)
-        .ok_or_else(|| Error::InvalidFormat("Word run-child absolute offset exceeds u32".into()))?;
-    let absolute_end = absolute_start
-        .checked_add(length)
-        .ok_or_else(|| Error::InvalidFormat("Word run-child range exceeds u32".into()))?;
-    let raw = source
-        .get(absolute_start as usize..absolute_end as usize)
+    let range = source
+        .subrange(relative_start, length)
         .ok_or_else(|| Error::InvalidFormat("Word run-child range is outside source".into()))?;
+    let raw = range.bytes();
 
     match kind {
         Kind::Text => contents.push(RunContent::Text(extract_word_text(raw)?)),
@@ -290,7 +281,7 @@ fn push_content(
         Kind::Drawing => {
             let images = parse_inline_images(raw)?;
             if images.is_empty() {
-                push_unknown(contents, source, absolute_start, length);
+                push_unknown(contents, &range);
             } else {
                 contents.extend(
                     images
@@ -308,7 +299,7 @@ fn push_content(
         },
         Kind::FootnoteMark => contents.push(RunContent::FootnoteMark),
         Kind::EndnoteMark => contents.push(RunContent::EndnoteMark),
-        Kind::Unknown => push_unknown(contents, source, absolute_start, length),
+        Kind::Unknown => push_unknown(contents, &range),
     }
     Ok(())
 }
@@ -325,14 +316,14 @@ fn note_id(raw: &[u8], fragment_prefix: &Option<Option<Vec<u8>>>) -> Result<u32>
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let value = word_attribute_value(
                     &element,
                     b"id",
                     reader.decoder(),
-                    &resolver,
+                    resolver,
                     fragment_prefix,
                 )?
                 .ok_or_else(|| {
@@ -361,8 +352,8 @@ fn note_id(raw: &[u8], fragment_prefix: &Option<Option<Vec<u8>>>) -> Result<u32>
     }
 }
 
-fn push_unknown(contents: &mut Vec<RunContent>, source: &Arc<Vec<u8>>, start: u32, length: u32) {
+fn push_unknown(contents: &mut Vec<RunContent>, source: &XmlRef) {
     contents.push(RunContent::Unknown(Box::new(
-        OpaqueRunContent::from_arc_range(Arc::clone(source), start, length),
+        OpaqueRunContent::from_xml_ref(source.clone()),
     )));
 }

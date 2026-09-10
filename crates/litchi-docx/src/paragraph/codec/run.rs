@@ -37,6 +37,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
+        let _parser_admission = self.parser_admission()?;
         extract_word_text(self.xml_bytes())
     }
 
@@ -46,6 +47,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn breaks(&self) -> Result<SmallVec<[RunBreak; 2]>> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
         let mut breaks = SmallVec::new();
@@ -106,6 +108,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn last_rendered_page_break_count(&self) -> Result<usize> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
         let mut count = 0usize;
@@ -190,6 +193,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn underline_formatting(&self) -> Result<Option<RunUnderline>> {
+        let _parser_admission = self.parser_admission()?;
         parse_run_underline(self.xml_bytes())
     }
 
@@ -203,6 +207,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn effects(&self) -> Result<Effects> {
+        let _parser_admission = self.parser_admission()?;
         Effects::parse(self.xml_bytes())
     }
 
@@ -212,6 +217,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open_type(&self) -> Result<OpenType> {
+        let _parser_admission = self.parser_admission()?;
         OpenType::parse(self.xml_bytes())
     }
 
@@ -221,6 +227,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open_type_snapshot(&self) -> Result<OpenTypeSnapshot> {
+        let _parser_admission = self.parser_admission()?;
         OpenTypeSnapshot::from_xml(self.xml_bytes().to_vec())
     }
 
@@ -231,6 +238,14 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn set_open_type(&mut self, value: OpenType) -> Result<&mut Self> {
+        if self.is_managed() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "run.set_open_type",
+                reason: "managed run views cannot detach source-owned XML",
+            });
+        }
+        let _parser_admission = self.parser_admission()?;
         let rewritten = crate::font::open_type::rewrite(self.xml_bytes(), &value)?;
         if rewritten.as_slice() != self.xml_bytes() {
             self.replace_xml(rewritten);
@@ -278,6 +293,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn get_text_and_properties(&self) -> Result<(String, RunProperties)> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(false);
 
@@ -387,6 +403,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn get_properties(&self) -> Result<RunProperties> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
@@ -429,6 +446,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn vertical_position(&self) -> Result<Option<VerticalPosition>> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
@@ -475,6 +493,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn font_name(&self) -> Result<Option<String>> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
@@ -521,6 +540,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn font_size(&self) -> Result<Option<u32>> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
@@ -566,6 +586,7 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn omml_formula(&self) -> Result<Option<String>> {
+        let _parser_admission = self.parser_admission()?;
         Ok(extract_omml_formulas(self.xml_bytes())?.into_iter().next())
     }
     /// Helper to extract boolean properties from run properties.
@@ -573,6 +594,7 @@ impl Run {
     /// Handles the tri-state logic where w:val can be "true", "false", "1", "0"
     /// or the element can be present without a val attribute (implies true).
     fn get_bool_property(&self, property_name: &[u8]) -> Result<Option<bool>> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 

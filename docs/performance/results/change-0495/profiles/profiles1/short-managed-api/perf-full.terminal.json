@@ -1,0 +1,86 @@
+{
+  "artifacts": {
+    "perf-full.csv": {
+      "bytes": 609,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.csv",
+      "sha256": "ffd8782848a5d8ceb7bee593b4b2dfbb827bdf035928a5d9a662a2e8b0610073"
+    },
+    "perf-full.report.json": {
+      "bytes": 3235838,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.report.json",
+      "sha256": "7a496c27f98225c6e5ab8745a7e85be4707f64400a65f9d521184a454574cc6f"
+    },
+    "perf-full.started.json": {
+      "bytes": 2459,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.started.json",
+      "sha256": "60b6ab00bdf6231fcb84c704a04e2ed47a990064c9cb67837938b809cad5f26a"
+    },
+    "perf-full.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-full.stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "finished_utc": "2026-09-10T12:48:10.143110+00:00",
+  "process": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "stat",
+      "--no-big-num",
+      "-x,",
+      "-e",
+      "task-clock,cycles,instructions,branches,branch-misses,L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses,minor-faults,major-faults,context-switches,cpu-migrations,page-faults",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.csv",
+      "--",
+      "/home/zhuhe/.cache/litchi-goal-0495/retained/final1/after/normal/litchi-perf-baseline",
+      "docx-managed-edit",
+      "--edit-api",
+      "managed-api",
+      "--provider",
+      "short",
+      "--max-range",
+      "4096",
+      "--trace-ranges",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--source-revision",
+      "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-managed-api/perf-full.report.json"
+    ],
+    "exit_code": 0,
+    "finished_utc": "2026-09-10T12:48:09.863153+00:00",
+    "new_session": true,
+    "pid": 2989502,
+    "process_group_id": 2989502,
+    "started_utc": "2026-09-10T12:48:08.397445+00:00",
+    "termination": null,
+    "timed_out": false
+  },
+  "reason": "perf events unsupported: ['LLC-loads', 'LLC-load-misses']",
+  "role": "perf-perf-full",
+  "schema": "docx-edit-provider-profile-process-terminal-v1",
+  "source_after": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_before": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_unchanged": true,
+  "status": "unavailable"
+}

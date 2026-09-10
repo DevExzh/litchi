@@ -1,0 +1,17 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: variable does not need to be mutable
+   --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:627:9
+    |
+627 |     let mut paragraph = snapshot.paragraph(Position::new(0)).unwrap();
+    |         ----^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi-docx` (test "source_backed_managed_document_edit") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

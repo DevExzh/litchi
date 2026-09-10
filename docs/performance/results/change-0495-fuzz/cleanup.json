@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "removed_root": "/home/zhuhe/.cache/litchi-goal-0495-fuzz",
+  "allocated_bytes_removed": 2396868608,
+  "active_process_references": [],
+  "standalone_git_checkout": true,
+  "removed_ns": 1789046701975980861,
+  "protected_worktree_touched": false
+}

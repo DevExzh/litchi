@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "artifacts": {
+    "before-normal1.stderr": {
+      "bytes": 9159,
+      "sha256": "eee2d43e640a94dc66c1bf8db8062f401b72967ccbea2b3d9abb472f630e57a0"
+    },
+    "before-normal1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "ccb7aafc42990c08ec61595b0fa2e049ae7c49f623fd0a6dcfb2b2b85c205588",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-10T09:36:50.654382+00:00",
+  "label": "before-normal1",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7120,
+    "path": "validation-sources/889c14a2cb07819792fe70219f291a2302ef81cedf2cd4134a8ce38ea968125c.json",
+    "sha256": "889c14a2cb07819792fe70219f291a2302ef81cedf2cd4134a8ce38ea968125c"
+  },
+  "source_before": {
+    "files": 7120,
+    "path": "validation-sources/889c14a2cb07819792fe70219f291a2302ef81cedf2cd4134a8ce38ea968125c.json",
+    "sha256": "889c14a2cb07819792fe70219f291a2302ef81cedf2cd4134a8ce38ea968125c"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T09:33:18.403970+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

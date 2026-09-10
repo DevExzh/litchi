@@ -1,0 +1,20 @@
+{
+  "crates/litchi-docx/src/document/mod.rs": "12e727d40b76abfa46c4a208fe76e8f4a03caa6d1a43736d9ac9b8e7ad160b67",
+  "crates/litchi-docx/src/document/transaction.rs": "85ee4d795cef6aefb51f48ee604b2c4a793b421a304f24e56d0a2ccf9892a08a",
+  "crates/litchi-docx/src/document/transaction/durable.rs": "5c6edfd19bb6d4c0f1a3ca5672fc1d638868b771e27b46601c5e89330ecb2b99",
+  "crates/litchi-docx/src/paragraph/codec/content.rs": "057611839de3623324219bb1819c845659ac93be6ebecc851cbd98b87f3919c9",
+  "crates/litchi-docx/src/paragraph/codec/inlines.rs": "389e71d148b44a13578aa395393598be445cf9360932aa2512875e40a5e70cc6",
+  "crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs": "b65f1e20654d76d2b00533c805fefeb110e9fea89477caafda8f995813cf7131",
+  "crates/litchi-docx/src/paragraph/codec/run.rs": "a2b3122087b19240234b68b7bba2711e9cb644c9627ce0cfdc84e8ab9bab5821",
+  "crates/litchi-docx/src/paragraph/codec/run_contents.rs": "3ade035e8e6cb9a7fee59e8244bfda2e7e4e78432aa54278cd2e8a68538d966b",
+  "crates/litchi-docx/src/paragraph/codec/runs.rs": "287e8fc6ac10b73da33ae6bb0ea071e1e1ecfcc6ab1c940720ff49f075afe4b3",
+  "crates/litchi-docx/src/paragraph/codec/text.rs": "37d8a449816f28c160fe12681c576bc3acc4746476f4843714583551d254ad02",
+  "crates/litchi-docx/src/paragraph/extensions/package.rs": "d461705e37bf834b4725e06bab23aa602cd1d9074a84e7071bb7efe1c592c036",
+  "crates/litchi-docx/src/paragraph/model.rs": "c03859ecf3421cf3e1c819a234a62c21a2409e4438a9b268bd643113eaff936b",
+  "crates/litchi-docx/src/paragraph/package.rs": "d75672828ad42aec2e67a20f87f0155bb403f08718868bd5dab40a747f204b0d",
+  "crates/litchi-docx/src/source_backed.rs": "ea65fbb2becf988a79d39d50d456168874689a116fa96efac5b956a3010ab0f9",
+  "crates/litchi-docx/src/source_backed/story_text.rs": "eac38974c5992ad501ce8908589f504940069e5c2e23ccd35c69229795fdb1e6",
+  "crates/litchi-docx/tests/source_backed_managed.rs": "bc87d4ba451901f66457eaf721c58cfaaa4487f11f023e3ce851c5b251f1c52a",
+  "crates/litchi-docx/src/source_backed/document_policy.rs": "9fc736fc208093ab9563080a4b07842c7b59199aa235158cc8c163bb4fcfa46d",
+  "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": "f0e2690ef8655be620a7b9996f6cca1f5eaa7080eeafea715eb9e94fd7159944"
+}

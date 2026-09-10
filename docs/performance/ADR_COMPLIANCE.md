@@ -1,5 +1,34 @@
 # Performance optimization ADR-compliance matrix
 
+## 0495: ordinary managed DOCX edit ownership and measured custody
+
+[0495](changes/0495-docx-managed-document-edits.md) applies the architectural
+ADR matrix to the ordinary managed `Snapshot`/`Edit`/`Commit`/`Patch` path and
+its source-authorized publication. The implementation and final gates map as
+follows:
+
+| ADR | 0495 mapping |
+| --- | --- |
+| 0001 — priorities and API layers | The ordinary facade keeps package/format semantics above the OPC source and sink layers; complete-artifact inverse authority remains explicit and the broader goal stays scoped. |
+| 0002 — crate topology and dependency direction | DOCX owns semantic edit policy and source-backed facade behavior; OPC owns source topology, preservation, sequential publication, and artifact restoration; no archive implementation type crosses the format boundary. |
+| 0003 — snapshots, edits, patches, and concurrency | Snapshots retain source identity and owners, edits retain finite reservations, and commits return reversible patches without mutating the source; `Patch::apply`/`same_source` and publication perform exact document-identity checks, while `Patch::inverse()` retains/swaps source-owned snapshots. Unwired durable history/composition remains refused. |
+| 0005 — I/O, memory, and measured performance | `ExecutionContext` admission covers retained payloads, indexes, parser/namespace workspace, objects, depth, and Work; source/provider identity and accepted sink bytes are checked; the formal matrix records custody without a managed-before speed claim. |
+| 0006 — validation, security, and compatibility | Untouched ZIP members and exact settings bytes are preserved; signed, protected, MCE-selected, ambiguous, stale, foreign, and unsupported dependency cases fail closed with typed errors; complete inverse authentication is separate from XML patch reversal. |
+| 0008 — migration and verification | The 27-path candidate scope, source manifests, protocol, formal/pilot receipts, results/profile reviews, and final gates preserve dependency-ordered verification and reproducibility. |
+| 0011 — physical package ownership | Physical package reads, source topology, raw member preservation, sequential sink publication, and complete-artifact restoration remain in OPC ownership; DOCX supplies semantic source policy. |
+| 0024 — current post-migration workspace topology | The final source scope uses the current `litchi-docx` and `litchi-opc` package layers and their existing dependency direction; no legacy umbrella package or protected worktree is involved. |
+
+The verified formal run retains 72 processes and 2,160 samples, with pilot2 at
+36 processes and 108 samples. Final receipts include 478 harness tests (one
+ignored), 937 DOCX unit tests, 119 integration tests, 388 OPC unit tests, 79
+doctests (31 ignored), and 58 Python helper tests. The formal evidence is
+descriptive: managed-after rows are finite-capability and budget observations,
+while before/after performance review is limited to matched unmanaged rows.
+Eight whole-child RSS flags and three latency flags remain visible with
+unresolved causality. The full non-iWork goal, including borrowed input,
+atomic save, independent producers, scaling, durable history/composition, and
+broader CRUD, remains open.
+
 ## 0483: format-owned bounded DOCX tail proof
 
 [0483](changes/0483-docx-bounded-tail-append.md) keeps Word grammar, settings and

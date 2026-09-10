@@ -1,0 +1,23 @@
+	Command being timed: "/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0495/retained/final1/before/normal/litchi-perf-baseline docx-managed-edit --edit-api unmanaged-api --provider delayed --max-range 65536 --delay-us 0 --transfer-bytes-per-second 104857600 --transfer-delay-policy minimum-service --trace-ranges --samples 3 --warmup 1 --source-revision de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8 --output /home/zhuhe/code/litchi/docs/performance/results/change-0495/captures/pilot1/pilot-r1-before-unmanaged-api-normal-range-zero/report.json"
+	User time (seconds): 0.98
+	System time (seconds): 0.14
+	Percent of CPU this job got: 60%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 137012
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 96194
+	Voluntary context switches: 1476
+	Involuntary context switches: 6
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 608
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

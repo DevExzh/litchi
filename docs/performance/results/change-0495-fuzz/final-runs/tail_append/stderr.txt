@@ -1,0 +1,113 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 495002
+INFO: Loaded 1 modules   (97438 inline 8-bit counters): 97438 [0x5c477d986103, 0x5c477d99dda1), 
+INFO: Loaded 1 PC tables (97438 PCs): 97438 [0x5c477d99dda8,0x5c477db1a788), 
+INFO:        9 files found in /home/zhuhe/code/litchi/docs/performance/results/change-0495-fuzz/final-runs/tail_append/corpus
+INFO: seed corpus: files: 9 min: 1157b max: 1593b total: 12274b rss: 121Mb
+#11	INITED cov: 6722 ft: 7722 corp: 8/10783b exec/s: 0 rss: 121Mb
+	NEW_FUNC[1/9]: 0x5c477d5e1100  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x600100) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+	NEW_FUNC[2/9]: 0x5c477d5e91b0  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x6081b0) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#12	NEW    cov: 6811 ft: 8397 corp: 9/12319b lim: 1593 exec/s: 0 rss: 121Mb L: 1536/1593 MS: 1 CrossOver-
+	NEW_FUNC[1/4]: 0x5c477d44c020  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x46b020) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+	NEW_FUNC[2/4]: 0x5c477d44c500  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x46b500) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#13	NEW    cov: 6873 ft: 10338 corp: 10/13834b lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 ChangeBit-
+	NEW_FUNC[1/5]: 0x5c477d5defa0  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x5fdfa0) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+	NEW_FUNC[2/5]: 0x5c477d6962e0  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x6b52e0) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#14	NEW    cov: 6902 ft: 11197 corp: 11/15022b lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 1 ChangeBinInt-
+#18	NEW    cov: 6921 ft: 11245 corp: 12/16Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1572/1593 MS: 4 CrossOver-ShuffleBytes-ChangeBinInt-InsertByte-
+#21	NEW    cov: 6929 ft: 11291 corp: 13/16Kb lim: 1593 exec/s: 0 rss: 121Mb L: 717/1593 MS: 3 InsertRepeatedBytes-ShuffleBytes-EraseBytes-
+#22	NEW    cov: 6935 ft: 11438 corp: 14/18Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1450/1593 MS: 1 CMP- DE: "\377\377\377\377\377\377\001\315"-
+	NEW_FUNC[1/1]: 0x5c477d76dfe0  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x78cfe0) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#23	NEW    cov: 6950 ft: 11557 corp: 15/19Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 ChangeBinInt-
+#29	NEW    cov: 6965 ft: 11795 corp: 16/21Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1593/1593 MS: 1 CrossOver-
+	NEW_FUNC[1/1]: 0x5c477d75a600  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x779600) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#40	NEW    cov: 6975 ft: 11839 corp: 17/21Kb lim: 1593 exec/s: 0 rss: 121Mb L: 486/1593 MS: 1 EraseBytes-
+#43	NEW    cov: 6975 ft: 11841 corp: 18/22Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 3 ShuffleBytes-ChangeASCIIInt-ChangeBinInt-
+#44	NEW    cov: 6975 ft: 11842 corp: 19/24Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1192/1593 MS: 1 CMP- DE: "[\000\000\000"-
+	NEW_FUNC[1/1]: 0x5c477d738940  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x757940) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#50	NEW    cov: 6993 ft: 11865 corp: 20/25Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1185/1593 MS: 1 PersAutoDict- DE: "\377\377\377\377\377\377\001\315"-
+#51	NEW    cov: 6993 ft: 11869 corp: 21/26Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1572/1593 MS: 1 CopyPart-
+#57	NEW    cov: 6993 ft: 11873 corp: 22/28Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 1 CopyPart-
+#67	NEW    cov: 6993 ft: 11874 corp: 23/28Kb lim: 1593 exec/s: 0 rss: 121Mb L: 775/1593 MS: 5 ShuffleBytes-ShuffleBytes-CrossOver-ChangeBit-CopyPart-
+	NEW_FUNC[1/3]: 0x5c477d68ef70  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x6adf70) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+	NEW_FUNC[2/3]: 0x5c477d6d9670  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x6f8670) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#69	NEW    cov: 7011 ft: 11919 corp: 24/30Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1316/1593 MS: 2 InsertRepeatedBytes-PersAutoDict- DE: "\377\377\377\377\377\377\001\315"-
+#91	NEW    cov: 7011 ft: 11920 corp: 25/30Kb lim: 1593 exec/s: 0 rss: 121Mb L: 877/1593 MS: 2 ShuffleBytes-EraseBytes-
+#104	NEW    cov: 7011 ft: 11950 corp: 26/32Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1537/1593 MS: 3 ChangeBinInt-InsertByte-CMP- DE: "'\000\000\000\000\000\000\000"-
+#120	NEW    cov: 7015 ft: 11968 corp: 27/33Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 PersAutoDict- DE: "'\000\000\000\000\000\000\000"-
+#121	NEW    cov: 7027 ft: 12276 corp: 28/35Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1236/1593 MS: 1 ChangeBinInt-
+	NEW_FUNC[1/1]: 0x5c477d726440  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x745440) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#124	NEW    cov: 7047 ft: 12300 corp: 29/36Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 3 ChangeASCIIInt-ChangeBit-ChangeBinInt-
+#140	NEW    cov: 7048 ft: 12302 corp: 30/37Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1519/1593 MS: 1 CMP- DE: "\347\377\377\377"-
+#162	NEW    cov: 7052 ft: 12326 corp: 31/39Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1463/1593 MS: 2 CMP-ChangeByte- DE: "\377\377\377l"-
+#163	REDUCE cov: 7052 ft: 12326 corp: 31/39Kb lim: 1593 exec/s: 0 rss: 121Mb L: 454/1593 MS: 1 EraseBytes-
+#170	NEW    cov: 7052 ft: 12331 corp: 32/40Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1190/1593 MS: 2 ChangeASCIIInt-CMP- DE: "\001C"-
+#172	NEW    cov: 7052 ft: 12341 corp: 33/41Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 2 CMP-ChangeByte- DE: "\377\377\377p"-
+#173	NEW    cov: 7052 ft: 12342 corp: 34/42Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 PersAutoDict- DE: "\377\377\377\377\377\377\001\315"-
+#174	NEW    cov: 7053 ft: 12534 corp: 35/44Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1482/1593 MS: 1 CrossOver-
+#180	REDUCE cov: 7053 ft: 12534 corp: 35/44Kb lim: 1593 exec/s: 0 rss: 121Mb L: 869/1593 MS: 1 EraseBytes-
+#187	REDUCE cov: 7053 ft: 12534 corp: 35/44Kb lim: 1593 exec/s: 0 rss: 121Mb L: 423/1593 MS: 2 CMP-CrossOver- DE: "\036_\303\344"-
+#218	NEW    cov: 7053 ft: 12536 corp: 36/45Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1450/1593 MS: 1 ChangeByte-
+#250	NEW    cov: 7060 ft: 12544 corp: 37/46Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1516/1593 MS: 2 InsertByte-ChangeByte-
+#254	REDUCE cov: 7060 ft: 12544 corp: 37/46Kb lim: 1593 exec/s: 0 rss: 121Mb L: 447/1593 MS: 4 ChangeASCIIInt-ChangeBit-ChangeBit-EraseBytes-
+#265	NEW    cov: 7066 ft: 12567 corp: 38/48Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 ChangeASCIIInt-
+#268	REDUCE cov: 7066 ft: 12567 corp: 38/47Kb lim: 1593 exec/s: 0 rss: 121Mb L: 221/1593 MS: 3 ChangeBit-ChangeASCIIInt-EraseBytes-
+#279	NEW    cov: 7068 ft: 12586 corp: 39/49Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1188/1593 MS: 1 PersAutoDict- DE: "'\000\000\000\000\000\000\000"-
+#290	NEW    cov: 7070 ft: 12650 corp: 40/50Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1157/1593 MS: 1 ChangeBit-
+#296	NEW    cov: 7072 ft: 12785 corp: 41/51Kb lim: 1593 exec/s: 0 rss: 121Mb L: 1515/1593 MS: 1 CrossOver-
+	NEW_FUNC[1/1]: 0x5c477d8a1cc0  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x8c0cc0) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#317	NEW    cov: 7085 ft: 12826 corp: 42/52Kb lim: 1593 exec/s: 0 rss: 122Mb L: 1188/1593 MS: 1 ShuffleBytes-
+#324	NEW    cov: 7086 ft: 12827 corp: 43/54Kb lim: 1593 exec/s: 0 rss: 123Mb L: 1593/1593 MS: 2 ChangeBinInt-CopyPart-
+#327	NEW    cov: 7092 ft: 12840 corp: 44/55Kb lim: 1593 exec/s: 0 rss: 124Mb L: 1188/1593 MS: 3 ChangeASCIIInt-ChangeBit-ChangeByte-
+#338	NEW    cov: 7092 ft: 12845 corp: 45/56Kb lim: 1593 exec/s: 0 rss: 125Mb L: 1188/1593 MS: 1 ChangeBinInt-
+#354	NEW    cov: 7092 ft: 12846 corp: 46/58Kb lim: 1593 exec/s: 0 rss: 127Mb L: 1515/1593 MS: 1 CMP- DE: "\000\000\000\037"-
+#366	NEW    cov: 7096 ft: 12852 corp: 47/59Kb lim: 1593 exec/s: 0 rss: 129Mb L: 1538/1593 MS: 2 InsertRepeatedBytes-ChangeBit-
+#387	NEW    cov: 7099 ft: 12858 corp: 48/61Kb lim: 1593 exec/s: 0 rss: 131Mb L: 1583/1593 MS: 1 CopyPart-
+#413	NEW    cov: 7099 ft: 12883 corp: 49/62Kb lim: 1593 exec/s: 0 rss: 135Mb L: 1450/1593 MS: 1 ChangeBit-
+	NEW_FUNC[1/1]: 0x5c477d4bbc50  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x4dac50) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#414	NEW    cov: 7109 ft: 12893 corp: 50/63Kb lim: 1593 exec/s: 0 rss: 135Mb L: 1157/1593 MS: 1 PersAutoDict- DE: "\377\377\377l"-
+#421	NEW    cov: 7109 ft: 12894 corp: 51/64Kb lim: 1593 exec/s: 0 rss: 136Mb L: 1170/1593 MS: 2 InsertRepeatedBytes-CrossOver-
+#437	NEW    cov: 7111 ft: 12896 corp: 52/66Kb lim: 1593 exec/s: 0 rss: 139Mb L: 1450/1593 MS: 1 ChangeBit-
+#459	NEW    cov: 7112 ft: 12902 corp: 53/67Kb lim: 1593 exec/s: 0 rss: 143Mb L: 1593/1593 MS: 2 ChangeASCIIInt-ChangeByte-
+#510	NEW    cov: 7117 ft: 12921 corp: 54/69Kb lim: 1593 exec/s: 0 rss: 150Mb L: 1185/1593 MS: 1 ChangeByte-
+#518	REDUCE cov: 7117 ft: 12921 corp: 54/69Kb lim: 1593 exec/s: 0 rss: 151Mb L: 360/1593 MS: 3 InsertByte-InsertByte-EraseBytes-
+#521	NEW    cov: 7117 ft: 12929 corp: 55/70Kb lim: 1593 exec/s: 0 rss: 151Mb L: 1366/1593 MS: 3 PersAutoDict-ChangeByte-CrossOver- DE: "\377\377\377p"-
+#562	REDUCE cov: 7117 ft: 12929 corp: 55/70Kb lim: 1593 exec/s: 0 rss: 157Mb L: 1200/1593 MS: 1 EraseBytes-
+#568	NEW    cov: 7117 ft: 12930 corp: 56/70Kb lim: 1593 exec/s: 0 rss: 157Mb L: 529/1593 MS: 1 CrossOver-
+#586	NEW    cov: 7118 ft: 12941 corp: 57/72Kb lim: 1593 exec/s: 0 rss: 159Mb L: 1498/1593 MS: 3 InsertRepeatedBytes-PersAutoDict-CopyPart- DE: "\347\377\377\377"-
+#640	NEW    cov: 7120 ft: 12943 corp: 58/73Kb lim: 1593 exec/s: 0 rss: 167Mb L: 1328/1593 MS: 4 CopyPart-EraseBytes-InsertByte-ChangeByte-
+#661	NEW    cov: 7120 ft: 13017 corp: 59/74Kb lim: 1593 exec/s: 0 rss: 169Mb L: 1188/1593 MS: 1 ChangeByte-
+#682	NEW    cov: 7122 ft: 13024 corp: 60/76Kb lim: 1593 exec/s: 0 rss: 173Mb L: 1593/1593 MS: 1 CopyPart-
+#696	REDUCE cov: 7122 ft: 13024 corp: 60/76Kb lim: 1593 exec/s: 0 rss: 175Mb L: 256/1593 MS: 4 InsertByte-ShuffleBytes-PersAutoDict-EraseBytes- DE: "\000\000\000\037"-
+#792	NEW    cov: 7123 ft: 13039 corp: 61/77Kb lim: 1593 exec/s: 0 rss: 191Mb L: 1515/1593 MS: 1 CMP- DE: "\027\000"-
+	NEW_FUNC[1/2]: 0x5c477d463770  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x482770) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+	NEW_FUNC[2/2]: 0x5c477d4fcd40  (/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/tail_append+0x51bd40) (BuildId: 3fe23a624bfb7708bdd31df007df936cffb9f056)
+#818	NEW    cov: 7147 ft: 13388 corp: 62/78Kb lim: 1593 exec/s: 0 rss: 196Mb L: 1185/1593 MS: 1 ChangeBit-
+#834	NEW    cov: 7150 ft: 13399 corp: 63/79Kb lim: 1593 exec/s: 0 rss: 200Mb L: 1188/1593 MS: 1 ChangeByte-
+#856	NEW    cov: 7150 ft: 13400 corp: 64/80Kb lim: 1593 exec/s: 0 rss: 203Mb L: 777/1593 MS: 2 ShuffleBytes-PersAutoDict- DE: "\027\000"-
+#862	NEW    cov: 7151 ft: 13402 corp: 65/81Kb lim: 1593 exec/s: 0 rss: 204Mb L: 1185/1593 MS: 1 PersAutoDict- DE: "\377\377\377\377\377\377\001\315"-
+#883	NEW    cov: 7152 ft: 13403 corp: 66/83Kb lim: 1593 exec/s: 0 rss: 207Mb L: 1188/1593 MS: 1 ChangeBit-
+#908	REDUCE cov: 7152 ft: 13403 corp: 66/82Kb lim: 1593 exec/s: 0 rss: 210Mb L: 956/1593 MS: 5 CrossOver-ChangeBinInt-CMP-CopyPart-EraseBytes- DE: "pa"-
+#929	NEW    cov: 7157 ft: 13410 corp: 67/83Kb lim: 1593 exec/s: 0 rss: 213Mb L: 1450/1593 MS: 1 ChangeBinInt-
+#996	NEW    cov: 7157 ft: 13411 corp: 68/85Kb lim: 1593 exec/s: 0 rss: 223Mb L: 1450/1593 MS: 2 ChangeBinInt-PersAutoDict- DE: "pa"-
+#999	REDUCE cov: 7157 ft: 13411 corp: 68/85Kb lim: 1593 exec/s: 0 rss: 223Mb L: 147/1593 MS: 3 ChangeByte-ChangeByte-EraseBytes-
+#1000	DONE   cov: 7157 ft: 13411 corp: 68/85Kb lim: 1593 exec/s: 0 rss: 224Mb
+###### Recommended dictionary. ######
+"\377\377\377\377\377\377\001\315" # Uses: 15
+"[\000\000\000" # Uses: 4
+"'\000\000\000\000\000\000\000" # Uses: 12
+"\347\377\377\377" # Uses: 11
+"\377\377\377l" # Uses: 8
+"\001C" # Uses: 15
+"\377\377\377p" # Uses: 7
+"\036_\303\344" # Uses: 2
+"\000\000\000\037" # Uses: 3
+"\027\000" # Uses: 6
+"pa" # Uses: 1
+###### End of recommended dictionary. ######
+Done 1000 runs in 0 second(s)
+stat::number_of_executed_units: 1000
+stat::average_exec_per_sec:     0
+stat::new_units_added:          70
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              224

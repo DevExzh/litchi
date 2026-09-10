@@ -1,0 +1,5 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+   Compiling litchi v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/tools/perf-baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 41s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/litchi_perf_baseline-4cf290a7b480158a)

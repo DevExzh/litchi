@@ -568,22 +568,23 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#
     );
     let bytes = package_bytes(xml, None, false);
+    let memory = 1 << 20;
     let budget = litchi_core::Budget::root(
         "docx-semantic-managed-test",
         litchi_core::Limits::new(
-            bytes.len() as u64 * 4,
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
+            memory,
+            64 * 1024 * 1024,
+            64 * 1024 * 1024,
+            1_000_000,
+            1024,
+            1 << 30,
         ),
     );
     let (cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
     let limits = litchi_core::ExecutionLimits::new(
         std::num::NonZeroUsize::MIN,
         std::num::NonZeroUsize::MIN,
-        std::num::NonZeroU64::new(bytes.len() as u64 * 4).unwrap(),
+        std::num::NonZeroU64::new(memory).unwrap(),
         0,
     )
     .unwrap();

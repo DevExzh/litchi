@@ -8,7 +8,7 @@
 )]
 //! Run and writer facades for the `symEx` semantic owner.
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::paragraph::Run;
 use crate::writer::{MutableRun, RunContent};
 
@@ -22,7 +22,12 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn symbols(&self) -> Result<Symbols> {
-        codec::read(self.xml_bytes())
+        let source = self.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
+        let resolver = source.namespace_resolver()?;
+        let result = codec::read_with_resolver(source.bytes(), &resolver);
+        resolver.check()?;
+        result
     }
 
     /// Read the first direct symbol, preserving an absent element as `None`.
@@ -50,6 +55,14 @@ impl Run {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn set_symbols(&mut self, value: Symbols) -> Result<&mut Self> {
+        if self.is_managed() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "run.set_symbols",
+                reason: "managed run views cannot detach source-owned XML",
+            });
+        }
+        let _parser_admission = self.parser_admission()?;
         let original = self.xml_bytes();
         let rewritten = codec::rewrite(original, &value)?;
         if rewritten.as_slice() != original {

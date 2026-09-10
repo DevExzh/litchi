@@ -1,0 +1,55 @@
+
+running 20 tests
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_candidate_budget_failure_happens_before_publication_output ... FAILED
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... FAILED
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_repeated_equal_setter_keeps_first_changed_commit ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... FAILED
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test managed_source_document_rejects_mce_and_dtd_before_edit ... FAILED
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+
+failures:
+
+---- managed_candidate_budget_failure_happens_before_publication_output stdout ----
+
+thread 'managed_candidate_budget_failure_happens_before_publication_output' (1295908) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:1085:10:
+source and edit baseline must fit the bounded ceiling: Document(Opc(Execution(ResourceLimit(ResourceLimit { resource: Memory, observed: 16956, limit: 15704, scope: "docx-managed-document-edit-test" }))))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- managed_changed_publication_rejects_settings_mce_and_dtd_before_output stdout ----
+
+thread 'managed_changed_publication_rejects_settings_mce_and_dtd_before_output' (1295911) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:162:39:
+called `Result::unwrap()` on an `Err` value: XmlPublication { part: "/word/settings.xml", source: Doctype { offset: 0 } }
+
+---- managed_signed_noop_and_equal_setter_preserve_exact_source stdout ----
+
+thread 'managed_signed_noop_and_equal_setter_preserve_exact_source' (1295924) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:61:39:
+called `Result::unwrap()` on an `Err` value: SignedSourceRequiresExplicitPolicy
+
+---- managed_source_document_rejects_mce_and_dtd_before_edit stdout ----
+
+thread 'managed_source_document_rejects_mce_and_dtd_before_edit' (1295926) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:100:39:
+called `Result::unwrap()` on an `Err` value: XmlPublication { part: "/word/document.xml", source: Doctype { offset: 0 } }
+
+
+failures:
+    managed_candidate_budget_failure_happens_before_publication_output
+    managed_changed_publication_rejects_settings_mce_and_dtd_before_output
+    managed_signed_noop_and_equal_setter_preserve_exact_source
+    managed_source_document_rejects_mce_and_dtd_before_edit
+
+test result: FAILED. 16 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

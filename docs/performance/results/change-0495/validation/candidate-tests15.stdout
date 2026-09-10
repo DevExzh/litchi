@@ -1,0 +1,152 @@
+
+running 16 tests
+test alt_chunk_overlay_refuses_non_body_anchor_layouts ... ok
+test alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members ... ok
+test alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_noops_exact ... ok
+test alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members ... ok
+test alt_chunk_overlay_rejects_oversized_payload_before_reading_source ... ok
+test read_limits_are_returned_as_the_original_opc_error ... ok
+test sequential_sink_failure_is_typed_as_incomplete_output ... ok
+test opening_stays_cold_and_document_query_loads_only_main_document ... ok
+test source_changes_remain_visible_before_the_first_payload_read ... ok
+test markup_compatibility_branch_selection_is_refused_before_output ... ok
+test exact_noop_reproduces_every_source_byte ... ok
+test strict_main_document_relationship_uses_the_same_overlay_contract ... ok
+test rolled_back_document_operations_use_the_exact_signed_source_path ... ok
+test signed_changes_are_refused_but_signed_noops_are_exact ... ok
+test document_commit_edits_only_the_main_part_and_reopens ... ok
+test stale_commit_and_changed_source_fail_before_output ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 5 tests
+test managed_document_read_retains_budgeted_part_data_and_supports_selective_queries ... ok
+test managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication ... ok
+test managed_cancellation_is_checked_at_open_and_before_lazy_read ... ok
+test managed_document_variables_check_cancellation_before_relationship_metadata ... ok
+test managed_main_document_edits_retain_source_and_candidate_reservations ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 33 tests
+test managed_candidate_budget_failure_happens_before_publication_output ... ok
+test managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory ... ok
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_collapsed_and_symbols_reads_refuse_when_memory_is_held ... ok
+test managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mutation ... ok
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... ok
+test managed_failed_second_edit_cancellation_leaves_first_projection_intact ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact ... ok
+test managed_paragraph_and_nested_run_mutations_refuse_without_state_change ... ok
+test managed_failed_second_edit_budget_leaves_first_projection_intact ... ok
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_retained_runs_resolve_inherited_symex_and_ignore_foreign_bindings ... ok
+test managed_repeated_position_keeps_final_value_and_collapses_equal_setter ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_revert_to_original_publishes_exact_noop_bytes ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_source_document_rejects_mce_and_dtd_before_edit ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... ok
+test managed_reverting_one_operation_preserves_the_other_and_inverse_artifact ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_output ... ok
+test managed_empty_text_slots_refuse_low_scan_memory_before_projection_change ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 12 tests
+test changed_source_version_is_rejected_before_publication_output ... ok
+test empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous ... ok
+test publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact ... ok
+test enforced_protection_is_refused ... ok
+test empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing ... ok
+test positions_operation_count_and_resource_limits_are_failure_atomic ... ok
+test durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness ... ok
+test partial_sinks_complete_and_write_zero_fails_without_false_progress ... ok
+test strict_and_ordinary_producer_namespace_declarations_are_supported ... ok
+test copies_exact_fragment_at_first_middle_and_last_source_order_slots ... ok
+test structured_paragraphs_sections_and_hostile_namespaces_are_refused ... ok
+test relationships_dependencies_signatures_macros_and_paths_are_refused ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test changed_live_source_version_is_rejected_before_publication_output ... ok
+test durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound ... ok
+test invalid_positions_operation_and_resource_limits_leave_projection_unchanged ... ok
+test publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact ... ok
+test empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing ... ok
+test removes_first_middle_last_and_the_only_paragraph_exactly ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 25 tests
+test managed_secondary_edits_refuse_and_cancellation_stops_selection ... ok
+test markup_heavier_than_output_bound_can_decode_to_visible_text ... ok
+test large_text_event_is_bounded_by_xml_and_decoded_output_limits ... ok
+test package_wide_mixed_dialect_rejects_main_header_and_footer_capture ... ok
+test secondary_edit_refuses_when_synthetic_wrapper_exceeds_output_limit ... ok
+test secondary_entry_preserves_whitespace_comments_and_opaque_markup ... ok
+test allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse ... ok
+test transitional_main_rejects_strict_header_relationship_metadata ... ok
+test secondary_relationship_dialect_mismatch_is_refused ... ok
+test header_and_footer_root_dialect_mismatches_are_refused ... ok
+test secondary_limits_bound_xml_paragraphs_and_output ... ok
+test xml_expanding_replacement_is_refused_without_changing_projection ... ok
+test header_and_footer_stories_cannot_own_word_story_relationships ... ok
+test secondary_output_accumulation_and_borrowed_replacement_are_bounded ... ok
+test secondary_publication_rejects_a_source_revision_change ... ok
+test secondary_ids_cover_missing_reserved_and_duplicate_values ... ok
+test secondary_patches_reject_stale_and_foreign_snapshots ... ok
+test signed_secondary_change_is_refused_but_signed_noop_is_exact ... ok
+test secondary_publication_rejects_a_partial_sink_without_panicking ... ok
+test secondary_relationship_topology_and_content_type_are_checked ... ok
+test secondary_noop_is_exact_and_inverse_restores_the_source ... ok
+test secondary_story_cannot_own_a_word_story_relationship ... ok
+test deep_large_namespace_input_hits_a_finite_namespace_limit ... ok
+test long_namespace_prefix_and_value_hit_namespace_byte_and_count_limits ... ok
+test secondary_stories_select_edit_and_preserve_siblings_root_and_anchors ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test managed_source_preflight_rejects_special_events_and_extra_roots ... ok
+test source_section_scan_rejects_non_xml_outer_whitespace_and_late_declarations ... ok
+test malformed_source_document_errors_at_first_semantic_read ... ok
+test source_document_is_send_sync_and_managed_arc_views_refuse_consistently ... FAILED
+test source_package_materializes_through_the_owned_docx_facade_on_explicit_request ... ok
+test source_queries_read_only_selected_payloads_and_preserve_stale_precedence ... ok
+test source_metadata_matches_dialects_absence_and_graph_failures ... ok
+test source_semantic_queries_match_eager_mce_order_and_unknown_retention ... ok
+
+failures:
+
+---- source_document_is_send_sync_and_managed_arc_views_refuse_consistently stdout ----
+
+thread 'source_document_is_send_sync_and_managed_arc_views_refuse_consistently' (2487361) panicked at crates/litchi-docx/tests/source_backed_semantic.rs:597:39:
+called `Result::unwrap()` on an `Err` value: Opc(Execution(ResourceLimit(ResourceLimit { resource: Memory, observed: 138695, limit: 6596, scope: "docx-semantic-managed-test" })))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    source_document_is_send_sync_and_managed_arc_views_refuse_consistently
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

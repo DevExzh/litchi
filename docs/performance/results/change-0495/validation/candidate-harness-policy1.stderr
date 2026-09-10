@@ -1,0 +1,29 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error[E0423]: cannot initialize a tuple struct which contains private fields
+   --> /home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx/src/source_backed/document_policy.rs:586:62
+    |
+586 |                 let namespace = resolver.resolve_prefix(Some(Prefix(prefix.as_bytes())), false);
+    |                                                              ^^^^^^
+    |
+note: constructor is not visible here due to private fields
+   --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:269:23
+    |
+269 | pub struct Prefix<'a>(&'a [u8]);
+    |                       ^^^^^^^^ private field
+note: tuple variant `crate::math::InheritedNamespaceBinding::Prefix` exists but is inaccessible
+   --> /home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx/src/math.rs:218:5
+    |
+218 |     Prefix(String),
+    |     ^^^^^^^^^^^^^^ not accessible
+help: a local variable with a similar name exists
+    |
+586 -                 let namespace = resolver.resolve_prefix(Some(Prefix(prefix.as_bytes())), false);
+586 +                 let namespace = resolver.resolve_prefix(Some(prefix(prefix.as_bytes())), false);
+    |
+help: consider importing this tuple variant instead
+    |
+ 10 + use std::path::Component::Prefix;
+    |
+
+For more information about this error, try `rustc --explain E0423`.
+error: could not compile `litchi-docx` (lib) due to 1 previous error

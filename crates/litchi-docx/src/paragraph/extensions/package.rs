@@ -19,6 +19,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn extensions(&self) -> Result<Extensions> {
+        let _parser_admission = self.parser_admission()?;
         parse_paragraph(self.xml_bytes())
     }
 }

@@ -1,0 +1,76 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error[E0599]: no method named `is_empty` found for enum `OperationList` in the current scope
+    --> crates/litchi-docx/src/document/transaction/durable.rs:617:45
+     |
+ 617 |         let operations = if self.operations.is_empty() {
+     |                                             ^^^^^^^^ method not found in `OperationList`
+     |
+    ::: crates/litchi-docx/src/document/transaction.rs:4168:1
+     |
+4168 | enum OperationList {
+     | ------------------ method `is_empty` not found for this enum
+     |
+note: the method `is_empty` exists on the type `std::sync::Arc<[Operation]>`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/slice/mod.rs:136:4
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following traits define an item `is_empty`, perhaps you need to implement one of them:
+             candidate #1: `ExactSizeIterator`
+             candidate #2: `Flags`
+             candidate #3: `RangeBounds`
+             candidate #4: `ReadAt`
+             candidate #5: `litchi_core::sheet::Cell`
+             candidate #6: `rand::distr::uniform::SampleRange`
+             candidate #7: `rand::seq::slice::IndexedRandom`
+
+error[E0599]: no method named `iter` found for enum `OperationList` in the current scope
+    --> crates/litchi-docx/src/document/transaction/durable.rs:624:18
+     |
+ 623 | /             self.operations
+ 624 | |                 .iter()
+     | |                 -^^^^ method not found in `OperationList`
+     | |_________________|
+     |
+     |
+    ::: crates/litchi-docx/src/document/transaction.rs:4168:1
+     |
+4168 |   enum OperationList {
+     |   ------------------ method `iter` not found for this enum
+     |
+note: the method `iter` exists on the type `std::sync::Arc<[Operation]>`
+    --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/slice/mod.rs:1043:4
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `iter`, perhaps you need to implement it:
+             candidate #1: `Flags`
+
+error[E0599]: no method named `range` found for struct `document::transaction::Snapshot` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:1753:36
+     |
+ 705 | pub struct Snapshot {
+     | ------------------- method `range` not found for this struct
+...
+1753 |         let base_range = self.base.range(position)?;
+     |                                    ^^^^^ method not found in `document::transaction::Snapshot`
+
+error[E0599]: no method named `range` found for struct `document::transaction::Snapshot` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:2005:35
+     |
+ 705 | pub struct Snapshot {
+     | ------------------- method `range` not found for this struct
+...
+2005 |             let range = self.base.range(*operation_position)?;
+     |                                   ^^^^^ method not found in `document::transaction::Snapshot`
+
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+   --> crates/litchi-docx/src/paragraph/collapsed/package.rs:158:17
+    |
+158 |                 paragraph.set_collapsed(value)?;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `?` operator cannot be applied to type `&mut MutableParagraph`
+    |
+    = help: the nightly-only, unstable trait `Try` is not implemented for `&mut MutableParagraph`
+
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (lib) due to 5 previous errors

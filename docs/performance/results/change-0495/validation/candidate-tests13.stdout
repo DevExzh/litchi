@@ -1,0 +1,94 @@
+
+running 5 tests
+test managed_cancellation_is_checked_at_open_and_before_lazy_read ... ok
+test managed_document_read_retains_budgeted_part_data_and_supports_selective_queries ... ok
+test managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication ... FAILED
+test managed_document_variables_check_cancellation_before_relationship_metadata ... ok
+test managed_main_document_edits_retain_source_and_candidate_reservations ... ok
+
+failures:
+
+---- managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication stdout ----
+
+thread 'managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication' (2080968) panicked at crates/litchi-docx/tests/source_backed_managed.rs:311:5:
+assertion `left == right` failed
+  left: 152
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 31 tests
+test managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory ... ok
+test managed_candidate_budget_failure_happens_before_publication_output ... ok
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_collapsed_and_symbols_reads_refuse_when_memory_is_held ... FAILED
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... FAILED
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_failed_second_edit_budget_leaves_first_projection_intact ... ok
+test managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact ... ok
+test managed_failed_second_edit_cancellation_leaves_first_projection_intact ... ok
+test managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mutation ... ok
+test managed_revert_to_original_publishes_exact_noop_bytes ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_paragraph_and_nested_run_mutations_refuse_without_state_change ... FAILED
+test managed_source_document_rejects_mce_and_dtd_before_edit ... FAILED
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test managed_repeated_position_keeps_final_value_and_collapses_equal_setter ... ok
+test managed_reverting_one_operation_preserves_the_other_and_inverse_artifact ... ok
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+test managed_empty_text_slots_refuse_low_scan_memory_before_projection_change ... ok
+
+failures:
+
+---- managed_collapsed_and_symbols_reads_refuse_when_memory_is_held stdout ----
+
+thread 'managed_collapsed_and_symbols_reads_refuse_when_memory_is_held' (2080977) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:654:5:
+assertion `left == right` failed
+  left: None
+ right: Some(Enabled)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- managed_changed_publication_rejects_settings_mce_and_dtd_before_output stdout ----
+
+thread 'managed_changed_publication_rejects_settings_mce_and_dtd_before_output' (2080976) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:1261:9:
+settings DTD must refuse changed publication: Some(Document(Opc(SourceBackedOverlayUnavailable { reason: "source XML DTDs are not permitted" })))
+
+---- managed_paragraph_and_nested_run_mutations_refuse_without_state_change stdout ----
+
+thread 'managed_paragraph_and_nested_run_mutations_refuse_without_state_change' (2080988) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:581:5:
+assertion `left == right` failed
+  left: None
+ right: Some(Enabled)
+
+---- managed_source_document_rejects_mce_and_dtd_before_edit stdout ----
+
+thread 'managed_source_document_rejects_mce_and_dtd_before_edit' (2081001) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:1296:9:
+document DTD must refuse source capture: Some(Document(Opc(SourceBackedOverlayUnavailable { reason: "source XML DTDs are not permitted" })))
+
+
+failures:
+    managed_changed_publication_rejects_settings_mce_and_dtd_before_output
+    managed_collapsed_and_symbols_reads_refuse_when_memory_is_held
+    managed_paragraph_and_nested_run_mutations_refuse_without_state_change
+    managed_source_document_rejects_mce_and_dtd_before_edit
+
+test result: FAILED. 27 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

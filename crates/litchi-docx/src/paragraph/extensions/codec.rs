@@ -52,7 +52,7 @@ fn parse_root(
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let decoder = reader.decoder();
         let (namespace, event) = resolver.resolve_event(event);
 
@@ -66,7 +66,7 @@ fn parse_root(
                     }
                     parse_attributes(
                         &element,
-                        &resolver,
+                        resolver,
                         decoder,
                         allow_no_spell_err,
                         &mut para_id,
@@ -90,7 +90,7 @@ fn parse_root(
                     }
                     parse_attributes(
                         &element,
-                        &resolver,
+                        resolver,
                         decoder,
                         allow_no_spell_err,
                         &mut para_id,

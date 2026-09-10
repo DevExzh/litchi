@@ -45,6 +45,7 @@ impl Paragraph {
     }
 
     fn list_properties(&self) -> Result<(Option<crate::numbering::Paragraph>, Option<String>)> {
+        let _parser_admission = self.parser_admission()?;
         let mut reader = NsReader::from_reader(self.xml_bytes());
         let mut depth = 0usize;
         let mut word_prefix: Option<Vec<u8>> = None;
@@ -195,6 +196,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn division_id(&self) -> Result<Option<String>> {
+        let _parser_admission = self.parser_admission()?;
         direct_word_property_value(self.xml_bytes(), b"p", b"pPr", b"divId")?
             .map(|value| normalize_xml_integer(value, "Word paragraph division ID"))
             .transpose()
@@ -210,6 +212,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn spacing(&self) -> Result<Option<ParagraphSpacing>> {
+        let _parser_admission = self.parser_admission()?;
         parse_spacing(self.xml_bytes())
     }
 }
@@ -229,7 +232,7 @@ fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
 
         match event {
@@ -290,7 +293,7 @@ fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {
                     spacing = Some(parse_spacing_element(
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         &fragment_prefix,
                     )?);
                 }
@@ -350,7 +353,7 @@ fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {
                         spacing = Some(parse_spacing_element(
                             &element,
                             decoder,
-                            &resolver,
+                            resolver,
                             &fragment_prefix,
                         )?);
                     }

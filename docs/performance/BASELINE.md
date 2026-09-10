@@ -1,5 +1,48 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0495: ordinary managed DOCX edit/save capability baseline
+
+[0495](changes/0495-docx-managed-document-edits.md) records the verified
+finite-owner managed DOCX edit/save capability that 0494 could only exercise
+as a typed refusal. The formal run retains 72 processes and 2,160 samples;
+pilot2 retains 36 processes and 108 samples. It uses six provider arms in
+normal and allocator roles over the 200-paragraph, 20-member archive with
+eight 2 MiB media members. Every formal row emits the expected 16,793,048-byte
+artifact and passes source, sink, semantic, and untouched-media checks. Managed
+rows pass finite-budget checks; allocator-role rows pass allocator-conservation
+checks. Normal rows have no allocator counters, and unmanaged rows have no
+managed budget fields.
+
+Normal managed p50 values in milliseconds are:
+
+| Provider | Repeat 1 | Repeat 2 |
+| --- | ---: | ---: |
+| owned | 5.592 | 5.556 |
+| instrumented | 3.277 | 3.298 |
+| file-warm | 5.682 | 5.853 |
+| short (4 KiB) | 4.066 | 4.060 |
+| delayed (1 ms + 100 MiB/s) | 572.748 | 576.147 |
+| range-zero (0 ms + 100 MiB/s) | 182.327 | 181.990 |
+
+This is a managed capability and budget baseline. No managed-before baseline
+exists, and the only before/after comparison is paired unmanaged evidence.
+That review retains eight whole-child RSS flags and three latency flags over
+the five-percent threshold; repeat variation and unresolved causality remain
+part of the result. The allocator observations are also descriptive: unmanaged
+before-to-after calls fall 57.583% and allocated bytes fall 71.620%, while peak
+live increment rises 0.485%; managed-after versus unmanaged-after changes
+calls +111.788%, allocated bytes +162.992%, and peak live +2.058%.
+
+`cache_before` is sampled post-open, `cache_live` post-edit/pre-publication,
+resource `live` post-publication, and `after_drop` after package consumption
+and returned-snapshot/commit release. No cache-after-drop sample exists.
+Whole-child profiles include setup and output verification and cannot attribute
+CPU or RSS to the timed operation. Phase-local CPU/whole-child RSS attribution,
+repeats of unstable file-warm and short/allocator arms, and a distinct
+post-publication cache observation are the measured follow-ups. This evidence
+does not close borrowed input, atomic save, independent producers, scaling,
+durable history, or broader CRUD requirements.
+
 ## 0485: consumed-window OPC splice comparison
 
 [0485](changes/0485-opc-splice-consumed-window-batching.md) batches bytes

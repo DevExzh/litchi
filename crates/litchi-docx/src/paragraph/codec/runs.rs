@@ -13,7 +13,7 @@ use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::sync::Arc;
 
-use super::super::model::{Paragraph, Run};
+use super::super::model::{Paragraph, Run, XmlRef};
 use super::xml::is_fragment_word_name;
 
 impl Paragraph {
@@ -39,7 +39,8 @@ impl Paragraph {
         }
 
         let xml_bytes = self.xml_bytes();
-        let (source_arc, base_offset) = self.xml_data.get_or_create_arc();
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml_bytes);
         let mut runs = SmallVec::new();
         let mut run_start = None;
@@ -120,13 +121,7 @@ impl Paragraph {
                     })?;
                 },
                 RunEvent::Empty => {
-                    Self::push_run_slice(
-                        &mut runs,
-                        &source_arc,
-                        base_offset,
-                        event_start,
-                        event_end,
-                    )?;
+                    Self::push_run_slice(&mut runs, &source, event_start, event_end)?;
                 },
                 RunEvent::End => {
                     run_depth = run_depth.checked_sub(1).ok_or_else(|| {
@@ -138,13 +133,7 @@ impl Paragraph {
                                 "missing Word run start offset".to_string(),
                             ));
                         };
-                        Self::push_run_slice(
-                            &mut runs,
-                            &source_arc,
-                            base_offset,
-                            start,
-                            event_end,
-                        )?;
+                        Self::push_run_slice(&mut runs, &source, start, event_end)?;
                     }
                 },
                 RunEvent::Eof if run_start.is_some() => {
@@ -173,7 +162,17 @@ impl Paragraph {
         }
 
         let xml_bytes = self.xml_bytes();
-        let (source_arc, base_offset) = self.xml_data.get_or_create_arc();
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
+        let Some(source_slice) = source.as_unmanaged_slice() else {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "paragraph.smart_tags",
+                reason: "managed paragraph views cannot detach smart-tag XmlSlice ownership",
+            });
+        };
+        let source_arc = source_slice.arc();
+        let base_offset = source_slice.start();
         let mut reader = NsReader::from_reader(xml_bytes);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut depth = 0usize;
@@ -303,8 +302,7 @@ impl Paragraph {
 
     fn push_run_slice(
         runs: &mut SmallVec<[Run; 8]>,
-        source: &Arc<Vec<u8>>,
-        base_offset: u32,
+        source: &XmlRef,
         start: usize,
         end: usize,
     ) -> Result<()> {
@@ -316,14 +314,10 @@ impl Paragraph {
                 .ok_or_else(|| Error::InvalidFormat("invalid Word run byte range".to_string()))?,
         )
         .map_err(|_source_error| Error::InvalidFormat("Word run length exceeds u32".to_string()))?;
-        let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
-            Error::InvalidFormat("Word run absolute offset exceeds u32".to_string())
-        })?;
-        runs.push(Run::from_slice(XmlSlice::new(
-            Arc::clone(source),
-            absolute_start,
-            length,
-        )));
+        let range = source
+            .subrange(start, length)
+            .ok_or_else(|| Error::InvalidFormat("Word run range exceeds source XML".to_string()))?;
+        runs.push(Run::from_xml_ref(range));
         Ok(())
     }
 }

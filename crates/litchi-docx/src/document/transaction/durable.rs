@@ -14,8 +14,9 @@ use serde_json::Value;
 
 use super::{
     Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    Operation, Patch, RevisionKind, Snapshot, TableCellAddress, TransactionError,
-    TransactionResult, TransferGraph, TransferPart, TransferRelationship,
+    ManagedAdmission, Operation, Patch, RevisionKind, Snapshot, SourceIdentity, TableCellAddress,
+    TransactionError, TransactionResult, TransferGraph, TransferPart, TransferRelationship,
+    XmlStorage,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";
@@ -23,8 +24,52 @@ const RESTORE_OPERATION: &str = "document.restore";
 const RESTORE_TRANSFER_INSERT: &str = "document.restore-transfer.insert";
 const RESTORE_TRANSFER_REMOVE: &str = "document.restore-transfer.remove";
 
-#[derive(Clone, PartialEq, Eq)]
-struct Lineage(Arc<Vec<u8>>);
+#[derive(Clone, Debug)]
+enum Lineage {
+    Unmanaged(Arc<Vec<u8>>),
+    Identified {
+        xml: Arc<Vec<u8>>,
+        identity: Arc<SourceIdentity>,
+    },
+    Managed {
+        storage: XmlStorage,
+        identity: Arc<SourceIdentity>,
+        _admission: Option<Arc<ManagedAdmission>>,
+    },
+}
+
+impl PartialEq for Lineage {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Unmanaged(left), Self::Unmanaged(right)) => left == right,
+            (
+                Self::Identified {
+                    xml: left_xml,
+                    identity: left_identity,
+                },
+                Self::Identified {
+                    xml: right_xml,
+                    identity: right_identity,
+                },
+            ) => left_identity == right_identity && left_xml == right_xml,
+            (
+                Self::Managed {
+                    storage: left_storage,
+                    identity: left_identity,
+                    ..
+                },
+                Self::Managed {
+                    storage: right_storage,
+                    identity: right_identity,
+                    ..
+                },
+            ) => left_identity == right_identity && left_storage.bytes() == right_storage.bytes(),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Lineage {}
 
 struct TransferGraphDecoder<'a> {
     bytes: &'a [u8],
@@ -293,6 +338,13 @@ impl History {
     }
 
     pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
+        if self.current().is_managed() || commit.snapshot().is_managed() {
+            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "document.history.ensure_can_record",
+                reason: "managed history metadata has no retained reservation ledger",
+            }));
+        }
         let bytes = history_weight(commit)?;
         if bytes > self.limits().max_weight() {
             return Err(litchi_core::patch::PatchError::HistoryWeight {
@@ -316,6 +368,13 @@ impl History {
     /// Returns a history-weight error without changing history when the
     /// published transition alone exceeds the configured byte budget.
     pub fn record(&mut self, commit: Commit) -> TransactionResult<Vec<Snapshot>> {
+        if self.current().is_managed() || commit.snapshot().is_managed() {
+            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "document.history.record",
+                reason: "managed history metadata has no retained reservation ledger",
+            }));
+        }
         let weight = history_weight(&commit)?;
         let graph = history_graph_transition(commit.patch.operations())?;
         let invalidated_redo = self.redo_graph.len();
@@ -427,6 +486,13 @@ impl Snapshot {
     /// Returns an error for the wrong format, blobs, malformed operations,
     /// stale artifact hashes, or failed semantic preconditions.
     pub fn apply_durable<Mode>(&self, patch: &CorePatch<Mode>) -> TransactionResult<Self> {
+        if self.is_managed() {
+            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "document.apply_durable",
+                reason: "durable replay has no source-owner publication authority",
+            }));
+        }
         if patch.format() != FORMAT_NAME {
             return Err(invalid_durable("unsupported format"));
         }
@@ -457,7 +523,7 @@ impl Snapshot {
             .iter()
             .all(|operation| is_restore_operation(&operation.op))
         {
-            return restore_snapshot(patch);
+            return restore_snapshot(patch, self.source_identity());
         }
         if patch
             .operations()
@@ -491,7 +557,23 @@ impl Snapshot {
     }
 
     fn lineage(&self) -> Lineage {
-        Lineage(Arc::clone(&self.xml))
+        match &self.xml {
+            XmlStorage::Owned(xml) => Lineage::Unmanaged(Arc::clone(xml)),
+            XmlStorage::OwnedWithIdentity { xml, identity } => Lineage::Identified {
+                xml: Arc::clone(xml),
+                identity: Arc::clone(identity),
+            },
+            XmlStorage::Managed(xml) => Lineage::Managed {
+                storage: self.xml.clone(),
+                identity: Arc::clone(&xml.identity),
+                _admission: self.admission.clone(),
+            },
+            XmlStorage::Source { identity, .. } => Lineage::Managed {
+                storage: self.xml.clone(),
+                identity: Arc::clone(identity),
+                _admission: self.admission.clone(),
+            },
+        }
     }
 }
 
@@ -506,6 +588,13 @@ impl Edit {
         limits: CompositionLimits,
         identifier: impl Into<String>,
     ) -> TransactionResult<PreparedEdit> {
+        if self.base.is_managed() {
+            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "document.edit.prepare",
+                reason: "durable composition metadata has no managed owner reservation",
+            }));
+        }
         let (reads, writes) = operation_effects(&self.operations, self.base.paragraph_count());
         let inner = SubEdit::new(
             self.base.lineage(),
@@ -531,6 +620,13 @@ impl Patch {
         &self,
         limits: PatchLimits,
     ) -> Result<CorePatch<Reversible>, TransactionError> {
+        if self.before.is_managed() || self.after.is_managed() {
+            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "document.patch.to_durable",
+                reason: "durable serialization has no managed owner reservation",
+            }));
+        }
         let forward_artifact = BlobId::of(self.before.xml_bytes()).as_hex();
         let reverse_artifact = BlobId::of(self.after.xml_bytes()).as_hex();
         let mut forward_blobs = BlobBundle::new(limits.blobs());
@@ -1942,7 +2038,10 @@ fn common_target_artifact<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<&s
     expected.ok_or_else(|| invalid_durable("missing target artifact precondition"))
 }
 
-fn restore_snapshot<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<Snapshot> {
+fn restore_snapshot<Mode>(
+    patch: &CorePatch<Mode>,
+    identity: Option<Arc<SourceIdentity>>,
+) -> TransactionResult<Snapshot> {
     let identifier = patch.operations()[0]
         .value
         .as_str()
@@ -1992,7 +2091,11 @@ fn restore_snapshot<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<Snapshot
             actual: bytes.len(),
         });
     }
-    Snapshot::from_xml(bytes.to_vec())
+    if let Some(identity) = identity {
+        Snapshot::from_owned_xml_with_identity(Arc::new(bytes.to_vec()), identity)
+    } else {
+        Snapshot::from_xml(bytes.to_vec())
+    }
 }
 
 fn parse_single_target(target: &str, prefix: &str) -> TransactionResult<Position> {

@@ -1,0 +1,192 @@
+{
+  "attempt": "pilot2",
+  "pilot": true,
+  "protocol_sha256": "55d417150a998a992c8e6bf3f724041b52569f17c75126517a8579f80f52186a",
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-owned",
+      "report_sha256": "070c4ef0c7dd3d53ca5208910cbb7850959724e6036a591fbfd0d7a9bec6f1cd",
+      "terminal_sha256": "63b18e3cf3f6142b276daadbd7fa681ee6210333fe83eac6600dc86e208aa8e1"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-instrumented",
+      "report_sha256": "1de0c2bd648d209a017751911bda1b3cd1c066ee895938ad257c3d2ab317e6fd",
+      "terminal_sha256": "a5b96f63f8bc6ee276a2766835679e73938422e1faf6df871a766d1d5fac579b"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-file-warm",
+      "report_sha256": "d587f7f156549743fbc07fd2625aada14cc0de4eef9fb095e6e107d682a539ab",
+      "terminal_sha256": "879a69a9be8da3853781797f22fb3a3e3e610ca8b453b7d5d91000e2b44d91e0"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-short",
+      "report_sha256": "5e36ed9eecde361ada54442938c9ff68e7c3e75fe263be0dc92bb70d3f88c23c",
+      "terminal_sha256": "e113d898de0ff85647edb4d6b863716ef4d1f7faa3961f134a6cae0b201f263a"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-delayed",
+      "report_sha256": "38dabe17b9a55d0a2573833ab0b7e77227638356dcfa74fcd111f06a7484e5ca",
+      "terminal_sha256": "9872cedde0f960eaed89b310ee1868d7cf89a792a08cfc7561e8ba69569eaa76"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-normal-range-zero",
+      "report_sha256": "cb8764e6cc944ff35b2ace7061e0c180934c798401d468df52e70bb5423d20a7",
+      "terminal_sha256": "82dc94613a567b3f2b0b215ce538c0e6a8b820cac609c9994778138954119c0f"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-owned",
+      "report_sha256": "b8172f4fc806ec47c8818047e32625e661f59e3dd42df33eff5234160b2dfc97",
+      "terminal_sha256": "af92e421b57a73f89f613812e963559da931fffb66677673cfe0fea4f04853e7"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-instrumented",
+      "report_sha256": "2c137d75f32c3ebe890a14b344955d28c2945e6b243e6f2f75ae81d5ee9bfb1d",
+      "terminal_sha256": "27043487bb53dc8119f085edf8d405853e54b09d7368ceccb592f4b6d4e2adbf"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-file-warm",
+      "report_sha256": "e7dd39edcc38739ffa8ce45a80ae35ae191029a4eae99d637fd512ff48161bb6",
+      "terminal_sha256": "708931d7a2335bb3cd20b4a4756b22bd0310ce3b0f2ea655ee7d5892fb47a4a6"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-short",
+      "report_sha256": "de07d2eabcc5e9e3aa00c706cb5943ddd607ad2b9631246ad6c68d4ee30714b9",
+      "terminal_sha256": "b6cd8445cb49ac3c5c5fa47c8c106eaf9561c0ab9865d3f4dbe63a606ab1353c"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-delayed",
+      "report_sha256": "357c874acbbb6c510b83881d94124a76b01a9974876dc0990533808557081392",
+      "terminal_sha256": "419875e82a49f70f0562c51b3e2cef17a49b5716c06be9e507cdb9b34775b751"
+    },
+    {
+      "label": "pilot-r1-before-unmanaged-api-allocator-range-zero",
+      "report_sha256": "a26e9e1837f635cd726c0330c5ee11e34746823de53c5685168692c9203a9b70",
+      "terminal_sha256": "95d262cde2cac916a53087916c8f5caf14f5a94ba88865de487d3ebce5455763"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-owned",
+      "report_sha256": "97b89a62ebcc558458851d665c06b6774e2a7fcf8527aaebb99992c8dd854b7b",
+      "terminal_sha256": "2b06445e362daa9e6478bfaac1ae54f5ef2bb49a9eea994f3738da91409799be"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-instrumented",
+      "report_sha256": "dc195e172566dfde4f48ff9477b43a0bade0b1bf1b1be71ae674ebdd0284427a",
+      "terminal_sha256": "089e9a113e06ea72b1d5e9d1529c92ef78b9ecfd925fcea292b87f7b442a4f34"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-file-warm",
+      "report_sha256": "e34ef906892eadc0de470b4607d894a3e7a98dd21cb15ed3adf5237959bd43c0",
+      "terminal_sha256": "b9287601f4c63fc1b1f9d3e1af3c4c2fd504431540e276a82be3dcc1a2ea926e"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-short",
+      "report_sha256": "37c08d1308da967a9ba89151a6607826ad52622fd56fb343b9adc6edc641818a",
+      "terminal_sha256": "e1e4926527bb0335620f8711d63f71675af817ebb8803220616645cced0cb3f4"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-delayed",
+      "report_sha256": "84df06bd526c1d8f3bd44c41b1a6c02ec4aed56e341c39962dd3ba13306f538b",
+      "terminal_sha256": "e797ca8be863c304cf564dda72e68c6ba99722486c1874c55f2089589232af84"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-normal-range-zero",
+      "report_sha256": "464de123568bcb883df87da2122955ae934e2694096f4069a3c025cd1d7fdf9a",
+      "terminal_sha256": "92095211a395f55422a0fe5cb9f7639f347bb081f13d8f875381a168da4fe1fe"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-owned",
+      "report_sha256": "8519cb2a5319a24e54ba171982b629433cee8be3297395e607cbbd044ecc9441",
+      "terminal_sha256": "8cc5fe7981b77d1ad0a40aeaa2ba8a88b81126199ad579be3fd24eda4fe3620c"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-instrumented",
+      "report_sha256": "45dc62c00aeaead275384ba42c5df1538e73e9daa45e49f1f13ca7b340630ed0",
+      "terminal_sha256": "e6b76228edd1bd5f50b0f6f742b07dc581f01461bbad6962e1e71ea6977d3fcc"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-file-warm",
+      "report_sha256": "0146e5209c6dd7109c38e7d9703f63ad3458f6f01d5b5627a69bb6f49c10ec26",
+      "terminal_sha256": "92b5c3616b7b3a45229eb11f699879fbb4a68b30c33442fb72d13a6097bf6d37"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-short",
+      "report_sha256": "5ac4904cea1f7387ed0591d7aee37149826c01080351e9948c5d08a8dd7f2ee4",
+      "terminal_sha256": "4055ae87a7fcecd95a5c2b307aec4ed3f9e0b15dae7fb7d8924d9b434c17be2c"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-delayed",
+      "report_sha256": "dd8aed2fe6f6cfd3757fbea34ecdcf9e1355d68927becf6a7e91890bdb56d0d5",
+      "terminal_sha256": "3d088aacb94704b4120976711442fad6175f7b093102b7386a145ae1e01d758f"
+    },
+    {
+      "label": "pilot-r1-after-unmanaged-api-allocator-range-zero",
+      "report_sha256": "bd79dd2486698231d68c99a903c8d9cd4f1531c93adef7a6aa46362db02b6bb4",
+      "terminal_sha256": "7268a245552426e7f367050371dfb54c72d83d84df35c3ce614d358f4366c358"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-owned",
+      "report_sha256": "e3ab8fcdf7d46c43e13e7fad5acb8c78bb8c5091ae7916c5ee523b37ad6d22a0",
+      "terminal_sha256": "10f9e105cc712a76fd6e5882b835387b00336e090d70424e587c34b5bda20d80"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-instrumented",
+      "report_sha256": "1d8fb7e5aa875fc27addd9265e575382ce8ffb1136dd5b6260e59744c608c3a9",
+      "terminal_sha256": "cd5df8ab0b62d9ef7b882a1f5d7075daef2a7c5d5420c3a078660e20fe11723c"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-file-warm",
+      "report_sha256": "40d99efb255ca4a0bed39e7259ef8f64dc7dde083eb14b209084302394c38282",
+      "terminal_sha256": "4275a493d8c0945c26567f717aa03362dd1c39fbbf47796eec3cc9d236b9614a"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-short",
+      "report_sha256": "2e357be2be02832856ef908c51fa081e991b1880778c264e953b1faa1c3c0629",
+      "terminal_sha256": "586f610a8aead8fb218efc16bdca9cd60270e2c54c50ef13357d375275e52664"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-delayed",
+      "report_sha256": "ce0c4ff8b357471d503b9b46f822af49cfe1c321110f0bf5290d2be865982112",
+      "terminal_sha256": "aa3a1fefdafabf9ff231a1adce66f57458d782b51cbfae522a4acffe098a2b87"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-normal-range-zero",
+      "report_sha256": "39df72d6e7f78ac3515a1686ab7b7ea2a1c79b8b678f73dfcff0e910ef5cad58",
+      "terminal_sha256": "e458e91139edb12db04547b38440ddb2f3adfd7ee89fc3b6e1b508a3860d7485"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-owned",
+      "report_sha256": "80b57bbed60a5cc24181cc4850e293e093b4722ad90ffa7dbd09ce57273d41ac",
+      "terminal_sha256": "50bfecb11f9c52bd0ad81d80fa3a3957102a762b02e42de8b18b60b384af5281"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-instrumented",
+      "report_sha256": "e17334b01b611a6218d6d7dfd420375302fb277aa27184992524973d40d6feb8",
+      "terminal_sha256": "6c7c38c8f5d700cc8667ea201a55681cdad458f2c01a7782ed422a91e22cc05a"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-file-warm",
+      "report_sha256": "a97290779a54f3acfa37fc3b94c1357f9965f4cd6fe8aa497b9b12451484e696",
+      "terminal_sha256": "cba19d8cfac7535410652437dcc36e875a159f75b79abe118ba3e72cbb692b16"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-short",
+      "report_sha256": "9afb88a14d8c4c130c91687c88f9fede28a163695c13c86beb1a4518ff9f61c0",
+      "terminal_sha256": "1796023cf6ac972d3b85c32fb4d9e2e452cb181c82ac71260c1c71a359046a3c"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-delayed",
+      "report_sha256": "06fe3eaaa780716d1e4daaf71b00a1a75bf28291d4e10a07eed4fd4ea466b5f9",
+      "terminal_sha256": "bb12c9123cb3b9fb11de8d5eb04724f5bed837545ad29bcaf02fed32af0290cf"
+    },
+    {
+      "label": "pilot-r1-after-managed-api-allocator-range-zero",
+      "report_sha256": "bc1b6a2899c5fd8849819fe6fdbc7c9ed3a31b78c7ffb84336d69c6fcdf28621",
+      "terminal_sha256": "a5cdab4e195f248d433117ced4dc9e59a4c760abe954a89418d797372d5ba912"
+    }
+  ],
+  "schema": "docx-edit-provider-managed-verification-v1",
+  "status": "pass",
+  "summary_sha256": "614cf7a7e98a92c2826be9d6f59d478c47f6f1130d6de071b6ad58ab5bfa4ca7",
+  "verified_utc": "2026-09-10T12:34:39.291356+00:00",
+  "version": 1
+}
