@@ -1113,6 +1113,8 @@ enum Case {
     OpcFileSourceOpen,
     OpcFileEagerOnePartAtomicSave,
     OpcFileSourceOnePartAtomicSave,
+    ProviderFileReadAt,
+    ProviderAtomicSave,
     CfbFileSameLengthOverlayAtomicSave,
     CfbFileOwnedSameLengthOverlayAtomicSave,
     PptxFileEagerOpen,
@@ -1359,6 +1361,8 @@ enum Case {
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
+    ProviderRangeReadAt,
+    ProviderNonSeekWrite,
     XlsxRangeSourceOpen,
     XlsxRangeSourceListSheets,
     XlsxRangeSourceFirstCell,
@@ -1597,6 +1601,8 @@ impl Case {
             Self::OpcFileSourceOpen => "opc_file_source_open",
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
             Self::OpcFileSourceOnePartAtomicSave => "opc_file_source_one_part_atomic_save",
+            Self::ProviderFileReadAt => "provider_file_read_at",
+            Self::ProviderAtomicSave => "provider_atomic_save",
             Self::CfbFileSameLengthOverlayAtomicSave => "cfb_file_same_length_overlay_atomic_save",
             Self::CfbFileOwnedSameLengthOverlayAtomicSave => {
                 "cfb_file_owned_same_length_overlay_atomic_save"
@@ -1945,6 +1951,8 @@ impl Case {
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
+            Self::ProviderRangeReadAt => "provider_range_read_at",
+            Self::ProviderNonSeekWrite => "provider_nonseek_write",
             Self::XlsxRangeSourceOpen => "xlsx_range_source_open",
             Self::XlsxRangeSourceListSheets => "xlsx_range_source_list_sheets",
             Self::XlsxRangeSourceFirstCell => "xlsx_range_source_first_cell",
@@ -2174,8 +2182,10 @@ impl Case {
                 | Self::OpcSourceMaterializeAccounted
                 | Self::OpcSourceCachedMainRead
                 | Self::OpcSourceConcurrentSamePart
+                | Self::ProviderNonSeekWrite
                 | Self::OpcRangeSourceOpen
                 | Self::OpcRangeSourceOpenMainRead
+                | Self::ProviderRangeReadAt
                 | Self::OpcOpenSessionScaling
         )
     }
@@ -3024,6 +3034,8 @@ impl Case {
                 | Self::OpcFileSourceOpen
                 | Self::OpcFileEagerOnePartAtomicSave
                 | Self::OpcFileSourceOnePartAtomicSave
+                | Self::ProviderFileReadAt
+                | Self::ProviderAtomicSave
                 | Self::CfbFileSameLengthOverlayAtomicSave
                 | Self::CfbFileOwnedSameLengthOverlayAtomicSave
                 | Self::PptxFileEagerOpen
@@ -3061,6 +3073,16 @@ impl Case {
                 | Self::OdtFileSourceOpen
                 | Self::OdtFileEagerOpenFullTextLifecycle
                 | Self::OdtFileSourceOpenFullTextLifecycle
+        )
+    }
+
+    const fn is_provider_axis(self) -> bool {
+        matches!(
+            self,
+            Self::ProviderFileReadAt
+                | Self::ProviderAtomicSave
+                | Self::ProviderRangeReadAt
+                | Self::ProviderNonSeekWrite
         )
     }
 
@@ -4295,8 +4317,10 @@ struct CfbSelectiveImplementationEvidence {
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 struct CfbSelectiveSimulationPhase {
     logical_read_calls: u64,
+    logical_requested_bytes: u64,
     logical_read_bytes: u64,
     physical_request_count: u64,
+    physical_requested_bytes: u64,
     physical_request_bytes: u64,
     physical_request_sizes: Vec<u64>,
     /// Raw `(offset, requested_len, returned_len)` physical source events in
@@ -4758,6 +4782,15 @@ struct SourceSummary {
     xls_visibility: Option<XlsVisibilitySourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     simulation: Option<RangeSimulationSummary>,
+    /// Explicit provider/sink accounting for the opt-in provider-axis rows.
+    ///
+    /// The ordinary source counters remain the compatibility surface for the
+    /// historical matrix.  This separate envelope makes the distinction
+    /// between caller-visible logical reads, simulator requests, storage I/O,
+    /// and unavailable copy/decompression counters reviewable without
+    /// changing the legacy 201-row schema contract.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provider_axis: Option<ProviderAxisSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4843,8 +4876,95 @@ struct SourceSummary {
     docx_section_layout: Option<DocxSectionLayoutSummary>,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+struct ProviderAxisSummary {
+    axis: &'static str,
+    implementation: &'static str,
+    timing_scope: &'static str,
+    /// Original retained-sample index for each provider vector entry.  All
+    /// provider vectors are emitted in this elapsed-time order, matching the
+    /// top-level `elapsed_ns.samples` view.
+    sample_order: Vec<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    simulation_config: Option<RangeSimulationConfig>,
+    logical_counter_scope: &'static str,
+    physical_counter_scope: &'static str,
+    request_distribution_scope: &'static str,
+    copied_bytes_scope: &'static str,
+    decompressed_bytes_scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_read_calls: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_read_requested_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_read_returned_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    physical_request_count: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    physical_requested_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    physical_returned_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_sizes: Option<Vec<Vec<u64>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    copied_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decompressed_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    storage_read_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    storage_write_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sink_accepted_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sink_write_calls: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sink_write_sizes: Option<Vec<Vec<u64>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sink_write_size_buckets: Option<Vec<WriteSizeBuckets>>,
+    correctness_oracle: &'static str,
+    correctness_verified: Vec<bool>,
+}
+
 fn boxed_source(source: SourceSummary) -> Option<Box<SourceSummary>> {
     Some(Box::new(source))
+}
+
+fn reorder_provider_axis_summary(
+    summary: &mut ProviderAxisSummary,
+    sample_order: &[usize],
+) -> Result<(), Box<dyn Error>> {
+    if summary.sample_order != sample_order {
+        return Err("provider summary sample order differs from elapsed_ns".into());
+    }
+    reorder_sample_vector(&mut summary.correctness_verified, sample_order)?;
+    for values in [
+        &mut summary.logical_read_calls,
+        &mut summary.logical_read_requested_bytes,
+        &mut summary.logical_read_returned_bytes,
+        &mut summary.physical_request_count,
+        &mut summary.physical_requested_bytes,
+        &mut summary.physical_returned_bytes,
+        &mut summary.copied_bytes,
+        &mut summary.decompressed_bytes,
+        &mut summary.storage_read_bytes,
+        &mut summary.storage_write_bytes,
+        &mut summary.sink_accepted_bytes,
+        &mut summary.sink_write_calls,
+    ] {
+        if let Some(values) = values.as_mut() {
+            reorder_sample_vector(values, sample_order)?;
+        }
+    }
+    for values in [&mut summary.request_sizes, &mut summary.sink_write_sizes] {
+        if let Some(values) = values.as_mut() {
+            reorder_sample_vector(values, sample_order)?;
+        }
+    }
+    if let Some(values) = summary.sink_write_size_buckets.as_mut() {
+        reorder_sample_vector(values, sample_order)?;
+    }
+    Ok(())
 }
 
 /// Exact, untimed identity and per-sample count gates for the relationship
@@ -6146,8 +6266,14 @@ struct XlsVisibilityIterationEvidence {
 #[derive(Clone, Debug, Default, Serialize)]
 struct RangeSimulationSummary {
     logical_read_calls: Vec<u64>,
+    logical_requested_bytes: Vec<u64>,
     logical_read_bytes: Vec<u64>,
     physical_request_count: Vec<u64>,
+    /// Sum of requested physical ranges.  This is distinct from
+    /// `physical_request_bytes`, which is the number of bytes returned by the
+    /// backing source and can be smaller at EOF.
+    physical_requested_bytes: Vec<u64>,
+    /// Sum of bytes returned by the backing source for the physical requests.
     physical_request_bytes: Vec<u64>,
     physical_request_sizes: Vec<Vec<u64>>,
     physical_request_size_buckets: Vec<RequestSizeBuckets>,
@@ -6886,7 +7012,7 @@ impl io::Read for SimulatedCursor {
                 break;
             }
         }
-        self.metrics.record_logical(copied)?;
+        self.metrics.record_logical(output.len(), copied)?;
         self.position = self
             .position
             .checked_add(u64::try_from(copied).map_err(|_error| {
@@ -6921,8 +7047,10 @@ impl Seek for SimulatedCursor {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct RangeSimulationSnapshot {
     logical_read_calls: u64,
+    logical_requested_bytes: u64,
     logical_read_bytes: u64,
     physical_request_count: u64,
+    physical_requested_bytes: u64,
     physical_request_bytes: u64,
     physical_request_sizes: Vec<u64>,
     physical_ranges: Vec<[u64; 3]>,
@@ -6932,8 +7060,10 @@ struct RangeSimulationSnapshot {
 #[derive(Debug, Default)]
 struct SimulatedRangeMetrics {
     logical_read_calls: AtomicU64,
+    logical_requested_bytes: AtomicU64,
     logical_read_bytes: AtomicU64,
     physical_request_count: AtomicU64,
+    physical_requested_bytes: AtomicU64,
     physical_request_bytes: AtomicU64,
     physical_request_sizes: Mutex<Vec<u64>>,
     physical_ranges: Mutex<Vec<[u64; 3]>>,
@@ -6953,8 +7083,10 @@ impl SimulatedRangeMetrics {
         }
         Ok(RangeSimulationSnapshot {
             logical_read_calls: self.logical_read_calls.load(Ordering::SeqCst),
+            logical_requested_bytes: self.logical_requested_bytes.load(Ordering::SeqCst),
             logical_read_bytes: self.logical_read_bytes.load(Ordering::SeqCst),
             physical_request_count: self.physical_request_count.load(Ordering::SeqCst),
+            physical_requested_bytes: self.physical_requested_bytes.load(Ordering::SeqCst),
             physical_request_bytes: self.physical_request_bytes.load(Ordering::SeqCst),
             physical_request_sizes: sizes,
             physical_ranges: self
@@ -6968,8 +7100,10 @@ impl SimulatedRangeMetrics {
 
     fn reset(&self) -> io::Result<()> {
         self.logical_read_calls.store(0, Ordering::SeqCst);
+        self.logical_requested_bytes.store(0, Ordering::SeqCst);
         self.logical_read_bytes.store(0, Ordering::SeqCst);
         self.physical_request_count.store(0, Ordering::SeqCst);
+        self.physical_requested_bytes.store(0, Ordering::SeqCst);
         self.physical_request_bytes.store(0, Ordering::SeqCst);
         self.physical_request_sizes
             .lock()
@@ -6982,10 +7116,15 @@ impl SimulatedRangeMetrics {
         Ok(())
     }
 
-    fn record_logical(&self, bytes: usize) -> io::Result<()> {
+    fn record_logical(&self, requested: usize, returned: usize) -> io::Result<()> {
         self.logical_read_calls.fetch_add(1, Ordering::SeqCst);
+        self.logical_requested_bytes.fetch_add(
+            u64::try_from(requested)
+                .map_err(|_error| io::Error::other("logical request size does not fit u64"))?,
+            Ordering::SeqCst,
+        );
         self.logical_read_bytes.fetch_add(
-            u64::try_from(bytes)
+            u64::try_from(returned)
                 .map_err(|_error| io::Error::other("logical read size does not fit u64"))?,
             Ordering::SeqCst,
         );
@@ -7003,6 +7142,8 @@ impl SimulatedRangeMetrics {
             ));
         }
         self.physical_request_count.fetch_add(1, Ordering::SeqCst);
+        self.physical_requested_bytes
+            .fetch_add(requested, Ordering::SeqCst);
         self.physical_request_bytes
             .fetch_add(returned, Ordering::SeqCst);
         self.physical_request_sizes
@@ -8277,7 +8418,7 @@ impl ReadAt for SimulatedRangeSource {
                 break;
             }
         }
-        self.metrics.record_logical(total)?;
+        self.metrics.record_logical(output.len(), total)?;
         Ok(total)
     }
 
@@ -8772,10 +8913,16 @@ impl SourceSummary {
             .simulation
             .get_or_insert_with(RangeSimulationSummary::default);
         summary.logical_read_calls.push(snapshot.logical_read_calls);
+        summary
+            .logical_requested_bytes
+            .push(snapshot.logical_requested_bytes);
         summary.logical_read_bytes.push(snapshot.logical_read_bytes);
         summary
             .physical_request_count
             .push(snapshot.physical_request_count);
+        summary
+            .physical_requested_bytes
+            .push(snapshot.physical_requested_bytes);
         summary
             .physical_request_bytes
             .push(snapshot.physical_request_bytes);
@@ -9057,6 +9204,26 @@ fn validate_opc_source_overlay_multi_part_options(
     Ok(())
 }
 
+fn validate_provider_axis_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    let has_bounded_synthetic_provider = cases.iter().any(|case| {
+        case.is_provider_axis()
+            && matches!(case, Case::ProviderRangeReadAt | Case::ProviderNonSeekWrite)
+    });
+    if has_bounded_synthetic_provider
+        && (shapes != [CorpusShape::Tiny].as_slice()
+            || payloads != [PayloadKind::Compressible].as_slice())
+    {
+        return Err(
+            "synthetic provider-axis selectors require --shape tiny --payload compressible".into(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_docx_section_layout_options(
     cases: &[Case],
     shapes: &[CorpusShape],
@@ -9225,6 +9392,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         &options.payloads,
     )?;
     validate_opc_serial_eager_open_options(&options.cases, &options.shapes, &options.payloads)?;
+    validate_provider_axis_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_pptx_source_image_query_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_opc_casefold_lookup_options(&options.cases, &options.shapes, &options.payloads)?;
@@ -11759,6 +11927,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
         "opc_file_eager_one_part_atomic_save" => Some(Case::OpcFileEagerOnePartAtomicSave),
         "opc_file_source_one_part_atomic_save" => Some(Case::OpcFileSourceOnePartAtomicSave),
+        "provider_file_read_at" => Some(Case::ProviderFileReadAt),
+        "provider_atomic_save" => Some(Case::ProviderAtomicSave),
         "cfb_file_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileSameLengthOverlayAtomicSave)
         },
@@ -12129,6 +12299,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
+        "provider_range_read_at" => Some(Case::ProviderRangeReadAt),
+        "provider_nonseek_write" => Some(Case::ProviderNonSeekWrite),
         "xlsx_range_source_open" => Some(Case::XlsxRangeSourceOpen),
         "xlsx_range_source_list_sheets" => Some(Case::XlsxRangeSourceListSheets),
         "xlsx_range_source_first_cell" => Some(Case::XlsxRangeSourceFirstCell),
@@ -12416,6 +12588,7 @@ fn usage_text() -> String {
                                        opc_file_eager_open,opc_file_source_open,\n\
                                        opc_file_eager_one_part_atomic_save,\n\
                                        opc_file_source_one_part_atomic_save,\n\
+                                       provider_file_read_at,provider_atomic_save,\n\
                                        cfb_file_same_length_overlay_atomic_save,\n\
                                        cfb_file_owned_same_length_overlay_atomic_save,\n\
                                        pptx_file_eager_open,pptx_file_source_open,\n\
@@ -12623,6 +12796,7 @@ fn usage_text() -> String {
                                        xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
+                                       provider_range_read_at,provider_nonseek_write,\n\
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
@@ -23067,6 +23241,9 @@ fn run_case_with_config(
             Err("OPC case-fold lookup uses its fixed dedicated corpus runner".into())
         },
         Case::OpcNoopSave => run_opc_noop_save(corpus, warmup_iterations, samples),
+        Case::ProviderNonSeekWrite => {
+            run_provider_nonseek_write(corpus, warmup_iterations, samples)
+        },
         Case::OpcMutatedSave => run_opc_mutated_save(corpus, warmup_iterations, samples),
         Case::OpcSourceOpen => run_opc_source_open(corpus, warmup_iterations, samples, false),
         Case::OpcSourceOpenMainRead => {
@@ -23104,6 +23281,8 @@ fn run_case_with_config(
         | Case::OpcFileSourceOpen
         | Case::OpcFileEagerOnePartAtomicSave
         | Case::OpcFileSourceOnePartAtomicSave
+        | Case::ProviderFileReadAt
+        | Case::ProviderAtomicSave
         | Case::CfbFileSameLengthOverlayAtomicSave
         | Case::CfbFileOwnedSameLengthOverlayAtomicSave
         | Case::PptxFileEagerOpen
@@ -23467,6 +23646,9 @@ fn run_case_with_config(
         },
         Case::OpcRangeSourceOpenMainRead => {
             run_opc_range_source_open(corpus, warmup_iterations, samples, range_simulation, true)
+        },
+        Case::ProviderRangeReadAt => {
+            run_provider_range_read_at(corpus, warmup_iterations, samples, range_simulation)
         },
         Case::XlsxRangeSourceOpen => {
             run_xlsx_range_source_open(corpus, warmup_iterations, samples, range_simulation)
@@ -45531,6 +45713,24 @@ fn verify_simulation_snapshot(
     if snapshot.logical_read_bytes != snapshot.physical_request_bytes {
         return Err(format!("{context} logical and physical byte totals differ").into());
     }
+    if snapshot.logical_requested_bytes < snapshot.logical_read_bytes {
+        return Err(
+            format!("{context} logical requested bytes are smaller than returned bytes").into(),
+        );
+    }
+    let requested_bytes = snapshot
+        .physical_request_sizes
+        .iter()
+        .try_fold(0_u64, |total, &bytes| total.checked_add(bytes))
+        .ok_or_else(|| format!("{context} physical requested-byte total overflows u64"))?;
+    if requested_bytes != snapshot.physical_requested_bytes
+        || snapshot.physical_requested_bytes < snapshot.physical_request_bytes
+    {
+        return Err(format!(
+            "{context} physical requested and returned byte totals are inconsistent"
+        )
+        .into());
+    }
     if snapshot.physical_request_count != u64::try_from(snapshot.physical_request_sizes.len())?
         || snapshot
             .physical_request_sizes
@@ -45595,6 +45795,76 @@ fn run_opc_range_source_open(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result_with_source(case, corpus, elapsed, source_summary))
+}
+
+/// Bounded provider-axis control for a positional range source.  The
+/// simulator exposes both caller-visible logical reads and its own requested
+/// physical chunks; the latter are explicitly simulator events and never
+/// presented as storage-I/O measurements.
+fn run_provider_range_read_at(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut result = run_opc_range_source_open(corpus, warmup_iterations, samples, config, true)?;
+    result.case = Case::ProviderRangeReadAt.name();
+    let sample_order = result.elapsed_ns.sample_order.clone();
+    let source = result
+        .source
+        .as_mut()
+        .ok_or("provider range result omitted source summary")?;
+    let simulation = source
+        .simulation
+        .as_ref()
+        .ok_or("provider range result omitted simulation summary")?;
+    let sample_count = result.elapsed_ns.samples.len();
+    if sample_order.len() != sample_count {
+        return Err("provider range elapsed sample order has the wrong length".into());
+    }
+    if simulation.logical_read_calls.len() != sample_count
+        || simulation.logical_requested_bytes.len() != sample_count
+        || simulation.logical_read_bytes.len() != sample_count
+        || simulation.physical_request_count.len() != sample_count
+        || simulation.physical_requested_bytes.len() != sample_count
+        || simulation.physical_request_bytes.len() != sample_count
+        || simulation.physical_request_sizes.len() != sample_count
+    {
+        return Err("provider range summary is not aligned with elapsed samples".into());
+    }
+    let target_payload_bytes = u64::try_from(corpus.target_payload.len())?;
+    let mut provider = ProviderAxisSummary {
+        axis: "range_read_at",
+        implementation: "SimulatedRangeSource over InstrumentedSource",
+        timing_scope: "SourceBackedPackage::from_read_at plus one main-part payload read; corpus construction, semantic oracle, and metric snapshots are outside elapsed_ns",
+        sample_order: sample_order.clone(),
+        simulation_config: Some(config),
+        logical_counter_scope: "ReadAt calls and returned bytes observed by the simulated provider",
+        physical_counter_scope: "simulated physical chunks only; no OS or storage-I/O claim",
+        request_distribution_scope: "physical requested chunk sizes and size buckets in source.simulation",
+        copied_bytes_scope: "not_measured: the simulator does not expose internal buffer-copy events",
+        decompressed_bytes_scope: "verified target payload bytes returned by the OPC data reader",
+        logical_read_calls: Some(simulation.logical_read_calls.clone()),
+        logical_read_requested_bytes: Some(simulation.logical_requested_bytes.clone()),
+        logical_read_returned_bytes: Some(simulation.logical_read_bytes.clone()),
+        physical_request_count: Some(simulation.physical_request_count.clone()),
+        physical_requested_bytes: Some(simulation.physical_requested_bytes.clone()),
+        physical_returned_bytes: Some(simulation.physical_request_bytes.clone()),
+        request_sizes: Some(simulation.physical_request_sizes.clone()),
+        copied_bytes: None,
+        decompressed_bytes: Some(vec![target_payload_bytes; sample_count]),
+        storage_read_bytes: None,
+        storage_write_bytes: None,
+        sink_accepted_bytes: None,
+        sink_write_calls: None,
+        sink_write_sizes: None,
+        sink_write_size_buckets: None,
+        correctness_oracle: "all OPC parts, main relationship, target payload bytes, and target payload SHA-256 verified after every measured sample",
+        correctness_verified: vec![true; sample_count],
+    };
+    reorder_provider_axis_summary(&mut provider, &sample_order)?;
+    source.provider_axis = Some(provider);
+    Ok(result)
 }
 
 fn verify_opc_main_payload(
@@ -54838,6 +55108,64 @@ fn run_opc_noop_save(
     )
 }
 
+/// Bounded non-seek sink control.  It reuses the historical exact no-op OPC
+/// publication workload while exposing sink acceptance and copy accounting in
+/// the provider-axis envelope.
+fn run_provider_nonseek_write(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut result = run_opc_noop_save(corpus, warmup_iterations, samples)?;
+    result.case = Case::ProviderNonSeekWrite.name();
+    result.output_sha256 = Some(corpus.manifest.archive_sha256.clone());
+    let sink = result
+        .sink
+        .as_ref()
+        .ok_or("provider non-seek result omitted sink summary")?;
+    let sample_count = result.elapsed_ns.samples.len();
+    let summary = *sink;
+    let sample_order = result.elapsed_ns.sample_order.clone();
+    if sample_order.len() != sample_count {
+        return Err("provider non-seek elapsed sample order has the wrong length".into());
+    }
+    let mut provider = ProviderAxisSummary {
+        axis: "non_seek_sink",
+        implementation: "PackageWriter::write_to_stream + CountingSink",
+        timing_scope: "PackageWriter::write_to_stream into a pre-reserved non-seek sink; corpus parsing, exact-byte oracle, and sink finalization are outside elapsed_ns",
+        sample_order: sample_order.clone(),
+        simulation_config: None,
+        logical_counter_scope: "not_applicable: owned OPC package is already in memory",
+        physical_counter_scope: "not_measured: no filesystem or storage provider is used",
+        request_distribution_scope: "sink write-call count, largest write, and write-size buckets in result.sink",
+        copied_bytes_scope: "CountingSink::extend_from_slice accepted bytes; excludes package-internal copies",
+        decompressed_bytes_scope: "not_measured: no part payload is materialized during no-op publication",
+        logical_read_calls: None,
+        logical_read_requested_bytes: None,
+        logical_read_returned_bytes: None,
+        physical_request_count: None,
+        physical_requested_bytes: None,
+        physical_returned_bytes: None,
+        request_sizes: None,
+        copied_bytes: Some(vec![summary.accepted_bytes; sample_count]),
+        decompressed_bytes: None,
+        storage_read_bytes: None,
+        storage_write_bytes: None,
+        sink_accepted_bytes: Some(vec![summary.accepted_bytes; sample_count]),
+        sink_write_calls: Some(vec![summary.write_calls; sample_count]),
+        sink_write_sizes: None,
+        sink_write_size_buckets: Some(vec![summary.write_size_buckets; sample_count]),
+        correctness_oracle: "exact sink bytes equal the deterministic OPC archive and the archive SHA-256 is stable for every measured sample",
+        correctness_verified: vec![true; sample_count],
+    };
+    reorder_provider_axis_summary(&mut provider, &sample_order)?;
+    result.source = boxed_source(SourceSummary {
+        provider_axis: Some(provider),
+        ..SourceSummary::default()
+    });
+    Ok(result)
+}
+
 fn run_opc_mutated_save(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -56317,6 +56645,7 @@ fn cfb_simulation_phase_allow_empty(
     if snapshot.logical_read_calls == 0
         && snapshot.logical_read_bytes == 0
         && snapshot.physical_request_count == 0
+        && snapshot.physical_requested_bytes == 0
         && snapshot.physical_request_bytes == 0
         && snapshot.physical_request_sizes.is_empty()
         && snapshot.physical_ranges.is_empty()
@@ -56324,8 +56653,10 @@ fn cfb_simulation_phase_allow_empty(
     {
         return Ok(CfbSelectiveSimulationPhase {
             logical_read_calls: 0,
+            logical_requested_bytes: 0,
             logical_read_bytes: 0,
             physical_request_count: 0,
+            physical_requested_bytes: 0,
             physical_request_bytes: 0,
             physical_request_sizes: Vec::new(),
             physical_ranges: Vec::new(),
@@ -56350,6 +56681,19 @@ fn cfb_simulation_phase(
     if snapshot.logical_read_bytes != snapshot.physical_request_bytes {
         return Err("simulated CFB logical and physical bytes differ".into());
     }
+    if snapshot.logical_requested_bytes < snapshot.logical_read_bytes {
+        return Err("simulated CFB logical requested bytes are smaller than returned bytes".into());
+    }
+    let requested_bytes = snapshot
+        .physical_request_sizes
+        .iter()
+        .try_fold(0_u64, |total, &bytes| total.checked_add(bytes))
+        .ok_or("simulated CFB physical requested-byte total overflows u64")?;
+    if requested_bytes != snapshot.physical_requested_bytes
+        || snapshot.physical_requested_bytes < snapshot.physical_request_bytes
+    {
+        return Err("simulated CFB physical requested and returned byte totals differ".into());
+    }
     let max_physical_range_bytes = u64::try_from(config.max_physical_range_bytes)?;
     if snapshot.physical_request_count != u64::try_from(snapshot.physical_request_sizes.len())?
         || snapshot
@@ -56369,8 +56713,10 @@ fn cfb_simulation_phase(
     let simulated_service_floor_ns = simulated_service_floor_ns(&snapshot, config)?;
     Ok(CfbSelectiveSimulationPhase {
         logical_read_calls: snapshot.logical_read_calls,
+        logical_requested_bytes: snapshot.logical_requested_bytes,
         logical_read_bytes: snapshot.logical_read_bytes,
         physical_request_count: snapshot.physical_request_count,
+        physical_requested_bytes: snapshot.physical_requested_bytes,
         physical_request_bytes: snapshot.physical_request_bytes,
         physical_request_sizes: snapshot.physical_request_sizes,
         physical_ranges: snapshot.physical_ranges,
@@ -56405,6 +56751,10 @@ fn combine_range_simulation_snapshots(
             .logical_read_calls
             .checked_add(read.logical_read_calls)
             .ok_or("simulated CFB logical request count overflows u64")?,
+        logical_requested_bytes: open
+            .logical_requested_bytes
+            .checked_add(read.logical_requested_bytes)
+            .ok_or("simulated CFB logical requested byte count overflows u64")?,
         logical_read_bytes: open
             .logical_read_bytes
             .checked_add(read.logical_read_bytes)
@@ -56413,6 +56763,10 @@ fn combine_range_simulation_snapshots(
             .physical_request_count
             .checked_add(read.physical_request_count)
             .ok_or("simulated CFB physical request count overflows u64")?,
+        physical_requested_bytes: open
+            .physical_requested_bytes
+            .checked_add(read.physical_requested_bytes)
+            .ok_or("simulated CFB physical requested byte count overflows u64")?,
         physical_request_bytes: open
             .physical_request_bytes
             .checked_add(read.physical_request_bytes)
@@ -58227,7 +58581,7 @@ mod tests {
         OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE, OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX, OpcCacheMode,
         OpcPackage, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
         PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT,
-        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PackURI, PayloadKind,
+        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PackURI, PayloadKind, ProviderAxisSummary,
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
@@ -58258,9 +58612,9 @@ mod tests {
         cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         parse_case, payload_bytes, pptx_named_slide_name, prepare_opc_materialization_oracle,
-        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
-        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
-        run_docx_source_backed_existing_section_layout_edit_save,
+        reorder_provider_axis_summary, resolve_execution_workers, run_case, run_case_with_config,
+        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
+        run_cfb_selective_simulated_read, run_docx_source_backed_existing_section_layout_edit_save,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_serial_eager_open, run_opc_source_cache_budget_boundary,
         run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
@@ -58276,11 +58630,11 @@ mod tests {
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
         simulated_request_delay, statistics, updated_writer_text, usage_text,
         validate_opc_serial_eager_open_options, validate_pptx_source_image_query_options,
-        validate_xls_source_locality, validate_xls_source_options, verify_opc_materialized_package,
-        verify_opc_serial_eager_fixed_corpus_preflight, verify_xlsx_cells, writer_shape,
-        xls_owned_source_dispatch_cases, xls_source_family_dispatch_cases,
-        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
-        xlsx_cell_count, xlsx_spec, zip_member_ranges,
+        validate_provider_axis_options, validate_xls_source_locality, validate_xls_source_options,
+        verify_opc_materialized_package, verify_opc_serial_eager_fixed_corpus_preflight,
+        verify_xlsx_cells, writer_shape, xls_owned_source_dispatch_cases,
+        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
+        xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
     };
 
     #[test]
@@ -59365,6 +59719,7 @@ mod tests {
 
         let check_phase = |phase: &CfbSelectiveSimulationPhase| {
             assert!(phase.logical_read_calls > 0);
+            assert!(phase.logical_requested_bytes >= phase.logical_read_bytes);
             assert!(phase.logical_read_bytes > 0);
             assert_eq!(phase.logical_read_bytes, phase.physical_request_bytes);
             assert_eq!(
@@ -59473,7 +59828,11 @@ mod tests {
     fn selectable_case_count_matches_current_enumeration() {
         // `Case` is the central selectable-name enumeration. Keep the
         // documented current count mechanically tied to that enum until a
-        // generated registry replaces the exhaustive `Case::name` match.
+        // generated registry replaces the exhaustive `Case::name` match. The
+        // four provider-axis controls below are deliberately opt-in: they
+        // increase the selectable registry without changing the default 37
+        // cases or the separate default allocator contract of 201 rows.
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 443;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
@@ -59491,8 +59850,16 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 439);
+        assert_eq!(selectable_count, EXPECTED_SELECTABLE_CASE_COUNT);
         assert_eq!(Case::DEFAULT.len(), 37);
+        for case in [
+            Case::ProviderFileReadAt,
+            Case::ProviderAtomicSave,
+            Case::ProviderRangeReadAt,
+            Case::ProviderNonSeekWrite,
+        ] {
+            assert!(!Case::DEFAULT.contains(&case));
+        }
     }
 
     #[test]
@@ -60177,6 +60544,7 @@ mod tests {
         };
         let assert_phase = |phase: &CfbSelectiveSimulationPhase| {
             if phase.logical_read_calls == 0 {
+                assert_eq!(phase.logical_requested_bytes, 0);
                 assert_eq!(phase.logical_read_bytes, 0);
                 assert_eq!(phase.physical_request_count, 0);
                 assert_eq!(phase.physical_request_bytes, 0);
@@ -60184,6 +60552,7 @@ mod tests {
                 assert!(phase.physical_ranges.is_empty());
                 assert_eq!(phase.simulated_service_floor_ns, 0);
             } else {
+                assert!(phase.logical_requested_bytes >= phase.logical_read_bytes);
                 assert_eq!(
                     phase.physical_request_count,
                     u64::try_from(phase.physical_ranges.len()).unwrap()
@@ -67309,8 +67678,10 @@ mod tests {
         assert_eq!(output, bytes);
         let first = source.snapshot().unwrap();
         assert_eq!(first.logical_read_calls, 1);
+        assert_eq!(first.logical_requested_bytes, 10_000);
         assert_eq!(first.logical_read_bytes, 10_000);
         assert_eq!(first.physical_request_count, 3);
+        assert_eq!(first.physical_requested_bytes, 10_000);
         assert_eq!(first.physical_request_bytes, 10_000);
         assert_eq!(first.physical_request_sizes, vec![1_808, 4_096, 4_096]);
         assert_eq!(
@@ -67362,8 +67733,10 @@ mod tests {
         assert_eq!(&output[..1], &[3]);
         let short = source.snapshot().unwrap();
         assert_eq!(short.logical_read_calls, 1);
+        assert_eq!(short.logical_requested_bytes, 4);
         assert_eq!(short.logical_read_bytes, 1);
         assert_eq!(short.physical_request_count, 1);
+        assert_eq!(short.physical_requested_bytes, 4);
         assert_eq!(short.physical_request_bytes, 1);
         assert_eq!(short.physical_request_sizes, vec![4]);
 
@@ -67371,8 +67744,10 @@ mod tests {
         assert_eq!(source.read_at(3, &mut output).unwrap(), 0);
         let eof = source.snapshot().unwrap();
         assert_eq!(eof.logical_read_calls, 1);
+        assert_eq!(eof.logical_requested_bytes, 4);
         assert_eq!(eof.logical_read_bytes, 0);
         assert_eq!(eof.physical_request_count, 1);
+        assert_eq!(eof.physical_requested_bytes, 4);
         assert_eq!(eof.physical_request_bytes, 0);
         assert_eq!(eof.physical_request_sizes, vec![4]);
 
@@ -67383,8 +67758,10 @@ mod tests {
         assert_eq!(cursor.read(&mut output).unwrap(), 0);
         let cursor_snapshot = cursor_metrics.snapshot().unwrap();
         assert_eq!(cursor_snapshot.logical_read_calls, 2);
+        assert_eq!(cursor_snapshot.logical_requested_bytes, 8);
         assert_eq!(cursor_snapshot.logical_read_bytes, 1);
         assert_eq!(cursor_snapshot.physical_request_count, 2);
+        assert_eq!(cursor_snapshot.physical_requested_bytes, 8);
         assert_eq!(cursor_snapshot.physical_request_bytes, 1);
         assert_eq!(cursor_snapshot.physical_request_sizes, vec![4, 4]);
     }
@@ -67398,16 +67775,37 @@ mod tests {
             max_physical_range_bytes: 512,
         };
         let opc = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
-        for case in [Case::OpcRangeSourceOpen, Case::OpcRangeSourceOpenMainRead] {
+        for case in [
+            Case::OpcRangeSourceOpen,
+            Case::OpcRangeSourceOpenMainRead,
+            Case::ProviderRangeReadAt,
+        ] {
             let measured = run_case_with_config(case, &opc, 0, 1, config).unwrap();
-            let simulation = measured.source.unwrap().simulation.unwrap();
+            let source = measured.source.unwrap();
+            let simulation = source.simulation.unwrap();
             assert_eq!(simulation.logical_read_calls.len(), 1);
             assert!(simulation.physical_request_count[0] > 0);
+            assert_eq!(
+                simulation.physical_requested_bytes[0],
+                simulation.physical_request_sizes[0].iter().sum::<u64>()
+            );
+            assert!(simulation.physical_requested_bytes[0] >= simulation.physical_request_bytes[0]);
             assert!(
                 simulation.physical_request_sizes[0]
                     .iter()
                     .all(|&bytes| bytes <= 512)
             );
+            if case == Case::ProviderRangeReadAt {
+                let provider = source.provider_axis.unwrap();
+                assert_eq!(provider.axis, "range_read_at");
+                assert_eq!(provider.simulation_config, Some(config));
+                assert_eq!(provider.correctness_verified, vec![true]);
+                assert_eq!(
+                    provider.decompressed_bytes,
+                    Some(vec![u64::try_from(opc.target_payload.len()).unwrap()])
+                );
+                assert!(provider.copied_bytes.is_none());
+            }
         }
 
         let xlsx = build_xlsx_corpus(XlsxShape::Tiny).unwrap();
@@ -67432,6 +67830,95 @@ mod tests {
                 assert!(simulation.physical_request_count[0] > 0);
             }
         }
+    }
+
+    #[test]
+    fn provider_nonseek_sink_reports_copy_and_exact_output_oracle() {
+        let corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let measured = run_case_with_config(
+            Case::ProviderNonSeekWrite,
+            &corpus,
+            0,
+            1,
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(measured.case, "provider_nonseek_write");
+        let sink = measured.sink.as_ref().unwrap();
+        assert!(sink.accepted_bytes > 0);
+        assert!(sink.write_calls > 0);
+        let provider = measured
+            .source
+            .unwrap()
+            .provider_axis
+            .expect("provider sink evidence");
+        assert_eq!(provider.axis, "non_seek_sink");
+        assert_eq!(provider.copied_bytes, Some(vec![sink.accepted_bytes]));
+        assert_eq!(
+            provider.sink_accepted_bytes,
+            Some(vec![sink.accepted_bytes])
+        );
+        assert_eq!(provider.sink_write_calls, Some(vec![sink.write_calls]));
+        assert_eq!(provider.correctness_verified, vec![true]);
+        assert!(provider.decompressed_bytes.is_none());
+    }
+
+    #[test]
+    fn provider_axis_vectors_follow_elapsed_sample_order() {
+        let mut provider = ProviderAxisSummary {
+            axis: "test",
+            implementation: "test",
+            timing_scope: "untimed test",
+            sample_order: vec![1, 0],
+            logical_read_calls: Some(vec![10, 20]),
+            request_sizes: Some(vec![vec![1], vec![2]]),
+            correctness_verified: vec![false, true],
+            ..ProviderAxisSummary::default()
+        };
+        reorder_provider_axis_summary(&mut provider, &[1, 0]).unwrap();
+        assert_eq!(provider.logical_read_calls, Some(vec![20, 10]));
+        assert_eq!(provider.request_sizes, Some(vec![vec![2], vec![1]]));
+        assert_eq!(provider.correctness_verified, vec![true, false]);
+        assert_eq!(provider.sample_order, vec![1, 0]);
+    }
+
+    #[test]
+    fn provider_axis_selectors_are_opt_in_and_bounded() {
+        assert!(!Case::DEFAULT.contains(&Case::ProviderRangeReadAt));
+        assert!(!Case::DEFAULT.contains(&Case::ProviderNonSeekWrite));
+        assert_eq!(
+            parse_case("provider_file_read_at"),
+            Some(Case::ProviderFileReadAt)
+        );
+        assert_eq!(
+            parse_case("provider_atomic_save"),
+            Some(Case::ProviderAtomicSave)
+        );
+        assert_eq!(
+            parse_case("provider_range_read_at"),
+            Some(Case::ProviderRangeReadAt)
+        );
+        assert_eq!(
+            parse_case("provider_nonseek_write"),
+            Some(Case::ProviderNonSeekWrite)
+        );
+        assert!(usage_text().contains("provider_nonseek_write"));
+        assert!(
+            validate_provider_axis_options(
+                &[Case::ProviderRangeReadAt],
+                &[CorpusShape::Tiny],
+                &[PayloadKind::Compressible],
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_provider_axis_options(
+                &[Case::ProviderRangeReadAt],
+                CorpusShape::ALL.as_slice(),
+                PayloadKind::ALL.as_slice(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
