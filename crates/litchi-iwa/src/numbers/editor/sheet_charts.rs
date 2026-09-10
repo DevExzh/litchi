@@ -87,6 +87,10 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
+use litchi_numbers::{
+    ChartSelector as FocusedChartSelector, Package as FocusedNumbersPackage,
+    SheetSelector as FocusedSheetSelector,
+};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 
@@ -302,6 +306,33 @@ impl NumbersEditor {
 
     /// Replace the complete inline data grid of one standalone chart.
     pub fn set_sheet_chart_data(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        data: ChartData,
+    ) -> Result<()> {
+        let source = chart_graph(self, sheet_id, drawable_object_id)?;
+        if chart_data_shape_and_labels_match(&source.info.data, &data) {
+            let (sheet_index, chart_position) =
+                arrangement::focused_chart_data_target(self, sheet_id, drawable_object_id)?;
+            match set_focused_sheet_chart_data(self, sheet_index, chart_position, data) {
+                Ok(()) => return Ok(()),
+                Err(FocusedSheetChartDataError::UnsupportedDependency(data)) => {
+                    return self.set_sheet_chart_data_full_replace(
+                        sheet_id,
+                        drawable_object_id,
+                        data,
+                    );
+                },
+                Err(FocusedSheetChartDataError::Host(error)) => return Err(error),
+            }
+        }
+        self.set_sheet_chart_data_full_replace(sheet_id, drawable_object_id, data)
+    }
+
+    /// Replace the complete inline data grid through the legacy generated
+    /// archive path when labels or dimensions change.
+    fn set_sheet_chart_data_full_replace(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
@@ -684,6 +715,83 @@ impl NumbersEditor {
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> bool {
+    before.row_names() == after.row_names()
+        && before.column_names() == after.column_names()
+        && before.values().len() == after.values().len()
+        && before
+            .values()
+            .iter()
+            .zip(after.values())
+            .all(|(before_row, after_row)| before_row.len() == after_row.len())
+}
+
+fn set_focused_sheet_chart_data(
+    editor: &mut NumbersEditor,
+    sheet_index: usize,
+    chart_position: usize,
+    data: ChartData,
+) -> std::result::Result<(), FocusedSheetChartDataError> {
+    let source_bytes = editor
+        .to_bytes()
+        .map_err(FocusedSheetChartDataError::Host)?;
+    let focused = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+        FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
+            "focused Numbers chart data source failed: {error}"
+        )))
+    })?;
+    let edit = match focused.edit_sheet_chart_data(
+        FocusedSheetSelector::index(sheet_index),
+        FocusedChartSelector::index(chart_position),
+    ) {
+        Ok(edit) => edit,
+        Err(error) => {
+            if matches!(
+                &error,
+                litchi_numbers::ChartDataError::UnsupportedDependency
+            ) {
+                return Err(FocusedSheetChartDataError::UnsupportedDependency(data));
+            }
+            return Err(FocusedSheetChartDataError::Host(Error::InvalidFormat(
+                format!("focused Numbers chart data edit failed: {error}"),
+            )));
+        },
+    };
+    let committed = edit.set(data).commit().map_err(|error| {
+        if matches!(
+            &error,
+            litchi_numbers::ChartDataError::UnsupportedDependency
+        ) {
+            FocusedSheetChartDataError::Host(Error::InvalidFormat(
+                "focused Numbers chart data commit rejected a previously admitted dependency"
+                    .to_owned(),
+            ))
+        } else {
+            FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
+                "focused Numbers chart data commit failed: {error}"
+            )))
+        }
+    })?;
+    let mut target_bytes = Vec::new();
+    committed
+        .package()
+        .write_to(&mut target_bytes)
+        .map_err(|error| {
+            FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
+                "focused Numbers chart data package write failed: {error}"
+            )))
+        })?;
+    let verified =
+        NumbersEditor::from_bytes(&target_bytes).map_err(FocusedSheetChartDataError::Host)?;
+    *editor = verified;
+    Ok(())
+}
+
+enum FocusedSheetChartDataError {
+    UnsupportedDependency(ChartData),
+    Host(Error),
 }
 
 fn update_chart_payload(
@@ -1436,6 +1544,25 @@ mod tests {
         editor
             .set_sheet_chart_kind(sheet_id, created.drawable_object_id, Kind::Bar2d)
             .unwrap();
+
+        let same_shape = ChartData::new(
+            vec!["North".to_owned(), "South".to_owned()],
+            vec!["Q1".to_owned(), "Q2".to_owned()],
+            vec![vec![Some(15.0), None], vec![Some(11.0), Some(23.0)]],
+        )
+        .unwrap();
+        editor
+            .set_sheet_chart_data(sheet_id, created.drawable_object_id, same_shape.clone())
+            .unwrap();
+        let focused = litchi_numbers::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            focused.sheet_chart_data(0usize, 0usize).unwrap(),
+            same_shape
+        );
+        assert_eq!(editor.sheet_charts(sheet_id).unwrap()[0].data, same_shape);
+
+        // Changed labels and dimensions intentionally retain the legacy full-
+        // grid replacement path until grid authoring owns those transitions.
         editor
             .set_sheet_chart_data(sheet_id, created.drawable_object_id, replacement.clone())
             .unwrap();

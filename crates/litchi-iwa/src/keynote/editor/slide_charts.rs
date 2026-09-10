@@ -78,7 +78,10 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
-use litchi_keynote::{ChartArrangement, ChartCatalog, ChartSelector, ChartSelectorError};
+use litchi_keynote::{
+    ChartArrangement, ChartCatalog, ChartSelector, ChartSelectorError,
+    Package as FocusedKeynotePackage, SlideSelector,
+};
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -337,6 +340,21 @@ impl KeynoteEditor {
         data: ChartData,
     ) -> Result<()> {
         let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        let source = chart_graph(self, slide_index, drawable_object_id)?;
+        if chart_data_shape_and_labels_match(&source.info.data, &data) {
+            return set_focused_slide_chart_data(self, slide_index, source.chart_position, data);
+        }
+        self.set_slide_chart_data_full_replace(slide_index, drawable_object_id, data)
+    }
+
+    /// Replace the complete inline data grid through the legacy generated
+    /// archive path when labels or dimensions change.
+    fn set_slide_chart_data_full_replace(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        data: ChartData,
+    ) -> Result<()> {
         self.update_slide_chart(
             slide_index,
             drawable_object_id,
@@ -752,6 +770,54 @@ impl KeynoteEditor {
         *self = verified;
         Ok(())
     }
+}
+
+fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> bool {
+    before.row_names() == after.row_names()
+        && before.column_names() == after.column_names()
+        && before.values().len() == after.values().len()
+        && before
+            .values()
+            .iter()
+            .zip(after.values())
+            .all(|(before_row, after_row)| before_row.len() == after_row.len())
+}
+
+fn set_focused_slide_chart_data(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    chart_position: usize,
+    data: ChartData,
+) -> Result<()> {
+    let source_bytes = editor.to_bytes()?;
+    let focused = FocusedKeynotePackage::from_bytes(&source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote chart data source failed: {error}"))
+    })?;
+    let committed = focused
+        .edit_slide_chart_data(
+            SlideSelector::index(slide_index),
+            ChartSelector::index(chart_position),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote chart data edit failed: {error}"))
+        })?
+        .set(data)
+        .commit()
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote chart data commit failed: {error}"))
+        })?;
+    let mut target_bytes = Vec::new();
+    committed
+        .package()
+        .write_to(&mut target_bytes)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Keynote chart data package write failed: {error}"
+            ))
+        })?;
+    let verified = KeynoteEditor::from_bytes(&target_bytes)?;
+    *editor = verified;
+    Ok(())
 }
 
 #[allow(

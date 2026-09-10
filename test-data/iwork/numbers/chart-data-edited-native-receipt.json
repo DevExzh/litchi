@@ -1,0 +1,41 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "chart-data-edited-native.numbers",
+  "size": 62570,
+  "sha256": "5810602f87912c3b3d02f3f47926cb8b07e40a565565bdddfd9a1e4d1a3f6c7f",
+  "source": "Disposable host-authored standalone 2D column chart with an empty-source TN mediator",
+  "source_sha256": "96bbc41294d2f06f15bfd1292944990933fbb00a4b6d04b887e41d9b783a96c6",
+  "lifecycle": [
+    "Authored a standalone chart through the existing NumbersDocumentBuilder and add_sheet_chart APIs.",
+    "Applied focused edit_sheet_chart_data transactions: April 17.25 to 27.5; empty May to 12.75.",
+    "Opened, saved, closed, and reopened the exact generated path in Numbers.",
+    "Verified both series, category labels, April 27.5 and May 12.8 (native accessibility rounding); closed the document."
+  ],
+  "row_labels": [
+    "North",
+    "South"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      27.5,
+      12.75,
+      53,
+      96
+    ],
+    [
+      55,
+      43,
+      70,
+      58
+    ]
+  ],
+  "scope": "Standalone numeric replacement and insertion survive native save/reopen. Exact values are checked by the focused golden reader; native chart accessibility rounds 12.75 to 12.8. The separate table-backed chart-data-native.numbers remains a write-refusal control."
+}

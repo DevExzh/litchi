@@ -71,7 +71,10 @@ pub use body_chart_arrangement::{
     BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
     BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
 };
-pub use body_chart_data::{BodyChartDataError, BodyChartDataLimitKind};
+pub use body_chart_data::{
+    BodyChartDataCommit, BodyChartDataDiagnostics, BodyChartDataEdit, BodyChartDataError,
+    BodyChartDataLimitKind, BodyChartDataPatch,
+};
 pub use body_chart_metadata::{BodyChartMetadataError, BodyChartMetadataLimitKind};
 pub use body_footnote::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,

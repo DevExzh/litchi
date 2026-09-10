@@ -1,0 +1,41 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "chart-data-edited-native.key",
+  "size": 495425,
+  "sha256": "c9957a58db25ea8440006655ea1caff94b6e78bc562a62992abce8d7dd496b1e",
+  "source": "chart-data-native.key",
+  "lifecycle": [
+    "Generated through the focused edit_slide_chart_data example: April 17.25 to 27.5; empty May to 12.75.",
+    "Opened the generated file in Keynote and verified exact values in the chart data editor.",
+    "Saved, closed, and reopened the exact path.",
+    "Verified the chart, separate caption, and exact May value 12.75; closed the document."
+  ],
+  "row_labels": [
+    "Region 1",
+    "Region 2"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      27.5,
+      12.75,
+      53,
+      96
+    ],
+    [
+      55,
+      43,
+      70,
+      58
+    ]
+  ],
+  "caption": "Native chart caption marker",
+  "scope": "Focused same-shape numeric field replacement and insertion survived native save/reopen. Chart accessibility rounds 12.75 to 12.8; the data editor showed exact 12.75."
+}

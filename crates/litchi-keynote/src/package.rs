@@ -146,7 +146,10 @@ pub use slide_chart_caption::{
     ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit, ChartCaptionError,
     ChartCaptionLimitKind, ChartCaptionPatch,
 };
-pub use slide_chart_data::{SlideChartDataError, SlideChartDataLimitKind};
+pub use slide_chart_data::{
+    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
+    SlideChartDataLimitKind, SlideChartDataPatch,
+};
 pub use slide_chart_legend::{
     ChartLegendVisibilityCommit, ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit,
     ChartLegendVisibilityError, ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch,

@@ -111,6 +111,15 @@ pub enum ChartDataError {
     /// A bounded temporary allocation failed.
     #[error("could not allocate {amount} units for Numbers chart data")]
     Allocation { amount: usize },
+    /// Chart-data writes must preserve the source axes and rectangular shape.
+    #[error("Numbers chart-data edits must preserve the existing labels and dimensions")]
+    ShapeMismatch,
+    /// The patch was created from another exact package artifact.
+    #[error("the Numbers chart-data patch does not match the exact source package")]
+    PatchConflict,
+    /// Candidate reopening or semantic readback did not reproduce the target.
+    #[error("the edited Numbers chart data failed semantic verification")]
+    Verification,
 }
 
 impl Package {
@@ -135,42 +144,54 @@ impl Package {
             &mut budget,
         )
         .map_err(map_arrangement_error)?;
-        let payload = selected_chart_payload(self, &selection).map_err(map_arrangement_error)?;
-        let options = budget.data_codec_options().map_err(map_arrangement_error)?;
-        let (snapshot, report) = match codec::decode_modern_with_report(payload, &options) {
-            Ok(decoded) => decoded,
-            Err(error) => {
-                let report = error.report();
-                if let Err(budget_error) = budget.data_codec_report(report) {
-                    return Err(map_arrangement_error(budget_error));
-                }
-                if let Some(limit) = map_codec_limit(&error) {
-                    return Err(limit);
-                }
-                return Err(ChartDataError::InvalidSource);
-            },
-        };
-        budget
-            .data_codec_report(report)
-            .map_err(map_arrangement_error)?;
-
-        // Label and row iterators intentionally remain lazy in the codec, so
-        // account for their bounded source walks and semantic copy loop before
-        // attempting any fallible allocation or ownership transfer.
-        let materialization_work = materialization_work(snapshot, report)?;
-        budget
-            .data_materialization_work(materialization_work)
-            .map_err(map_arrangement_error)?;
-
-        // The strict codec has already checked dimensions and finite numeric
-        // values.  These helpers still preflight every owned allocation so a
-        // fallible copy cannot publish a partially materialized model.
-        let row_names = own_labels(snapshot.row_labels(), &mut budget)?;
-        let column_names = own_labels(snapshot.column_labels(), &mut budget)?;
-        let values = own_values(snapshot, &mut budget)?;
-
-        ChartData::new(row_names, column_names, values).map_err(|_| ChartDataError::InvalidSource)
+        read_selected_chart_data(self, &selection, &mut budget)
     }
+}
+
+/// Read the selected chart through an already-admitted chart transaction
+/// budget.  Focused chart-data writers use this after selecting and checking
+/// the same drawable so the selector walk and codec projection are charged
+/// exactly once per operation.
+pub(super) fn read_selected_chart_data(
+    package: &Package,
+    selection: &chart_arrangement::ChartSelection,
+    budget: &mut ChartBudget,
+) -> Result<ChartData, ChartDataError> {
+    let payload = selected_chart_payload(package, selection).map_err(map_arrangement_error)?;
+    let options = budget.data_codec_options().map_err(map_arrangement_error)?;
+    let (snapshot, report) = match codec::decode_modern_with_report(payload, &options) {
+        Ok(decoded) => decoded,
+        Err(error) => {
+            let report = error.report();
+            if let Err(budget_error) = budget.data_codec_report(report) {
+                return Err(map_arrangement_error(budget_error));
+            }
+            if let Some(limit) = map_codec_limit(&error) {
+                return Err(limit);
+            }
+            return Err(ChartDataError::InvalidSource);
+        },
+    };
+    budget
+        .data_codec_report(report)
+        .map_err(map_arrangement_error)?;
+
+    // Label and row iterators intentionally remain lazy in the codec, so
+    // account for their bounded source walks and semantic copy loop before
+    // attempting any fallible allocation or ownership transfer.
+    let materialization_work = materialization_work(snapshot, report)?;
+    budget
+        .data_materialization_work(materialization_work)
+        .map_err(map_arrangement_error)?;
+
+    // The strict codec has already checked dimensions and finite numeric
+    // values.  These helpers still preflight every owned allocation so a
+    // fallible copy cannot publish a partially materialized model.
+    let row_names = own_labels(snapshot.row_labels(), budget)?;
+    let column_names = own_labels(snapshot.column_labels(), budget)?;
+    let values = own_values(snapshot, budget)?;
+
+    ChartData::new(row_names, column_names, values).map_err(|_| ChartDataError::InvalidSource)
 }
 
 fn materialization_work(
@@ -297,7 +318,7 @@ fn own_values(
     Ok(values)
 }
 
-fn map_arrangement_error(error: ChartArrangementError) -> ChartDataError {
+pub(super) fn map_arrangement_error(error: ChartArrangementError) -> ChartDataError {
     match error {
         ChartArrangementError::UnsupportedSource => ChartDataError::UnsupportedSource,
         ChartArrangementError::UnsupportedDependency => ChartDataError::UnsupportedDependency,
@@ -320,9 +341,9 @@ fn map_arrangement_error(error: ChartArrangementError) -> ChartDataError {
             maximum,
         },
         ChartArrangementError::Allocation { amount } => ChartDataError::Allocation { amount },
-        ChartArrangementError::InvalidSource
-        | ChartArrangementError::Verification
-        | ChartArrangementError::PatchConflict => ChartDataError::InvalidSource,
+        ChartArrangementError::InvalidSource => ChartDataError::InvalidSource,
+        ChartArrangementError::Verification => ChartDataError::Verification,
+        ChartArrangementError::PatchConflict => ChartDataError::PatchConflict,
     }
 }
 
@@ -352,7 +373,7 @@ const fn map_arrangement_limit_kind(
     }
 }
 
-fn map_codec_limit(error: &codec::DecodeError) -> Option<ChartDataError> {
+pub(super) fn map_codec_limit(error: &codec::DecodeError) -> Option<ChartDataError> {
     let (kind, observed, maximum) = match error.resource_limit()? {
         codec::DecodeLimit::Bytes { observed, maximum } => {
             (ChartDataLimitKind::WireBytes, observed, maximum)

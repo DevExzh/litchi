@@ -7987,10 +7987,20 @@ def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> No
     codec.parent.mkdir(parents=True, exist_ok=True)
     codec.write_text(
         "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
+        "use buffa::ViewEncode as _;\n"
         "pub struct DecodeOptions;\n"
         "pub struct DecodeReport;\n"
         "pub struct ChartDataSnapshot<'source>(&'source [u8]);\n"
+        "pub struct ChartDataWrite;\n"
+        "pub struct PreparedChartDataRewrite;\n"
+        "pub struct RewriteError;\n"
+        "pub struct RewriteExecutionRequirements;\n"
         "pub fn decode_chart_data<'source>() {}\n"
+        "pub fn prepare_chart_data_rewrite() -> Result<PreparedChartDataRewrite, RewriteError> { todo!() }\n"
+        "fn execution_requirements() -> RewriteExecutionRequirements { todo!() }\n"
+        "fn encode_rewrite(value: &Value, output: &mut Vec<u8>) {\n"
+        "    value.try_encoded_len(); value.try_encode_bounded(0, output);\n"
+        "}\n"
         "fn preflight<'source>() {}\n"
         "fn decode_lazy_view(source: &[u8]) { let _ = source; }\n",
         encoding="utf-8",
@@ -8034,6 +8044,15 @@ def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> No
             "        let _ = selector; chart_data_codec::decode_chart_data(); "
             "todo!()\n"
             "    }\n"
+            "    pub fn edit_body_chart_data(&self, selector: BodyChartSelector) "
+            "-> Result<ChartDataEdit, Error> {\n"
+            "        let _ = selector; todo!()\n"
+            "    }\n"
+            "    pub fn apply_body_chart_data(&self, patch: ChartDataPatch) "
+            "-> Result<ChartDataCommit, Error> {\n"
+            "        let _ = patch; chart_data_codec::prepare_chart_data_rewrite(); "
+            "todo!()\n"
+            "    }\n"
             "}\n"
         ),
         "Numbers": (
@@ -8045,6 +8064,14 @@ def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> No
             "        let _ = selector; codec::decode_chart_data(); "
             "todo!()\n"
             "    }\n"
+            "    pub fn edit_sheet_chart_data(&self, sheet: SheetSelector, chart: ChartSelector) "
+            "-> Result<ChartDataEdit, Error> {\n"
+            "        let _ = (sheet, chart); todo!()\n"
+            "    }\n"
+            "    pub fn apply_sheet_chart_data(&self, patch: ChartDataPatch) "
+            "-> Result<ChartDataCommit, Error> {\n"
+            "        let _ = patch; codec::prepare_chart_data_rewrite(); todo!()\n"
+            "    }\n"
             "}\n"
         ),
         "Keynote": (
@@ -8054,6 +8081,15 @@ def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> No
             "    pub fn slide_chart_data(&self, selector: SlideSelector) "
             "-> Result<ChartData, Error> {\n"
             "        let _ = selector; chart_data_codec::decode_chart_data(); "
+            "todo!()\n"
+            "    }\n"
+            "    pub fn edit_slide_chart_data(&self, slide: SlideSelector, chart: ChartSelector) "
+            "-> Result<ChartDataEdit, Error> {\n"
+            "        let _ = (slide, chart); todo!()\n"
+            "    }\n"
+            "    pub fn apply_slide_chart_data(&self, patch: ChartDataPatch) "
+            "-> Result<ChartDataCommit, Error> {\n"
+            "        let _ = patch; chart_data_codec::prepare_chart_data_rewrite(); "
             "todo!()\n"
             "    }\n"
             "}\n"
@@ -48664,6 +48700,67 @@ fn rewrite_movie_title_operation(
             add_iwa_chart_data_scaffold(root)
             self.assertEqual(boundaries.audit_iwa_chart_data_source_topology(root), [])
 
+    def test_chart_data_write_boundary_accepts_prepared_buffa_transactions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            self.assertEqual(boundaries.audit_iwa_chart_data_write_source_topology(root), [])
+
+    def test_chart_data_write_boundary_requires_bounded_buffa_rewrite(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            codec = root / boundaries.IWA_CHART_DATA_CODEC_SOURCE
+            source = codec.read_text(encoding="utf-8")
+            source = source.replace("pub struct RewriteError;\n", "")
+            source = source.replace(
+                "pub fn prepare_chart_data_rewrite() -> Result<PreparedChartDataRewrite, RewriteError> { todo!() }\n",
+                "",
+            )
+            source = source.replace("use buffa::DecodeOptions as BuffaDecodeOptions;\n", "")
+            source = source.replace("use buffa::ViewEncode as _;\n", "")
+            source = source.replace("value.try_encoded_len(); value.try_encode_bounded(0, output);", "")
+            source = source.replace(
+                "fn decode_lazy_view(source: &[u8]) { let _ = source; }\n", ""
+            )
+            source += "use prost::Message;\n"
+            codec.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_iwa_chart_data_write_source_topology(root)
+            self.assertTrue(any("RewriteError" in item for item in violations), violations)
+            self.assertTrue(any("prepare_chart_data_rewrite" in item for item in violations), violations)
+            self.assertTrue(any("bounded Buffa production validation" in item for item in violations), violations)
+            self.assertTrue(any("must use Buffa rather than Prost" in item for item in violations), violations)
+
+    def test_chart_data_write_boundary_rejects_raw_selector_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            owner = root / boundaries.IWA_CHART_DATA_FOCUSED_OWNERS["Pages"]
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn edit_body_chart_data(&self, selector: BodyChartSelector)",
+                    "pub fn edit_body_chart_data(&self, object_id: u64, bytes: &[u8])",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_write_source_topology(root)
+            self.assertTrue(any("must accept a semantic selector" in item for item in violations), violations)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("exposes a raw ID" in item for item in violations), violations)
+
+    def test_chart_data_write_boundary_keeps_host_fallback_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            host = root / boundaries.IWA_CHART_DATA_HOST_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "fn set_body_chart_data_with_full_replacement() { chart_grid(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_iwa_chart_data_write_source_topology(root), [])
+
     def test_chart_data_boundary_rejects_common_physical_or_raw_id_leaks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -48785,6 +48882,7 @@ fn rewrite_movie_title_operation(
             self.assertEqual(boundaries.audit_iwa_chart_data_source_topology(root), [])
         main_source = inspect.getsource(boundaries.main)
         self.assertIn("+ audit_iwa_chart_data_source_topology()", main_source)
+        self.assertIn("+ audit_iwa_chart_data_write_source_topology()", main_source)
 
     def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

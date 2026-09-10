@@ -66,6 +66,7 @@ const SNAPPY_ENCODER_WORKSPACE_BYTES: usize = 32 * 1024;
 // field before entering the parser. A large opaque length-delimited value does
 // not create one span per payload byte.
 const WIRE_VIEW_SPAN_BYTES_PER_FIELD: usize = size_of::<[usize; 8]>();
+const ROOT_PREVIEW_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
 /// Resource category reported by a focused Numbers chart-arrangement
 /// operation.
@@ -430,12 +431,12 @@ pub(super) struct ChartSelection {
     pub(super) component_index: usize,
     pub(super) object_index: usize,
     pub(super) message_index: usize,
-    sheet_position: Position,
-    chart_position: Position,
-    sheet_identifier: u64,
-    chart_identifier: u64,
-    component_name: Arc<str>,
-    before: ChartArrangement,
+    pub(super) sheet_position: Position,
+    pub(super) chart_position: Position,
+    pub(super) sheet_identifier: u64,
+    pub(super) chart_identifier: u64,
+    pub(super) component_name: Arc<str>,
+    pub(super) before: ChartArrangement,
 }
 
 impl fmt::Debug for ChartSelection {
@@ -569,7 +570,7 @@ impl ChartBudget {
         Ok(())
     }
 
-    fn source(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn source(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.input,
             amount,
@@ -578,7 +579,7 @@ impl ChartBudget {
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn output(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.output,
             amount,
@@ -596,7 +597,7 @@ impl ChartBudget {
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn work(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.work,
             amount,
@@ -605,7 +606,7 @@ impl ChartBudget {
         )
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn references(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.references,
             amount,
@@ -632,7 +633,7 @@ impl ChartBudget {
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn scratch(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::add(
             &mut self.scratch,
             amount,
@@ -719,7 +720,7 @@ impl ChartBudget {
         )
     }
 
-    fn preflight_scratch(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_scratch(&self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::preflight(
             self.scratch,
             amount,
@@ -728,7 +729,7 @@ impl ChartBudget {
         )
     }
 
-    fn preflight_output(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_output(&self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::preflight(
             self.output,
             amount,
@@ -737,7 +738,7 @@ impl ChartBudget {
         )
     }
 
-    fn preflight_work(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_work(&self, amount: usize) -> Result<(), ChartArrangementError> {
         Self::preflight(
             self.work,
             amount,
@@ -994,7 +995,10 @@ impl ChartBudget {
         self.work(work)
     }
 
-    fn codec_report(&mut self, report: DecodeReport) -> Result<(), ChartArrangementError> {
+    pub(super) fn codec_report(
+        &mut self,
+        report: DecodeReport,
+    ) -> Result<(), ChartArrangementError> {
         self.source(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -1004,7 +1008,7 @@ impl ChartBudget {
         self.scratch(report.scratch_bytes())
     }
 
-    fn codec_requirements(
+    pub(super) fn codec_requirements(
         &mut self,
         requirements: RewriteExecutionRequirements,
     ) -> Result<(), ChartArrangementError> {
@@ -1025,7 +1029,32 @@ impl ChartBudget {
         self.scratch(requirements.scratch_bytes)
     }
 
-    fn reassembly(
+    /// Charge one prepared chart-data rewrite using the same aggregate ledger
+    /// as chart arrangement publication.  The two codecs intentionally expose
+    /// the same finite execution axes while retaining independent typed
+    /// requirement structs at their public boundaries.
+    pub(super) fn data_codec_requirements(
+        &mut self,
+        requirements: chart_data_codec::RewriteExecutionRequirements,
+    ) -> Result<(), ChartArrangementError> {
+        self.output(requirements.output_bytes)?;
+        self.fields(requirements.fields)?;
+        self.work(requirements.work_bytes)?;
+        let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(ChartArrangementError::LimitExceeded {
+                kind: ChartArrangementLimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.nesting = self.nesting.max(depth);
+        self.allocations(requirements.allocations)?;
+        self.retained(requirements.retained_bytes)?;
+        self.scratch(requirements.scratch_bytes)
+    }
+
+    pub(super) fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
     ) -> Result<(), ChartArrangementError> {
@@ -1036,7 +1065,7 @@ impl ChartBudget {
         self.scratch(requirements.scratch_bytes())
     }
 
-    fn candidate_reopen(&mut self, bytes: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn candidate_reopen(&mut self, bytes: usize) -> Result<(), ChartArrangementError> {
         self.source(bytes)?;
         self.work(bytes)?;
         self.allocations(1)?;
@@ -1742,7 +1771,7 @@ fn decode_arrangement(
     ))
 }
 
-fn same_selection(left: &ChartSelection, right: &ChartSelection) -> bool {
+pub(super) fn same_selection(left: &ChartSelection, right: &ChartSelection) -> bool {
     left.sheet_position == right.sheet_position
         && left.chart_position == right.chart_position
         && left.sheet_identifier == right.sheet_identifier
@@ -1827,13 +1856,46 @@ fn commit_edit(
     })
 }
 
-fn rewrite_chart(
+/// Publish one rewritten chart drawable while retaining the exact ZIP and
+/// archive publication accounting used by every focused chart owner.
+///
+/// The caller owns semantic validation and supplies the complete replacement
+/// drawable payload.  This helper only validates physical ownership, replaces
+/// the selected message, performs bounded Snappy/IWA publication, and reopens
+/// the candidate through the package ingress path.  Keeping this seam here
+/// prevents chart-data mutations from growing a second, subtly different
+/// publication implementation.
+pub(super) fn rewrite_selected_chart_payload(
     source: &Package,
     selection: &ChartSelection,
-    after: ChartArrangement,
+    rewritten: Vec<u8>,
+    budget: &mut ChartBudget,
+) -> Result<Package, ChartArrangementError> {
+    rewrite_selected_chart_payload_with_previews(source, selection, rewritten, false, budget)
+}
+
+/// Publish one rewritten chart drawable and optionally remove the canonical
+/// root rendering previews.  Chart arrangement changes preserve previews;
+/// chart-data changes use the invalidating mode because those bytes describe
+/// the old rendered values.  The deletion list is deliberately bounded to
+/// the three canonical Numbers root members.
+pub(super) fn rewrite_selected_chart_payload_with_previews(
+    source: &Package,
+    selection: &ChartSelection,
+    rewritten: Vec<u8>,
+    delete_previews: bool,
     budget: &mut ChartBudget,
 ) -> Result<Package, ChartArrangementError> {
     let catalog = physical_catalog(source)?;
+    if is_root_preview_name(selection.component_name.as_ref()) {
+        return Err(ChartArrangementError::InvalidSource);
+    }
+    let mut deleted_previews = [""; ROOT_PREVIEW_NAMES.len()];
+    let deleted_preview_count = if delete_previews {
+        collect_root_preview_deletions(catalog, &mut deleted_previews)?
+    } else {
+        0
+    };
     let entry = catalog
         .package()
         .iter()
@@ -1882,28 +1944,11 @@ fn rewrite_chart(
         selection.sheet_identifier,
     )?;
     let original = message.data.as_slice();
-    let before = decode_arrangement(original, budget)?;
-    if before != selection.before {
-        return Err(ChartArrangementError::InvalidSource);
-    }
     let source_encoded_len = source_archive
         .encoded_len_with_limits(archive_limits)
         .map_err(|_| ChartArrangementError::InvalidSource)?;
-    let options = budget.codec_options(original)?;
-    let prepared = codec::prepare_chart_arrangement_rewrite(
-        original,
-        ChartArrangementWrite::new(after.locked(), after.constrain_proportions()),
-        options,
-    )
-    .map_err(map_codec_error)?;
-    budget.codec_report(prepared.prepare_report())?;
-    let requirements = prepared.execution_requirements();
-    budget.codec_requirements(requirements)?;
-    let encoded_bound = rewritten_archive_bound(
-        source_encoded_len,
-        original.len(),
-        requirements.output_bytes,
-    )?;
+    let encoded_bound =
+        rewritten_archive_bound(source_encoded_len, original.len(), rewritten.len())?;
     let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound)
         .map_err(|_| ChartArrangementError::InvalidSource)?;
     let (snappy_allocations, snappy_scratch) = snappy_compression_requirements(encoded_bound)?;
@@ -1954,14 +1999,6 @@ fn rewrite_chart(
     budget.retained(serialization_retained)?;
     budget.scratch(snappy_scratch)?;
     let mut archive = source_archive.clone();
-    let rewritten = prepared
-        .execute(requirements.exact_limits())
-        .map_err(map_codec_error)?
-        .into_output();
-    let verified = decode_arrangement(&rewritten, budget)?;
-    if verified != after {
-        return Err(ChartArrangementError::Verification);
-    }
     archive
         .objects
         .get_mut(selection.object_index)
@@ -1988,7 +2025,11 @@ fn rewrite_chart(
         &compressed,
     )];
     let prepared_reassembly = catalog
-        .prepare_reassembly_with_deletions(&edits, &[], source.state.options.archive())
+        .prepare_reassembly_with_deletions(
+            &edits,
+            &deleted_previews[..deleted_preview_count],
+            source.state.options.archive(),
+        )
         .map_err(|_| ChartArrangementError::InvalidSource)?;
     let reassembly_requirements = prepared_reassembly.execution_requirements();
     budget.reassembly(reassembly_requirements)?;
@@ -2000,7 +2041,66 @@ fn rewrite_chart(
         .map_err(|_| ChartArrangementError::Verification)
 }
 
-fn verify_locality(
+fn is_root_preview_name(name: &str) -> bool {
+    ROOT_PREVIEW_NAMES.contains(&name)
+}
+
+fn collect_root_preview_deletions(
+    catalog: &SourceCatalog,
+    output: &mut [&'static str; ROOT_PREVIEW_NAMES.len()],
+) -> Result<usize, ChartArrangementError> {
+    let mut count = 0;
+    for name in ROOT_PREVIEW_NAMES {
+        let matches = catalog
+            .package()
+            .iter()
+            .filter(|entry| entry.name() == name)
+            .count();
+        match matches {
+            0 => {},
+            1 => {
+                output[count] = name;
+                count += 1;
+            },
+            _ => return Err(ChartArrangementError::InvalidSource),
+        }
+    }
+    Ok(count)
+}
+
+fn rewrite_chart(
+    source: &Package,
+    selection: &ChartSelection,
+    after: ChartArrangement,
+    budget: &mut ChartBudget,
+) -> Result<Package, ChartArrangementError> {
+    let original = selected_chart_payload(source, selection)?;
+    let before = decode_arrangement(original, budget)?;
+    if before != selection.before {
+        return Err(ChartArrangementError::InvalidSource);
+    }
+    let options = budget.codec_options(original)?;
+    let prepared = codec::prepare_chart_arrangement_rewrite(
+        original,
+        ChartArrangementWrite::new(after.locked(), after.constrain_proportions()),
+        options,
+    )
+    .map_err(map_codec_error)?;
+    budget.codec_report(prepared.prepare_report())?;
+    let requirements = prepared.execution_requirements();
+    budget.codec_requirements(requirements)?;
+    let rewritten = prepared
+        .execute(requirements.exact_limits())
+        .map_err(map_codec_error)?
+        .into_output();
+    let verified = decode_arrangement(&rewritten, budget)?;
+    if verified != after {
+        return Err(ChartArrangementError::Verification);
+    }
+    rewrite_selected_chart_payload(source, selection, rewritten, budget)
+}
+
+pub(super) fn verify_locality(
     source: &Package,
     candidate: &Package,
     selection: &ChartSelection,
@@ -2009,48 +2109,24 @@ fn verify_locality(
 ) -> Result<(), ChartArrangementError> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
-    if source_catalog.package().len() != candidate_catalog.package().len() {
+    if is_root_preview_name(selection.component_name.as_ref()) {
         return Err(ChartArrangementError::Verification);
     }
     let selected_component = selection.component_name.as_ref();
     let mut entry_work = 0usize;
-    for (source_entry, candidate_entry) in source_catalog
+    for entry in source_catalog
         .package()
         .iter()
-        .zip(candidate_catalog.package().iter())
+        .chain(candidate_catalog.package().iter())
     {
-        let source_entry_work =
-            zip_entry_work(source_entry, source_entry.name() != selected_component)?;
-        let candidate_entry_work = zip_entry_work(
-            candidate_entry,
-            candidate_entry.name() != selected_component,
-        )?;
+        let entry_work_value = zip_entry_work(entry, entry.name() != selected_component)?;
         entry_work = entry_work
-            .checked_add(source_entry_work)
-            .and_then(|amount| amount.checked_add(candidate_entry_work))
+            .checked_add(entry_work_value)
             .ok_or(ChartArrangementError::InvalidSource)?;
     }
     budget.preflight_work(entry_work)?;
     budget.work(entry_work)?;
-    for (source_entry, candidate_entry) in source_catalog
-        .package()
-        .iter()
-        .zip(candidate_catalog.package().iter())
-    {
-        if source_entry.name() != candidate_entry.name() {
-            return Err(ChartArrangementError::Verification);
-        }
-        if !same_entry_fixed_metadata(source_entry, candidate_entry) {
-            return Err(ChartArrangementError::Verification);
-        }
-        if source_entry.name() == selected_component {
-            if !same_selected_entry_records(source_entry, candidate_entry) {
-                return Err(ChartArrangementError::Verification);
-            }
-        } else if !same_unselected_entry_records(source_entry, candidate_entry) {
-            return Err(ChartArrangementError::Verification);
-        }
-    }
+    verify_package_entries(source_catalog, candidate_catalog, selected_component)?;
     let source_archive = package_component(source, selection.component_index)?.archive();
     let candidate_archive = package_component(candidate, selection.component_index)?.archive();
     if source_archive.objects.len() != candidate_archive.objects.len() {
@@ -2146,6 +2222,103 @@ fn verify_locality(
         }
     }
     Ok(())
+}
+
+fn verify_package_entries(
+    source_catalog: &SourceCatalog,
+    candidate_catalog: &SourceCatalog,
+    selected_component: &str,
+) -> Result<(), ChartArrangementError> {
+    let source_previews = root_preview_entries(source_catalog)?;
+    let candidate_previews = root_preview_entries(candidate_catalog)?;
+    for (source_entry, candidate_entry) in source_previews.into_iter().zip(candidate_previews) {
+        // A focused numeric rewrite may invalidate a stale root preview;
+        // inverse application may restore the exact retained member.
+        if let (Some(source_entry), Some(candidate_entry)) = (source_entry, candidate_entry)
+            && (!same_entry_fixed_metadata(source_entry, candidate_entry)
+                || !same_unselected_entry_records(source_entry, candidate_entry))
+        {
+            return Err(ChartArrangementError::Verification);
+        }
+    }
+
+    let mut source_entries = source_catalog
+        .package()
+        .iter()
+        .filter(|entry| !is_root_preview_name(entry.name()));
+    let mut candidate_entries = candidate_catalog
+        .package()
+        .iter()
+        .filter(|entry| !is_root_preview_name(entry.name()));
+    loop {
+        match (source_entries.next(), candidate_entries.next()) {
+            (Some(source_entry), Some(candidate_entry)) => {
+                if source_entry.name() != candidate_entry.name()
+                    || !same_entry_fixed_metadata(source_entry, candidate_entry)
+                {
+                    return Err(ChartArrangementError::Verification);
+                }
+                if source_entry.name() == selected_component {
+                    if !same_selected_entry_records(source_entry, candidate_entry) {
+                        return Err(ChartArrangementError::Verification);
+                    }
+                } else if !same_unselected_entry_records(source_entry, candidate_entry) {
+                    return Err(ChartArrangementError::Verification);
+                }
+            },
+            (None, None) => break,
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(ChartArrangementError::Verification);
+            },
+        }
+    }
+    Ok(())
+}
+
+fn root_preview_entries(
+    catalog: &SourceCatalog,
+) -> Result<[Option<&Entry>; ROOT_PREVIEW_NAMES.len()], ChartArrangementError> {
+    let mut previews = [None; ROOT_PREVIEW_NAMES.len()];
+    for entry in catalog.package().iter() {
+        let Some(index) = ROOT_PREVIEW_NAMES
+            .iter()
+            .position(|name| *name == entry.name())
+        else {
+            continue;
+        };
+        if previews[index].is_some() {
+            return Err(ChartArrangementError::Verification);
+        }
+        previews[index] = Some(entry);
+    }
+    Ok(previews)
+}
+
+pub(super) fn root_preview_count(
+    catalog: &SourceCatalog,
+    budget: &mut ChartBudget,
+) -> Result<usize, ChartArrangementError> {
+    let scan_work = catalog
+        .package()
+        .len()
+        .checked_mul(ROOT_PREVIEW_NAMES.len())
+        .ok_or(ChartArrangementError::InvalidSource)?;
+    budget.preflight_work(scan_work)?;
+    budget.work(scan_work)?;
+    let mut previews = [false; ROOT_PREVIEW_NAMES.len()];
+    for entry in catalog.package().iter() {
+        let Some(index) = ROOT_PREVIEW_NAMES
+            .iter()
+            .position(|name| *name == entry.name())
+        else {
+            continue;
+        };
+        if previews[index] {
+            return Err(ChartArrangementError::Verification);
+        }
+        previews[index] = true;
+    }
+    Ok(previews.into_iter().filter(|present| *present).count())
 }
 
 fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, ChartArrangementError> {
@@ -2256,7 +2429,7 @@ fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
         && left_central[46..] == right_central[46..]
 }
 
-fn package_component(
+pub(super) fn package_component(
     package: &Package,
     component_index: usize,
 ) -> Result<&litchi_iwa_archive::Component, ChartArrangementError> {
@@ -2288,7 +2461,7 @@ pub(super) fn selected_chart_payload<'source>(
     Ok(message.data.as_slice())
 }
 
-fn retain_payload_pair(
+pub(super) fn retain_payload_pair(
     source: &[u8],
     target: &[u8],
     budget: &mut ChartBudget,
@@ -2307,7 +2480,7 @@ fn retain_payload_pair(
     Ok((source, target))
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartArrangementError> {
+pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartArrangementError> {
     package
         .state
         .components
@@ -2708,7 +2881,7 @@ fn map_common_error(error: CommonError) -> ChartArrangementError {
     }
 }
 
-fn map_package_error(error: PackageError) -> ChartArrangementError {
+pub(super) fn map_package_error(error: PackageError) -> ChartArrangementError {
     match error {
         PackageError::Common(error) => map_common_error(error),
         _ => ChartArrangementError::InvalidSource,

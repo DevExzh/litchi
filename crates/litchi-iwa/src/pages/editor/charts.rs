@@ -85,6 +85,7 @@ use crate::shapes::{
     remove_orphaned_image_asset,
 };
 use litchi_iwa_common::chart::arrangement::ChartArrangement;
+use litchi_pages::{BodyChartSelector, Package as FocusedPagesPackage};
 
 const PAGES_THEME_MESSAGE_TYPE: u32 = 10_001;
 
@@ -290,6 +291,20 @@ impl PagesEditor {
 
     /// Replace the complete inline data grid of one body chart.
     pub fn set_body_chart_data(&mut self, drawable_object_id: u64, data: ChartData) -> Result<()> {
+        let source = body_chart_graph(self, drawable_object_id)?;
+        if chart_data_shape_and_labels_match(&source.info.data, &data) {
+            return set_focused_body_chart_data(self, source.chart_position, data);
+        }
+        self.set_body_chart_data_full_replace(drawable_object_id, data)
+    }
+
+    /// Replace the complete inline data grid through the legacy generated
+    /// archive path when labels or dimensions change.
+    fn set_body_chart_data_full_replace(
+        &mut self,
+        drawable_object_id: u64,
+        data: ChartData,
+    ) -> Result<()> {
         self.update_body_chart(drawable_object_id, |chart| {
             let payload = chart.chart.as_mut().ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -697,6 +712,50 @@ impl PagesEditor {
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> bool {
+    before.row_names() == after.row_names()
+        && before.column_names() == after.column_names()
+        && before.values().len() == after.values().len()
+        && before
+            .values()
+            .iter()
+            .zip(after.values())
+            .all(|(before_row, after_row)| before_row.len() == after_row.len())
+}
+
+fn set_focused_body_chart_data(
+    editor: &mut PagesEditor,
+    chart_position: usize,
+    data: ChartData,
+) -> Result<()> {
+    let source_bytes = editor.to_bytes()?;
+    let focused = FocusedPagesPackage::from_bytes(&source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Pages chart data source failed: {error}"))
+    })?;
+    let committed = focused
+        .edit_body_chart_data(BodyChartSelector::index(chart_position))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Pages chart data edit failed: {error}"))
+        })?
+        .set(data)
+        .commit()
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Pages chart data commit failed: {error}"))
+        })?;
+    let mut target_bytes = Vec::new();
+    committed
+        .package()
+        .write_to(&mut target_bytes)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Pages chart data package write failed: {error}"
+            ))
+        })?;
+    let verified = PagesEditor::from_bytes(&target_bytes)?;
+    *editor = verified;
+    Ok(())
 }
 
 fn remapped_identifiers(

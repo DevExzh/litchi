@@ -1,0 +1,41 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "chart-data-edited-native.pages",
+  "size": 118445,
+  "sha256": "0df254d5b5f4d1f4ba57ad0f1f6654ee0e18fe5df0765bd739e7833d5c00616c",
+  "source": "chart-data-native.pages",
+  "lifecycle": [
+    "Generated through edit_body_chart_data: April 17.25 to 27.5; empty May to 12.75.",
+    "Opened in Pages and verified the chart values and title.",
+    "Saved, closed, and reopened the exact path.",
+    "Verified exact May 12.75 in the native data editor; closed the document."
+  ],
+  "row_labels": [
+    "Region 1",
+    "Region 2"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      27.5,
+      12.75,
+      53,
+      96
+    ],
+    [
+      55,
+      43,
+      70,
+      58
+    ]
+  ],
+  "title": "Pages Arrange native chart",
+  "scope": "Focused same-shape numeric replacement and insertion survived native save/reopen; chart AX rounds 12.75 to 12.8 while the editor retains exact 12.75."
+}

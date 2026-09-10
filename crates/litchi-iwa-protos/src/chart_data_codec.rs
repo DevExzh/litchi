@@ -47,6 +47,10 @@ pub struct DecodeOptions {
     max_cells: usize,
     max_label_count: usize,
     max_text_bytes: usize,
+    max_output_bytes: usize,
+    max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
 }
 
 impl DecodeOptions {
@@ -69,6 +73,10 @@ impl DecodeOptions {
             max_cells,
             max_label_count,
             max_text_bytes,
+            max_output_bytes: max_input_bytes,
+            max_allocations: max_input_bytes,
+            max_retained_bytes: max_input_bytes,
+            max_scratch_bytes: max_input_bytes,
         }
     }
 
@@ -85,7 +93,25 @@ impl DecodeOptions {
             .unwrap_or(MAX_AUTOMATIC_LIMIT)
             .clamp(1, MAX_AUTOMATIC_LIMIT);
         let cells = bytes.clamp(1, MAX_AUTOMATIC_LIMIT);
+        let output = bytes
+            .checked_mul(2)
+            .unwrap_or(MAX_AUTOMATIC_LIMIT)
+            .clamp(1, MAX_AUTOMATIC_LIMIT);
+        let retained = bytes
+            .checked_mul(4)
+            .unwrap_or(MAX_AUTOMATIC_LIMIT)
+            .min(MAX_AUTOMATIC_LIMIT)
+            .max(bytes);
+        let scratch = bytes
+            .checked_mul(4)
+            .unwrap_or(MAX_AUTOMATIC_LIMIT)
+            .min(MAX_AUTOMATIC_LIMIT)
+            .max(bytes);
         Self::new(bytes, fields, work, 16, cells, bytes, bytes)
+            .with_max_output_bytes(output)
+            .with_max_allocations(1)
+            .with_max_retained_bytes(retained)
+            .with_max_scratch_bytes(scratch)
     }
 
     /// Aggregate source-byte ceiling.
@@ -128,6 +154,30 @@ impl DecodeOptions {
     #[must_use]
     pub const fn max_text_bytes(self) -> usize {
         self.max_text_bytes
+    }
+
+    /// Candidate output-byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    /// Logical allocation ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.max_allocations
+    }
+
+    /// Source-plus-candidate retained-byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    /// Candidate scratch-byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
     }
 
     /// Replace the source-byte ceiling.
@@ -188,6 +238,34 @@ impl DecodeOptions {
     #[must_use]
     pub const fn with_max_text_bytes(mut self, maximum: usize) -> Self {
         self.max_text_bytes = maximum;
+        self
+    }
+
+    /// Replace the candidate output-byte ceiling.
+    #[must_use]
+    pub const fn with_max_output_bytes(mut self, maximum: usize) -> Self {
+        self.max_output_bytes = maximum;
+        self
+    }
+
+    /// Replace the logical allocation ceiling.
+    #[must_use]
+    pub const fn with_max_allocations(mut self, maximum: usize) -> Self {
+        self.max_allocations = maximum;
+        self
+    }
+
+    /// Replace the source-plus-candidate retained-byte ceiling.
+    #[must_use]
+    pub const fn with_max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = maximum;
+        self
+    }
+
+    /// Replace the candidate scratch-byte ceiling.
+    #[must_use]
+    pub const fn with_max_scratch_bytes(mut self, maximum: usize) -> Self {
+        self.max_scratch_bytes = maximum;
         self
     }
 
@@ -1651,5 +1729,15 @@ fn skip_unchecked_group(source: &mut &[u8], expected: u32) -> Result<(), DecodeE
     Err(DecodeErrorKind::Wire(buffa::DecodeError::UnexpectedEof))
 }
 
+mod rewrite;
+
+pub use rewrite::{
+    PreparedChartDataRewrite, RewriteError, RewriteExecutionLimits, RewriteExecutionRequirements,
+    RewriteLimit, RewriteOutput, RewriteReport, prepare_chart_data_rewrite,
+};
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod rewrite_tests;

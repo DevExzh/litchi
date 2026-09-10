@@ -4595,3 +4595,20 @@ through `body_chart_data`, `sheet_chart_data`, and `slide_chart_data`.
 The migration host reexports the common model and delegates numeric reading;
 its remaining source-building encoder and mutation graph machinery are not
 new canonical owners. The dependency-debt count is unchanged.
+
+## 2026-09-10 Focused numeric chart transactions
+
+Numeric changes to existing chart grids belong to the Pages, Numbers, and
+Keynote package owners. Their selector-based data edits use the shared
+prepared chart-data rewrite codec and the existing exact package publication
+machinery. The first write contract preserves labels and dimensions, native
+row/column identities, nonnumeric cell fields, and unknown source fields.
+Numbers admits standalone charts only; a table-backed chart's inline cache
+cannot be edited independently of its source table.
+
+The host setters delegate changes within this contract to focused packages.
+Their complete-grid replacement fallback remains for label or dimension
+changes, preserving the previous API while its broader identity and topology
+semantics are migrated. Fresh chart authoring also remains host debt. This
+slice does not retire the complete chart mutation graph or change the
+monolith deletion gate.

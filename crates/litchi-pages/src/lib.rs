@@ -103,7 +103,10 @@ pub use package::{
     BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
     BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
 };
-pub use package::{BodyChartDataError, BodyChartDataLimitKind};
+pub use package::{
+    BodyChartDataCommit, BodyChartDataDiagnostics, BodyChartDataEdit, BodyChartDataError,
+    BodyChartDataLimitKind, BodyChartDataPatch,
+};
 pub use package::{BodyChartMetadataError, BodyChartMetadataLimitKind};
 pub use package::{
     BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,

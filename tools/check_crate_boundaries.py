@@ -70167,6 +70167,41 @@ IWA_CHART_DATA_CODEC_REQUIRED_MARKER_GROUPS = {
     ),
     "strict preflight": (("preflight_modern", "preflight_grid", "preflight"),),
 }
+IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_TYPES = (
+    "RewriteError",
+    "RewriteExecutionRequirements",
+)
+IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_TYPE_GROUPS = {
+    # Keep the prepared-plan name flexible.  The request itself may be a
+    # borrowed rectangular slice or a common semantic value, so the boundary
+    # must not force one private input representation.
+    "prepared rewrite type": (
+        "PreparedChartDataRewrite",
+        "PreparedChartDataEdit",
+        "PreparedRewrite",
+    ),
+}
+IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_FUNCTIONS = (
+    "prepare_chart_data_rewrite",
+)
+IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_MARKER_GROUPS = {
+    "source-preserving rewrite preparation": (
+        "prepare_chart_data_rewrite",
+        "RewriteExecutionRequirements",
+    ),
+    "exact rewrite accounting": (
+        "execution_requirements",
+        "RewriteError",
+    ),
+    # A focused chart-data writer may implement the wire walk in a private
+    # helper or a nested rewrite module.  A generated Buffa encoder is one
+    # valid implementation; a manual bounded emitter is also valid when the
+    # prepared plan performs an authoritative private Buffa lazy readback.
+    "bounded Buffa production validation": (
+        ("ViewEncode", "try_encoded_len", "try_encode_bounded"),
+        ("decode_lazy_view", "BuffaDecodeOptions"),
+    ),
+}
 IWA_CHART_DATA_CODEC_PROST = re.compile(
     r"(?<![A-Za-z0-9_])prost(?:_types)?(?![A-Za-z0-9_])"
 )
@@ -70190,6 +70225,16 @@ IWA_CHART_DATA_FOCUSED_METHODS = {
     "Pages": "body_chart_data",
     "Numbers": "sheet_chart_data",
     "Keynote": "slide_chart_data",
+}
+IWA_CHART_DATA_FOCUSED_EDIT_METHODS = {
+    "Pages": "edit_body_chart_data",
+    "Numbers": "edit_sheet_chart_data",
+    "Keynote": "edit_slide_chart_data",
+}
+IWA_CHART_DATA_FOCUSED_APPLY_METHODS = {
+    "Pages": "apply_body_chart_data",
+    "Numbers": "apply_sheet_chart_data",
+    "Keynote": "apply_slide_chart_data",
 }
 IWA_CHART_DATA_COMMON_IMPORT = re.compile(
     r"(?:"
@@ -72133,6 +72178,284 @@ def _chart_data_check_codec_source(root: Path) -> list[str]:
     return sorted(set(violations))
 
 
+def _chart_data_codec_production_sources(root: Path) -> tuple[tuple[Path, str], ...]:
+    """Return chart-data codec production sources, including rewrite modules.
+
+    The decoder started life as one source file and may grow a private
+    ``chart_data_codec/`` implementation directory as the writer becomes
+    larger.  Keep the boundary about the production seam rather than forcing
+    that implementation layout.  Test-only sources are deliberately excluded
+    because differential Prost fixtures are allowed there.
+    """
+
+    codec_path = root / IWA_CHART_DATA_CODEC_SOURCE
+    if not codec_path.is_file():
+        return ()
+    paths = [codec_path]
+    module_directory = codec_path.with_suffix("")
+    if module_directory.is_dir():
+        paths.extend(
+            path
+            for path in sorted(module_directory.glob("*.rs"))
+            if path.name not in {"tests.rs", "test.rs"}
+            and not path.stem.endswith("_tests")
+        )
+    return tuple(
+        (
+            path,
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8")),
+        )
+        for path in paths
+    )
+
+
+def _chart_data_check_codec_rewrite_source(root: Path) -> list[str]:
+    """Require a bounded Buffa/source-preserving chart-data write seam."""
+
+    sources = _chart_data_codec_production_sources(root)
+    if not sources:
+        return []
+    production = "\n".join(source for _path, source in sources)
+    code = _mask_rust_non_code(production)
+    violations: list[str] = []
+
+    if IWA_CHART_DATA_CODEC_PROST.search(code) is not None:
+        violations.append(
+            "neutral chart-data rewrite codec must use Buffa rather than Prost: "
+            f"{IWA_CHART_DATA_CODEC_SOURCE}"
+        )
+
+    for name in IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_TYPES:
+        if re.search(
+            rf"\b(?:pub(?:\([^()]*\))?[ \t]+)?"
+            rf"(?:struct|enum|type)\s+{re.escape(name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "neutral chart-data rewrite codec is missing strict API "
+                f"{name}: {IWA_CHART_DATA_CODEC_SOURCE}"
+            )
+
+    for label, alternatives in IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_TYPE_GROUPS.items():
+        if not any(
+            re.search(
+                rf"\b(?:pub(?:\([^()]*\))?[ \t]+)?"
+                rf"(?:struct|enum|type)\s+{re.escape(name)}\b",
+                code,
+            )
+            for name in alternatives
+        ):
+            violations.append(
+                "neutral chart-data rewrite codec is missing "
+                f"{label}: {IWA_CHART_DATA_CODEC_SOURCE}"
+            )
+
+    for name in IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_FUNCTIONS:
+        if re.search(
+            rf"\b(?:pub(?:\([^()]*\))?[ \t]+)?fn\s+"
+            rf"{re.escape(name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "neutral chart-data rewrite codec is missing strict API "
+                f"{name}: {IWA_CHART_DATA_CODEC_SOURCE}"
+            )
+
+    def marker_present(marker: str | tuple[str, ...]) -> bool:
+        if isinstance(marker, tuple):
+            return all(
+                re.search(rf"\b{re.escape(item)}\b", code) is not None
+                for item in marker
+            )
+        return re.search(rf"\b{re.escape(marker)}\b", code) is not None
+
+    for label, markers in IWA_CHART_DATA_CODEC_REWRITE_REQUIRED_MARKER_GROUPS.items():
+        alternatives = bool(markers) and isinstance(markers[0], tuple)
+        present = (
+            any(marker_present(option) for option in markers)
+            if alternatives
+            else all(marker_present(marker) for marker in markers)
+        )
+        if not present:
+            violations.append(
+                "neutral chart-data rewrite codec is missing "
+                f"{label}: {IWA_CHART_DATA_CODEC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
+def _rust_method_declaration(source: str, method_name: str) -> str | None:
+    """Return one public method declaration without descending into its body."""
+
+    masked = _mask_rust_cfg_test_items(source)
+    code = _mask_rust_non_code(masked)
+    pattern = re.compile(
+        r"(?m)^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+"
+        r"(?:(?:unsafe|async|const)[ \t\r\n]+)*fn[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(method_name)}\b"
+    )
+    match = pattern.search(code)
+    if match is None:
+        return None
+    cursor = match.end()
+    parentheses = 0
+    brackets = 0
+    while cursor < len(code):
+        character = code[cursor]
+        if character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == "[":
+            brackets += 1
+        elif character == "]" and brackets:
+            brackets -= 1
+        elif not parentheses and not brackets and character in "{;":
+            break
+        cursor += 1
+    if cursor >= len(code) or code[cursor] != "{":
+        return None
+    return code[match.start() : cursor]
+
+
+def _focused_chart_data_write_sources(
+    root: Path, owner_path: Path
+) -> tuple[tuple[Path, str], ...]:
+    """Return one focused chart-data owner and its narrowly named siblings."""
+
+    absolute = root / owner_path
+    if not absolute.is_file():
+        return ()
+    paths = [absolute]
+    paths.extend(
+        path
+        for path in sorted(absolute.parent.glob(f"{absolute.stem}*.rs"))
+        if path != absolute
+    )
+    module_directory = absolute.parent / absolute.stem
+    if module_directory.is_dir():
+        paths.extend(sorted(module_directory.glob("*.rs")))
+    unique_paths = tuple(dict.fromkeys(paths))
+    return tuple(
+        (path, path.read_text(encoding="utf-8")) for path in unique_paths
+    )
+
+
+def _audit_focused_chart_data_write_owner(
+    root: Path,
+    *,
+    format_name: str,
+    owner_path: Path,
+    edit_method: str,
+    apply_method: str,
+) -> list[str]:
+    """Check one focused package's semantic chart-data transaction seam."""
+
+    sources = _focused_chart_data_write_sources(root, owner_path)
+    if not sources:
+        return []
+    source = "\n".join(source for _path, source in sources)
+    code = _mask_rust_non_code(_mask_rust_cfg_test_items(source))
+    violations: list[str] = []
+
+    edit_declaration = next(
+        (
+            declaration
+            for _path, implementation in sources
+            if (declaration := _rust_method_declaration(implementation, edit_method))
+            is not None
+        ),
+        None,
+    )
+    apply_declaration = next(
+        (
+            declaration
+            for _path, implementation in sources
+            if (declaration := _rust_method_declaration(implementation, apply_method))
+            is not None
+        ),
+        None,
+    )
+    if edit_declaration is None:
+        violations.append(
+            f"focused {format_name} chart-data owner is missing public "
+            f"Package::{edit_method}: {owner_path}"
+        )
+    if apply_declaration is None:
+        violations.append(
+            f"focused {format_name} chart-data owner is missing public "
+            f"Package::{apply_method}: {owner_path}"
+        )
+
+    if edit_declaration is not None:
+        if re.search(r"\b[A-Za-z_][A-Za-z0-9_]*Selector\b", edit_declaration) is None:
+            violations.append(
+                f"focused {format_name} {edit_method} must accept a semantic selector: "
+                f"{owner_path}"
+            )
+        if RUST_BYTE_SLICE.search(edit_declaration) is not None:
+            violations.append(
+                f"focused {format_name} {edit_method} exposes raw bytes: {owner_path}"
+            )
+        raw_id = IWA_CHART_DATA_RAW_ID_PARAMETER.search(edit_declaration)
+        if raw_id is not None:
+            violations.append(
+                f"focused {format_name} {edit_method} exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {owner_path}"
+            )
+
+    if apply_declaration is not None:
+        if RUST_BYTE_SLICE.search(apply_declaration) is not None:
+            violations.append(
+                f"focused {format_name} {apply_method} exposes raw bytes: {owner_path}"
+            )
+        raw_id = IWA_CHART_DATA_RAW_ID_PARAMETER.search(apply_declaration)
+        if raw_id is not None:
+            violations.append(
+                f"focused {format_name} {apply_method} exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {owner_path}"
+            )
+
+    if re.search(r"\bChartData\b", code) is None:
+        violations.append(
+            f"focused {format_name} chart-data transaction is missing common ChartData: "
+            f"{owner_path}"
+        )
+    if IWA_CHART_DATA_CODEC_IMPORT.search(code) is None:
+        violations.append(
+            f"focused {format_name} chart-data transaction is missing shared codec import: "
+            f"{owner_path}"
+        )
+    if re.search(r"\bprepare_chart_data_rewrite\b", code) is None:
+        violations.append(
+            f"focused {format_name} chart-data transaction must prepare the shared "
+            f"source-preserving rewrite: {owner_path}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_chart_data_write_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep focused numeric chart-data writes selector-first and source-preserving."""
+
+    if not _chart_data_boundary_active(root):
+        return []
+
+    violations = _chart_data_check_codec_rewrite_source(root)
+    for format_name, owner_path in IWA_CHART_DATA_FOCUSED_OWNERS.items():
+        violations.extend(
+            _audit_focused_chart_data_write_owner(
+                root,
+                format_name=format_name,
+                owner_path=owner_path,
+                edit_method=IWA_CHART_DATA_FOCUSED_EDIT_METHODS[format_name],
+                apply_method=IWA_CHART_DATA_FOCUSED_APPLY_METHODS[format_name],
+            )
+        )
+    return sorted(set(violations))
+
+
 def _audit_focused_chart_data_owner(
     root: Path,
     *,
@@ -72645,6 +72968,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_chart_arrangement_source_topology()
         + audit_iwa_chart_metadata_source_topology()
         + audit_iwa_chart_data_source_topology()
+        + audit_iwa_chart_data_write_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()
         + audit_keynote_chart_axis_title_facade_source_topology()

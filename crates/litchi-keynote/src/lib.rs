@@ -522,7 +522,10 @@ pub use package::{
     SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
     SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
 };
-pub use package::{SlideChartDataError, SlideChartDataLimitKind};
+pub use package::{
+    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
+    SlideChartDataLimitKind, SlideChartDataPatch,
+};
 pub use package::{SlideChartMetadataError, SlideChartMetadataLimitKind};
 pub use package::{
     SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,

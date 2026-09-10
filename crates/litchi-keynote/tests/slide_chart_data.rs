@@ -22,6 +22,11 @@ fn data_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/keynote/chart-data-native.key")
 }
 
+fn edited_data_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/chart-data-edited-native.key")
+}
+
 fn expected(values: [[Option<f64>; 4]; 2]) -> ChartData {
     ChartData::new(
         ROWS.iter().map(|value| (*value).to_owned()).collect(),
@@ -74,6 +79,27 @@ fn native_chart_data_preserves_missing_numeric_cells() -> TestResult {
 }
 
 #[test]
+fn native_keynote_saved_chart_data_matches_the_golden_grid_and_caption() -> TestResult {
+    let source = std::fs::read(edited_data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+
+    let data = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    assert_eq!(
+        data,
+        expected([
+            [Some(27.5), Some(12.75), Some(53.0), Some(96.0)],
+            [Some(55.0), Some(43.0), Some(70.0), Some(58.0)],
+        ])
+    );
+    assert_eq!(
+        package.slide_chart_caption(SlideSelector::index(0), ChartSelector::index(0))?,
+        Some(String::from("Native chart caption marker"))
+    );
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
 fn chart_data_rejects_unknown_selectors_before_reading_a_grid() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     let package = Package::from_bytes(&source)?;
@@ -93,5 +119,100 @@ fn chart_data_rejects_unknown_selectors_before_reading_a_grid() -> TestResult {
         Err(SlideChartDataError::EmptyChartName)
     ));
     assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn native_chart_data_transaction_rewrites_values_and_restores_exact_source() -> TestResult {
+    let source = std::fs::read(data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    let mut values = before.values().to_owned();
+    values[0][0] = Some(27.5);
+    values[0][1] = Some(12.75);
+    let requested = ChartData::new(
+        before.row_names().to_owned(),
+        before.column_names().to_owned(),
+        values,
+    )?;
+
+    let noop = package
+        .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+        .set(before.clone())
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(exact_bytes(noop.package())?, source);
+
+    let commit = package
+        .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+        .set(requested.clone())
+        .commit()?;
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert_eq!(
+        commit
+            .package()
+            .slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?,
+        requested
+    );
+    assert!(!commit.patch().is_noop());
+    assert!(matches!(
+        commit.package().apply_slide_chart_data(commit.patch()),
+        Err(SlideChartDataError::PatchConflict)
+    ));
+
+    let restored = commit
+        .package()
+        .apply_slide_chart_data(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    assert_eq!(
+        restored
+            .package()
+            .slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?,
+        before
+    );
+    Ok(())
+}
+
+#[test]
+fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
+    let source = std::fs::read(data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+
+    let mut labels = before.row_names().to_owned();
+    labels[0].push_str(" changed");
+    let changed_labels = ChartData::new(
+        labels,
+        before.column_names().to_owned(),
+        before.values().to_owned(),
+    )?;
+    assert!(matches!(
+        package
+            .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+            .set(changed_labels)
+            .commit(),
+        Err(SlideChartDataError::LabelsChanged)
+    ));
+
+    let mut changed_shape = before.values().to_owned();
+    for row in &mut changed_shape {
+        row.push(None);
+    }
+    let mut changed_columns = before.column_names().to_owned();
+    changed_columns.push(String::from("August"));
+    let changed_shape = ChartData::new(
+        before.row_names().to_owned(),
+        changed_columns,
+        changed_shape,
+    )?;
+    assert!(matches!(
+        package
+            .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+            .set(changed_shape)
+            .commit(),
+        Err(SlideChartDataError::LabelsChanged)
+    ));
     Ok(())
 }

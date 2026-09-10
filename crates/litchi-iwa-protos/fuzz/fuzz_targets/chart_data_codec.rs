@@ -4,8 +4,9 @@ use std::{hint::black_box, ptr, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::chart_data_codec::{
-    ChartDataSnapshot, DecodeError, DecodeLimit, DecodeOptions, decode_grid,
-    decode_grid_with_report, decode_modern, decode_modern_with_report,
+    ChartDataSnapshot, DecodeError, DecodeLimit, DecodeOptions, RewriteError,
+    RewriteExecutionRequirements, decode_grid, decode_grid_with_report, decode_modern,
+    decode_modern_with_report, prepare_chart_data_rewrite,
 };
 
 // Keep both the fuzzer input and every decoder pass bounded. Oversized inputs
@@ -93,13 +94,13 @@ fuzz_target!(|data: &[u8]| {
     // Arbitrary data drives both routes. A fixed one-time matrix keeps valid,
     // malformed, non-finite, ragged, and duplicate-field cases hot even when
     // a mutation campaign has not yet discovered a complete chart grid.
-    exercise_route(&source, Route::Modern);
-    exercise_route(&source, Route::Grid);
+    exercise_route(&source, Route::Modern, data);
+    exercise_route(&source, Route::Grid, data);
 
     static FIXTURES: OnceLock<()> = OnceLock::new();
     FIXTURES.get_or_init(|| {
         for (source, route) in fixed_cases() {
-            exercise_route(&source, route);
+            exercise_route(&source, route, b"fixed-chart-data-case");
         }
     });
 });
@@ -155,7 +156,7 @@ fn options() -> DecodeOptions {
     )
 }
 
-fn exercise_route(source: &[u8], route: Route) {
+fn exercise_route(source: &[u8], route: Route, request_seed: &[u8]) {
     let before = source.to_vec();
     let source_range = SourceRange::new(source);
     let limits = options();
@@ -184,6 +185,14 @@ fn exercise_route(source: &[u8], route: Route) {
             // accounting. This exercises inclusive limits and the complete
             // failure report for each bounded resource axis.
             exercise_limit_failures(source, route, report);
+
+            // The source-preserving writer only accepts a complete modern
+            // drawable.  Direct-grid decoding remains read-only, so keeping
+            // this branch explicit prevents a writer from accidentally
+            // treating a grid payload as a drawable root.
+            if matches!(route, Route::Modern) {
+                exercise_rewrites(source, snapshot, request_seed, &before);
+            }
         },
         (Err(error), Err(reported_error)) => {
             observe_error(error);
@@ -197,6 +206,205 @@ fn exercise_route(source: &[u8], route: Route) {
             );
         },
     }
+}
+
+fn snapshot_values(snapshot: ChartDataSnapshot<'_>) -> Vec<Vec<Option<f64>>> {
+    snapshot
+        .rows()
+        .iter()
+        .map(|row| row.values().collect())
+        .collect()
+}
+
+fn generated_value(data: &[u8], cell: usize) -> f64 {
+    let first = data
+        .get(cell % data.len().max(1))
+        .copied()
+        .unwrap_or_default();
+    let second = data
+        .get((cell.wrapping_mul(7).wrapping_add(3)) % data.len().max(1))
+        .copied()
+        .unwrap_or_default();
+    let magnitude = f64::from(first) + f64::from(second) / 256.0 + 0.25;
+    if first & 1 == 0 {
+        magnitude
+    } else {
+        -magnitude
+    }
+}
+
+fn replacement_values(snapshot: ChartDataSnapshot<'_>, data: &[u8]) -> Vec<Vec<Option<f64>>> {
+    let mut cell = 0usize;
+    snapshot
+        .rows()
+        .iter()
+        .map(|row| {
+            row.values()
+                .map(|current| {
+                    let marker = data
+                        .get(cell % data.len().max(1))
+                        .copied()
+                        .unwrap_or_default();
+                    let replacement = if marker % 3 == 0 {
+                        None
+                    } else {
+                        Some(generated_value(data, cell))
+                    };
+                    cell = cell.checked_add(1).expect("bounded fuzz cell count");
+                    // Keep the generated value finite while making both
+                    // numeric insertion and numeric removal reachable.
+                    let _ = current;
+                    replacement
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn exercise_rewrites(source: &[u8], snapshot: ChartDataSnapshot<'_>, data: &[u8], before: &[u8]) {
+    let original_values = snapshot_values(snapshot);
+    let desired_values = replacement_values(snapshot, data);
+
+    // A matching request must be a true byte-exact no-op, including unknown
+    // outer/chart/grid fields and the opaque native id map.
+    exercise_one_rewrite(source, &original_values, before, true);
+
+    // A second request changes only numeric presence/bits while keeping the
+    // validated row/column shape.  The writer's readback is compared bitwise
+    // so signed zero remains observable.
+    exercise_one_rewrite(
+        source,
+        &desired_values,
+        before,
+        value_grids_equal(&original_values, &desired_values),
+    );
+}
+
+fn value_grids_equal(left: &[Vec<Option<f64>>], right: &[Vec<Option<f64>>]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| match (left, right) {
+                        (None, None) => true,
+                        (Some(left), Some(right)) => left.to_bits() == right.to_bits(),
+                        _ => false,
+                    })
+        })
+}
+
+fn exercise_one_rewrite(
+    source: &[u8],
+    desired: &[Vec<Option<f64>>],
+    before: &[u8],
+    expected_noop: bool,
+) {
+    let options = options();
+    let prepared = prepare_chart_data_rewrite(source, desired, options);
+    let Ok(prepared) = prepared else {
+        // Random valid modern payloads can legitimately hit the finite output
+        // ceiling when a missing numeric value is added.  Preparation itself
+        // is the bounded refusal path; fixed cases cover successful writes.
+        return;
+    };
+    let requirements = prepared.execution_requirements();
+    let output = prepared
+        .execute(requirements.exact())
+        .unwrap_or_else(|error| panic!("exact chart-data rewrite failed: {error:?}"));
+    assert_eq!(source, before, "chart-data rewrite modified its source");
+    assert_eq!(output.report().output_bytes(), output.output().len());
+    assert_eq!(output.report().changed(), output.output() != source);
+    assert_eq!(output.output() == source, expected_noop);
+    if expected_noop {
+        assert_eq!(requirements.output_bytes, source.len());
+        // The package-level snapshot is allocation-free, while the codec
+        // returns an owned Vec even for a byte-exact no-op.
+        assert_eq!(requirements.allocations, usize::from(!source.is_empty()));
+    } else {
+        assert_preserved_wire_markers(source, output.output());
+    }
+
+    let decoded = decode_modern(output.output(), &options)
+        .unwrap_or_else(|error| panic!("chart-data rewrite readback failed: {error:?}"));
+    assert_eq!(snapshot_values(decoded), desired);
+    exercise_rewrite_limit_failures(source, desired, requirements);
+    black_box(output);
+}
+
+fn assert_preserved_wire_markers(source: &[u8], output: &[u8]) {
+    // These markers occur in the fixed rich source and make preservation of
+    // unknown fields observable without parsing private wire spans here.
+    for marker in [
+        b"future drawable extension".as_slice(),
+        b"future grid extension".as_slice(),
+        b"future chart extension".as_slice(),
+        b"cell future bytes".as_slice(),
+        b"blank future bytes".as_slice(),
+    ] {
+        if source.windows(marker.len()).any(|window| window == marker) {
+            assert!(
+                output.windows(marker.len()).any(|window| window == marker),
+                "chart-data rewrite dropped preserved wire marker"
+            );
+        }
+    }
+}
+
+fn exercise_rewrite_limit_failures(
+    source: &[u8],
+    desired: &[Vec<Option<f64>>],
+    requirements: RewriteExecutionRequirements,
+) {
+    let probes = [
+        (requirements.output_bytes > 0).then(|| {
+            requirements
+                .exact()
+                .with_output_bytes(requirements.output_bytes - 1)
+        }),
+        (requirements.fields > 0)
+            .then(|| requirements.exact().with_fields(requirements.fields - 1)),
+        (requirements.work_bytes > 0).then(|| {
+            requirements
+                .exact()
+                .with_work_bytes(requirements.work_bytes - 1)
+        }),
+        (requirements.max_depth > 0).then(|| {
+            requirements
+                .exact()
+                .with_max_depth(requirements.max_depth - 1)
+        }),
+        (requirements.allocations > 0).then(|| {
+            requirements
+                .exact()
+                .with_allocations(requirements.allocations - 1)
+        }),
+        (requirements.retained_bytes > 0).then(|| {
+            requirements
+                .exact()
+                .with_retained_bytes(requirements.retained_bytes - 1)
+        }),
+        (requirements.scratch_bytes > 0).then(|| {
+            requirements
+                .exact()
+                .with_scratch_bytes(requirements.scratch_bytes - 1)
+        }),
+    ];
+    for limits in probes.into_iter().flatten() {
+        let prepared = prepare_chart_data_rewrite(source, desired, options())
+            .expect("broad chart-data rewrite limits must prepare");
+        let error = prepared
+            .execute(limits)
+            .expect_err("one-below chart-data rewrite limit was accepted");
+        assert!(error.resource_limit().is_some());
+        observe_rewrite_error(error);
+    }
+}
+
+fn observe_rewrite_error(error: RewriteError) {
+    black_box((error.resource_limit(), error.allocation_amount()));
+    black_box(format_args!("{error:?}"));
 }
 
 fn observe_snapshot(snapshot: ChartDataSnapshot<'_>, source: SourceRange, route: Route) {
@@ -396,14 +604,20 @@ fn grid(
     if let Some(id_map) = id_map {
         output.extend(length_field(4, id_map));
     }
+    output.extend(length_field(80, b"future grid extension"));
     output
 }
 
 fn modern(grid: &[u8]) -> Vec<u8> {
-    let chart = joined([length_field(7, grid), varint_field(91, 0xfeed)]);
+    let chart = joined([
+        length_field(7, grid),
+        varint_field(91, 0xfeed),
+        length_field(92, b"future chart extension"),
+    ]);
     joined([
+        varint_field(4000, 7),
         length_field(10_000, &chart),
-        length_field(92, b"future drawable data"),
+        length_field(93, b"future drawable extension"),
     ])
 }
 
@@ -413,13 +627,25 @@ fn fixed_cases() -> Vec<(Vec<u8>, Route)> {
         &["Q1", "Q2", "Q3"],
         [
             vec![
-                fixed64_field(1, 0.0),
-                fixed64_field(1, 17.25),
+                joined([
+                    varint_field(90, 17),
+                    fixed64_field(1, 0.0),
+                    fixed64_field(4, 45123.25),
+                    length_field(89, b"cell future bytes"),
+                ]),
+                joined([
+                    length_field(88, b"blank future bytes"),
+                    fixed64_field(4, 45124.0),
+                ]),
                 fixed64_field(4, 45123.0),
             ],
             vec![
-                fixed64_field(3, 0.5),
-                fixed64_field(1, -9.25),
+                joined([
+                    fixed64_field(3, 0.5),
+                    fixed64_field(1, -0.0),
+                    varint_field(87, 29),
+                ]),
+                joined([fixed64_field(3, 3.5), fixed64_field(1, -9.25)]),
                 fixed64_field(1, 42.0),
             ],
         ],

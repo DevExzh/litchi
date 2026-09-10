@@ -34,6 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
@@ -4226,6 +4227,7 @@ fn enforce_chart_data_projection_provenance(
     let common = fs::read_to_string(proto_directory.join("TSCHArchives.Common.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("TSCHChartDataArchive.proto"))?;
     let codec = fs::read_to_string("src/chart_data_codec.rs")?;
+    let rewrite = fs::read_to_string("src/chart_data_codec/rewrite.rs")?;
     let lib = fs::read_to_string("src/lib.rs")?;
     let normalize = |source: &str| {
         source
@@ -4248,6 +4250,9 @@ fn enforce_chart_data_projection_provenance(
             .iter()
             .all(|marker| lib.matches(marker).count() == 1)
         || has_forbidden_codec_marker(&codec)
+        || has_forbidden_codec_marker(&rewrite)
+        || production_codec_source(&rewrite).contains("IWorkPackage")
+        || production_codec_source(&rewrite).contains("encode_to_vec")
         || production_codec_source(&codec).contains("IWorkPackage")
         || production_codec_source(&codec).contains("encode_to_vec")
         || production_codec_source(&codec).contains("try_encode")
