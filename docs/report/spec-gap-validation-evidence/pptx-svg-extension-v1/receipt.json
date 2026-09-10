@@ -1,0 +1,116 @@
+{
+  "recorded_at": "2026-09-10T02:58:58.121566+00:00",
+  "validation_base": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "candidate": "/var/tmp/litchi-performance-full-baseline-pptx-fix-candidate-20260909",
+  "sources": {
+    "crates/litchi-pptx/src/presentation/source.rs": "04a47d44d0af1343f637a6957848a6e713b3c7805b1c1f6d5a46bbd6a2085ed1",
+    "crates/litchi-pptx/tests/source_backed_edit.rs": "1552e4ff1a55f5c5c4f57f9b292c914fe5f1b0c690ff47ad3aa316c4b4bb396e",
+    "tools/perf-baseline/src/pptx_native_image.rs": "2ef04581ebe135c27cb0f3cb11fa4988fb433e5893f95cf2fd24da1fa3f66489"
+  },
+  "source_manifest_sha256": "0ef4160a09929be6b49f80cacc77ffd04719334163d62eb84fc3561ab5220edf",
+  "toolchain": "1.95.0",
+  "dedicated_target": "/var/tmp/litchi-pptx-guid-root-target-195",
+  "results": {
+    "unit_integration_passed": 868,
+    "doctests_passed": 6,
+    "doctests_ignored": 2,
+    "strict_clippy": "pass",
+    "warning_denied_rustdoc": "pass",
+    "format": "pass",
+    "diff_check": "pass",
+    "independent_review": "clear"
+  },
+  "commands": [
+    "cargo +1.95.0 test -p litchi-pptx --all-features --no-fail-fast",
+    "cargo +1.95.0 clippy -p litchi-pptx --all-targets --all-features -- -D warnings",
+    "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-pptx --all-features --no-deps",
+    "rustup run 1.95.0 rustfmt --check --edition 2024 --config skip_children=true crates/litchi-pptx/src/presentation/source.rs crates/litchi-pptx/tests/source_backed_edit.rs tools/perf-baseline/src/pptx_native_image.rs",
+    "git diff --check"
+  ],
+  "logs_and_locks": {
+    "tests": {
+      "file": "tests.log.gz",
+      "raw_sha256": "fc855259ba94a8039584ebdb8817fc2a749ff4ee9407023c8badb864755f670a",
+      "raw_bytes": 95164,
+      "source": "/var/tmp/litchi-pptx-guid-root-tests-v2.log",
+      "exit_code": 0
+    },
+    "clippy": {
+      "file": "clippy.log.gz",
+      "raw_sha256": "1331f7e114f1ecd89365692c6007412b401f7aba1e617b533b5a221db9b1d508",
+      "raw_bytes": 5994,
+      "source": "/var/tmp/litchi-pptx-guid-root-clippy-v2.log",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "file": "rustdoc.log.gz",
+      "raw_sha256": "2c94e7cd0a0b5437954f717ef3dbc7744f5e190af8bd6994cf249faa8d98a8f7",
+      "raw_bytes": 1944,
+      "source": "/var/tmp/litchi-pptx-guid-root-rustdoc-v2.log",
+      "exit_code": 0
+    },
+    "Cargo.lock.gz": {
+      "file": "Cargo.lock.gz",
+      "raw_sha256": "37718061c1a24826a91b5904c2a1f7b30593037d243f3fba5b4af814e7b3a40f",
+      "raw_bytes": 138692,
+      "source": "/var/tmp/litchi-performance-full-baseline-pptx-fix-candidate-20260909/Cargo.lock"
+    },
+    "perf-Cargo.lock.gz": {
+      "file": "perf-Cargo.lock.gz",
+      "raw_sha256": "911d911aca4bb68988d5faa4e46c71e95dcdc3107a7aef042aa3e2fa2fe5477d",
+      "raw_bytes": 56133,
+      "source": "/var/tmp/litchi-performance-full-baseline-pptx-fix-candidate-20260909/tools/perf-baseline/Cargo.lock"
+    },
+    "perf-native-tests.log.gz": {
+      "file": "perf-native-tests.log.gz",
+      "raw_sha256": "ad3b41dbcb0a6a8341c4bf638eaa64fe77d0464025fcc0f971b2a22d6eb745a0",
+      "raw_bytes": 10035,
+      "source": "/var/tmp/litchi-performance-full-baseline-20260910/pptx-guid-native-tests-rerun.log"
+    },
+    "perf-library-tests.log.gz": {
+      "file": "perf-library-tests.log.gz",
+      "raw_sha256": "4a869da2ee999ddfbc2c8ffdcee88a2590e05741a6439f7f7e6fe65fc2d3295c",
+      "raw_bytes": 31904,
+      "source": "/var/tmp/litchi-performance-full-baseline-20260910/pptx-guid-all-lib-tests.log"
+    }
+  },
+  "artifacts": {
+    "Cargo.lock.gz": {
+      "sha256": "29a8c7d3c80fb98d13bb6ab78f17fa145d2184810fd12ddf0317af6c0645f830",
+      "bytes": 33441
+    },
+    "README.md": {
+      "sha256": "7c7c9b45fb2688a6e47171501ab6e8dcdfc821476366d7b4748bb4226b8dee13",
+      "bytes": 2575
+    },
+    "clippy.log.gz": {
+      "sha256": "a56bca74e324c3f900f47dc18ceb7f7b8eee01241e413140f32acd216c672927",
+      "bytes": 1553
+    },
+    "perf-Cargo.lock.gz": {
+      "sha256": "cec1d4f9001206be2deaadf064dd89fdd90c555b87a25c5ce1088f3c38ed3c02",
+      "bytes": 13199
+    },
+    "perf-library-tests.log.gz": {
+      "sha256": "c153d169889567f3aef47e485af0bd4e4c82946e8d0a20fb2f65b340c19a1002",
+      "bytes": 7378
+    },
+    "perf-native-tests.log.gz": {
+      "sha256": "7857cb387ae664c6ed8c6f3bfe43171c0297dd77a6cd8dd461de754eb62ace67",
+      "bytes": 2211
+    },
+    "rustdoc.log.gz": {
+      "sha256": "4ea13482a01c6175158e2c3351da82837c8f95fe054aca07e95d2be3516a9e9d",
+      "bytes": 375
+    },
+    "source-manifest.json": {
+      "sha256": "0ef4160a09929be6b49f80cacc77ffd04719334163d62eb84fc3561ab5220edf",
+      "bytes": 605
+    },
+    "tests.log.gz": {
+      "sha256": "b265e3ba4c5144c9c55ae097cfbdcf7d3342b9297a553b544f47fa08ebbd8ee8",
+      "bytes": 19101
+    }
+  },
+  "performance_claim": false
+}
