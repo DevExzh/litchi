@@ -133,3 +133,16 @@ and audited. Unselected source spans keep their slots, and additional elements
 follow the last selected slot. The operation bounds its exact output size before
 allocation and validates the assembled XML. An unchanged sequence shares the
 source buffer.
+
+The Custom Data owner in `litchi-xlsx` uses this path for storage and connection
+UID edits, including exact inverse publication. Data Model load-version edits
+and descriptor graph insertion/removal also retain source publication provenance
+through saves and inverses. Survey scalar edits on existing elements use the
+batch path, preserving comments, namespace context, and lexical spelling outside
+the edited attributes. Survey property insertion, removal, and replacement with
+fresh typed properties use structural batches in schema order while retaining
+neighboring source XML. Question sequence edits move and copy opaque subtrees
+within the original parent; column-name selectors resolve against the owning
+table during ordinary edits. Survey snapshots retain source tokens for exact
+inverse publication and restoration of removed parts. The positional, budget-managed
+`SourceXmlPart` API remains available for source-backed package editing.
