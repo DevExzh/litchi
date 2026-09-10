@@ -10,6 +10,6 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use semantic::Chart;
+pub use semantic::{Chart, GraphFamily};
 
 pub(in crate::chart) use validation::{cache_dimensions, dimensions_cover};

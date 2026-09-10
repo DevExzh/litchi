@@ -1,9 +1,11 @@
-use super::super::super::{Kind, Ref, Stream, axis, cache as chart_cache, codec, format, layout};
-use super::super::cache::Cache;
-use super::super::context::{Context, GroupId, Props, Rect};
-use super::super::groups::Group;
+use super::super::super::{
+    Kind, Ref, Stream, axis, cache as chart_cache, codec, format, group, layout,
+};
+use super::super::cache::{Cache, Value};
+use super::super::context::{Context, Count, GroupId, Order, Props, Rect};
+use super::super::groups::{Family, Group};
 use super::super::inventory::{Edit, Label, Legend, Origin, Raw};
-use super::super::series::{Link, Owner, Series};
+use super::super::series::{Link, Owner, Role, RowCol, Series, Source};
 use super::validation::{cache_dimensions, check_add, dimensions_cover, reserve_one};
 use crate::{Error, Limits, Result};
 
@@ -13,10 +15,9 @@ use crate::{Error, Limits, Result};
 /// therefore be encoded byte-for-byte without copying. Mutation is allowed for
 /// inspection workflows, but encoding such a value is refused until a future
 /// lossless record editor can prove placement of every opaque record.
-/// Fresh values can be assembled and validated, but encoding currently returns
-/// [`Error::UnsupportedAuthoring`] until the complete mandatory chart-sheet
-/// scaffold is represented. This prevents self-consistent but Office-invalid
-/// streams from escaping the crate.
+/// Fresh values can be assembled through the deliberately scoped standalone
+/// Graph profile. Other fresh values return [`Error::UnsupportedAuthoring`],
+/// so self-consistent but unsupported streams cannot escape the crate.
 #[derive(Debug)]
 pub struct Chart {
     pub(in crate::chart) context: Context,
@@ -38,9 +39,29 @@ pub struct Chart {
     pub(in crate::chart) origin: Origin,
     pub(in crate::chart) dirty: bool,
     pub(in crate::chart) limits: Limits,
-    /// Internal proof gate. No public constructor enables it until the full
-    /// CHARTSHEET/CHARTFOMATS/SERIESDATA grammar is modeled.
+    /// Internal proof gate for the record encoder. The public Graph builder
+    /// enables it only after its scoped profile has been validated.
     pub(in crate::chart) authoring_proven: bool,
+    /// Whether the public standalone Graph profile has proved its canonical
+    /// datasheet orientation and record scaffold.
+    pub(in crate::chart) graph_authoring_profile: bool,
+}
+
+/// The deliberately small standalone Graph authoring profile.
+///
+/// The profile has one primary chart group. Bar and line charts use one
+/// category and one value axis; pie charts use the same primary axis group but
+/// contain no axes, as required by [MS-OGRAPH] for pie chart groups. Other
+/// chart families, secondary axes, and combination charts remain outside this
+/// constructor's proof boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphFamily {
+    /// A bounded Bar chart group.
+    Bar,
+    /// A bounded Line chart group.
+    Line,
+    /// A bounded Pie chart group with no axes.
+    Pie,
 }
 
 impl Chart {
@@ -93,7 +114,320 @@ impl Chart {
             dirty: false,
             limits: validated,
             authoring_proven: false,
+            graph_authoring_profile: false,
         })
+    }
+
+    /// Creates the complete scaffold used by the standalone Graph authoring
+    /// profile.
+    ///
+    /// This only creates the checked structural baseline. Call
+    /// [`Self::finish_graph_authoring`] after adding the series and caches; the
+    /// encoder will not emit a fresh chart until that final validation has
+    /// succeeded.
+    pub fn new_graph_authoring(family: GraphFamily, limits: Limits) -> Result<Self> {
+        let mut chart = Self::new_with(Context::graph(), limits)?;
+        let group = chart.groups.first_mut().ok_or(Error::InvalidModel {
+            field: "groups",
+            reason: "fresh chart did not contain its primary chart group",
+        })?;
+        group.family = match family {
+            GraphFamily::Bar => Family::Bar {
+                overlap: group::Overlap::ZERO,
+                gap: group::Gap::new(150).ok_or(Error::InvalidModel {
+                    field: "group",
+                    reason: "default bar gap is outside its checked range",
+                })?,
+                // fTranspose=1 is the horizontal Bar profile; it avoids the
+                // separate column/Chart3d series-axis combination.
+                flags: 1,
+            },
+            // A stacked line group is the smallest positive Line profile
+            // without a SeriesAxis/Chart3d pair. MS-OGRAPH requires that
+            // pair when fStacked is zero, so the two-axis profile uses the
+            // normative fStacked=1 form (with f100 left clear).
+            GraphFamily::Line => Family::Line { flags: 1 },
+            GraphFamily::Pie => Family::Pie {
+                rotation: 0,
+                hole: 0,
+                flags: 0,
+            },
+        };
+        if !matches!(family, GraphFamily::Pie) {
+            chart.add_axis(axis::Axis::new(axis::Kind::Category))?;
+            chart.add_axis(axis::Axis::new(axis::Kind::Value))?;
+        } else {
+            // PlotArea belongs to the optional AXES sequence. A pie profile
+            // has no axes, so retaining the default PlotArea flag would emit
+            // a record outside the normative Pie AXISPARENT grammar.
+            chart.props.plot_area = false;
+        }
+        Ok(chart)
+    }
+
+    /// Completes and proves the standalone Graph authoring profile.
+    ///
+    /// The proof is established only after producer identity, collection
+    /// ownership, chart-family/axis combinations, series links, cache
+    /// dimensions, and all bounded record fields have been validated. Parsed
+    /// charts and unsupported families cannot be promoted through this API.
+    pub fn finish_graph_authoring(mut self) -> Result<Self> {
+        self.validate_graph_authoring()?;
+        self.authoring_proven = true;
+        self.graph_authoring_profile = true;
+        Ok(self)
+    }
+
+    fn validate_graph_authoring(&self) -> Result<()> {
+        if self.context.kind() != Kind::Graph {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "standalone Graph authoring requires a Graph producer context",
+            });
+        }
+        if !matches!(&self.origin, Origin::Fresh) {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "parsed chart replacement remains on the source-bound edit path",
+            });
+        }
+        if self.parents.len() != 1 || self.parents[0].id() != axis::ParentId::PRIMARY {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "the fresh Graph profile has exactly one primary AxisParent",
+            });
+        }
+        if self.groups.len() != 1 {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "fresh Graph authoring supports one chart group only",
+            });
+        }
+        let group = self.groups.first().ok_or(Error::InvalidModel {
+            field: "groups",
+            reason: "fresh Graph chart group is missing",
+        })?;
+        if group.parent != axis::ParentId::PRIMARY
+            || group.order != Order::ZERO
+            || !group.lines.is_empty()
+            || !group.drop_bars.is_empty()
+        {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "Graph authoring does not support secondary or opaque group children",
+            });
+        }
+        let family = match group.family {
+            Family::Bar {
+                overlap,
+                gap,
+                flags,
+            } if overlap == group::Overlap::ZERO && gap.get() == 150 && flags == 1 => {
+                GraphFamily::Bar
+            },
+            Family::Line { flags: 1 } => GraphFamily::Line,
+            Family::Pie {
+                rotation,
+                hole,
+                flags,
+            } if rotation == 0 && hole == 0 && flags == 0 => GraphFamily::Pie,
+            Family::Area { .. }
+            | Family::Scatter { .. }
+            | Family::Radar { .. }
+            | Family::Surface { .. }
+            | Family::Bar { .. }
+            | Family::Line { .. }
+            | Family::Pie { .. } => {
+                return Err(Error::UnsupportedAuthoring {
+                    reason: "the selected Graph family settings are outside the authoring profile",
+                });
+            },
+        };
+        match family {
+            GraphFamily::Pie if !self.axes.is_empty() => {
+                return Err(Error::UnsupportedAuthoring {
+                    reason: "pie chart groups must not contain axes",
+                });
+            },
+            GraphFamily::Bar | GraphFamily::Line => {
+                if self.axes.len() != 2
+                    || self.axes[0].kind != axis::Kind::Category
+                    || self.axes[1].kind != axis::Kind::Value
+                    || self
+                        .axes
+                        .iter()
+                        .any(|value| value.parent != axis::ParentId::PRIMARY)
+                {
+                    return Err(Error::UnsupportedAuthoring {
+                        reason: "bar and line charts require one primary category and value axis",
+                    });
+                }
+            },
+            GraphFamily::Pie => {},
+        }
+        if matches!(family, GraphFamily::Bar | GraphFamily::Line) && !self.props.plot_area {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "the standalone Graph profile requires a chart plot area",
+            });
+        }
+        if family == GraphFamily::Pie && self.props.plot_area {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "the standalone Graph pie profile has no AXES PlotArea record",
+            });
+        }
+        if self.series.is_empty() {
+            return Err(Error::InvalidModel {
+                field: "series",
+                reason: "a fresh Graph chart requires at least one series",
+            });
+        }
+        if !self.formats.is_empty() || !self.labels.is_empty() || !self.unknown.is_empty() {
+            return Err(Error::UnsupportedAuthoring {
+                reason: "fresh Graph authoring does not synthesize opaque format or label records",
+            });
+        }
+        let first_count = self
+            .series
+            .first()
+            .map(|series| series.category_count)
+            .ok_or(Error::InvalidModel {
+                field: "series",
+                reason: "a fresh Graph chart requires at least one series",
+            })?;
+        let category_count = usize::from(first_count.get());
+        let expected_caches = self
+            .series
+            .len()
+            .checked_mul(category_count.checked_add(1).ok_or(Error::SizeOverflow {
+                resource: "Graph authoring cache count",
+            })?)
+            .and_then(|value| value.checked_add(category_count))
+            .ok_or(Error::SizeOverflow {
+                resource: "Graph authoring cache count",
+            })?;
+        if self.caches.len() != expected_caches {
+            return Err(Error::InvalidModel {
+                field: "cache",
+                reason: "the Graph profile requires one name cell and one value cell per series point plus categories",
+            });
+        }
+        let mut coordinates = Vec::new();
+        coordinates
+            .try_reserve_exact(self.caches.len())
+            .ok()
+            .ok_or(Error::Allocation {
+                resource: "Graph authoring cache coordinates",
+            })?;
+        for cache in &self.caches {
+            let Cache::Graph {
+                row, col, value, ..
+            } = cache
+            else {
+                return Err(Error::InvalidModel {
+                    field: "cache",
+                    reason: "fresh Graph authoring requires Graph cache cells",
+                });
+            };
+            let row_index = usize::from(row.get());
+            let col_index = usize::from(col.get());
+            if row_index == 0 {
+                if !(1..=category_count).contains(&col_index)
+                    || !matches!(value, Value::Text(_) | Value::Blank)
+                {
+                    return Err(Error::InvalidModel {
+                        field: "cache",
+                        reason: "the Graph category row must contain text or blank cells from column one",
+                    });
+                }
+            } else if row_index > self.series.len()
+                || col_index > category_count
+                || (col_index == 0 && !matches!(value, Value::Text(_) | Value::Blank))
+                || (col_index != 0 && !matches!(value, Value::Number(_) | Value::Blank))
+            {
+                return Err(Error::InvalidModel {
+                    field: "cache",
+                    reason: "the Graph series rows must contain numeric or blank cells from column zero",
+                });
+            }
+            coordinates.push((row_index, col_index));
+        }
+        coordinates.sort_unstable();
+        coordinates.dedup();
+        if coordinates.len() != expected_caches {
+            return Err(Error::InvalidModel {
+                field: "cache",
+                reason: "Graph authoring cache coordinates must form one complete datasheet grid",
+            });
+        }
+        for (series_index, series) in self.series.iter().enumerate() {
+            if series.category_count == Count::ZERO
+                || series.value_count == Count::ZERO
+                || series.category_count != series.value_count
+                || series.category_count != first_count
+                || series.bubble_count != Count::ZERO
+                || series.owner != Owner::Group(GroupId::ZERO)
+            {
+                return Err(Error::InvalidModel {
+                    field: "series",
+                    reason: "the supported Graph profile requires equal non-empty category/value caches",
+                });
+            }
+            for (binding, role) in series.ai.ordered().into_iter().zip(Role::ALL) {
+                let Link::Graph { source, .. } = binding.link() else {
+                    return Err(Error::InvalidModel {
+                        field: "link",
+                        reason: "fresh Graph series cannot contain Excel links",
+                    });
+                };
+                let Link::Graph { row_col, .. } = binding.link() else {
+                    unreachable!("Graph link was checked above");
+                };
+                let expected_row = match role {
+                    Role::Categories | Role::Bubbles => RowCol::ZERO,
+                    Role::Name | Role::Values => {
+                        RowCol::new(u16::try_from(series_index + 1).ok().ok_or(
+                            Error::SizeOverflow {
+                                resource: "Graph authoring series row",
+                            },
+                        )?)
+                        .ok_or(Error::InvalidModel {
+                            field: "series",
+                            reason: "Graph authoring series row exceeds the datasheet range",
+                        })?
+                    },
+                };
+                if *row_col != expected_row
+                    || (role != Role::Bubbles && *source == Source::Automatic)
+                    || (role == Role::Bubbles && *source != Source::Automatic)
+                {
+                    return Err(Error::InvalidModel {
+                        field: "link",
+                        reason: "fresh Graph series links do not match the canonical datasheet orientation",
+                    });
+                }
+            }
+            let name = series.ai.get(Role::Name).text();
+            let name_cell = self.caches.iter().find(|cache| {
+                matches!(
+                    cache,
+                    Cache::Graph { row, col, .. }
+                        if row.get() == u16::try_from(series_index + 1).unwrap_or(u16::MAX)
+                            && col.get() == 0
+                )
+            });
+            let Some(Cache::Graph { value, .. }) = name_cell else {
+                return Err(Error::InvalidModel {
+                    field: "cache",
+                    reason: "each Graph series name link requires its first datasheet cell",
+                });
+            };
+            match (name, value) {
+                (Some(expected), Value::Text(actual)) if expected == actual => {},
+                (None, Value::Blank) => {},
+                _ => {
+                    return Err(Error::InvalidModel {
+                        field: "cache",
+                        reason: "the Graph series name cache disagrees with SeriesText",
+                    });
+                },
+            }
+        }
+        codec::validate_chart(self, self.limits, true)
     }
 
     /// Parses a borrowed chart and retains an exact bounded copy for replay.
@@ -159,7 +493,7 @@ impl Chart {
         crate::chart::transaction::Editor::new(self)
     }
 
-    /// Replays an untouched parsed chart, or refuses unsupported fresh authoring.
+    /// Replays an untouched parsed chart, or emits a proven fresh profile.
     pub fn encode(self) -> Result<Stream> {
         let limits = self.limits;
         self.encode_with(limits)
@@ -167,8 +501,8 @@ impl Chart {
 
     /// Consumes and replays under explicit bounds.
     ///
-    /// Parsed mutations return [`Error::UnsafeEdit`]; fresh values return
-    /// [`Error::UnsupportedAuthoring`] until full chart-sheet authoring lands.
+    /// Parsed mutations return [`Error::UnsafeEdit`]; fresh values outside the
+    /// supported standalone Graph profile return [`Error::UnsupportedAuthoring`].
     pub fn encode_with(mut self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
         let origin = std::mem::replace(&mut self.origin, Origin::Fresh);
@@ -178,6 +512,13 @@ impl Chart {
             }),
             Origin::Parsed(stream) => stream.relimit(limits),
             Origin::Fresh => {
+                if self.graph_authoring_profile {
+                    // Public mutators can change a fresh model after the
+                    // proof gate has been established. Re-run the complete
+                    // profile proof immediately before emission so a stale
+                    // internal flag cannot authorize an invalid stream.
+                    self.validate_graph_authoring()?;
+                }
                 let bytes = codec::encode(&self, limits)?;
                 Stream::with_limits(bytes, limits)
             },
