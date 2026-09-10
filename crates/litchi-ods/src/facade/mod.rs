@@ -581,6 +581,75 @@ impl Spreadsheet {
         crate::data_pilot::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
     }
 
+    /// Discover inert database-range declarations owned by this spreadsheet.
+    ///
+    /// Database sources, filters, sorting, and subtotals are metadata only;
+    /// this method never opens a database, refreshes a range, or evaluates a
+    /// filter or subtotal.
+    ///
+    /// # Errors
+    /// Returns an error when the content owner is malformed or over budget.
+    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
+        crate::database_range::Catalog::load(&self.package)
+    }
+
+    /// Capture database-range metadata as an immutable, exact-package
+    /// snapshot for explicit Snapshot → Edit → Commit → Patch workflows.
+    ///
+    /// # Errors
+    /// Returns an error when the package or typed owner exceeds its finite
+    /// admission limits.
+    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        crate::database_range::Snapshot::from_package(&self.package)
+    }
+
+    /// Alias with a plural noun for callers that use the owner name.
+    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.database_range_snapshot()
+    }
+
+    /// Apply an exact-source database-range patch and rehydrate the full
+    /// spreadsheet only after typed readback succeeds.
+    ///
+    /// # Errors
+    /// Returns an error for stale lineage, invalid metadata, or failed
+    /// candidate readback.
+    pub fn apply_database_range_patch(
+        &mut self,
+        patch: &crate::database_range::Patch,
+    ) -> Result<()> {
+        let commit = patch.apply(&self.database_range_snapshot()?)?;
+        if commit.changed() {
+            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
+    /// Clone-stage inert database-range CRUD and publish one package edit.
+    ///
+    /// Unknown markup inside the owned XML is retained by no-op transactions
+    /// and causes a changed transaction to fail before package bytes are
+    /// rebuilt.
+    ///
+    /// # Errors
+    /// Returns an error when the closure, source checks, package rebuild, or
+    /// typed readback fails.
+    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+    {
+        let commit = {
+            let catalog = self.database_ranges()?;
+            let mut transaction = catalog.transaction();
+            edit(&mut transaction.editor())?;
+            transaction.commit()?
+        };
+        if commit.changed() {
+            *self = Self::from_bytes(commit.into_owned_bytes())?;
+        }
+        Ok(())
+    }
+
     /// Return the typed worksheet graph in document order.
     #[must_use]
     pub fn sheets(&self) -> &[crate::worksheet::Sheet] {

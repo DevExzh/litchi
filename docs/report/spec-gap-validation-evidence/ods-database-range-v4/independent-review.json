@@ -1,0 +1,263 @@
+{
+  "candidate": "/var/tmp/litchi-ods-database-range-validation-v4-20260910",
+  "created_utc": "2026-09-10T13:08:48.541838+00:00",
+  "focused_validation": {
+    "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo test -p litchi-ods --all-features database_range -- --nocapture",
+    "log": {
+      "bytes": 12854,
+      "path": "/var/tmp/litchi-ods-database-range-validation-v4-focused-tests.log",
+      "sha256": "e46b4b4d5d514de0b14b80415594c1d8be856c143abe547fa0b7ab83bdb89be4"
+    },
+    "named_regressions": [
+      "every_known_parent_context_marks_wrong_table_children_opaque",
+      "valid_expanded_name_parent_contexts_remain_editable",
+      "known_children_in_wrong_parents_never_silently_drop_on_public_edit",
+      "contextual_read_refuses_known_children_nested_under_source_leaves",
+      "unknown_owner_markup_blocks_changed_edit_but_noop_is_byte_exact",
+      "owned_snapshot_patch_inverse_and_conflict_are_atomic",
+      "facade_rejects_overbudget_owner_before_materializing_snapshot_graph"
+    ],
+    "status": "passed",
+    "tests": "34 passed, 0 failed, 0 ignored; 215 filtered out",
+    "working_directory": "/var/tmp/litchi-ods-database-range-validation-v4-20260910"
+  },
+  "frozen_gate_receipts": {
+    "cargo_tests": {
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target taskset -c 8-31 cargo test -p litchi-ods --all-features --no-fail-fast",
+      "log": {
+        "bytes": 52148,
+        "path": "/var/tmp/litchi-ods-database-range-validation-v4-tests.log",
+        "sha256": "59fec7dc5d2a93dd3a515a87af03f09bbfe9a97dda98c4d06b3b8abb1bdb0079"
+      },
+      "status": "passed",
+      "summary": "249 passed, 0 failed; passed, 0 failed"
+    },
+    "clippy": {
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target taskset -c 8-31 cargo clippy -p litchi-ods --all-targets --all-features -- -D warnings",
+      "log": {
+        "bytes": 4734,
+        "path": "/var/tmp/litchi-ods-database-range-validation-v4-clippy.log",
+        "sha256": "861d3e03a01002a4abe4dfc070b7f0eac1e01c1d3a56b831b4397002e39c1171"
+      },
+      "status": "passed"
+    },
+    "git_diff_check": "passed",
+    "rustdoc": {
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target RUSTDOCFLAGS='-D warnings' taskset -c 8-31 cargo doc -p litchi-ods --all-features --no-deps",
+      "log": {
+        "bytes": 276,
+        "path": "/var/tmp/litchi-ods-database-range-validation-v4-rustdoc-strict.log",
+        "sha256": "6e89f257313e940e29a618c61e96771e7a011765ece3db6ca48fc20a59174c49"
+      },
+      "status": "passed"
+    },
+    "rustfmt": {
+      "command": "rustfmt --edition 2024 --check on all V4-owned Rust paths",
+      "status": "passed",
+      "toolchain": "1.98.1"
+    }
+  },
+  "manifest": {
+    "artifact": "litchi-ods-database-range-validation-v4",
+    "files": [
+      {
+        "bytes": 22702,
+        "path": "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+        "sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874"
+      },
+      {
+        "bytes": 34272,
+        "path": "crates/litchi-ods/src/authoring/builder.rs",
+        "sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f"
+      },
+      {
+        "bytes": 25875,
+        "path": "crates/litchi-ods/src/authoring/mutable.rs",
+        "sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa"
+      },
+      {
+        "bytes": 27843,
+        "path": "crates/litchi-ods/src/database_range/codec.rs",
+        "sha256": "0b3a26d76486c735143e9c8258f06573ac9c7aa788e449ea415218872d351b23"
+      },
+      {
+        "bytes": 5580,
+        "path": "crates/litchi-ods/src/database_range/content.rs",
+        "sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2"
+      },
+      {
+        "bytes": 2716,
+        "path": "crates/litchi-ods/src/database_range/mod.rs",
+        "sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df"
+      },
+      {
+        "bytes": 4337,
+        "path": "crates/litchi-ods/src/database_range/model.rs",
+        "sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c"
+      },
+      {
+        "bytes": 1017,
+        "path": "crates/litchi-ods/src/database_range/package.rs",
+        "sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9"
+      },
+      {
+        "bytes": 9667,
+        "path": "crates/litchi-ods/src/database_range/snapshot.rs",
+        "sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d"
+      },
+      {
+        "bytes": 20617,
+        "path": "crates/litchi-ods/src/database_range/tests.rs",
+        "sha256": "f8e6cb61b97cb57ac7621431b82cedfccf47d5444b204c5382fe3c5a9f42a3cf"
+      },
+      {
+        "bytes": 7448,
+        "path": "crates/litchi-ods/src/database_range/transaction.rs",
+        "sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0"
+      },
+      {
+        "bytes": 1620,
+        "path": "crates/litchi-ods/src/database_range/validation.rs",
+        "sha256": "5197c42649a0254c22e07b26ff6b42f37e7d02b243eacc212c3eaa5e6940691f"
+      },
+      {
+        "bytes": 58740,
+        "path": "crates/litchi-ods/src/facade/mod.rs",
+        "sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff"
+      },
+      {
+        "bytes": 3968,
+        "path": "crates/litchi-ods/src/lib.rs",
+        "sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa"
+      },
+      {
+        "bytes": 10502,
+        "path": "crates/litchi-ods/src/model/data_pilot/codec/writer.rs",
+        "sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952"
+      },
+      {
+        "bytes": 2363,
+        "path": "crates/litchi-ods/src/model/data_pilot/mod.rs",
+        "sha256": "7e8a6c023ee26ad5257c2a0be02d9d87bfbec639c2734ea38b8f7532d510235d"
+      },
+      {
+        "bytes": 11277,
+        "path": "crates/litchi-ods/src/model/data_pilot/range.rs",
+        "sha256": "e807e89073af61908da0e7ac85da5893e3ea81c09158e533cc6e6132d5857b8f"
+      },
+      {
+        "bytes": 822,
+        "path": "crates/litchi-ods/src/model/database_range.rs",
+        "sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae"
+      },
+      {
+        "bytes": 62962,
+        "path": "crates/litchi-ods/src/model/database_range/codec.rs",
+        "sha256": "ff5a799066d9fd55abcea2991ca2394582f5394674e1285b984f8ca63acd424b"
+      },
+      {
+        "bytes": 8867,
+        "path": "crates/litchi-ods/src/model/database_range/semantic.rs",
+        "sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a"
+      },
+      {
+        "bytes": 11105,
+        "path": "crates/litchi-ods/src/model/database_range/tests.rs",
+        "sha256": "f83df38299c03a8d8c13660ea34308315e017a28e7480337b2c3dc3b215ff7ee"
+      },
+      {
+        "bytes": 20260,
+        "path": "crates/litchi-ods/src/model/database_range/validation.rs",
+        "sha256": "750a20f0b2493fc8923711ec3b52148aa4ba3a2312e312d1911cf1773e6eb59b"
+      }
+    ],
+    "path": "/var/tmp/litchi-ods-database-range-validation-v4-20260910-manifest.json",
+    "sha256": "457753a6f1ca290e36ed8b1a220dac9377fd94dc4015010261718156e92d973e",
+    "source_file_count": 22,
+    "source_hashes_verified": true
+  },
+  "normative_local_inputs": {
+    "anchors": [
+      {
+        "construct": "table-database-range",
+        "lines": "14758-14777",
+        "rule": "optional source choice, then optional filter, sort, and subtotal-rules children in that order"
+      },
+      {
+        "construct": "table-database-ranges",
+        "lines": "14834-14839",
+        "rule": "zeroOrMore table-database-range children"
+      },
+      {
+        "construct": "table-filter and table-filter-and",
+        "lines": "15045-15064",
+        "rule": "filter chooses condition, filter-and, or filter-or; filter-and contains filter-or or condition"
+      },
+      {
+        "construct": "table-filter-or",
+        "lines": "15179-15187",
+        "rule": "filter-or contains filter-and or condition"
+      },
+      {
+        "construct": "table-filter-set-item",
+        "lines": "15189-15196",
+        "rule": "filter-set-item is an empty element with table:value"
+      }
+    ],
+    "schema_rng": {
+      "bytes": 610092,
+      "path": "/var/tmp/odf14-spec-v3/schema.rng",
+      "sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f"
+    },
+    "source_zip": {
+      "bytes": 8130448,
+      "path": "/home/zhuhe/code/litchi-spec-gaps/3rdparty/specs/OpenDocument-v1.4-os.zip",
+      "sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4"
+    }
+  },
+  "preservation_probes": {
+    "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/var/tmp/litchi-ods-db-probe-v4-target CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo run --quiet --manifest-path /var/tmp/litchi-ods-db-probe-v4-20260910/Cargo.toml",
+    "invalid_context_result": {
+      "changed_refused": true,
+      "changed_unchanged": true,
+      "noop_exact": true,
+      "noop_ok": true,
+      "read_ok": true
+    },
+    "invalid_contexts": [
+      "sort-by under filter",
+      "sort-by under filter-condition",
+      "filter-condition under sort",
+      "filter-condition under subtotal-rule",
+      "nested database-range"
+    ],
+    "log": {
+      "bytes": 669,
+      "path": "/var/tmp/litchi-ods-database-range-validation-v4-preservation-probe.log",
+      "sha256": "7a3df3f0e2b6343d38f066acf77b7d1f6e3b73cbc1e6f9e8feb3f24f407dee17"
+    },
+    "project": "/var/tmp/litchi-ods-db-probe-v4-20260910",
+    "status": "passed",
+    "valid_context": {
+      "changed_ok": true,
+      "description": "nested filter-and/filter-or/filter-condition/filter-set-item groups",
+      "name_present": true
+    }
+  },
+  "receipt_version": 1,
+  "repository_state": {
+    "committed_changes": false,
+    "frozen_v3_unchanged": true,
+    "primary_worktree_mutated": false,
+    "staged_changes": false
+  },
+  "review": "independent V4 ODS database-range parent-grammar review",
+  "review_conclusion": [
+    "The V4 expanded parent grammar marks all tested known-but-out-of-context table elements opaque before typed rewrite.",
+    "No-op publication preserves source bytes exactly for the invalid-context cases.",
+    "Changed publication refuses atomically for those cases.",
+    "Valid nested filter groups remain typed and editable.",
+    "No source, candidate, staging, or commit changes were made by this review."
+  ],
+  "status": "CLEAR"
+}

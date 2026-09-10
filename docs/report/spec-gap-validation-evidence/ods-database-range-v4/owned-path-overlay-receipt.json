@@ -1,0 +1,187 @@
+{
+  "schema": "litchi.ods.v4.owned-path-overlay-receipt.v1",
+  "created_utc": "2026-09-10T13:15:12.371594+00:00",
+  "base_commit": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "candidate_root": "/var/tmp/litchi-ods-database-range-validation-v4-integration-clean-20260910",
+  "v4_root": "/var/tmp/litchi-ods-database-range-validation-v4-20260910",
+  "owned_path_count": 22,
+  "all_candidate_hashes_match_v4": true,
+  "paths": [
+    {
+      "path": "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+      "v4_sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874",
+      "v4_bytes": 22702,
+      "candidate_sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874",
+      "candidate_bytes": 22702,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/authoring/builder.rs",
+      "v4_sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f",
+      "v4_bytes": 34272,
+      "candidate_sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f",
+      "candidate_bytes": 34272,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/authoring/mutable.rs",
+      "v4_sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa",
+      "v4_bytes": 25875,
+      "candidate_sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa",
+      "candidate_bytes": 25875,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/codec.rs",
+      "v4_sha256": "0b3a26d76486c735143e9c8258f06573ac9c7aa788e449ea415218872d351b23",
+      "v4_bytes": 27843,
+      "candidate_sha256": "0b3a26d76486c735143e9c8258f06573ac9c7aa788e449ea415218872d351b23",
+      "candidate_bytes": 27843,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/content.rs",
+      "v4_sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2",
+      "v4_bytes": 5580,
+      "candidate_sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2",
+      "candidate_bytes": 5580,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/mod.rs",
+      "v4_sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df",
+      "v4_bytes": 2716,
+      "candidate_sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df",
+      "candidate_bytes": 2716,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/model.rs",
+      "v4_sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c",
+      "v4_bytes": 4337,
+      "candidate_sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c",
+      "candidate_bytes": 4337,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/package.rs",
+      "v4_sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9",
+      "v4_bytes": 1017,
+      "candidate_sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9",
+      "candidate_bytes": 1017,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/snapshot.rs",
+      "v4_sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d",
+      "v4_bytes": 9667,
+      "candidate_sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d",
+      "candidate_bytes": 9667,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/tests.rs",
+      "v4_sha256": "f8e6cb61b97cb57ac7621431b82cedfccf47d5444b204c5382fe3c5a9f42a3cf",
+      "v4_bytes": 20617,
+      "candidate_sha256": "f8e6cb61b97cb57ac7621431b82cedfccf47d5444b204c5382fe3c5a9f42a3cf",
+      "candidate_bytes": 20617,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/transaction.rs",
+      "v4_sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0",
+      "v4_bytes": 7448,
+      "candidate_sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0",
+      "candidate_bytes": 7448,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/validation.rs",
+      "v4_sha256": "5197c42649a0254c22e07b26ff6b42f37e7d02b243eacc212c3eaa5e6940691f",
+      "v4_bytes": 1620,
+      "candidate_sha256": "5197c42649a0254c22e07b26ff6b42f37e7d02b243eacc212c3eaa5e6940691f",
+      "candidate_bytes": 1620,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/facade/mod.rs",
+      "v4_sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff",
+      "v4_bytes": 58740,
+      "candidate_sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff",
+      "candidate_bytes": 58740,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/lib.rs",
+      "v4_sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa",
+      "v4_bytes": 3968,
+      "candidate_sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa",
+      "candidate_bytes": 3968,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/codec/writer.rs",
+      "v4_sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952",
+      "v4_bytes": 10502,
+      "candidate_sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952",
+      "candidate_bytes": 10502,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/mod.rs",
+      "v4_sha256": "7e8a6c023ee26ad5257c2a0be02d9d87bfbec639c2734ea38b8f7532d510235d",
+      "v4_bytes": 2363,
+      "candidate_sha256": "7e8a6c023ee26ad5257c2a0be02d9d87bfbec639c2734ea38b8f7532d510235d",
+      "candidate_bytes": 2363,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/range.rs",
+      "v4_sha256": "e807e89073af61908da0e7ac85da5893e3ea81c09158e533cc6e6132d5857b8f",
+      "v4_bytes": 11277,
+      "candidate_sha256": "e807e89073af61908da0e7ac85da5893e3ea81c09158e533cc6e6132d5857b8f",
+      "candidate_bytes": 11277,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range.rs",
+      "v4_sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae",
+      "v4_bytes": 822,
+      "candidate_sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae",
+      "candidate_bytes": 822,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/codec.rs",
+      "v4_sha256": "ff5a799066d9fd55abcea2991ca2394582f5394674e1285b984f8ca63acd424b",
+      "v4_bytes": 62962,
+      "candidate_sha256": "ff5a799066d9fd55abcea2991ca2394582f5394674e1285b984f8ca63acd424b",
+      "candidate_bytes": 62962,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/semantic.rs",
+      "v4_sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a",
+      "v4_bytes": 8867,
+      "candidate_sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a",
+      "candidate_bytes": 8867,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/tests.rs",
+      "v4_sha256": "f83df38299c03a8d8c13660ea34308315e017a28e7480337b2c3dc3b215ff7ee",
+      "v4_bytes": 11105,
+      "candidate_sha256": "f83df38299c03a8d8c13660ea34308315e017a28e7480337b2c3dc3b215ff7ee",
+      "candidate_bytes": 11105,
+      "candidate_equals_v4": true
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/validation.rs",
+      "v4_sha256": "750a20f0b2493fc8923711ec3b52148aa4ba3a2312e312d1911cf1773e6eb59b",
+      "v4_bytes": 20260,
+      "candidate_sha256": "750a20f0b2493fc8923711ec3b52148aa4ba3a2312e312d1911cf1773e6eb59b",
+      "candidate_bytes": 20260,
+      "candidate_equals_v4": true
+    }
+  ]
+}

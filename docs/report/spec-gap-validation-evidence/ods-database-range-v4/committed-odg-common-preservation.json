@@ -1,0 +1,162 @@
+{
+  "schema": "litchi.ods.v4.committed-odg-common-preservation.v1",
+  "base_commit": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "parent_commit": "8076d72455ecebb4bfbe3d479f9f219aeaa1550e",
+  "paths": [
+    {
+      "path": "crates/litchi-odf-common/src/core/family.rs",
+      "base_commit_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+      "base_commit_bytes": 51559,
+      "candidate_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+      "candidate_bytes": 51559,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odf-common/src/core/package.rs",
+      "base_commit_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+      "base_commit_bytes": 119716,
+      "candidate_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+      "candidate_bytes": 119716,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/docs/FEATURE_MATRIX.md",
+      "base_commit_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+      "base_commit_bytes": 7826,
+      "candidate_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+      "candidate_bytes": 7826,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/facade/mod.rs",
+      "base_commit_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "base_commit_bytes": 10352,
+      "candidate_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "candidate_bytes": 10352,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/flat.rs",
+      "base_commit_sha256": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+      "base_commit_bytes": 32397,
+      "candidate_sha256": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+      "candidate_bytes": 32397,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/lib.rs",
+      "base_commit_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "base_commit_bytes": 2797,
+      "candidate_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "candidate_bytes": 2797,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/auxiliary.rs",
+      "base_commit_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+      "base_commit_bytes": 9640,
+      "candidate_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+      "candidate_bytes": 9640,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/enhanced.rs",
+      "base_commit_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+      "base_commit_bytes": 7403,
+      "candidate_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+      "candidate_bytes": 7403,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/mod.rs",
+      "base_commit_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "base_commit_bytes": 576,
+      "candidate_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "candidate_bytes": 576,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/page.rs",
+      "base_commit_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+      "base_commit_bytes": 5733,
+      "candidate_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+      "candidate_bytes": 5733,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/shape.rs",
+      "base_commit_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+      "base_commit_bytes": 16278,
+      "candidate_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+      "candidate_bytes": 16278,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/model/transition.rs",
+      "base_commit_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+      "base_commit_bytes": 16873,
+      "candidate_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+      "candidate_bytes": 16873,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/package/mod.rs",
+      "base_commit_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "base_commit_bytes": 818,
+      "candidate_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "candidate_bytes": 818,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/src/package/snapshot.rs",
+      "base_commit_sha256": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+      "base_commit_bytes": 459379,
+      "candidate_sha256": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+      "candidate_bytes": 459379,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/tests/allocation_admission.rs",
+      "base_commit_sha256": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+      "base_commit_bytes": 14159,
+      "candidate_sha256": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+      "candidate_bytes": 14159,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/tests/package_snapshot.rs",
+      "base_commit_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+      "base_commit_bytes": 13280,
+      "candidate_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+      "candidate_bytes": 13280,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-odg/tests/page_transitions.rs",
+      "base_commit_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+      "base_commit_bytes": 31548,
+      "candidate_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+      "candidate_bytes": 31548,
+      "candidate_kind": "file",
+      "candidate_equals_base_commit": true
+    }
+  ],
+  "owned_overlay_overlap_count": 0,
+  "all_candidate_hashes_match_base": true
+}
