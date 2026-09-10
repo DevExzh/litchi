@@ -1,0 +1,332 @@
+{
+  "schema": "litchi.rtf.smarttags-move-publication-candidate/v4-git",
+  "created_utc": "2026-09-10T08:00:23.318049+00:00",
+  "candidate_root": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git",
+  "candidate_base_commit": "f0097deb0e80aa4ca7d4347cbba1aebdeadee764",
+  "candidate_head": "f0097deb0e80aa4ca7d4347cbba1aebdeadee764",
+  "git_worktree": true,
+  "candidate_detached": true,
+  "source_lineage": {
+    "unversioned_v4_preserved": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4",
+    "copied_v4_manifest": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-paths.json",
+    "primary_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+    "primary_edited": false,
+    "primary_staged": false,
+    "primary_committed": false
+  },
+  "path_scope": {
+    "path_count": 24,
+    "changed_from_base_count": 24,
+    "added_count": 4,
+    "modified_count": 20,
+    "outside_paths_match_base": true,
+    "status_paths_exact": true,
+    "patch_against_base": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git.patch",
+    "patch_sha256": "241c1e280c6bb0ac79223859b13c1000b3b37ec2df90c5fa265b15227b52b382",
+    "patch_bytes": 157318
+  },
+  "paths": [
+    {
+      "path": "crates/litchi-rtf/README.md",
+      "status": "modified",
+      "base_sha256": "cbefea28e224b0462caa03388bac9bc04cf6f856ba4c62172a41dcff5d9c7393",
+      "base_bytes": 4455,
+      "base_git_blob": "74139bb8884c894eb84d11b8caa68b544dd9a47e",
+      "candidate_sha256": "8d43364b597748e39da97ff0f68fb01a742068b821acd99de81a8e5ea23d6813",
+      "candidate_bytes": 4818,
+      "copied_v4_sha256": "8d43364b597748e39da97ff0f68fb01a742068b821acd99de81a8e5ea23d6813"
+    },
+    {
+      "path": "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+      "status": "added",
+      "base_sha256": null,
+      "base_bytes": null,
+      "base_git_blob": null,
+      "candidate_sha256": "20cb640396d3938f7af104537d3d61480754cc4ff16351ba639ef067dce65c7f",
+      "candidate_bytes": 14589,
+      "copied_v4_sha256": "20cb640396d3938f7af104537d3d61480754cc4ff16351ba639ef067dce65c7f"
+    },
+    {
+      "path": "crates/litchi-rtf/src/api/facade.rs",
+      "status": "modified",
+      "base_sha256": "748887cfa2d8d34f449a5c73d09b68771a1d07278a8066b279afb9c4e6d3a8ea",
+      "base_bytes": 20584,
+      "base_git_blob": "29b748b21b6ad38183a4b865c95f6c664c9f2fe0",
+      "candidate_sha256": "202ce132c3ae9fa30e2a7d4a612d91e56c3c06014f2eb83c52e64b2c0fec5915",
+      "candidate_bytes": 21192,
+      "copied_v4_sha256": "202ce132c3ae9fa30e2a7d4a612d91e56c3c06014f2eb83c52e64b2c0fec5915"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+      "status": "modified",
+      "base_sha256": "76eef48998127bdb1f98ce3da1415c34dd47cc9f53f6eda8902b7885dcbd7fb7",
+      "base_bytes": 128794,
+      "base_git_blob": "c0779f0949dfa86174826dd1b9096488f2be9860",
+      "candidate_sha256": "99df02f14ac4375cdecb18ef4fe07da3f61aa09c24ccb4166707aaec7f53ddb5",
+      "candidate_bytes": 130686,
+      "copied_v4_sha256": "99df02f14ac4375cdecb18ef4fe07da3f61aa09c24ccb4166707aaec7f53ddb5"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+      "status": "modified",
+      "base_sha256": "ef2e82ac0ee5ce812bf91394de7980957776472651688bfba7f8e0ea3feb5b9d",
+      "base_bytes": 38372,
+      "base_git_blob": "a811277cca7433845b20c16f1e6265022aa1a582",
+      "candidate_sha256": "b224ea96e14d11336a9523fdd9a739336e166c2cb5969dd4b788ab4a3919b458",
+      "candidate_bytes": 38668,
+      "copied_v4_sha256": "b224ea96e14d11336a9523fdd9a739336e166c2cb5969dd4b788ab4a3919b458"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/api.rs",
+      "status": "modified",
+      "base_sha256": "cae46425db18fc5bc43564a700bf06118bab4cb6535aa15d4972a179aaa9bf1d",
+      "base_bytes": 32471,
+      "base_git_blob": "d8785d49b1e93d786fb2353dae1083a53c05dc2b",
+      "candidate_sha256": "e62d7d6001e6b8f5c548ca9e9b057416d07ef2d7f00b2fd363f38253d18beb19",
+      "candidate_bytes": 33146,
+      "copied_v4_sha256": "e62d7d6001e6b8f5c548ca9e9b057416d07ef2d7f00b2fd363f38253d18beb19"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+      "status": "modified",
+      "base_sha256": "74793d5b5b2308896e919f19937394440b5b091ab462ad0b62c1365e167e855d",
+      "base_bytes": 165997,
+      "base_git_blob": "27467d468d0cf1bb05bce0cbd438ffd4f8eed207",
+      "candidate_sha256": "a49cb1a95bb9c944b5293fd99777561a9fb6d4b8e84faa8f301411ab27c3734a",
+      "candidate_bytes": 166342,
+      "copied_v4_sha256": "a49cb1a95bb9c944b5293fd99777561a9fb6d4b8e84faa8f301411ab27c3734a"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+      "status": "modified",
+      "base_sha256": "f636e59f9787dbb1d0277223336d7d5f1146a661efd4a6247bd1a027a9cfa47b",
+      "base_bytes": 86034,
+      "base_git_blob": "4d2b56bed8ad0d2f6fc15a6f73bd2b78d862ff48",
+      "candidate_sha256": "473e1ca5152104cae6ce47445e77b06457b90b6f53a5a0a26df3ab323c6cf859",
+      "candidate_bytes": 88659,
+      "copied_v4_sha256": "473e1ca5152104cae6ce47445e77b06457b90b6f53a5a0a26df3ab323c6cf859"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/markup.rs",
+      "status": "modified",
+      "base_sha256": "110fcaf0d1b8c2c00bd1567a015a682b29c5d8406bad684bdf94abb5cbd21dbf",
+      "base_bytes": 23695,
+      "base_git_blob": "e38268360d3a3275d0e85c6fa67f468d3f5a4644",
+      "candidate_sha256": "ba5dfb236ff4b423aa7fcc327e6854d742d09a7cea356eab62f87192cf50cf82",
+      "candidate_bytes": 54679,
+      "copied_v4_sha256": "ba5dfb236ff4b423aa7fcc327e6854d742d09a7cea356eab62f87192cf50cf82"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/mod.rs",
+      "status": "modified",
+      "base_sha256": "6d5257e41b492acaccd916c03ee1b1511d60615b3355a04499b45b431ed4d081",
+      "base_bytes": 97000,
+      "base_git_blob": "2e53151583232300c9e25b3a5b639fc95113f89f",
+      "candidate_sha256": "0db5538b7ee9b9516e78d2af46fbaeb1af9ca185d95821a66eefcf87221d99a5",
+      "candidate_bytes": 99750,
+      "copied_v4_sha256": "0db5538b7ee9b9516e78d2af46fbaeb1af9ca185d95821a66eefcf87221d99a5"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/mod.rs",
+      "status": "modified",
+      "base_sha256": "01821a0c65eac3f83df722a3282a1bb981f2fbb2607ee96ac47fcac3dd8f5156",
+      "base_bytes": 21201,
+      "base_git_blob": "f550e707e8989986545a5f93a2f2b1d499e89645",
+      "candidate_sha256": "7223d8cc7121d9d60f6b205e12d619bbb6888540e308adc08b5631a7194812d6",
+      "candidate_bytes": 21702,
+      "copied_v4_sha256": "7223d8cc7121d9d60f6b205e12d619bbb6888540e308adc08b5631a7194812d6"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs",
+      "status": "modified",
+      "base_sha256": "ee1aa0f419ec0f67ce7769bc99fd44a21f68968a952c969a76a95e575d036420",
+      "base_bytes": 28459,
+      "base_git_blob": "8ac62da59fce83a640869faaf07d2ceadcb81364",
+      "candidate_sha256": "8d1d229c2d74806c0aad631d6c3fe59c4b01b61bb4d9f5f78dee81d1d3fa1894",
+      "candidate_bytes": 32728,
+      "copied_v4_sha256": "8d1d229c2d74806c0aad631d6c3fe59c4b01b61bb4d9f5f78dee81d1d3fa1894"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/story.rs",
+      "status": "modified",
+      "base_sha256": "2a716c61e0ec62670576c65102fce8bdcee83bd75bdebcc8ff144e00c54cdb54",
+      "base_bytes": 90240,
+      "base_git_blob": "f50d6a822a0540dc9262555b14219bb6378d0a18",
+      "candidate_sha256": "572787c8556da5eb907424470ca8bbfafc07fa98e0704806f02003bbd5db5d33",
+      "candidate_bytes": 93449,
+      "copied_v4_sha256": "572787c8556da5eb907424470ca8bbfafc07fa98e0704806f02003bbd5db5d33"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/tests.rs",
+      "status": "modified",
+      "base_sha256": "0967901be5b09085344afcef6e40f46c4231cc1831962092b1570a43a5216473",
+      "base_bytes": 21345,
+      "base_git_blob": "e4f49a95fd771e631d1cd7ea32194867cd279280",
+      "candidate_sha256": "a4388834413c2ae440378383c0a21cbd46d8a51e4cd326917c1a79dad85cd497",
+      "candidate_bytes": 21763,
+      "copied_v4_sha256": "a4388834413c2ae440378383c0a21cbd46d8a51e4cd326917c1a79dad85cd497"
+    },
+    {
+      "path": "crates/litchi-rtf/src/content/field/model.rs",
+      "status": "modified",
+      "base_sha256": "a740332f07892953d420758f18f7c70cbb7d6c6974ccfc3164b723e211d305a4",
+      "base_bytes": 243823,
+      "base_git_blob": "217f7e0a2900863cf9e940ee6b2261596e7e19b8",
+      "candidate_sha256": "d7d7b3521673f1c5dccad46e14e9d55670d70607d367e348aa59dac51a315a0c",
+      "candidate_bytes": 243932,
+      "copied_v4_sha256": "d7d7b3521673f1c5dccad46e14e9d55670d70607d367e348aa59dac51a315a0c"
+    },
+    {
+      "path": "crates/litchi-rtf/src/edit.rs",
+      "status": "modified",
+      "base_sha256": "5ccd26c94e8dc89a06c87fc1c3f9b07af1cfdc62c03783a7b41b5369f5980598",
+      "base_bytes": 434401,
+      "base_git_blob": "f4218cfb08dca28841ad43ae9ec88886e19e2882",
+      "candidate_sha256": "75e78d1f7645590f0779f0a34626d86cb6ef2d0c3eec8407c3dc9f2757e17111",
+      "candidate_bytes": 443907,
+      "copied_v4_sha256": "75e78d1f7645590f0779f0a34626d86cb6ef2d0c3eec8407c3dc9f2757e17111"
+    },
+    {
+      "path": "crates/litchi-rtf/src/edit/composition.rs",
+      "status": "modified",
+      "base_sha256": "47b5d2c63401594ffccea0f82661e27983887e81469096041faa7f72112228fa",
+      "base_bytes": 106318,
+      "base_git_blob": "51098202959f69a8c455d18af622254d07c22316",
+      "candidate_sha256": "6de4ec822d73167dd7e6ab02e1107c050527175b81d0f8b13e2a66d561147fdf",
+      "candidate_bytes": 106396,
+      "copied_v4_sha256": "6de4ec822d73167dd7e6ab02e1107c050527175b81d0f8b13e2a66d561147fdf"
+    },
+    {
+      "path": "crates/litchi-rtf/src/lib.rs",
+      "status": "modified",
+      "base_sha256": "8875a5f99fc51e7297cb1896620a125b989f2de04826c16a7f2975707e72e3f6",
+      "base_bytes": 23950,
+      "base_git_blob": "99744ff6c28795926d25bbb1fc5a561cfd66d999",
+      "candidate_sha256": "99f9e8e172f356cbd562df5a77ee568394b15ef1fb12b16fbd532529ad9e86fa",
+      "candidate_bytes": 24117,
+      "copied_v4_sha256": "99f9e8e172f356cbd562df5a77ee568394b15ef1fb12b16fbd532529ad9e86fa"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/mod.rs",
+      "status": "modified",
+      "base_sha256": "1785c03a2467465b95023386a256f8ed71a9d25cf92d47523f1b62e9b602129a",
+      "base_bytes": 847,
+      "base_git_blob": "04134ac634cfe98a28b47a15b12e441e6f01b6f3",
+      "candidate_sha256": "6fe617be94bca3623a4a14fd32ba91efeb47b41a260e69659a9fa418a1644b4f",
+      "candidate_bytes": 923,
+      "copied_v4_sha256": "6fe617be94bca3623a4a14fd32ba91efeb47b41a260e69659a9fa418a1644b4f"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/smart_tag.rs",
+      "status": "added",
+      "base_sha256": null,
+      "base_bytes": null,
+      "base_git_blob": null,
+      "candidate_sha256": "3d562e60f6c0a703109e082ca82ccde566a6ddc88bea4dfe1a704bfe8589fe34",
+      "candidate_bytes": 7014,
+      "copied_v4_sha256": "3d562e60f6c0a703109e082ca82ccde566a6ddc88bea4dfe1a704bfe8589fe34"
+    },
+    {
+      "path": "crates/litchi-rtf/src/model/document/model.rs",
+      "status": "modified",
+      "base_sha256": "655e2f96927902a51431db80ba3b48a0736ec460c12c934f99646092e3e6a88c",
+      "base_bytes": 239231,
+      "base_git_blob": "0d0f0d56baf8d20a949eb1ccd37511ff78464842",
+      "candidate_sha256": "8a746852d2ca5be010bfa50dbfa0ce09bcd7e58551fd3e3e852a95016d6279b5",
+      "candidate_bytes": 245910,
+      "copied_v4_sha256": "8a746852d2ca5be010bfa50dbfa0ce09bcd7e58551fd3e3e852a95016d6279b5"
+    },
+    {
+      "path": "crates/litchi-rtf/src/review/mod.rs",
+      "status": "modified",
+      "base_sha256": "587624049c73e00220fecffd1ff28f1dbc182f40faecf2de4dfa8793f62ec746",
+      "base_bytes": 506,
+      "base_git_blob": "0198de47e35e8a2b9dcb25d0a2e5aaa68eceafdd",
+      "candidate_sha256": "717df871c93d2e65407dd6afd191f5662e6fcc9408be4b4bfb452ef829acd963",
+      "candidate_bytes": 593,
+      "copied_v4_sha256": "717df871c93d2e65407dd6afd191f5662e6fcc9408be4b4bfb452ef829acd963"
+    },
+    {
+      "path": "crates/litchi-rtf/src/review/move_bookmark.rs",
+      "status": "added",
+      "base_sha256": null,
+      "base_bytes": null,
+      "base_git_blob": null,
+      "candidate_sha256": "b555b72c35bd27d4fdea1419defd7d17a6f3cd093ff959e11455f86268842137",
+      "candidate_bytes": 3981,
+      "copied_v4_sha256": "b555b72c35bd27d4fdea1419defd7d17a6f3cd093ff959e11455f86268842137"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/smart_tags_move_bookmarks.rs",
+      "status": "added",
+      "base_sha256": null,
+      "base_bytes": null,
+      "base_git_blob": null,
+      "candidate_sha256": "3fdb978ca7930f91d72f24f3d5661a4bc5e8ed5f7f15b85d3890d1c29f815c8b",
+      "candidate_bytes": 15332,
+      "copied_v4_sha256": "3fdb978ca7930f91d72f24f3d5661a4bc5e8ed5f7f15b85d3890d1c29f815c8b"
+    }
+  ],
+  "full_source_hash_freeze": {
+    "candidate_all_24_hashes_match_preserved_v4": true,
+    "ignored_generated_lock_removed_from_candidate": true,
+    "generated_lock_sha256": "0282f37c57303422f0c1cae42dd829fcbc3a4c5740595962141c42c6208d12dc",
+    "generated_lock_bytes": 138832,
+    "status_output_sha256": "ee3645f4ad8736107a6f6ba822104442acadaa1f02a5225e5f9fcd1370ba7ce8"
+  },
+  "changes": "Full frozen 24-path SmartTag/move-bookmark feature delta from f009, including the v4 direct-PCDATA and precharge corrections in markup.rs, SmartTag docs, and focused tests.",
+  "spec_input": {
+    "path": "/home/zhuhe/code/litchi-spec-gaps/3rdparty/specs/rtf-specs-1.9.1.pdf",
+    "sha256": "15717dd5b2a9ed795f0e5f5442aaf34b5fdf07a4e8bc12dbe2c9ae792c6ec117",
+    "references": "Local RTF 1.9.1 p.153 SmartTag grammar and pp.146-148 move bookmarks; no online materials."
+  },
+  "validation": {
+    "toolchain": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "rustfmt": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)"
+    },
+    "focused_command": "TMPDIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-tmp RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-target CARGO_BUILD_JOBS=24 cargo +1.95.0 test --manifest-path /var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git/Cargo.toml -p litchi-rtf --all-features --test smart_tags_move_bookmarks --test custom_xml --test xml_namespaces --test document_protection",
+    "focused_log": {
+      "path": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-focused.log",
+      "sha256": "a10959c4e69bee005e7660c6de2f746827e393ab500a66f43d77b82fa775a34e",
+      "bytes": 10968,
+      "result": {
+        "suites": 4,
+        "passed": 38,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "all_tests_command": "TMPDIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-tmp RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-target CARGO_BUILD_JOBS=8 cargo +1.95.0 test --manifest-path /var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git/Cargo.toml -p litchi-rtf --all-features",
+    "all_tests_log": {
+      "path": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-all-tests.log",
+      "sha256": "c0cd759ddbe48057cef7e968dcfa0d3fafc8f2b6150138087c8de19e9ca4f865",
+      "bytes": 145740,
+      "result": {
+        "suites": 173,
+        "passed": 1376,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "clippy_command": "TMPDIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-tmp RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-target CARGO_BUILD_JOBS=8 cargo +1.95.0 clippy --manifest-path /var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git/Cargo.toml -p litchi-rtf --all-targets --all-features -- -D warnings",
+    "clippy_result": "pass",
+    "clippy_log": {
+      "path": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-clippy.log",
+      "sha256": "8047c29869816820c7babc220610330ae146ebf8c01639ed33c9309f9e206aa5",
+      "bytes": 1494
+    },
+    "rustdoc_command": "TMPDIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-tmp RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-target RUSTDOCFLAGS=-Dwarnings CARGO_BUILD_JOBS=8 cargo +1.95.0 doc --manifest-path /var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git/Cargo.toml -p litchi-rtf --all-features --no-deps",
+    "rustdoc_result": "pass",
+    "rustdoc_log": {
+      "path": "/var/tmp/litchi-rtf-smarttags-validation-20260910-v4-git-rustdoc.log",
+      "sha256": "81d2896913514196f353c6af30eb8e9daf11b988bf275caea86bd82df2001637",
+      "bytes": 511
+    },
+    "rustfmt_result": "pass (22 Rust paths)",
+    "diff_check": "pass; status scope is exactly these 24 paths",
+    "patch_apply_check": "pass via git apply --check against a pristine f009 worktree"
+  },
+  "review_boundary": "Independent review and root publication gate remain pending; no primary synchronization, staging, or commit."
+}

@@ -9,9 +9,11 @@ use super::super::{
     Annotation, AnnotationType, Bookmark, CustomXmlTag, DocumentInfo, DocumentProtection,
     DocumentVariable, DrawingStoryTextMode, FieldOwner, HashSet, MathElement, MathElementRole,
     MathObject, MathProperties, MathPropertyName, MathRun, MathStructure, MathStructureChild,
-    MathStructureKind, MathZone, MathZoneKind, ProtectionRange, RtfTimestamp, RtfWriter,
-    UserProperty, Write, document_variable, io, user_property,
+    MathStructureKind, MathZone, MathZoneKind, MoveBookmark, ProtectionRange, RtfTimestamp,
+    RtfWriter, SmartTag, UserProperty, Write, document_variable, io, user_property,
 };
+
+const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 
 impl<W: Write> RtfWriter<W> {
     /// Write the standard RTF document-information destination.
@@ -354,6 +356,102 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("bkmkend", None)?;
         self.write_str(" ")?;
         self.write_text(name)?;
+        self.write_str("}")
+    }
+
+    /// Write an inert RTF 1.9.1 SmartTag/factoid opening destination.
+    pub fn write_smart_tag_open(&mut self, tag: &SmartTag<'_>) -> io::Result<()> {
+        tag.validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*")?;
+        self.write_control_word("xmlopen", None)?;
+        if let Some(namespace) = tag.namespace {
+            self.write_control_word("xmlns", Some(namespace.cast_signed()))?;
+        }
+        self.write_str("{\\factoidname ")?;
+        self.write_destination_text(tag.name.as_ref())?;
+        self.write_str("}")?;
+        for attribute in &tag.attributes {
+            self.write_str("{\\xmlattr")?;
+            if let Some(namespace) = attribute.namespace {
+                self.write_control_word("xmlattrns", Some(namespace.cast_signed()))?;
+            }
+            self.write_str("{\\xmlattrname ")?;
+            self.write_destination_text(attribute.name.as_ref())?;
+            self.write_str("}{\\xmlattrvalue ")?;
+            self.write_destination_text(attribute.value.as_ref())?;
+            self.write_str("}}")?;
+        }
+        self.write_str("}")
+    }
+
+    /// Write an inert RTF 1.9.1 SmartTag closing destination.
+    pub fn write_smart_tag_close(&mut self, tag: &SmartTag<'_>) -> io::Result<()> {
+        tag.validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\xmlclose}")
+    }
+
+    fn write_move_bookmark_payload(&mut self, bookmark: &MoveBookmark<'_>) -> io::Result<()> {
+        let bytes = [
+            (bookmark.author & 0xff) as u8,
+            (bookmark.author >> 8) as u8,
+            bookmark.date as u8,
+            (bookmark.date >> 8) as u8,
+            (bookmark.date >> 16) as u8,
+            (bookmark.date >> 24) as u8,
+        ];
+        let mut hex = [0_u8; 12];
+        for (index, byte) in bytes.into_iter().enumerate() {
+            let offset = index * 2;
+            let high = HEX_DIGITS
+                .get(usize::from(byte >> 4))
+                .copied()
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "invalid move-bookmark payload")
+                })?;
+            let low = HEX_DIGITS
+                .get(usize::from(byte & 0x0f))
+                .copied()
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "invalid move-bookmark payload")
+                })?;
+            *hex.get_mut(offset).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "invalid move-bookmark payload")
+            })? = high;
+            *hex.get_mut(offset + 1).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "invalid move-bookmark payload")
+            })? = low;
+        }
+        let text = std::str::from_utf8(&hex).map_err(|_error| {
+            io::Error::new(io::ErrorKind::InvalidInput, "invalid move-bookmark payload")
+        })?;
+        self.write_str(text)
+    }
+
+    /// Write an inert tracked-move bookmark opening destination.
+    pub fn write_move_bookmark_start(&mut self, bookmark: &MoveBookmark<'_>) -> io::Result<()> {
+        bookmark
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*")?;
+        self.write_control_word(bookmark.kind.start_control(), None)?;
+        self.write_str(" ")?;
+        self.write_destination_text(bookmark.tag.as_ref())?;
+        self.write_str(" ")?;
+        self.write_move_bookmark_payload(bookmark)?;
+        self.write_str("}")
+    }
+
+    /// Write an inert tracked-move bookmark closing destination.
+    pub fn write_move_bookmark_end(&mut self, bookmark: &MoveBookmark<'_>) -> io::Result<()> {
+        bookmark
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*")?;
+        self.write_control_word(bookmark.kind.end_control(), None)?;
+        self.write_str(" ")?;
+        self.write_destination_text(bookmark.tag.as_ref())?;
         self.write_str("}")
     }
 

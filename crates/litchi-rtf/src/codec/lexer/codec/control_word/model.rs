@@ -237,8 +237,18 @@ pub(crate) enum ControlWord<'a> {
     XmlNamespace(i32),
     XmlOpen,
     XmlClose,
+    XmlAttributeGroup,
+    /// `\xmlattrN`, the custom XML tag type selector.
+    XmlAttribute(i32),
+    /// `\xmlattrnsN`, the SmartTag/custom XML attribute namespace reference.
+    XmlAttributeNamespace(i32),
     XmlAttributeName,
     XmlAttributeValue,
+    FactoidName,
+    MoveFromStart,
+    MoveFromEnd,
+    MoveToStart,
+    MoveToEnd,
     MathZoneInline,
     MathZoneDisplay,
     MathZoneParagraphProperties,

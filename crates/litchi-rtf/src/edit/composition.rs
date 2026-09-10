@@ -382,7 +382,9 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::HeaderFooterText { .. }
         | Operation::AnnotationText { .. }
         | Operation::NoteText { .. }
-        | Operation::ShapeText { .. } => PublicationDomain::Destination,
+        | Operation::ShapeText { .. }
+        | Operation::SmartTag { .. }
+        | Operation::MoveBookmark { .. } => PublicationDomain::Destination,
         Operation::PicturePayload(_) => PublicationDomain::PicturePayload,
         Operation::PictureRemoval(_) => PublicationDomain::PictureRemoval,
         Operation::RootTransfer { .. } => PublicationDomain::RootTransfer,

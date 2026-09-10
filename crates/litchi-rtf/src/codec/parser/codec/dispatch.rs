@@ -127,9 +127,27 @@ impl Parser<'_> {
                     self.states.pop();
                     return Ok(true);
                 },
-                Token::Control(ControlWord::XmlAttributeName | ControlWord::XmlAttributeValue) => {
+                Token::Control(
+                    ControlWord::XmlAttributeGroup
+                    | ControlWord::XmlAttribute(_)
+                    | ControlWord::XmlAttributeNamespace(_)
+                    | ControlWord::XmlAttributeName
+                    | ControlWord::XmlAttributeValue
+                    | ControlWord::FactoidName,
+                ) => {
                     return Err(RtfError::MalformedDocument(
-                        "RTF custom XML attribute destinations must be starred".to_string(),
+                        "RTF SmartTag/XML attribute destinations must be grouped and starred"
+                            .to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::MoveFromStart
+                    | ControlWord::MoveFromEnd
+                    | ControlWord::MoveToStart
+                    | ControlWord::MoveToEnd,
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF move-bookmark destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(
@@ -176,6 +194,35 @@ impl Parser<'_> {
                         self.states.pop();
                         return Ok(true);
                     }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::XmlOpen))
+                    ) {
+                        self.parse_smart_tag_open_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::XmlClose))
+                    ) {
+                        self.parse_smart_tag_close_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::MoveFromStart
+                                | ControlWord::MoveFromEnd
+                                | ControlWord::MoveToStart
+                                | ControlWord::MoveToEnd,
+                        ))
+                    ) {
+                        self.parse_move_bookmark_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
                     match self.tokens.get(self.pos + 1) {
                         Some(Token::Control(
                             ControlWord::XmlAttributeName | ControlWord::XmlAttributeValue,
@@ -183,6 +230,17 @@ impl Parser<'_> {
                             self.parse_custom_xml_attribute_destination()?;
                             self.states.pop();
                             return Ok(true);
+                        },
+                        Some(Token::Control(
+                            ControlWord::XmlAttributeGroup
+                            | ControlWord::XmlAttribute(_)
+                            | ControlWord::XmlAttributeNamespace(_)
+                            | ControlWord::FactoidName,
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF SmartTag metadata is only valid inside a starred xmlopen"
+                                    .to_string(),
+                            ));
                         },
                         Some(Token::Control(
                             ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd,

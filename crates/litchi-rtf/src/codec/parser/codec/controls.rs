@@ -1824,9 +1824,17 @@ impl Parser<'_> {
                     "RTF generated list marker must be a grouped body destination".to_string(),
                 ));
             },
-            ControlWord::XmlNamespace(_) => {
+            ControlWord::XmlNamespace(_)
+            | ControlWord::XmlAttributeGroup
+            | ControlWord::XmlAttribute(_)
+            | ControlWord::XmlAttributeNamespace(_)
+            | ControlWord::FactoidName
+            | ControlWord::MoveFromStart
+            | ControlWord::MoveFromEnd
+            | ControlWord::MoveToStart
+            | ControlWord::MoveToEnd => {
                 return Err(RtfError::MalformedDocument(
-                    "orphan RTF xmlns control outside xmlnstbl".to_string(),
+                    "orphan RTF metadata control outside its destination".to_string(),
                 ));
             },
             ControlWord::ListPicture(_)
