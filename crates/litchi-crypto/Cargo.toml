@@ -29,6 +29,7 @@ hmac = { workspace = true, optional = true, features = ["zeroize"] }
 litchi-cfb = { workspace = true }
 litchi-core = { workspace = true }
 litchi-ole-common = { workspace = true }
+md-5 = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true, optional = true }
 rc4 = { workspace = true }

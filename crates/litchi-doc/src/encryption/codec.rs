@@ -8,16 +8,15 @@ use encoding_rs::{
     WINDOWS_1252, WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257,
     WINDOWS_1258,
 };
+use litchi_crypto::legacy_rc4;
 use litchi_crypto::rc4 as office_rc4;
 use litchi_crypto::rc4::{Context, Error, Flags};
-use md5::{Digest, Md5};
 use rand::{TryRng, rngs::SysRng};
-use rc4::{KeyInit, Rc4, StreamCipher};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
 pub(super) const FIB_BASE_LEN: usize = 68;
-const BINARY_RC4_HEADER_LEN: usize = 52;
+const BINARY_RC4_HEADER_LEN: usize = legacy_rc4::HEADER_LEN;
 const BINARY_RC4_BLOCK_SIZE: usize = 512;
 const CRYPTO_API_VERIFIER_LEN: usize = 60;
 const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
@@ -104,14 +103,25 @@ pub(crate) fn encrypt_document_streams_for_write(
             let mut verifier = Zeroizing::new([0u8; 16]);
             fill_random(salt.as_mut(), "binary RC4 salt")?;
             fill_random(verifier.as_mut(), "binary RC4 verifier")?;
-            let (header, secret) = build_binary_rc4_header(password, &salt, &verifier)?;
+            let (header, context) = build_binary_rc4_header(password, &salt, &verifier)?;
             table_stream[..header_len].copy_from_slice(&header);
             patch_fib_encryption(word_document, false, header_len as u32);
-            apply_stream_cipher(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &secret)
+            legacy_rc4::apply_at(
+                &context,
+                BINARY_RC4_BLOCK_SIZE,
+                FIB_BASE_LEN,
+                &mut word_document[FIB_BASE_LEN..],
+            )
+            .map_err(|error| error.to_string())?;
+            legacy_rc4::apply_at(
+                &context,
+                BINARY_RC4_BLOCK_SIZE,
+                header_len,
+                &mut table_stream[header_len..],
+            )
+            .map_err(|error| error.to_string())?;
+            legacy_rc4::apply_at(&context, BINARY_RC4_BLOCK_SIZE, 0, data_stream)
                 .map_err(|error| error.to_string())?;
-            apply_stream_cipher(&mut table_stream[header_len..], header_len, &secret)
-                .map_err(|error| error.to_string())?;
-            apply_stream_cipher(data_stream, 0, &secret).map_err(|error| error.to_string())?;
         },
         EncryptionProfile::CryptoApiRc4 { key_bits } => {
             let mut salt = Zeroizing::new([0u8; 16]);
@@ -155,21 +165,8 @@ fn build_binary_rc4_header(
     password: &str,
     salt: &[u8; 16],
     verifier: &[u8; 16],
-) -> std::result::Result<(Vec<u8>, Zeroizing<[u8; 5]>), String> {
-    let secret = derive_secret(password, salt);
-    let key = derive_block_key(&secret, 0);
-    let mut encrypted = Zeroizing::new([0u8; 32]);
-    encrypted[..16].copy_from_slice(verifier);
-    encrypted[16..].copy_from_slice(&Md5::digest(verifier));
-    let mut cipher = Rc4::new_from_slice(key.as_ref())
-        .map_err(|_| "invalid DOC binary RC4 key length".to_string())?;
-    cipher.apply_keystream(encrypted.as_mut());
-    let mut header = Vec::with_capacity(BINARY_RC4_HEADER_LEN);
-    header.extend_from_slice(&1u16.to_le_bytes());
-    header.extend_from_slice(&1u16.to_le_bytes());
-    header.extend_from_slice(salt);
-    header.extend_from_slice(encrypted.as_ref());
-    Ok((header, secret))
+) -> std::result::Result<(Vec<u8>, legacy_rc4::Context), String> {
+    legacy_rc4::build_header(password, salt, verifier).map_err(|error| error.to_string())
 }
 
 fn build_cryptoapi_header(
@@ -215,13 +212,6 @@ const XOR_MATRIX: [[u16; 7]; 15] = [
     [0x3331, 0x6662, 0xccc4, 0x89a9, 0x0373, 0x06e6, 0x0dcc],
     [0x1021, 0x2042, 0x4084, 0x8108, 0x1231, 0x2462, 0x48c4],
 ];
-
-#[derive(Debug, Clone, Copy)]
-struct BinaryRc4Header {
-    salt: [u8; 16],
-    encrypted_verifier: [u8; 16],
-    encrypted_verifier_hash: [u8; 16],
-}
 
 pub(super) struct XorContext {
     pub(super) array: Zeroizing<[u8; 16]>,
@@ -304,25 +294,29 @@ pub(crate) fn decrypt_document_streams(
         )));
     }
 
-    let mut salt = [0u8; 16];
-    let mut encrypted_verifier = [0u8; 16];
-    let mut encrypted_verifier_hash = [0u8; 16];
-    salt.copy_from_slice(&header[4..20]);
-    encrypted_verifier.copy_from_slice(&header[20..36]);
-    encrypted_verifier_hash.copy_from_slice(&header[36..52]);
-    let header = BinaryRc4Header {
-        salt,
-        encrypted_verifier,
-        encrypted_verifier_hash,
-    };
-
     let password = password.ok_or(PackageError::PasswordRequired)?;
-    let secret = verify(&header, password)?.ok_or(PackageError::InvalidPassword)?;
+    let header = legacy_rc4::parse_header(header).map_err(map_legacy_error)?;
+    let context = legacy_rc4::verify(&header, password)
+        .map_err(map_legacy_error)?
+        .ok_or(PackageError::InvalidPassword)?;
 
-    apply_stream_cipher(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &secret)?;
-    apply_stream_cipher(&mut table_stream[header_len..], header_len, &secret)?;
+    legacy_rc4::apply_at(
+        &context,
+        BINARY_RC4_BLOCK_SIZE,
+        FIB_BASE_LEN,
+        &mut word_document[FIB_BASE_LEN..],
+    )
+    .map_err(map_legacy_error)?;
+    legacy_rc4::apply_at(
+        &context,
+        BINARY_RC4_BLOCK_SIZE,
+        header_len,
+        &mut table_stream[header_len..],
+    )
+    .map_err(map_legacy_error)?;
     if let Some(data_stream) = data_stream {
-        apply_stream_cipher(data_stream, 0, &secret)?;
+        legacy_rc4::apply_at(&context, BINARY_RC4_BLOCK_SIZE, 0, data_stream)
+            .map_err(map_legacy_error)?;
     }
     Ok(())
 }
@@ -494,6 +488,24 @@ fn map_crypto_error(error: Error) -> PackageError {
     }
 }
 
+fn map_legacy_error(error: legacy_rc4::Error) -> PackageError {
+    match error {
+        legacy_rc4::Error::Malformed(message) => PackageError::MalformedEncryptionHeader(message),
+        legacy_rc4::Error::PasswordTooLong { units } => PackageError::MalformedEncryptionHeader(
+            format!("legacy RC4 password contains {units} UTF-16 code units; maximum is 255"),
+        ),
+        legacy_rc4::Error::UnsupportedVersion { major, minor } => {
+            PackageError::UnsupportedEncryption(EncryptionKind::Unknown { major, minor })
+        },
+        legacy_rc4::Error::InvalidBlockSize { size } => PackageError::Corrupted(format!(
+            "legacy RC4 block size {size} is outside the bounded range"
+        )),
+        legacy_rc4::Error::StreamRangeOverflow => {
+            PackageError::Corrupted("legacy RC4 stream range overflow".to_string())
+        },
+    }
+}
+
 pub(super) fn apply_cryptoapi_stream(
     mut data: &mut [u8],
     mut absolute_offset: usize,
@@ -511,80 +523,6 @@ pub(super) fn apply_cryptoapi_stream(
             .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
         office_rc4::apply_at(context, block, block_offset, &mut data[..count])
             .map_err(map_crypto_error)?;
-        absolute_offset += count;
-        data = &mut data[count..];
-    }
-    Ok(())
-}
-
-pub(super) fn derive_secret(password: &str, salt: &[u8; 16]) -> Zeroizing<[u8; 5]> {
-    let password_bytes = Zeroizing::new(
-        password
-            .encode_utf16()
-            .take(255)
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>(),
-    );
-    let initial_hash = Zeroizing::new(<[u8; 16]>::from(Md5::digest(password_bytes.as_slice())));
-    let mut intermediate = Zeroizing::new([0u8; 336]);
-    for chunk in intermediate.as_chunks_mut::<21>().0.iter_mut() {
-        chunk[..5].copy_from_slice(&initial_hash[..5]);
-        chunk[5..].copy_from_slice(salt);
-    }
-    let final_hash = Zeroizing::new(<[u8; 16]>::from(Md5::digest(intermediate.as_slice())));
-    let mut secret = Zeroizing::new([0u8; 5]);
-    secret.copy_from_slice(&final_hash[..5]);
-    secret
-}
-
-fn derive_block_key(secret: &[u8; 5], block: u32) -> Zeroizing<[u8; 16]> {
-    let mut input = Zeroizing::new([0u8; 9]);
-    input[..5].copy_from_slice(secret);
-    input[5..].copy_from_slice(&block.to_le_bytes());
-    Zeroizing::new(<[u8; 16]>::from(Md5::digest(input.as_slice())))
-}
-
-fn verify(header: &BinaryRc4Header, password: &str) -> Result<Option<Zeroizing<[u8; 5]>>> {
-    let secret = derive_secret(password, &header.salt);
-    let key = derive_block_key(&secret, 0);
-    let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
-        PackageError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
-    })?;
-    let mut verifier = Zeroizing::new(header.encrypted_verifier);
-    let mut verifier_hash = Zeroizing::new(header.encrypted_verifier_hash);
-    cipher.apply_keystream(verifier.as_mut());
-    cipher.apply_keystream(verifier_hash.as_mut());
-    let calculated = Zeroizing::new(<[u8; 16]>::from(Md5::digest(verifier.as_slice())));
-    let difference = calculated
-        .iter()
-        .zip(verifier_hash.iter())
-        .fold(0u8, |difference, (left, right)| difference | (left ^ right));
-    Ok((difference == 0).then_some(secret))
-}
-
-pub(super) fn apply_stream_cipher(
-    mut data: &mut [u8],
-    mut absolute_offset: usize,
-    secret: &[u8; 5],
-) -> Result<()> {
-    while !data.is_empty() {
-        let block = u32::try_from(absolute_offset / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
-            PackageError::Corrupted("encrypted DOC stream is too large for binary RC4".to_string())
-        })?;
-        let block_offset = absolute_offset % BINARY_RC4_BLOCK_SIZE;
-        let key = derive_block_key(secret, block);
-        let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
-            PackageError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
-        })?;
-        if block_offset != 0 {
-            let mut discarded = Zeroizing::new([0u8; BINARY_RC4_BLOCK_SIZE]);
-            cipher.apply_keystream(&mut discarded[..block_offset]);
-        }
-
-        let count = data
-            .len()
-            .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-        cipher.apply_keystream(&mut data[..count]);
         absolute_offset += count;
         data = &mut data[count..];
     }
