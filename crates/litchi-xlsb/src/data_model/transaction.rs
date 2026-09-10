@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::codec::validate_definition;
-use super::model::{Definition, Model, ModelPart};
+use super::model::{Definition, Model, ModelPart, TimeGrouping};
 use super::package::{validate_definition_connection_names, validate_payload};
 use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
@@ -15,6 +15,7 @@ pub struct Transaction {
     before: Snapshot,
     definition: Option<Definition>,
     payload: Option<Arc<Vec<u8>>>,
+    validated_time_grouping_edit: bool,
 }
 
 impl Transaction {
@@ -25,6 +26,7 @@ impl Transaction {
             before,
             definition,
             payload,
+            validated_time_grouping_edit: false,
         }
     }
 
@@ -80,6 +82,111 @@ impl Transaction {
         Ok(true)
     }
 
+    /// Add one time grouping after proving its source and every generated
+    /// calculated column against the complete source XLDM closure.
+    ///
+    /// This operation changes only the typed workbook records. The opaque
+    /// model payload is retained byte-for-byte; native/generated value
+    /// regeneration and calculated-column creation remain a separate writer
+    /// operation and are refused when the referenced columns are absent.
+    pub fn add_time_grouping(&mut self, grouping: TimeGrouping) -> Result<bool> {
+        let mut definition = self.current_definition()?;
+        if definition.time_groupings.iter().any(|existing| {
+            existing.table_name == grouping.table_name && existing.column_id == grouping.column_id
+        }) {
+            return Err(invalid("duplicate Data Model time grouping"));
+        }
+        definition.time_groupings.push(grouping);
+        self.validate_time_grouping_definition(&definition)?;
+        self.definition = Some(definition);
+        self.validated_time_grouping_edit = true;
+        Ok(true)
+    }
+
+    /// Replace one existing time grouping by its qualified source identity.
+    ///
+    /// The replacement may change calculated-column selections and names, but
+    /// every resulting source/calculated identity must already exist in the
+    /// source payload. A missing inner column is rejected before the detached
+    /// draft is changed.
+    pub fn replace_time_grouping(
+        &mut self,
+        table_name: &str,
+        column_id: &str,
+        grouping: TimeGrouping,
+    ) -> Result<bool> {
+        let mut definition = self.current_definition()?;
+        let Some(index) = definition.time_groupings.iter().position(|existing| {
+            existing.table_name == table_name && existing.column_id == column_id
+        }) else {
+            return Err(invalid(format!(
+                "Data Model time grouping {table_name}.{column_id} is absent"
+            )));
+        };
+        if definition.time_groupings[index] == grouping {
+            return Ok(false);
+        }
+        if definition
+            .time_groupings
+            .iter()
+            .enumerate()
+            .any(|(other, existing)| {
+                other != index
+                    && existing.table_name == grouping.table_name
+                    && existing.column_id == grouping.column_id
+            })
+        {
+            return Err(invalid("duplicate Data Model time grouping"));
+        }
+        definition.time_groupings[index] = grouping;
+        self.validate_time_grouping_definition(&definition)?;
+        self.definition = Some(definition);
+        self.validated_time_grouping_edit = true;
+        Ok(true)
+    }
+
+    /// Remove a time grouping by its qualified source identity.
+    ///
+    /// Removing workbook metadata does not delete the opaque calculated-column
+    /// payload. The remaining grouping records are still checked against the
+    /// source closure before publication, so a removal cannot conceal an
+    /// unrelated dangling reference.
+    pub fn remove_time_grouping(&mut self, table_name: &str, column_id: &str) -> Result<bool> {
+        let mut definition = self.current_definition()?;
+        let Some(index) = definition.time_groupings.iter().position(|existing| {
+            existing.table_name == table_name && existing.column_id == column_id
+        }) else {
+            return Ok(false);
+        };
+        definition.time_groupings.remove(index);
+        self.validate_time_grouping_definition(&definition)?;
+        self.definition = Some(definition);
+        self.validated_time_grouping_edit = true;
+        Ok(true)
+    }
+
+    fn current_definition(&self) -> Result<Definition> {
+        self.definition.clone().ok_or_else(|| {
+            invalid("cannot edit Data Model time groupings when the model is absent")
+        })
+    }
+
+    fn validate_time_grouping_definition(&self, definition: &Definition) -> Result<()> {
+        if self.payload.is_none() {
+            return Err(invalid(
+                "cannot edit Data Model time groupings without a model payload",
+            ));
+        }
+        validate_definition(definition, self.before.limits())?;
+        self.validate_connection_closure(definition)?;
+        let Some(payload) = self.payload.as_ref().map(Arc::as_ref) else {
+            return Err(invalid(
+                "cannot edit Data Model time groupings without a model payload",
+            ));
+        };
+        validate_time_groupings(payload, &definition.time_groupings)
+    }
+
     /// Replace the inert payload while retaining typed workbook metadata.
     pub fn replace_payload(&mut self, payload: Vec<u8>) -> Result<bool> {
         let definition = self
@@ -108,6 +215,7 @@ impl Transaction {
         {
             return Ok(false);
         }
+        validate_time_groupings(part.bytes(), &definition.time_groupings)?;
         self.payload = Some(Arc::clone(&part.bytes));
         Ok(true)
     }
@@ -126,6 +234,7 @@ impl Transaction {
                         maximum: self.before.limits().max_part_bytes,
                     });
                 }
+                validate_time_groupings(model.part.bytes(), &model.definition.time_groupings)?;
                 if let Some(before) = self.before.definition() {
                     ensure_opaque_identity_compatible(Some(before), &model.definition)?;
                 }
@@ -194,7 +303,25 @@ impl Transaction {
         let after_definition = after_model.as_ref().map(|model| &model.definition);
         if let Some(after_definition) = after_definition {
             self.validate_connection_closure(after_definition)?;
-            ensure_opaque_identity_compatible(before_definition, after_definition)?;
+            if self.validated_time_grouping_edit {
+                let before_payload = self.before.part().map(ModelPart::bytes);
+                let after_payload = self.payload.as_ref().map(|value| value.as_slice());
+                if before_payload != after_payload {
+                    return Err(Error::UnsupportedFeature(
+                        "time-grouping edits cannot be combined with an opaque XLDM payload replacement; native/generated regeneration requires a closure-aware writer".to_string(),
+                    ));
+                }
+                ensure_opaque_identity_compatible_except_time_groupings(
+                    before_definition,
+                    after_definition,
+                )?;
+                self.validate_time_grouping_definition(after_definition)?;
+            } else {
+                ensure_opaque_identity_compatible(before_definition, after_definition)?;
+            }
+            if let Some(after_payload) = self.payload.as_ref() {
+                validate_time_groupings(after_payload, &after_definition.time_groupings)?;
+            }
         }
         if self.before.package().is_signed()
             || self.before.package().requires_signature_edit_policy()
@@ -229,6 +356,13 @@ impl Transaction {
     }
 }
 
+fn validate_time_groupings(payload: &[u8], groupings: &[TimeGrouping]) -> Result<()> {
+    for grouping in groupings {
+        super::proof::prove_time_grouping(payload, grouping)?;
+    }
+    Ok(())
+}
+
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
@@ -246,6 +380,21 @@ fn ensure_opaque_identity_compatible(
     {
         return Err(Error::UnsupportedFeature(
             "cannot rename or restructure Data Model metadata while the MS-XLDM payload is opaque; replace and validate the complete model in a format-aware owner first".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_opaque_identity_compatible_except_time_groupings(
+    before: Option<&Definition>,
+    after: &Definition,
+) -> Result<()> {
+    let Some(before) = before else {
+        return Ok(());
+    };
+    if before.tables != after.tables || before.relationships != after.relationships {
+        return Err(Error::UnsupportedFeature(
+            "time-grouping edits cannot change Data Model tables or relationships while the MS-XLDM payload is opaque".to_string(),
         ));
     }
     Ok(())

@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::error::Result;
+
 /// Retained `x15:extLst` descriptor markup that is not interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpaqueXml {
@@ -12,6 +14,50 @@ pub struct OpaqueXml {
     /// overrides remain lexical. Prefixes, comments, mixed content, and opaque
     /// attribute values are otherwise not rewritten.
     pub xml: Vec<u8>,
+}
+
+/// The content type of a calculated column in a data-model time grouping.
+///
+/// The [`Other`](Self::Other) variant retains a value introduced by a newer
+/// producer without assigning it semantics this crate does not know. Such a
+/// value is readable and preserved, but cannot be emitted by the typed writer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModelTimeGroupingContentType {
+    Years,
+    Quarters,
+    MonthsIndex,
+    Months,
+    DaysIndex,
+    Days,
+    Hours,
+    Minutes,
+    Seconds,
+    Other(String),
+}
+
+/// One calculated column belonging to a data-model time grouping.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CalculatedTimeColumn {
+    pub column_name: String,
+    pub column_id: String,
+    pub content_type: ModelTimeGroupingContentType,
+    pub is_selected: bool,
+}
+
+/// One data-model time grouping for a table and source date column.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelTimeGrouping {
+    pub table_name: String,
+    pub column_name: String,
+    pub column_id: String,
+    pub calculated_time_columns: Vec<CalculatedTimeColumn>,
+}
+
+/// The typed `modelTimeGroupings` extension owned by the Data Model
+/// descriptor. Unknown sibling extensions remain in [`OpaqueXml`] verbatim.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelTimeGroupings {
+    pub groupings: Vec<ModelTimeGrouping>,
 }
 
 /// One workbook Data Model table descriptor.
@@ -49,6 +95,39 @@ impl Default for Definition {
             relationships: Vec::new(),
             extension_list: None,
         }
+    }
+}
+
+impl Definition {
+    /// Read the typed MS-XLSX `modelTimeGroupings` extension, if present.
+    ///
+    /// The surrounding `x15:extLst` and all unrecognized extensions remain
+    /// source bytes; this method only projects the recognized child.
+    pub fn model_time_groupings(&self) -> Result<Option<ModelTimeGroupings>> {
+        self.extension_list
+            .as_ref()
+            .map(|extension| super::codec::parse_model_time_groupings_extension(&extension.xml))
+            .transpose()
+            .map(|value| value.flatten())
+    }
+
+    /// Add, replace, or remove the typed `modelTimeGroupings` child while
+    /// retaining unrelated extension markup byte-for-byte. This detached
+    /// descriptor helper does not prove identity against the XLDM payload;
+    /// source-bound package transactions perform that proof before staging a
+    /// changed write.
+    pub fn set_model_time_groupings(&mut self, value: Option<ModelTimeGroupings>) -> Result<()> {
+        if self.model_time_groupings()? == value {
+            return Ok(());
+        }
+        let updated = super::codec::rewrite_model_time_groupings_extension(
+            self.extension_list
+                .as_ref()
+                .map(|extension| extension.xml.as_slice()),
+            value.as_ref(),
+        )?;
+        self.extension_list = updated.map(|xml| OpaqueXml { xml });
+        Ok(())
     }
 }
 

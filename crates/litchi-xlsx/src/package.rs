@@ -281,11 +281,12 @@ impl Package {
     ///
     /// Creation/import validates the typed descriptor, XLDM storage profile,
     /// OPC ownership, and relationship closure while retaining the binary
-    /// payload as opaque bytes. It does not prove inner XLDM table,
-    /// relationship, column, time-group, or dependency identity. For an
-    /// existing source-bound model, payload-only replacement with an unchanged
-    /// typed descriptor is supported; structural replacement is refused until
-    /// that inner proof exists.
+    /// payload as opaque bytes. A time-grouping write additionally requires a
+    /// complete neutral XLDM identity closure for its table, source column,
+    /// and calculated columns. For an existing source-bound model,
+    /// payload-only replacement with an unchanged typed descriptor is
+    /// supported; other structural replacement remains refused until its
+    /// complete inner proof exists.
     pub fn put_data_model(&mut self, model: crate::workbook::data_model::Model) -> Result<()> {
         self.ensure_mutation_allowed("put_data_model")?;
         let mut transaction = crate::workbook::data_model::Transaction::new(&mut self.0)?;
@@ -853,9 +854,15 @@ pub(crate) fn build_minimal_package() -> Result<OpcPackage> {
 pub mod xldm {
     pub use litchi_xldm::{
         BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
-        GeneratedPath, Header, LoggedFile, Offset, PartitionMarker, Size, Storage, StorageProfile,
-        WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, XmlEncoding, compression, crypt,
-        generated, metadata, native, olap,
+        GeneratedPath, Header, LoggedFile, Offset, OlapProofLimits, PartitionMarker, Size, Storage,
+        StorageProfile, WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, Xldm140Closure,
+        Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity, Xldm140FileReplacement,
+        Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection, Xldm140Patch,
+        Xldm140PatchBytes, Xldm140RelationshipIdentity, Xldm140TableIdentity,
+        Xldm140TimeGroupingBinding, Xldm140TimeGroupingContentType, XmlEncoding, compression,
+        crypt, generated, identity, metadata, native, olap, olapproof, project_xldm140_identity,
+        project_xldm140_identity_with_closure, prove_xldm140_closure,
+        validate_xldm140_identity_closure,
     };
 
     /// Classify a generated path while preserving the XLSX facade error type.

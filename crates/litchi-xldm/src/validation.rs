@@ -65,7 +65,13 @@ pub(super) fn validate_backup_log(
                     .normalized_path
                     .rsplit_once('/')
                     .map_or("", |value| value.0);
-                if parent != persist && !parent.starts_with(&format!("{persist}/")) {
+                let database_definition_at_root = group.class == FileGroupClass::Database
+                    && file.generated.kind == GeneratedNameKind::DatabaseDefinition
+                    && parent.is_empty();
+                if !database_definition_at_root
+                    && parent != persist
+                    && !parent.starts_with(&format!("{persist}/"))
+                {
                     return Err(invalid(format!(
                         "StoragePath '{}' is outside PersistLocationPath",
                         file.storage_path
@@ -269,8 +275,17 @@ pub(super) fn classify_generated_name(
         let Some((version, rest)) = prefix.split_once('.') else {
             return Err(invalid("invalid hidx name"));
         };
-        if digits(version) && rest.starts_with("H$") && dollar_ids(&rest[2..], 2) {
-            return Ok(GeneratedNameKind::ColumnHashIndex);
+        if digits(version) {
+            if let Some(value) = rest.strip_prefix("H$")
+                && dollar_ids(value, 2)
+            {
+                return Ok(GeneratedNameKind::ColumnHashIndex);
+            }
+            // A relationship index is an `.idf` member.  Section 2.4.3.1
+            // permits its payload to use the sparse hash-index layout, but
+            // that alternative does not change the physical member suffix.
+            // A literal relationship `.hidx` path is therefore not a valid
+            // section-2.2 generated member.
         }
     }
     if let Some(prefix) = name.strip_suffix(".idf") {

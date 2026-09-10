@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::model::{Definition, ModelPart};
+use super::model::{Definition, Model, ModelPart};
 use crate::package::connections::Connections;
 use crate::package::error::{Error, Result};
 
@@ -341,6 +341,28 @@ pub(crate) fn validate_payload(part: &ModelPart) -> Result<()> {
     }
     let _ = model_part_uri()?;
     Ok(())
+}
+
+/// Validate the opaque owner before a writer retains a model containing
+/// workbook time-grouping records.  The workbook stream and the model part
+/// are separate owners; validating only the former lets a caller publish
+/// stale groupings after replacing the opaque bytes.
+pub(crate) fn validate_model_payload_and_groupings(model: &Model) -> Result<()> {
+    super::codec::validate_definition(&model.definition, super::ReadLimits::DEFAULT)?;
+    validate_payload(&model.part)?;
+    for grouping in &model.definition.time_groupings {
+        super::proof::prove_time_grouping(model.part.bytes(), grouping)?;
+    }
+    Ok(())
+}
+
+/// Validate every owner at the final XLSB publication boundary.
+pub(crate) fn validate_model_for_write(
+    model: &Model,
+    connections: Option<&Connections>,
+) -> Result<()> {
+    validate_model_payload_and_groupings(model)?;
+    validate_definition_connections(&model.definition, connections)
 }
 
 /// Validate the workbook-owned external connection closure for Data Model

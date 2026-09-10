@@ -7,7 +7,10 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::{Reader, events::Event};
 
 use crate::error::{Error, Result};
-use crate::package::xldm::{StorageProfile, inspect as inspect_xldm};
+use crate::package::xldm::{
+    OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType, generated,
+    inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
+};
 
 const NATIVE_MODEL_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData";
@@ -17,7 +20,11 @@ use super::codec::{
     parse_document_with_base, rewrite_data_model_extension, rewrite_load_version,
     validate_definition, workbook_definition, write_data_model,
 };
-use super::model::{Definition, Model, ModelView};
+#[cfg(test)]
+use super::model::{CalculatedTimeColumn, ModelTimeGrouping};
+use super::model::{
+    Definition, Model, ModelTimeGroupingContentType, ModelTimeGroupings, ModelView,
+};
 use super::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, DATA_MODEL_CONTENT_TYPE,
     DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, MAX_PAYLOAD_BYTES,
@@ -78,6 +85,7 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
         part.partname(),
         (profile == StorageProfile::Tabular150).then_some(workbook_name),
     )?;
+    validate_model_time_grouping_references(&definition)?;
     validate_connections(package, workbook_name, &definition)?;
     Ok(Some(ModelView {
         definition: Arc::new(definition),
@@ -88,10 +96,9 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
 /// Store a singleton Data Model after validating the complete mutation plan.
 ///
 /// The outer XLDM storage profile, descriptor, package ownership, and
-/// relationship closure are checked. The binary payload remains inert, so a
-/// newly created/imported model has no inner table, relationship, column, or
-/// time-group identity proof against another source. Source-bound transactions
-/// consequently refuse structural replacement until that proof is implemented.
+/// relationship closure are checked. A model-time-grouping write additionally
+/// requires the neutral XLDM owner to prove the source and calculated-column
+/// identity closure before the descriptor is published.
 pub fn store_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
@@ -103,6 +110,10 @@ pub fn store_data_model(
     if load_shared_model(package, workbook_name)?.is_some() {
         return Err(invalid("workbook already contains a Data Model"));
     }
+    validate_model_time_grouping_identity(
+        &value.payload.data,
+        value.definition.model_time_groupings()?.as_ref(),
+    )?;
     validate_model_contents(
         package,
         workbook_name,
@@ -305,6 +316,118 @@ fn validate_model(package: &OpcPackage, workbook_name: &PackURI, value: &ModelVi
     )
 }
 
+const MODEL_TIME_GROUPING_IDENTITY_FEATURE: &str = "modelTimeGroupings writes require validated inner XLDM table, column, and calculated-column identity closure";
+
+fn model_time_grouping_identity_unsupported() -> Error {
+    Error::Unsupported {
+        feature: MODEL_TIME_GROUPING_IDENTITY_FEATURE,
+    }
+}
+
+/// Prove every workbook time grouping against the complete neutral XLDM 140
+/// closure. The proof is source-bound: it resolves the table XML name, the
+/// table-local source column, every calculated column, the Date DBType of the
+/// source, the integral calculated result types, and each known
+/// modelTimeGrouping content type through the same inspected payload.
+/// Tabular-150 payloads and incomplete/opaque closures remain readable but
+/// cannot be authored through this typed operation.
+fn validate_model_time_grouping_identity(
+    data: &[u8],
+    groupings: Option<&ModelTimeGroupings>,
+) -> Result<()> {
+    let Some(groupings) = groupings else {
+        return Ok(());
+    };
+    let storage = inspect_xldm(data)?;
+    if storage.profile() != StorageProfile::Xldm140 {
+        return Err(model_time_grouping_identity_unsupported());
+    }
+    let metadata =
+        metadata::inspect(&storage).map_err(|_| model_time_grouping_identity_unsupported())?;
+    let native = native::inspect(&storage, &metadata.native_parse_options())
+        .map_err(|_| model_time_grouping_identity_unsupported())?;
+    let generated = generated::inspect_system_generated(&storage)
+        .map_err(|_| model_time_grouping_identity_unsupported())?;
+    let olap = olap::inspect(&storage, &metadata)
+        .map_err(|_| model_time_grouping_identity_unsupported())?;
+    // The table-local projection is necessary but does not prove the
+    // standalone section-2.6 graph.  In particular, a grouping can appear
+    // to name valid columns while a duplicate or unlinked Dimension
+    // relationship remains outside that projection.  Require the same full
+    // semantic proof at the XLSX authoring boundary before binding any
+    // descriptor IDs.
+    let olap_proof =
+        olapproof::prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
+            .map_err(|_| model_time_grouping_identity_unsupported())?;
+    if !olap_proof.is_complete() {
+        return Err(model_time_grouping_identity_unsupported());
+    }
+    let closure = prove_xldm140_closure(&storage, &metadata, &olap, &native, &generated)
+        .map_err(|_| model_time_grouping_identity_unsupported())?;
+    for grouping in &groupings.groupings {
+        let calculated = grouping
+            .calculated_time_columns
+            .iter()
+            .map(|column| {
+                Ok((
+                    column.column_name.as_str(),
+                    column.column_id.as_str(),
+                    xldm_time_grouping_content_type(&column.content_type)?,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()
+            .map_err(|_| model_time_grouping_identity_unsupported())?;
+        closure
+            .bind_time_grouping_with_content_types(
+                &grouping.table_name,
+                &grouping.column_name,
+                &grouping.column_id,
+                &calculated,
+            )
+            .map_err(|_| model_time_grouping_identity_unsupported())?;
+    }
+    Ok(())
+}
+
+fn xldm_time_grouping_content_type(
+    value: &ModelTimeGroupingContentType,
+) -> Result<Xldm140TimeGroupingContentType> {
+    Ok(match value {
+        ModelTimeGroupingContentType::Years => Xldm140TimeGroupingContentType::Years,
+        ModelTimeGroupingContentType::Quarters => Xldm140TimeGroupingContentType::Quarters,
+        ModelTimeGroupingContentType::MonthsIndex => Xldm140TimeGroupingContentType::MonthsIndex,
+        ModelTimeGroupingContentType::Months => Xldm140TimeGroupingContentType::Months,
+        ModelTimeGroupingContentType::DaysIndex => Xldm140TimeGroupingContentType::DaysIndex,
+        ModelTimeGroupingContentType::Days => Xldm140TimeGroupingContentType::Days,
+        ModelTimeGroupingContentType::Hours => Xldm140TimeGroupingContentType::Hours,
+        ModelTimeGroupingContentType::Minutes => Xldm140TimeGroupingContentType::Minutes,
+        ModelTimeGroupingContentType::Seconds => Xldm140TimeGroupingContentType::Seconds,
+        ModelTimeGroupingContentType::Other(_) => {
+            return Err(model_time_grouping_identity_unsupported());
+        },
+    })
+}
+
+fn require_unchanged_model_time_groupings(
+    before: Option<&ModelView>,
+    candidate: &ModelView,
+) -> Result<()> {
+    let before = before
+        .map(|model| model.definition.model_time_groupings())
+        .transpose()?;
+    let after = candidate.definition.model_time_groupings()?;
+    let unchanged = match before {
+        None => after.is_none(),
+        Some(before) => before == after,
+    };
+    if !unchanged {
+        return Err(Error::Unsupported {
+            feature: "modelTimeGroupings writes require validated inner XLDM table, column, and calculated-column identity closure",
+        });
+    }
+    Ok(())
+}
+
 fn validate_model_contents(
     package: &OpcPackage,
     workbook_name: &PackURI,
@@ -313,6 +436,7 @@ fn validate_model_contents(
     data: &[u8],
 ) -> Result<()> {
     validate_definition(definition, false)?;
+    validate_model_time_grouping_references(definition)?;
     if part_name != DATA_MODEL_PART_NAME {
         return Err(invalid(format!(
             "Data Model part must be '{DATA_MODEL_PART_NAME}'"
@@ -331,6 +455,25 @@ fn validate_model_contents(
         (profile == StorageProfile::Tabular150).then_some(workbook_name),
     )?;
     validate_connections(package, workbook_name, definition)
+}
+
+fn validate_model_time_grouping_references(definition: &Definition) -> Result<()> {
+    let Some(groupings) = definition.model_time_groupings()? else {
+        return Ok(());
+    };
+    for grouping in groupings.groupings {
+        if !definition
+            .tables
+            .iter()
+            .any(|table| table.name.eq_ignore_ascii_case(&grouping.table_name))
+        {
+            return Err(invalid(format!(
+                "modelTimeGrouping references unknown table '{}'",
+                grouping.table_name
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn validate_connections(
@@ -730,6 +873,16 @@ impl<'a> Transaction<'a> {
             return Ok(false);
         }
         self.check_structure(&model)?;
+        require_unchanged_model_time_groupings(self.before.model.as_ref(), &model)?;
+        // A payload-only replacement can invalidate the identities and
+        // derivation closure even when the outer descriptor is byte-for-byte
+        // unchanged. Reprove the retained extension against the candidate
+        // payload before staging it, so set/edit_definition cannot leave stale
+        // modelTimeGroupings attached to a different XLDM source.
+        validate_model_time_grouping_identity(
+            model.payload(),
+            model.definition.model_time_groupings()?.as_ref(),
+        )?;
         validate_model(self.target, &self.before.workbook_name, &model)?;
         self.draft = Some(model);
         Ok(true)
@@ -770,6 +923,33 @@ impl<'a> Transaction<'a> {
             data: Arc::clone(&current.data),
         };
         self.set_shared(candidate)
+    }
+
+    /// Edit only the typed `modelTimeGroupings` extension while retaining the
+    /// source-bound XLDM payload and every unrelated extension byte. The
+    /// neutral XLDM closure proves table, source-column, and calculated-column
+    /// identity before the edit is staged.
+    pub fn edit_model_time_groupings(&mut self, value: Option<ModelTimeGroupings>) -> Result<bool> {
+        let current = self
+            .draft
+            .as_ref()
+            .ok_or_else(|| invalid("workbook has no Data Model to edit"))?;
+        if current.definition.model_time_groupings()? == value {
+            return Ok(false);
+        }
+        let mut definition = current.definition.as_ref().clone();
+        definition.set_model_time_groupings(value)?;
+        let candidate = ModelView {
+            definition: Arc::new(definition),
+            data: Arc::clone(&current.data),
+        };
+        validate_model_time_grouping_identity(
+            candidate.payload(),
+            candidate.definition.model_time_groupings()?.as_ref(),
+        )?;
+        validate_model(self.target, &self.before.workbook_name, &candidate)?;
+        self.draft = Some(candidate);
+        Ok(true)
     }
 
     /// Remove the staged Data Model graph.
@@ -1113,11 +1293,15 @@ fn publish_source_part(package: &mut OpcPackage, part: &SourcePart) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::super::codec::parse_data_model;
-    use super::super::codec::parse_document;
+    use super::super::codec::{
+        parse_data_model, parse_document, parse_document_with_base, rewrite_data_model_extension,
+        workbook_definition,
+    };
     use super::*;
     use crate::package::xldm_test_support::test_xldm_bytes;
-    use crate::workbook::data_model::{MAX_XML_BYTES, Payload, SML, X15};
+    use crate::workbook::data_model::{
+        MAX_XML_BYTES, MODEL_TIME_GROUPINGS_EXTENSION_URI, Payload, SML, X15,
+    };
     use litchi_opc::Part;
 
     fn definition() -> Definition {
@@ -1235,6 +1419,30 @@ mod tests {
         }
     }
 
+    fn install_model_time_groupings(
+        package: &mut OpcPackage,
+        workbook: &PackURI,
+        value: ModelTimeGroupings,
+    ) {
+        let mut current = load_data_model(package, workbook).unwrap().unwrap();
+        current
+            .definition
+            .set_model_time_groupings(Some(value))
+            .unwrap();
+        let (source, updated) = {
+            let source = package.source_xml_part(workbook).unwrap();
+            let source_bytes = source.bytes().to_vec();
+            let root = parse_document_with_base(&source_bytes, Some(workbook.as_str())).unwrap();
+            let (core, _) = workbook_definition(&root).unwrap();
+            let fragment = write_data_model_fragment(core, &current.definition).unwrap();
+            let updated = rewrite_data_model_extension(&source, core, Some(&fragment)).unwrap();
+            (source_bytes, updated)
+        };
+        package
+            .try_replace_owned_xml_part(&source, updated)
+            .unwrap();
+    }
+
     fn replace_connections_target(package: &mut OpcPackage, workbook: &PackURI, target: &str) {
         let relationships = package.get_part_mut(workbook).unwrap().rels_mut();
         relationships.remove("rIdConnections");
@@ -1296,6 +1504,34 @@ mod tests {
                     .is_err()
             );
         }
+    }
+
+    #[test]
+    fn fresh_model_time_grouping_store_refuses_without_inner_identity_proof() {
+        let (mut package, workbook) = fixture_package();
+        let mut value = model();
+        value
+            .definition
+            .set_model_time_groupings(Some(ModelTimeGroupings {
+                groupings: vec![ModelTimeGrouping {
+                    table_name: "Sales".into(),
+                    column_name: "OrderDate".into(),
+                    column_id: "date-1".into(),
+                    calculated_time_columns: vec![CalculatedTimeColumn {
+                        column_name: "Year".into(),
+                        column_id: "year-1".into(),
+                        content_type: ModelTimeGroupingContentType::Years,
+                        is_selected: true,
+                    }],
+                }],
+            }))
+            .unwrap();
+        assert!(matches!(
+            store_data_model(&mut package, &workbook, &value),
+            Err(Error::Unsupported { feature })
+                if feature.contains("inner XLDM table, column, and calculated-column identity closure")
+        ));
+        assert!(load_data_model(&package, &workbook).unwrap().is_none());
     }
 
     #[test]
@@ -1656,6 +1892,321 @@ mod tests {
     }
 
     #[test]
+    fn source_bound_time_grouping_changed_writes_refuse_unproven_inner_identity() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping.clone());
+        let before = package.get_part(&workbook).unwrap().blob().to_vec();
+        let mut changed = grouping.clone();
+        changed.groupings[0].column_id = "unproven-source-column".into();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        assert!(matches!(
+            transaction.edit_model_time_groupings(Some(changed)),
+            Err(Error::Unsupported { feature })
+                if feature.contains("inner XLDM table, column, and calculated-column identity closure")
+        ));
+        assert!(!transaction.is_changed());
+        drop(transaction);
+        assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
+        assert_eq!(
+            load_data_model(&package, &workbook)
+                .unwrap()
+                .unwrap()
+                .definition
+                .model_time_groupings()
+                .unwrap(),
+            Some(grouping)
+        );
+    }
+
+    #[test]
+    fn source_bound_time_grouping_noop_survives_save_reopen_and_inverse() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Date".into(),
+                column_name: "DateKey".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Month".into(),
+                    column_id: "month-1".into(),
+                    content_type: ModelTimeGroupingContentType::Months,
+                    is_selected: false,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping.clone());
+        let before = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        assert!(
+            !transaction
+                .edit_model_time_groupings(Some(grouping.clone()))
+                .unwrap()
+        );
+        assert!(!transaction.is_changed());
+        let commit = transaction.commit().unwrap();
+        assert!(!commit.changed());
+
+        let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+        assert_eq!(after, before);
+        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        assert_eq!(
+            load_data_model(&reopened, &workbook)
+                .unwrap()
+                .unwrap()
+                .definition
+                .model_time_groupings()
+                .unwrap(),
+            Some(grouping)
+        );
+        commit.patch().inverse().apply(&mut reopened).unwrap();
+        assert_eq!(
+            litchi_opc::PackageWriter::to_bytes(&reopened).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn source_bound_time_grouping_remove_is_reversible_without_inner_rewrite() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping);
+        let before = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        assert!(transaction.edit_model_time_groupings(None).unwrap());
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+        assert_eq!(
+            load_data_model(&package, &workbook)
+                .unwrap()
+                .unwrap()
+                .definition
+                .model_time_groupings()
+                .unwrap(),
+            None
+        );
+
+        let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        commit.patch().inverse().apply(&mut reopened).unwrap();
+        assert_eq!(
+            litchi_opc::PackageWriter::to_bytes(&reopened).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn source_bound_time_grouping_bad_references_never_reach_specialized_writer() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping.clone());
+        let mut candidates = Vec::new();
+        let mut bad_table = grouping.clone();
+        bad_table.groupings[0].table_name = "MissingTable".into();
+        candidates.push(bad_table);
+        let mut bad_column = grouping.clone();
+        bad_column.groupings[0].column_id = "MissingColumn".into();
+        candidates.push(bad_column);
+        let mut bad_calculated = grouping.clone();
+        bad_calculated.groupings[0].calculated_time_columns[0].column_id =
+            "MissingCalculatedColumn".into();
+        candidates.push(bad_calculated);
+        let mut future = grouping.clone();
+        future.groupings[0].calculated_time_columns[0].content_type =
+            ModelTimeGroupingContentType::Other("futureUnit".into());
+        candidates.push(future);
+
+        let before = package.get_part(&workbook).unwrap().blob().to_vec();
+        for candidate in candidates {
+            let mut transaction = Transaction::new(&mut package).unwrap();
+            assert!(matches!(
+                transaction.edit_model_time_groupings(Some(candidate)),
+                Err(Error::Unsupported { feature })
+                    if feature.contains("inner XLDM table, column, and calculated-column identity closure")
+                        || feature.contains("unknown modelTimeGrouping contentType")
+            ));
+            assert!(!transaction.is_changed());
+        }
+        assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
+    }
+
+    #[test]
+    fn source_bound_time_grouping_unknown_sibling_topology_is_not_rewritten() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping.clone());
+        let before = package.get_part(&workbook).unwrap().blob().to_vec();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        assert!(matches!(
+            transaction.edit_definition(|definition| {
+                let mut changed = grouping.clone();
+                changed.groupings[0].column_id = "changed".into();
+                definition.set_model_time_groupings(Some(changed))
+            }),
+            Err(Error::Unsupported { feature })
+                if feature.contains("structural Data Model edits require validated inner XLDM identity closure")
+        ));
+        assert!(!transaction.is_changed());
+        drop(transaction);
+        assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
+    }
+
+    #[test]
+    fn load_rejects_unknown_model_time_grouping_table() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "MissingTable".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping);
+        assert!(matches!(
+            load_data_model(&package, &workbook),
+            Err(Error::Invalid(message)) if message.contains("unknown table 'MissingTable'")
+        ));
+    }
+
+    #[test]
+    fn load_rejects_duplicate_model_time_grouping_owner() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping);
+        let source =
+            String::from_utf8(package.get_part(&workbook).unwrap().blob().to_vec()).unwrap();
+        let owner = format!(r#"<x15:ext uri="{MODEL_TIME_GROUPINGS_EXTENSION_URI}">"#);
+        let start = source.find(&owner).unwrap();
+        let end = source[start..].find("</x15:ext>").unwrap() + start + "</x15:ext>".len();
+        let duplicate = source[start..end].to_owned();
+        let marker = "</x15:extLst>";
+        let (before_close, close) = source.rsplit_once(marker).unwrap();
+        package
+            .get_part_mut(&workbook)
+            .unwrap()
+            .set_blob(format!("{before_close}{duplicate}{marker}{close}").into_bytes());
+        assert!(matches!(
+            load_data_model(&package, &workbook),
+            Err(Error::Invalid(message)) if message.contains("duplicate modelTimeGroupings owner")
+        ));
+    }
+
+    #[test]
+    fn signed_source_bound_time_grouping_write_refuses_before_commit() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        install_model_time_groupings(&mut package, &workbook, grouping.clone());
+        let mut package = as_source(&package);
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        assert!(package.is_signed());
+        let before = package.get_part(&workbook).unwrap().blob().to_vec();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        let mut changed = grouping;
+        changed.groupings[0].column_id = "changed".into();
+        assert!(matches!(
+            transaction.edit_model_time_groupings(Some(changed)),
+            Err(Error::Unsupported { .. })
+        ));
+        assert!(!transaction.is_changed());
+        drop(transaction);
+        assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
+    }
+
+    #[test]
     fn source_bound_transaction_removes_and_restores_the_singleton() {
         let (mut package, workbook) = fixture_package();
         store_data_model(&mut package, &workbook, &model()).unwrap();
@@ -1704,6 +2255,45 @@ mod tests {
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(transaction.set(replacement).unwrap());
         assert!(transaction.commit().is_ok());
+    }
+
+    #[test]
+    fn payload_only_replacement_reproves_retained_time_groupings() {
+        let (mut package, workbook) = fixture_package();
+        store_data_model(&mut package, &workbook, &model()).unwrap();
+        let mut package = as_source(&package);
+        let grouping = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Sales".into(),
+                column_name: "OrderDate".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "year-1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        // Install this deliberately through the low-level source fixture: it
+        // lets the test model a previously published workbook whose opaque
+        // XLDM bytes had already been admitted by an older reader.  The
+        // ordinary edit API must reprove the retained grouping before it
+        // stages a new payload.
+        install_model_time_groupings(&mut package, &workbook, grouping);
+
+        let before = package.get_part(&workbook).unwrap().blob().to_vec();
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        let mut replacement = transaction.model().unwrap().to_owned();
+        replacement.payload.data = payload_with_equivalent_object_id_case();
+        assert!(matches!(
+            transaction.set(replacement),
+            Err(Error::Unsupported { feature })
+                if feature.contains("inner XLDM table, column, and calculated-column identity closure")
+        ));
+        assert!(!transaction.is_changed());
+        drop(transaction);
+        assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
 
     #[test]

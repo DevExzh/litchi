@@ -1,6 +1,7 @@
 //! Focused regression tests for the MS-XLDM outer-storage facade.
 
 use super::codec::{crc32, decode_xml, utf16le};
+use super::identity::Xldm140FileReplacement;
 use super::model::{BOM, CRC_SIZE, MAX_DIRECTORY_BYTES};
 use super::{
     FileGroupClass, FileKind, GeneratedNameKind, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
@@ -94,6 +95,54 @@ fn shared_inspection_retains_the_caller_source_buffer() {
     let storage = inspect_shared(&bytes).unwrap();
     assert_eq!(storage.source_bytes().as_ptr(), source);
     assert_eq!(storage.source_bytes(), bytes.as_slice());
+}
+
+#[test]
+fn same_size_payload_rewrite_updates_crc_and_has_exact_inverse() {
+    let original = test_xldm_bytes();
+    let storage = inspect(&original).unwrap();
+    let path = storage.files[1].path.clone();
+    let old_payload = storage.file_payload(1).unwrap().to_vec();
+    let mut replacement = old_payload.clone();
+    replacement[0] ^= 0x55;
+    let rewritten = super::codec::rewrite_same_size_payloads(
+        &storage,
+        &[Xldm140FileReplacement {
+            storage_path: &path,
+            payload: &replacement,
+        }],
+    )
+    .unwrap();
+    let changed = inspect(&rewritten).unwrap();
+    assert_eq!(changed.file_payload(1).unwrap(), replacement.as_slice());
+    assert_ne!(rewritten, original);
+
+    let restored = super::codec::rewrite_same_size_payloads(
+        &changed,
+        &[Xldm140FileReplacement {
+            storage_path: &path,
+            payload: &old_payload,
+        }],
+    )
+    .unwrap();
+    assert_eq!(restored, original);
+}
+
+#[test]
+fn same_size_payload_rewrite_rejects_growth_before_materialization() {
+    let original = test_xldm_bytes();
+    let storage = inspect(&original).unwrap();
+    let path = storage.files[1].path.clone();
+    let payload = vec![0_u8; storage.file_payload(1).unwrap().len() + 1];
+    let error = super::codec::rewrite_same_size_payloads(
+        &storage,
+        &[Xldm140FileReplacement {
+            storage_path: &path,
+            payload: &payload,
+        }],
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("changes allocation size"));
 }
 
 #[test]
@@ -403,6 +452,9 @@ mod tests {
                 "{path}"
             );
         }
+        assert!(
+            classify_generated_path("Model.1.db/Table.0.dim/1.R$Table$Rel.INDEX.0.hidx").is_err()
+        );
     }
 
     #[test]
@@ -440,5 +492,44 @@ mod tests {
             ]);
             assert!(inspect(&bytes).is_err());
         }
+    }
+
+    #[test]
+    fn variable_inner_rewrite_updates_backup_log_size_offsets_and_crc() {
+        let original_payload = b"data";
+        let log = test_backup_log("Model.1.db.xml", original_payload.len() as i32, 100002);
+        let source = build_test_storage(&[
+            ("Partitions", partitions_xml().as_bytes()),
+            ("Model.1.db.xml", original_payload),
+            ("BackupLog", log.as_bytes()),
+        ]);
+        let before = inspect(&source).expect("source fixture is valid");
+        let expanded = vec![b'x'; 5000];
+        let candidate = super::super::codec::rewrite_variable_size_payloads(
+            &before,
+            &[Xldm140FileReplacement {
+                storage_path: "Model.1.db.xml",
+                payload: &expanded,
+            }],
+        )
+        .expect("variable-size member rewrite should rebuild the outer stream");
+        let after = inspect(&candidate).expect("rewritten fixture remains valid");
+        assert_eq!(after.file_payload(1), Some(expanded.as_slice()));
+        assert_eq!(
+            after.backup_log.file_groups[0].files[0].size,
+            expanded.len() as u32
+        );
+        assert!(after.header.directory_offset.0 > before.header.directory_offset.0);
+        assert!(candidate.len() > source.len());
+
+        let restored = super::super::codec::rewrite_variable_size_payloads(
+            &after,
+            &[Xldm140FileReplacement {
+                storage_path: "Model.1.db.xml",
+                payload: original_payload,
+            }],
+        )
+        .expect("the variable-size outer rewrite should have an exact inverse");
+        assert_eq!(restored, source);
     }
 }

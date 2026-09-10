@@ -308,6 +308,7 @@ impl WorkbookWriter {
     /// the model part remains opaque and is never refreshed or evaluated.
     pub fn set_data_model(&mut self, value: crate::data_model::Model) -> Result<&mut Self> {
         crate::data_model::serialize_workbook_records(&value.definition)?;
+        crate::data_model::validate_model_payload_and_groupings(&value)?;
         if let Some(connections) = self.connections.as_ref() {
             crate::data_model::validate_definition_connections(
                 &value.definition,

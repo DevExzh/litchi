@@ -43,10 +43,7 @@ impl WorkbookWriter {
     /// * `writer` - A writer that implements `Write` and `Seek`
     pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         if let Some(model) = self.data_model.as_ref() {
-            crate::data_model::validate_definition_connections(
-                &model.definition,
-                self.connections.as_ref(),
-            )?;
+            crate::data_model::validate_model_for_write(model, self.connections.as_ref())?;
         }
         self.validate_formula_metadata()?;
         let mut xml_maps_plan = crate::writer::xml_maps::stage(

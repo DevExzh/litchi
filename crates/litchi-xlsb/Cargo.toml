@@ -23,6 +23,7 @@ litchi-opc = { workspace = true }
 litchi-sign = { workspace = true, optional = true }
 litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
+litchi-xldm = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }

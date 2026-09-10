@@ -64,7 +64,7 @@ pub struct NativeParseOptions {
 }
 
 impl NativeParseOptions {
-    fn string_hash_mode(&self, path: &str) -> NativeResult<StringHashMode> {
+    pub(crate) fn string_hash_mode(&self, path: &str) -> NativeResult<StringHashMode> {
         let mut result = StringHashMode::Auto;
         let mut found = false;
         for entry in &self.string_hash_overrides {
@@ -294,6 +294,11 @@ pub fn inspect<'a>(
                     options.string_hash_mode(path)?,
                 )?),
                 "hidx" => NativeData::HashIndex(parse_hash_index(bytes)?),
+                _ if generated.kind == GeneratedNameKind::TableRelationshipIndex => {
+                    parse_relationship_index(bytes).map_err(|error| {
+                        NativeError::new(format!("relationship index {path}: {error}"))
+                    })?
+                },
                 _ => NativeData::Idf(parse_storage_idf(generated.kind, bytes)?),
             };
             files.push(NativeFile {
@@ -304,6 +309,21 @@ pub fn inspect<'a>(
         }
     }
     Ok(NativeModel { files })
+}
+
+pub(crate) fn parse_relationship_index(bytes: &[u8]) -> NativeResult<NativeData<'_>> {
+    let idf = parse_idf(bytes);
+    let hash = parse_hash_index(bytes);
+    match (idf, hash) {
+        (Ok(idf), Err(_)) => Ok(NativeData::Idf(idf)),
+        (Err(_), Ok(hash)) => Ok(NativeData::HashIndex(hash)),
+        (Ok(_), Ok(_)) => Err(NativeError::new(
+            "ambiguous relationship index payload layout",
+        )),
+        (Err(idf), Err(hash)) => Err(NativeError::new(format!(
+            "invalid relationship index as .idf ({idf}) and .hidx ({hash})"
+        ))),
+    }
 }
 
 fn parse_storage_idf(kind: GeneratedNameKind, bytes: &[u8]) -> NativeResult<IdfFile<'_>> {
@@ -1162,6 +1182,13 @@ mod tests {
             data: NativeData::HashIndex(parsed),
         };
         assert_eq!(write_file(&file).unwrap(), bytes);
+    }
+
+    #[test]
+    fn relationship_index_accepts_hash_layout_inside_idf_named_member() {
+        let bytes = valid_hash_index();
+        let data = parse_relationship_index(&bytes).unwrap();
+        assert!(matches!(data, NativeData::HashIndex(_)));
     }
 
     #[test]

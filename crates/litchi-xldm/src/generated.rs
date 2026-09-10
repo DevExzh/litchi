@@ -121,6 +121,10 @@ pub fn parse_system_generated_file<'a>(
         return Ok(None);
     };
     let data = match (name.kind, name.layout) {
+        // Section 2.2.3.7.2.2 fixes the relationship member spelling to
+        // `.idf`; section 2.4.3.1 permits that member's payload to use the
+        // sparse `.hidx` layout. Keep that explicit payload exception local
+        // to this role; every other `.idf` role is parsed as an IDF payload.
         (SystemGeneratedKind::RelationshipIndex, Layout::Idf) => {
             let idf = parse_idf(bytes);
             let hash = parse_hash_index(bytes);
@@ -482,6 +486,16 @@ mod tests {
         assert_eq!(
             file.expected_compression(),
             SystemGeneratedCompression::Uncompressed
+        );
+        let error = parse_system_generated_file(
+            "Model.1.db/Table.0.dim/73.R$Table1$c4047114-e5d3-4730-ab46-478baf7ae64f.INDEX.0.hidx",
+            &hidx,
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unrecognized section 2.2 generated file name")
         );
     }
 
