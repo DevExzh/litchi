@@ -130,11 +130,21 @@ pub struct Element {
     tag_name: String,
     qualified_name: QualifiedName,
     attributes: HashMap<String, String>,
+    /// Raw lexical values for attributes read by `from_bytes`.
+    ///
+    /// The public attribute map intentionally retains the source spelling so
+    /// callers can inspect it.  Keeping the source lexical separately lets
+    /// serialization distinguish that spelling from a caller-supplied logical
+    /// value such as the literal string `&#x31;`.
+    parsed_attribute_lexicals: Option<Box<ParsedAttributeLexicals>>,
     namespace_context: NamespaceContext,
     text_content: String,
     encode_text_as_references: bool,
     pub(crate) children: Vec<Element>,
 }
+
+#[derive(Debug, Clone)]
+struct ParsedAttributeLexicals(HashMap<String, String>);
 
 impl Element {
     pub(crate) fn try_new(tag_name: &str) -> Result<Self> {
@@ -142,6 +152,7 @@ impl Element {
             tag_name: try_owned_string(tag_name, "ODT element tag name")?,
             qualified_name: QualifiedName::try_from_string(tag_name)?,
             attributes: HashMap::new(),
+            parsed_attribute_lexicals: None,
             namespace_context: NamespaceContext::default(),
             text_content: String::new(),
             encode_text_as_references: false,
@@ -201,6 +212,27 @@ impl Element {
             );
         }
 
+        let parsed_attribute_lexicals = self
+            .parsed_attribute_lexicals
+            .as_deref()
+            .map(|source| -> Result<Box<ParsedAttributeLexicals>> {
+                let mut parsed_attribute_lexicals = HashMap::new();
+                parsed_attribute_lexicals
+                    .try_reserve(source.0.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT parsed attribute lexicals",
+                        source,
+                    })?;
+                for (name, value) in &source.0 {
+                    parsed_attribute_lexicals.insert(
+                        try_owned_string(name, "ODT parsed attribute name")?,
+                        try_owned_string(value, "ODT parsed attribute lexical value")?,
+                    );
+                }
+                Ok(Box::new(ParsedAttributeLexicals(parsed_attribute_lexicals)))
+            })
+            .transpose()?;
+
         let mut children = Vec::new();
         children
             .try_reserve_exact(self.children.len())
@@ -216,6 +248,7 @@ impl Element {
             tag_name: try_owned_string(&self.tag_name, "ODT element tag name")?,
             qualified_name,
             attributes,
+            parsed_attribute_lexicals,
             namespace_context,
             text_content: try_owned_string(&self.text_content, "ODT element text")?,
             encode_text_as_references: self.encode_text_as_references,
@@ -281,7 +314,25 @@ impl Element {
             .map_err(|source| Error::Allocation { resource, source })?;
         owned_value.push_str(value);
         self.attributes.insert(owned_name, owned_value);
+        if let Some(parsed_attribute_lexicals) = &mut self.parsed_attribute_lexicals {
+            parsed_attribute_lexicals.0.remove(name);
+        }
         Ok(())
+    }
+
+    fn set_parsed_attribute(&mut self, name: &str, value: &str) {
+        self.attributes.insert(name.to_string(), value.to_string());
+        let parsed_attribute_lexicals = self
+            .parsed_attribute_lexicals
+            .get_or_insert_with(|| Box::new(ParsedAttributeLexicals(HashMap::new())));
+        parsed_attribute_lexicals
+            .0
+            .insert(name.to_string(), value.to_string());
+    }
+
+    pub(crate) fn parsed_attribute_lexical(&self, name: &str) -> Option<&str> {
+        let parsed = self.parsed_attribute_lexicals.as_deref()?.0.get(name)?;
+        (self.attributes.get(name).map(String::as_str) == Some(parsed.as_str())).then_some(parsed)
     }
 
     /// Get children as concrete Elements
@@ -353,6 +404,7 @@ impl Element {
             tag_name: tag_name.to_string(),
             qualified_name,
             attributes: HashMap::new(),
+            parsed_attribute_lexicals: None,
             namespace_context: NamespaceContext::default(),
             text_content: String::new(),
             encode_text_as_references: false,
@@ -367,6 +419,7 @@ impl Element {
             tag_name: tag_name.to_string(),
             qualified_name,
             attributes: HashMap::new(),
+            parsed_attribute_lexicals: None,
             namespace_context,
             text_content: String::new(),
             encode_text_as_references: false,
@@ -489,7 +542,7 @@ impl Element {
 
                         // Skip namespace declarations - they're already handled
                         if !(key == "xmlns" || key.starts_with("xmlns:")) {
-                            element.set_attribute(&key, &value);
+                            element.set_parsed_attribute(&key, &value);
                         }
                     }
 
@@ -578,14 +631,18 @@ impl Element {
             output.push(' ');
             output.push_str(key);
             output.push_str("=\"");
-            // Escape quotes in attribute values
-            for ch in value.chars() {
-                match ch {
-                    '"' => output.push_str("&quot;"),
-                    '&' => output.push_str("&amp;"),
-                    '<' => output.push_str("&lt;"),
-                    '>' => output.push_str("&gt;"),
-                    _ => output.push(ch),
+            if let Some(raw_value) = self.parsed_attribute_lexical(key) {
+                output.push_str(raw_value);
+            } else {
+                // Escape quotes in caller-supplied logical attribute values.
+                for ch in value.chars() {
+                    match ch {
+                        '"' => output.push_str("&quot;"),
+                        '&' => output.push_str("&amp;"),
+                        '<' => output.push_str("&lt;"),
+                        '>' => output.push_str("&gt;"),
+                        _ => output.push(ch),
+                    }
                 }
             }
             output.push('"');
@@ -637,7 +694,24 @@ impl ElementBase for Element {
     }
 
     fn attributes_mut(&mut self) -> &mut HashMap<String, String> {
+        // The trait returns the map directly, so changes cannot be observed
+        // while the borrow is live. Serialization compares each current
+        // value with this parsed baseline and escapes only changed entries.
         &mut self.attributes
+    }
+
+    fn set_attribute(&mut self, name: &str, value: &str) {
+        if let Some(parsed_attribute_lexicals) = &mut self.parsed_attribute_lexicals {
+            parsed_attribute_lexicals.0.remove(name);
+        }
+        self.attributes.insert(name.to_string(), value.to_string());
+    }
+
+    fn remove_attribute(&mut self, name: &str) {
+        if let Some(parsed_attribute_lexicals) = &mut self.parsed_attribute_lexicals {
+            parsed_attribute_lexicals.0.remove(name);
+        }
+        self.attributes.remove(name);
     }
 
     fn text(&self) -> &str {
@@ -723,6 +797,31 @@ mod tests {
 
         element.remove_attribute("class");
         assert!(!element.has_attribute("class"));
+    }
+
+    #[test]
+    fn parsed_attribute_provenance_survives_mutable_borrow_and_partial_change() {
+        let source = br#"<text:p text:first="&#x31;" text:second="&#x30;">x</text:p>"#;
+
+        let mut untouched = Element::from_bytes(source).unwrap();
+        let before = untouched.to_xml_string();
+        let _ = ElementBase::attributes_mut(&mut untouched);
+        assert_eq!(untouched.to_xml_string(), before);
+        assert!(!before.contains("&amp;#x"));
+        let reopened = Element::from_bytes(untouched.to_xml_string().as_bytes()).unwrap();
+        assert_eq!(reopened.get_attribute("text:first"), Some("&#x31;"));
+        assert_eq!(reopened.get_attribute("text:second"), Some("&#x30;"));
+
+        let mut changed = Element::from_bytes(source).unwrap();
+        ElementBase::attributes_mut(&mut changed).insert("text:first".to_string(), "2".to_string());
+        let serialized = changed.to_xml_string();
+        assert!(serialized.contains(r#"text:first="2""#));
+        assert!(serialized.contains(r#"text:second="&#x30;""#));
+        assert!(!serialized.contains("&amp;#x30;"));
+        let reopened = Element::from_bytes(serialized.as_bytes()).unwrap();
+        assert_eq!(reopened.get_attribute("text:first"), Some("2"));
+        assert_eq!(reopened.get_attribute("text:second"), Some("&#x30;"));
+        assert_eq!(reopened.to_xml_string(), serialized);
     }
 
     #[test]

@@ -125,6 +125,7 @@ pub enum CellValue {
 pub mod auto_mark_file;
 pub mod bibliography_configuration;
 pub mod chart_properties;
+pub mod content_metadata;
 pub mod content_validation;
 pub mod dde_connection;
 pub mod document_scripts;
@@ -155,6 +156,7 @@ pub mod streaming;
 pub mod style;
 pub mod transaction;
 pub mod variable_declaration;
+pub mod xforms;
 
 #[allow(
     unused_imports,
@@ -296,6 +298,7 @@ pub(crate) use elements::field::{
     reason = "ODT facade exposes hyperlink element vocabulary"
 )]
 pub(crate) use elements::text::{Hyperlink, TextHyperlinkActuate, TextHyperlinkShow};
+pub use elements::text::{NumberLabel, SoftPageBreak};
 
 mod builder;
 mod document;
@@ -321,6 +324,10 @@ pub mod section;
 pub mod tracked_changes;
 
 pub use builder::Builder;
+pub use content_metadata::{
+    ContentMetadata, MetadataAttribute, MetadataPart, RdfaAttributes, RdfaHost, RdfaOccurrence,
+    TextMeta,
+};
 pub use document::{
     Document, ReadLimits, SourceBackedDocument, SourceBackedDocumentCatalog, TextBlockCatalogEntry,
 };
@@ -351,6 +358,11 @@ pub(crate) use section::{
 pub(crate) use tracked_changes::{
     Position, mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
     unmark_tracked_change_xml,
+};
+pub use xforms::{
+    Attribute as XFormsAttribute, Bind, Extension as XFormsExtension, Instance,
+    Model as XFormsModel, ModelChild as XFormsModelChild,
+    NamespaceBinding as XFormsNamespaceBinding, Submission, SubmissionMethod, SubmissionReplace,
 };
 
 // Re-export ODT-specific types for external use
