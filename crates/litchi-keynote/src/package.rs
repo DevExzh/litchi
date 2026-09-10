@@ -41,6 +41,7 @@ pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_lock_state;
+pub(crate) mod slide_table_merges;
 pub(crate) mod slide_table_name;
 mod slide_table_physical_sort;
 pub(crate) mod slide_table_sort_order;
@@ -220,6 +221,9 @@ pub use slide_table_lock_state::{
     SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
     SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
     SlideTableLockStatePath,
+};
+pub use slide_table_merges::{
+    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
 };
 pub use slide_table_name::{
     SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,

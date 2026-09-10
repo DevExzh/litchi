@@ -883,9 +883,14 @@ impl FormulaVisitor for () {}
 /// Numbers uses the four 32-bit words of `TSP.CFUUIDArchive` for table
 /// references.  The words remain optional because native archives may carry
 /// only an opaque/partial CFUUID; callers can use [`Self::is_complete`] before
-/// looking the value up in their owner map.
+/// looking the value up in their owner map.  [`Self::has_uuid_bytes`] retains
+/// the presence of the optional raw UUID field even when that field is empty;
+/// strict consumers can therefore distinguish the generated default shape
+/// from a wire archive that carries contradictory or opaque UUID bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormulaRenderCfuuid {
+    /// Whether the optional `CFUUIDArchive.uuid_bytes` field was present.
+    pub has_uuid_bytes: bool,
     pub word0: Option<u32>,
     pub word1: Option<u32>,
     pub word2: Option<u32>,
@@ -4516,17 +4521,22 @@ fn parse_render_cross_extra(
 ) -> Result<FormulaRenderCrossTableExtra, DecodeError> {
     budget.message(source, depth)?;
     let mut table = None;
-    let mut seen = [false; 2];
+    let mut seen = [false; 6];
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
-        if field.number != 1 {
-            if budget.options.allow_opaque_unknown_fields {
-                continue;
-            }
-            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        match field.number {
+            1 => {
+                singular(&mut seen, 1)?;
+                table = Some(parse_render_cfuuid(field.bytes()?, budget, depth + 1)?);
+            },
+            2..=5 => {
+                singular(&mut seen, field.number as usize)?;
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+            },
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
         }
-        singular(&mut seen, 1)?;
-        table = Some(parse_render_cfuuid(field.bytes()?, budget, depth + 1)?);
     }
     Ok(FormulaRenderCrossTableExtra {
         table_id: required(table)?,
@@ -4540,25 +4550,26 @@ fn parse_render_cfuuid(
 ) -> Result<FormulaRenderCfuuid, DecodeError> {
     budget.message(source, depth)?;
     let mut words = [None; 4];
+    let mut has_uuid_bytes = false;
     let mut seen = [false; 6];
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
-        if !(1..=5).contains(&field.number) {
-            if budget.options.allow_opaque_unknown_fields {
-                continue;
-            }
-            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
-        }
-        singular(&mut seen, field.number as usize)?;
         match field.number {
             1 => {
+                singular(&mut seen, 1)?;
                 let _ = field.bytes()?;
+                has_uuid_bytes = true;
             },
-            2..=5 => words[field.number as usize - 2] = Some(field.varint_u32()?),
-            _ => unreachable!(),
+            2..=5 => {
+                singular(&mut seen, field.number as usize)?;
+                words[field.number as usize - 2] = Some(field.varint_u32()?);
+            },
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
         }
     }
     Ok(FormulaRenderCfuuid {
+        has_uuid_bytes,
         word0: words[0],
         word1: words[1],
         word2: words[2],

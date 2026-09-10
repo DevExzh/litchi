@@ -68812,6 +68812,192 @@ NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_FIELD = re.compile(
     r"[ \t\r\n]*::[ \t\r\n]*model[ \t\r\n]*::[ \t\r\n]*Table\b"
 )
 
+# Merged-cell geometry is a neutral table concern.  Keep the checker focused
+# on the public declaration/import seam so the common owner can change its
+# private representation without turning the ratchet into a body snapshot.
+IWA_COMMON_TABLE_MERGE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "merge.rs"
+IWA_COMMON_TABLE_MERGE_REQUIRED_TYPES = frozenset(
+    {"AnchorRelocation", "Axis", "Deletion", "Error", "Region", "Result"}
+)
+IWA_COMMON_TABLE_MERGE_REQUIRED_FUNCTIONS = frozenset(
+    {"after_deletion", "after_insertion", "anchor_relocation_after_deletion"}
+)
+IWA_COMMON_TABLE_MERGE_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    + "|".join(
+        re.escape(name)
+        for name in (
+            "litchi_iwa",
+            "litchi_iwa_archive",
+            "litchi_iwa_core",
+            "litchi_iwa_protos",
+            "litchi_numbers",
+            "litchi_pages",
+            "litchi_keynote",
+            "buffa",
+            "prost",
+            "prost_types",
+            "archive",
+            "protobuf",
+            "proto",
+            "wire",
+        )
+    )
+    + r")(?![A-Za-z0-9_])"
+)
+IWA_COMMON_TABLE_MERGE_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?merge\b"
+)
+IWA_COMMON_TABLE_MERGE_REEXPORT = re.compile(
+    r"(?ms)^[ \t]*pub[ \t\r\n]+use[ \t\r\n]+"
+    r"litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table"
+    r"[ \t\r\n]*::[ \t\r\n]*merge\b.*?;"
+)
+IWA_COMMON_TABLE_MERGE_LOCAL_DECLARATION = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+    r"(?:struct|enum|union|type)[ \t]+(?:r#)?"
+    r"(?:AnchorRelocation|Axis|Deletion|Region)\b"
+)
+IWA_COMMON_TABLE_MERGE_LOCAL_FUNCTION = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+(?:r#)?"
+    r"(?:after_deletion|after_insertion|anchor_relocation_after_deletion)\b"
+)
+
+# Native merge formulas are decoded once by the low-level Numbers wire crate.
+# The wire owner may depend on generated schema definitions, but focused
+# format facades must consume this semantic report instead of exposing a
+# generated AST or recreating the merge walk.
+IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/table_merges.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_REQUIRED_TYPES = frozenset(
+    {"AttemptedCost", "MergeRead", "MergeReadError", "ReadLimits", "ReadReport"}
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_REQUIRED_FUNCTIONS = frozenset(
+    {"read_table_merges"}
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_merges\b"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_COMMON_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_WIRE_LIMITS = re.compile(r"\bWireLimits\b")
+IWA_NUMBERS_WIRE_TABLE_MERGES_REGION = re.compile(r"\bRegion\b")
+IWA_NUMBERS_WIRE_TABLE_MERGES_FORMAT_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"litchi_numbers|litchi_pages|litchi_keynote|litchi_iwa"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_LOCAL_DECLARATIONS = (
+    (
+        "ReadLimits",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+(?:r#)?ReadLimits\b"
+        ),
+    ),
+    (
+        "ReadReport",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+(?:r#)?ReadReport\b"
+        ),
+    ),
+    (
+        "MergeRead",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+(?:r#)?MergeRead\b"
+        ),
+    ),
+    (
+        "AttemptedCost",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+(?:r#)?AttemptedCost\b"
+        ),
+    ),
+    (
+        "MergeReadError",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+            r"(?:struct|enum|union|type)[ \t]+(?:r#)?MergeReadError\b"
+        ),
+    ),
+)
+IWA_NUMBERS_WIRE_TABLE_MERGES_LOCAL_FUNCTIONS = (
+    (
+        "read_table_merges",
+        re.compile(
+            r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+            r"(?:r#)?read_table_merges\b"
+        ),
+    ),
+)
+IWA_FOCUSED_TABLE_MERGES_WIRE_IMPORT = re.compile(
+    r"\blitchi_numbers_wire[ \t\r\n]*::[ \t\r\n]*table_merges\b"
+)
+IWA_FOCUSED_TABLE_MERGES_COMMON_IMPORT = re.compile(
+    r"(?:\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*(?:"
+    r"table[ \t\r\n]*::[ \t\r\n]*merge\b|"
+    r"\{[^{};]*\btable[ \t\r\n]*::[ \t\r\n]*merge\b"
+    r")|\bcrate[ \t\r\n]*::[ \t\r\n]*table[ \t\r\n]*::"
+    r"[ \t\r\n]*merge\b)"
+)
+IWA_FOCUSED_TABLE_MERGES_GENERATED_AST = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"FormulaArchive|AstNodeArchive|AstNodeType|MergeRegionMapArchive|"
+    r"numbers_formula_codec|litchi_iwa_protos|prost::Message|"
+    r"prost_types::"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_FOCUSED_TABLE_MERGES_RAW_ID_PARAMETER = re.compile(
+    r"\b(?:table|model|drawable|object|native|slide|sheet)?"
+    r"_?(?:id|identifier)\b[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
+)
+IWA_FOCUSED_TABLE_MERGES_API_METHODS = (
+    "body_table_merges",
+    "slide_table_merges",
+)
+PAGES_TABLE_MERGE_SOURCE = Path(
+    "crates/litchi-pages/src/package/body_table_merges.rs"
+)
+KEYNOTE_TABLE_MERGE_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_table_merges.rs"
+)
+PAGES_TABLE_MERGE_PACKAGE_SOURCE = Path("crates/litchi-pages/src/package.rs")
+KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE = Path("crates/litchi-keynote/src/package.rs")
+PAGES_TABLE_MERGE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?body_table_merges\b[ \t]*(?:;|\{)"
+)
+KEYNOTE_TABLE_MERGE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?slide_table_merges\b[ \t]*(?:;|\{)"
+)
+PAGES_TABLE_MERGE_COMMON_TABLE_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?merge\b"
+)
+KEYNOTE_TABLE_MERGE_COMMON_TABLE_MODULE = PAGES_TABLE_MERGE_COMMON_TABLE_MODULE
+PAGES_TABLE_MERGE_FOCUSED_CALL = re.compile(
+    r"\b(?:read_table_merges|table_merges::[ \t\r\n]*read_table_merges)\b"
+)
+KEYNOTE_TABLE_MERGE_FOCUSED_CALL = PAGES_TABLE_MERGE_FOCUSED_CALL
+PAGES_TABLE_MERGE_PUBLIC_METHOD = "body_table_merges"
+KEYNOTE_TABLE_MERGE_PUBLIC_METHOD = "slide_table_merges"
+PAGES_TABLE_MERGE_SELECTOR_TYPES = frozenset({"BodyTableSelector"})
+KEYNOTE_TABLE_MERGE_SELECTOR_TYPES = frozenset({"SlideSelector", "TableSelector"})
+PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"litchi_iwa_protos|litchi_iwa|prost|buffa|"
+    r"litchi_numbers|litchi_keynote|FormulaArchive|AstNodeArchive|AstNodeType|"
+    r"MergeRegionMapArchive"
+    r")(?![A-Za-z0-9_])"
+)
+KEYNOTE_TABLE_MERGE_FORBIDDEN_MODULES = PAGES_TABLE_MERGE_FORBIDDEN_MODULES
+
 
 def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the cell-border value in common and the old path compatibility-only."""
@@ -69037,6 +69223,528 @@ def audit_neutral_table_model_source_topology(root: Path = ROOT) -> list[str]:
 
     return sorted(set(violations))
 
+
+def audit_iwa_common_table_merge_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep merged-cell geometry neutral and singular.
+
+    The common table module owns checked coordinate geometry and its pure
+    topology transforms. Numbers keeps only an import-path compatibility
+    re-export while Pages and Keynote adapters consume the same owner. This
+    audit is dormant until the owner or a focused merge adapter exists, so a
+    staged source deletion does not become a false failure during monolith
+    retirement.
+    """
+
+    common_path = root / IWA_COMMON_TABLE_MERGE_SOURCE
+    module_path = root / NEUTRAL_TABLE_MODULE_SOURCE
+    numbers_path = root / Path("crates/litchi-numbers/src/table/merge.rs")
+    focused_paths = (
+        root / Path("crates/litchi-pages/src/package/body_table_merges.rs"),
+        root / Path("crates/litchi-keynote/src/package/slide_table_merges.rs"),
+    )
+    if not common_path.is_file() and not any(
+        path.is_file() for path in (numbers_path, *focused_paths)
+    ):
+        return []
+
+    violations: list[str] = []
+    if not common_path.is_file():
+        violations.append(
+            "common merged-cell geometry owner is missing: "
+            f"{IWA_COMMON_TABLE_MERGE_SOURCE}"
+        )
+        return violations
+
+    common_raw = common_path.read_text(encoding="utf-8")
+    common_code = _mask_rust_non_code(_mask_rust_cfg_test_items(common_raw))
+    if not module_path.is_file():
+        violations.append(
+            "common table module is missing its merge export: "
+            f"{NEUTRAL_TABLE_MODULE_SOURCE}"
+        )
+    else:
+        module_code = _mask_rust_non_code(module_path.read_text(encoding="utf-8"))
+        if IWA_COMMON_TABLE_MERGE_MODULE.search(module_code) is None:
+            violations.append(
+                "common table module is missing public merge module: "
+                f"{NEUTRAL_TABLE_MODULE_SOURCE}"
+            )
+
+    for name in sorted(IWA_COMMON_TABLE_MERGE_REQUIRED_TYPES):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(common_code) is None:
+            violations.append(
+                "common merged-cell geometry owner is missing public "
+                f"{name}: {IWA_COMMON_TABLE_MERGE_SOURCE}"
+            )
+    for name in sorted(IWA_COMMON_TABLE_MERGE_REQUIRED_FUNCTIONS):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(common_code) is None:
+            violations.append(
+                "common merged-cell geometry owner is missing public "
+                f"{name}: {IWA_COMMON_TABLE_MERGE_SOURCE}"
+            )
+
+    import_statement = re.compile(
+        r"(?ms)^[ \t]*(?:pub[ \t]+)?(?:use|extern[ \t]+crate)\b.*?;"
+    )
+    for statement in import_statement.finditer(common_code):
+        match = IWA_COMMON_TABLE_MERGE_FORBIDDEN_IMPORT.search(statement.group(0))
+        if match is None:
+            continue
+        line_number = common_code.count("\n", 0, statement.start() + match.start()) + 1
+        violations.append(
+            "common merged-cell geometry imports a format/archive/wire owner "
+            f"{match.group(0)}: {IWA_COMMON_TABLE_MERGE_SOURCE}:{line_number}"
+        )
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(common_raw)
+    ):
+        if RUST_BYTE_SLICE.search(declaration) is None:
+            continue
+        violations.append(
+            "common merged-cell geometry exposes raw bytes: "
+            f"{IWA_COMMON_TABLE_MERGE_SOURCE}:{line_number}"
+        )
+
+    if numbers_path.is_file():
+        numbers_raw = numbers_path.read_text(encoding="utf-8")
+        numbers_code = _mask_rust_non_code(_mask_rust_cfg_test_items(numbers_raw))
+        if IWA_COMMON_TABLE_MERGE_REEXPORT.search(numbers_code) is None:
+            violations.append(
+                "Numbers merged-cell geometry compatibility module must re-export "
+                f"the common owner: {numbers_path.relative_to(root)}"
+            )
+        for pattern, label in (
+            (IWA_COMMON_TABLE_MERGE_LOCAL_DECLARATION, "type"),
+            (IWA_COMMON_TABLE_MERGE_LOCAL_FUNCTION, "function"),
+        ):
+            for match in pattern.finditer(numbers_code):
+                line_number = numbers_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "Numbers merged-cell geometry compatibility module redeclares "
+                    f"common {label}: {numbers_path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_wire_table_merges_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep native table-merge decoding in one bounded wire owner.
+
+    ``litchi-numbers-wire`` is allowed to inspect the generated Numbers schema
+    because it is the immediate low-level adapter.  Its exported result is a
+    compact semantic report over common ``Region`` values.  Format packages
+    must call this report and keep package identity, selectors, and typed
+    error mapping at their own boundary.
+    """
+
+    owner_path = root / IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE
+    focused_paths = (
+        root / Path("crates/litchi-pages/src/package/body_table_merges.rs"),
+        root / Path("crates/litchi-keynote/src/package/slide_table_merges.rs"),
+    )
+    if not owner_path.is_file() and not any(path.is_file() for path in focused_paths):
+        return []
+
+    violations: list[str] = []
+    if not owner_path.is_file():
+        violations.append(
+            "Numbers wire table-merge owner is missing: "
+            f"{IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+        )
+        return violations
+
+    raw_source = owner_path.read_text(encoding="utf-8")
+    code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+    library_path = root / Path("crates/litchi-numbers-wire/src/lib.rs")
+    if not library_path.is_file():
+        violations.append(
+            "Numbers wire table-merge owner is missing its crate export: "
+            "crates/litchi-numbers-wire/src/lib.rs"
+        )
+    else:
+        library_code = _mask_rust_non_code(library_path.read_text(encoding="utf-8"))
+        if IWA_NUMBERS_WIRE_TABLE_MERGES_MODULE.search(library_code) is None:
+            violations.append(
+                "Numbers wire table-merge owner is missing public table_merges module: "
+                "crates/litchi-numbers-wire/src/lib.rs"
+            )
+
+    for name in sorted(IWA_NUMBERS_WIRE_TABLE_MERGES_REQUIRED_TYPES):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|union|type)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                "Numbers wire table-merge owner is missing public "
+                f"{name}: {IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+            )
+    for name in sorted(IWA_NUMBERS_WIRE_TABLE_MERGES_REQUIRED_FUNCTIONS):
+        declaration = re.compile(
+            r"(?m)^[ \t]*pub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b"
+        )
+        if declaration.search(code) is None:
+            violations.append(
+                "Numbers wire table-merge owner is missing public "
+                f"{name}: {IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+            )
+
+    for name, declaration in IWA_NUMBERS_WIRE_TABLE_MERGES_LOCAL_DECLARATIONS:
+        if len(declaration.findall(code)) > 1:
+            violations.append(
+                "Numbers wire table-merge owner redeclares shared type "
+                f"{name}: {IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+            )
+    for name, declaration in IWA_NUMBERS_WIRE_TABLE_MERGES_LOCAL_FUNCTIONS:
+        if len(declaration.findall(code)) > 1:
+            violations.append(
+                "Numbers wire table-merge owner redeclares shared function "
+                f"{name}: {IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+            )
+
+    if IWA_NUMBERS_WIRE_TABLE_MERGES_COMMON_IMPORT.search(code) is None:
+        violations.append(
+            "Numbers wire table-merge owner is missing its common import: "
+            f"{IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_TABLE_MERGES_WIRE_LIMITS.search(code) is None:
+        violations.append(
+            "Numbers wire table-merge owner is missing bounded WireLimits: "
+            f"{IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+        )
+    if IWA_NUMBERS_WIRE_TABLE_MERGES_REGION.search(code) is None:
+        violations.append(
+            "Numbers wire table-merge owner is missing common Region values: "
+            f"{IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}"
+        )
+
+    for match in IWA_NUMBERS_WIRE_TABLE_MERGES_FORMAT_IMPORT.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "Numbers wire table-merge owner imports a concrete format owner "
+            f"{match.group(0)}: {IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
+def _rust_public_method_bodies(
+    source: str, method_name: str
+) -> list[tuple[str, str, int]]:
+    """Return declarations and bodies for one public ``impl Package`` method."""
+
+    masked_source = _mask_rust_cfg_test_items(source)
+    code = _mask_rust_non_code(masked_source)
+    methods = _rust_public_methods_in_impl(masked_source, "Package")
+    if not methods:
+        return []
+
+    method_pattern = re.compile(
+        r"(?m)^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+"
+        r"(?:(?:unsafe|async|const)[ \t\r\n]+)*fn[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(method_name)}\b"
+    )
+    expected_lines = {line for name, _declaration, line in methods if name == method_name}
+    evidence: list[tuple[str, str, int]] = []
+    for match in method_pattern.finditer(code):
+        line_number = source.count("\n", 0, match.start()) + 1
+        if line_number not in expected_lines:
+            continue
+        cursor = match.end()
+        parentheses = 0
+        brackets = 0
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif not parentheses and not brackets and character in "{;":
+                break
+            cursor += 1
+        if cursor >= len(code) or code[cursor] != "{":
+            continue
+        end = _rust_balanced_delimited_end(code, cursor)
+        if end is None:
+            continue
+        evidence.append((code[match.start() : cursor], code[match.start() : end], line_number))
+    return evidence
+
+
+def _audit_focused_table_merge_source_topology(
+    root: Path,
+    *,
+    format_name: str,
+    owner_path: Path,
+    package_path: Path,
+    module_pattern: re.Pattern[str],
+    table_module_path: Path,
+    table_merge_path: Path,
+    table_module_pattern: re.Pattern[str],
+    public_method: str,
+    selector_types: frozenset[str],
+) -> list[str]:
+    """Protect a selector-first focused Pages/Keynote merged-cell reader."""
+
+    owner_absolute = root / owner_path
+    package_absolute = root / package_path
+    package_source = (
+        package_absolute.read_text(encoding="utf-8")
+        if package_absolute.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(_mask_rust_cfg_test_items(package_source))
+    module_match = module_pattern.search(package_code)
+
+    implementation_sources: list[tuple[Path, str]] = []
+    if package_absolute.is_file():
+        implementation_sources.append((package_path, package_source))
+    package_directory = package_absolute.parent / package_absolute.stem
+    if package_directory.is_dir():
+        implementation_sources.extend(
+            (path.relative_to(root), path.read_text(encoding="utf-8"))
+            for path in sorted(package_directory.glob("*.rs"))
+        )
+    method_evidence = [
+        (path, declaration, body, line)
+        for path, source in implementation_sources
+        for declaration, body, line in _rust_public_method_bodies(source, public_method)
+    ]
+
+    # Keep the audit dormant while an entire focused API is absent. A package
+    # module declaration is itself an intentional source-topology claim, so a
+    # half-removed owner still reports a useful failure.
+    if not owner_absolute.is_file() and module_match is None and not method_evidence:
+        return []
+
+    violations: list[str] = []
+    if not owner_absolute.is_file():
+        violations.append(
+            f"{format_name} table-merge focused owner is missing: {owner_path}"
+        )
+    elif module_match is None:
+        violations.append(
+            f"{format_name} table-merge package is missing its focused module: "
+            f"{package_path}"
+        )
+    elif re.search(
+        rf"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?"
+        rf"{re.escape(public_method.removesuffix('_merges'))}_merges\b",
+        package_code,
+    ):
+        # The exact module patterns below are intentionally private or
+        # ``pub(crate)``. A public module would expose the physical adapter.
+        violations.append(
+            f"{format_name} table-merge focused module must remain private: "
+            f"{package_path}"
+        )
+
+    focused_source = (
+        owner_absolute.read_text(encoding="utf-8")
+        if owner_absolute.is_file()
+        else package_source
+    )
+    focused_raw = focused_source
+    focused_code = _mask_rust_non_code(_mask_rust_cfg_test_items(focused_source))
+    relative_owner = owner_path if owner_absolute.is_file() else package_path
+
+    if IWA_FOCUSED_TABLE_MERGES_WIRE_IMPORT.search(focused_code) is None:
+        violations.append(
+            f"{format_name} table-merge focused owner must consume numbers-wire "
+            f"table_merges: {relative_owner}"
+        )
+    if IWA_FOCUSED_TABLE_MERGES_COMMON_IMPORT.search(focused_code) is None:
+        violations.append(
+            f"{format_name} table-merge focused owner must import common merge "
+            f"geometry: {relative_owner}"
+        )
+    if PAGES_TABLE_MERGE_FOCUSED_CALL.search(focused_code) is None:
+        violations.append(
+            f"{format_name} table-merge focused owner must call the shared reader: "
+            f"{relative_owner}"
+        )
+
+    for pattern, label in (
+        (PAGES_TABLE_MERGE_FORBIDDEN_MODULES, "format/archive or generated AST import"),
+        (IWA_FOCUSED_TABLE_MERGES_GENERATED_AST, "generated AST projection"),
+    ):
+        for match in pattern.finditer(focused_code):
+            line_number = focused_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"{format_name} table-merge focused owner contains {label} "
+                f"{match.group(0)}: {relative_owner}:{line_number}"
+            )
+
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(focused_raw)
+    ):
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                f"{format_name} table-merge focused owner exposes raw bytes: "
+                f"{relative_owner}:{line_number}"
+            )
+        raw_id = IWA_FOCUSED_TABLE_MERGES_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            violations.append(
+                f"{format_name} table-merge focused owner exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {relative_owner}:{line_number}"
+            )
+
+    duplicate_type = re.compile(
+        r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+        r"(?:struct|enum|union|type)[ \t]+(?:r#)?"
+        r"(?:Region|ReadLimits|ReadReport|MergeRead|MergeReadError|AttemptedCost)\b"
+    )
+    duplicate_function = re.compile(
+        r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+        r"(?:r#)?read_table_merges\b"
+    )
+    for pattern, label in (
+        (duplicate_type, "semantic type"),
+        (duplicate_function, "wire reader"),
+    ):
+        for match in pattern.finditer(focused_code):
+            line_number = focused_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"{format_name} table-merge focused owner redeclares a shared {label}: "
+                f"{relative_owner}:{line_number}"
+            )
+
+    if owner_absolute.is_file():
+        table_module_absolute = root / table_module_path
+        table_merge_absolute = root / table_merge_path
+        if not table_module_absolute.is_file():
+            violations.append(
+                f"{format_name} table semantic module is missing its merge export: "
+                f"{table_module_path}"
+            )
+        else:
+            table_module_source = table_module_absolute.read_text(encoding="utf-8")
+            table_module_code = _mask_rust_non_code(table_module_source)
+            if table_module_pattern.search(table_module_code) is None:
+                violations.append(
+                    f"{format_name} table semantic module is missing public merge "
+                    f"module: {table_module_path}"
+                )
+        if not table_merge_absolute.is_file():
+            violations.append(
+                f"{format_name} table semantic merge wrapper is missing: "
+                f"{table_merge_path}"
+            )
+        else:
+            table_merge_source = table_merge_absolute.read_text(encoding="utf-8")
+            table_merge_code = _mask_rust_non_code(table_merge_source)
+            wrapper_code = table_merge_code
+            if table_module_absolute.is_file():
+                wrapper_code += "\n" + _mask_rust_non_code(
+                    table_module_absolute.read_text(encoding="utf-8")
+                )
+            if IWA_FOCUSED_TABLE_MERGES_COMMON_IMPORT.search(wrapper_code) is None:
+                violations.append(
+                    f"{format_name} table semantic merge wrapper must re-export "
+                    f"common geometry: {table_merge_path}"
+                )
+            for pattern, label in (
+                (PAGES_TABLE_MERGE_FORBIDDEN_MODULES, "forbidden physical import"),
+                (IWA_FOCUSED_TABLE_MERGES_GENERATED_AST, "generated AST projection"),
+            ):
+                for match in pattern.finditer(table_merge_code):
+                    line_number = table_merge_code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        f"{format_name} table semantic merge wrapper contains "
+                        f"{label} {match.group(0)}: {table_merge_path}:{line_number}"
+                    )
+
+    if not method_evidence:
+        violations.append(
+            f"{format_name} table-merge focused owner is missing public "
+            f"Package::{public_method}: {owner_path}"
+        )
+    else:
+        for path, declaration, body, line_number in method_evidence:
+            if re.search(r"\bRegion\b", declaration) is None:
+                violations.append(
+                    f"{format_name} Package::{public_method} must return common Region "
+                    f"values: {path}:{line_number}"
+                )
+            missing_selectors = sorted(
+                selector
+                for selector in selector_types
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None
+            )
+            for selector in missing_selectors:
+                violations.append(
+                    f"{format_name} Package::{public_method} must resolve typed "
+                    f"{selector}: {path}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration) is not None:
+                violations.append(
+                    f"{format_name} Package::{public_method} exposes raw bytes: "
+                    f"{path}:{line_number}"
+                )
+            raw_id = IWA_FOCUSED_TABLE_MERGES_RAW_ID_PARAMETER.search(declaration)
+            if raw_id is not None:
+                violations.append(
+                    f"{format_name} Package::{public_method} exposes a raw ID parameter "
+                    f"{raw_id.group(0).strip()}: {path}:{line_number}"
+                )
+            generated = IWA_FOCUSED_TABLE_MERGES_GENERATED_AST.search(body)
+            if generated is not None:
+                violations.append(
+                    f"{format_name} Package::{public_method} contains a generated AST "
+                    f"projection {generated.group(0)}: {path}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_merge_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Pages merged-cell reads selector-first and archive-free."""
+
+    return _audit_focused_table_merge_source_topology(
+        root,
+        format_name="Pages",
+        owner_path=PAGES_TABLE_MERGE_SOURCE,
+        package_path=PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+        module_pattern=PAGES_TABLE_MERGE_MODULE,
+        table_module_path=Path("crates/litchi-pages/src/table/mod.rs"),
+        table_merge_path=Path("crates/litchi-pages/src/table/merge.rs"),
+        table_module_pattern=PAGES_TABLE_MERGE_COMMON_TABLE_MODULE,
+        public_method=PAGES_TABLE_MERGE_PUBLIC_METHOD,
+        selector_types=PAGES_TABLE_MERGE_SELECTOR_TYPES,
+    )
+
+
+def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Keynote merged-cell reads selector-first and archive-free."""
+
+    return _audit_focused_table_merge_source_topology(
+        root,
+        format_name="Keynote",
+        owner_path=KEYNOTE_TABLE_MERGE_SOURCE,
+        package_path=KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+        module_pattern=KEYNOTE_TABLE_MERGE_MODULE,
+        table_module_path=Path("crates/litchi-keynote/src/slide/table.rs"),
+        table_merge_path=Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+        table_module_pattern=KEYNOTE_TABLE_MERGE_COMMON_TABLE_MODULE,
+        public_method=KEYNOTE_TABLE_MERGE_PUBLIC_METHOD,
+        selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
+    )
 
 
 def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
@@ -69558,6 +70266,10 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_section_background_facade_source_topology()
         + audit_iwa_table_cell_borders_source_topology()
         + audit_neutral_table_model_source_topology()
+        + audit_iwa_common_table_merge_source_topology()
+        + audit_iwa_numbers_wire_table_merges_source_topology()
+        + audit_pages_table_merge_source_topology()
+        + audit_keynote_table_merge_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

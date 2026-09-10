@@ -1,0 +1,27 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "body-table-merges-native.pages",
+  "size": 139093,
+  "sha256": "6d6b5434f048897b05cda19ef8df735e3fe476c38b75e7993955f646d6b50e61",
+  "source": "body-table-cells-native.pages",
+  "table": "Table 1",
+  "table_rows": 5,
+  "table_columns": 4,
+  "merged_range": "C4:D4",
+  "zero_based_region": {
+    "row": 3,
+    "column": 2,
+    "rows": 1,
+    "columns": 2
+  },
+  "lifecycle": [
+    "Copied the existing table control to a disposable directory.",
+    "Selected blank cells in the native application and used Format > Table > Merge Cells.",
+    "Saved and closed the document.",
+    "Reopened the exact saved path with Open Finder item and verified the merged rectangle visually.",
+    "Closed the verified document."
+  ],
+  "scope": "Native merged-cell readback control; accessibility span-count text was inconsistent, so selected coordinates and the visible merged rectangle establish native verification. Synthetic tests cover wire corruption, overlap, identity, and limits."
+}

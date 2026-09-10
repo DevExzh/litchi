@@ -18,6 +18,9 @@ pub mod formula_envelope;
 /// Shared generated-free Numbers formula event renderer.
 pub mod formula_render;
 
+/// Shared bounded reader for native table merge formulas.
+pub mod table_merges;
+
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
 

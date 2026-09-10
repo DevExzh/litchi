@@ -397,6 +397,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "table_merges"
+path = "fuzz_targets/table_merges.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }

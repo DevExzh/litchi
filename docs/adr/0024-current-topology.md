@@ -4472,3 +4472,16 @@ Concrete readers retain the owned formula bytes, package budget mutation,
 format-specific error mapping, and decode-at-use policy. The shared scan
 returns costs for successful and failed attempts; this boundary does not
 retire the remaining Pages/Keynote host table-reader dependencies.
+
+## 2026-09-10 Focused merged-cell readback
+
+Archive-free merge geometry and its topology algebra now belong to
+`litchi-iwa-common::table::merge`; Numbers retains its existing public paths
+through compatibility reexports. Pages and Keynote expose the same checked
+geometry through their format-owned semantic table APIs.
+
+`litchi-numbers-wire::table_merges` owns bounded native merge-store readback.
+The format adapters prove table ownership and supply their remaining read
+budgets. The host merge read path also uses the shared decoder, while its
+existing mutation code remains until focused write parity is complete.
+The broader host table-value/comment reader dependencies remain tracked.
