@@ -143,6 +143,7 @@ litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
 litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }
 litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
 litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
+litchi-xldm         = { version = "0.0.1", path = "crates/litchi-xldm" }
 litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"

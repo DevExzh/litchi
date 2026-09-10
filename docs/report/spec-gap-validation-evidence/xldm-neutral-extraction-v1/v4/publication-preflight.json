@@ -1,0 +1,324 @@
+[
+  {
+    "path": "Cargo.toml",
+    "primary_sha256": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "candidate_sha256": "650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/Cargo.toml",
+    "primary_sha256": null,
+    "candidate_sha256": "4ae553d9fa4724d524d63a8760295327976a2c2f71bd40bc5538f9b7db957b9d",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/codec.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "8a579df7e84342012c3a494750909c2687a4608db2558364d29fe5e05c00cce6",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/compression.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "d70f54ab8f83190120a4012c9df0f2fa39ba2287d497b06eba781693f096a387",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/compression/xpress_stream.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "28a17e3b085d0a44a62171070e62002fe13651ebd1a9d8c6f822fb3caad2e4b4",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/crypt.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "8c3d1e5e4cdf6a062b363f3ae857e69b45d39335dbddf3a7376bfccdf1b47322",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/error.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "0168baf4e2c2ff94d04735da6baf823b72e7a317e9e82f33e4ed00e0ccaa5b8c",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/generated.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/lib.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "4977cf04f1fa30c973ae1d4a5699f93387db392bcc80e897aae79dc4584660cb",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/metadata/codec.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/metadata/mod.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "e74d663d315382602a77fa0193107101857076418d20ae101bba068b23528e59",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/metadata/model.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "f8a6464e86c19a689cd415411846a45ae1fbbf71e3eb7153cccaca90709839f4",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/metadata/tests.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "22c7131e171b04704daf94f4463102c016c4d8eeb88bff2ba3fe20bbd2aeb681",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/metadata/validation.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "5b3073e96a84b5cce7666efa39c80d235eb19d3cc378c1386ac307fdf17fb05b",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/model.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "a4cc83820321407bc417fb9f24d2b15c888614a72b448e9594dc9320c1586626",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/native.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/olap.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/semantic.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "7dcc83f633c0abb8f129af68acbfa35ce86667bcf1a0121c668b3928765f4adb",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/tabular_paths.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "a54233efad8b34cba55e9c21c85dea311bbd3c20debb9e6a2c39aaf1075a1244",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/tests.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "7ee96415ec8e9d2cabb14ff28146e70dc3fc5548a918e7b7298b499dab7724e5",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xldm/src/validation.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/Cargo.toml",
+    "primary_sha256": "d8139ad1d4abd39e3aa0a09c60fc7a70aa251ab026fa4f2e793b68228fcb3d9c",
+    "candidate_sha256": "8f3f5b6f05a744f35fd617171fbdcf81d102759dc37ef596f47587f0b5353a89",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package.rs",
+    "primary_sha256": "0266c10fcfecaf8848d540113d62b3a8863cfd5ab494c28352caca99026dba2a",
+    "candidate_sha256": "cf1a15d1fe57003b653aa66c26fb684d0c92c90231a165a9ed29a181f0cd8246",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/codec.rs",
+    "primary_sha256": "911227d46b9f4f687f9273e44e1eab1d77d187c4dc95b2ef2ba8120950feeee2",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/compression.rs",
+    "primary_sha256": "d70f54ab8f83190120a4012c9df0f2fa39ba2287d497b06eba781693f096a387",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/compression/xpress_stream.rs",
+    "primary_sha256": "28a17e3b085d0a44a62171070e62002fe13651ebd1a9d8c6f822fb3caad2e4b4",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/crypt.rs",
+    "primary_sha256": "8c3d1e5e4cdf6a062b363f3ae857e69b45d39335dbddf3a7376bfccdf1b47322",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/generated.rs",
+    "primary_sha256": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/metadata/codec.rs",
+    "primary_sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/metadata/mod.rs",
+    "primary_sha256": "e74d663d315382602a77fa0193107101857076418d20ae101bba068b23528e59",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/metadata/model.rs",
+    "primary_sha256": "f8a6464e86c19a689cd415411846a45ae1fbbf71e3eb7153cccaca90709839f4",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/metadata/tests.rs",
+    "primary_sha256": "22c7131e171b04704daf94f4463102c016c4d8eeb88bff2ba3fe20bbd2aeb681",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/metadata/validation.rs",
+    "primary_sha256": "5b3073e96a84b5cce7666efa39c80d235eb19d3cc378c1386ac307fdf17fb05b",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/mod.rs",
+    "primary_sha256": "d19580f4a093a2064e5a9543829d2a3394d6cbcb591dc8d0d0ff1ec96a9332bc",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/model.rs",
+    "primary_sha256": "dfb092adda9327ff25ab53e7fa06ba9db39acc14adab2aa6a9a2b41f14625630",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/native.rs",
+    "primary_sha256": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/olap.rs",
+    "primary_sha256": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/semantic.rs",
+    "primary_sha256": "7dcc83f633c0abb8f129af68acbfa35ce86667bcf1a0121c668b3928765f4adb",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/tabular_paths.rs",
+    "primary_sha256": "a54233efad8b34cba55e9c21c85dea311bbd3c20debb9e6a2c39aaf1075a1244",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/tests.rs",
+    "primary_sha256": "c9e8204b9373dee0db6a781770ab66c22a16e199af45157b375f003e24bb36cd",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm/validation.rs",
+    "primary_sha256": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502",
+    "candidate_sha256": null,
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/package/xldm_test_support.rs",
+    "primary_sha256": null,
+    "candidate_sha256": "70455e64dba5bf321b6a78ab4dd13da868e853efe1229a316c0a1e167e11dff1",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+    "primary_sha256": "0441a918cc8a98a76cd52873abe732e4cd84933152ce3c212e2f6eb06ff958d6",
+    "candidate_sha256": "9b99a601804a97d00402a53fdd6edc49375bdd77a6bd65fd692c10757529c189",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "crates/litchi-xlsx/tests/xldm_native_storage.rs",
+    "primary_sha256": "c39f42a3118697dbe59778fc18946903567f9fcd8b7fdd7a1e8ef7ab426e80e7",
+    "candidate_sha256": "185f308ae893434c9148ab3d571af60bf94d1ea240c202c41014de2c86904143",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "tools/native-resave/Cargo.lock",
+    "primary_sha256": "703cde346b1082700c0c0774b4fb9a7cb56af032e45936f8e3d835f32610e263",
+    "candidate_sha256": "ce814d44ac005c15e5fac5fac842c35a93c2424eff26eacf38a5aab55580211b",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  },
+  {
+    "path": "tools/perf-baseline/Cargo.lock",
+    "primary_sha256": "911d911aca4bb68988d5faa4e46c71e95dcdc3107a7aef042aa3e2fa2fe5477d",
+    "candidate_sha256": "3509994602d90b8f57f636b4728c5987b367a57b4c260077c151cc11ebfdfce8",
+    "primary_matches_head": true,
+    "primary_matches_candidate": false
+  }
+]

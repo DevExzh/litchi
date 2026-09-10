@@ -7,7 +7,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::{Reader, events::Event};
 
 use crate::error::{Error, Result};
-use crate::package::xldm::{StorageProfile, inspect};
+use crate::package::xldm::{StorageProfile, inspect as inspect_xldm};
 
 const NATIVE_MODEL_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData";
@@ -67,7 +67,7 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
     if part.blob().len() > MAX_PAYLOAD_BYTES {
         return Err(limit("payload bytes"));
     }
-    let profile = inspect(part.blob())?.profile();
+    let profile = inspect_xldm(part.blob())?.profile();
     if !part.rels().is_empty() {
         return Err(invalid(
             "Data Model part has forbidden outbound relationships",
@@ -324,7 +324,7 @@ fn validate_model_contents(
     if data.len() > MAX_PAYLOAD_BYTES {
         return Err(limit("payload bytes"));
     }
-    let profile = inspect(data)?.profile();
+    let profile = inspect_xldm(data)?.profile();
     validate_inbound_relationships(
         package,
         &PackURI::new(part_name).map_err(invalid)?,
@@ -1116,7 +1116,7 @@ mod tests {
     use super::super::codec::parse_data_model;
     use super::super::codec::parse_document;
     use super::*;
-    use crate::package::xldm::test_xldm_bytes;
+    use crate::package::xldm_test_support::test_xldm_bytes;
     use crate::workbook::data_model::{MAX_XML_BYTES, Payload, SML, X15};
     use litchi_opc::Part;
 
@@ -1269,7 +1269,7 @@ mod tests {
             .expect("test XLDM directory timestamp");
         let value_offset = offset + "<LastWriteTime>".encode_utf16().count() * 2;
         payload[value_offset] = b'1';
-        assert!(inspect(&payload).is_ok());
+        assert!(litchi_xldm::inspect(&payload).is_ok());
         payload
     }
 

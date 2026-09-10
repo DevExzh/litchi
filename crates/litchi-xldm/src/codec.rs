@@ -588,7 +588,7 @@ pub(super) fn crc32(bytes: &[u8]) -> u32 {
     crc
 }
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+    Error::Xml(error.to_string())
 }
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())

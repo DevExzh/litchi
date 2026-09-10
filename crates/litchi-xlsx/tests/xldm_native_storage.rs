@@ -116,3 +116,9 @@ fn native_outer_storage_is_borrowed_exact_and_checks_member_crcs() {
         );
     }
 }
+
+#[test]
+fn public_xldm_path_classifier_preserves_xlsx_error_type() {
+    let result = litchi_xlsx::package::xldm::classify_generated_path("../escape");
+    assert!(matches!(result, Err(litchi_xlsx::Error::Invalid(_))));
+}

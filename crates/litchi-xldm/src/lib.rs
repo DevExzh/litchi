@@ -7,6 +7,8 @@
 //! decrypted, evaluated, or used for I/O. The nested metadata owner is
 //! responsible for the typed section 2.5 model.
 
+mod error;
+
 pub mod compression;
 pub mod crypt;
 pub mod generated;
@@ -24,6 +26,7 @@ mod validation;
 mod tests;
 
 pub use codec::{inspect, write};
+pub use error::{Error, Result};
 pub use model::{
     BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
     GeneratedPath, Header, LoggedFile, Offset, PartitionMarker, Size, Storage, StorageProfile,
@@ -31,5 +34,11 @@ pub use model::{
 };
 pub use semantic::classify_generated_path;
 
-#[cfg(test)]
-pub(crate) use tests::test_xldm_bytes;
+/// Inspect a borrowed source buffer and retain it for all typed views.
+///
+/// This name makes the source-sharing lifetime explicit at call sites; it is
+/// equivalent to [`inspect`]. No member payload is copied by inspection.
+#[must_use = "inspection results carry the borrowed source lifetime"]
+pub fn inspect_shared(bytes: &[u8]) -> Result<Storage<'_>> {
+    inspect(bytes)
+}

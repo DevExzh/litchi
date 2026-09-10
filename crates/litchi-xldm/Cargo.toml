@@ -1,0 +1,17 @@
+[package]
+name = "litchi-xldm"
+description = "Bounded, source-sharing Spreadsheet Data Model storage codecs."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+memchr = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

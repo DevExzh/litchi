@@ -846,4 +846,52 @@ pub(crate) fn build_minimal_package() -> Result<OpcPackage> {
 }
 
 /// Inert analytical-model package resources.
-pub mod xldm;
+///
+/// The nested codecs live in the neutral [`litchi_xldm`] crate. The two
+/// package-level entry points retain the historical XLSX error type so code
+/// using `crate::package::xldm::inspect` continues to match [`crate::Error`].
+pub mod xldm {
+    pub use litchi_xldm::{
+        BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
+        GeneratedPath, Header, LoggedFile, Offset, PartitionMarker, Size, Storage, StorageProfile,
+        WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, XmlEncoding, compression, crypt,
+        generated, metadata, native, olap,
+    };
+
+    /// Classify a generated path while preserving the XLSX facade error type.
+    pub fn classify_generated_path(path: &str) -> crate::error::Result<GeneratedPath> {
+        litchi_xldm::classify_generated_path(path).map_err(super::map_xldm_error)
+    }
+
+    /// Inspect an XLDM stream while preserving the XLSX facade error type.
+    pub fn inspect(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
+        litchi_xldm::inspect(bytes).map_err(super::map_xldm_error)
+    }
+
+    /// Inspect a borrowed XLDM stream through the source-sharing API.
+    pub fn inspect_shared(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
+        litchi_xldm::inspect_shared(bytes).map_err(super::map_xldm_error)
+    }
+
+    /// Write an unchanged or explicitly edited XLDM storage snapshot.
+    pub fn write(storage: &Storage<'_>) -> crate::error::Result<Vec<u8>> {
+        litchi_xldm::write(storage).map_err(super::map_xldm_error)
+    }
+}
+
+fn map_xldm_error(error: litchi_xldm::Error) -> crate::error::Error {
+    match error {
+        litchi_xldm::Error::Invalid(message) => crate::error::Error::Invalid(message),
+        litchi_xldm::Error::Unsupported { feature } => crate::error::Error::Unsupported { feature },
+        litchi_xldm::Error::Allocation { resource, source } => {
+            crate::error::Error::Allocation { resource, source }
+        },
+        litchi_xldm::Error::Xml(message) => {
+            crate::error::Error::Xml(litchi_ooxml_common::XmlError::Malformed(message))
+        },
+        other => crate::error::Error::Invalid(other.to_string()),
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod xldm_test_support;

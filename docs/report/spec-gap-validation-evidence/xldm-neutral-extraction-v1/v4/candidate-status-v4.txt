@@ -1,0 +1,18 @@
+Neutral XLDM extraction freeze v4
+base=906be17c2408e863bb26f2faf8f79361809597e6
+worktree=/var/tmp/litchi-xldm-extraction-validation-20260910
+patch=/var/tmp/litchi-xldm-extraction-v4-20260910.patch
+patch_sha256=f5c2acf9099a708aeb14f42845b72809f388eac01b4c0f5798a3d4f18e4b6a9a
+source_manifest=/var/tmp/litchi-xldm-extraction-v4-source-manifest-20260910.json
+source_archive_sha256=92cddd61ddcf686d559713e2a91535ad5f3031fec533c6bd427ca14da1b5c67e
+source_hash_list_sha256=8bfb544a810e2885ec00aec679fcaa1f001b76a65e3c18f72ceae3d8d0222c4d
+
+Focused results:
+- litchi-xldm lib tests: 50 passed
+- XLSX xldm_native_storage: 3 passed
+- XLSX data_model_native: 23 passed
+- XLSX tests clippy: passed with -D warnings
+- litchi-xldm+litchi-xlsx rustdoc: passed with RUSTDOCFLAGS=-D warnings
+- standalone native-resave/perf-baseline locked checks: inherited from v3 unchanged
+
+No files staged or committed.
