@@ -1,0 +1,90 @@
+snapshot_kind=preparation_only
+2026-09-10T02:25:52+00:00
+pwd=/home/zhuhe/code/litchi-spec-gaps
+nproc=32
+online_cpus:
+0-31
+affinity_of_shell:
+pid 2959982's current affinity list: 0-31
+selected_runtime_cpu=2
+affinity_of_selected_shell:
+pid 2960031's current affinity list: 2
+loadavg:
+5.17 5.95 4.27 5/1282 2960033
+cpu_summary:
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC 9R45
+CPU family:                              26
+Model:                                   2
+Thread(s) per core:                      1
+Core(s) per socket:                      32
+Socket(s):                               1
+Stepping:                                1
+BogoMIPS:                                5200.00
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d
+Hypervisor vendor:                       KVM
+Virtualization type:                     full
+L1d cache:                               1.5 MiB (32 instances)
+L1i cache:                               1 MiB (32 instances)
+L2 cache:                                32 MiB (32 instances)
+L3 cache:                                128 MiB (4 instances)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-31
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+memory:
+MemTotal:       129447068 kB
+MemFree:         2711612 kB
+MemAvailable:   68532980 kB
+Buffers:         2880508 kB
+Cached:         106012344 kB
+top_processes_at_snapshot:
+    PID    PPID PSR %CPU %MEM STAT COMMAND
+2959868 2959408  10  100  0.6 Sl   rustdoc
+1416416  225771  21 99.9  0.0 Rs   git
+1416559  225771   0 99.9  0.0 Rs   git
+2936514 2930115   9 99.3  0.1 Sl   litchi_perf_bas
+2959982  225771  16 42.8  0.0 Ss   bash
+ 225771  192616  13  2.6  0.8 Sl+  codex
+2959408 2959382  15  1.2  0.0 Sl   cargo
+1511943  198235  25  1.1  0.0 Ssl+ lazygit
+ 227706  188364  29  0.8  0.5 Sl+  codex
+2882696  224533  14  0.7  0.1 Sl+  codex
+ 127282  127198  14  0.6  0.0 S    run-pipeline3
+2959730  227706  19  0.4  0.0 Ss   python3
+2959645  227706   1  0.4  0.0 Ss   python3
+2632040  252768   9  0.3  0.4 Sl+  kimi-code
+   5191       1   2  0.3  0.0 Ss   tmux: server
+1221149  395345  13  0.3  0.4 Sl+  kimi-code
+2896327       2  14  0.3  0.0 I    kworker/u130:1-events_unbound
+ 198235  198234  13  0.2  0.3 Ssl  nvim
+1309380 1309379   8  0.2  0.2 Ssl  nvim
+1490696 1490695  25  0.2  0.0 Ssl  nvim
+2959382  225771   4  0.2  0.0 Ss   bash
+2875657       2  31  0.1  0.0 I    kworker/u132:3-events_unbound
+2955310  127282  11  0.1  0.0 S    wget-at
+2955700       2   6  0.1  0.0 I    kworker/u129:0-events_unbound
+2878137       2  29  0.1  0.0 I    kworker/u132:1-events_unbound
+environment_selected:
+LC_ALL=C.UTF-8
+LC_CTYPE=C.UTF-8
+perf_event_paranoid:
+1
+rustc:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo:
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)

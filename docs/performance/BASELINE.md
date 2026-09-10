@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Historical full baseline publication (2026-09-10)
+
+The portable [full baseline publication](results/full-baseline-20260910/)
+records one descriptive control capture from historical source commit
+`1b3f2c2d`. It has 201 normal rows across 37 cases and 31 deterministic
+corpora, with zero normal filesystem rows, and a separate two-row `tmpfs`
+allocator smoke. The raw report remains immutable; its explicitly labelled
+derived report removes only 25 misaligned per-sample `operation_metrics`
+envelopes and leaves top-level elapsed timing and sink objects unchanged.
+
+The publication records the failed allocator V2 sidecar and the successful
+manual two-row V1-manifest rerun, the build-only lock overlay, exact commands,
+and host contention. `cold-requested` is not physical cache evidence. These
+artifacts are descriptive historical observations and make no causal,
+latency-improvement, scaling, native-producer, or production optimization
+claim. They do not represent the current feature HEAD.
+
 ## Current XLSX compaction allocation result (0469)
 
 [0469](changes/0469-xlsx-borrowed-compaction-events.md) removes temporary event
