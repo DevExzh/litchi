@@ -93,8 +93,8 @@ use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
 use metadata::{
     custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
-    generator, info, mail_merge, theme, user_property, window_caption, write_reservation,
-    xml_namespace, xsl_transform,
+    generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
+    write_reservation, xml_namespace, xsl_transform,
 };
 use model::{document, types};
 use numbering::{
@@ -111,8 +111,8 @@ use policy::{
     document_view, document_word_2003_compatibility, document_xml_policies,
 };
 use review::{
-    annotation, bookmark, editable_region, note_options, note_separator, protection_range,
-    protection_user, review_display, revision_save,
+    annotation, bookmark, editable_region, move_bookmark, note_options, note_separator,
+    protection_range, protection_user, review_display, revision_save,
 };
 use text::{
     border, character_positioning, document_default_formatting, hyphenation, kinsoku, language,
@@ -215,11 +215,11 @@ mod native {
         equation, error, external_reference, field, file_table, form_field, generated_list_marker,
         generator, hyphenation, info, kinsoku, language, latent_style, legacy_drawing,
         legacy_numbering, legacy_paragraph_numbering, legacy_text_box, limits, list, mail_merge,
-        math, math_properties, navigation_entry, note_options, note_separator, object, page_border,
-        paragraph_group, picture, picture_compatibility, protection_range, protection_user,
-        review_display, revision_save, section, shape, style_list_filter, stylesheet, table, theme,
-        types, user_property, window_caption, write_reservation, writer, xml_namespace,
-        xsl_transform,
+        math, math_properties, move_bookmark, navigation_entry, note_options, note_separator,
+        object, page_border, paragraph_group, picture, picture_compatibility, protection_range,
+        protection_user, review_display, revision_save, section, shape, smart_tag,
+        style_list_filter, stylesheet, table, theme, types, user_property, window_caption,
+        write_reservation, writer, xml_namespace, xsl_transform,
     };
 
     pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
@@ -376,6 +376,7 @@ mod native {
         DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
         MathJustification, MathLimitPlacement,
     };
+    pub use move_bookmark::{MoveBookmark, MoveBookmarkKind};
     pub use navigation_entry::{
         IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,
     };
@@ -427,6 +428,7 @@ mod native {
         ShapeRotationDegrees, ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType,
         ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
     };
+    pub use smart_tag::{SmartTag, SmartTagAttribute};
     pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
     pub use stylesheet::{Style, StyleSheet, StyleType, TableStyleConditionalFormatting};
     pub use table::{

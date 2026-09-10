@@ -1061,6 +1061,16 @@ enum Operation {
         before: String,
         after: String,
     },
+    SmartTag {
+        index: usize,
+        before: crate::SmartTag<'static>,
+        after: crate::SmartTag<'static>,
+    },
+    MoveBookmark {
+        index: usize,
+        before: crate::MoveBookmark<'static>,
+        after: crate::MoveBookmark<'static>,
+    },
     PicturePayload(picture_payload::StagedPicturePayload),
     PictureRemoval(picture_payload::StagedPictureRemoval),
     RootTransfer {
@@ -1108,6 +1118,14 @@ impl Operation {
             | Self::AnnotationText { after, .. }
             | Self::NoteText { after, .. }
             | Self::ShapeText { after, .. } => after.len(),
+            Self::SmartTag { after, .. } => after.name.len().saturating_add(
+                after
+                    .attributes
+                    .iter()
+                    .map(|attribute| attribute.name.len().saturating_add(attribute.value.len()))
+                    .sum(),
+            ),
+            Self::MoveBookmark { after, .. } => after.tag.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
             Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
@@ -1217,6 +1235,8 @@ impl Operation {
             Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
             Self::NoteText { index, .. } => vec![note_effect(*index)],
             Self::ShapeText { index, .. } => vec![shape_effect(*index)],
+            Self::SmartTag { index, .. } => vec![format!("body:smart-tag:{index}")],
+            Self::MoveBookmark { index, .. } => vec![format!("body:move-bookmark:{index}")],
             Self::PicturePayload(operation) => {
                 vec![format!("body:picture:{}:payload", operation.position)]
             },
@@ -1255,6 +1275,8 @@ impl Operation {
             | Self::AnnotationText { .. }
             | Self::NoteText { .. }
             | Self::ShapeText { .. }
+            | Self::SmartTag { .. }
+            | Self::MoveBookmark { .. }
             | Self::PicturePayload(_)
             | Self::PictureRemoval(_)
             | Self::RootTransfer { .. } => None,
@@ -1291,6 +1313,8 @@ impl Operation {
                 | Self::AnnotationText { .. }
                 | Self::NoteText { .. }
                 | Self::ShapeText { .. }
+                | Self::SmartTag { .. }
+                | Self::MoveBookmark { .. }
                 | Self::PicturePayload(_)
                 | Self::PictureRemoval(_)
                 | Self::RootTransfer { .. }
@@ -2907,6 +2931,9 @@ impl Edit {
                 let update = updates.next().ok_or(Error::UnsupportedSource(
                     "paragraph-layout selector cursor became inconsistent",
                 ))?;
+                if let Some(Some(frame)) = update.patch.frame {
+                    frame.validate()?
+                }
                 let fields = update.patch.fields();
                 if let Some(Some(frame)) = update.patch.frame {
                     frame.validate()?;
@@ -3150,6 +3177,95 @@ impl Edit {
         self.ensure_unique_destination(&effect)?;
         self.charge_replacement(after.len())?;
         self.operations.push(Operation::ShapeText {
+            index,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Stages replacement of one inert SmartTag/factoid metadata record.
+    ///
+    /// The factoid name, namespace, and attributes may change.  Its body
+    /// position and covered text must remain identical so source-bound story
+    /// offsets stay valid.  The operation is canonical-writer backed and
+    /// therefore refuses snapshots containing opaque destination syntax.
+    pub fn set_smart_tag(
+        &mut self,
+        index: usize,
+        value: crate::SmartTag<'_>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let before = self
+            .source
+            .smart_tags()
+            .get(index)
+            .ok_or(Error::DestinationOutOfRange("SmartTag"))?
+            .clone()
+            .into_owned();
+        let after = value.into_owned();
+        after.validate()?;
+        if before.position != after.position || before.content != after.content {
+            return Err(Error::UnsupportedSource(
+                "SmartTag edits cannot change the body range",
+            ));
+        }
+        let effect = format!("body:smart-tag:{index}");
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(
+            after
+                .name
+                .len()
+                .saturating_add(after.content.len())
+                .saturating_add(
+                    after
+                        .attributes
+                        .iter()
+                        .map(|attribute| attribute.name.len().saturating_add(attribute.value.len()))
+                        .sum::<usize>(),
+                ),
+        )?;
+        self.operations.push(Operation::SmartTag {
+            index,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Stages replacement of one inert tracked-move bookmark's revision
+    /// metadata.  Identity and body range stay source-bound; move execution is
+    /// never performed.
+    pub fn set_move_bookmark(
+        &mut self,
+        index: usize,
+        value: crate::MoveBookmark<'_>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let before = self
+            .source
+            .move_bookmarks()
+            .get(index)
+            .ok_or(Error::DestinationOutOfRange("move-bookmark"))?
+            .clone()
+            .into_owned();
+        let after = value.into_owned();
+        after.validate()?;
+        if before.kind != after.kind
+            || before.tag != after.tag
+            || before.position != after.position
+            || before.content != after.content
+        {
+            return Err(Error::UnsupportedSource(
+                "move-bookmark edits cannot change identity or body range",
+            ));
+        }
+        let effect = format!("body:move-bookmark:{index}");
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.tag.len().saturating_add(after.content.len()))?;
+        self.operations.push(Operation::MoveBookmark {
             index,
             before,
             after,
@@ -3620,6 +3736,8 @@ impl Edit {
                 | Operation::AnnotationText { .. }
                 | Operation::NoteText { .. }
                 | Operation::ShapeText { .. }
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_) => {
                     return Err(Error::BodyDestinationConflict);
@@ -4397,6 +4515,12 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::ShapeText { index, after, .. } => {
                 model.set_body_shape_text(*index, Cow::Owned(after.clone()))?;
             },
+            Operation::SmartTag { index, after, .. } => {
+                model.replace_smart_tag(*index, after.clone().into_owned())?;
+            },
+            Operation::MoveBookmark { index, after, .. } => {
+                model.replace_move_bookmark(*index, after.clone().into_owned())?;
+            },
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
@@ -4481,6 +4605,20 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                 if shape(&snapshot, *index)?.text != after.as_str() {
                     return Err(Error::UnsupportedSource(
                         "shape text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::SmartTag { index, after, .. } => {
+                if snapshot.smart_tags().get(*index) != Some(after) {
+                    return Err(Error::UnsupportedSource(
+                        "SmartTag metadata did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::MoveBookmark { index, after, .. } => {
+                if snapshot.move_bookmarks().get(*index) != Some(after) {
+                    return Err(Error::UnsupportedSource(
+                        "move-bookmark metadata did not survive RTF validation",
                     ));
                 }
             },
@@ -4582,6 +4720,11 @@ fn ensure_changed_publication_allowed(source: &Snapshot) -> Result<(), Error> {
         return Err(Error::ProtectedDocument {
             protection_type: protection.protection_type(),
         });
+    }
+    if source.model().has_unmatched_move_bookmarks() {
+        return Err(Error::UnsupportedSource(
+            "changed publication refuses unmatched move-bookmark destinations",
+        ));
     }
     Ok(())
 }
@@ -5173,6 +5316,8 @@ fn project_text(
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -5320,6 +5465,8 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::AnnotationText { .. }
         | Operation::NoteText { .. }
         | Operation::ShapeText { .. }
+        | Operation::SmartTag { .. }
+        | Operation::MoveBookmark { .. }
         | Operation::PicturePayload(_)
         | Operation::PictureRemoval(_)
         | Operation::RootTransfer { .. } => {
@@ -5590,6 +5737,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -5652,6 +5801,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -5704,6 +5855,8 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -5766,6 +5919,8 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -5821,6 +5976,8 @@ fn base_underline_for_edit(
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -5883,6 +6040,8 @@ fn base_underline_for_edit(
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(UnderlineStyle::None)
@@ -5938,6 +6097,8 @@ fn base_font_size_for_edit(
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6000,6 +6161,8 @@ fn base_font_size_for_edit(
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or_else(|| crate::types::Formatting::default().font_size)
@@ -6321,6 +6484,8 @@ fn base_baseline_for_edit(
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6383,6 +6548,8 @@ fn base_baseline_for_edit(
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(CharacterBaseline::Normal)
@@ -6449,6 +6616,8 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6511,6 +6680,8 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -6549,6 +6720,8 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6611,6 +6784,8 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -6663,6 +6838,8 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6725,6 +6902,8 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -6777,6 +6956,8 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6839,6 +7020,8 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -6891,6 +7074,8 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -6953,6 +7138,8 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::ShapeText { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -7002,6 +7189,8 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
             final_position,
             ..
         } => position != final_position,
+        Operation::SmartTag { before, after, .. } => before != after,
+        Operation::MoveBookmark { before, after, .. } => before != after,
         Operation::RootTransfer { before, after, .. } => before != after,
         Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. }
@@ -7558,6 +7747,8 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::ShapeText { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -8963,6 +9154,16 @@ enum Change {
         before: String,
         after: String,
     },
+    SmartTag {
+        index: usize,
+        before: crate::SmartTag<'static>,
+        after: crate::SmartTag<'static>,
+    },
+    MoveBookmark {
+        index: usize,
+        before: crate::MoveBookmark<'static>,
+        after: crate::MoveBookmark<'static>,
+    },
     PicturePayload(picture_payload::StagedPicturePayload),
     PictureRemoval {
         position: usize,
@@ -9270,6 +9471,24 @@ impl Change {
                 before,
                 after,
             } => Self::ShapeText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::SmartTag {
+                index,
+                before,
+                after,
+            } => Self::SmartTag {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::MoveBookmark {
+                index,
+                before,
+                after,
+            } => Self::MoveBookmark {
                 index: *index,
                 before: after.clone(),
                 after: before.clone(),
@@ -9620,6 +9839,24 @@ fn semantic_changes_with_replacement(
                 before: before.clone(),
                 after: after.clone(),
             }),
+            Operation::SmartTag {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::SmartTag {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::MoveBookmark {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::MoveBookmark {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
             Operation::PicturePayload(operation) if operation.before != operation.after => {
                 Some(Change::PicturePayload(operation.clone()))
             },
@@ -9658,6 +9895,8 @@ fn semantic_changes_with_replacement(
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
             | Operation::ShapeText { .. }
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
             | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => None,
         })
@@ -10244,6 +10483,12 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Change::SmartTag { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF SmartTag durable patches are not supported",
+        }),
+        Change::MoveBookmark { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF move-bookmark durable patches are not supported",
+        }),
         Change::PicturePayload(operation) => {
             picture_payload::durable_operation(limits, operation, source)
         },

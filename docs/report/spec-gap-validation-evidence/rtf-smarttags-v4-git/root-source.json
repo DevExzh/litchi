@@ -1,0 +1,29 @@
+{
+  "base": "f0097deb0e80aa4ca7d4347cbba1aebdeadee764",
+  "files": {
+    "crates/litchi-rtf/README.md": "8d43364b597748e39da97ff0f68fb01a742068b821acd99de81a8e5ea23d6813",
+    "crates/litchi-rtf/docs/FEATURE_MATRIX.md": "20cb640396d3938f7af104537d3d61480754cc4ff16351ba639ef067dce65c7f",
+    "crates/litchi-rtf/src/api/facade.rs": "202ce132c3ae9fa30e2a7d4a612d91e56c3c06014f2eb83c52e64b2c0fec5915",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs": "99df02f14ac4375cdecb18ef4fe07da3f61aa09c24ccb4166707aaec7f53ddb5",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs": "b224ea96e14d11336a9523fdd9a739336e166c2cb5969dd4b788ab4a3919b458",
+    "crates/litchi-rtf/src/codec/parser/codec/api.rs": "e62d7d6001e6b8f5c548ca9e9b057416d07ef2d7f00b2fd363f38253d18beb19",
+    "crates/litchi-rtf/src/codec/parser/codec/controls.rs": "a49cb1a95bb9c944b5293fd99777561a9fb6d4b8e84faa8f301411ab27c3734a",
+    "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs": "473e1ca5152104cae6ce47445e77b06457b90b6f53a5a0a26df3ab323c6cf859",
+    "crates/litchi-rtf/src/codec/parser/codec/markup.rs": "ba5dfb236ff4b423aa7fcc327e6854d742d09a7cea356eab62f87192cf50cf82",
+    "crates/litchi-rtf/src/codec/parser/codec/mod.rs": "0db5538b7ee9b9516e78d2af46fbaeb1af9ca185d95821a66eefcf87221d99a5",
+    "crates/litchi-rtf/src/codec/writer/codec/mod.rs": "7223d8cc7121d9d60f6b205e12d619bbb6888540e308adc08b5631a7194812d6",
+    "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs": "8d1d229c2d74806c0aad631d6c3fe59c4b01b61bb4d9f5f78dee81d1d3fa1894",
+    "crates/litchi-rtf/src/codec/writer/codec/output/story.rs": "572787c8556da5eb907424470ca8bbfafc07fa98e0704806f02003bbd5db5d33",
+    "crates/litchi-rtf/src/codec/writer/tests.rs": "a4388834413c2ae440378383c0a21cbd46d8a51e4cd326917c1a79dad85cd497",
+    "crates/litchi-rtf/src/content/field/model.rs": "d7d7b3521673f1c5dccad46e14e9d55670d70607d367e348aa59dac51a315a0c",
+    "crates/litchi-rtf/src/edit.rs": "75e78d1f7645590f0779f0a34626d86cb6ef2d0c3eec8407c3dc9f2757e17111",
+    "crates/litchi-rtf/src/edit/composition.rs": "6de4ec822d73167dd7e6ab02e1107c050527175b81d0f8b13e2a66d561147fdf",
+    "crates/litchi-rtf/src/lib.rs": "99f9e8e172f356cbd562df5a77ee568394b15ef1fb12b16fbd532529ad9e86fa",
+    "crates/litchi-rtf/src/metadata/mod.rs": "6fe617be94bca3623a4a14fd32ba91efeb47b41a260e69659a9fa418a1644b4f",
+    "crates/litchi-rtf/src/metadata/smart_tag.rs": "3d562e60f6c0a703109e082ca82ccde566a6ddc88bea4dfe1a704bfe8589fe34",
+    "crates/litchi-rtf/src/model/document/model.rs": "8a746852d2ca5be010bfa50dbfa0ce09bcd7e58551fd3e3e852a95016d6279b5",
+    "crates/litchi-rtf/src/review/mod.rs": "717df871c93d2e65407dd6afd191f5662e6fcc9408be4b4bfb452ef829acd963",
+    "crates/litchi-rtf/src/review/move_bookmark.rs": "b555b72c35bd27d4fdea1419defd7d17a6f3cd093ff959e11455f86268842137",
+    "crates/litchi-rtf/tests/smart_tags_move_bookmarks.rs": "3fdb978ca7930f91d72f24f3d5661a4bc5e8ed5f7f15b85d3890d1c29f815c8b"
+  }
+}
