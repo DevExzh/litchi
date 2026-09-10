@@ -1,0 +1,22 @@
+{
+  "head": "527b1481c3ae68d83ac39d8b33eb7f256085344a",
+  "evidence": {
+    "root-test-counts.json.gz": "43f1da33b4bd23fb07df9ae8b02cc1352d4858423ddce239570378aeafd086ef",
+    "root-body_text.rs.gz": "72600c0e61fcf6413af13938c2bf7689c5361d728a4b5d89e6e9eee7cecfe598",
+    "candidate.patch.gz": "fff315b76bd870bdcc46822f40053f13ba4f41a4f0b526299e7eb76b718332e4",
+    "pending-preimage.patch.gz": "3b709d6c53218e81efb792a890ae751468ad2c9b7edf5f30420665680f010fb5",
+    "root-source-after.json.gz": "9eb365c6b810142633fa7b3c355d76784db2209c35e3949b557c930d22de6ad5",
+    "root-tests.rs.gz": "0ab854729286825f4181f916d417786599267a12db4ea521db017a9524554f57",
+    "root-rustfmt.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "README.md": "562549ba7f0d2f86bc3940f48920604403458e30397124489ca4a85d482abd10",
+    "independent-review.md.gz": "96137ef27093f3aafe03b664c95418465360d4c9568afe3020ff25045c8aa6a5",
+    "root-gates.json.gz": "bc5cd1646f377bc1c00e4212b4321d087feff98cee3a05b794c89cbfcffebbb1",
+    "candidate-manifest.json.gz": "e5e4974f0ccb0d74cf6dc31ba45f2bc8c329116101e5358ba90f6a0738ee3b5f",
+    "root-dofr.rs.gz": "3fd6e63e1d16f1b6eefedea59cb614cc28fae12222bd080b0387472a5223b9d6",
+    "root-rustdoc.log.gz": "ff6240f09b89a24c9656f40d6ff1156df1a34589b3502cf9c91ef8b35046cac5",
+    "root-build-Cargo.lock.gz": "2c8869b97a69bec7ee92d15087aa3eac0fe8cc16c4d59c399c929644d971d7fe",
+    "root-clippy.log.gz": "0d3bd91903283523ee365259b01f7d5e68dafeb63952f4b870cc4aa7fd324f47",
+    "root-integration.json.gz": "02621b3e3ef02f4af8023bc658713b9f9c82211ce1d7438029ee2a8095e092f6",
+    "root-test.log.gz": "01370732e9730ab64f9b49edb84e9ab172fa97cae0098936996aa1339fb6ad03"
+  }
+}
