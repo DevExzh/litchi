@@ -17,6 +17,9 @@ pub mod pre_bnc;
 /// Allocation-free semantic projection of one Numbers cell payload.
 pub mod cell_value;
 
+/// Shared root/segment coordinator for Numbers table-data-list projections.
+pub mod table_data_list;
+
 pub mod formula_envelope;
 /// Shared generated-free Numbers formula event renderer.
 pub mod formula_render;

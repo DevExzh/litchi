@@ -53,6 +53,7 @@ use litchi_numbers::table::Dimensions;
 use litchi_numbers_wire::cell_value::{
     DecodeError as CellDecodeError, ValueSource, decode_cell_value,
 };
+use litchi_numbers_wire::table_data_list;
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
@@ -808,6 +809,7 @@ fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<Compa
     compact_table_vec(compacted)
 }
 
+#[cfg(test)]
 fn compact_table_vec<T>(mut compacted: Vec<(u32, T)>) -> Result<CompactTable<T>> {
     compacted.sort_unstable_by_key(|(key, _)| *key);
     if compacted.windows(2).any(|pair| pair[0].0 == pair[1].0) {
@@ -1194,6 +1196,416 @@ where
         self.segment_id_set.insert(identifier);
         self.segment_ids.push(identifier);
         Ok(())
+    }
+}
+
+/// Probe one root or segment payload and charge only the wire work needed to
+/// determine whether it can be admitted. Root and segment codecs expose
+/// different snapshots, but both snapshots carry the list type needed by the
+/// shared coordinator's candidate selector. Keeping that distinction here
+/// lets the host use the same admission hook for either payload kind.
+fn probe_table_data_list_message(
+    source: &[u8],
+    object_id: u64,
+    list_type: tst::table_data_list::ListType,
+    budget: &mut ProjectionBudget,
+    is_segment: bool,
+) -> Result<i32> {
+    let field_offset = budget.payload_fields;
+    let work_offset = budget.payload_work;
+    let (snapshot_list_type, report) = if is_segment {
+        let (snapshot, report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_segment_type_with_report(
+                source,
+                table_data_list_decode_options_with_budget(source, *budget, false),
+            )
+            .map_err(|error| {
+                table_data_list_decode_error_with_offsets(
+                    object_id,
+                    list_type,
+                    error,
+                    budget.references,
+                    field_offset,
+                    work_offset,
+                    budget.staging_text_bytes,
+                )
+            })?;
+        (snapshot.list_type(), report)
+    } else {
+        let (snapshot, report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_type_with_report(
+                source,
+                table_data_list_decode_options_with_budget(source, *budget, false),
+            )
+            .map_err(|error| {
+                table_data_list_decode_error_with_offsets(
+                    object_id,
+                    list_type,
+                    error,
+                    budget.references,
+                    field_offset,
+                    work_offset,
+                    budget.staging_text_bytes,
+                )
+            })?;
+        (snapshot.list_type(), report)
+    };
+    budget.charge_decode_work(report)?;
+    Ok(snapshot_list_type)
+}
+
+/// Result of one strict root or segment callback pass.  The shared wire
+/// coordinator owns candidate selection and merge precedence; this value keeps
+/// the host codec's preflight/callback bookkeeping and staged budget available
+/// until the admitted candidate is ready to publish.
+struct DecodedTableDataList<T> {
+    list_type: i32,
+    segment_key_range: Option<(u32, u32)>,
+    segment_bounds: (Option<u32>, Option<u32>),
+    report: numbers_table_cell_storage_codec::DecodeReport,
+    staged_budget: ProjectionBudget,
+    reserved_report: Option<numbers_table_cell_storage_codec::DecodeReport>,
+    values: Vec<(u32, T)>,
+    keys: HashSet<u32>,
+    references: Vec<u64>,
+    structural_error: Option<Error>,
+    semantic_error: Option<Error>,
+}
+
+fn borrowed_table_data_list_messages<'source>(
+    messages: &'source [crate::archive::RawMessage],
+) -> impl Iterator<Item = table_data_list::Message<'source>> + 'source {
+    messages
+        .iter()
+        .map(|message| table_data_list::Message::new(message.type_, &message.data))
+}
+
+/// Strictly preflight and then callback-decode one admitted or non-admitted
+/// list payload.  The `is_segment` switch stays at this owner boundary: the
+/// generated-free visitor, budget staging, report equality check, and error
+/// mapping are identical, while the wire codec uses distinct root and segment
+/// entry snapshots.
+fn decode_table_data_list_message<T, C>(
+    source: &[u8],
+    object_id: u64,
+    list_type: tst::table_data_list::ListType,
+    budget: &mut ProjectionBudget,
+    converter: &mut C,
+    is_segment: bool,
+    admit: bool,
+    max_entries: usize,
+    max_segment_references: usize,
+) -> Result<DecodedTableDataList<T>>
+where
+    C: ListValueConverter<T>,
+{
+    let mut staged_budget = *budget;
+    let reserved_report = if admit {
+        // Charge the exact no-callback report before any owner conversion can
+        // allocate or resolve referenced objects.  The callback pass gets a
+        // separate staged copy and must observe the identical report.
+        let report = if is_segment {
+            let (_, report) =
+                numbers_table_cell_storage_codec::decode_table_data_list_segment_with_report(
+                    source,
+                    table_data_list_decode_options_with_budget(source, *budget, true),
+                )
+                .map_err(|error| {
+                    table_data_list_decode_error_with_offsets(
+                        object_id,
+                        list_type,
+                        error,
+                        budget.references,
+                        budget.payload_fields,
+                        budget.payload_work,
+                        budget.staging_text_bytes,
+                    )
+                })?;
+            report
+        } else {
+            let (_, report) = numbers_table_cell_storage_codec::decode_table_data_list_with_report(
+                source,
+                table_data_list_decode_options_with_budget(source, *budget, true),
+            )
+            .map_err(|error| {
+                table_data_list_decode_error_with_offsets(
+                    object_id,
+                    list_type,
+                    error,
+                    budget.references,
+                    budget.payload_fields,
+                    budget.payload_work,
+                    budget.staging_text_bytes,
+                )
+            })?;
+            report
+        };
+        budget.charge_decode_report(report)?;
+        staged_budget = *budget;
+        staged_budget.charge_decode_report(report)?;
+        Some(report)
+    } else {
+        None
+    };
+
+    let field_offset = budget.payload_fields;
+    let work_offset = budget.payload_work;
+    let reference_offset = budget.references;
+    let text_offset = budget.staging_text_bytes;
+    let decode_options = table_data_list_decode_options_with_budget(source, *budget, admit);
+    let visitor_budget = if admit {
+        &mut staged_budget
+    } else {
+        &mut *budget
+    };
+    let mut visitor = TypedListVisitor::new(
+        converter,
+        visitor_budget,
+        list_type as i32,
+        is_segment,
+        admit,
+        max_entries,
+        max_segment_references,
+    );
+    let (decoded_list_type, segment_key_range, report) = if is_segment {
+        let (snapshot, report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                source,
+                decode_options,
+                &mut visitor,
+            )
+            .map_err(|error| {
+                table_data_list_decode_error_with_offsets(
+                    object_id,
+                    list_type,
+                    error,
+                    reference_offset,
+                    field_offset,
+                    work_offset,
+                    text_offset,
+                )
+            })?;
+        (
+            snapshot.list_type(),
+            Some((snapshot.key_range_location(), snapshot.key_range_length())),
+            report,
+        )
+    } else {
+        let (snapshot, report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+                source,
+                decode_options,
+                &mut visitor,
+            )
+            .map_err(|error| {
+                table_data_list_decode_error_with_offsets(
+                    object_id,
+                    list_type,
+                    error,
+                    reference_offset,
+                    field_offset,
+                    work_offset,
+                    text_offset,
+                )
+            })?;
+        (snapshot.list_type(), None, report)
+    };
+    let bounds = visitor.take_segment_bounds();
+    let (values, keys, references, structural_error, semantic_error) = visitor.take_parts();
+    debug_assert!(!is_segment || segment_key_range.is_some());
+
+    Ok(DecodedTableDataList {
+        list_type: decoded_list_type,
+        segment_key_range,
+        segment_bounds: bounds,
+        report,
+        staged_budget,
+        reserved_report,
+        values,
+        keys,
+        references,
+        structural_error,
+        semantic_error,
+    })
+}
+
+/// Host-side implementation of the shared list decoder contract. Codec
+/// admission remains local so the aggregate budget and semantic converter
+/// behavior stay unchanged; the wire crate owns topology, merge checks, and
+/// final publication.
+struct HostTableDataListDecoder<'converter, 'budget, T, C> {
+    list_type: tst::table_data_list::ListType,
+    root_object_id: u64,
+    budget: &'budget mut ProjectionBudget,
+    converter: &'converter mut C,
+    _value: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<'source, 'converter, 'budget, T, C> table_data_list::ListDecoder<'source>
+    for HostTableDataListDecoder<'converter, 'budget, T, C>
+where
+    C: ListValueConverter<T>,
+{
+    type Value = T;
+    type Error = Error;
+
+    fn probe(
+        &mut self,
+        source: &'source [u8],
+        kind: table_data_list::RootOrSegment,
+        object_id: u64,
+    ) -> Result<i32> {
+        probe_table_data_list_message(
+            source,
+            object_id,
+            self.list_type,
+            self.budget,
+            matches!(kind, table_data_list::RootOrSegment::Segment),
+        )
+    }
+
+    fn decode(
+        &mut self,
+        source: &'source [u8],
+        kind: table_data_list::RootOrSegment,
+        object_id: u64,
+        admit: bool,
+    ) -> Result<table_data_list::Candidate<Self::Value, Self::Error>> {
+        let is_segment = matches!(kind, table_data_list::RootOrSegment::Segment);
+        let (local_max_entries, max_segment_references) = table_list_collection_limits(source);
+        let max_entries = if admit {
+            local_max_entries.min(self.budget.remaining_entries())
+        } else {
+            local_max_entries
+        };
+        let candidate = decode_table_data_list_message(
+            source,
+            object_id,
+            self.list_type,
+            self.budget,
+            self.converter,
+            is_segment,
+            admit,
+            max_entries,
+            max_segment_references,
+        )?;
+        let report = candidate.report;
+        if admit && candidate.list_type == self.list_type as i32 {
+            if let Some(reserved) = candidate.reserved_report {
+                if report != reserved {
+                    return Err(Error::InvalidFormat(if is_segment {
+                        format!(
+                            "Numbers {:?} TableDataListSegment report changed between preflight and callback",
+                            self.list_type
+                        )
+                    } else {
+                        format!(
+                            "Numbers {:?} TableDataList report changed between preflight and callback",
+                            self.list_type
+                        )
+                    }));
+                }
+                let mut staged_budget = candidate.staged_budget;
+                staged_budget.charge_entries(candidate.keys.len())?;
+                *self.budget = staged_budget;
+            } else {
+                self.budget.charge_decode_report(report)?;
+                self.budget.charge_entries(candidate.keys.len())?;
+            }
+        } else {
+            // Wrong-type and duplicate candidates remain wire-checked, but
+            // their references/text/values are not admitted to the aggregate
+            // budget. Preserve the host's attempted work accounting.
+            self.budget.charge_decode_work(report)?;
+        }
+        Ok(table_data_list::Candidate {
+            list_type: candidate.list_type,
+            values: candidate.values,
+            keys: candidate.keys,
+            segment_refs: candidate.references,
+            key_range: candidate
+                .segment_key_range
+                .map(|(location, length)| table_data_list::KeyRange { location, length }),
+            entry_bounds: match candidate.segment_bounds {
+                (Some(minimum), Some(maximum)) => {
+                    Some(table_data_list::EntryBounds { minimum, maximum })
+                },
+                _ => None,
+            },
+            structural_error: candidate.structural_error,
+            semantic_error: candidate.semantic_error,
+        })
+    }
+
+    fn map_issue(&mut self, issue: table_data_list::CoordinatorIssue) -> Error {
+        match issue {
+            table_data_list::CoordinatorIssue::MissingRoot { object_id, .. } => {
+                Error::InvalidFormat(format!(
+                    "Object {object_id} has no Numbers {:?} TableDataList payload",
+                    self.list_type
+                ))
+            },
+            table_data_list::CoordinatorIssue::DuplicateRoot { object_id, .. } => {
+                Error::InvalidFormat(format!(
+                    "Object {object_id} has multiple Numbers {:?} TableDataList payloads",
+                    self.list_type
+                ))
+            },
+            table_data_list::CoordinatorIssue::MissingSegment { segment_id, .. } => {
+                Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment object {segment_id} is missing"
+                ))
+            },
+            table_data_list::CoordinatorIssue::MissingSegmentPayload { segment_id } => {
+                Error::InvalidFormat(format!(
+                    "Object {segment_id} has no Numbers TableDataListSegment payload"
+                ))
+            },
+            table_data_list::CoordinatorIssue::DuplicateSegmentPayload { segment_id } => {
+                Error::InvalidFormat(format!(
+                    "Object {segment_id} has multiple Numbers TableDataListSegment payloads"
+                ))
+            },
+            table_data_list::CoordinatorIssue::WrongSegmentType {
+                segment_id,
+                actual_type,
+                ..
+            } => Error::InvalidFormat(format!(
+                "Numbers table-data-list segment {segment_id} has list type {actual_type}, expected {:?}",
+                self.list_type
+            )),
+            table_data_list::CoordinatorIssue::KeyRangeOverflow { segment_id } => {
+                Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment {segment_id} key range overflows"
+                ))
+            },
+            table_data_list::CoordinatorIssue::MissingKeyRange { segment_id } => {
+                Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment {segment_id} has no key range"
+                ))
+            },
+            table_data_list::CoordinatorIssue::EntryOutsideKeyRange { segment_id } => {
+                Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment {segment_id} contains an entry outside its key range"
+                ))
+            },
+            table_data_list::CoordinatorIssue::DuplicateEntryKey { key } => {
+                Error::InvalidFormat(format!(
+                    "Numbers {:?} table {} repeats entry key {key} across root and segments",
+                    self.list_type, self.root_object_id
+                ))
+            },
+            table_data_list::CoordinatorIssue::EntryLimit { observed, .. } => {
+                table_list_entry_limit_error(observed)
+            },
+            table_data_list::CoordinatorIssue::Allocation { target, amount } => {
+                let description = match target {
+                    table_data_list::AllocationTarget::Keys => "Numbers table-list entry keys",
+                    table_data_list::AllocationTarget::Values => "Numbers table-list entries",
+                };
+                allocation_error(description, amount)
+            },
+        }
     }
 }
 
@@ -1669,414 +2081,35 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers table-data-list object {object_id} is missing"
                 ))
             })?;
+        let root_messages = borrowed_table_data_list_messages(resolved.messages);
         let expected = list_type as i32;
-        let mut selected_values = None;
-        let mut selected_keys = None;
-        let mut segment_ids = None;
-        let mut structural_error = None;
-        let mut semantic_error = None;
-        for message in resolved
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 6005 || message.type_ == 6201)
-        {
-            // Probe only the scalar envelope before admitting any entry
-            // conversion or referenced-object resolution. The full strict
-            // decode below still validates every repeated child and unknown.
-            let field_offset = budget.payload_fields;
-            let work_offset = budget.payload_work;
-            let (probe, probe_report) =
-                numbers_table_cell_storage_codec::decode_table_data_list_type_with_report(
-                    &message.data,
-                    table_data_list_decode_options_with_budget(&message.data, *budget, false),
-                )
-                .map_err(|error| {
-                    table_data_list_decode_error_with_offsets(
-                        object_id,
-                        list_type,
-                        error,
-                        budget.references,
-                        field_offset,
-                        work_offset,
-                        budget.staging_text_bytes,
-                    )
-                })?;
-            budget.charge_decode_work(probe_report)?;
-            let duplicate_candidate = selected_values.is_some();
-            let admitting_candidate = !duplicate_candidate && probe.list_type() == expected;
-            let (local_max_entries, max_segment_references) =
-                table_list_collection_limits(&message.data);
-            let max_entries = if admitting_candidate {
-                local_max_entries.min(budget.remaining_entries())
-            } else {
-                local_max_entries
-            };
-            let mut staged_budget = *budget;
-            let mut reserved_report = None;
-            let decode_options = if admitting_candidate {
-                // The storage codec invokes converters while it scans list
-                // entries. Obtain and charge an exact no-callback report,
-                // then reserve the identical callback-pass report before any
-                // formula wire preflight or owned copy can run.
-                let (_, report) =
-                    numbers_table_cell_storage_codec::decode_table_data_list_with_report(
-                        &message.data,
-                        table_data_list_decode_options_with_budget(&message.data, *budget, true),
-                    )
-                    .map_err(|error| {
-                        table_data_list_decode_error_with_offsets(
-                            object_id,
-                            list_type,
-                            error,
-                            budget.references,
-                            budget.payload_fields,
-                            budget.payload_work,
-                            budget.staging_text_bytes,
-                        )
-                    })?;
-                budget.charge_decode_report(report)?;
-                let options =
-                    table_data_list_decode_options_with_budget(&message.data, *budget, true);
-                staged_budget = *budget;
-                staged_budget.charge_decode_report(report)?;
-                reserved_report = Some(report);
-                options
-            } else {
-                table_data_list_decode_options_with_budget(&message.data, *budget, false)
-            };
-            let field_offset = budget.payload_fields;
-            let work_offset = budget.payload_work;
-            let reference_offset = budget.references;
-            let text_offset = budget.staging_text_bytes;
-            let visitor_budget = if admitting_candidate {
-                &mut staged_budget
-            } else {
-                &mut *budget
-            };
-            let mut visitor = TypedListVisitor::new(
-                converter,
-                visitor_budget,
-                expected,
-                false,
-                admitting_candidate,
-                max_entries,
-                max_segment_references,
-            );
-            let (snapshot, report) =
-                numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
-                    &message.data,
-                    decode_options,
-                    &mut visitor,
-                )
-                .map_err(|error| {
-                    table_data_list_decode_error_with_offsets(
-                        object_id,
-                        list_type,
-                        error,
-                        reference_offset,
-                        field_offset,
-                        work_offset,
-                        text_offset,
-                    )
-                })?;
-            let (values, keys, references, callback_structural, callback_semantic) =
-                visitor.take_parts();
-            if snapshot.list_type() != expected {
-                budget.charge_decode_work(report)?;
-                continue;
-            }
-            if selected_values.is_some() {
-                budget.charge_decode_work(report)?;
-                record_first_list_error(
-                    &mut structural_error,
-                    Error::InvalidFormat(format!(
-                        "Object {object_id} has multiple Numbers {list_type:?} TableDataList payloads"
-                    )),
-                );
-                continue;
-            }
-            if let Some(reserved) = reserved_report {
-                if report != reserved {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers {list_type:?} TableDataList report changed between preflight and callback"
-                    )));
-                }
-                staged_budget.charge_entries(keys.len())?;
-                *budget = staged_budget;
-            } else {
-                budget.charge_decode_report(report)?;
-                budget.charge_entries(keys.len())?;
-            }
-            if let Some(error) = callback_structural {
-                record_first_list_error(&mut structural_error, error);
-            }
-            if let Some(error) = callback_semantic {
-                record_first_list_error(&mut semantic_error, error);
-            }
-            selected_values = Some(values);
-            selected_keys = Some(keys);
-            segment_ids = Some(references);
-        }
-
-        let mut values = selected_values.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Object {object_id} has no Numbers {list_type:?} TableDataList payload"
-            ))
-        })?;
-        let mut keys = selected_keys.unwrap_or_default();
-        let segment_ids = segment_ids.unwrap_or_default();
-
-        for segment_id in segment_ids {
-            let segment_object = match self.object_index.resolve_ref_id(self.bundle, segment_id) {
-                Ok(Some(object)) => object,
-                Ok(None) => {
-                    record_first_list_error(
-                        &mut structural_error,
-                        Error::InvalidFormat(format!(
-                            "Numbers table-data-list segment object {segment_id} is missing"
-                        )),
-                    );
-                    continue;
-                },
-                Err(error) => {
-                    record_first_list_error(&mut structural_error, error);
-                    continue;
-                },
-            };
-            let mut segment_count = 0usize;
-            for segment_message in segment_object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == 6011)
-            {
-                segment_count = segment_count.saturating_add(1);
-                let field_offset = budget.payload_fields;
-                let work_offset = budget.payload_work;
-                let (probe, probe_report) = numbers_table_cell_storage_codec::decode_table_data_list_segment_type_with_report(
-                    &segment_message.data,
-                    table_data_list_decode_options_with_budget(
-                        &segment_message.data,
-                        *budget,
-                        false,
-                    ),
-                )
-                .map_err(|error| {
-                    table_data_list_decode_error_with_offsets(
-                        segment_id,
-                        list_type,
-                        error,
-                        budget.references,
-                        field_offset,
-                        work_offset,
-                        budget.staging_text_bytes,
-                    )
-                })?;
-                budget.charge_decode_work(probe_report)?;
-                let admitting_segment = segment_count == 1 && probe.list_type() == expected;
-                let (local_max_entries, max_segment_references) =
-                    table_list_collection_limits(&segment_message.data);
-                let max_entries = if admitting_segment {
-                    local_max_entries.min(budget.remaining_entries())
-                } else {
-                    local_max_entries
-                };
-                let mut staged_budget = *budget;
-                let mut reserved_report = None;
-                let decode_options = if admitting_segment {
-                    let (_, report) = numbers_table_cell_storage_codec::decode_table_data_list_segment_with_report(
-                        &segment_message.data,
-                        table_data_list_decode_options_with_budget(
-                            &segment_message.data,
-                            *budget,
-                            true,
-                        ),
-                    )
-                    .map_err(|error| {
-                        table_data_list_decode_error_with_offsets(
-                            segment_id,
-                            list_type,
-                            error,
-                            budget.references,
-                            budget.payload_fields,
-                            budget.payload_work,
-                            budget.staging_text_bytes,
-                        )
-                    })?;
-                    budget.charge_decode_report(report)?;
-                    let options = table_data_list_decode_options_with_budget(
-                        &segment_message.data,
-                        *budget,
-                        true,
-                    );
-                    staged_budget = *budget;
-                    staged_budget.charge_decode_report(report)?;
-                    reserved_report = Some(report);
-                    options
-                } else {
-                    table_data_list_decode_options_with_budget(
-                        &segment_message.data,
-                        *budget,
-                        false,
-                    )
-                };
-                let field_offset = budget.payload_fields;
-                let work_offset = budget.payload_work;
-                let reference_offset = budget.references;
-                let text_offset = budget.staging_text_bytes;
-                let visitor_budget = if admitting_segment {
-                    &mut staged_budget
-                } else {
-                    &mut *budget
-                };
-                let mut visitor = TypedListVisitor::new(
-                    converter,
-                    visitor_budget,
-                    expected,
-                    true,
-                    admitting_segment,
-                    max_entries,
-                    max_segment_references,
-                );
-                let (snapshot, report) =
-                    numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
-                        &segment_message.data,
-                        decode_options,
-                        &mut visitor,
-                    )
-                    .map_err(|error| {
-                        table_data_list_decode_error_with_offsets(
-                            segment_id,
-                            list_type,
-                            error,
-                            reference_offset,
-                            field_offset,
-                            work_offset,
-                            text_offset,
-                        )
-                    })?;
-                let bounds = visitor.take_segment_bounds();
-                let (
-                    segment_values,
-                    segment_keys,
-                    _segment_refs,
-                    callback_structural,
-                    callback_semantic,
-                ) = visitor.take_parts();
-                if segment_count > 1 {
-                    budget.charge_decode_work(report)?;
-                    record_first_list_error(
-                        &mut structural_error,
-                        Error::InvalidFormat(format!(
-                            "Object {segment_id} has multiple Numbers TableDataListSegment payloads"
-                        )),
-                    );
-                    continue;
-                }
-                if snapshot.list_type() != expected {
-                    budget.charge_decode_work(report)?;
-                    record_first_list_error(
-                        &mut structural_error,
-                        Error::InvalidFormat(format!(
-                            "Numbers table-data-list segment {segment_id} has list type {}, expected {list_type:?}",
-                            snapshot.list_type()
-                        )),
-                    );
-                    continue;
-                }
-                if let Some(reserved) = reserved_report {
-                    if report != reserved {
-                        return Err(Error::InvalidFormat(format!(
-                            "Numbers {list_type:?} TableDataListSegment report changed between preflight and callback"
-                        )));
-                    }
-                    staged_budget.charge_entries(segment_keys.len())?;
-                    *budget = staged_budget;
-                } else {
-                    budget.charge_decode_report(report)?;
-                    budget.charge_entries(segment_keys.len())?;
-                }
-                if let Some(error) = callback_structural {
-                    record_first_list_error(&mut structural_error, error);
-                }
-                if let Some(error) = callback_semantic {
-                    record_first_list_error(&mut semantic_error, error);
-                }
-                let end = snapshot
-                    .key_range_location()
-                    .checked_add(snapshot.key_range_length())
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "Numbers table-data-list segment {segment_id} key range overflows"
-                        ))
-                    })?;
-                if let (Some(minimum), Some(maximum)) = bounds
-                    && (minimum < snapshot.key_range_location() || maximum >= end)
-                {
-                    record_first_list_error(
-                        &mut structural_error,
-                        Error::InvalidFormat(format!(
-                            "Numbers table-data-list segment {segment_id} contains an entry outside its key range"
-                        )),
-                    );
-                    continue;
-                }
-                for (key, value) in segment_values {
-                    if keys.contains(&key) {
-                        record_first_list_error(
-                            &mut structural_error,
-                            Error::InvalidFormat(format!(
-                                "Numbers {list_type:?} table {object_id} repeats entry key {key} across root and segments"
-                            )),
-                        );
-                        continue;
-                    }
-                    if keys.len() >= MAX_TABLE_LIST_ENTRIES {
-                        record_first_list_error(
-                            &mut semantic_error,
-                            table_list_entry_limit_error(keys.len().saturating_add(1)),
-                        );
-                        continue;
-                    }
-                    if keys.try_reserve(1).is_err() {
-                        record_first_list_error(
-                            &mut semantic_error,
-                            allocation_error(
-                                "Numbers table-list entry keys",
-                                keys.len().saturating_add(1),
-                            ),
-                        );
-                        continue;
-                    }
-                    keys.insert(key);
-                    if values.try_reserve(1).is_err() {
-                        record_first_list_error(
-                            &mut semantic_error,
-                            allocation_error(
-                                "Numbers table-list entries",
-                                values.len().saturating_add(1),
-                            ),
-                        );
-                        continue;
-                    }
-                    values.push((key, value));
-                }
-            }
-            if segment_count == 0 {
-                record_first_list_error(
-                    &mut structural_error,
-                    Error::InvalidFormat(format!(
-                        "Object {segment_id} has no Numbers TableDataListSegment payload"
-                    )),
-                );
-            }
-        }
-        if let Some(error) = structural_error {
-            return Err(error);
-        }
-        if let Some(error) = semantic_error {
-            return Err(error);
-        }
-        compact_table_vec(values)
+        let mut decoder = HostTableDataListDecoder {
+            list_type,
+            root_object_id: object_id,
+            budget,
+            converter,
+            _value: std::marker::PhantomData,
+        };
+        let values = table_data_list::read_list(
+            object_id,
+            expected,
+            root_messages,
+            |segment_id| {
+                self.object_index
+                    .resolve_ref_id(self.bundle, segment_id)
+                    .map(|resolved| {
+                        resolved
+                            .map(|resolved| borrowed_table_data_list_messages(resolved.messages))
+                    })
+            },
+            &mut decoder,
+            table_data_list::ListReadPolicy {
+                max_entries: MAX_TABLE_LIST_ENTRIES,
+                overflow: table_data_list::OverflowPolicy::Deferred,
+                range_overflow: table_data_list::OverflowPolicy::Immediate,
+            },
+        )?;
+        Ok(values.into_boxed_slice())
     }
 
     /// Parse tile storage to extract cells
@@ -3598,6 +3631,99 @@ mod tests {
 
         let mut focused_source = Vec::new();
         focused.write_to(&mut focused_source).unwrap();
+        assert_eq!(focused_source, source);
+        Ok(())
+    }
+
+    #[test]
+    fn native_table_data_list_fixture_matches_focused_document_and_comments()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/table-data-list-native.numbers");
+        let source = std::fs::read(&path)?;
+
+        let bundle = Bundle::from_bytes(&source)?;
+        let index = ObjectIndex::from_bundle(&bundle)?;
+        let host_tables = TableDataExtractor::new(&bundle, &index).extract_all_tables()?;
+        assert_eq!(host_tables.len(), 1);
+        let host_table = &host_tables[0];
+        assert_eq!(host_table.name(), "shared-model");
+        assert_eq!(host_table.dimensions(), (10, 3));
+
+        let focused = litchi_numbers::Package::from_bytes(&source)?;
+        let focused_table = focused
+            .document()
+            .table("Sheet 1", "shared-model")?
+            .expect("native table is rooted in the focused document");
+
+        let host_cells = host_table
+            .iter_cells()
+            .map(|(position, value)| (position, value.clone()))
+            .collect::<Vec<_>>();
+        let focused_cells = focused_table
+            .iter_cells()
+            .map(|cell| {
+                (
+                    (
+                        cell.position().row() as usize,
+                        cell.position().column() as usize,
+                    ),
+                    cell.value().clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(focused_cells, host_cells);
+
+        let shared_text = litchi_numbers::cell::Value::Text("Text Café, \"北京\"".to_owned());
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(1, 2)),
+            Some(&shared_text)
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(8, 1)),
+            Some(&shared_text)
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(8, 2)),
+            Some(&shared_text)
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(9, 1)),
+            Some(&litchi_numbers::cell::Value::Formula("=(B2+1)".to_owned()))
+        );
+        assert_eq!(
+            focused_table.get(litchi_numbers::CellPosition::new(9, 2)),
+            Some(&litchi_numbers::cell::Value::Formula("=(1/0)".to_owned()))
+        );
+
+        let focused_b6 = focused
+            .table_cell_comment(
+                "Sheet 1",
+                "shared-model",
+                litchi_numbers::CellPosition::new(5, 1),
+            )?
+            .expect("native B6 comment is present");
+        let focused_b10 = focused
+            .table_cell_comment(
+                "Sheet 1",
+                "shared-model",
+                litchi_numbers::CellPosition::new(9, 1),
+            )?
+            .expect("native B10 comment is present");
+        let host_b6 = host_table
+            .get_comment(5, 1)
+            .expect("host B6 comment is present");
+        let host_b10 = host_table
+            .get_comment(9, 1)
+            .expect("host B10 comment is present");
+        assert_eq!(focused_b6.text(), host_b6.text);
+        assert_eq!(focused_b10.text(), host_b10.text);
+        assert_eq!(focused_b6.text(), "Shared cell value control — 北京");
+        assert_eq!(focused_b10.text(), "Sidecar value control — Café 北京");
+        assert_eq!(host_table.comment_count(), 2);
+
+        let mut focused_source = Vec::new();
+        focused.write_to(&mut focused_source)?;
         assert_eq!(focused_source, source);
         Ok(())
     }

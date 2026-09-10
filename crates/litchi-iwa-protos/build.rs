@@ -80,6 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // provenance checks below are intentionally conditional on their presence.
     for path in [
         "../litchi-iwa/src/protobuf.rs",
+        "../litchi-iwa/src/numbers/table_extractor.rs",
+        "../litchi-numbers-wire/src/table_data_list.rs",
         "../litchi-numbers/src/package/extractor.rs",
         "../litchi-iwa/src/pages/editor.rs",
         "../litchi-iwa/src/pages/editor/movies/graph.rs",
@@ -6316,9 +6318,11 @@ fn enforce_numbers_table_data_list_provenance(
         .all(|field| codec.contains(field))
         && codec.contains(SEGMENT_CODEC_PARITY);
 
-    let route_paths = [
-        Path::new("../litchi-iwa/src/protobuf.rs"),
+    let registry_path = Path::new("../litchi-iwa/src/protobuf.rs");
+    let wire_owner_path = Path::new("../litchi-numbers-wire/src/table_data_list.rs");
+    let adapter_paths = [
         Path::new("../litchi-numbers/src/package/extractor.rs"),
+        Path::new("../litchi-iwa/src/numbers/table_extractor.rs"),
     ];
     let registry_table_data_list_markers = [
         format!(
@@ -6334,45 +6338,87 @@ fn enforce_numbers_table_data_list_provenance(
         "{}u32 => decode_table_data_list_segment,",
         TABLE_DATA_LIST_SEGMENT_NATIVE_ID
     );
-    let extractor_table_data_list_marker = format!(
-        ".filter(|message| message.type_ == {} || message.type_ == {})",
-        TABLE_DATA_LIST_NATIVE_IDS[0], TABLE_DATA_LIST_NATIVE_IDS[1]
-    );
-    let extractor_table_data_list_segment_marker = format!(
-        ".filter(|message| message.type_ == {})",
-        TABLE_DATA_LIST_SEGMENT_NATIVE_ID
-    );
-    let route_sources = route_paths
-        .iter()
-        .filter(|path| path.is_file())
-        .map(fs::read_to_string)
-        .collect::<Result<Vec<_>, _>>()?;
-    let route_scope_ok = if route_sources.is_empty() {
-        true
-    } else if route_sources.len() != route_paths.len() {
-        false
-    } else {
-        route_sources[0]
+    // Message-ID registration remains in the legacy host's type registry,
+    // while candidate routing and root/segment publication now live in the
+    // borrowed Numbers wire coordinator.  Each adapter keeps its decoder,
+    // budget, and converter hooks but delegates the topology walk to
+    // `table_data_list::read_list`.
+    let wire_table_data_list_markers = [
+        "pub const TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_005;",
+        "pub const NATIVE_TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_201;",
+        "pub const TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND: u32 = 6_011;",
+        "pub fn read_list<",
+    ];
+    let adapter_wire_import_marker = "litchi_numbers_wire::table_data_list";
+    let adapter_read_list_marker = "read_list(";
+    let legacy_root_filter_markers = [
+        format!(
+            ".filter(|message| message.type_ == {} || message.type_ == {})",
+            TABLE_DATA_LIST_NATIVE_IDS[0], TABLE_DATA_LIST_NATIVE_IDS[1]
+        ),
+        ".filter(|message| message.type_ == 6_005 || message.type_ == 6_201)".to_owned(),
+    ];
+    let legacy_segment_filter_markers = [
+        format!(
+            ".filter(|message| message.type_ == {})",
+            TABLE_DATA_LIST_SEGMENT_NATIVE_ID
+        ),
+        ".filter(|message| message.type_ == 6_011)".to_owned(),
+    ];
+
+    let registry_scope_ok = if registry_path.is_file() {
+        let registry_source = fs::read_to_string(registry_path)?;
+        registry_source
             .matches(registry_table_data_list_markers[0].as_str())
             .count()
             == 1
-            && route_sources[0]
+            && registry_source
                 .matches(registry_table_data_list_markers[1].as_str())
                 .count()
                 == 1
-            && route_sources[0]
+            && registry_source
                 .matches(registry_table_data_list_segment_marker.as_str())
                 .count()
                 == 1
-            && route_sources[1]
-                .matches(extractor_table_data_list_marker.as_str())
-                .count()
-                == 1
-            && route_sources[1]
-                .matches(extractor_table_data_list_segment_marker.as_str())
-                .count()
-                == 1
+    } else {
+        true
     };
+
+    let adapter_sources = adapter_paths
+        .iter()
+        .filter(|path| path.is_file())
+        .map(|path| Ok((*path, fs::read_to_string(path)?)))
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let wire_owner_source = if wire_owner_path.is_file() {
+        Some(fs::read_to_string(wire_owner_path)?)
+    } else {
+        None
+    };
+    let wire_scope_ok = if adapter_sources.is_empty() {
+        // A standalone iwa-protos checkout may contain no sibling adapter.
+        // When no adapter is present, there is no route claim to validate.
+        wire_owner_source.as_ref().is_none_or(|source| {
+            wire_table_data_list_markers
+                .iter()
+                .all(|marker| source.matches(marker).count() == 1)
+        })
+    } else {
+        wire_owner_source.as_ref().is_some_and(|source| {
+            wire_table_data_list_markers
+                .iter()
+                .all(|marker| source.matches(marker).count() == 1)
+        })
+    };
+    let adapters_scope_ok = adapter_sources.iter().all(|(_path, source)| {
+        let legacy_filter_absent = legacy_root_filter_markers
+            .iter()
+            .chain(legacy_segment_filter_markers.iter())
+            .all(|marker| !source.contains(marker));
+        source.contains(adapter_wire_import_marker)
+            && source.contains(adapter_read_list_marker)
+            && legacy_filter_absent
+    });
+    let route_scope_ok = registry_scope_ok && wire_scope_ok && adapters_scope_ok;
 
     if !canonical_scope_ok || !projection_scope_ok || !codec_scope_ok || !route_scope_ok {
         return Err(

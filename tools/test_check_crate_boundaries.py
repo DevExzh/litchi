@@ -1026,6 +1026,87 @@ def add_iwa_numbers_wire_cell_value_scaffold(
         path.write_text(reader, encoding="utf-8")
 
 
+def add_iwa_numbers_wire_table_data_list_scaffold(
+    root: Path,
+    *,
+    owner_source: str | None = None,
+    lib_source: str | None = None,
+    reader_source: str | None = None,
+    include_host: bool = True,
+    include_focused: bool = True,
+) -> None:
+    """Install the shared table-data-list coordinator and reader adapters."""
+
+    owner = root / boundaries.IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        owner_source
+        if owner_source is not None
+        else (
+            "use std::collections::HashSet;\n"
+            "pub const TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_005;\n"
+            "pub const NATIVE_TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_201;\n"
+            "pub const TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND: u32 = 6_011;\n"
+            "pub struct Message<'source> {\n"
+            "    pub kind: u32,\n"
+            "    pub data: &'source [u8],\n"
+            "}\n"
+            "pub enum RootOrSegment { Root, Segment }\n"
+            "pub struct KeyRange { pub location: u32, pub length: u32 }\n"
+            "pub struct EntryBounds { pub minimum: u32, pub maximum: u32 }\n"
+            "pub struct Candidate<T, E> { pub values: Vec<(u32, T)>, pub error: Option<E> }\n"
+            "pub enum CoordinatorIssue { DuplicateRoot, DuplicateSegmentPayload, "
+            "DuplicateSegmentReference, WrongSegmentType, EntryOutsideKeyRange, "
+            "MissingKeyRange, KeyRangeOverflow, DuplicateEntryKey, EntryLimit, Allocation }\n"
+            "pub enum AllocationTarget { Keys, Values }\n"
+            "pub enum OverflowPolicy { Immediate, Deferred }\n"
+            "pub struct ListReadPolicy { pub max_entries: usize }\n"
+            "pub trait ListDecoder<'source> { type Value; type Error; }\n"
+            "pub fn read_list<'source, Root, Segments, Resolve, Decoder>(\n"
+            "    root: Root, resolve: Resolve, decoder: &mut Decoder,\n"
+            " ) where Root: IntoIterator<Item = Message<'source>>,\n"
+            "    Segments: IntoIterator<Item = Message<'source>>,\n"
+            "    Resolve: FnMut(u64), Decoder: ListDecoder<'source> {\n"
+            "    let _ = (root, resolve, decoder);\n"
+            "    let _ = (TABLE_DATA_LIST_MESSAGE_KIND, NATIVE_TABLE_DATA_LIST_MESSAGE_KIND, "
+            "TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND);\n"
+            "    let _ = (DuplicateRoot, DuplicateSegmentPayload, DuplicateSegmentReference, "
+            "WrongSegmentType, MissingKeyRange, KeyRangeOverflow, EntryOutsideKeyRange, "
+            "DuplicateEntryKey, EntryLimit, Allocation);\n"
+            "    let mut values: Vec<(u32, Decoder::Value)> = Vec::new();\n"
+            "    values.sort_unstable_by_key(|(key, _)| *key);\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    lib = root / boundaries.IWA_NUMBERS_WIRE_TABLE_DATA_LIST_LIB_SOURCE
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        lib_source if lib_source is not None else "pub mod table_data_list;\n",
+        encoding="utf-8",
+    )
+
+    reader = reader_source or (
+        "use litchi_numbers_wire::table_data_list::{self, read_list};\n"
+        "fn extract() {\n"
+        "    let _ = (table_data_list::read_list(), read_list());\n"
+        "    let _ = numbers_table_cell_storage_codec::decode_table_data_list_with_visitor;\n"
+        "    let _ = table_data_list_decode_options_with_budget;\n"
+        "    let _ = ListValueConverter::<()>::convert;\n"
+        "}\n"
+    )
+    reader_paths = []
+    if include_host:
+        reader_paths.append(boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE)
+    if include_focused:
+        reader_paths.append(boundaries.NUMBERS_EXTRACTOR_SOURCE)
+    for relative in reader_paths:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(reader, encoding="utf-8")
+
+
 def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
     """Mark the table extractor's import/use edge to the renderer adapter."""
 
@@ -47302,6 +47383,180 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_numbers_wire_cell_value_ownership()",
+            main_source,
+        )
+
+    def test_iwa_numbers_wire_table_data_list_ownership_accepts_shared_coordinator(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_table_data_list_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_table_data_list_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_table_data_list_requires_owner_contract(self) -> None:
+        mutations = (
+            (
+                "missing module export",
+                {"lib_source": "pub mod other;\n"},
+                "missing its public module export",
+            ),
+            (
+                "missing borrowed message",
+                {
+                    "owner_source": (
+                        "pub const TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_005;\n"
+                        "pub const NATIVE_TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_201;\n"
+                        "pub const TABLE_DATA_LIST_SEGMENT_MESSAGE_KIND: u32 = 6_011;\n"
+                        "pub struct Candidate<T, E>;\n"
+                        "pub enum RootOrSegment { Root, Segment }\n"
+                        "pub struct KeyRange;\n"
+                        "pub struct EntryBounds;\n"
+                        "pub enum CoordinatorIssue { DuplicateRoot, "
+                        "DuplicateSegmentPayload, DuplicateSegmentReference, "
+                        "WrongSegmentType, EntryOutsideKeyRange, DuplicateEntryKey }\n"
+                        "pub struct ListReadPolicy;\n"
+                        "pub trait ListDecoder<'source> {}\n"
+                        "pub fn read_list<'source, Root, Segments, Resolve, Decoder>() {}\n"
+                        "fn sort_unstable_by_key() {}\n"
+                    )
+                },
+                "must carry borrowed Message payloads",
+            ),
+            (
+                "forbidden concrete import",
+                {
+                    "owner_source": (
+                        "use litchi_iwa_protos::tst;\n"
+                        + (Path(
+                            boundaries.ROOT / boundaries.IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE
+                        ).read_text(encoding="utf-8"))
+                    )
+                },
+                "imports a concrete format/protobuf/core crate",
+            ),
+            (
+                "missing topology marker",
+                {
+                    "owner_source": (
+                        Path(
+                            boundaries.ROOT / boundaries.IWA_NUMBERS_WIRE_TABLE_DATA_LIST_SOURCE
+                        )
+                        .read_text(encoding="utf-8")
+                        .replace("DuplicateRoot", "RemovedRoot")
+                    )
+                },
+                "missing its DuplicateRoot topology route",
+            ),
+        )
+        for label, kwargs, expected in mutations:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_table_data_list_scaffold(root, **kwargs)
+                    violations = boundaries.audit_iwa_numbers_wire_table_data_list_ownership(
+                        root
+                    )
+                    self.assertTrue(
+                        any(expected in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_table_data_list_requires_reader_delegation(self) -> None:
+        mutations = (
+            (
+                "missing import",
+                "fn extract() { let _ = read_list; }\n",
+                "missing the shared wire owner import",
+            ),
+            (
+                "missing call",
+                "use litchi_numbers_wire::table_data_list;\n"
+                "fn extract() { let _ = table_data_list; }\n",
+                "missing the shared read_list call",
+            ),
+            (
+                "duplicate root filter",
+                "use litchi_numbers_wire::table_data_list;\n"
+                "fn extract(messages: Messages) {\n"
+                "    let _ = table_data_list::read_list;\n"
+                "    for message in messages.iter().filter(|message| "
+                "message.type_ == 6005 || message.type_ == 6201) {}\n"
+                "}\n",
+                "duplicated root candidate topology filter",
+            ),
+            (
+                "duplicate segment filter",
+                "use litchi_numbers_wire::table_data_list;\n"
+                "fn extract(messages: Messages) {\n"
+                "    let _ = table_data_list::read_list;\n"
+                "    for message in messages.iter().filter(|message| message.type_ == 6011) {}\n"
+                "}\n",
+                "duplicated segment payload topology filter",
+            ),
+            (
+                "duplicate selection state",
+                "use litchi_numbers_wire::table_data_list;\n"
+                "fn extract() {\n"
+                "    let _ = table_data_list::read_list;\n"
+                "    let mut selected_values = None;\n"
+                "}\n",
+                "duplicated root/segment selection state",
+            ),
+        )
+        for label, reader_source, expected in mutations:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_table_data_list_scaffold(
+                        root,
+                        reader_source=reader_source,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_table_data_list_ownership(
+                        root
+                    )
+                    self.assertTrue(
+                        any(expected in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_table_data_list_allows_adapter_hooks_and_reader_exit(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_table_data_list_scaffold(
+                root,
+                include_host=False,
+                reader_source=(
+                    "use litchi_numbers_wire::table_data_list::read_list;\n"
+                    "fn extract() {\n"
+                    "    let _ = read_list();\n"
+                    "    let _ = numbers_table_cell_storage_codec::decode_table_data_list_with_visitor;\n"
+                    "    let _ = table_data_list_decode_options_with_budget;\n"
+                    "    let _ = ListValueConverter::<()>::convert;\n"
+                    "}\n"
+                    "#[cfg(test)]\n"
+                    "fn old_topology_oracle() {\n"
+                    "    let mut selected_values = None;\n"
+                    "    for message in messages.iter().filter(|message| message.type_ == 6005 || message.type_ == 6201) {}\n"
+                    "}\n"
+                    "// selected_values and message.type_ == 6011\n"
+                    "const NOTE: &str = \"segment_count\";\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_table_data_list_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_table_data_list_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_wire_table_data_list_ownership()",
             main_source,
         )
 

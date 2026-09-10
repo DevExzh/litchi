@@ -4500,3 +4500,18 @@ comment materialization, and their existing error categories. The shared
 projection is a building block for selected-table readers; format graph
 selection and table traversal remain owner-local. The Pages and Keynote host
 table readers are still migration debt.
+
+## 2026-09-10 Shared table-data-list coordination
+
+`litchi-numbers-wire::table_data_list` now coordinates strict root and segment
+selection, resolution, range validation, key merging, and sorted publication
+for both Numbers readers. Borrowed message iterators leave archive ownership
+and object lookup in the format adapter. Rejected and duplicate candidates
+still receive complete wire validation without retaining semantic values.
+
+The adapters retain their codec visitors, error mapping, and resource budgets.
+In particular, the host reserves callback work after its no-callback preflight;
+the focused reader preserves its existing single callback pass. An explicit
+range-overflow policy preserves the readers' historical error precedence.
+This shared coordinator prepares selected-table readback without moving
+format graph traversal or concrete package state into the wire crate.
