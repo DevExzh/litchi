@@ -1,0 +1,18 @@
+{
+  "archive_sha256": "2707f3dd860f45424a130a1189449bdca64b75d717f8192f560f1c7ed258177d",
+  "archive_bytes": 3246583,
+  "regular_files": 86,
+  "verification": {
+    "manifest_entries": 84,
+    "sha256sum_entries": 85,
+    "status": "passed",
+    "workload_executed": false
+  },
+  "source_bundle_manifest_sha256": "daeb5919dd3fbcbc9953278686427c571f6995af5e1015eb44856b7d57eb8b2f",
+  "command": [
+    "python3",
+    "/var/tmp/litchi-allocator-diagnostic-root-publication-v4-20260910/fresh/evidence/tools/verify_v6_diagnostic.py",
+    "--check"
+  ],
+  "source_scope": "historical cf4 scannerV6 diagnostics; no gain or native acceptance claim"
+}

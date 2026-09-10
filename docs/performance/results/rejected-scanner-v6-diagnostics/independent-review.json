@@ -1,0 +1,16 @@
+{
+  "reviewer": "xlsx_current_review",
+  "verdict": "CLEAR for final V4 publication",
+  "manifest_entries": 84,
+  "checksum_entries": 85,
+  "workload_executed": false,
+  "checks": [
+    "all85checksums",
+    "revision4identity",
+    "operationallocator versus wholeprocess heaptrack scope",
+    "exactly one expected case per report",
+    "all allocator metric scopes",
+    "independent extra-result and wrong-case mutations fail closed",
+    "eight bundled mutation probes"
+  ]
+}
