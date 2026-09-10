@@ -1,0 +1,37 @@
+{
+  "root": "/var/tmp/litchi-pptx-bwmode-validation-20260910",
+  "paths": [
+    {
+      "path": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "sha256": "7ccc7a76c14449b09edc6fedb71b73119b4482585ecee7fef89c147f7a283f39"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs",
+      "sha256": "4f783ac3b88ae722d35cac4f335ed3c6706a1c6d9eca61ecddff0cf6411ff64c"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/mod.rs",
+      "sha256": "2ae7a4a696d3ff4798f399ebfd2cff52f545b20a0db6ebb6fe660878cc3cb677"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/model.rs",
+      "sha256": "71c72a5fed5cad088cbc25a629d1570fa8817b9f0c9943da2180216c4a20f4f2"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/package.rs",
+      "sha256": "aa20b503b5e6666d7c64376cd294313b3b87b32fe1a6d1ea30794c2b1da83c99"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/tests.rs",
+      "sha256": "2b37a7b2fb946b5b0aa10aac9dab751b345a74a711e5e1787c91075375be9bba"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/transaction.rs",
+      "sha256": "863e7bef63b46ff9096bba689c6534fa4115ecf6819838f3ce758bf2aa2017e8"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/embedded/content_parts/validation.rs",
+      "sha256": "6d95bdfefd3a6eb4368985fa8379f5adf317338d2e7b5dc0045651a45449e15a"
+    }
+  ]
+}

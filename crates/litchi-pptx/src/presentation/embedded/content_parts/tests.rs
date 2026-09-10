@@ -5,8 +5,8 @@
 )]
 
 use super::{
-    Anchor, Limits, Payload, Relationship, Snapshot, Target, TargetMode, apply_commit, apply_patch,
-    load_slide, load_snapshot,
+    Anchor, BlackWhiteMode, Limits, Payload, Relationship, Snapshot, Target, TargetMode,
+    apply_commit, apply_patch, load_slide, load_snapshot,
 };
 use crate::Error;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -294,6 +294,407 @@ fn invalid_edits_do_not_mutate_the_staged_snapshot() {
     let mut edit = source.edit();
     assert!(edit.set_relationship_id(0, "bad\u{0000}").is_err());
     assert_eq!(edit.parts(), source.parts());
+}
+
+#[test]
+fn reads_optional_p14_bw_mode_and_round_trips_all_schema_tokens() {
+    let modes = [
+        ("clr", BlackWhiteMode::Color),
+        ("auto", BlackWhiteMode::Auto),
+        ("gray", BlackWhiteMode::Gray),
+        ("ltGray", BlackWhiteMode::LightGray),
+        ("invGray", BlackWhiteMode::InverseGray),
+        ("grayWhite", BlackWhiteMode::GrayWhite),
+        ("blackGray", BlackWhiteMode::BlackGray),
+        ("blackWhite", BlackWhiteMode::BlackWhite),
+        ("black", BlackWhiteMode::Black),
+        ("white", BlackWhiteMode::White),
+        ("hidden", BlackWhiteMode::Hidden),
+    ];
+    for (token, mode) in modes {
+        assert_eq!(mode.as_str(), token);
+        assert_eq!(BlackWhiteMode::try_from(token).unwrap(), mode);
+    }
+    assert!(BlackWhiteMode::try_from("AUTO").is_err());
+
+    let (package, slide_name) = package_with_internal_payload(b"opaque");
+    let slide = package.get_part(&slide_name).unwrap();
+    let parts = load_slide(&package, 0, slide, &mut Limits::default()).unwrap();
+    assert_eq!(parts[0].black_white_mode(), None);
+
+    let package = package_with_anchor(
+        br#"<p:contentPart p14:bwMode="auto" r:id="rIdOpaque"><p14:nvContentPartPr/></p:contentPart>"#,
+        Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+        None,
+    );
+    let slide = package.get_part(&slide_name).unwrap();
+    let parts = load_slide(&package, 0, slide, &mut Limits::default()).unwrap();
+    assert_eq!(parts[0].black_white_mode(), Some(BlackWhiteMode::Auto));
+    assert_eq!(
+        parts[0].anchor().black_white_mode(),
+        Some(BlackWhiteMode::Auto)
+    );
+}
+
+#[test]
+fn p14_bw_mode_commits_and_reopens_every_schema_token() {
+    let modes = [
+        ("clr", BlackWhiteMode::Color),
+        ("auto", BlackWhiteMode::Auto),
+        ("gray", BlackWhiteMode::Gray),
+        ("ltGray", BlackWhiteMode::LightGray),
+        ("invGray", BlackWhiteMode::InverseGray),
+        ("grayWhite", BlackWhiteMode::GrayWhite),
+        ("blackGray", BlackWhiteMode::BlackGray),
+        ("blackWhite", BlackWhiteMode::BlackWhite),
+        ("black", BlackWhiteMode::Black),
+        ("white", BlackWhiteMode::White),
+        ("hidden", BlackWhiteMode::Hidden),
+    ];
+
+    for (token, mode) in modes {
+        let mut package = package_with_anchor(
+            br#"<p:contentPart r:id="rIdOpaque"/>"#,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        );
+        let source = snapshot(&package);
+        let mut edit = source.edit();
+        assert!(edit.set_black_white_mode(0, Some(mode)).unwrap());
+        let commit = edit.commit().unwrap();
+        let written = commit.snapshot().source_xml();
+        assert!(
+            written
+                .windows(format!(r#"p14:bwMode="{token}""#).len())
+                .any(|window| window == format!(r#"p14:bwMode="{token}""#).as_bytes())
+        );
+
+        apply_patch(&mut package, commit.patch()).unwrap();
+        let reopened = snapshot(&package);
+        assert_eq!(reopened.parts()[0].black_white_mode(), Some(mode));
+        assert!(
+            reopened
+                .source_xml()
+                .windows(format!(r#"p14:bwMode="{token}""#).len())
+                .any(|window| window == format!(r#"p14:bwMode="{token}""#).as_bytes())
+        );
+    }
+}
+
+#[test]
+fn p14_bw_mode_edits_preserve_opaque_anchor_bytes_and_inverse() {
+    let anchor = br#"<p:contentPart xmlns:vendor="urn:vendor" vendor:flag="keep" p14:bwMode="gray" r:id="rIdOpaque"><p14:nvContentPartPr/><vendor:opaque/></p:contentPart>"#;
+    let (mut package, _) = (
+        package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        ),
+        PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+    );
+    let source = snapshot(&package);
+    assert_eq!(
+        source.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::Gray)
+    );
+
+    let mut noop = source.edit();
+    assert!(
+        !noop
+            .set_black_white_mode(0, Some(BlackWhiteMode::Gray))
+            .unwrap()
+    );
+    assert!(!noop.commit().unwrap().is_changed());
+
+    let mut edit = source.edit();
+    assert!(
+        edit.set_black_white_mode(0, Some(BlackWhiteMode::BlackWhite))
+            .unwrap()
+    );
+    let commit = edit.commit().unwrap();
+    let changed_xml = commit.snapshot().source_xml();
+    assert!(
+        changed_xml
+            .windows(b"p14:bwMode=\"blackWhite\"".len())
+            .any(|window| { window == b"p14:bwMode=\"blackWhite\"" })
+    );
+    assert!(
+        changed_xml
+            .windows(b"vendor:flag=\"keep\"".len())
+            .any(|window| window == b"vendor:flag=\"keep\"")
+    );
+    assert!(
+        changed_xml
+            .windows(b"vendor:opaque".len())
+            .any(|window| window == b"vendor:opaque")
+    );
+
+    apply_patch(&mut package, commit.patch()).unwrap();
+    let changed = snapshot(&package);
+    assert_eq!(
+        changed.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::BlackWhite)
+    );
+    apply_patch(&mut package, &commit.patch().inverse()).unwrap();
+    assert_eq!(snapshot(&package).source_xml(), source.source_xml());
+}
+
+#[test]
+fn p14_bw_mode_insert_remove_handles_inherited_and_local_namespaces() {
+    let (mut package, _) = (
+        package_with_anchor(
+            br#"<p:contentPart r:id="rIdOpaque"/>"#,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        ),
+        PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+    );
+    let source = snapshot(&package);
+    let mut edit = source.edit();
+    assert!(
+        edit.set_black_white_mode(0, Some(BlackWhiteMode::Auto))
+            .unwrap()
+    );
+    let commit = edit.commit().unwrap();
+    let xml = commit.snapshot().source_xml();
+    assert!(
+        xml.windows(b"p14:bwMode=\"auto\"".len())
+            .any(|window| window == b"p14:bwMode=\"auto\"")
+    );
+    assert!(
+        xml.windows(format!("xmlns:p14=\"{P14}\"").len())
+            .any(|window| window == format!("xmlns:p14=\"{P14}\"").as_bytes())
+    );
+    apply_patch(&mut package, commit.patch()).unwrap();
+
+    let current = snapshot(&package);
+    let mut remove = current.edit();
+    assert!(remove.set_bw_mode(0, None).unwrap());
+    let removed = remove.commit().unwrap();
+    let removed_xml = removed.snapshot().source_xml();
+    assert!(
+        !removed_xml
+            .windows(b"p14:bwMode".len())
+            .any(|window| window == b"p14:bwMode")
+    );
+    assert!(
+        removed_xml
+            .windows(format!("xmlns:p14=\"{P14}\"").len())
+            .any(|window| window == format!("xmlns:p14=\"{P14}\"").as_bytes())
+    );
+    apply_patch(&mut package, removed.patch()).unwrap();
+    assert_eq!(snapshot(&package).parts()[0].black_white_mode(), None);
+
+    let mut exact = source.edit();
+    exact
+        .set_black_white_mode(0, Some(BlackWhiteMode::Auto))
+        .unwrap();
+    exact.set_black_white_mode(0, None).unwrap();
+    let exact = exact.commit().unwrap();
+    assert!(!exact.is_changed());
+    assert_eq!(exact.snapshot().source_xml(), source.source_xml());
+}
+
+#[test]
+fn p14_bw_mode_accepts_inherited_custom_prefix_and_rejects_bad_values() {
+    let anchor = br#"<p:contentPart x:bwMode="gray" r:id="rIdOpaque"/>"#;
+    let (mut package, _) = (
+        package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        ),
+        PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+    );
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let slide = package.get_part(&slide_name).unwrap();
+    let mut limits = Limits::default();
+    let parts = load_slide(&package, 0, slide, &mut limits).unwrap();
+    assert_eq!(parts[0].black_white_mode(), None);
+
+    let slide = package.get_part_mut(&slide_name).unwrap();
+    let anchor_text = std::str::from_utf8(anchor).unwrap();
+    let xml = format!(
+        "<p:sld xmlns:p=\"{PML}\" xmlns:r=\"{REL}\" xmlns:x=\"{P14}\"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{anchor_text}</p:spTree></p:cSld></p:sld>"
+    );
+    slide.set_blob(xml.into_bytes());
+    let source = snapshot(&package);
+    assert_eq!(
+        source.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::Gray)
+    );
+    let mut edit = source.edit();
+    edit.set_black_white_mode(0, Some(BlackWhiteMode::White))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(
+        commit
+            .snapshot()
+            .source_xml()
+            .windows(b"x:bwMode=\"white\"".len())
+            .any(|window| window == b"x:bwMode=\"white\"")
+    );
+
+    for value in ["AUTO", "unknown"] {
+        let package = package_with_anchor(
+            format!(r#"<p:contentPart p14:bwMode="{value}" r:id="rIdOpaque"/>"#).as_bytes(),
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        );
+        let slide = package.get_part(&slide_name).unwrap();
+        let error = load_slide(&package, 0, slide, &mut Limits::default()).unwrap_err();
+        assert!(matches!(error, Error::Invalid(message) if message.contains("bwMode")));
+    }
+
+    let package = package_with_anchor(
+        br#"<p:contentPart xmlns:x="http://schemas.microsoft.com/office/powerpoint/2010/main" p14:bwMode="gray" x:bwMode="white" r:id="rIdOpaque"/>"#,
+        Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+        None,
+    );
+    let slide = package.get_part(&slide_name).unwrap();
+    let error = load_slide(&package, 0, slide, &mut Limits::default()).unwrap_err();
+    assert!(matches!(error, Error::Invalid(message) if message.contains("duplicate")));
+}
+
+#[test]
+fn p14_bw_mode_ignores_unqualified_foreign_and_media_lookalikes() {
+    for anchor in [
+        br#"<p:contentPart bwMode="gray" r:id="rIdOpaque"/>"#.as_slice(),
+        br#"<p:contentPart xmlns:x="urn:foreign" x:bwMode="gray" r:id="rIdOpaque"/>"#.as_slice(),
+        br#"<p:contentPart r:id="rIdOpaque"><p14:media p14:bwMode="gray"/></p:contentPart>"#
+            .as_slice(),
+    ] {
+        let package = package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        );
+        let current = snapshot(&package);
+        assert_eq!(current.parts()[0].black_white_mode(), None);
+    }
+}
+
+#[test]
+fn p14_bw_mode_edits_only_the_active_mce_branch() {
+    let anchor = br#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:Choice Requires="x"><p:contentPart p14:bwMode="black" r:id="rIdInactive"/></mc:Choice><mc:Fallback><p:contentPart p14:bwMode="gray" r:id="rIdOpaque"><p14:nvContentPartPr/></p:contentPart></mc:Fallback></mc:AlternateContent>"#;
+    let (mut package, _) = (
+        package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdInactive", false)),
+        ),
+        PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+    );
+    let source = snapshot(&package);
+    assert_eq!(source.parts().len(), 1);
+    assert_eq!(source.parts()[0].relationship_id(), "rIdOpaque");
+    assert_eq!(
+        source.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::Gray)
+    );
+
+    let mut edit = source.edit();
+    edit.set_black_white_mode(0, Some(BlackWhiteMode::White))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let xml = std::str::from_utf8(commit.snapshot().source_xml()).unwrap();
+    assert!(xml.contains(r#"r:id="rIdInactive""#));
+    assert!(xml.contains(r#"p14:bwMode="black""#));
+    assert!(xml.contains(r#"r:id="rIdOpaque""#));
+    assert!(xml.contains(r#"p14:bwMode="white""#));
+    apply_patch(&mut package, commit.patch()).unwrap();
+    assert_eq!(
+        snapshot(&package).parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::White)
+    );
+}
+
+#[test]
+fn p14_bw_mode_selects_a_canonical_mce_choice() {
+    let anchor = br#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="p14"><p:contentPart p14:bwMode="black" r:id="rIdChoice"/></mc:Choice><mc:Fallback><p:contentPart p14:bwMode="gray" r:id="rIdFallback"/></mc:Fallback></mc:AlternateContent>"#;
+    let (mut package, _) = (
+        package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdChoice", false)),
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdFallback", false)),
+        ),
+        PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+    );
+    let source = snapshot(&package);
+    assert_eq!(source.parts().len(), 1);
+    assert_eq!(source.parts()[0].relationship_id(), "rIdChoice");
+    assert_eq!(
+        source.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::Black)
+    );
+
+    let mut edit = source.edit();
+    edit.set_black_white_mode(0, Some(BlackWhiteMode::White))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let xml = std::str::from_utf8(commit.snapshot().source_xml()).unwrap();
+    assert!(xml.contains(r#"r:id="rIdChoice""#));
+    assert!(xml.contains(r#"p14:bwMode="white""#));
+    assert!(xml.contains(r#"r:id="rIdFallback""#));
+    assert!(xml.contains(r#"p14:bwMode="gray""#));
+
+    apply_patch(&mut package, commit.patch()).unwrap();
+    let reopened = snapshot(&package);
+    assert_eq!(reopened.parts()[0].relationship_id(), "rIdChoice");
+    assert_eq!(
+        reopened.parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::White)
+    );
+}
+
+#[test]
+fn signed_content_part_noop_is_preserved_and_mutation_requires_explicit_unsign() {
+    let (mut package, _) = package_with_internal_payload(b"opaque");
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin"
+            .to_owned(),
+        "_xmlsignatures/origin.sigs".to_owned(),
+        "rIdSignature".to_owned(),
+        false,
+    );
+    assert!(package.is_signed());
+
+    let source = snapshot(&package);
+    let noop = source.edit().commit().unwrap();
+    assert!(!noop.is_changed());
+    apply_commit(&mut package, noop).unwrap();
+    assert!(package.is_signed());
+
+    let mut edit = source.edit();
+    edit.set_black_white_mode(0, Some(BlackWhiteMode::White))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let before = package
+        .get_part(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let error = apply_patch(&mut package, commit.patch()).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
+    assert!(package.is_signed());
+    assert_eq!(
+        package
+            .get_part(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
+            .unwrap()
+            .blob(),
+        before.as_slice()
+    );
+
+    package.unsign();
+    assert!(!package.is_signed());
+    apply_patch(&mut package, commit.patch()).unwrap();
+    assert_eq!(
+        snapshot(&package).parts()[0].black_white_mode(),
+        Some(BlackWhiteMode::White)
+    );
 }
 
 fn package_with_internal_payload(payload: &[u8]) -> (OpcPackage, PackURI) {
