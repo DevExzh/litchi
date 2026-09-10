@@ -1,0 +1,45 @@
+[
+  {
+    "gate": "test",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "soapberry-zip",
+      "--all-features",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-security-corpus-root-982-common-20260910-test.log",
+    "sha256": "a7bd4da3115d622e03c57e9c7260824a6e1085561655cb88e09a63818cdbf453"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "soapberry-zip",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-security-corpus-root-982-common-20260910-clippy.log",
+    "sha256": "1261d279df0688399af9a2de386b059707d956614125d4134da8fe60361e0b6b"
+  }
+]

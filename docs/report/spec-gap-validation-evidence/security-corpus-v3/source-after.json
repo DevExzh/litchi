@@ -1,0 +1,247 @@
+[
+  {
+    "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+    "expected": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348",
+    "actual": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348"
+  },
+  {
+    "path": "tools/perf-baseline/Cargo.toml",
+    "expected": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470",
+    "actual": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470"
+  },
+  {
+    "path": "tools/perf-baseline/Cargo.lock",
+    "expected": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562",
+    "actual": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562"
+  },
+  {
+    "path": "tools/perf-baseline/src/security_corpus.rs",
+    "expected": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb",
+    "actual": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb"
+  },
+  {
+    "path": "crates/litchi-crypto/tests/ooxml_interoperability.rs",
+    "expected": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf",
+    "actual": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf"
+  },
+  {
+    "path": "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json",
+    "expected": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5",
+    "actual": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5"
+  },
+  {
+    "path": "crates/litchi-crypto/tests/data/ooxml/agile-mixed-manifest.json",
+    "expected": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9",
+    "actual": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9"
+  },
+  {
+    "path": "crates/litchi-crypto/tests/data/ooxml/native-agile-manifest.json",
+    "expected": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520",
+    "actual": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520"
+  },
+  {
+    "path": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json",
+    "expected": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a",
+    "actual": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a"
+  },
+  {
+    "path": "crates/litchi-crypto/src/ooxml/mod.rs",
+    "expected": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece",
+    "actual": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece"
+  },
+  {
+    "path": "crates/litchi-crypto/src/ooxml/container.rs",
+    "expected": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db",
+    "actual": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db"
+  },
+  {
+    "path": "crates/litchi-crypto/src/ooxml/standard.rs",
+    "expected": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964",
+    "actual": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964"
+  },
+  {
+    "path": "crates/litchi-crypto/src/ooxml/agile.rs",
+    "expected": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0",
+    "actual": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0"
+  },
+  {
+    "path": "crates/litchi-crypto/src/spaces.rs",
+    "expected": "4169d37c3a728576b26416675ede28b68edecc0ba8a9d00019b3a422e3fff835",
+    "actual": "4169d37c3a728576b26416675ede28b68edecc0ba8a9d00019b3a422e3fff835"
+  },
+  {
+    "path": "crates/litchi-cfb/src/file.rs",
+    "expected": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642",
+    "actual": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642"
+  },
+  {
+    "path": "crates/litchi-cfb/src/allocation_validation_tests.rs",
+    "expected": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f",
+    "actual": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f"
+  },
+  {
+    "path": "crates/litchi-doc/src/package/codec.rs",
+    "expected": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9",
+    "actual": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9"
+  },
+  {
+    "path": "crates/litchi-doc/src/package/mod.rs",
+    "expected": "e3b92479c2d107714e0c8db28267c38c9a66c47927e6129bb6b46c12b5a9293a",
+    "actual": "e3b92479c2d107714e0c8db28267c38c9a66c47927e6129bb6b46c12b5a9293a"
+  },
+  {
+    "path": "crates/litchi-doc/src/package/model.rs",
+    "expected": "7bc48acd1634d338f5799cebc9cf6ad0e314c908413c1f9af9343996996c5926",
+    "actual": "7bc48acd1634d338f5799cebc9cf6ad0e314c908413c1f9af9343996996c5926"
+  },
+  {
+    "path": "crates/litchi-doc/src/document/mod.rs",
+    "expected": "0a43d49daebbb61de9b4315cdad31b2ede6a1da323b22811dcbaff4aefc1031c",
+    "actual": "0a43d49daebbb61de9b4315cdad31b2ede6a1da323b22811dcbaff4aefc1031c"
+  },
+  {
+    "path": "crates/litchi-doc/src/document/package.rs",
+    "expected": "0b546a79ec0fb6e516dd299edb844bda83660d9737189303604b91c94919da79",
+    "actual": "0b546a79ec0fb6e516dd299edb844bda83660d9737189303604b91c94919da79"
+  },
+  {
+    "path": "crates/litchi-docx/src/source_backed.rs",
+    "expected": "8557c29f54d175563e582366edba1c8c202136e4a5da3594ba7ca52cecf2f645",
+    "actual": "8557c29f54d175563e582366edba1c8c202136e4a5da3594ba7ca52cecf2f645"
+  },
+  {
+    "path": "crates/litchi-opc/src/pkgreader.rs",
+    "expected": "85bb29e62bdcf58c813a7d44c590c2bbe7ae6e2dbf64393f033dec0b7c049c3c",
+    "actual": "85bb29e62bdcf58c813a7d44c590c2bbe7ae6e2dbf64393f033dec0b7c049c3c"
+  },
+  {
+    "path": "crates/litchi-opc/src/package.rs",
+    "expected": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1",
+    "actual": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1"
+  },
+  {
+    "path": "crates/litchi-opc/src/limits.rs",
+    "expected": "2c8ef7a5081ced8a81429ac26cca308d874aa12422745ebfc1c3701589976a32",
+    "actual": "2c8ef7a5081ced8a81429ac26cca308d874aa12422745ebfc1c3701589976a32"
+  },
+  {
+    "path": "crates/litchi-opc/src/phys_pkg.rs",
+    "expected": "0ea390fee12dc461401cdc2d887854a32f96bd3d3f526f376b34e9bbebef38a2",
+    "actual": "0ea390fee12dc461401cdc2d887854a32f96bd3d3f526f376b34e9bbebef38a2"
+  },
+  {
+    "path": "crates/litchi-opc/src/source_backed.rs",
+    "expected": "c56d1d0dd21ca97528982085560d292f6caf6b0594d095f0f4fc65664e8310bd",
+    "actual": "c56d1d0dd21ca97528982085560d292f6caf6b0594d095f0f4fc65664e8310bd"
+  },
+  {
+    "path": "crates/litchi-ooxml-common/src/properties/read.rs",
+    "expected": "57b393b460623f89b75c7761ab4f39672fe7ccad221253fb47c7eabc0e46c205",
+    "actual": "57b393b460623f89b75c7761ab4f39672fe7ccad221253fb47c7eabc0e46c205"
+  },
+  {
+    "path": "crates/litchi-sign/src/xml.rs",
+    "expected": "187ec1f6a926e87f0e817af4f778861d6eb746053d0ec71b144b672460f1f4a2",
+    "actual": "187ec1f6a926e87f0e817af4f778861d6eb746053d0ec71b144b672460f1f4a2"
+  },
+  {
+    "path": "crates/litchi-xls/src/workbook/package.rs",
+    "expected": "3ee906f6e96a1851347408b88205e2f18de6ddd9eb294b672f95390e6dc5e054",
+    "actual": "3ee906f6e96a1851347408b88205e2f18de6ddd9eb294b672f95390e6dc5e054"
+  },
+  {
+    "path": "crates/litchi-xls/src/vba.rs",
+    "expected": "a3e4fe975485269a36341d0accc961cda7601f78561599c7dba2cf980a80393e",
+    "actual": "a3e4fe975485269a36341d0accc961cda7601f78561599c7dba2cf980a80393e"
+  },
+  {
+    "path": "crates/litchi-xls/src/cell_values/mod.rs",
+    "expected": "b7e9d4fa191c52fa3760020d10e931200fad4e43a0c8b723f900967dfc54746e",
+    "actual": "b7e9d4fa191c52fa3760020d10e931200fad4e43a0c8b723f900967dfc54746e"
+  },
+  {
+    "path": "crates/litchi-xls/src/cell_values/structural.rs",
+    "expected": "644e5a7f9a3f45fd337ed066225d6e6e025c3894b842dc77f2a077af58ce1554",
+    "actual": "644e5a7f9a3f45fd337ed066225d6e6e025c3894b842dc77f2a077af58ce1554"
+  },
+  {
+    "path": "crates/litchi-xls/src/workbook/source.rs",
+    "expected": "3e7dbde9f197771ee7766a597f3f27f6a0143b79f1cf2575dd52a9f8493f6d92",
+    "actual": "3e7dbde9f197771ee7766a597f3f27f6a0143b79f1cf2575dd52a9f8493f6d92"
+  },
+  {
+    "path": "crates/litchi-ole-common/src/object/mod.rs",
+    "expected": "8c183aec5c6818fdc748739a8881aeb0d4585ae9e1f9ba241ce909c5a3c8b87f",
+    "actual": "8c183aec5c6818fdc748739a8881aeb0d4585ae9e1f9ba241ce909c5a3c8b87f"
+  },
+  {
+    "path": "crates/litchi-ole-common/src/object/model.rs",
+    "expected": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352",
+    "actual": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+  },
+  {
+    "path": "crates/litchi-ole-common/src/object/editor.rs",
+    "expected": "0e3d136ff167f82cb960f37766e996b2aa1f6450008d2b4ba364814e69a42542",
+    "actual": "0e3d136ff167f82cb960f37766e996b2aa1f6450008d2b4ba364814e69a42542"
+  },
+  {
+    "path": "crates/litchi-xlsx/src/workbook/model.rs",
+    "expected": "345c517288661ae41553f72a98594476531e7464d51df692333d2a2bb1d59612",
+    "actual": "345c517288661ae41553f72a98594476531e7464d51df692333d2a2bb1d59612"
+  },
+  {
+    "path": "crates/litchi-xlsx/tests/reader_tolerance.rs",
+    "expected": "71292ec5da0a78e64d55d73c7de251e7c4a0959838ea89ddc21b77ec2967bb8a",
+    "actual": "71292ec5da0a78e64d55d73c7de251e7c4a0959838ea89ddc21b77ec2967bb8a"
+  },
+  {
+    "path": "crates/litchi-xlsx/src/xml_maps/tests.rs",
+    "expected": "cb73a9f5874d367af9fb1c54907e8597affe3ea912da2ee364654a2002a4117f",
+    "actual": "cb73a9f5874d367af9fb1c54907e8597affe3ea912da2ee364654a2002a4117f"
+  },
+  {
+    "path": "crates/soapberry-zip/src/archive.rs",
+    "expected": "7e4243ab183ce7c92b94916835a15cd86adfdcd8149ccdcacc48f5693786a968",
+    "actual": "7e4243ab183ce7c92b94916835a15cd86adfdcd8149ccdcacc48f5693786a968"
+  },
+  {
+    "path": "crates/soapberry-zip/src/office.rs",
+    "expected": "a6f8fd14aed46468063455467e808b40ac1272901548d1bde325b35e4711cb34",
+    "actual": "a6f8fd14aed46468063455467e808b40ac1272901548d1bde325b35e4711cb34"
+  },
+  {
+    "path": "crates/soapberry-zip/src/preserve.rs",
+    "expected": "48bc63a2197f6c17801acd0f82db8fb8a2062d4c590ab6e62531b7dc7d38321f",
+    "actual": "48bc63a2197f6c17801acd0f82db8fb8a2062d4c590ab6e62531b7dc7d38321f"
+  },
+  {
+    "path": "docs/adr/0005-io-memory-and-performance.md",
+    "expected": "34a6148a8fe77b3e90212810996667b654e25209fb49c56aaecd8d8fbe83f770",
+    "actual": "34a6148a8fe77b3e90212810996667b654e25209fb49c56aaecd8d8fbe83f770"
+  },
+  {
+    "path": "docs/adr/0006-validation-security-and-compatibility.md",
+    "expected": "b686465f342b2e051f856f094e38c2333aa05a2768bb255fc5b223cbba1f3381",
+    "actual": "b686465f342b2e051f856f094e38c2333aa05a2768bb255fc5b223cbba1f3381"
+  },
+  {
+    "path": "docs/performance/results/security-corpus-v3/catalog.json",
+    "expected": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797",
+    "actual": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797"
+  },
+  {
+    "path": "docs/performance/results/security-corpus-v3/oracles.json",
+    "expected": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6",
+    "actual": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6"
+  },
+  {
+    "path": "docs/performance/results/security-corpus-v3/profile.json",
+    "expected": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1",
+    "actual": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1"
+  },
+  {
+    "path": "docs/performance/results/security-corpus-v3/README.md",
+    "expected": "9f5f9226750c73b8c2bf15aa54ccf6ccce524e105f0278b20f8c700818267a80",
+    "actual": "9f5f9226750c73b8c2bf15aa54ccf6ccce524e105f0278b20f8c700818267a80"
+  }
+]

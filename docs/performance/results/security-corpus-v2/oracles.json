@@ -1,0 +1,861 @@
+{
+  "catalog_id": "litchi-security-corpus-v2",
+  "policy": {
+    "default_catalog_bindings": 201,
+    "external_links": "inventory only; never resolve or fetch",
+    "macros": "inspect-and-preserve-inertly; never execute",
+    "producer_claim": "source repository only; all document producers are unknown or explicitly synthetic",
+    "timed_captures_recorded": false,
+    "timed_operation_definitions": 3
+  },
+  "profile_id": "security-corpus-bounded-read-v2",
+  "rows": [
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+      "expected": {
+        "edit_publication": "refuse_without_explicit_policy",
+        "signature": "valid"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-signed-docx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+      "expected": {
+        "edit_publication": "refuse_without_explicit_policy",
+        "signature": "valid"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-signed-xlsx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+      "expected": {
+        "edit_publication": "refuse_without_explicit_policy",
+        "signature": "valid"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-signed-pptx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-protected-docx-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+      "expected": {
+        "changed_publication": "refuse",
+        "document_protection": "present"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "ooxml-protected-docx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-external-xlsx-inventory-no-fetch",
+      "corpus_id": "ooxml-zip:sha256:e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+      "expected": {
+        "external_resolution": false,
+        "inventory_only": true
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "ooxml-external-startup-xlsx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "inventory-only"
+    },
+    {
+      "case": "security-macro-xls-inert-preservation",
+      "corpus_id": "cfb-ole2:sha256:0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+      "expected": {
+        "macro_execution": false,
+        "macro_inventory": "present"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-simple-macro-xls",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-encrypted-ole-password-readback",
+      "corpus_id": "cfb-ole2:sha256:f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+      "expected": {
+        "password_required": true,
+        "semantic_sha256": "6dd4273bea0a8f70f4b6d8448e0ea1cb22b54713ad78d177394bd8b496e0aea6",
+        "wrong_password": "invalid"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-cryptoapi-encrypted-doc",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-encrypted-ole-password-readback",
+      "corpus_id": "cfb-ole2:sha256:9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+      "expected": {
+        "password_required": true,
+        "semantic_sha256": "5c5c945257fcd1569b5161722e15a9d73283daf786aca1daf04d0029d3736b78",
+        "wrong_password": "invalid"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-binaryrc4-encrypted-doc",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-opc-malformed-refusal",
+      "corpus_id": "ooxml-zip:sha256:e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+      "expected": {
+        "open": "refuse",
+        "output_bytes": 0
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-opc-multiple-core-properties",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-opc-malformed-refusal",
+      "corpus_id": "ooxml-zip:sha256:a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+      "expected": {
+        "open": "refuse",
+        "output_bytes": 0
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-opc-derived-part-name",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-cfb-boundary-read",
+      "corpus_id": "cfb-ole2:sha256:f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+      "expected": {
+        "open": "accept",
+        "stream": "WordDocument"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "cfb-short-final-sector",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-cfb-boundary-read",
+      "corpus_id": "cfb-ole2:sha256:d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+      "expected": {
+        "open": "accept",
+        "stream": "WordDocument"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "cfb-uninitialized-size-high-word",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-xlsx-adversarial-inert-read",
+      "corpus_id": "ooxml-zip:sha256:95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+      "expected": {
+        "external_resolution": false,
+        "opaque_schema_preserved": true
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "poi-xxe-schema-inert-xlsx",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "inventory-only"
+    },
+    {
+      "case": "security-xlsx-adversarial-inert-read",
+      "corpus_id": "ooxml-zip:sha256:c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+      "expected": {
+        "nonempty_target": true,
+        "open": "accept"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "ooxml-malformed-shared-string-hints",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Standard AES-192"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-component-standard-aes192",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Standard AES-256"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-component-standard-aes256",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Agile AES-256/SHA-512"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-component-agile-mixed-key-size",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Agile AES-256/SHA-512"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-msoffcrypto-agile-valid-graph",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-advisory-compatibility",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Agile AES-256/SHA-512"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-msoffcrypto-agile-zero-block-graph",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Standard AES-192"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-rust-standard-aes192",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Standard AES-256"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-rust-standard-aes256",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+      "expected": {
+        "clear_package_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+        "external_verifier": "msoffcrypto-tool",
+        "mode": "Agile AES-256/SHA-512"
+      },
+      "external_reference_resolution": false,
+      "fixture_id": "crypto-rust-agile-aes256-sha512",
+      "host_code_execution": false,
+      "operations": [
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "bounded_read",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation read",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "validate",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation validate",
+          "timed": true
+        },
+        {
+          "capture_recorded": false,
+          "executable": true,
+          "name": "preserve",
+          "read_only_or_guarded": true,
+          "selector": "security-corpus --operation preserve",
+          "timed": true
+        }
+      ],
+      "role": "guard"
+    }
+  ],
+  "schema_version": 2
+}

@@ -1,0 +1,4974 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-security-corpus-v1",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "9c66e095ae2c970bee97131a9d9b408033258d5667de7c9100449adbec951c17",
+  "content_set_sha256": "ea93b2d1bfe8779e5561fc81ece9ca405eb76c69dfdaed3f2d761a0328ac5107",
+  "build": {
+    "tool": "litchi-security-corpus-catalog",
+    "tool_version": "1",
+    "git_revision": "0201c716e6005ad26712895db409b807cdbca5b0",
+    "git_worktree_dirty": true,
+    "source_files": [
+      {
+        "path": "tools/generate_security_corpus_catalog.py",
+        "sha256": "12bac7868dbddb27eca651ea1113980b8459c1c7285c34d498665b19e54c850f"
+      },
+      {
+        "path": "tools/validate_security_corpus_catalog.py",
+        "sha256": "3c7df432616ba762d4886902df9850cac5bd1d3676bfde8054ea459b70cd3489"
+      },
+      {
+        "path": "docs/performance/results/security-corpus-v1/profile.json",
+        "sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239"
+      },
+      {
+        "path": "docs/performance/results/security-corpus-v1/oracles.json",
+        "sha256": "2209d0d3069e61c338316d142fe45e89d6812658fd06287e464a82e203d65e4e"
+      }
+    ]
+  },
+  "corpora": [
+    {
+      "id": "cfb-ole2:sha256:0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+      "name": "Apache POI VBA-bearing XLS fixture",
+      "legacy_v1": {
+        "name": "Apache POI VBA-bearing XLS fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "fixture",
+        "payload_kind": "opaque-container-bytes",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 30720,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 30720,
+        "archive_sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 30720,
+        "target_payload_sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "small",
+      "categories": [
+        "cfb",
+        "fixture",
+        "macro",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/spreadsheet/SimpleMacro.xls",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/spreadsheet/SimpleMacro.xls",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 30720,
+        "archive_sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "present",
+          "kind": "VBA project storage",
+          "evidence": "vba_metadata and inert project inventory in security_corpus"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 30720,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 30720,
+          "sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-macro-xls-inert-preservation"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "cfb-ole2:sha256:9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+      "name": "Apache POI binary RC4 encrypted DOC fixture",
+      "legacy_v1": {
+        "name": "Apache POI binary RC4 encrypted DOC fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "fixture",
+        "payload_kind": "opaque-container-bytes",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 22016,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 22016,
+        "archive_sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 22016,
+        "target_payload_sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "small",
+      "categories": [
+        "cfb",
+        "encrypted",
+        "fixture",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/document/password_tika_binaryrc4.doc",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/document/password_tika_binaryrc4.doc",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 22016,
+        "archive_sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "binary RC4",
+          "evidence": "PasswordRequired/InvalidPassword and authenticated semantic readback in security_corpus"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 22016,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 22016,
+          "sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-encrypted-ole-password-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "cfb-ole2:sha256:d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+      "name": "CFB version-3 uninitialized-size-word compatibility fixture",
+      "legacy_v1": {
+        "name": "CFB version-3 uninitialized-size-word compatibility fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "fixture",
+        "payload_kind": "opaque-container-bytes",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 15360,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 15360,
+        "archive_sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 15360,
+        "target_payload_sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "tiny",
+      "categories": [
+        "adversarial",
+        "cfb",
+        "fixture",
+        "malformed"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc",
+          "fixture_repository": null,
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "repository-fixture-producer-unknown",
+        "source_path": "test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc",
+        "source_repository": null,
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "No checked-in provenance records the application that authored this fixture.",
+        "producer_version": null,
+        "source_sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; document producer and redistribution license are not recorded",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 15360,
+        "archive_sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "adversarial",
+        "malformation_kind": "uninitialized version-3 stream-size high word",
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "litchi-cfb allocation_validation_tests high-word oracle"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 15360,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 15360,
+          "sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-cfb-boundary-read"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "cfb-ole2:sha256:f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+      "name": "CFB short-final-sector compatibility fixture",
+      "legacy_v1": {
+        "name": "CFB short-final-sector compatibility fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "fixture",
+        "payload_kind": "opaque-container-bytes",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 24065,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 24065,
+        "archive_sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 24065,
+        "target_payload_sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "small",
+      "categories": [
+        "adversarial",
+        "cfb",
+        "fixture",
+        "malformed"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/ole/doc/cfb-truncated-final-sector.doc",
+          "fixture_repository": null,
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "repository-fixture-producer-unknown",
+        "source_path": "test-data/ole/doc/cfb-truncated-final-sector.doc",
+        "source_repository": null,
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "No checked-in provenance records the application that authored this fixture.",
+        "producer_version": null,
+        "source_sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; document producer and redistribution license are not recorded",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 24065,
+        "archive_sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "adversarial",
+        "malformation_kind": "short final sector",
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "litchi-cfb allocation_validation_tests short-final-sector oracle"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 24065,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 24065,
+          "sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-cfb-boundary-read"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "cfb-ole2:sha256:f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+      "name": "Apache POI CryptoAPI encrypted DOC fixture",
+      "legacy_v1": {
+        "name": "Apache POI CryptoAPI encrypted DOC fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "fixture",
+        "payload_kind": "opaque-container-bytes",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 27136,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 27136,
+        "archive_sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 27136,
+        "target_payload_sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "small",
+      "categories": [
+        "cfb",
+        "encrypted",
+        "fixture",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/document/password_password_cryptoapi.doc",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/document/password_password_cryptoapi.doc",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 27136,
+        "archive_sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "CryptoAPI",
+          "evidence": "PasswordRequired/InvalidPassword and authenticated semantic readback in security_corpus"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 27136,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 27136,
+          "sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-encrypted-ole-password-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+      "name": "Litchi crypto component Standard AES-192/SHA-1 fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto component Standard AES-192/SHA-1 fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 30208,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 30208,
+        "archive_sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 30208,
+        "target_payload_sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/component-standard-aes192-sha1.docx",
+          "fixture_repository": "litchi-crypto synthetic interoperability fixtures",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/component-standard-aes192-sha1.docx",
+        "source_repository": "litchi-crypto synthetic interoperability fixtures",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 30208,
+        "archive_sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Standard AES-192/SHA-1",
+          "integrity": "unauthenticated",
+          "evidence": "crates/litchi-crypto/tests/ooxml_interoperability.rs"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 30208,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 30208,
+          "sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+      "name": "msoffcrypto Agile zero-DataSpaces-block interoperability fixture",
+      "legacy_v1": {
+        "name": "msoffcrypto Agile zero-DataSpaces-block interoperability fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 31232,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 31232,
+        "archive_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 31232,
+        "target_payload_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "advisory-compatibility",
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512.docx",
+          "fixture_repository": "msoffcrypto-tool synthetic interoperability fixture",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512.docx",
+        "source_repository": "msoffcrypto-tool synthetic interoperability fixture",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 31232,
+        "archive_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Agile AES-256/SHA-512",
+          "integrity": "authenticated",
+          "evidence": "crates/litchi-crypto/tests/ooxml_interoperability.rs"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "advisory-noncanonical",
+        "malformation_kind": "zero EncryptionBlockSize in third-party DataSpaces transform",
+        "expected_behavior": "strict-refuse-compatibility-accept",
+        "within_limits": true,
+        "evidence": "crates/litchi-crypto/tests/data/ooxml/README.md"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 31232,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 31232,
+          "sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-advisory-compatibility"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+      "name": "Litchi crypto component Standard AES-256/SHA-1 fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto component Standard AES-256/SHA-1 fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 30208,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 30208,
+        "archive_sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 30208,
+        "target_payload_sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/component-standard-aes256-sha1.docx",
+          "fixture_repository": "litchi-crypto synthetic interoperability fixtures",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/component-standard-aes256-sha1.docx",
+        "source_repository": "litchi-crypto synthetic interoperability fixtures",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 30208,
+        "archive_sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Standard AES-256/SHA-1",
+          "integrity": "unauthenticated",
+          "evidence": "crates/litchi-crypto/tests/ooxml_interoperability.rs"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 30208,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 30208,
+          "sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+      "name": "msoffcrypto Agile AES-256/SHA-512 valid-graph interoperability fixture",
+      "legacy_v1": {
+        "name": "msoffcrypto Agile AES-256/SHA-512 valid-graph interoperability fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 31232,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 31232,
+        "archive_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 31232,
+        "target_payload_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512-valid-graph.docx",
+          "fixture_repository": "msoffcrypto-tool synthetic interoperability fixture",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/msoffcrypto-agile-aes256-sha512-valid-graph.docx",
+        "source_repository": "msoffcrypto-tool synthetic interoperability fixture",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 31232,
+        "archive_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Agile AES-256/SHA-512",
+          "integrity": "authenticated",
+          "evidence": "crates/litchi-crypto/tests/data/ooxml/native-agile-manifest.json"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "crates/litchi-crypto/tests/data/ooxml/README.md"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 31232,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 31232,
+          "sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+      "name": "Litchi crypto authored Agile AES-256/SHA-512 fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto authored Agile AES-256/SHA-512 fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 31232,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 31232,
+        "archive_sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 31232,
+        "target_payload_sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/rust-agile-aes256-sha512.docx",
+          "fixture_repository": "litchi-crypto authored interoperability fixture",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/rust-agile-aes256-sha512.docx",
+        "source_repository": "litchi-crypto authored interoperability fixture",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 31232,
+        "archive_sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Agile AES-256/SHA-512",
+          "integrity": "authenticated",
+          "evidence": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 31232,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 31232,
+          "sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+      "name": "Litchi crypto authored Standard AES-192/SHA-1 fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto authored Standard AES-192/SHA-1 fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 30208,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 30208,
+        "archive_sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 30208,
+        "target_payload_sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes192.docx",
+          "fixture_repository": "litchi-crypto authored interoperability fixture",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes192.docx",
+        "source_repository": "litchi-crypto authored interoperability fixture",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 30208,
+        "archive_sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Standard AES-192/SHA-1",
+          "integrity": "unauthenticated",
+          "evidence": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 30208,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 30208,
+          "sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+      "name": "Litchi crypto authored Standard AES-256/SHA-1 fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto authored Standard AES-256/SHA-1 fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 30208,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 30208,
+        "archive_sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 30208,
+        "target_payload_sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes256.docx",
+          "fixture_repository": "litchi-crypto authored interoperability fixture",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/rust-standard-aes256.docx",
+        "source_repository": "litchi-crypto authored interoperability fixture",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 30208,
+        "archive_sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Standard AES-256/SHA-1",
+          "integrity": "unauthenticated",
+          "evidence": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 30208,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 30208,
+          "sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-encrypted-cfb:sha256:d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+      "name": "Litchi crypto component Agile mixed wrapper/data key-size fixture",
+      "legacy_v1": {
+        "name": "Litchi crypto component Agile mixed wrapper/data key-size fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML encrypted CFB",
+        "shape": "fixture",
+        "payload_kind": "encrypted-package",
+        "compression": "none",
+        "entry_count": 0,
+        "archive_member_count": 0,
+        "entry_bytes": 31232,
+        "uncompressed_payload_bytes": 0,
+        "archive_bytes": 31232,
+        "archive_sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+        "target_entry": "__raw_archive__",
+        "target_payload_bytes": 31232,
+        "target_payload_sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+        "xlsx": null
+      },
+      "format": "OOXML encrypted CFB",
+      "size_class": "small",
+      "categories": [
+        "crypto",
+        "encrypted",
+        "fixture",
+        "interop",
+        "ooxml",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "crates/litchi-crypto/tests/data/ooxml/component-agile-aes128-wrap-aes256-data-sha512.docx",
+          "fixture_repository": "litchi-crypto synthetic interoperability fixtures",
+          "document_producer": null,
+          "archive_kind": "opaque",
+          "member_inventory": "unavailable",
+          "opaque_target_is_raw_archive": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "synthetic-interoperability-not-native-office",
+        "source_path": "crates/litchi-crypto/tests/data/ooxml/component-agile-aes128-wrap-aes256-data-sha512.docx",
+        "source_repository": "litchi-crypto synthetic interoperability fixtures",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The fixture manifest identifies a component or litchi-crypto interop vector; it is not evidence of native Microsoft Office authoring.",
+        "producer_version": null,
+        "source_sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; repository license applies",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 31232,
+        "archive_sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+        "logical_payload_bytes": 0,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "opaque",
+        "member_inventory": "unavailable",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "present",
+          "kind": "Agile AES-128 wrapper/AES-256 data/SHA-512",
+          "integrity": "authenticated",
+          "evidence": "crates/litchi-crypto/tests/ooxml_interoperability.rs"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "crates/litchi-crypto/tests/data/ooxml/agile-mixed-manifest.json"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 31232,
+          "members": null,
+          "relationships": null,
+          "materialized_bytes": null,
+          "max_member_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "__raw_archive__",
+          "logical_bytes": 31232,
+          "sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-ooxml-encryption-interop-readback"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+      "name": "Apache POI signed XLSX fixture",
+      "legacy_v1": {
+        "name": "Apache POI signed XLSX fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 15,
+        "archive_member_count": 15,
+        "entry_bytes": 7953,
+        "uncompressed_payload_bytes": 24331,
+        "archive_bytes": 12180,
+        "archive_sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+        "target_entry": "_xmlsignatures/sig1.xml",
+        "target_payload_bytes": 7953,
+        "target_payload_sha256": "bf5c1cad0108ea1d2fc863dd66b6b232b6eaec2e91729d6075f9efd3e8afd6b9",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "fixture",
+        "ooxml",
+        "security",
+        "signed"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 12180,
+        "archive_sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+        "logical_payload_bytes": 24331,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "present",
+          "kind": "OOXML package signature",
+          "evidence": "litchi-sign Status::Valid in security_corpus"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 12180,
+          "members": 15,
+          "relationships": null,
+          "materialized_bytes": 24331,
+          "max_member_bytes": 7953
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1680,
+            "stored_bytes": 409,
+            "sha256": "6ceaf50846bd4e0a3126625f7457f2dacf498a86717bfdf372219df1c583d67b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 742,
+            "stored_bytes": 281,
+            "sha256": "0eb56ccd83073bd5c49f7ae450ffd4828c7a0199645d93d28a089d23367ffd1d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "xl/_rels/workbook.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 980,
+            "stored_bytes": 258,
+            "sha256": "24612fb23445b0b316a33b6bfc513e887916020d875f6b64b7a48f56a21e5fb2",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "xl/workbook.xml",
+            "kind": "xml",
+            "logical_bytes": 626,
+            "stored_bytes": 350,
+            "sha256": "414b83ac6c279dcbffaa438516d62767810663a8eeb0e93b9bdfffa5b440bcea",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "xl/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 7079,
+            "stored_bytes": 1684,
+            "sha256": "ea7678093691b7c2abe37d2fef425965934a555414fcf9c0a176d986ae578d87",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "xl/worksheets/sheet2.xml",
+            "kind": "xml",
+            "logical_bytes": 628,
+            "stored_bytes": 352,
+            "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "xl/worksheets/sheet3.xml",
+            "kind": "xml",
+            "logical_bytes": 628,
+            "stored_bytes": 352,
+            "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "xl/worksheets/sheet1.xml",
+            "kind": "xml",
+            "logical_bytes": 816,
+            "stored_bytes": 441,
+            "sha256": "661241bae1a0467d48393d07c7bd00b2a3bc4e16fb0db8049da6314264fd4e4b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "xl/sharedStrings.xml",
+            "kind": "xml",
+            "logical_bytes": 202,
+            "stored_bytes": 164,
+            "sha256": "aafffc6b42f24d291b5ca4edfc0753106a822fab96e6e43f7d52246927f51f09",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "xl/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 1260,
+            "stored_bytes": 584,
+            "sha256": "ba5b2cb32192bd8fc86ad9b5a94d1c99f307f1b77a67d58b23249564b995e397",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 820,
+            "stored_bytes": 395,
+            "sha256": "7b4f46cc8828e08dd59ae22b68dff4701fceab18515909908eeb707016711f47",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 621,
+            "stored_bytes": 325,
+            "sha256": "07a0ec764a71359f248b65634c3e5dd9df862bb100214374297335bd198035e9",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "_xmlsignatures/origin.sigs",
+            "kind": "binary",
+            "logical_bytes": 0,
+            "stored_bytes": 2,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "_xmlsignatures/sig1.xml",
+            "kind": "xml",
+            "logical_bytes": 7953,
+            "stored_bytes": 2863,
+            "sha256": "bf5c1cad0108ea1d2fc863dd66b6b232b6eaec2e91729d6075f9efd3e8afd6b9",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 14,
+            "name": "_xmlsignatures/_rels/origin.sigs.rels",
+            "kind": "xml",
+            "logical_bytes": 296,
+            "stored_bytes": 179,
+            "sha256": "054c32c9d6d3514653d4d80754dd1c4dfafe7b443fb3489afbd2598463d810c3",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "_xmlsignatures/sig1.xml",
+          "logical_bytes": 7953,
+          "sha256": "bf5c1cad0108ea1d2fc863dd66b6b232b6eaec2e91729d6075f9efd3e8afd6b9"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-signed-ooxml-verify-noop-refusal"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+      "name": "Apache POI signed PPTX fixture",
+      "legacy_v1": {
+        "name": "Apache POI signed PPTX fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 40,
+        "archive_member_count": 40,
+        "entry_bytes": 18149,
+        "uncompressed_payload_bytes": 105441,
+        "archive_bytes": 38874,
+        "archive_sha256": "4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+        "target_entry": "_xmlsignatures/sig1.xml",
+        "target_payload_bytes": 18149,
+        "target_payload_sha256": "9359b20990ce0b7f16edcece07c5a1ce7e29d541299b81e4ce82e4acf5979607",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "small",
+      "categories": [
+        "fixture",
+        "ooxml",
+        "security",
+        "signed"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.pptx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.pptx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 38874,
+        "archive_sha256": "4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+        "logical_payload_bytes": 105441,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "present",
+          "kind": "OOXML package signature",
+          "evidence": "litchi-sign Status::Valid in security_corpus"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 38874,
+          "members": 40,
+          "relationships": null,
+          "materialized_bytes": 105441,
+          "max_member_bytes": 18149
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 3382,
+            "stored_bytes": 499,
+            "sha256": "6cdd90b36e673848f3ea389dafa668256f2ca0510b39080de7341c2801910385",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 892,
+            "stored_bytes": 304,
+            "sha256": "6a61e63534ffcabf03a8e77742279fc1950a2551b7edd16f8efd77da5c4c2d76",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "ppt/slides/_rels/slide1.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 193,
+            "sha256": "e125c916ff3118a8767f5a2303bd9c0b3068a0e7476556f56fbe2f41943c26a9",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "ppt/_rels/presentation.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 976,
+            "stored_bytes": 275,
+            "sha256": "6c38eb3088da6ec9ee6f33f157e329c366fa21ea95fcb45bde372a249590822e",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "ppt/presentation.xml",
+            "kind": "xml",
+            "logical_bytes": 3228,
+            "stored_bytes": 589,
+            "sha256": "5914f8339c00e6edc954bc3b9133deecc3044dbe50add522d75907ebcc07b510",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "ppt/slides/slide1.xml",
+            "kind": "xml",
+            "logical_bytes": 1322,
+            "stored_bytes": 590,
+            "sha256": "93b7dbeb43c9226a6027b5fa3abf08a1eb33de3c1aa4f2bbc70efba1475c3735",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 14,
+            "name": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 15,
+            "name": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 16,
+            "name": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 1991,
+            "stored_bytes": 286,
+            "sha256": "e9e503158ddaff4d9afa825a3d1048ffa1c1275291d9ab818812ff8e061ea8fd",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 17,
+            "name": "ppt/slideLayouts/slideLayout11.xml",
+            "kind": "xml",
+            "logical_bytes": 3248,
+            "stored_bytes": 1051,
+            "sha256": "5f5a48132f4f42bee60e3449ef194cce4a551b35d26b8ea7c5bc66d20fecd702",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 18,
+            "name": "ppt/slideLayouts/slideLayout10.xml",
+            "kind": "xml",
+            "logical_bytes": 3024,
+            "stored_bytes": 974,
+            "sha256": "4dfa96ac042514bd340ed094015b27cbedeb43a0d2062554497437ecbaebe000",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 19,
+            "name": "ppt/slideLayouts/slideLayout3.xml",
+            "kind": "xml",
+            "logical_bytes": 4444,
+            "stored_bytes": 1259,
+            "sha256": "2e99586bb322f4c28cdf0be738a8ba94b5ada9e95a470f1b9e26fcb4496a00d6",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 20,
+            "name": "ppt/slideLayouts/slideLayout2.xml",
+            "kind": "xml",
+            "logical_bytes": 2969,
+            "stored_bytes": 951,
+            "sha256": "8d93350bec011d3558ff50e035c0324a80c3ecba3c47e2d45635571b8ed6e14c",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 21,
+            "name": "ppt/slideLayouts/slideLayout1.xml",
+            "kind": "xml",
+            "logical_bytes": 4360,
+            "stored_bytes": 1180,
+            "sha256": "0ce1ad44fbee594aeac49e9bee96367b71aeadb274a7e3ede2f69c0bd4d5bfd7",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 22,
+            "name": "ppt/slideMasters/slideMaster1.xml",
+            "kind": "xml",
+            "logical_bytes": 12250,
+            "stored_bytes": 2044,
+            "sha256": "029e374d1663f8eddf8e54a11edbd3a3d9fd41f110df525418e509085fca5fc3",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 23,
+            "name": "ppt/slideLayouts/slideLayout4.xml",
+            "kind": "xml",
+            "logical_bytes": 4715,
+            "stored_bytes": 1150,
+            "sha256": "e665ddc609db1e2bd5f301f6500a5c05b679b98f94a538e58718f8c1d1774da2",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 24,
+            "name": "ppt/slideLayouts/slideLayout5.xml",
+            "kind": "xml",
+            "logical_bytes": 7224,
+            "stored_bytes": 1496,
+            "sha256": "c1390e7d7a0d173795180a260261f68d99c50d229fb1a8079a76711587641aa7",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 25,
+            "name": "ppt/slideLayouts/slideLayout6.xml",
+            "kind": "xml",
+            "logical_bytes": 2236,
+            "stored_bytes": 832,
+            "sha256": "754dfc3b973683a0c063fa61cfac844a7d3ff6aff70d236c92de9752aef74b84",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 26,
+            "name": "ppt/slideLayouts/slideLayout7.xml",
+            "kind": "xml",
+            "logical_bytes": 1897,
+            "stored_bytes": 781,
+            "sha256": "d4d3a3a6a1809586562ae5d34d47268d979420a6adea31e2f2fa2f791cc6f148",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 27,
+            "name": "ppt/slideLayouts/slideLayout8.xml",
+            "kind": "xml",
+            "logical_bytes": 4805,
+            "stored_bytes": 1366,
+            "sha256": "61c12a39d505a5c6895767bc0d632c116d09dd269a48095ef71b9d77af972f68",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 28,
+            "name": "ppt/slideLayouts/slideLayout9.xml",
+            "kind": "xml",
+            "logical_bytes": 4660,
+            "stored_bytes": 1301,
+            "sha256": "bef41b7e97154e7c3c0baf46a3ed4169f713e499dea957f829b872548a59648a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 29,
+            "name": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 311,
+            "stored_bytes": 190,
+            "sha256": "8246d333bf3764cd35563e3df1828c26bbc28890815a2987caf3e592791ba60d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 30,
+            "name": "ppt/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 7088,
+            "stored_bytes": 1686,
+            "sha256": "dd3e740e61e0ab14cb27452cf76721e0efe504c9ec2d57a84289cb5cd4db668a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 31,
+            "name": "docProps/thumbnail.jpeg",
+            "kind": "binary",
+            "logical_bytes": 5120,
+            "stored_bytes": 5120,
+            "sha256": "bf4f77e176614d40c8f563a22f79e4fcbda21c3a6876058dfcf890f6831ff0bb",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 32,
+            "name": "ppt/presProps.xml",
+            "kind": "xml",
+            "logical_bytes": 651,
+            "stored_bytes": 337,
+            "sha256": "d169519a620af452353d652cdc09e28c94541cdbb008a2ef592697377f381fd3",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 33,
+            "name": "ppt/tableStyles.xml",
+            "kind": "xml",
+            "logical_bytes": 182,
+            "stored_bytes": 172,
+            "sha256": "0e7ac03251337ecbaf6c8ca13619db1caeda5c90c4e3210d45d6c3f5df4de103",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 34,
+            "name": "ppt/viewProps.xml",
+            "kind": "xml",
+            "logical_bytes": 826,
+            "stored_bytes": 390,
+            "sha256": "9d6c25a95632f94be6b803ff3abb8059841c12c075c5c1b93520000ae9d91628",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 35,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 681,
+            "stored_bytes": 356,
+            "sha256": "d766989ee609e6b9e166983d6d3509d8a71c8026d54606a9856fa849de428b3c",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 36,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 1093,
+            "stored_bytes": 497,
+            "sha256": "3eb1a2dc18491bc67d8f8de7bc3ed22aa8c7435b3a1b3217ec2bc4dc009caee2",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 37,
+            "name": "_xmlsignatures/origin.sigs",
+            "kind": "binary",
+            "logical_bytes": 0,
+            "stored_bytes": 2,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 38,
+            "name": "_xmlsignatures/sig1.xml",
+            "kind": "xml",
+            "logical_bytes": 18149,
+            "stored_bytes": 3568,
+            "sha256": "9359b20990ce0b7f16edcece07c5a1ce7e29d541299b81e4ce82e4acf5979607",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 39,
+            "name": "_xmlsignatures/_rels/origin.sigs.rels",
+            "kind": "xml",
+            "logical_bytes": 296,
+            "stored_bytes": 179,
+            "sha256": "054c32c9d6d3514653d4d80754dd1c4dfafe7b443fb3489afbd2598463d810c3",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "_xmlsignatures/sig1.xml",
+          "logical_bytes": 18149,
+          "sha256": "9359b20990ce0b7f16edcece07c5a1ce7e29d541299b81e4ce82e4acf5979607"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-signed-ooxml-verify-noop-refusal"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+      "name": "OOXML document-protection fixture",
+      "legacy_v1": {
+        "name": "OOXML document-protection fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 11,
+        "archive_member_count": 11,
+        "entry_bytes": 1519,
+        "uncompressed_payload_bytes": 29740,
+        "archive_bytes": 9856,
+        "archive_sha256": "5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+        "target_entry": "word/settings.xml",
+        "target_payload_bytes": 1519,
+        "target_payload_sha256": "fd76443d99f0ba9b35d65d8aea47766bc7c698add56e5edb4aa2abbebd879c68",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "fixture",
+        "ooxml",
+        "protected",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/ooxml/docx/documentProtection_readonly_no_password.docx",
+          "fixture_repository": null,
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "repository-fixture-producer-unknown",
+        "source_path": "test-data/ooxml/docx/documentProtection_readonly_no_password.docx",
+        "source_repository": null,
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "No checked-in provenance records the application that authored this fixture.",
+        "producer_version": null,
+        "source_sha256": "5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; document producer and redistribution license are not recorded",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 9856,
+        "archive_sha256": "5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+        "logical_payload_bytes": 29740,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "present",
+          "scopes": [
+            "document"
+          ],
+          "evidence": "documentProtection_readonly_no_password fixture and security_corpus"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 9856,
+          "members": 11,
+          "relationships": null,
+          "materialized_bytes": 29740,
+          "max_member_bytes": 14840
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1312,
+            "stored_bytes": 358,
+            "sha256": "6f1ac5f0ebfb7e97d3dc4100e88eaab10016a5cac75e1251781f2ea12477af51",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 590,
+            "stored_bytes": 243,
+            "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "word/_rels/document.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 817,
+            "stored_bytes": 250,
+            "sha256": "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "word/document.xml",
+            "kind": "xml",
+            "logical_bytes": 1036,
+            "stored_bytes": 473,
+            "sha256": "0e7f44b4afe62edc61447bf332d38c43a68f018f3f1eb29e509fb1cf348f151a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "word/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 6992,
+            "stored_bytes": 1686,
+            "sha256": "bf4992e3fa7832e5c68fdbc4ec5189c8e5d347fef03c5ba2522ad704bde5078f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "word/settings.xml",
+            "kind": "xml",
+            "logical_bytes": 1519,
+            "stored_bytes": 685,
+            "sha256": "fd76443d99f0ba9b35d65d8aea47766bc7c698add56e5edb4aa2abbebd879c68",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "word/fontTable.xml",
+            "kind": "xml",
+            "logical_bytes": 1031,
+            "stored_bytes": 378,
+            "sha256": "1ea35f020235c607628ce746bca4afb1f15d51ee3ab6b5e80db459833dbc656a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "word/webSettings.xml",
+            "kind": "xml",
+            "logical_bytes": 260,
+            "stored_bytes": 187,
+            "sha256": "cbc26fa167e8052d5ddfb37bd843233f1e61843cce11c730ca50b27afc60cf93",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 706,
+            "stored_bytes": 370,
+            "sha256": "7f40d7949318307f1ed3d4fb4f91361dea2ffeb240ac96f2b1e98c75e860716b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 637,
+            "stored_bytes": 327,
+            "sha256": "1f730c0ac80e4742d2b97406bb7e24ed8571ffc837f09e4b7b976f6871480fa0",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "word/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 14840,
+            "stored_bytes": 1811,
+            "sha256": "eba765bc600f3524111ab54d3b43f6ac2e804aad8e6a6b3e04e6e12f2308589e",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "word/settings.xml",
+          "logical_bytes": 1519,
+          "sha256": "fd76443d99f0ba9b35d65d8aea47766bc7c698add56e5edb4aa2abbebd879c68"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-protected-docx-noop-refusal"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+      "name": "Apache POI XML-maps external-entity-looking fixture",
+      "legacy_v1": {
+        "name": "Apache POI XML-maps external-entity-looking fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 23,
+        "archive_member_count": 23,
+        "entry_bytes": 763,
+        "uncompressed_payload_bytes": 17785,
+        "archive_bytes": 9801,
+        "archive_sha256": "95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+        "target_entry": "xl/xmlMaps.xml",
+        "target_payload_bytes": 763,
+        "target_payload_sha256": "444cfe00ad04332e43f86589564c27e50a566da4a6620a04c476714d0887a646",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "adversarial",
+        "fixture",
+        "ooxml",
+        "security",
+        "unknown-extension"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 9801,
+        "archive_sha256": "95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+        "logical_payload_bytes": 17785,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "adversarial",
+        "malformation_kind": "external-entity-looking schema payload",
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "litchi-xlsx xml_maps::tests::keeps_poi_xxe_schema_inert"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 9801,
+          "members": 23,
+          "relationships": null,
+          "materialized_bytes": 17785,
+          "max_member_bytes": 6798
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1412,
+            "stored_bytes": 363,
+            "sha256": "f6c57354faf6359f882ce189eca07156e3512fbdedac78bc84abfe53a3667949",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "docProps/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 809,
+            "stored_bytes": 390,
+            "sha256": "66bf0f086179e059155a5111121f65926d7146183501a7d0a058b9d87a57228a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 593,
+            "stored_bytes": 300,
+            "sha256": "40b0c9118b8a3b3ae5d14f8b1c64561556aa9171c78fec68accbb00ed5e48b4d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "_rels/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 588,
+            "stored_bytes": 235,
+            "sha256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "xl/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "xl/printerSettings/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "xl/printerSettings/printerSettings1.bin",
+            "kind": "binary",
+            "logical_bytes": 220,
+            "stored_bytes": 60,
+            "sha256": "0d4eb7ac97cca22ad26f78b933e29c8824268e5bd6a62cde746754bebd8a7ddc",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "xl/xmlMaps.xml",
+            "kind": "xml",
+            "logical_bytes": 763,
+            "stored_bytes": 401,
+            "sha256": "444cfe00ad04332e43f86589564c27e50a566da4a6620a04c476714d0887a646",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "xl/_rels/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "xl/_rels/workbook.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 827,
+            "stored_bytes": 251,
+            "sha256": "ae113b23c59118340d6f31866f8e85530a93925bea5ab11fb53be3a1e931c59a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "xl/worksheets/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "xl/worksheets/sheet1.xml",
+            "kind": "xml",
+            "logical_bytes": 1200,
+            "stored_bytes": 567,
+            "sha256": "4d2a54babe4cef81ec584fc942ee3d01677f0c69922ee65a815be32254e81d15",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 14,
+            "name": "xl/worksheets/_rels/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 15,
+            "name": "xl/worksheets/_rels/sheet1.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 458,
+            "stored_bytes": 209,
+            "sha256": "7278090537b94e2da15ea13592e03a77fc42074b866dc43282215321ccdb0054",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 16,
+            "name": "xl/sharedStrings.xml",
+            "kind": "xml",
+            "logical_bytes": 249,
+            "stored_bytes": 167,
+            "sha256": "76bfe7c1c874c102333d63b89976c63cacbdeb126550053400439b08dffad2b8",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 17,
+            "name": "xl/theme/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 18,
+            "name": "xl/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 6798,
+            "stored_bytes": 1516,
+            "sha256": "a0df54cd7c507e485061a0ba3de7503eb81f6dfa8cc701ee4478439bdf26dfbb",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 19,
+            "name": "xl/workbook.xml",
+            "kind": "xml",
+            "logical_bytes": 919,
+            "stored_bytes": 475,
+            "sha256": "d4cc07e2aa99cce7a23cac24d12be815923f75e9fac2eb82d928980ad1dbb76b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 20,
+            "name": "xl/tables/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 21,
+            "name": "xl/tables/table1.xml",
+            "kind": "xml",
+            "logical_bytes": 764,
+            "stored_bytes": 354,
+            "sha256": "27a267af5199332c4ccc78f4f4722d132a164484b57bf392288a6ffaee48a753",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 22,
+            "name": "xl/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 2185,
+            "stored_bytes": 773,
+            "sha256": "6922b069ed29ac944e5ca0d6500eaf02d3c154af6d8c0166f378dbaf2e517cff",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "xl/xmlMaps.xml",
+          "logical_bytes": 763,
+          "sha256": "444cfe00ad04332e43f86589564c27e50a566da4a6620a04c476714d0887a646"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [],
+        "inventory_only": true
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+      "name": "Apache POI OPC malformed derived-part-name fixture",
+      "legacy_v1": {
+        "name": "Apache POI OPC malformed derived-part-name fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 13,
+        "archive_member_count": 13,
+        "entry_bytes": 5893,
+        "uncompressed_payload_bytes": 98759,
+        "archive_bytes": 24759,
+        "archive_sha256": "a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+        "target_entry": "word/document.xml",
+        "target_payload_bytes": 5893,
+        "target_payload_sha256": "3ec6d1101d4bf3766f3e8633cb63994eb21cb4be950348071ff425448e514e01",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "small",
+      "categories": [
+        "fixture",
+        "malformed",
+        "ooxml",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 24759,
+        "archive_sha256": "a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+        "logical_payload_bytes": 98759,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "malformed",
+        "malformation_kind": "derived part name",
+        "expected_behavior": "refuse",
+        "within_limits": true,
+        "evidence": "litchi-opc package reader derived-part-name regression"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 24759,
+          "members": 13,
+          "relationships": null,
+          "materialized_bytes": 98759,
+          "max_member_bytes": 59168
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1414,
+            "stored_bytes": 385,
+            "sha256": "d46d05ecdca9e09f0ff8c089ad4d6ff19d314782c33c1b74a6303e4b1af037ad",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 734,
+            "stored_bytes": 259,
+            "sha256": "5a73f8103b247f3efb183ed55928cf33f03d72ff39751a8f2843d9ed334f5944",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "word/_rels/document.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 949,
+            "stored_bytes": 272,
+            "sha256": "64262e8ef3654d23d0225b9bd2c75e1f4ac02d9a790c484ea79b39b8b3e5599b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "word/document.xml",
+            "kind": "xml",
+            "logical_bytes": 5893,
+            "stored_bytes": 1891,
+            "sha256": "3ec6d1101d4bf3766f3e8633cb63994eb21cb4be950348071ff425448e514e01",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "word/document.xml/image1.gif",
+            "kind": "binary",
+            "logical_bytes": 2266,
+            "stored_bytes": 2266,
+            "sha256": "fbc3b95aa19509ae2a6b95b791612042f13d62d683615b0dc4594a4e411e70ba",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "word/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 6880,
+            "stored_bytes": 1672,
+            "sha256": "f38f796368a16b635631611463af804b68c7afda1d89e5f2f9a121f42faf6652",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "docProps/thumbnail.wmf",
+            "kind": "binary",
+            "logical_bytes": 59168,
+            "stored_bytes": 10152,
+            "sha256": "c798b8d4b60f857eba9927fc7b420404522eb0b73d90ac8512357c60071de5a5",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "word/settings.xml",
+            "kind": "xml",
+            "logical_bytes": 2009,
+            "stored_bytes": 889,
+            "sha256": "9994bdf83a6ceda4154ba9dc9c7c17e3572622991feda1ae16d4b7f07b228f1b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "word/webSettings.xml",
+            "kind": "xml",
+            "logical_bytes": 273,
+            "stored_bytes": 196,
+            "sha256": "73da9b07f1d2b8d95dd47ac08cae7d7441046f64cd1efaad646db80fa8cf367e",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 872,
+            "stored_bytes": 461,
+            "sha256": "07abeab9f25ca38c8a600fa1924461208350582131bbee5680b47146ec9e0e7f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "word/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 15947,
+            "stored_bytes": 2026,
+            "sha256": "7b33c5d519da3bcd75e86f0b380472d26f4931e620ad100efe381254fe37c95b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "word/fontTable.xml",
+            "kind": "xml",
+            "logical_bytes": 1312,
+            "stored_bytes": 434,
+            "sha256": "d796c1e910f43714ce0dd502a5ffa062fd6a49120f28af495f754954e27e88bc",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 1042,
+            "stored_bytes": 516,
+            "sha256": "36ace7d77340453377e0857324bc3737aca23673c71a3a5c402124f252019e76",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "word/document.xml",
+          "logical_bytes": 5893,
+          "sha256": "3ec6d1101d4bf3766f3e8633cb63994eb21cb4be950348071ff425448e514e01"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-opc-malformed-refusal"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+      "name": "Apache POI signed DOCX fixture",
+      "legacy_v1": {
+        "name": "Apache POI signed DOCX fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 15,
+        "archive_member_count": 15,
+        "entry_bytes": 7937,
+        "uncompressed_payload_bytes": 56358,
+        "archive_bytes": 16142,
+        "archive_sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+        "target_entry": "_xmlsignatures/sig1.xml",
+        "target_payload_bytes": 7937,
+        "target_payload_sha256": "dc7bd530b1c49c5b8d73f56990a28e4b42f0422ba0e89cb9640db946ae7b3e41",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "fixture",
+        "ooxml",
+        "security",
+        "signed"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 16142,
+        "archive_sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+        "logical_payload_bytes": 56358,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "present",
+          "kind": "OOXML package signature",
+          "evidence": "litchi-sign Status::Valid in security_corpus"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 16142,
+          "members": 15,
+          "relationships": null,
+          "materialized_bytes": 56358,
+          "max_member_bytes": 15710
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1662,
+            "stored_bytes": 435,
+            "sha256": "03a233b22d0469bac4c6a0697928e0611fc990cd8679cf5059409c9e7928f8ff",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 744,
+            "stored_bytes": 279,
+            "sha256": "be184eab16863b47b7f08f0c9c287e17c70620fe6ff52fe14d86d36639eba49d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "word/_rels/document.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 953,
+            "stored_bytes": 290,
+            "sha256": "31f4f4ee74f68d76f77375e997b1974e20ac41c8cd527fcbc9551a548a330939",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "word/document.xml",
+            "kind": "xml",
+            "logical_bytes": 1551,
+            "stored_bytes": 576,
+            "sha256": "b39faed210af5cbbbb2742f44a3422fdbd7db1a51e0e4c41bb188bf712005701",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "word/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 7076,
+            "stored_bytes": 1704,
+            "sha256": "488a401645c6030b741d7e912aa55ad9ec6b219d36a3247332454c0de867b827",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "word/settings.xml",
+            "kind": "xml",
+            "logical_bytes": 2225,
+            "stored_bytes": 888,
+            "sha256": "6d8ec32277c7e5939ff43c622823f4fae018528468c96ab0b6a8e59c4a23b88a",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "word/webSettings.xml",
+            "kind": "xml",
+            "logical_bytes": 428,
+            "stored_bytes": 258,
+            "sha256": "2de8631b2a69ae54c962af917bb57a9ae06949e606da5088f256b866df8cdaba",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "word/stylesWithEffects.xml",
+            "kind": "xml",
+            "logical_bytes": 15710,
+            "stored_bytes": 1979,
+            "sha256": "00c5cda7671bf545a8c97312f14b2b8bc0ee7fa469b36c25ee158c8a5c1c1568",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 649,
+            "stored_bytes": 332,
+            "sha256": "f432ff469e64c71854404c506c50da5254845c79876c736923a0e59619db3a89",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "word/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 14957,
+            "stored_bytes": 1851,
+            "sha256": "8ec7ca3b62dd913c49f4cdd744c757c4ca926cb6d8de5e955734f0cd9ce1a990",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "word/fontTable.xml",
+            "kind": "xml",
+            "logical_bytes": 1186,
+            "stored_bytes": 450,
+            "sha256": "e6f723aa9b8e747f9ddb43fbc5e5b91d673c49a8af32c6d3431cd077ead4cc36",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 984,
+            "stored_bytes": 468,
+            "sha256": "986d05233950929005e5fc02d78db98d8a89f09953f0e742dbe384968060242f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "_xmlsignatures/origin.sigs",
+            "kind": "binary",
+            "logical_bytes": 0,
+            "stored_bytes": 2,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "_xmlsignatures/sig1.xml",
+            "kind": "xml",
+            "logical_bytes": 7937,
+            "stored_bytes": 2921,
+            "sha256": "dc7bd530b1c49c5b8d73f56990a28e4b42f0422ba0e89cb9640db946ae7b3e41",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 14,
+            "name": "_xmlsignatures/_rels/origin.sigs.rels",
+            "kind": "xml",
+            "logical_bytes": 296,
+            "stored_bytes": 179,
+            "sha256": "054c32c9d6d3514653d4d80754dd1c4dfafe7b443fb3489afbd2598463d810c3",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "_xmlsignatures/sig1.xml",
+          "logical_bytes": 7937,
+          "sha256": "dc7bd530b1c49c5b8d73f56990a28e4b42f0422ba0e89cb9640db946ae7b3e41"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-signed-ooxml-verify-noop-refusal"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+      "name": "OOXML malformed shared-string hint fixture",
+      "legacy_v1": {
+        "name": "OOXML malformed shared-string hint fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 14,
+        "archive_member_count": 14,
+        "entry_bytes": 504,
+        "uncompressed_payload_bytes": 12197,
+        "archive_bytes": 6266,
+        "archive_sha256": "c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+        "target_entry": "xl/sharedStrings.xml",
+        "target_payload_bytes": 504,
+        "target_payload_sha256": "670f1d69143897bdcd0eb6c1e225b251d6b051a993d42f3ef2365b36c530a19f",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "adversarial",
+        "fixture",
+        "malformed",
+        "ooxml"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx",
+          "fixture_repository": null,
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "repository-fixture-producer-unknown",
+        "source_path": "test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx",
+        "source_repository": null,
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "No checked-in provenance records the application that authored this fixture.",
+        "producer_version": null,
+        "source_sha256": "c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; document producer and redistribution license are not recorded",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 6266,
+        "archive_sha256": "c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+        "logical_payload_bytes": 12197,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "malformed",
+        "malformation_kind": "inconsistent shared-string count hint",
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "litchi-xlsx reader_tolerance::standalone_reader_opens_duplicate_names_and_malformed_string_hints"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 6266,
+          "members": 14,
+          "relationships": null,
+          "materialized_bytes": 12197,
+          "max_member_bytes": 4451
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1367,
+            "stored_bytes": 345,
+            "sha256": "4b1b5345d9bf86efffe3096ae3736ec2c8f3cf29b09e7a3912a5a0f1b19c03bb",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "xl/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "xl/workbook.xml",
+            "kind": "xml",
+            "logical_bytes": 878,
+            "stored_bytes": 503,
+            "sha256": "34c21d4c5d5a84317567d6644b3a120d2197eaab9665464b7dcc1eead0daa956",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "xl/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 4451,
+            "stored_bytes": 643,
+            "sha256": "f9357a702d1afb20d43200a5989f5bb272ce99e6c0fdc9e6b4392e5a9239ef58",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "xl/worksheets/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "xl/worksheets/sheet1.xml",
+            "kind": "xml",
+            "logical_bytes": 2736,
+            "stored_bytes": 1004,
+            "sha256": "bb04dfc6e1d6803d46b616ae4ff48b7a6a57654c4e363424809bd8921b111df5",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "xl/_rels/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "xl/_rels/workbook.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 549,
+            "stored_bytes": 210,
+            "sha256": "aec33864f07c2ab8768583ae5e7878d48921497827f58edfc1626661b91ad8dd",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "xl/sharedStrings.xml",
+            "kind": "xml",
+            "logical_bytes": 504,
+            "stored_bytes": 205,
+            "sha256": "670f1d69143897bdcd0eb6c1e225b251d6b051a993d42f3ef2365b36c530a19f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "_rels/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 571,
+            "stored_bytes": 224,
+            "sha256": "8934738e3bc3451cb3a03927211465c86fc52c3d7c9a0ad6dd6aa1ae18ea2498",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "docProps/",
+            "kind": "directory",
+            "logical_bytes": 0,
+            "stored_bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 731,
+            "stored_bytes": 353,
+            "sha256": "2f6345236a966ae5ad4bfd25c448fe3f467a4e32ff6aa99698d97103d6d08d18",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 410,
+            "stored_bytes": 249,
+            "sha256": "ef529773a2b8f1c4bc8657598d0a4496bb71d7dee0663399784ae6a01ba9edfa",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "xl/sharedStrings.xml",
+          "logical_bytes": 504,
+          "sha256": "670f1d69143897bdcd0eb6c1e225b251d6b051a993d42f3ef2365b36c530a19f"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-xlsx-adversarial-inert-read"
+        ],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+      "name": "OOXML external-link inventory fixture",
+      "legacy_v1": {
+        "name": "OOXML external-link inventory fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 13,
+        "archive_member_count": 13,
+        "entry_bytes": 666,
+        "uncompressed_payload_bytes": 27148,
+        "archive_bytes": 11076,
+        "archive_sha256": "e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+        "target_entry": "xl/externalLinks/externalLink1.xml",
+        "target_payload_bytes": 666,
+        "target_payload_sha256": "a06d6425496bbb91d993d7e490d26023dc80457ed0003e8e03a7be9f00bad092",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "external-links",
+        "fixture",
+        "ooxml",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/ooxml/xlsx/external-link-path-startup.xlsx",
+          "fixture_repository": null,
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "repository-fixture-producer-unknown",
+        "source_path": "test-data/ooxml/xlsx/external-link-path-startup.xlsx",
+        "source_repository": null,
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "No checked-in provenance records the application that authored this fixture.",
+        "producer_version": null,
+        "source_sha256": "e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+        "license_spdx": null,
+        "license_evidence": "fixture is tracked; document producer and redistribution license are not recorded",
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 11076,
+        "archive_sha256": "e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+        "logical_payload_bytes": 27148,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "present",
+          "count": 1,
+          "targets_sha256": "16a2466d394b25d4a465c4db740fca842b9627e98a91c37163312b9585b80beb",
+          "evidence": "collect_external_targets in security_corpus; no target fetch"
+        }
+      },
+      "input": {
+        "validity": "well-formed",
+        "malformation_kind": null,
+        "expected_behavior": "accept",
+        "within_limits": true,
+        "evidence": "security-corpus-catalog-v1"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 11076,
+          "members": 13,
+          "relationships": null,
+          "materialized_bytes": 27148,
+          "max_member_bytes": 8632
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1445,
+            "stored_bytes": 382,
+            "sha256": "2492dea650d8ad0943f53f5083b82b33b4089df0eebe2a7262c5d85295c00a51",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 563,
+            "stored_bytes": 254,
+            "sha256": "7a74b4a353aac4ca0abacdab0370d22522bd82c62f8b3f4c9c4bc70de27ae8dc",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "xl/workbook.xml",
+            "kind": "xml",
+            "logical_bytes": 2337,
+            "stored_bytes": 949,
+            "sha256": "27eedbe77c5ac1b949545bb656d4b2a8fe6e98ba784d2c55a2d2d589f052246e",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "xl/_rels/workbook.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 913,
+            "stored_bytes": 289,
+            "sha256": "7ae1e617bb8faad604be4b0fa219dd5ef6795228d74b19ea7a81021ce10c2b3d",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "xl/worksheets/sheet1.xml",
+            "kind": "xml",
+            "logical_bytes": 7467,
+            "stored_bytes": 1172,
+            "sha256": "59be58ed4f0b641998b638591a780919047da035af8ae557ac2d2f994545d994",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "xl/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 8632,
+            "stored_bytes": 1954,
+            "sha256": "fd5817f4f13a75520d9db14012e5f58e5bf90a96e8085f8abf3e2e845ba6cc0c",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "xl/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 1547,
+            "stored_bytes": 657,
+            "sha256": "fa8b82aacf113e0ec05041989172c91c1246db1f498f1c22f5395b65cc86a727",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "xl/sharedStrings.xml",
+            "kind": "xml",
+            "logical_bytes": 863,
+            "stored_bytes": 480,
+            "sha256": "e8b8d84a5c20ae4b69d32ec2d2f6be479c486594fe8a5c221368b3c6ea01ac58",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "xl/externalLinks/externalLink1.xml",
+            "kind": "xml",
+            "logical_bytes": 666,
+            "stored_bytes": 348,
+            "sha256": "a06d6425496bbb91d993d7e490d26023dc80457ed0003e8e03a7be9f00bad092",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "xl/calcChain.xml",
+            "kind": "xml",
+            "logical_bytes": 1058,
+            "stored_bytes": 268,
+            "sha256": "76ea52a69b7322bf3b72a7b6e29e317e9a66946b2f9eff3c512c053a6cb57530",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 581,
+            "stored_bytes": 325,
+            "sha256": "358aa775c6ff8be8c9a93b25739987322b985fc370af8d0b192fee564a0cbfcf",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 759,
+            "stored_bytes": 391,
+            "sha256": "ddbd2c94da54022917ff70ec14b41ab8fbd260c2bee8d0f47dda4099a17c2fbb",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "xl/externalLinks/_rels/externalLink1.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 317,
+            "stored_bytes": 215,
+            "sha256": "bd5980f397546bbe769865aa375ac3f20d70e0208a0132a9f19c51fc3276ddb2",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "xl/externalLinks/externalLink1.xml",
+          "logical_bytes": 666,
+          "sha256": "a06d6425496bbb91d993d7e490d26023dc80457ed0003e8e03a7be9f00bad092"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [],
+        "inventory_only": true
+      }
+    },
+    {
+      "id": "ooxml-zip:sha256:e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+      "name": "Apache POI OPC malformed multiple-core-properties fixture",
+      "legacy_v1": {
+        "name": "Apache POI OPC malformed multiple-core-properties fixture",
+        "generator": "litchi-security-fixture-v1",
+        "package_format": "OOXML/ZIP",
+        "shape": "fixture",
+        "payload_kind": "opaque",
+        "compression": "mixed",
+        "entry_count": 14,
+        "archive_member_count": 14,
+        "entry_bytes": 1572,
+        "uncompressed_payload_bytes": 99954,
+        "archive_bytes": 24250,
+        "archive_sha256": "e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+        "target_entry": "[Content_Types].xml",
+        "target_payload_bytes": 1572,
+        "target_payload_sha256": "b8e5ffae82732a286ca0317d0ff83ac19f9433287aac560d878b40f36ba96b01",
+        "xlsx": null
+      },
+      "format": "OOXML/ZIP",
+      "size_class": "small",
+      "categories": [
+        "fixture",
+        "malformed",
+        "ooxml",
+        "security"
+      ],
+      "generator": {
+        "id": "litchi-security-fixture-v1",
+        "kind": "fixture",
+        "revision": "catalog-v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "fixture_path": "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
+          "fixture_repository": "Apache POI test-data snapshot",
+          "document_producer": null,
+          "archive_kind": "zip",
+          "member_inventory": "complete",
+          "member_hashes_are_logical": true
+        }
+      },
+      "provenance": {
+        "source_kind": "repository-fixture",
+        "provenance_kind": "third-party-test-fixture-not-native-office",
+        "source_path": "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
+        "source_repository": "Apache POI test-data snapshot",
+        "producer": null,
+        "producer_status": "unknown",
+        "producer_evidence": "The repository identifies this as Apache POI test data; it does not establish the application that authored the Office file.",
+        "producer_version": null,
+        "source_sha256": "e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "test-data/poi/NOTICE and repository LICENSE",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 24250,
+        "archive_sha256": "e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+        "logical_payload_bytes": 99954,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "archive_kind": "zip",
+        "member_inventory": "complete",
+        "document_producer": null
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "malformed",
+        "malformation_kind": "duplicate core-properties relationship",
+        "expected_behavior": "refuse",
+        "within_limits": true,
+        "evidence": "litchi-ooxml-common properties/read.rs POI compliance regression"
+      },
+      "limits": {
+        "profile_id": "security-corpus-bounded-read-v1",
+        "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239",
+        "observed": {
+          "input_bytes": 24250,
+          "members": 14,
+          "relationships": null,
+          "materialized_bytes": 99954,
+          "max_member_bytes": 59168
+        }
+      },
+      "members": {
+        "status": "complete",
+        "items": [
+          {
+            "ordinal": 0,
+            "name": "[Content_Types].xml",
+            "kind": "xml",
+            "logical_bytes": 1572,
+            "stored_bytes": 372,
+            "sha256": "b8e5ffae82732a286ca0317d0ff83ac19f9433287aac560d878b40f36ba96b01",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 1,
+            "name": "_rels/.rels",
+            "kind": "xml",
+            "logical_bytes": 899,
+            "stored_bytes": 262,
+            "sha256": "df78a2d58765bf4e6f920a79ea4df64b1dd6dbfc85d134ba5c2d26ee61758792",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 2,
+            "name": "word/_rels/document.xml.rels",
+            "kind": "xml",
+            "logical_bytes": 949,
+            "stored_bytes": 272,
+            "sha256": "64262e8ef3654d23d0225b9bd2c75e1f4ac02d9a790c484ea79b39b8b3e5599b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 3,
+            "name": "word/document.xml",
+            "kind": "xml",
+            "logical_bytes": 5893,
+            "stored_bytes": 1891,
+            "sha256": "3ec6d1101d4bf3766f3e8633cb63994eb21cb4be950348071ff425448e514e01",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 4,
+            "name": "word/media/image1.gif",
+            "kind": "binary",
+            "logical_bytes": 2266,
+            "stored_bytes": 2266,
+            "sha256": "fbc3b95aa19509ae2a6b95b791612042f13d62d683615b0dc4594a4e411e70ba",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 5,
+            "name": "word/theme/theme1.xml",
+            "kind": "xml",
+            "logical_bytes": 6880,
+            "stored_bytes": 1672,
+            "sha256": "f38f796368a16b635631611463af804b68c7afda1d89e5f2f9a121f42faf6652",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 6,
+            "name": "docProps/thumbnail.wmf",
+            "kind": "binary",
+            "logical_bytes": 59168,
+            "stored_bytes": 10152,
+            "sha256": "c798b8d4b60f857eba9927fc7b420404522eb0b73d90ac8512357c60071de5a5",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 7,
+            "name": "word/settings.xml",
+            "kind": "xml",
+            "logical_bytes": 2009,
+            "stored_bytes": 889,
+            "sha256": "9994bdf83a6ceda4154ba9dc9c7c17e3572622991feda1ae16d4b7f07b228f1b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 8,
+            "name": "word/webSettings.xml",
+            "kind": "xml",
+            "logical_bytes": 273,
+            "stored_bytes": 196,
+            "sha256": "73da9b07f1d2b8d95dd47ac08cae7d7441046f64cd1efaad646db80fa8cf367e",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 9,
+            "name": "docProps/core.xml",
+            "kind": "xml",
+            "logical_bytes": 872,
+            "stored_bytes": 461,
+            "sha256": "07abeab9f25ca38c8a600fa1924461208350582131bbee5680b47146ec9e0e7f",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 10,
+            "name": "word/styles.xml",
+            "kind": "xml",
+            "logical_bytes": 15947,
+            "stored_bytes": 2026,
+            "sha256": "7b33c5d519da3bcd75e86f0b380472d26f4931e620ad100efe381254fe37c95b",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 11,
+            "name": "word/fontTable.xml",
+            "kind": "xml",
+            "logical_bytes": 1312,
+            "stored_bytes": 434,
+            "sha256": "d796c1e910f43714ce0dd502a5ffa062fd6a49120f28af495f754954e27e88bc",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 12,
+            "name": "docProps/app.xml",
+            "kind": "xml",
+            "logical_bytes": 1042,
+            "stored_bytes": 516,
+            "sha256": "36ace7d77340453377e0857324bc3737aca23673c71a3a5c402124f252019e76",
+            "stored_sha256": null,
+            "role": "package-member"
+          },
+          {
+            "ordinal": 13,
+            "name": "docProps/core2.xml",
+            "kind": "xml",
+            "logical_bytes": 872,
+            "stored_bytes": 443,
+            "sha256": "07abeab9f25ca38c8a600fa1924461208350582131bbee5680b47146ec9e0e7f",
+            "stored_sha256": null,
+            "role": "package-member"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "entry": "[Content_Types].xml",
+          "logical_bytes": 1572,
+          "sha256": "b8e5ffae82732a286ca0317d0ff83ac19f9433287aac560d878b40f36ba96b01"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [],
+        "guard_cases": [
+          "security-opc-malformed-refusal"
+        ],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "security-cfb-boundary-read",
+      "corpus_id": "cfb-ole2:sha256:d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+      "legacy_name": "CFB version-3 uninitialized-size-word compatibility fixture",
+      "legacy_archive_sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+      "role": "guard"
+    },
+    {
+      "case": "security-cfb-boundary-read",
+      "corpus_id": "cfb-ole2:sha256:f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+      "legacy_name": "CFB short-final-sector compatibility fixture",
+      "legacy_archive_sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+      "role": "guard"
+    },
+    {
+      "case": "security-encrypted-ole-password-readback",
+      "corpus_id": "cfb-ole2:sha256:9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+      "legacy_name": "Apache POI binary RC4 encrypted DOC fixture",
+      "legacy_archive_sha256": "9231e724bb17a2e5f74815728d90b06e15684cf5fb2443a6fa24deebd33be952",
+      "role": "guard"
+    },
+    {
+      "case": "security-encrypted-ole-password-readback",
+      "corpus_id": "cfb-ole2:sha256:f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+      "legacy_name": "Apache POI CryptoAPI encrypted DOC fixture",
+      "legacy_archive_sha256": "f2d0dc59ad7ec2356695ad5dc550057052a4017d5f1eb46e887297f5089896fb",
+      "role": "guard"
+    },
+    {
+      "case": "security-external-xlsx-inventory-no-fetch",
+      "corpus_id": "ooxml-zip:sha256:e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+      "legacy_name": "OOXML external-link inventory fixture",
+      "legacy_archive_sha256": "e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+      "role": "inventory-only"
+    },
+    {
+      "case": "security-macro-xls-inert-preservation",
+      "corpus_id": "cfb-ole2:sha256:0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+      "legacy_name": "Apache POI VBA-bearing XLS fixture",
+      "legacy_archive_sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-advisory-compatibility",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+      "legacy_name": "msoffcrypto Agile zero-DataSpaces-block interoperability fixture",
+      "legacy_archive_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+      "legacy_name": "Litchi crypto component Standard AES-192/SHA-1 fixture",
+      "legacy_archive_sha256": "40931c6c034e1d1a5542f801797a188c81d01fb399089c9a6df99f7d143f72a2",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+      "legacy_name": "Litchi crypto component Standard AES-256/SHA-1 fixture",
+      "legacy_archive_sha256": "5820482f9b9318c98606e3a2394392be23fcf1c0d722d76654d017f5662a1500",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+      "legacy_name": "msoffcrypto Agile AES-256/SHA-512 valid-graph interoperability fixture",
+      "legacy_archive_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+      "legacy_name": "Litchi crypto authored Agile AES-256/SHA-512 fixture",
+      "legacy_archive_sha256": "7b56a5c882e85420b85fb6fc892ad54a2122319f7fa7b51d3a5e5b8e661f2a01",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+      "legacy_name": "Litchi crypto authored Standard AES-192/SHA-1 fixture",
+      "legacy_archive_sha256": "83bb67744ce5037349c45d7f2ee6ab1cee05b285c600aba92bb3ef4f85861aa8",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+      "legacy_name": "Litchi crypto authored Standard AES-256/SHA-1 fixture",
+      "legacy_archive_sha256": "b2c8105fe28c91c1955a20f9b3818fa680dfcce89b0dfe9841288e12040189f3",
+      "role": "guard"
+    },
+    {
+      "case": "security-ooxml-encryption-interop-readback",
+      "corpus_id": "ooxml-encrypted-cfb:sha256:d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+      "legacy_name": "Litchi crypto component Agile mixed wrapper/data key-size fixture",
+      "legacy_archive_sha256": "d7f53bf7112b416c489afe24d0d0653fb563bf5ac644afe8bce3af90e332fe9c",
+      "role": "guard"
+    },
+    {
+      "case": "security-opc-malformed-refusal",
+      "corpus_id": "ooxml-zip:sha256:a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+      "legacy_name": "Apache POI OPC malformed derived-part-name fixture",
+      "legacy_archive_sha256": "a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29",
+      "role": "guard"
+    },
+    {
+      "case": "security-opc-malformed-refusal",
+      "corpus_id": "ooxml-zip:sha256:e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+      "legacy_name": "Apache POI OPC malformed multiple-core-properties fixture",
+      "legacy_archive_sha256": "e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5",
+      "role": "guard"
+    },
+    {
+      "case": "security-protected-docx-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+      "legacy_name": "OOXML document-protection fixture",
+      "legacy_archive_sha256": "5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544",
+      "role": "guard"
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+      "legacy_name": "Apache POI signed XLSX fixture",
+      "legacy_archive_sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+      "role": "guard"
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+      "legacy_name": "Apache POI signed PPTX fixture",
+      "legacy_archive_sha256": "4d925d282dcca86e62b6716647a458246f8b9ea0eae0ec6664bbbf5a3f91bce1",
+      "role": "guard"
+    },
+    {
+      "case": "security-signed-ooxml-verify-noop-refusal",
+      "corpus_id": "ooxml-zip:sha256:bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+      "legacy_name": "Apache POI signed DOCX fixture",
+      "legacy_archive_sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+      "role": "guard"
+    },
+    {
+      "case": "security-xlsx-adversarial-inert-read",
+      "corpus_id": "ooxml-zip:sha256:95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+      "legacy_name": "Apache POI XML-maps external-entity-looking fixture",
+      "legacy_archive_sha256": "95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+      "role": "inventory-only"
+    },
+    {
+      "case": "security-xlsx-adversarial-inert-read",
+      "corpus_id": "ooxml-zip:sha256:c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+      "legacy_name": "OOXML malformed shared-string hint fixture",
+      "legacy_archive_sha256": "c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+      "role": "guard"
+    }
+  ]
+}

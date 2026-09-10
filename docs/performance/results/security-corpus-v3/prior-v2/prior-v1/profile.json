@@ -1,0 +1,13 @@
+{
+  "profile_id": "security-corpus-bounded-read-v1",
+  "max_input_bytes": 67108864,
+  "max_members": 4096,
+  "max_member_bytes": 67108864,
+  "max_relationships": 8192,
+  "max_materialized_bytes": 67108864,
+  "max_output_bytes": 67108864,
+  "timed": false,
+  "host_code_execution": false,
+  "external_reference_resolution": false,
+  "notes": "Correctness-only opt-in rows; no timer or cold-cache claim. ZIP members are hashed after bounded decompression; CFB payloads remain opaque to this catalog."
+}

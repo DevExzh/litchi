@@ -27,6 +27,7 @@ dependencies = [
  "cipher 0.5.2",
  "cpubits",
  "cpufeatures 0.3.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -975,14 +976,21 @@ dependencies = [
 name = "litchi-crypto"
 version = "0.0.1"
 dependencies = [
+ "aes",
+ "base64",
  "bitflags",
+ "cbc",
+ "hmac 0.13.0",
  "litchi-cfb",
  "litchi-core",
  "litchi-ole-common",
  "quick-xml",
+ "rand 0.10.2",
  "rc4",
  "sha1 0.11.0",
+ "sha2 0.11.0",
  "subtle",
+ "thiserror",
  "zeroize",
 ]
 
@@ -1214,6 +1222,7 @@ dependencies = [
  "litchi",
  "litchi-cfb",
  "litchi-core",
+ "litchi-crypto",
  "litchi-doc",
  "litchi-docx",
  "litchi-odf-common",
@@ -1389,6 +1398,7 @@ dependencies = [
  "litchi-opc",
  "litchi-sheet",
  "litchi-spreadsheet-drawing",
+ "litchi-xldm",
  "once_cell",
  "quick-xml",
  "thiserror",

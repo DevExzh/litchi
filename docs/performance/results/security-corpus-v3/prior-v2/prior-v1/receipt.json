@@ -1,0 +1,86 @@
+{
+  "schema": "litchi-security-corpus-receipt-v1",
+  "artifact": "security-corpus-v1",
+  "base_commit": "0201c716e6005ad26712895db409b807cdbca5b0",
+  "candidate_worktree": "/var/tmp/litchi-security-corpus-validation-20260910",
+  "primary_worktree_modified": false,
+  "owned_scope": [
+    "tools/generate_security_corpus_catalog.py",
+    "tools/validate_security_corpus_catalog.py",
+    "tools/test_security_corpus_catalog.py",
+    "tools/perf-baseline/README.md",
+    "docs/performance/results/security-corpus-v1/"
+  ],
+  "shared_provider_scope": "not modified; CFB boundary and allocator provider batches remain separate",
+  "catalog": {
+    "catalog_sha256": "9c66e095ae2c970bee97131a9d9b408033258d5667de7c9100449adbec951c17",
+    "content_set_sha256": "ea93b2d1bfe8779e5561fc81ece9ca405eb76c69dfdaed3f2d761a0328ac5107",
+    "corpora": 22,
+    "bindings": 22,
+    "oracles": 10,
+    "default_bindings_unchanged": 201,
+    "timed_rows": 0,
+    "profile_id": "security-corpus-bounded-read-v1",
+    "profile_sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239"
+  },
+  "commands": {
+    "catalog_build": "python3 tools/generate_security_corpus_catalog.py --revision 0201c716e6005ad26712895db409b807cdbca5b0 --worktree-dirty",
+    "catalog_validate_direct": "python3 tools/validate_security_corpus_catalog.py",
+    "catalog_validate_module": "python3 -m tools.validate_security_corpus_catalog",
+    "python_compile": "python3 -m py_compile tools/generate_security_corpus_catalog.py tools/validate_security_corpus_catalog.py tools/test_security_corpus_catalog.py",
+    "catalog_unit_tests": "python3 -m unittest tools.test_security_corpus_catalog -v",
+    "security_corpus": "TMPDIR=/var/tmp/litchi-security-corpus-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --locked --manifest-path tools/perf-baseline/Cargo.toml --lib security_corpus -- --ignored",
+    "ooxml_interoperability": "TMPDIR=/var/tmp/litchi-security-corpus-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test -p litchi-crypto --features ooxml --test ooxml_interoperability"
+  },
+  "results": {
+    "catalog_build": "pass",
+    "catalog_validate_direct": "pass: 22 security corpora and 22 opt-in rows",
+    "catalog_validate_module": "pass: 22 security corpora and 22 opt-in rows",
+    "python_compile": "pass",
+    "catalog_unit_tests": "pass: 3 tests",
+    "security_corpus": "pass: 1 passed, 0 failed, 362 filtered",
+    "ooxml_interoperability": "pass: 4 passed, 0 failed, 0 ignored"
+  },
+  "evidence": {
+    "source_manifest": "docs/performance/results/security-corpus-v1/source-manifest.json",
+    "source_manifest_sha256": "7a4b1fc78ad9ad4981b8fbbf8d75a088c9ffb767e16db6b50dd08c9a25c72294",
+    "compressed_logs": [
+      "docs/performance/results/security-corpus-v1/logs/catalog-build.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/catalog-module-validation.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/catalog-test-compile.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/catalog-unit-tests.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/catalog-validation.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/ooxml-interoperability.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/python-compile.log.gz",
+      "docs/performance/results/security-corpus-v1/logs/security-corpus-tests.log.gz"
+    ]
+  },
+  "policy": {
+    "timed_runs": false,
+    "host_code_execution": false,
+    "external_reference_resolution": false,
+    "native_acceptance_claim": false,
+    "native_checkout_fixture_policy": "optional ignored tests only; external 3rdparty checkout is not part of this tracked catalog",
+    "macro_policy": "inventory and inert preservation only"
+  },
+  "preserved_prior_artifacts": [
+    {
+      "artifact": "xls-embedded-payload-v1",
+      "status": "historical audit-failed receipt retained verbatim",
+      "receipt_path": "docs/performance/results/security-corpus-v1/prior-receipts/xls-embedded-payload-v1-receipt.json",
+      "receipt_sha256": "a8e3c3bcf8eb1f930621eed6dcb3971233ed0e6d957603da8243b6ba4f34ac1f",
+      "audit_blocker": "odd cbFmla=5 form omitted the required PtgTbl and PictFmlaEmbedInfo shape; corrected v2 is separate",
+      "toolchain": "1.95.0",
+      "cpu_affinity": "8-31",
+      "commands": {
+        "tests": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test -p litchi-xls --lib ole_object::tests -- --nocapture",
+        "clippy": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 clippy -p litchi-xls --lib --tests --all-features -- -D warnings",
+        "rustdoc": "TMPDIR=/var/tmp/litchi-xls-embedded-payload-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-xls-embedded-payload-target-20260910 CARGO_BUILD_JOBS=4 RUSTDOCFLAGS=-D warnings taskset -c 8-31 cargo +1.95.0 doc -p litchi-xls --all-features --no-deps",
+        "rustfmt": "rustup run stable rustfmt --edition 2024 --check crates/litchi-xls/src/lib.rs crates/litchi-xls/src/ole_object/semantic/mod.rs crates/litchi-xls/src/ole_object/semantic/payload.rs crates/litchi-xls/src/ole_object/package/transaction.rs crates/litchi-xls/src/ole_object/edit/transaction.rs crates/litchi-xls/src/ole_object/tests/transaction.rs"
+      }
+    }
+  ],
+  "not_run": [
+    "timed performance capture; allocator or latency measurement; native host application round-trip"
+  ]
+}

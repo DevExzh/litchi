@@ -12,7 +12,7 @@ use crate::ole_streams::{
     self, NativePatch, NativeSnapshot, NativeTransaction, PresentationPatch, PresentationSnapshot,
     PresentationTransaction,
 };
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
@@ -98,6 +98,26 @@ impl Editor {
     pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, OleError> {
         Self::validate_open_inputs(&targets, limits)?;
         let mut ole = OleFile::open(Cursor::new(bytes))?;
+        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let original = Arc::new(ole.into_inner().into_inner());
+        Ok(Self::from_admitted(original, limits, admitted))
+    }
+
+    /// Opens a package with an explicit low-level CFB admission profile.
+    ///
+    /// Security-sensitive format owners should use this entry point when the
+    /// source has already been admitted to a caller-owned input ceiling. The
+    /// CFB profile is applied before directory, FAT, or selected-object
+    /// allocations, then the object capture profile is applied to the admitted
+    /// package.
+    pub fn open_with_cfb_limits(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::validate_open_inputs(&targets, limits)?;
+        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
         let original = Arc::new(ole.into_inner().into_inner());
         Ok(Self::from_admitted(original, limits, admitted))
