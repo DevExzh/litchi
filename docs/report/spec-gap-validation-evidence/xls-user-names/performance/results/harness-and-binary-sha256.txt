@@ -1,0 +1,15 @@
+The first three entries are durable evidence inputs; the last two are the
+executed release binaries used for the baseline and final runs.
+The raw run artifact hashes are included after the executable hashes.
+
+1ff371ea104dcda38cb53c09391510970ded66cbf60d8c0a783d5824e4937dad  docs/report/spec-gap-validation-evidence/xls-user-names/performance/harness/Cargo.lock
+2460136d22bad1647760072534a58dfe18b466cc483aae32b32b1e5d7bf07c1d  docs/report/spec-gap-validation-evidence/xls-user-names/performance/harness/Cargo.toml
+962d0fc2b93e3eae94fab157b5e5abf40a2ae74e0b3e46b5d2eaad255f45d325  docs/report/spec-gap-validation-evidence/xls-user-names/performance/harness/src/main.rs
+8ae8da5fc2748ba630738eb76200dfe94493638d6da8a821f5d1a84104b71531  /var/tmp/litchi-xls-user-names-root-profile-target/release/litchi-xls-profiler-v5
+ced49c994ce25311121e9e7a964341b83bc4c506b85665627b6d13f6db9a5dae  /var/tmp/litchi-xls-profiler-baseline-target/release/litchi-xls-profiler-baseline
+9324d9265fa95ca191d4d1e3430f9014a51b3968d528858b20a15da1aa1778d7  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/baseline-v5-runs.txt
+212b8011ab20ca3ac387fb8204beb52b95716cb245e4c6ec32802690e0b960fd  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/final-current-runs.txt
+fed18862427f2fc8a269942b014eca9221652bca9944770296e9d03f2280f55c  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/baseline-source-sha256.txt
+13caabbacef7e4ea2608bbd56132dc4c2daaa9390b8d5d5fc0af6368903664f6  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/final-source-sha256.txt
+fd4a5c1b9608b73dab1c1f0db9590db2e59104c7e87030dcf2bf7a786c588bd6  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/baseline-source.patch
+7cf8b79d53f2268314a0e21ec5e13dba49f53ceae54aebef3f5e128d36e6804c  docs/report/spec-gap-validation-evidence/xls-user-names/performance/results/baseline-source.json

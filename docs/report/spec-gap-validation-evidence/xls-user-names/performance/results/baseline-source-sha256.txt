@@ -1,0 +1,20 @@
+tree=/var/tmp/litchi-xls-user-names-validation-20260910-v5
+HEAD=fa29f97deb6974ec4d2567f20cd02b299dca2ca5
+
+2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/docs/FEATURE_MATRIX.md
+6fb0f1ac31b0c91c9cf63c5dad9d7dbcfdb40005114d6fa6f40b325dbb1a2d39  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/lib.rs
+cf6e26b86f81321d39a0c11d5441cf27aea0b759c0df0808618cc90ec58fbdf4  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_routing.rs
+214252bb40ad0dfb0db097e08ade1697ae9c60f41cbf4beeec74f58335d11d16  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/revision_records/codec.rs
+3ca28624dd34e095c6e9d5149f30dbb0cdad3ddd8c676d464d28f6219be2fffe  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/revision_records/transaction_tests.rs
+02a581ab7d6c358f51966392e75b9fde64ad0e049227beba1285a1f7f4074268  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/mod.rs
+346c01ef66c7e174afb456d96cdb4c945ec0fb78b6e8d875e8a32a4ec3ae5171  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/tests.rs
+506199529183f6bc696edd29c9d99a4b9541645bf5912e4cb967b71b39223add  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/edit.rs
+627720b2568a31e7ba081449749835b74f222f2b858d46b33345a3c32cd06a95  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/Cargo.toml
+68883833fbec133d3bd64b1620cc7375a7df631b04e6076ec38931dd23973ca4  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/model.rs
+78b9667cf12d7419e47910e572460d60433061ed33f8192eafa7abfa525febe0  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/codec.rs
+8058700956351c188f98f06262316d77f50b0ec36238c14a886f24e7932fafe6  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/workbook/package.rs
+9a36a65e1414ed7224ab5db46dd964c0190db6030905d2c9a8311227dbeb9bbf  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/package.rs
+e551f280a9124e0fefb91cb54506e9b1dd8b574e7ee37561b4343faa4e84779b  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/revision_log.rs
+f9c404d1d235b6b393af04f7bec4d9fb48c876b90c445383fbfb2f576fb12827  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/src/user_names/publication.rs
+8bdfa078101726f899eb4a1f258752eaa2f83c5b20eadfcafcf3356b9c68a4d0  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/tests/xls_revision_log.rs
+486a6742c08e79235ad8f48f86156dd4884133fb616abf20559dc8b4b8109bbe  /var/tmp/litchi-xls-user-names-validation-20260910-v5/crates/litchi-xls/tests/xls_user_names.rs

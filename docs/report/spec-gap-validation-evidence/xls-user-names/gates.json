@@ -1,0 +1,103 @@
+{
+  "base": "fa0e2371745f4cfb0dee2947ccf23736bfc323f6",
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-xls-user-names-current-target",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "source_sha256": {
+    "crates/litchi-xls/docs/FEATURE_MATRIX.md": "7f146871f20861c07a4ea1964933f3167256fda415cf31cd7ea70837b1cc6de5",
+    "crates/litchi-xls/src/lib.rs": "6fb0f1ac31b0c91c9cf63c5dad9d7dbcfdb40005114d6fa6f40b325dbb1a2d39",
+    "crates/litchi-xls/src/revision_log.rs": "60ad9c4738c1403f62acb74b99ddbc285d9429498a9bb05f9561efacc6add674",
+    "crates/litchi-xls/src/revision_records/codec.rs": "074a6a281f4ed8b0fe1f8251df130e8efdda432634944c1e4a171b49b70cc018",
+    "crates/litchi-xls/src/revision_records/transaction_tests.rs": "3ca28624dd34e095c6e9d5149f30dbb0cdad3ddd8c676d464d28f6219be2fffe",
+    "crates/litchi-xls/src/user_names/codec.rs": "78b9667cf12d7419e47910e572460d60433061ed33f8192eafa7abfa525febe0",
+    "crates/litchi-xls/src/user_names/edit.rs": "c534a0407e11ec320d91ea4c82375ce5ffd5f5d3a558018d0e96b2004da2e9c2",
+    "crates/litchi-xls/src/user_names/mod.rs": "02a581ab7d6c358f51966392e75b9fde64ad0e049227beba1285a1f7f4074268",
+    "crates/litchi-xls/src/user_names/model.rs": "6576ab3b89e44a1f7fcc2a14bda3037166a5cb23e7840a298e93d1fa6d76119a",
+    "crates/litchi-xls/src/user_names/package.rs": "9a36a65e1414ed7224ab5db46dd964c0190db6030905d2c9a8311227dbeb9bbf",
+    "crates/litchi-xls/src/user_names/publication.rs": "f9c404d1d235b6b393af04f7bec4d9fb48c876b90c445383fbfb2f576fb12827",
+    "crates/litchi-xls/src/user_names/tests.rs": "a8a9e8c9d93558d7321b5570957453aa464422e1e53021c0c48b5d1be913d30a",
+    "crates/litchi-xls/src/user_routing.rs": "2d60780ce69df404ff272bda48809cbf0c9af99ee8d711cd546112dfea2b24af",
+    "crates/litchi-xls/src/workbook/package.rs": "bdc61f2175baa873f8c758d76afee66ad6a9d0656805696217f2353aa442a1e9",
+    "crates/litchi-xls/tests/xls_revision_log.rs": "d5a639220c351ce62970e487fa887b2db75a20bb895a746cbbd2f646647e6a48",
+    "crates/litchi-xls/tests/xls_user_names.rs": "a8927c111b6740bfacaffcb851ba88dc1f7d16c3c06463e4bf30410537439fda"
+  },
+  "source_unchanged": true,
+  "gates": [
+    {
+      "gate": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--no-deps",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-xls",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "crates/litchi-xls"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "tests": {
+    "targets": 73,
+    "passed": 1417,
+    "failed": 0,
+    "ignored": 1
+  }
+}
