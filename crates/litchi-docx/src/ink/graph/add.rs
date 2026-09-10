@@ -699,7 +699,7 @@ mod tests {
     use litchi_opc::PackageWriter;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
-    const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:ink>"##;
+    const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2, 3 4</i:trace></i:ink>"##;
 
     fn package() -> OpcPackage {
         let mut package = OpcPackage::new();

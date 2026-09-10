@@ -42,6 +42,7 @@ mod host;
 mod model;
 pub(crate) mod package;
 mod placement;
+mod trace;
 mod transaction;
 mod xml;
 

@@ -968,7 +968,7 @@ fn durable_changed_and_noop_patches_reject_payload_graph_and_lexical_stale_sourc
     let noop = durable_patch(&baseline.edit_ink().unwrap().commit().unwrap());
 
     let payload = rewrite_member(&original, "payload/handwriting.xml", |content| {
-        replace_once(content, b"1 2 3", b"4 5 6")
+        replace_once(content, b"1 2, 3 4", b"4 5, 6 7")
     });
     assert_rejected_unchanged(&payload, &changed);
     assert_rejected_unchanged(&payload, &noop);

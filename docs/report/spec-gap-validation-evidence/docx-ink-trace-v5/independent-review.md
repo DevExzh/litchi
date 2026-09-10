@@ -1,0 +1,3 @@
+Final independent review by calc_chain_review: clear for isolated commit.
+
+T integer values are accepted for omitted/decimal declarations; Boolean and fractional values reject. Intermittent child metadata remains opaque while duplicate/late sections are rejected at the enclosing grammar level. Validation streams source spans and retains bounded per-active-trace difference state without point vectors or aggregate trace data. Source, XML, definition, channel, trace, and projection bounds are checked before or with fallible reservation. Context ownership, CDATA/entity splitting, ignored ancestry, and source projections remain consistent. No remaining actionable blocker was found.
