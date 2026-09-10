@@ -172,6 +172,62 @@ fn commit_does_not_retain_an_oversized_validated_store() {
     let committed = edit.commit().expect("commit");
     assert!(committed.workbook().inner.sheets[0].cells.get().is_none());
 }
+
+#[test]
+fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
+    let source = Workbook::new().expect("source workbook");
+    let mut create = source.edit().expect("create edit");
+    {
+        let mut sheet = create
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("sheet");
+        for index in 0..4_097_u32 {
+            sheet
+                .set(
+                    (index / 64, index % 64),
+                    i32::try_from(index).expect("bounded value"),
+                )
+                .expect("cell edit");
+        }
+    }
+    let created = create.commit().expect("large worksheet commit");
+    let reopened = Workbook::from_bytes(created.workbook().to_bytes().expect("large bytes"))
+        .expect("large worksheet reopen");
+
+    let mut edit = reopened.edit().expect("sparse edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("sheet")
+        .set("A1", 42_i32)
+        .expect("changed value");
+    let committed = edit.commit().expect("sparse commit");
+    assert!(
+        committed.workbook().inner.sheets[0].cells.get().is_none(),
+        "large sparse verification must not retain a second full worksheet store"
+    );
+    let sheet = committed
+        .workbook()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("sheet");
+    assert!(matches!(
+        sheet.cell("A1").expect("updated cell").stored(),
+        Some(Cell::Value(Value::Number(value))) if value.as_str() == "42"
+    ));
+    let final_bytes = committed.workbook().to_bytes().expect("final bytes");
+    let final_reopen = Workbook::from_bytes(final_bytes).expect("final reopen");
+    assert!(matches!(
+        final_reopen
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("sheet")
+            .cell("A1")
+            .expect("updated cell")
+            .stored(),
+        Some(Cell::Value(Value::Number(value))) if value.as_str() == "42"
+    ));
+}
 #[test]
 fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
     let source = merged_workbook();
