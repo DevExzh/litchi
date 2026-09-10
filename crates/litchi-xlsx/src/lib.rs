@@ -320,6 +320,13 @@ pub use threaded_comments::{
     parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
     validate_timestamp, write_comments, write_persons,
 };
+pub use workbook::data_model::{
+    Commit as DataModelCommit, Definition as DataModelDefinition, Model as DataModel,
+    OpaqueXml as DataModelOpaqueXml, Patch as DataModelPatch, Payload as DataModelPayload,
+    Relationship as DataModelRelationship, Snapshot as DataModelSnapshot, Table as DataModelTable,
+    Transaction as DataModelTransaction, load_data_model, parse_data_model, store_data_model,
+    write_data_model,
+};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
     DurablePatch, Edit, Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice,

@@ -266,6 +266,50 @@ impl Package {
         crate::survey::Snapshot::load_with_limits(&self.0, limits)
     }
 
+    /// Read the source-bound workbook Data Model graph, if present.
+    pub fn data_model(&self) -> Result<crate::workbook::data_model::Snapshot> {
+        crate::workbook::data_model::Snapshot::load(&self.0)
+    }
+
+    /// Start a source-bound Data Model transaction.
+    pub fn edit_data_model(&mut self) -> Result<crate::workbook::data_model::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_data_model")?;
+        crate::workbook::data_model::Transaction::new(&mut self.0)
+    }
+
+    /// Atomically create/import or replace a Data Model with outer validation.
+    ///
+    /// Creation/import validates the typed descriptor, XLDM storage profile,
+    /// OPC ownership, and relationship closure while retaining the binary
+    /// payload as opaque bytes. It does not prove inner XLDM table,
+    /// relationship, column, time-group, or dependency identity. For an
+    /// existing source-bound model, payload-only replacement with an unchanged
+    /// typed descriptor is supported; structural replacement is refused until
+    /// that inner proof exists.
+    pub fn put_data_model(&mut self, model: crate::workbook::data_model::Model) -> Result<()> {
+        self.ensure_mutation_allowed("put_data_model")?;
+        let mut transaction = crate::workbook::data_model::Transaction::new(&mut self.0)?;
+        transaction.set(model)?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Atomically remove the workbook Data Model graph.
+    pub fn remove_data_model(&mut self) -> Result<()> {
+        self.ensure_mutation_allowed("remove_data_model")?;
+        let mut transaction = crate::workbook::data_model::Transaction::new(&mut self.0)?;
+        transaction.remove()?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Apply an exact source-bound Data Model patch.
+    pub fn apply_data_model_patch(
+        &mut self,
+        patch: &crate::workbook::data_model::Patch,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("apply_data_model_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Read the source-bound Custom Data and Custom Data Properties catalog.
     pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
         crate::custom_data::Snapshot::load(&self.0)

@@ -1,0 +1,6 @@
+# Recorded root validation commands (Rust 1.95.0; no --offline or --locked flags)
+cargo +1.95.0 test -p litchi-xlsx --all-features
+cargo +1.95.0 clippy -p litchi-xlsx --all-targets --all-features -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo +1.95.0 doc -p litchi-xlsx --all-features --no-deps
+rustfmt --edition 2024 --config skip_children=true --check <the 9 Rust owner paths>
+git diff --check

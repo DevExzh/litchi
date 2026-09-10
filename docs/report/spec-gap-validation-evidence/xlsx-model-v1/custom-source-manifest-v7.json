@@ -1,0 +1,22 @@
+{
+  "base_commit": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+  "sources": {
+    "crates/litchi-xlsx/src/custom_data/codec.rs": "a7da42b790d1fc370de07853a7ce5494053beb97e43a468db9658aa696fcab6d",
+    "crates/litchi-xlsx/src/custom_data/model.rs": "6429a1a6993176b70eb54614423c432e2f158792a1840c23a0e94c8adb1076ef",
+    "crates/litchi-xlsx/src/custom_data/package.rs": "dfce2bb14e62fed803c555cffbb4deafed0899a34926a5a8c899a09fac21acd5",
+    "crates/litchi-xlsx/src/custom_data/mod.rs": "aed3bf47fa6077ee3743dcf0b0be6e48154be30b4b983a298cb55cda20592bb5",
+    "crates/litchi-xlsx/src/connections/embedded_data.rs": "2b77488a524981818714e9b2ced654bd78edd3ae5a2d9a0c0e29ca3e0b2e26c8",
+    "crates/litchi-xlsx/src/connections/mod.rs": "e81e58ab2a6570c09edac737c420335f3cedfaf32e8fcbd79636cf76793f3972",
+    "crates/litchi-xlsx/src/error.rs": "f7e93b6086464e15fe48ba631757849ce89eef8306ba130103386e4938a62783",
+    "crates/litchi-xlsx/src/lib.rs": "38b3c8eff9e2791f4a0e46bcb5a902a48c7f73dbb50d78bcd14aa7eb821b3e68",
+    "crates/litchi-xlsx/src/package.rs": "5264f7089917b451d7b29604ff3abaa4522a612c1397f92133759e59fe2c9a04",
+    "crates/litchi-xlsx/src/source_attributes.rs": "eac9cbc9e8e755de3a1bc6118e2e98c4a8518145e7e903b1cd8dcbd6f2999dc3",
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "482cb4bf0e375d2e016e4a8e13a1d487281551fe8d2c8803c7214fe139826fab",
+    "crates/litchi-xlsx/src/connections/codec.rs": "6cbee2a0da6c7e91b3a824bea871e5a7550bb1e86f3efbe5569de859fcac79cb",
+    "crates/litchi-xlsx/src/connections/package.rs": "55ec1361794046c07412458257777e2bc946975c0e6ebd98529bfe21b0b2c102",
+    "crates/litchi-xlsx/src/connections/tests.rs": "43d1d5978c872f5653b9e272fad3ec243145fd9818b2766f60bbeb052683365d",
+    "crates/litchi-xlsx/src/connections/codec/source_offsets_tests.rs": "98c94b65a62eab075f4bf50b2b8d596beabca1d45b4d34d31bc36cbf7c99b490",
+    "crates/litchi-xlsx/src/connections/namespace.rs": "62af6e3bff94056ac9438e65904e9843b45b7dbe76a47a1b4cbc295aaf8017f3",
+    "crates/litchi-xlsx/src/connections/model.rs": "4ef228ec8db5aa646e650f3a16aa0f90aabb465afdb5e0e24aa768f573e9fa56"
+  }
+}
