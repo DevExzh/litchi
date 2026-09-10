@@ -11,7 +11,7 @@ use litchi_opc::{
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::codec::{Form, scan};
@@ -22,6 +22,7 @@ use crate::{Error, Package, Result};
 
 const STRICT_CUSTOM_XML: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/customXml";
 const MAX_PROFILE_ATTRIBUTES: usize = 256;
+const EMMA_NAMESPACE: &str = "http://www.w3.org/2003/04/emma";
 
 impl Package {
     /// Inventory active InkML annotations across all reachable Word stories.
@@ -169,7 +170,8 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                         &element,
                         kind,
                         &namespace,
-                        &stack,
+                        reader.resolver(),
+                        &mut stack,
                         &mut definitions,
                         &mut traces,
                         start,
@@ -204,12 +206,14 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                         &element,
                         kind,
                         &namespace,
-                        &stack,
+                        reader.resolver(),
+                        &mut stack,
                         &mut definitions,
                         &mut traces,
                         start,
                     )?
                 };
+                complete_profile_frame(&frame)?;
                 record_projection(
                     frame.projection,
                     shared::SourceSpan::new(start, end),
@@ -223,6 +227,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 let frame = stack.pop().ok_or_else(|| {
                     Error::Invalid("DOCX Ink content part has an unexpected end".into())
                 })?;
+                complete_profile_frame(&frame)?;
                 record_projection(
                     frame.projection,
                     shared::SourceSpan::new(frame.start, end),
@@ -341,6 +346,8 @@ struct ProfileFrame {
     opaque: bool,
     projection: Option<ProjectionKind>,
     start: usize,
+    child_elements: usize,
+    required_child: bool,
 }
 
 impl ProfileFrame {
@@ -351,6 +358,8 @@ impl ProfileFrame {
             opaque: false,
             projection: None,
             start,
+            child_elements: 0,
+            required_child: false,
         }
     }
 
@@ -365,6 +374,8 @@ impl ProfileFrame {
             opaque: false,
             projection: Some(projection),
             start,
+            child_elements: 0,
+            required_child: false,
         }
     }
 
@@ -375,6 +386,8 @@ impl ProfileFrame {
             opaque: true,
             projection: None,
             start,
+            child_elements: 0,
+            required_child: false,
         }
     }
 }
@@ -423,16 +436,26 @@ fn observe_profile_element(
     element: &BytesStart<'_>,
     kind: ProfileKind,
     _namespace: &ResolveResult<'_>,
-    stack: &[ProfileFrame],
+    resolver: &NamespaceResolver,
+    stack: &mut [ProfileFrame],
     definitions: &mut Vec<Definition>,
     traces: &mut Vec<TraceReferences>,
     start: usize,
 ) -> Result<ProfileFrame> {
-    let Some(parent) = stack.last() else {
+    let Some(parent_index) = stack.len().checked_sub(1) else {
         return Err(Error::Invalid(
             "DOCX Ink content part has an element outside its root".into(),
         ));
     };
+    let child_index = stack[parent_index].child_elements;
+    stack[parent_index].child_elements = child_index.checked_add(1).ok_or_else(|| {
+        exceeded(
+            "DOCX Ink profile child elements",
+            usize::MAX,
+            shared::MAX_NODES,
+        )
+    })?;
+    let parent = stack[parent_index];
     if parent.opaque {
         return Ok(ProfileFrame::ignored(kind, start));
     }
@@ -504,9 +527,19 @@ fn observe_profile_element(
         {
             Ok(ProfileFrame::recognized(kind, start))
         },
-        ProfileKind::BrushProperty if parent.recognized && parent.kind == ProfileKind::Brush => Ok(
-            ProfileFrame::recognized_projection(kind, start, ProjectionKind::BrushProperty),
-        ),
+        ProfileKind::BrushProperty if parent.recognized && parent.kind == ProfileKind::Brush => {
+            let name = profile_attr(element, b"name")?.ok_or_else(|| {
+                Error::Invalid("DOCX Ink brushProperty name attribute is missing".into())
+            })?;
+            if !is_profile_brush_property(name.as_str()) {
+                return Ok(ProfileFrame::ignored(kind, start));
+            }
+            Ok(ProfileFrame::recognized_projection(
+                kind,
+                start,
+                ProjectionKind::BrushProperty,
+            ))
+        },
         ProfileKind::SourceLink | ProfileKind::DestinationLink
             if parent.recognized && parent.kind == ProfileKind::MicrosoftContext =>
         {
@@ -522,9 +555,19 @@ fn observe_profile_element(
             Ok(ProfileFrame::recognized(kind, start))
         },
         ProfileKind::Emma if parent.recognized && parent.kind == ProfileKind::AnnotationXml => {
+            if parent.required_child {
+                return Ok(ProfileFrame::ignored(kind, start));
+            }
+            stack[parent_index].required_child = true;
             Ok(ProfileFrame::recognized(kind, start))
         },
-        ProfileKind::Interpretation if parent.recognized && parent.kind == ProfileKind::Emma => {
+        ProfileKind::Interpretation
+            if parent.recognized
+                && parent.kind == ProfileKind::Emma
+                && child_index == 0
+                && emma_mode_is_ink(element, resolver)? =>
+        {
+            stack[parent_index].required_child = true;
             Ok(ProfileFrame::recognized(kind, start))
         },
         ProfileKind::MicrosoftContext => {
@@ -540,6 +583,7 @@ fn observe_profile_element(
             {
                 return Ok(ProfileFrame::ignored(kind, start));
             }
+            stack[parent_index].required_child = true;
             Ok(ProfileFrame::recognized_projection(
                 kind,
                 start,
@@ -551,6 +595,81 @@ fn observe_profile_element(
         // trace or context record from being mistaken for a recognized one.
         _ => Ok(ProfileFrame::ignored(kind, start)),
     }
+}
+
+fn complete_profile_frame(frame: &ProfileFrame) -> Result<()> {
+    if !frame.recognized {
+        return Ok(());
+    }
+    let required = match frame.kind {
+        ProfileKind::AnnotationXml => "emma:emma",
+        ProfileKind::Emma => "emma:interpretation as its first child",
+        ProfileKind::Interpretation => "msink:context",
+        _ => return Ok(()),
+    };
+    if frame.required_child {
+        Ok(())
+    } else {
+        Err(Error::Invalid(format!(
+            "DOCX Ink {} is missing required {}",
+            profile_kind_name(frame.kind),
+            required
+        )))
+    }
+}
+
+const fn profile_kind_name(kind: ProfileKind) -> &'static str {
+    match kind {
+        ProfileKind::AnnotationXml => "annotationXML",
+        ProfileKind::Emma => "emma:emma",
+        ProfileKind::Interpretation => "emma:interpretation",
+        _ => "Ink element",
+    }
+}
+
+fn is_profile_brush_property(name: &str) -> bool {
+    matches!(
+        name,
+        "width"
+            | "height"
+            | "color"
+            | "transparency"
+            | "tip"
+            | "rasterOp"
+            | "antiAliased"
+            | "fitToCurve"
+            | "ignorePressure"
+            | "inkEffects"
+            | "anchorX"
+            | "anchorY"
+            | "scaleFactor"
+    )
+}
+
+fn emma_mode_is_ink(element: &BytesStart<'_>, resolver: &NamespaceResolver) -> Result<bool> {
+    let mut mode = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if local.as_ref() != b"mode"
+            || !matches!(
+                namespace,
+                ResolveResult::Bound(Namespace(value)) if value == EMMA_NAMESPACE.as_bytes()
+            )
+        {
+            continue;
+        }
+        if mode.is_some() {
+            return Err(Error::Invalid(
+                "DOCX Ink emma:interpretation mode attribute is duplicated".into(),
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        mode = Some(value.into_owned());
+    }
+    Ok(mode.as_deref() == Some("ink"))
 }
 
 fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
@@ -1139,13 +1258,92 @@ mod tests {
         let ignored_trace = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:trace>1 2</i:trace></i:definitions></i:ink>"##;
         validate_content_part(ignored_trace).unwrap();
 
-        let ignored_context = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:group><m:context type="writingRegion"/></e:group></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        let ignored_context = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><e:group><m:context type="writingRegion"/></e:group><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
         validate_content_part(ignored_context).unwrap();
     }
 
     #[test]
+    fn profile_requires_emma_first_interpretation_mode_and_context() {
+        let valid = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><m:context type="writingRegion"/></e:interpretation><e:group><m:context type="line"/></e:group></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        validate_content_part(valid).expect("normative EMMA subset");
+
+        let invalid: &[&[u8]] = &[
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##,
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="speech"><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##,
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:group/><e:interpretation e:mode="ink"><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##,
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"/></e:emma></i:annotationXML></i:traceGroup></i:ink>"##,
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:traceGroup><i:annotationXML/></i:traceGroup></i:ink>"##,
+        ];
+        for source in invalid {
+            assert!(
+                validate_content_part(source).is_err(),
+                "profile must reject invalid EMMA boundary: {}",
+                String::from_utf8_lossy(source)
+            );
+        }
+
+        let alternate_prefix = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:q="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><q:emma><q:interpretation q:mode="ink"><m:context type="writingRegion"/></q:interpretation></q:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        validate_content_part(alternate_prefix)
+            .expect("EMMA namespace semantics are prefix independent");
+    }
+
+    #[test]
+    fn profile_ignores_unknown_brush_properties_but_exposes_effective_defaults() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush xml:id="br0"><i:brushProperty name="futureProperty" value="opaque"/><i:brushProperty name="width" value="not-a-decimal" units="bogus"/></i:brush></i:definitions></i:ink>"##;
+        let projection = validate_content_part(source).expect("profile structure");
+        assert_eq!(projection.brush_properties().len(), 1);
+        let document = shared::read_shared_with_source_spans(
+            Arc::new(source.to_vec()),
+            projection.contexts(),
+            projection.traces(),
+            projection.brush_properties(),
+            projection.links(),
+        )
+        .expect("recognized brush property");
+        assert_eq!(document.brush_property_count(), 1);
+        let property = &document.brush_properties()[0];
+        assert_eq!(property.value(), "not-a-decimal");
+        let effective = property.effective().expect("profile property default");
+        assert_eq!(effective.value(), ".053");
+        assert_eq!(effective.units(), Some("cm"));
+        assert!(effective.defaulted());
+        assert_eq!(document.source(), source);
+    }
+
+    #[test]
+    fn profile_applies_normative_units_and_schema_whitespace_to_brush_values() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty name="width" value="&#x20;1.25&#x9;" units="m"/><i:brushProperty name="height" value="1" units="px"/><i:brushProperty name="transparency" value="&#xA;42&#xD;"/><i:brushProperty name="antiAliased" value="&#x20;&#x31;&#x9;"/></i:brush></i:definitions></i:ink>"##;
+        let projection = validate_content_part(source).expect("profile structure");
+        let document = shared::read_shared_with_source_spans(
+            Arc::new(source.to_vec()),
+            projection.contexts(),
+            projection.traces(),
+            projection.brush_properties(),
+            projection.links(),
+        )
+        .expect("recognized brush properties");
+        let effective: Vec<_> = document
+            .brush_properties()
+            .iter()
+            .map(|property| property.effective())
+            .collect();
+
+        assert_eq!(effective[0].as_ref().unwrap().value(), "1.25");
+        assert_eq!(effective[0].as_ref().unwrap().units(), Some("m"));
+        assert!(!effective[0].as_ref().unwrap().defaulted());
+        assert_eq!(effective[1].as_ref().unwrap().value(), ".001");
+        assert_eq!(effective[1].as_ref().unwrap().units(), Some("cm"));
+        assert!(effective[1].as_ref().unwrap().defaulted());
+        assert_eq!(effective[2].as_ref().unwrap().value(), "42");
+        assert!(!effective[2].as_ref().unwrap().defaulted());
+        assert_eq!(effective[3].as_ref().unwrap().value(), "true");
+        assert!(!effective[3].as_ref().unwrap().defaulted());
+        assert_eq!(document.source(), source);
+    }
+
+    #[test]
     fn profile_projection_excludes_ignored_typed_elements_and_nested_roots() {
-        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:trace>ignored definitions trace</i:trace><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:ink/><i:ink><i:trace>ignored nested root trace</i:trace></i:ink><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"/></e:interpretation><e:group><m:context type="line"/></e:group></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:traceGroup><i:brushProperty name="color" value="#FFFFFF"/></i:ink>"##;
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:trace>ignored definitions trace</i:trace><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:ink/><i:ink><i:trace>ignored nested root trace</i:trace></i:ink><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><m:context type="writingRegion"/></e:interpretation><e:group><m:context type="line"/></e:group></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:traceGroup><i:brushProperty name="color" value="#FFFFFF"/></i:ink>"##;
         let projection = validate_content_part(source).unwrap();
         let filtered = shared::read_shared_with_source_spans(
             Arc::new(source.to_vec()),
@@ -1175,7 +1373,7 @@ mod tests {
 
     #[test]
     fn ignored_ancestry_skips_invalid_typed_values_but_keeps_bounded_scan() {
-        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:opaque><m:sourceLink direction="bad" ref="bad"/><m:context/><m:context type="not-a-guid"/><m:context type="writingRegion" id="not-a-guid"/><m:context type="writingRegion" rotatedBoundingBox="not points"/><i:brushProperty/></i:opaque><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:opaque><m:sourceLink direction="bad" ref="bad"/><m:context/><m:context type="not-a-guid"/><m:context type="writingRegion" id="not-a-guid"/><m:context type="writingRegion" rotatedBoundingBox="not points"/><i:brushProperty/></i:opaque><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
         let projection = validate_content_part(source).unwrap();
         let document = shared::read_shared_with_source_spans(
             Arc::new(source.to_vec()),
@@ -1201,7 +1399,7 @@ mod tests {
         ];
         for context in invalid_contexts {
             let source = format!(
-                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation>{context}</e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"#
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink">{context}</e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"#
             );
             let projection = validate_content_part(source.as_bytes()).unwrap();
             assert!(
@@ -1217,7 +1415,7 @@ mod tests {
             );
         }
 
-        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"><m:sourceLink direction="bad" ref="bad"/></m:context></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><m:context type="writingRegion"><m:sourceLink direction="bad" ref="bad"/></m:context></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
         let projection = validate_content_part(source).unwrap();
         assert!(
             shared::read_metadata_with_source_spans(
@@ -1231,16 +1429,6 @@ mod tests {
         );
 
         let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty/></i:brush></i:definitions></i:ink>"##;
-        let projection = validate_content_part(source).unwrap();
-        assert!(
-            shared::read_metadata_with_source_spans(
-                source,
-                projection.contexts(),
-                projection.traces(),
-                projection.brush_properties(),
-                projection.links(),
-            )
-            .is_err()
-        );
+        assert!(validate_content_part(source).is_err());
     }
 }

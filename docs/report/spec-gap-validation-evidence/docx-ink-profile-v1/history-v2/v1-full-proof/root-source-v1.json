@@ -1,0 +1,33 @@
+{
+  "root": "/var/tmp/litchi-docx-ink-profile-validation-20260910",
+  "paths": [
+    {
+      "path": "crates/litchi-docx/src/ink/mod.rs",
+      "sha256": "cc06788ee12b13856cac695c021de3cf0cae33b806a59230dc6bca2eea6cc010"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/model.rs",
+      "sha256": "360c79c57750db2a2eb27357eb57ac5d8547bb10ca5bccff3ff2e52f144d8c2d"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/package.rs",
+      "sha256": "46ada9fbba9cda404a8cd79153a9293e953f334ca97d893f39b57041f1a5bbe0"
+    },
+    {
+      "path": "crates/litchi-docx/tests/ink_inventory.rs",
+      "sha256": "73934fd823d470e129357ebe409aaded7b93892e3e4ead8e77c30f69054f1541"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/mod.rs",
+      "sha256": "a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/model.rs",
+      "sha256": "b4838a2976cb83cdf0274030ce06802f798fbbcbcd056bd4858af2ae016ebd99"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/tests.rs",
+      "sha256": "5bbc8cd875473c73227361eb8a9ae7a82927eccc19b1ca1eb3918dc957b5bbc3"
+    }
+  ]
+}

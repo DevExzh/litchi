@@ -1,6 +1,6 @@
 //! Semantic values for source-backed InkML and DrawingML ink metadata.
 
-use std::{fmt, ops::Range, sync::Arc};
+use std::{borrow::Cow, fmt, ops::Range, sync::Arc};
 
 use thiserror::Error;
 
@@ -498,6 +498,116 @@ impl BrushProperty {
             None
         }
     }
+    /// Return the effective MS-ODRAWXML brush value.
+    ///
+    /// The source [`Self::value`] and [`Self::units`] accessors always expose
+    /// the decoded source lexicals. This method applies the profile defaults
+    /// when a recognized base or DrawingML 2016 property has a missing or
+    /// invalid value/unit pair. Unknown generic InkML properties return
+    /// `None`; the generic reader still retains them in [`Self`].
+    #[must_use]
+    pub fn effective(&self) -> Option<EffectiveBrushProperty> {
+        let normalized_value = collapse_xsd_whitespace(&self.value);
+        let normalized_value = normalized_value.as_ref();
+        let (value, units, defaulted) = match &self.name {
+            BrushPropertyName::Width => {
+                if is_xsd_decimal(normalized_value)
+                    && self.units.as_deref().is_some_and(is_length_unit)
+                {
+                    (
+                        normalized_value.to_owned().into_boxed_str(),
+                        self.units.clone(),
+                        false,
+                    )
+                } else {
+                    (".053".into(), Some("cm".into()), true)
+                }
+            },
+            BrushPropertyName::Height => {
+                if is_xsd_decimal(normalized_value)
+                    && self.units.as_deref().is_some_and(is_length_unit)
+                {
+                    (
+                        normalized_value.to_owned().into_boxed_str(),
+                        self.units.clone(),
+                        false,
+                    )
+                } else {
+                    (".001".into(), Some("cm".into()), true)
+                }
+            },
+            BrushPropertyName::Color => {
+                if is_rgb_hex(&self.value) && self.units.is_none() {
+                    (self.value.clone(), None, false)
+                } else {
+                    ("#000000".into(), None, true)
+                }
+            },
+            BrushPropertyName::Transparency => {
+                if is_bounded_integer(normalized_value, 0, 255) && self.units.is_none() {
+                    (normalized_value.to_owned().into_boxed_str(), None, false)
+                } else {
+                    ("0".into(), None, true)
+                }
+            },
+            BrushPropertyName::Tip => {
+                if matches!(self.value.as_ref(), "ellipse" | "rectangle") && self.units.is_none() {
+                    (self.value.clone(), None, false)
+                } else {
+                    ("ellipse".into(), None, true)
+                }
+            },
+            BrushPropertyName::RasterOp => {
+                if is_raster_operation(&self.value) && self.units.is_none() {
+                    (self.value.clone(), None, false)
+                } else {
+                    ("copyPen".into(), None, true)
+                }
+            },
+            BrushPropertyName::AntiAliased => {
+                if is_xsd_boolean(normalized_value) && self.units.is_none() {
+                    (canonical_boolean(normalized_value).into(), None, false)
+                } else {
+                    ("true".into(), None, true)
+                }
+            },
+            BrushPropertyName::FitToCurve | BrushPropertyName::IgnorePressure => {
+                if is_xsd_boolean(normalized_value) && self.units.is_none() {
+                    (canonical_boolean(normalized_value).into(), None, false)
+                } else {
+                    ("false".into(), None, true)
+                }
+            },
+            BrushPropertyName::InkEffects => {
+                if is_ink_effect(&self.value) && self.units.is_none() {
+                    (self.value.clone(), None, false)
+                } else {
+                    ("none".into(), None, true)
+                }
+            },
+            BrushPropertyName::AnchorX | BrushPropertyName::AnchorY => {
+                if is_xsd_decimal(normalized_value) && self.units.is_none() {
+                    (normalized_value.to_owned().into_boxed_str(), None, false)
+                } else {
+                    ("0".into(), None, true)
+                }
+            },
+            BrushPropertyName::ScaleFactor => {
+                if is_xsd_decimal(normalized_value) && self.units.is_none() {
+                    (normalized_value.to_owned().into_boxed_str(), None, false)
+                } else {
+                    ("0.5".into(), None, true)
+                }
+            },
+            BrushPropertyName::Custom(_) => return None,
+        };
+        Some(EffectiveBrushProperty {
+            name: self.name.clone(),
+            value,
+            units,
+            defaulted,
+        })
+    }
     /// Source span of the complete brushProperty element.
     #[must_use]
     pub const fn source_span(&self) -> SourceSpan {
@@ -508,6 +618,161 @@ impl BrushProperty {
     pub fn xml<'a>(&self, document: &'a Document) -> &'a [u8] {
         document.fragment(self.source)
     }
+}
+
+/// The effective value of a recognized MS-ODRAWXML brush property.
+///
+/// This value is derived from source lexicals; it does not replace the exact
+/// source retained by [`BrushProperty`]. `defaulted` is true when the profile
+/// rule selected the specification default because the source value or units
+/// were absent or invalid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct EffectiveBrushProperty {
+    name: BrushPropertyName,
+    value: Box<str>,
+    units: Option<Box<str>>,
+    defaulted: bool,
+}
+
+impl EffectiveBrushProperty {
+    /// Property name.
+    #[must_use]
+    pub const fn name(&self) -> &BrushPropertyName {
+        &self.name
+    }
+    /// Effective value lexical form.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+    /// Effective optional units.
+    #[must_use]
+    pub fn units(&self) -> Option<&str> {
+        self.units.as_deref()
+    }
+    /// Whether the profile substituted a specification default.
+    #[must_use]
+    pub const fn defaulted(&self) -> bool {
+        self.defaulted
+    }
+}
+
+fn collapse_xsd_whitespace(value: &str) -> Cow<'_, str> {
+    if !value.chars().any(is_xsd_whitespace) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut collapsed = String::with_capacity(value.len());
+    let mut pending_space = false;
+    for character in value.chars() {
+        if is_xsd_whitespace(character) {
+            pending_space = true;
+            continue;
+        }
+        if pending_space && !collapsed.is_empty() {
+            collapsed.push(' ');
+        }
+        collapsed.push(character);
+        pending_space = false;
+    }
+    Cow::Owned(collapsed)
+}
+
+const fn is_xsd_whitespace(character: char) -> bool {
+    matches!(character, ' ' | '\t' | '\r' | '\n')
+}
+
+fn is_xsd_decimal(value: &str) -> bool {
+    let collapsed = collapse_xsd_whitespace(value);
+    let value = collapsed.as_ref();
+    let value = value.strip_prefix(['+', '-']).unwrap_or(value);
+    if value.is_empty() {
+        return false;
+    }
+    let mut parts = value.split('.');
+    let integer = parts.next().unwrap_or_default();
+    let fraction = parts.next();
+    if parts.next().is_some() {
+        return false;
+    }
+    integer.chars().all(|character| character.is_ascii_digit())
+        && fraction.is_none_or(|part| part.chars().all(|character| character.is_ascii_digit()))
+        && (fraction.is_some() || !integer.is_empty())
+        && (fraction.is_none_or(|part| !part.is_empty()) || !integer.is_empty())
+}
+
+fn is_xsd_boolean(value: &str) -> bool {
+    let collapsed = collapse_xsd_whitespace(value);
+    matches!(collapsed.as_ref(), "true" | "false" | "1" | "0")
+}
+
+fn canonical_boolean(value: &str) -> &'static str {
+    match value {
+        "true" | "1" => "true",
+        _ => "false",
+    }
+}
+
+fn is_bounded_integer(value: &str, minimum: i32, maximum: i32) -> bool {
+    let collapsed = collapse_xsd_whitespace(value);
+    let value = collapsed.as_ref();
+    let digits = value.strip_prefix(['+', '-']).unwrap_or(value);
+    !digits.is_empty()
+        && digits.chars().all(|character| character.is_ascii_digit())
+        && value
+            .parse::<i32>()
+            .is_ok_and(|value| (minimum..=maximum).contains(&value))
+}
+
+fn is_rgb_hex(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value[1..]
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+}
+
+fn is_length_unit(value: &str) -> bool {
+    matches!(value, "m" | "cm" | "mm" | "in" | "pt" | "pc" | "em" | "ex")
+}
+
+fn is_raster_operation(value: &str) -> bool {
+    matches!(
+        value,
+        "black"
+            | "copyPen"
+            | "maskNotPen"
+            | "maskPenNot"
+            | "maskPen"
+            | "mergeNotPen"
+            | "mergePen"
+            | "mergePenNot"
+            | "noOperation"
+            | "not"
+            | "notCopyPen"
+            | "notMaskPen"
+            | "notMergePen"
+            | "notXOrPen"
+            | "white"
+            | "xOrPen"
+    )
+}
+
+fn is_ink_effect(value: &str) -> bool {
+    matches!(
+        value,
+        "none"
+            | "pencil"
+            | "rainbow"
+            | "galaxy"
+            | "gold"
+            | "silver"
+            | "lava"
+            | "ocean"
+            | "rosegold"
+            | "bronze"
+    )
 }
 
 /// Immutable InkML metadata projection independent of the source buffer.

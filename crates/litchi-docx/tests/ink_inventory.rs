@@ -24,7 +24,7 @@ const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relations
 const SW: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 const SR: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const INK_TYPE: &str = "application/inkml+xml";
-const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion" semanticType="comment"/></e:interpretation></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:traceGroup></i:ink>"##;
+const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation e:mode="ink"><m:context type="writingRegion" semanticType="comment"/></e:interpretation></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:traceGroup></i:ink>"##;
 
 fn part(opc: &mut OpcPackage, name: &str, content_type: &str, data: &[u8]) {
     opc.add_part(Box::new(BlobPart::new(

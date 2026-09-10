@@ -1,0 +1,17 @@
+90fbd646668bbd9760f666872bc8e83df358052a247e31e97557138476795244  ./ARTIFACT-SHA256.txt
+1cc34c0aabe252a25173d9af5d848e29cf30f111ea40370002aed5aa0f5477bb  ./LOG-HASHES.txt
+ac5ac890fe6016966b336be7f3ffae44f428e1c77f1a781d27f508563935f64c  ./NORMATIVE-SCOPE.md
+e986f9f71f53882dcb0023dcec9bd5a71867037eacb527807e7afa6acbd11606  ./README.md
+3e92adde462c505a3f8cf21d0ac17ff172ba9d276100421ae3ba2d5f7d36ec82  ./v1-full-proof/logs/root-clippy-v1.log.gz
+5d27a709a435db3238a3d188d6ef6971e7f2ed64932c090af553235da5d2438d  ./v1-full-proof/logs/root-rustdoc-v1.log.gz
+aa7990f655dd34e8a353de353934596a23dad5a868910a9d290c2c4d04a6c848  ./v1-full-proof/logs/root-tests-v1.log.gz
+4a2722c577d218b8ded89280f23a4d0149b89ba935cc800d7232b5f31ca184bb  ./v1-full-proof/root-gates-v1.json
+6e1d65b39dae3befe2672865c30d03f2631d04f1e0dd1ee435699ba184ae922b  ./v1-full-proof/root-source-v1.json
+c1b4d3614ebdab31cdd8b387f5a1ac143f14dbe34540a67b6aa3fce34cc2e9ee  ./v2/logs/root-clippy-v2.log.gz
+672ea25492bee058e11f7d828877956e5adb3d45e551c70f673e479da4e50c75  ./v2/logs/root-rustdoc-v2.log.gz
+a6666c711fadd7bd9da243ebd22f547933ce3d74fd8676c19a2e29c751fcfae1  ./v2/logs/root-tests-v2.log.gz
+5d746acb7dd8eccb0120e8a45fda415ed34ac06cb23720da69d348b009872fb0  ./v2/patch-manifest.json
+4fd7ed4202a3d1d176bb786d4bbbb50d635a359dc70e57907e9566562c1e60c1  ./v2/patch-v2.patch.gz
+6af48ab99382729bdc3269f2f9107ce60f7ffbf28ad770f9d68e4963a87ae0fc  ./v2/root-gates-v2.json
+6b2cb389c28c3d714767362e5af5ea4fc67d742b2046ab4b248b5ec264e36d80  ./v2/root-source-v2.json
+6b2cb389c28c3d714767362e5af5ea4fc67d742b2046ab4b248b5ec264e36d80  ./v2/source-manifest.json

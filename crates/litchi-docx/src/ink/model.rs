@@ -213,6 +213,11 @@ impl BrushProperty<'_> {
     pub fn ink_effect(&self) -> Option<shared::InkEffect> {
         self.0.ink_effect()
     }
+    /// Return the effective MS-ODRAWXML value, including profile defaults.
+    #[must_use]
+    pub fn effective(&self) -> Option<shared::EffectiveBrushProperty> {
+        self.0.effective()
+    }
 }
 
 /// Immutable package-wide annotation inventory; clones share all retained data.
