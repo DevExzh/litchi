@@ -1,0 +1,36 @@
+use std::{error::Error, fs, io, sync::{Arc, Mutex}};
+use litchi_core::{ReadAt, SourceVersion};
+struct Source { bytes: Vec<u8>, reads: Mutex<Vec<(u64, usize)>> }
+impl ReadAt for Source {
+    fn len(&self) -> io::Result<u64> { Ok(self.bytes.len() as u64) }
+    fn version(&self) -> io::Result<SourceVersion> { Ok(SourceVersion::new(491, 0)) }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let data = usize::try_from(offset).ok().and_then(|n| self.bytes.get(n..)).unwrap_or(&[]);
+        let n = data.len().min(output.len()); output[..n].copy_from_slice(&data[..n]);
+        self.reads.lock().unwrap().push((offset,n)); Ok(n)
+    }
+}
+fn emit(name: &str, reads: &[(u64,usize)]) {
+    println!("\"{name}\":[{}],",reads.iter().map(|(a,b)|format!("[{a},{b}]")).collect::<Vec<_>>().join(","));
+}
+fn main() -> Result<(),Box<dyn Error>> {
+    let source=Arc::new(Source { bytes:fs::read(std::env::args_os().nth(1).ok_or("path required")?)?,reads:Mutex::new(Vec::new()) });
+    let package=litchi_docx::source_backed::Package::from_read_at(source.clone())?;
+    let opened=source.reads.lock().unwrap().len();
+    let document=package.document()?;
+    let prepared=source.reads.lock().unwrap().len();
+    let text=document.extract_text()?;
+    let count=document.paragraph_count()?;
+    let expected=(0..200).map(|i|format!("litchi-perf-baseline-docx-semantic-v1-source-{i:05}")).collect::<String>();
+    assert_eq!(text,expected); assert_eq!(count,200);
+    let archive=soapberry_zip::ZipArchive::from_slice(&source.bytes)?;
+    let mut ranges=Vec::new();
+    for header in archive.entries() {
+        let header=header?;let name=header.file_path().try_normalize()?.as_ref().to_owned();
+        let entry=archive.get_entry(header.wayfinder())?;let (a,b)=entry.compressed_data_range();
+        ranges.push(format!("[{name:?},{a},{b}]"));
+    }
+    let reads=source.reads.lock().unwrap();println!("{{\"ranges\":[{}],",ranges.join(","));
+    emit("open",&reads[..opened]);emit("prepare",&reads[opened..prepared]);emit("query",&reads[prepared..]);
+    println!("\"text_bytes\":{},\"paragraphs\":{count}}}",text.len());Ok(())
+}

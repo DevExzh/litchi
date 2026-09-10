@@ -1,0 +1,8 @@
+error: extern location for litchi_opc does not exist: /home/zhuhe/.cache/litchi-build-0491/release/deps/liblitchi_opc-fake.rlib
+ --> docs/performance/results/change-0491/corpus-legacy-diagnostic.rs.txt:3:5
+  |
+3 | use litchi_opc::{OpcPackage, PackURI};
+  |     ^^^^^^^^^^
+
+error: aborting due to 1 previous error
+

@@ -1,0 +1,30 @@
+// Diagnostic reproduction of lib.rs::docx_source_edit_bytes, outside formal timing.
+use std::{error::Error, fs, io::Cursor};
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut package = litchi_docx::Package::new()?;
+    let document = package.document_mut()?;
+    for index in 0..200 {
+        let paragraph = document.add_paragraph_with_text(&format!(
+            "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"
+        ));
+        if index < 8 {
+            let mut bytes = Vec::with_capacity(2 * 1024 * 1024);
+            let mut state = ((40_000 + index) as u64)
+                .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                .wrapping_add(0xd1b5_4a32_d192_ed03);
+            for _ in 0..2 * 1024 * 1024 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                bytes.push((state >> 24) as u8);
+            }
+            bytes[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+            paragraph.add_picture_from_bytes(bytes, Some(914_400), Some(914_400))?;
+        }
+    }
+    let mut output = Cursor::new(Vec::new());
+    package.to_stream(&mut output)?;
+    fs::write(std::env::args_os().nth(1).ok_or("output path required")?, output.into_inner())?;
+    Ok(())
+}

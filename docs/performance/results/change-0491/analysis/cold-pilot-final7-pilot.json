@@ -1,0 +1,1198 @@
+{
+  "adverse_rows": [],
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 473185528,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+        "sha256": "ad14475aeb5ea5cad9ccae1bdfe4ca321d80f8c1861c906ee146ddc2c7a22ddd"
+      },
+      "receipt_sha256": "ae736c30dfcee8a828492c6606d96975e23af952ec238dad9b6b45782223d0a6",
+      "source": {
+        "files": 7158,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+        "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 473498888,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline",
+        "sha256": "ed763be62c5577f2d4652bea361ad015b9affb2080e98b78e95a367703c9c78d"
+      },
+      "receipt_sha256": "afe16b7870e1b5b5c3c6d31fa95818081277b69f6482dc2554c73454532e8b51",
+      "source": {
+        "files": 7158,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+        "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+      }
+    }
+  },
+  "cache_states": [
+    "warm",
+    "cold-requested",
+    "cold-verified"
+  ],
+  "case": "docx_file_source_open_full_text_lifecycle",
+  "claim_authorized": false,
+  "controls": [
+    {
+      "cache_state": "cold-verified",
+      "case": "docx_file_source_full_text",
+      "kind": "control",
+      "label": "pilot-r1-normal-prepared-control",
+      "repeat": 1,
+      "report_sha256": "17831c018347e3ed097c408364044fad45f67ae4bd5546ca209581e6b75c4ad3",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline --case docx_file_source_full_text --filesystem-cache cold-verified --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-normal-prepared-control/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-prepared-control/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-prepared-control/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:02.25",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32824,
+        "involuntary_context_switches": 84,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 138244,
+        "minor_(reclaiming_a_frame)_page_faults": 100969,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1334,
+        "raw_sha256": "99bc0fa101618c7208229a2f3b6a819eb5da2c7121c84b7cdb60abd366d054fe",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.19,
+        "user_time_(seconds)": 2.04,
+        "voluntary_context_switches": 64
+      },
+      "role": "normal",
+      "samples": 3,
+      "status": "ineligible_prepared_query_control",
+      "terminal_sha256": "a823f29f14d102fe79cf1a6dc62b91b0afc67d0b399107f3e36bdba2ced966fc",
+      "warmups": 1
+    },
+    {
+      "cache_state": "cold-verified",
+      "case": "docx_file_source_full_text",
+      "kind": "control",
+      "label": "pilot-r1-allocator-prepared-control",
+      "repeat": 1,
+      "report_sha256": "31f715be6962b2b397a6e3c4080e44187eb8c8be9da790f037199c9712a4d392",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc --case docx_file_source_full_text --filesystem-cache cold-verified --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-allocator-prepared-control/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-prepared-control/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-prepared-control/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:02.25",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32824,
+        "involuntary_context_switches": 90,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 138048,
+        "minor_(reclaiming_a_frame)_page_faults": 100962,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1352,
+        "raw_sha256": "30f7f01cc65e95a4a19f49d3d6cc3d147a320e9392d816385b6670fcaa7f40b4",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.18,
+        "user_time_(seconds)": 2.04,
+        "voluntary_context_switches": 61
+      },
+      "role": "allocator",
+      "samples": 3,
+      "status": "ineligible_prepared_query_control",
+      "terminal_sha256": "d6afbfe9cee33b763253be12429e0fa94d1c9d2843d8ff07411d6f73514a0c13",
+      "warmups": 1
+    }
+  ],
+  "corpus": {
+    "archive_bytes": 16793036,
+    "archive_member_count": 20,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "compression": "deflate",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "name": "docx-source-backed-media",
+    "package_format": "DOCX/OPC/ZIP",
+    "payload_kind": "deterministic-incompressible-media",
+    "shape": "media-rich"
+  },
+  "inventory": {
+    "control_processes": 2,
+    "formal_processes": 8,
+    "measured_rows": 6,
+    "measured_samples": 18
+  },
+  "performance_claim": "none",
+  "pilot": true,
+  "prepared_query_control": "docx_file_source_full_text",
+  "repeats": [
+    1
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "rows": [
+    {
+      "cache_state": "warm",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-warm",
+      "percentiles": {
+        "elapsed_ns": {
+          "max": 596032,
+          "mean": 579398.6666666666,
+          "min": 570502,
+          "n": 3,
+          "p50": 571662,
+          "p95": 596032,
+          "p99": 596032
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 637666009,
+          "mean": 629813374.3333334,
+          "min": 625665253,
+          "n": 3,
+          "p50": 626108861,
+          "p95": 637666009,
+          "p99": 637666009
+        },
+        "peak_rss_bytes": {
+          "max": 11046912,
+          "mean": 10745173.333333334,
+          "min": 10153984,
+          "n": 3,
+          "p50": 11034624,
+          "p95": 11046912,
+          "p99": 11046912
+        },
+        "rss_bytes": {
+          "max": 5419008,
+          "mean": 5200554.666666667,
+          "min": 4767744,
+          "n": 3,
+          "p50": 5414912,
+          "p95": 5419008,
+          "p99": 5419008
+        }
+      },
+      "raw_vectors": {
+        "elapsed_ns": [
+          596032,
+          570502,
+          571662
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          625665253,
+          626108861,
+          637666009
+        ],
+        "peak_rss_bytes": [
+          11034624,
+          11046912,
+          10153984
+        ],
+        "rss_bytes": [
+          5414912,
+          5419008,
+          4767744
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "c31e01825611c9544a9b2cac65f14ce60c02e853d58ee6dc54f7c7176603f127",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline --case docx_file_source_open_full_text_lifecycle --filesystem-cache warm --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-normal-warm/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-warm/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-warm/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.26",
+        "exit_status": 0,
+        "file_system_inputs": 4192,
+        "file_system_outputs": 32880,
+        "involuntary_context_switches": 143,
+        "major_(requiring_i/o)_page_faults": 15,
+        "maximum_resident_set_size_(kbytes)": 139348,
+        "minor_(reclaiming_a_frame)_page_faults": 320529,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1310,
+        "raw_sha256": "2e59f3dac5065df9356772bf2337794009bef5340ce4a72055bbcf1489654ec1",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.39,
+        "user_time_(seconds)": 5.82,
+        "voluntary_context_switches": 136
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "86c5f318e2536870777f92f29a81bcc48c9051ba44d1dffa3733621a02e525d0",
+      "warmups": 1
+    },
+    {
+      "cache_state": "cold-requested",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-cold-requested",
+      "percentiles": {
+        "elapsed_ns": {
+          "max": 2005968,
+          "mean": 1967151.3333333333,
+          "min": 1899158,
+          "n": 3,
+          "p50": 1996328,
+          "p95": 2005968,
+          "p99": 2005968
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 678312894,
+          "mean": 675577249.6666666,
+          "min": 674101467,
+          "n": 3,
+          "p50": 674317388,
+          "p95": 678312894,
+          "p99": 678312894
+        },
+        "peak_rss_bytes": {
+          "max": 11132928,
+          "mean": 11090602.666666666,
+          "min": 11026432,
+          "n": 3,
+          "p50": 11112448,
+          "p95": 11132928,
+          "p99": 11132928
+        },
+        "rss_bytes": {
+          "max": 5492736,
+          "mean": 5431296.0,
+          "min": 5382144,
+          "n": 3,
+          "p50": 5419008,
+          "p95": 5492736,
+          "p99": 5492736
+        }
+      },
+      "raw_vectors": {
+        "elapsed_ns": [
+          1899158,
+          1996328,
+          2005968
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          674101467,
+          678312894,
+          674317388
+        ],
+        "peak_rss_bytes": [
+          11026432,
+          11132928,
+          11112448
+        ],
+        "rss_bytes": [
+          5382144,
+          5492736,
+          5419008
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "28833f2385afcbc0bd78264edc007a3bcd3a5b9712ed0e563cf050a5998c2fab",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline --case docx_file_source_open_full_text_lifecycle --filesystem-cache cold-requested --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-normal-cold-requested/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-cold-requested/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-cold-requested/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.35",
+        "exit_status": 0,
+        "file_system_inputs": 98400,
+        "file_system_outputs": 32880,
+        "involuntary_context_switches": 150,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 139292,
+        "minor_(reclaiming_a_frame)_page_faults": 311314,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "97%",
+        "raw_bytes": 1350,
+        "raw_sha256": "15072ad399bd3c0c2e1d7a5a2a8715ffe4fbc6f826252f8caf4545d6e4ceca08",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.39,
+        "user_time_(seconds)": 5.79,
+        "voluntary_context_switches": 255
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "19b462e335e03f2631a31a9487f0a1f635da8ca650a2b8c60dc58b6b7916a46e",
+      "warmups": 1
+    },
+    {
+      "cache_state": "cold-verified",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-cold-verified",
+      "percentiles": {
+        "elapsed_ns": {
+          "max": 3049093,
+          "mean": 2863891.6666666665,
+          "min": 2737061,
+          "n": 3,
+          "p50": 2805521,
+          "p95": 3049093,
+          "p99": 3049093
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 707565753,
+          "mean": 706604739.3333334,
+          "min": 705282364,
+          "n": 3,
+          "p50": 706966101,
+          "p95": 707565753,
+          "p99": 707565753
+        },
+        "peak_rss_bytes": {
+          "max": 24260608,
+          "mean": 24044885.333333332,
+          "min": 23711744,
+          "n": 3,
+          "p50": 24162304,
+          "p95": 24260608,
+          "p99": 24260608
+        },
+        "read_bytes_delta": {
+          "max": 81920,
+          "mean": 81920.0,
+          "min": 81920,
+          "n": 3,
+          "p50": 81920,
+          "p95": 81920,
+          "p99": 81920
+        },
+        "rss_bytes": {
+          "max": 5038080,
+          "mean": 4973909.333333333,
+          "min": 4907008,
+          "n": 3,
+          "p50": 4976640,
+          "p95": 5038080,
+          "p99": 5038080
+        }
+      },
+      "raw_vectors": {
+        "elapsed_ns": [
+          2805521,
+          3049093,
+          2737061
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          706966101,
+          707565753,
+          705282364
+        ],
+        "peak_rss_bytes": [
+          23711744,
+          24260608,
+          24162304
+        ],
+        "read_bytes_delta": [
+          81920,
+          81920,
+          81920
+        ],
+        "rss_bytes": [
+          5038080,
+          4907008,
+          4976640
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "abc4fcee99f6eee87eb7b765b8cd342c8d2aba5fe8a14a3f5e781a373cc9b976",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/normal/litchi-perf-baseline --case docx_file_source_open_full_text_lifecycle --filesystem-cache cold-verified --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-normal-cold-verified/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-cold-verified/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-normal-cold-verified/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.62",
+        "exit_status": 0,
+        "file_system_inputs": 131216,
+        "file_system_outputs": 65704,
+        "involuntary_context_switches": 208,
+        "major_(requiring_i/o)_page_faults": 1,
+        "maximum_resident_set_size_(kbytes)": 139612,
+        "minor_(reclaiming_a_frame)_page_faults": 359959,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "96%",
+        "raw_bytes": 1347,
+        "raw_sha256": "38b78350fea4f516e2a3d72f90ad3c9d9c353e8d9b7c08d197b4466cf53e07eb",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.47,
+        "user_time_(seconds)": 5.91,
+        "voluntary_context_switches": 415
+      },
+      "role": "normal",
+      "samples": 3,
+      "terminal_sha256": "722e4e5c215bf24f7491f74df3a9952ca5bd12641e3ea6b546c3bd21536c594d",
+      "warmups": 1
+    },
+    {
+      "cache_state": "warm",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-warm",
+      "percentiles": {
+        "allocation_allocated_bytes": {
+          "max": 652038,
+          "mean": 652038.0,
+          "min": 652038,
+          "n": 3,
+          "p50": 652038,
+          "p95": 652038,
+          "p99": 652038
+        },
+        "allocation_allocation_calls": {
+          "max": 899,
+          "mean": 899.0,
+          "min": 899,
+          "n": 3,
+          "p50": 899,
+          "p95": 899,
+          "p99": 899
+        },
+        "allocation_deallocated_bytes": {
+          "max": 639238,
+          "mean": 639238.0,
+          "min": 639238,
+          "n": 3,
+          "p50": 639238,
+          "p95": 639238,
+          "p99": 639238
+        },
+        "allocation_peak_increment_bytes": {
+          "max": 139219,
+          "mean": 139219.0,
+          "min": 139219,
+          "n": 3,
+          "p50": 139219,
+          "p95": 139219,
+          "p99": 139219
+        },
+        "allocation_reallocation_calls": {
+          "max": 113,
+          "mean": 113.0,
+          "min": 113,
+          "n": 3,
+          "p50": 113,
+          "p95": 113,
+          "p99": 113
+        },
+        "elapsed_ns": {
+          "max": 599533,
+          "mean": 587549.0,
+          "min": 569622,
+          "n": 3,
+          "p50": 593492,
+          "p95": 599533,
+          "p99": 599533
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 632621698,
+          "mean": 629390501.3333334,
+          "min": 626494683,
+          "n": 3,
+          "p50": 629055123,
+          "p95": 632621698,
+          "p99": 632621698
+        },
+        "peak_rss_bytes": {
+          "max": 11292672,
+          "mean": 11102890.666666666,
+          "min": 10809344,
+          "n": 3,
+          "p50": 11206656,
+          "p95": 11292672,
+          "p99": 11292672
+        },
+        "region_peak_live_bytes": {
+          "max": 141062,
+          "mean": 141062.0,
+          "min": 141062,
+          "n": 3,
+          "p50": 141062,
+          "p95": 141062,
+          "p99": 141062
+        },
+        "rss_bytes": {
+          "max": 5607424,
+          "mean": 5375317.333333333,
+          "min": 5124096,
+          "n": 3,
+          "p50": 5394432,
+          "p95": 5607424,
+          "p99": 5607424
+        }
+      },
+      "raw_vectors": {
+        "allocation_allocated_bytes": [
+          652038,
+          652038,
+          652038
+        ],
+        "allocation_allocation_calls": [
+          899,
+          899,
+          899
+        ],
+        "allocation_deallocated_bytes": [
+          639238,
+          639238,
+          639238
+        ],
+        "allocation_peak_increment_bytes": [
+          139219,
+          139219,
+          139219
+        ],
+        "allocation_reallocation_calls": [
+          113,
+          113,
+          113
+        ],
+        "elapsed_ns": [
+          599533,
+          593492,
+          569622
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          629055123,
+          626494683,
+          632621698
+        ],
+        "peak_rss_bytes": [
+          11206656,
+          11292672,
+          10809344
+        ],
+        "region_peak_live_bytes": [
+          141062,
+          141062,
+          141062
+        ],
+        "rss_bytes": [
+          5394432,
+          5607424,
+          5124096
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "d7b1ed39080d9c22dd84ff3e57a5e5392bd906e8296fd2dade951d10e239db64",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc --case docx_file_source_open_full_text_lifecycle --filesystem-cache warm --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-allocator-warm/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-warm/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-warm/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.21",
+        "exit_status": 0,
+        "file_system_inputs": 0,
+        "file_system_outputs": 32888,
+        "involuntary_context_switches": 150,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 139172,
+        "minor_(reclaiming_a_frame)_page_faults": 333773,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "99%",
+        "raw_bytes": 1324,
+        "raw_sha256": "2347c771ebf16faf622e1ed86abac1f13d34950db822d41b63dd5b786b31d8bb",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.41,
+        "user_time_(seconds)": 5.77,
+        "voluntary_context_switches": 115
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "7bdb2b2718282a0ca46c5c17d1b5a39ddb71209352e5b063d68e715f876fe747",
+      "warmups": 1
+    },
+    {
+      "cache_state": "cold-requested",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-cold-requested",
+      "percentiles": {
+        "allocation_allocated_bytes": {
+          "max": 652038,
+          "mean": 652038.0,
+          "min": 652038,
+          "n": 3,
+          "p50": 652038,
+          "p95": 652038,
+          "p99": 652038
+        },
+        "allocation_allocation_calls": {
+          "max": 899,
+          "mean": 899.0,
+          "min": 899,
+          "n": 3,
+          "p50": 899,
+          "p95": 899,
+          "p99": 899
+        },
+        "allocation_deallocated_bytes": {
+          "max": 639238,
+          "mean": 639238.0,
+          "min": 639238,
+          "n": 3,
+          "p50": 639238,
+          "p95": 639238,
+          "p99": 639238
+        },
+        "allocation_peak_increment_bytes": {
+          "max": 139219,
+          "mean": 139219.0,
+          "min": 139219,
+          "n": 3,
+          "p50": 139219,
+          "p95": 139219,
+          "p99": 139219
+        },
+        "allocation_reallocation_calls": {
+          "max": 113,
+          "mean": 113.0,
+          "min": 113,
+          "n": 3,
+          "p50": 113,
+          "p95": 113,
+          "p99": 113
+        },
+        "elapsed_ns": {
+          "max": 2107019,
+          "mean": 2053218.6666666667,
+          "min": 1999839,
+          "n": 3,
+          "p50": 2052798,
+          "p95": 2107019,
+          "p99": 2107019
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 692483292,
+          "mean": 686192103.0,
+          "min": 680434883,
+          "n": 3,
+          "p50": 685658134,
+          "p95": 692483292,
+          "p99": 692483292
+        },
+        "peak_rss_bytes": {
+          "max": 11182080,
+          "mean": 11101525.333333334,
+          "min": 10944512,
+          "n": 3,
+          "p50": 11177984,
+          "p95": 11182080,
+          "p99": 11182080
+        },
+        "region_peak_live_bytes": {
+          "max": 141102,
+          "mean": 141102.0,
+          "min": 141102,
+          "n": 3,
+          "p50": 141102,
+          "p95": 141102,
+          "p99": 141102
+        },
+        "rss_bytes": {
+          "max": 5361664,
+          "mean": 5315242.666666667,
+          "min": 5292032,
+          "n": 3,
+          "p50": 5292032,
+          "p95": 5361664,
+          "p99": 5361664
+        }
+      },
+      "raw_vectors": {
+        "allocation_allocated_bytes": [
+          652038,
+          652038,
+          652038
+        ],
+        "allocation_allocation_calls": [
+          899,
+          899,
+          899
+        ],
+        "allocation_deallocated_bytes": [
+          639238,
+          639238,
+          639238
+        ],
+        "allocation_peak_increment_bytes": [
+          139219,
+          139219,
+          139219
+        ],
+        "allocation_reallocation_calls": [
+          113,
+          113,
+          113
+        ],
+        "elapsed_ns": [
+          1999839,
+          2107019,
+          2052798
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          692483292,
+          680434883,
+          685658134
+        ],
+        "peak_rss_bytes": [
+          11182080,
+          10944512,
+          11177984
+        ],
+        "region_peak_live_bytes": [
+          141102,
+          141102,
+          141102
+        ],
+        "rss_bytes": [
+          5361664,
+          5292032,
+          5292032
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "0c787a5231804b22a4543e049f444d79a7a12653b134deda65d9d913a0080ce2",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc --case docx_file_source_open_full_text_lifecycle --filesystem-cache cold-requested --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-allocator-cold-requested/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-cold-requested/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-cold-requested/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.39",
+        "exit_status": 0,
+        "file_system_inputs": 98400,
+        "file_system_outputs": 32888,
+        "involuntary_context_switches": 143,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 139056,
+        "minor_(reclaiming_a_frame)_page_faults": 342975,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "97%",
+        "raw_bytes": 1368,
+        "raw_sha256": "1bc5bbaa374d72f4f4825f6b086ce6c2c286a50d7d33173ecc8e6f8fb3ca75ba",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.42,
+        "user_time_(seconds)": 5.8,
+        "voluntary_context_switches": 269
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "3d4cfc01710fbfabce539114e1b52bff94ce7253303ce1a0c7335a2942e0caf6",
+      "warmups": 1
+    },
+    {
+      "cache_state": "cold-verified",
+      "case": "docx_file_source_open_full_text_lifecycle",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-cold-verified",
+      "percentiles": {
+        "allocation_allocated_bytes": {
+          "max": 652094,
+          "mean": 652094.0,
+          "min": 652094,
+          "n": 3,
+          "p50": 652094,
+          "p95": 652094,
+          "p99": 652094
+        },
+        "allocation_allocation_calls": {
+          "max": 900,
+          "mean": 900.0,
+          "min": 900,
+          "n": 3,
+          "p50": 900,
+          "p95": 900,
+          "p99": 900
+        },
+        "allocation_deallocated_bytes": {
+          "max": 639294,
+          "mean": 639294.0,
+          "min": 639294,
+          "n": 3,
+          "p50": 639294,
+          "p95": 639294,
+          "p99": 639294
+        },
+        "allocation_peak_increment_bytes": {
+          "max": 139219,
+          "mean": 139219.0,
+          "min": 139219,
+          "n": 3,
+          "p50": 139219,
+          "p95": 139219,
+          "p99": 139219
+        },
+        "allocation_reallocation_calls": {
+          "max": 113,
+          "mean": 113.0,
+          "min": 113,
+          "n": 3,
+          "p50": 113,
+          "p95": 113,
+          "p99": 113
+        },
+        "elapsed_ns": {
+          "max": 2918891,
+          "mean": 2855911.0,
+          "min": 2820251,
+          "n": 3,
+          "p50": 2828591,
+          "p95": 2918891,
+          "p99": 2918891
+        },
+        "logical_read_bytes": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "logical_read_calls": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "n": 3,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "parent_wall_ns": {
+          "max": 716484455,
+          "mean": 711505768.3333334,
+          "min": 708427023,
+          "n": 3,
+          "p50": 709605827,
+          "p95": 716484455,
+          "p99": 716484455
+        },
+        "peak_rss_bytes": {
+          "max": 24215552,
+          "mean": 24128170.666666668,
+          "min": 24059904,
+          "n": 3,
+          "p50": 24109056,
+          "p95": 24215552,
+          "p99": 24215552
+        },
+        "read_bytes_delta": {
+          "max": 81920,
+          "mean": 81920.0,
+          "min": 81920,
+          "n": 3,
+          "p50": 81920,
+          "p95": 81920,
+          "p99": 81920
+        },
+        "region_peak_live_bytes": {
+          "max": 141482,
+          "mean": 141482.0,
+          "min": 141482,
+          "n": 3,
+          "p50": 141482,
+          "p95": 141482,
+          "p99": 141482
+        },
+        "rss_bytes": {
+          "max": 4804608,
+          "mean": 4777301.333333333,
+          "min": 4739072,
+          "n": 3,
+          "p50": 4788224,
+          "p95": 4804608,
+          "p99": 4804608
+        }
+      },
+      "raw_vectors": {
+        "allocation_allocated_bytes": [
+          652094,
+          652094,
+          652094
+        ],
+        "allocation_allocation_calls": [
+          900,
+          900,
+          900
+        ],
+        "allocation_deallocated_bytes": [
+          639294,
+          639294,
+          639294
+        ],
+        "allocation_peak_increment_bytes": [
+          139219,
+          139219,
+          139219
+        ],
+        "allocation_reallocation_calls": [
+          113,
+          113,
+          113
+        ],
+        "elapsed_ns": [
+          2828591,
+          2820251,
+          2918891
+        ],
+        "logical_read_bytes": [
+          0,
+          0,
+          0
+        ],
+        "logical_read_calls": [
+          0,
+          0,
+          0
+        ],
+        "parent_wall_ns": [
+          708427023,
+          709605827,
+          716484455
+        ],
+        "peak_rss_bytes": [
+          24215552,
+          24059904,
+          24109056
+        ],
+        "read_bytes_delta": [
+          81920,
+          81920,
+          81920
+        ],
+        "region_peak_live_bytes": [
+          141482,
+          141482,
+          141482
+        ],
+        "rss_bytes": [
+          4788224,
+          4804608,
+          4739072
+        ]
+      },
+      "repeat": 1,
+      "report_sha256": "a79b04dbea0253b0c154ba30ab010fc6292b99b5812708a065345b2f41f74b7e",
+      "resource": {
+        "average_resident_set_size_(kbytes)": 0,
+        "average_shared_text_size_(kbytes)": 0,
+        "average_stack_size_(kbytes)": 0,
+        "average_total_size_(kbytes)": 0,
+        "average_unshared_data_size_(kbytes)": 0,
+        "command_being_timed": "\"/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc --case docx_file_source_open_full_text_lifecycle --filesystem-cache cold-verified --filesystem-root /home/zhuhe/.cache/litchi-goal-0491/cold-matrix/cold-pilot-final7/pilot-r1-allocator-cold-verified/filesystem --samples 3 --warmup 1 --json /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-cold-verified/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/cold-pilot-final7/pilot-r1-allocator-cold-verified/corpus-manifest.json\"",
+        "elapsed_(wall_clock)_time_(h": "mm:ss or m:ss): 0:06.62",
+        "exit_status": 0,
+        "file_system_inputs": 131216,
+        "file_system_outputs": 65712,
+        "involuntary_context_switches": 214,
+        "major_(requiring_i/o)_page_faults": 0,
+        "maximum_resident_set_size_(kbytes)": 139352,
+        "minor_(reclaiming_a_frame)_page_faults": 374239,
+        "page_size_(bytes)": 4096,
+        "percent_of_cpu_this_job_got": "96%",
+        "raw_bytes": 1365,
+        "raw_sha256": "794654602eb0ca6fb22c888dd92114e25ced82aaf89882d148fec415c1f90b79",
+        "signals_delivered": 0,
+        "socket_messages_received": 0,
+        "socket_messages_sent": 0,
+        "swaps": 0,
+        "system_time_(seconds)": 0.45,
+        "user_time_(seconds)": 5.95,
+        "voluntary_context_switches": 426
+      },
+      "role": "allocator",
+      "samples": 3,
+      "terminal_sha256": "1319304e2bd46f71c957a7f61078998789709d962e64aff5da5ba5c505ef6b0c",
+      "warmups": 1
+    }
+  ],
+  "samples": 3,
+  "schema": "docx-filesystem-cold-matrix-v1-analysis",
+  "scope": "standalone cache-state/provider evidence; comparison unavailable",
+  "version": 1,
+  "warmups": 1
+}

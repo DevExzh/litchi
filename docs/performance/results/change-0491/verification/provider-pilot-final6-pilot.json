@@ -1,0 +1,62 @@
+{
+  "attempt": "provider-pilot-final6",
+  "pilot": true,
+  "protocol_sha256": "005f69ed2d16414dc2441f98f8b206898eedbf3eec6d40acf5ab891ad45991eb",
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-normal-bytes",
+      "report_sha256": "11a9c45544d4f0fb39d4aab46562db2c38e18a900d7d4c96a5373e5f3453b7db",
+      "terminal_sha256": "dc77932f5f39dee9dffa0db8dc988c50817cc0603bf865ef9455605d5428a0fa"
+    },
+    {
+      "label": "pilot-r1-normal-file",
+      "report_sha256": "f7edb00225b6fc58cdf70dc50d09d84e532c0b38a01ac7b1c5b03aec37e08df6",
+      "terminal_sha256": "0ff43cf59089ba1419b87ad61c3285d1f84dd91e1f9f9aa7e575c974eb0a8639"
+    },
+    {
+      "label": "pilot-r1-normal-instrumented-bytes",
+      "report_sha256": "edb04334667e861a8dcd87441fc1b36c578a91b9a3d6df52fa40ec12eebfdf25",
+      "terminal_sha256": "607c5ab48efdb5d75e7d0fecaa68e797967cb07e6fb2bfd9e9c88abcc39484c4"
+    },
+    {
+      "label": "pilot-r1-normal-range-64-0us",
+      "report_sha256": "cfa1ef29fd5a41b9a3427ad3b5ccafa64828033994f6bf5e52213b3b6499fdb2",
+      "terminal_sha256": "f5ebd573b20508679dbacb8c88fa0ff655369f8ad1fb98d75767ceeaac92227f"
+    },
+    {
+      "label": "pilot-r1-normal-range-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "f3dfa6ed277cff2bf1714c722103a0fe245a51c9a32481ac7a06d561766edfc2",
+      "terminal_sha256": "6035f52eb8091088e0ab84fa5a06497706da4b77652bec741e8f5d6e775cb3fa"
+    },
+    {
+      "label": "pilot-r1-allocator-bytes",
+      "report_sha256": "8b2ed993b761edcdaef10de86ff78ddddf036a2ccfe66b3c7bc63124c58205ae",
+      "terminal_sha256": "c76342c401e065c17f8ce6efd27b0f9d7e19cc801c9939104cd1b4cd8ea931cb"
+    },
+    {
+      "label": "pilot-r1-allocator-file",
+      "report_sha256": "371f8ef1ed96c813941c151f6e2ec3b976a2ab85a3fc0d9f87c4c146531ea180",
+      "terminal_sha256": "bb5d74c12ebe2e7419266f2989f2ba7c50da4fa5f33715a758f92785772481c9"
+    },
+    {
+      "label": "pilot-r1-allocator-instrumented-bytes",
+      "report_sha256": "e5154fde043ff975623ab2d07422f7e3091d455a687f86787b8337869f6b5ea1",
+      "terminal_sha256": "95097fa8af5dd00435b6caacc17077dd613ff1a7dae56c22465d528ad0b5fd2b"
+    },
+    {
+      "label": "pilot-r1-allocator-range-64-0us",
+      "report_sha256": "f0d4d243a41edf3a851cc605a4aca22c125c49e4fb9930ff3a20f7271b8aed6d",
+      "terminal_sha256": "6c6baff6d661df12c7f7d83f52fec9b9a466f85c2ab105ec28be49076deffaf1"
+    },
+    {
+      "label": "pilot-r1-allocator-range-65536-1000us-104857600bps-minimum-service",
+      "report_sha256": "0834b8f3f22a177600390b8b88f28017999cdd6f6b53ed38a8a811b443925d2e",
+      "terminal_sha256": "78d4e47b5465dacde7fd6075f6385306fdf7bee315e8cd2b87cb5911b28c7afa"
+    }
+  ],
+  "schema": "docx-provider-matrix-verification-v1",
+  "status": "pass",
+  "summary_sha256": "7180a5c4b3cdec69c6f99e7b2310c472d9cb4a528f3b3ce727bf77fbdd71af72",
+  "verified_utc": "2026-09-10T02:46:15.680787+00:00",
+  "version": 1
+}

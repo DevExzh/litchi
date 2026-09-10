@@ -1,0 +1,130 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+    "docx-provider-lifecycle",
+    "--provider",
+    "instrumented-bytes",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "59b509a7f9508778b20b428d733fc107ec22f142",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/report.json"
+  ],
+  "artifacts": {
+    "replay-cleanup.json": {
+      "bytes": 579,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/replay-cleanup.json",
+      "sha256": "2620fea53e6872ef99d4ff1c41dc88693f249ac84e35173320795c55e8293517"
+    },
+    "report.json": {
+      "bytes": 10128,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/report.json",
+      "sha256": "e5154fde043ff975623ab2d07422f7e3091d455a687f86787b8337869f6b5ea1"
+    },
+    "resource.txt": {
+      "bytes": 1105,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/resource.txt",
+      "sha256": "777dcc4cc3485c6ce80fe515d7bd506ffde26d1e06dd936671298714484967b7"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "provider-pilot-final6",
+  "binary": {
+    "bytes": 473185528,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/final5/allocator/litchi-perf-baseline-alloc",
+    "sha256": "ad14475aeb5ea5cad9ccae1bdfe4ca321d80f8c1861c906ee146ddc2c7a22ddd"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/build-allocator.json",
+    "sha256": "ae736c30dfcee8a828492c6606d96975e23af952ec238dad9b6b45782223d0a6",
+    "source": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    }
+  },
+  "cleanup": {
+    "remaining": [],
+    "removed": [
+      "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/tmp",
+      "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes"
+    ],
+    "root": "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes",
+    "schema": "docx-provider-private-cleanup-v1",
+    "status": "pass",
+    "tmpdir": "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/tmp"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "b177c4213b3c1ca2bb851c93087da1ce0a4a5f5d2f2fbc9278d1bb4ab2814e37",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T02:46:11.173187+00:00",
+  "machine": {
+    "path": "machine.json",
+    "sha256": "ceda2cd77fc770b3e98e652ffab259feac557e0196324b38ea306ae211b96866"
+  },
+  "missing_artifacts": [],
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "005f69ed2d16414dc2441f98f8b206898eedbf3eec6d40acf5ab891ad45991eb"
+  },
+  "run": {
+    "arm": "instrumented-bytes",
+    "kind": "pilot",
+    "label": "pilot-r1-allocator-instrumented-bytes",
+    "provider": "instrumented-bytes",
+    "repeat": 1,
+    "role": "allocator",
+    "samples": 3,
+    "warmups": 1
+  },
+  "schema": "docx-provider-terminal-v1",
+  "source": {
+    "files": 7158,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+    "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+  },
+  "started_artifact": {
+    "bytes": 3219,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/captures/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/started.json",
+    "sha256": "9ca7b876aa5e41fe9435298e765bc24b2930b01b22584166a9de4fe1a0639418"
+  },
+  "started_utc": "2026-09-10T02:46:10.607688+00:00",
+  "status": "pass",
+  "support_sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0491/provider/provider-pilot-final6/pilot-r1-allocator-instrumented-bytes/tmp",
+  "version": 1
+}

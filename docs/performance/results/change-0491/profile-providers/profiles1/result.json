@@ -1,0 +1,204 @@
+{
+  "attempt": "profiles1",
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/build-normal.json",
+    "sha256": "afe16b7870e1b5b5c3c6d31fa95818081277b69f6482dc2554c73454532e8b51",
+    "source": {
+      "files": 7158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation-sources/daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482.json",
+      "sha256": "daa439502abca1458a58b805600cebba49f0d514a59f491d7d1b0bf6bee52482"
+    }
+  },
+  "caller_gate": {
+    "driver": "gate.py",
+    "lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+    "ownership": "outer caller holds the shared lock for the complete command",
+    "required": true
+  },
+  "cpu": 2,
+  "finished_utc": "2026-09-10T03:03:39.432055+00:00",
+  "helpers": {
+    "gate.py": {
+      "bytes": 3283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/gate.py",
+      "sha256": "f2c1ae53c001dbf9133d1c446d0aa73615557a9e17e5cfa27c40f128469e12a6"
+    },
+    "profile_providers.py": {
+      "bytes": 41214,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile_providers.py",
+      "sha256": "63a8492704175998ee3d8dc7c477c47ddd4950b712b97c7579a8646fabfb3f44"
+    },
+    "provider_matrix.py": {
+      "bytes": 73552,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/provider_matrix.py",
+      "sha256": "ea63571118a4e52ac8a49df982597b2d2c377c7ca0c28ac38ee77f0e98193ee4"
+    },
+    "retain_build.py": {
+      "bytes": 2568,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/retain_build.py",
+      "sha256": "99dbd7597a6fa13fa89c24298d017925e42add4f2fcd220ad2ea131bc62f4898"
+    },
+    "support.py": {
+      "bytes": 4800,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/support.py",
+      "sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a"
+    }
+  },
+  "operation_attribution_claim": false,
+  "performance_claim": "whole-child profiler counters and resource values are descriptive; they are not attributed to an individual operation and do not establish a speedup",
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "4ff915e37f6a0db13b9de7e8ab5aaa3cfe6bd65aa1eb3b4d283691347650329a"
+  },
+  "records": [
+    {
+      "arm": "file",
+      "label": "perf-file",
+      "operation_attribution_claim": false,
+      "profiler": {
+        "bytes": 352,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-file/perf.txt",
+        "sha256": "a2cd5ede858045307d173ea730c0f3394a772e622d7105d058f24164ba2ce917"
+      },
+      "report": {
+        "bytes": 55615,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-file/report.json",
+        "sha256": "d09560283411f98239ee98a0c1b59cf85537364525c9b04261e1ede69591bc1e"
+      },
+      "resource": {
+        "bytes": 1055,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-file/resource.txt",
+        "sha256": "5bba103e8a11482e8037e486918c676367dca336e0b9457d2c9748517d69ca7d"
+      },
+      "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+      "status": "pass",
+      "terminal": {
+        "bytes": 12431,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-file/terminal.json",
+        "sha256": "9c1b2b988b55d87256b378f27f69a7a5aa6418873277c5c5fcc4d9a6a4653065"
+      },
+      "tool": "perf",
+      "tool_executable": {
+        "bytes": 25221960,
+        "executable": true,
+        "path": "/usr/bin/perf",
+        "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009"
+      }
+    },
+    {
+      "arm": "range-64-0us",
+      "label": "perf-range-64-0us",
+      "operation_attribution_claim": false,
+      "profiler": {
+        "bytes": 352,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-64-0us/perf.txt",
+        "sha256": "6af9397586532bae970ac002eedaf4f081449c2dfcaa01b0732f363bec8388ac"
+      },
+      "report": {
+        "bytes": 78801,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-64-0us/report.json",
+        "sha256": "c70c0b082d67ff4231994723e159f6cfe900b04ac2acd918a14cc13b1cd92103"
+      },
+      "resource": {
+        "bytes": 1090,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-64-0us/resource.txt",
+        "sha256": "7a761cbd9632f51504cca6e70f9b43b797b5149e1a6142aa7ec04641b0ae8f67"
+      },
+      "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+      "status": "pass",
+      "terminal": {
+        "bytes": 12680,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-64-0us/terminal.json",
+        "sha256": "2f301cdb6412c06e08087cb02eca7c59cab21b6b674e3eeb7a2a67c174f964dd"
+      },
+      "tool": "perf",
+      "tool_executable": {
+        "bytes": 25221960,
+        "executable": true,
+        "path": "/usr/bin/perf",
+        "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009"
+      }
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "label": "perf-range-65536-1000us-104857600bps-minimum-service",
+      "operation_attribution_claim": false,
+      "profiler": {
+        "bytes": 353,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-65536-1000us-104857600bps-minimum-service/perf.txt",
+        "sha256": "64b9c9b974a96aa47955934eca5f11df67d80ed25e62a3d4c89490710cc27222"
+      },
+      "report": {
+        "bytes": 78932,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-65536-1000us-104857600bps-minimum-service/report.json",
+        "sha256": "ef32f50b1c8dc2083260b815fd09834643369b1864134c37b105dc77f2e3d792"
+      },
+      "resource": {
+        "bytes": 1211,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-65536-1000us-104857600bps-minimum-service/resource.txt",
+        "sha256": "a5363bf18ad867d36331e402f38c27031922e4e0ed10742dba144739062e878d"
+      },
+      "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+      "status": "pass",
+      "terminal": {
+        "bytes": 13629,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/perf-range-65536-1000us-104857600bps-minimum-service/terminal.json",
+        "sha256": "3adba5e03aea1fa41ec474f6587fe3285b39712bb5bf03826500fd85b4209429"
+      },
+      "tool": "perf",
+      "tool_executable": {
+        "bytes": 25221960,
+        "executable": true,
+        "path": "/usr/bin/perf",
+        "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009"
+      }
+    },
+    {
+      "arm": "file",
+      "label": "strace-file",
+      "operation_attribution_claim": false,
+      "profiler": {
+        "bytes": 538,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/strace.txt",
+        "sha256": "1a8089078260a217b353d8475619f2edd8b86b0ac23cc6b42ff5c09ce7b5812d"
+      },
+      "report": {
+        "bytes": 55615,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/report.json",
+        "sha256": "2cd42f7784b7234d0ff21c888b7b8c2c5bbbe874c8d9596780543da2752b0716"
+      },
+      "resource": {
+        "bytes": 1061,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/resource.txt",
+        "sha256": "e539f7f032bc7a5b76996bce4a6348ee19c577a86372401989191fe110b31e89"
+      },
+      "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+      "status": "pass",
+      "terminal": {
+        "bytes": 11103,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/profile-providers/profiles1/strace-file/terminal.json",
+        "sha256": "04ab0a7fca5d5e101431f07415a57f38ff66fed78f31ba25e253296642541aba"
+      },
+      "tool": "strace",
+      "tool_executable": {
+        "bytes": 2374392,
+        "executable": true,
+        "path": "/usr/bin/strace",
+        "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5"
+      }
+    }
+  ],
+  "runs": [
+    "perf:file",
+    "perf:range-64-0us",
+    "perf:range-65536-1000us-104857600bps-minimum-service",
+    "strace:file"
+  ],
+  "samples": 30,
+  "schema": "docx-provider-whole-child-profile-result-v1",
+  "scope": "the /usr/bin/time/perf-or-strace child includes provider setup, corpus/file access, Package/document extraction, report serialization, and diagnostic work; operation rows retain the provider lifecycle timer scope separately",
+  "source_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+  "status": "pass",
+  "version": 1,
+  "warmups": 3
+}

@@ -55,6 +55,12 @@ const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATO
 const DOCX_FILE_CORPUS_GENERATOR: &str = super::DOCX_SOURCE_EDIT_CORPUS_GENERATOR;
 const DOCX_FILE_SOURCE_SHA256: &str =
     "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4";
+/// Versioned scope for the lifecycle full-text observation.  The document is
+/// dropped before the timer returns; only the caller-owned text is retained,
+/// and its digest/length are computed after all operation counters are
+/// sampled.
+const DOCX_TIMED_FULL_TEXT_TIMING_SCOPE_V2: &str =
+    "v2:open_plus_full_text;document_drop_inside_timer;text_digest_after_timer";
 // The unified XLSX file selectors use one fixed, media-rich cell-CRUD input.
 // Keep these literals independent of the builder's computed manifest so a
 // generator or archive-shape drift cannot silently redefine the evidence.
@@ -330,6 +336,15 @@ struct ChildResult {
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_source_replay: Option<DocxSourceReplayEvidence>,
+    /// Digest and UTF-8 byte length of the exact full-text String returned by
+    /// the timed DOCX lifecycle.  The fields are populated after the timer
+    /// and retained as an additive binding to the measured result.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_timed_full_text_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_timed_full_text_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_timed_full_text_timing_scope: Option<String>,
     /// Source identity and semantic projection for the unified XLSX facade
     /// path. These are collected after the timed operation so correctness I/O
     /// does not enter measured latency.
@@ -383,6 +398,9 @@ impl ChildResult {
             cfb_owned: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            docx_timed_full_text_sha256: None,
+            docx_timed_full_text_bytes: None,
+            docx_timed_full_text_timing_scope: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
             xlsx_selected_cell: None,
@@ -522,8 +540,34 @@ pub(crate) struct DocxSourceReplayEvidence {
     pub query_unselected_payload_covered_bytes: u64,
     pub query_core_payload_covered_bytes: u64,
     pub materializations: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aligned_eocd_tail_probe: Option<DocxAlignedEocdTailProbeEvidence>,
     pub semantic_sha256: String,
     pub classification: String,
+}
+
+/// Raw-read proof for the aligned cold-verifier copy's bounded ZIP tail
+/// search. The overlap fields are intentionally additive raw counters: they
+/// describe bytes returned by the metadata probe and are never presented as
+/// decompressed or semantically consumed payload bytes.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct DocxAlignedEocdTailProbeEvidence {
+    pub aligned_source_sha256: String,
+    pub aligned_source_bytes: u64,
+    pub unaligned_source_bytes: u64,
+    pub page_size_bytes: u64,
+    pub alignment_padding_bytes: u64,
+    pub eocd_offset: u64,
+    pub eocd_comment_bytes: u64,
+    pub eocd_tail_probe_offset: u64,
+    pub eocd_tail_probe_bytes: u64,
+    pub eocd_tail_probe_read_count: u64,
+    pub eocd_tail_probe_main_payload_overlap_bytes: u64,
+    pub eocd_tail_probe_media_payload_overlap_bytes: u64,
+    pub eocd_tail_probe_unselected_payload_overlap_bytes: u64,
+    pub eocd_tail_probe_core_payload_overlap_bytes: u64,
+    pub eocd_tail_probe_payload_overlap_bytes: u64,
+    pub cache_successful_loads: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -605,6 +649,14 @@ pub(crate) struct SampleEvidence {
     pub pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub docx_source_replay: Option<DocxSourceReplayEvidence>,
+    /// Digest and UTF-8 byte length of the exact full-text String returned by
+    /// the timed DOCX lifecycle, bound to the versioned timing scope.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docx_timed_full_text_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docx_timed_full_text_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docx_timed_full_text_timing_scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xlsx_source_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1695,7 +1747,14 @@ fn run_one(
                 ChildMode::Warm,
                 expected_source_sha256,
             )?;
-            verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
+            verify_child_output(
+                operation,
+                &source_path,
+                &destination_path,
+                corpus,
+                false,
+                None,
+            )?;
             warm_elapsed.push(warm.child.elapsed_ns);
             record_sample(
                 &mut sample_evidence,
@@ -1732,7 +1791,14 @@ fn run_one(
                 ChildMode::Cold,
                 expected_source_sha256,
             )?;
-            verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
+            verify_child_output(
+                operation,
+                &source_path,
+                &destination_path,
+                corpus,
+                false,
+                None,
+            )?;
             cold_elapsed.push(cold.child.elapsed_ns);
             record_sample(
                 &mut sample_evidence,
@@ -1803,7 +1869,14 @@ fn run_one(
                 cold_verified_status = Some(proof.status);
                 continue;
             }
-            verify_child_output(operation, verified_source, &destination_path, corpus, true)?;
+            verify_child_output(
+                operation,
+                verified_source,
+                &destination_path,
+                corpus,
+                true,
+                None,
+            )?;
             cold_verified_elapsed.push(verified.child.elapsed_ns);
             record_sample(
                 &mut sample_evidence,
@@ -1919,6 +1992,7 @@ fn record_sample(
     stem: &str,
     cfb_owned_evidence: &mut Vec<CfbOwnedSampleEvidence>,
 ) -> Result<(), Box<dyn Error>> {
+    validate_docx_timed_full_text_evidence(operation, &invocation.child)?;
     if cache_state == "cold-verified" {
         let proof = invocation
             .child
@@ -2007,11 +2081,43 @@ fn record_sample(
         cfb_phases: invocation.child.cfb_phases,
         pptx_source_replay: invocation.child.pptx_source_replay,
         docx_source_replay: invocation.child.docx_source_replay,
+        docx_timed_full_text_sha256: invocation.child.docx_timed_full_text_sha256,
+        docx_timed_full_text_bytes: invocation.child.docx_timed_full_text_bytes,
+        docx_timed_full_text_timing_scope: invocation.child.docx_timed_full_text_timing_scope,
         xlsx_source_sha256: invocation.child.xlsx_source_sha256,
         xlsx_semantic_sha256: invocation.child.xlsx_semantic_sha256,
         xlsx_selected_cell: invocation.child.xlsx_selected_cell,
         xlsx_repeat_store: invocation.child.xlsx_repeat_store,
     });
+    Ok(())
+}
+
+fn validate_docx_timed_full_text_evidence(
+    operation: Operation,
+    child: &ChildResult,
+) -> Result<(), Box<dyn Error>> {
+    let is_full_text_lifecycle = matches!(
+        operation,
+        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle
+    );
+    let has_evidence = child.docx_timed_full_text_sha256.is_some()
+        || child.docx_timed_full_text_bytes.is_some()
+        || child.docx_timed_full_text_timing_scope.is_some();
+    if !is_full_text_lifecycle {
+        if has_evidence {
+            return Err("non-lifecycle DOCX sample emitted timed full-text evidence".into());
+        }
+        return Ok(());
+    }
+    let expected = expected_docx_full_text();
+    let (expected_sha256, expected_bytes) = docx_timed_full_text_digest(&expected)?;
+    if child.docx_timed_full_text_sha256.as_deref() != Some(expected_sha256.as_str())
+        || child.docx_timed_full_text_bytes != Some(expected_bytes)
+        || child.docx_timed_full_text_timing_scope.as_deref()
+            != Some(DOCX_TIMED_FULL_TEXT_TIMING_SCOPE_V2)
+    {
+        return Err("DOCX sample timed full-text evidence differs from the fixed oracle".into());
+    }
     Ok(())
 }
 
@@ -2446,6 +2552,10 @@ where
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
     let mut details = OperationDetails::default();
+    // Only the lifecycle full-text operation returns a value from the timed
+    // body.  The String is retained for post-timer oracle validation; its
+    // digest is deliberately computed only after operation counters close.
+    let mut timed_docx_full_text = None;
     let mut deferred_source_open_package = None;
     let counter_result = (|| -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
         Ok(match operation {
@@ -2502,7 +2612,8 @@ where
             | Operation::DocxSourceOpenParagraphCountLifecycle
             | Operation::DocxEagerOpenFullTextLifecycle
             | Operation::DocxSourceOpenFullTextLifecycle => {
-                run_docx_operation(operation, &source, prepared_docx.as_ref())?;
+                timed_docx_full_text =
+                    run_docx_operation(operation, &source, prepared_docx.as_ref())?;
                 None
             },
             Operation::XlsxFileOpen
@@ -2540,6 +2651,15 @@ where
     let snapshot =
         counter.map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
 
+    // Hashing and measuring the returned text happen after elapsed_ns and all
+    // operation-only counters have been sampled.  The value itself remains
+    // available for the exact post-timer oracle check below.
+    let (docx_timed_full_text_sha256, docx_timed_full_text_bytes) = timed_docx_full_text
+        .as_deref()
+        .map(docx_timed_full_text_digest)
+        .transpose()?
+        .map_or((None, None), |(digest, bytes)| (Some(digest), Some(bytes)));
+
     // All operation-only evidence is now captured. Any package diagnostics,
     // source replay, semantic projection, and source hashing below are
     // deliberately untimed correctness work.
@@ -2569,18 +2689,26 @@ where
         "timed_read_at"
     }
     .to_owned();
+    let corpus = filesystem_corpus(operation)?;
     let pptx_source_replay = operation
         .is_source_pptx()
         .then(|| replay_pptx_source(&source, operation))
         .transpose()?;
     let docx_source_replay = operation
         .is_source_docx()
-        .then(|| replay_docx_source(&source, operation))
+        .then(|| {
+            replay_docx_source(
+                &source,
+                operation,
+                &corpus,
+                matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+                cold_verified.as_ref(),
+            )
+        })
         .transpose()?;
 
     // Correctness and hashing are intentionally after the timed operation and
     // after the operation-only counters have been sampled.
-    let corpus = filesystem_corpus(operation)?;
     if let Some(deferred) = deferred_xlsx_repeat_store_operation.as_mut() {
         finalize_xlsx_repeat_store_evidence(deferred)?;
     }
@@ -2618,6 +2746,7 @@ where
         &destination,
         &corpus,
         matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+        timed_docx_full_text.as_deref(),
     )?;
     if let Some(deferred) = deferred_xlsx_operation.take() {
         // Only release the exact timed workbook, selected result, and
@@ -2668,6 +2797,11 @@ where
         cfb_owned: details.cfb_owned,
         pptx_source_replay,
         docx_source_replay,
+        docx_timed_full_text_sha256,
+        docx_timed_full_text_bytes,
+        docx_timed_full_text_timing_scope: timed_docx_full_text
+            .as_ref()
+            .map(|_| DOCX_TIMED_FULL_TEXT_TIMING_SCOPE_V2.to_owned()),
         xlsx_source_sha256: xlsx_evidence
             .as_ref()
             .map(|value| value.0.clone())
@@ -4101,6 +4235,7 @@ fn docx_replay_phase(
     DocxReplayPhase {
         counters,
         return_sizes,
+        read_ranges: read_ranges.to_vec(),
         main_payload_covered_bytes,
         main_payload_fully_covered,
         media_payload_covered_bytes,
@@ -4113,6 +4248,7 @@ fn docx_replay_phase(
 struct DocxReplayPhase {
     counters: DocxReplayCounters,
     return_sizes: Vec<u64>,
+    read_ranges: Vec<Range<u64>>,
     main_payload_covered_bytes: u64,
     main_payload_fully_covered: bool,
     media_payload_covered_bytes: u64,
@@ -4152,15 +4288,237 @@ fn docx_replay_ranges(bytes: &[u8]) -> Result<DocxReplayRanges, Box<dyn Error>> 
     })
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct DocxAlignedEocdTailProbeOverlaps {
+    main: u64,
+    media: u64,
+    unselected: u64,
+    core: u64,
+}
+
+fn validate_docx_aligned_eocd_tail_probe(
+    open_phase: &DocxReplayPhase,
+    ranges: &DocxReplayRanges,
+    tail_range: &Range<u64>,
+    cache_successful_loads: u64,
+) -> Result<DocxAlignedEocdTailProbeOverlaps, Box<dyn Error>> {
+    if tail_range.is_empty() {
+        return Err("aligned DOCX EOCD tail probe range is empty".into());
+    }
+    if cache_successful_loads != 0 {
+        return Err(format!(
+            "aligned DOCX EOCD tail probe observed {cache_successful_loads} successful cache loads"
+        )
+        .into());
+    }
+    let exact_tail_reads = open_phase
+        .read_ranges
+        .iter()
+        .filter(|range| *range == tail_range)
+        .count();
+    if exact_tail_reads != 1 {
+        return Err(format!(
+            "aligned DOCX EOCD tail probe expected exactly one read of [{}, {}), observed {exact_tail_reads}",
+            tail_range.start, tail_range.end
+        )
+        .into());
+    }
+    let expected = DocxAlignedEocdTailProbeOverlaps {
+        main: overlap_len(tail_range, &ranges.main),
+        media: overlap_with_ranges(tail_range, &ranges.media),
+        unselected: overlap_with_ranges(tail_range, &ranges.unselected),
+        core: overlap_with_ranges(tail_range, &ranges.core),
+    };
+    let observed = DocxAlignedEocdTailProbeOverlaps {
+        main: open_phase.counters.main_payload_overlap_bytes,
+        media: open_phase.counters.media_payload_overlap_bytes,
+        unselected: open_phase.counters.unselected_payload_overlap_bytes,
+        core: open_phase.counters.core_payload_overlap_bytes,
+    };
+    if observed != expected {
+        return Err(format!(
+            "aligned DOCX EOCD tail probe payload overlap differs from raw open counters: observed main/media/unselected/core={}/{}/{}/{}, expected={}/{}/{}/{}",
+            observed.main,
+            observed.media,
+            observed.unselected,
+            observed.core,
+            expected.main,
+            expected.media,
+            expected.unselected,
+            expected.core,
+        )
+        .into());
+    }
+    Ok(observed)
+}
+
+fn docx_aligned_eocd_tail_probe(
+    source: &[u8],
+    corpus: &super::Corpus,
+    proof: Option<&cold_verified::Sample>,
+    open_phase: &DocxReplayPhase,
+    ranges: &DocxReplayRanges,
+    cache_successful_loads: u64,
+) -> Result<DocxAlignedEocdTailProbeEvidence, Box<dyn Error>> {
+    assert_pinned_docx_corpus(corpus)?;
+    if corpus.manifest.archive_bytes != corpus.archive.len()
+        || super::sha256_hex(&corpus.archive) != DOCX_FILE_SOURCE_SHA256
+    {
+        return Err("aligned DOCX replay corpus bytes do not match the pinned source".into());
+    }
+
+    let aligned_source_bytes = u64::try_from(source.len())?;
+    let aligned_source_sha256 = super::sha256_hex(source);
+    // The verified-prime child uses the same aligned bytes, but does not
+    // perform or claim a cold-cache observation. Its structural replay still
+    // has to prove the exact corpus transformation and bounded metadata read.
+    let page_size_bytes = if let Some(proof) = proof {
+        if proof.aligned_source_sha256.as_deref() != Some(aligned_source_sha256.as_str()) {
+            return Err("aligned DOCX replay source hash differs from retained cold proof".into());
+        }
+        if proof.aligned_source_bytes != Some(aligned_source_bytes)
+            || proof.source_bytes != Some(aligned_source_bytes)
+        {
+            return Err("aligned DOCX replay source size differs from retained cold proof".into());
+        }
+        proof
+            .page_size_bytes
+            .ok_or("aligned DOCX replay proof omitted page size")?
+    } else {
+        cold_verified::page_size_for_harness()
+            .map_err(|_| "aligned DOCX prime replay cannot observe the page size")?
+    };
+    if page_size_bytes == 0 || aligned_source_bytes % page_size_bytes != 0 {
+        return Err("aligned DOCX replay source is not aligned to the retained page size".into());
+    }
+    let source_pages = aligned_source_bytes / page_size_bytes;
+    if proof.is_some_and(|proof| proof.source_pages != Some(source_pages)) {
+        return Err(
+            "aligned DOCX replay source page count differs from retained cold proof".into(),
+        );
+    }
+
+    let unaligned_source_bytes = u64::try_from(corpus.archive.len())?;
+    let alignment_padding_bytes =
+        (page_size_bytes - (unaligned_source_bytes % page_size_bytes)) % page_size_bytes;
+    if alignment_padding_bytes == 0 {
+        return Err("aligned DOCX replay source has no alignment padding".into());
+    }
+    if aligned_source_bytes
+        != unaligned_source_bytes
+            .checked_add(alignment_padding_bytes)
+            .ok_or("aligned DOCX replay source size overflows")?
+    {
+        return Err("aligned DOCX replay source size does not match corpus padding".into());
+    }
+
+    let aligned_archive = ZipArchive::from_slice(source)?;
+    let unaligned_archive = ZipArchive::from_slice(&corpus.archive)?;
+    let eocd_offset = aligned_archive.eocd_offset();
+    if eocd_offset != unaligned_archive.eocd_offset() {
+        return Err("aligned DOCX replay moved the EOCD record".into());
+    }
+    let eocd_comment_bytes = u64::try_from(aligned_archive.comment().as_bytes().len())?;
+    let unaligned_comment_bytes = u64::try_from(unaligned_archive.comment().as_bytes().len())?;
+    if eocd_comment_bytes
+        != unaligned_comment_bytes
+            .checked_add(alignment_padding_bytes)
+            .ok_or("aligned DOCX EOCD comment length overflows")?
+    {
+        return Err("aligned DOCX replay EOCD comment length does not match padding".into());
+    }
+    if unaligned_archive.end_offset() != unaligned_source_bytes
+        || aligned_archive.end_offset() != aligned_source_bytes
+    {
+        return Err("aligned DOCX replay ZIP end does not match the retained file size".into());
+    }
+
+    let eocd_comment_length_offset = usize::try_from(
+        eocd_offset
+            .checked_add(20)
+            .ok_or("aligned DOCX EOCD comment offset overflows")?,
+    )?;
+    let eocd_comment_length_end = eocd_comment_length_offset
+        .checked_add(2)
+        .ok_or("aligned DOCX EOCD comment length offset overflows")?;
+    let base_comment_start = usize::try_from(
+        eocd_offset
+            .checked_add(22)
+            .ok_or("aligned DOCX EOCD comment start overflows")?,
+    )?;
+    let base_comment_end = base_comment_start
+        .checked_add(usize::try_from(unaligned_comment_bytes)?)
+        .ok_or("aligned DOCX base comment end overflows")?;
+    if source.get(..eocd_comment_length_offset) != corpus.archive.get(..eocd_comment_length_offset)
+        || source.get(base_comment_start..base_comment_end)
+            != corpus.archive.get(base_comment_start..base_comment_end)
+    {
+        return Err("aligned DOCX replay changed bytes outside the EOCD comment length".into());
+    }
+    let aligned_comment_length = u16::try_from(eocd_comment_bytes)?.to_le_bytes();
+    if source.get(eocd_comment_length_offset..eocd_comment_length_end)
+        != Some(aligned_comment_length.as_slice())
+    {
+        return Err("aligned DOCX replay EOCD comment length field is inconsistent".into());
+    }
+    let aligned_padding_start = usize::try_from(unaligned_source_bytes)?;
+    if source
+        .get(aligned_padding_start..)
+        .is_none_or(|padding| padding.iter().any(|byte| *byte != 0))
+    {
+        return Err("aligned DOCX replay padding is not an all-zero EOCD suffix".into());
+    }
+
+    let eocd_tail_probe_bytes = u64::try_from(soapberry_zip::RECOMMENDED_BUFFER_SIZE)?;
+    let eocd_tail_probe_offset = aligned_source_bytes
+        .checked_sub(eocd_tail_probe_bytes)
+        .ok_or("aligned DOCX source is shorter than the EOCD tail probe")?;
+    let tail_range = eocd_tail_probe_offset..aligned_source_bytes;
+    let overlaps = validate_docx_aligned_eocd_tail_probe(
+        open_phase,
+        ranges,
+        &tail_range,
+        cache_successful_loads,
+    )?;
+    let eocd_tail_probe_payload_overlap_bytes = overlaps
+        .main
+        .checked_add(overlaps.media)
+        .and_then(|total| total.checked_add(overlaps.unselected))
+        .and_then(|total| total.checked_add(overlaps.core))
+        .ok_or("aligned DOCX EOCD tail probe overlap total overflows")?;
+    Ok(DocxAlignedEocdTailProbeEvidence {
+        aligned_source_sha256,
+        aligned_source_bytes,
+        unaligned_source_bytes,
+        page_size_bytes,
+        alignment_padding_bytes,
+        eocd_offset,
+        eocd_comment_bytes,
+        eocd_tail_probe_offset,
+        eocd_tail_probe_bytes,
+        eocd_tail_probe_read_count: 1,
+        eocd_tail_probe_main_payload_overlap_bytes: overlaps.main,
+        eocd_tail_probe_media_payload_overlap_bytes: overlaps.media,
+        eocd_tail_probe_unselected_payload_overlap_bytes: overlaps.unselected,
+        eocd_tail_probe_core_payload_overlap_bytes: overlaps.core,
+        eocd_tail_probe_payload_overlap_bytes,
+        cache_successful_loads,
+    })
+}
+
 fn replay_docx_source(
     source: &Path,
     operation: Operation,
+    corpus: &super::Corpus,
+    aligned_mode: bool,
+    aligned_proof: Option<&cold_verified::Sample>,
 ) -> Result<DocxSourceReplayEvidence, Box<dyn Error>> {
     let bytes = Arc::new(fs::read(source)?);
     let ranges = docx_replay_ranges(&bytes)?;
     let replay = Arc::new(DocxReplaySource::new(Arc::clone(&bytes), ranges.clone()));
     let package = litchi_docx::source_backed::Package::from_read_at(replay.clone())?;
     let open = replay.snapshot()?;
+    let open_cache_successful_loads = package.cache_diagnostics().successful_loads;
     let mut semantic = Sha256::new();
     let mut paragraph_count = super::SemanticShape::Medium.docx_paragraphs();
     let (preparation, query) = if operation.is_docx_query() || operation.is_docx_lifecycle() {
@@ -4198,6 +4556,7 @@ fn replay_docx_source(
             DocxReplayPhase {
                 counters: DocxReplayCounters::default(),
                 return_sizes: Vec::new(),
+                read_ranges: Vec::new(),
                 main_payload_covered_bytes: 0,
                 main_payload_fully_covered: false,
                 media_payload_covered_bytes: 0,
@@ -4207,6 +4566,7 @@ fn replay_docx_source(
             DocxReplayPhase {
                 counters: DocxReplayCounters::default(),
                 return_sizes: Vec::new(),
+                read_ranges: Vec::new(),
                 main_payload_covered_bytes: 0,
                 main_payload_fully_covered: false,
                 media_payload_covered_bytes: 0,
@@ -4225,23 +4585,42 @@ fn replay_docx_source(
         &ranges,
     );
     let diagnostics = package.cache_diagnostics();
-    let classification = if open_phase.counters.main_payload_overlap_bytes == 0
+    let open_payload_zero = open_phase.counters.main_payload_overlap_bytes == 0
         && open_phase.counters.media_payload_overlap_bytes == 0
         && open_phase.counters.unselected_payload_overlap_bytes == 0
-        && open_phase.counters.core_payload_overlap_bytes == 0
-        && (!(operation.is_docx_query() || operation.is_docx_lifecycle())
-            || (preparation.counters.main_payload_overlap_bytes != 0
-                && preparation.main_payload_fully_covered
-                && preparation.counters.media_payload_overlap_bytes == 0
-                && preparation.counters.unselected_payload_overlap_bytes == 0
-                && preparation.counters.core_payload_overlap_bytes == 0
-                && query.counters.main_payload_overlap_bytes == 0
-                && query.counters.media_payload_overlap_bytes == 0
-                && query.counters.unselected_payload_overlap_bytes == 0
-                && query.counters.core_payload_overlap_bytes == 0))
-    {
+        && open_phase.counters.core_payload_overlap_bytes == 0;
+    let aligned_eocd_tail_probe = if open_payload_zero || !aligned_mode {
+        None
+    } else {
+        Some(docx_aligned_eocd_tail_probe(
+            &bytes,
+            corpus,
+            aligned_proof,
+            &open_phase,
+            &ranges,
+            open_cache_successful_loads,
+        )?)
+    };
+    let open_classified = open_payload_zero || aligned_eocd_tail_probe.is_some();
+    let query_classified = !(operation.is_docx_query() || operation.is_docx_lifecycle())
+        || (preparation.counters.main_payload_overlap_bytes != 0
+            && preparation.main_payload_fully_covered
+            && preparation.counters.media_payload_overlap_bytes == 0
+            && preparation.counters.unselected_payload_overlap_bytes == 0
+            && preparation.counters.core_payload_overlap_bytes == 0
+            && query.counters.main_payload_overlap_bytes == 0
+            && query.counters.media_payload_overlap_bytes == 0
+            && query.counters.unselected_payload_overlap_bytes == 0
+            && query.counters.core_payload_overlap_bytes == 0);
+    let classification = if open_classified && query_classified {
         if operation.is_docx_query() || operation.is_docx_lifecycle() {
-            "semantic-query:one-complete-main-range-preparation-zero-query-unselected-media-core"
+            if aligned_eocd_tail_probe.is_some() {
+                "semantic-query:aligned-eocd-tail-metadata-probe;one-complete-main-range-preparation-zero-query-unselected-media-core"
+            } else {
+                "semantic-query:one-complete-main-range-preparation-zero-query-unselected-media-core"
+            }
+        } else if aligned_eocd_tail_probe.is_some() {
+            "catalog-only:aligned-eocd-tail-metadata-probe"
         } else {
             "catalog-only:zero-main-media-unselected-core-overlap"
         }
@@ -4300,6 +4679,7 @@ fn replay_docx_source(
         query_unselected_payload_covered_bytes: query.unselected_payload_covered_bytes,
         query_core_payload_covered_bytes: query.core_payload_covered_bytes,
         materializations: diagnostics.successful_loads,
+        aligned_eocd_tail_probe,
         semantic_sha256: super::sha256_hex(&semantic_digest[..]),
         classification,
     })
@@ -4769,11 +5149,12 @@ fn run_docx_operation(
     operation: Operation,
     source: &Path,
     prepared: Option<&PreparedDocx>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<String>, Box<dyn Error>> {
     match operation {
         Operation::DocxEagerOpen => {
             let document = PreparedDocx::eager(fs::read(source)?)?;
             std::hint::black_box(document);
+            Ok(None)
         },
         Operation::DocxSourceOpen => {
             // This is the candidate path under measurement. The root facade
@@ -4781,20 +5162,24 @@ fn run_docx_operation(
             // buffer through the eager compatibility path.
             let document = litchi::Document::open(source)?;
             std::hint::black_box(document);
+            Ok(None)
         },
         Operation::DocxEagerParagraphCount | Operation::DocxSourceParagraphCount => {
             let document = prepared.ok_or("DOCX paragraph-count operation has no prepared root")?;
             let count = document.paragraph_count()?;
             std::hint::black_box(count);
+            Ok(None)
         },
         Operation::DocxEagerListParagraphs | Operation::DocxSourceListParagraphs => {
             let document = prepared.ok_or("DOCX list-paragraphs operation has no prepared root")?;
             document.list_paragraphs()?;
+            Ok(None)
         },
         Operation::DocxEagerFullText | Operation::DocxSourceFullText => {
             let document = prepared.ok_or("DOCX full-text operation has no prepared root")?;
             let text = document.text()?;
             std::hint::black_box(text);
+            Ok(None)
         },
         Operation::DocxEagerOpenParagraphCountLifecycle
         | Operation::DocxSourceOpenParagraphCountLifecycle => {
@@ -4808,17 +5193,50 @@ fn run_docx_operation(
                 return Err("DOCX lifecycle paragraph count differs from fixed corpus".into());
             }
             std::hint::black_box((document, count));
+            Ok(None)
         },
         Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle => {
-            let document = if operation.is_source_docx() {
-                PreparedDocx::source(source)?
-            } else {
-                PreparedDocx::eager(fs::read(source)?)?
+            // Keep the returned String alive after the timer while the
+            // document is dropped before this function returns.  This binds
+            // post-timer correctness to the exact value observed by the
+            // measured lifecycle without charging its digest to elapsed_ns.
+            let text = {
+                let document = if operation.is_source_docx() {
+                    PreparedDocx::source(source)?
+                } else {
+                    PreparedDocx::eager(fs::read(source)?)?
+                };
+                let text = document.text()?;
+                std::hint::black_box(&text);
+                text
             };
-            let text = document.text()?;
-            std::hint::black_box((document, text));
+            Ok(Some(text))
         },
-        _ => return Err("non-DOCX operation passed to run_docx_operation".into()),
+        _ => Err("non-DOCX operation passed to run_docx_operation".into()),
+    }
+}
+
+/// Returns the fixed full-text projection implied by the deterministic DOCX
+/// corpus inputs. This oracle does not reopen the measured source or invoke
+/// the timed facade; it is built from the pinned paragraph payloads.
+fn expected_docx_full_text() -> String {
+    let mut text = String::new();
+    for index in 0..super::SemanticShape::Medium.docx_paragraphs() {
+        text.push_str(&super::semantic_docx_text(index, false));
+    }
+    text
+}
+
+fn docx_timed_full_text_digest(text: &str) -> Result<(String, u64), Box<dyn Error>> {
+    Ok((
+        super::sha256_hex(text.as_bytes()),
+        u64::try_from(text.len())?,
+    ))
+}
+
+fn verify_docx_timed_full_text(observed: &str) -> Result<(), Box<dyn Error>> {
+    if observed != expected_docx_full_text() {
+        return Err("timed DOCX full-text result differs from the fixed corpus oracle".into());
     }
     Ok(())
 }
@@ -5241,6 +5659,7 @@ fn verify_child_output(
     destination: &Path,
     corpus: &super::Corpus,
     allow_page_aligned_source: bool,
+    timed_docx_full_text: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     match operation {
         Operation::OpcEagerOpen => {
@@ -5314,9 +5733,13 @@ fn verify_child_output(
         | Operation::DocxEagerOpenParagraphCountLifecycle
         | Operation::DocxSourceOpenParagraphCountLifecycle
         | Operation::DocxEagerOpenFullTextLifecycle
-        | Operation::DocxSourceOpenFullTextLifecycle => {
-            verify_docx_operation(source, corpus, allow_page_aligned_source)
-        },
+        | Operation::DocxSourceOpenFullTextLifecycle => verify_docx_operation(
+            operation,
+            source,
+            corpus,
+            allow_page_aligned_source,
+            timed_docx_full_text,
+        ),
         Operation::XlsxFileOpen
         | Operation::XlsxFileOpenLifecycle
         | Operation::XlsxFileSelectedCell
@@ -5362,9 +5785,11 @@ fn verify_pptx_operation(
 }
 
 fn verify_docx_operation(
+    operation: Operation,
     source: &Path,
     corpus: &super::Corpus,
     allow_page_aligned_source: bool,
+    timed_docx_full_text: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     if corpus.manifest.generator != DOCX_FILE_CORPUS_GENERATOR {
         return Err("DOCX filesystem source has the wrong corpus generator".into());
@@ -5386,6 +5811,18 @@ fn verify_docx_operation(
     }
     if eager.paragraph_count()? != super::SemanticShape::Medium.docx_paragraphs() {
         return Err("DOCX filesystem corpus paragraph count differs from specification".into());
+    }
+    let is_full_text_lifecycle = matches!(
+        operation,
+        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle
+    );
+    if let Some(observed) = timed_docx_full_text {
+        if !is_full_text_lifecycle {
+            return Err(
+                "non-lifecycle DOCX operation unexpectedly retained timed full text".into(),
+            );
+        }
+        verify_docx_timed_full_text(observed)?;
     }
     let aligned_signature = docx_archive_signature(&bytes)?;
     let corpus_signature = docx_archive_signature(&corpus.archive)?;
@@ -6329,6 +6766,42 @@ mod tests {
     }
 
     #[test]
+    fn timed_docx_full_text_oracle_rejects_wrong_observation() {
+        let error = super::verify_docx_timed_full_text("wrong-observed-text").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("timed DOCX full-text result differs")
+        );
+    }
+
+    #[test]
+    fn parent_rejects_missing_or_altered_timed_docx_text_evidence() {
+        let mut child =
+            super::ChildResult::ineligible_cold_verified(super::cold_verified::Sample::ineligible(
+                super::cold_verified::Status::IneligiblePreparedQueryControl,
+            ));
+        let operation = Operation::DocxSourceOpenFullTextLifecycle;
+        assert!(super::validate_docx_timed_full_text_evidence(operation, &child).is_err());
+        let (digest, bytes) =
+            super::docx_timed_full_text_digest(&super::expected_docx_full_text()).unwrap();
+        child.docx_timed_full_text_sha256 = Some(digest);
+        child.docx_timed_full_text_bytes = Some(bytes);
+        child.docx_timed_full_text_timing_scope =
+            Some(super::DOCX_TIMED_FULL_TEXT_TIMING_SCOPE_V2.to_owned());
+        super::validate_docx_timed_full_text_evidence(operation, &child).unwrap();
+        child.docx_timed_full_text_bytes = Some(bytes + 1);
+        assert!(super::validate_docx_timed_full_text_evidence(operation, &child).is_err());
+        child.docx_timed_full_text_bytes = Some(bytes);
+        child.docx_timed_full_text_sha256 = Some("0".repeat(64));
+        assert!(super::validate_docx_timed_full_text_evidence(operation, &child).is_err());
+        assert!(
+            super::validate_docx_timed_full_text_evidence(Operation::DocxSourceFullText, &child)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn pptx_replay_overlap_accounting_is_exact_and_disjoint() {
         let request = 10..30;
         assert_eq!(super::overlap_len(&request, &(0..10)), 0);
@@ -6391,6 +6864,111 @@ mod tests {
         assert_eq!(phase.unselected_payload_covered_bytes, 0);
         assert_eq!(phase.core_payload_covered_bytes, 0);
         assert_eq!(phase.return_sizes, vec![20, 20]);
+    }
+
+    fn aligned_probe_test_ranges() -> super::DocxReplayRanges {
+        super::DocxReplayRanges {
+            main: 100..200,
+            media: std::iter::once(1000..1100).collect(),
+            unselected: std::iter::once(2000..2100).collect(),
+            core: std::iter::once(3000..3100).collect(),
+        }
+    }
+
+    fn aligned_probe_test_phase(
+        read_ranges: Vec<std::ops::Range<u64>>,
+        counters: super::DocxReplayCounters,
+    ) -> super::DocxReplayPhase {
+        super::DocxReplayPhase {
+            counters,
+            return_sizes: Vec::new(),
+            read_ranges,
+            main_payload_covered_bytes: 0,
+            main_payload_fully_covered: false,
+            media_payload_covered_bytes: 0,
+            unselected_payload_covered_bytes: 0,
+            core_payload_covered_bytes: 0,
+        }
+    }
+
+    #[test]
+    fn aligned_probe_accepts_exact_tail_metadata_read_and_raw_overlap() {
+        let ranges = aligned_probe_test_ranges();
+        let tail = 0..4096;
+        let phase = aligned_probe_test_phase(
+            vec![tail.clone(), 5000..5010],
+            super::DocxReplayCounters {
+                read_calls: 2,
+                read_bytes: 4106,
+                main_payload_overlap_bytes: 100,
+                media_payload_overlap_bytes: 100,
+                unselected_payload_overlap_bytes: 100,
+                core_payload_overlap_bytes: 100,
+            },
+        );
+        let overlaps =
+            super::validate_docx_aligned_eocd_tail_probe(&phase, &ranges, &tail, 0).unwrap();
+        assert_eq!(overlaps.main, 100);
+        assert_eq!(overlaps.media, 100);
+        assert_eq!(overlaps.unselected, 100);
+        assert_eq!(overlaps.core, 100);
+    }
+
+    #[test]
+    fn aligned_probe_rejects_oversize_tail_read() {
+        let ranges = aligned_probe_test_ranges();
+        let tail = 0..4096;
+        let phase = aligned_probe_test_phase(
+            std::iter::once(0..4097).collect(),
+            super::DocxReplayCounters {
+                main_payload_overlap_bytes: 100,
+                media_payload_overlap_bytes: 100,
+                unselected_payload_overlap_bytes: 100,
+                core_payload_overlap_bytes: 100,
+                ..Default::default()
+            },
+        );
+        let error =
+            super::validate_docx_aligned_eocd_tail_probe(&phase, &ranges, &tail, 0).unwrap_err();
+        assert!(error.to_string().contains("exactly one read"));
+    }
+
+    #[test]
+    fn aligned_probe_rejects_extra_or_misplaced_payload_read() {
+        let ranges = aligned_probe_test_ranges();
+        let tail = 0..4096;
+        let phase = aligned_probe_test_phase(
+            vec![tail.clone(), 1050..1060],
+            super::DocxReplayCounters {
+                main_payload_overlap_bytes: 100,
+                media_payload_overlap_bytes: 110,
+                unselected_payload_overlap_bytes: 100,
+                core_payload_overlap_bytes: 100,
+                ..Default::default()
+            },
+        );
+        let error =
+            super::validate_docx_aligned_eocd_tail_probe(&phase, &ranges, &tail, 0).unwrap_err();
+        assert!(error.to_string().contains("payload overlap differs"));
+    }
+
+    #[test]
+    fn aligned_probe_rejects_cache_materialization() {
+        let ranges = aligned_probe_test_ranges();
+        let tail = 0..4096;
+        let phase = aligned_probe_test_phase(
+            vec![tail.clone()],
+            super::DocxReplayCounters {
+                main_payload_overlap_bytes: 100,
+                media_payload_overlap_bytes: 100,
+                unselected_payload_overlap_bytes: 100,
+                core_payload_overlap_bytes: 100,
+                ..Default::default()
+            },
+        );
+        let error =
+            super::validate_docx_aligned_eocd_tail_probe(&phase, &ranges, &tail, 1).unwrap_err();
+        assert!(error.to_string().contains("successful cache loads"));
     }
 
     #[test]
@@ -6773,6 +7351,43 @@ mod tests {
             corpus_signature.semantic_sha256
         );
         assert_eq!(aligned_signature.physical_bytes, aligned.len());
+        // Priming the aligned verifier copy must receive structural evidence
+        // without inventing a cold residency/procfs observation.
+        let ranges = super::docx_replay_ranges(&aligned).unwrap();
+        let replay = Arc::new(super::DocxReplaySource::new(
+            Arc::new(aligned.clone()),
+            ranges.clone(),
+        ));
+        let package = litchi_docx::source_backed::Package::from_read_at(replay.clone()).unwrap();
+        let opened = replay.snapshot().unwrap();
+        let empty = super::DocxReplaySnapshot {
+            counters: super::DocxReplayCounters::default(),
+            return_sizes: Vec::new(),
+            read_ranges: Vec::new(),
+        };
+        let phase = super::docx_replay_phase(&empty, &opened, &ranges);
+        let proof = super::docx_aligned_eocd_tail_probe(
+            &aligned,
+            &corpus,
+            None,
+            &phase,
+            &ranges,
+            package.cache_diagnostics().successful_loads,
+        )
+        .unwrap();
+        assert_eq!(proof.eocd_tail_probe_bytes, 65_536);
+        assert_eq!(proof.eocd_tail_probe_read_count, 1);
+        assert!(proof.eocd_tail_probe_media_payload_overlap_bytes > 0);
+        assert_eq!(proof.cache_successful_loads, 0);
+        let text = package.document().unwrap().extract_text().unwrap();
+        assert_eq!(text.len(), 10_000);
+        assert_eq!(package.cache_diagnostics().successful_loads, 1);
+        let mut changed = aligned.clone();
+        *changed.last_mut().unwrap() = 1;
+        assert!(
+            super::docx_aligned_eocd_tail_probe(&changed, &corpus, None, &phase, &ranges, 0,)
+                .is_err()
+        );
     }
 
     #[test]
@@ -6886,6 +7501,9 @@ mod tests {
             cfb_owned: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            docx_timed_full_text_sha256: None,
+            docx_timed_full_text_bytes: None,
+            docx_timed_full_text_timing_scope: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
             xlsx_selected_cell: None,

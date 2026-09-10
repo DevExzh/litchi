@@ -1,0 +1,55 @@
+{
+  "attempt": "final2",
+  "binary": {
+    "bytes": 473544888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0491/final2/normal/litchi-perf-baseline",
+    "sha256": "8e4ad3877b10c143c04bce195b98433525d0bb1af83ae1d51692a8c25a340c40"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "copied_utc": "2026-09-09T17:20:59.189276+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0491/validation/build-normal-final2.json",
+    "sha256": "30f3132fcfea9ce23204d93c4d744b0253d2342e11416e3b2b94360722b1f989"
+  },
+  "git_revision": "59b509a7f9508778b20b428d733fc107ec22f142",
+  "original_binary": {
+    "bytes": 473544888,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-build-0491/release/litchi-perf-baseline",
+    "sha256": "8e4ad3877b10c143c04bce195b98433525d0bb1af83ae1d51692a8c25a340c40"
+  },
+  "role": "normal",
+  "schema": "docx-provider-lifecycle-build-v1",
+  "source_after": {
+    "files": 7158,
+    "path": "validation-sources/ba54d790f35627bd60f0362b85fd20bdd8a808e1d561ffae95d522841e7c1f05.json",
+    "sha256": "ba54d790f35627bd60f0362b85fd20bdd8a808e1d561ffae95d522841e7c1f05"
+  },
+  "source_before": {
+    "files": 7158,
+    "path": "validation-sources/ba54d790f35627bd60f0362b85fd20bdd8a808e1d561ffae95d522841e7c1f05.json",
+    "sha256": "ba54d790f35627bd60f0362b85fd20bdd8a808e1d561ffae95d522841e7c1f05"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

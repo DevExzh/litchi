@@ -1,0 +1,352 @@
+{
+  "actual_text_oracle": {
+    "bytes": 10000,
+    "sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+    "timing_scope": "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside"
+  },
+  "arms": [
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "bytes",
+      "provider": "bytes",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "file",
+      "provider": "file",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "max_range_bytes": null,
+      "name": "instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": 0,
+      "max_range_bytes": 64,
+      "name": "range-64-0us",
+      "provider": "range",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": 1000,
+      "max_range_bytes": 65536,
+      "name": "range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service"
+    }
+  ],
+  "case": "docx_provider_open_full_text_lifecycle",
+  "change": 491,
+  "claim_authorized": false,
+  "corpus": {
+    "archive_bytes": 16793036,
+    "archive_member_count": 20,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "expected_text_bytes": 10000,
+    "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "media_member_bytes": 2097152,
+    "media_member_count": 8,
+    "paragraph_count": 200,
+    "shape": "200 paragraphs + eight 2 MiB PNG-signature media members",
+    "version": "0188-media-v1"
+  },
+  "cpu": 2,
+  "cpu_lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+  "driver": {
+    "provider_matrix.py": "cb58839a20bb36cd786ff9adee4bce73c387ef63b15a9098f46e1d47cae6e3d9",
+    "support.py": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a",
+    "test_provider_matrix.py": "e30e0714b6d0b645fba275105b5f972e7ecf8b360d4adc69af307e0f24303ed3"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0491",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "expected_formal_processes": 20,
+  "expected_measured_samples": 600,
+  "formal_runs": [
+    {
+      "arm": "bytes",
+      "kind": "formal",
+      "label": "r1-normal-bytes",
+      "provider": "bytes",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file",
+      "kind": "formal",
+      "label": "r1-normal-file",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "formal",
+      "label": "r1-normal-instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "formal",
+      "label": "r1-normal-range-64-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "formal",
+      "label": "r1-normal-range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "bytes",
+      "kind": "formal",
+      "label": "r1-allocator-bytes",
+      "provider": "bytes",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file",
+      "kind": "formal",
+      "label": "r1-allocator-file",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "formal",
+      "label": "r1-allocator-instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "formal",
+      "label": "r1-allocator-range-64-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "formal",
+      "label": "r1-allocator-range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "formal",
+      "label": "r2-allocator-range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "formal",
+      "label": "r2-allocator-range-64-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "formal",
+      "label": "r2-allocator-instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file",
+      "kind": "formal",
+      "label": "r2-allocator-file",
+      "provider": "file",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "bytes",
+      "kind": "formal",
+      "label": "r2-allocator-bytes",
+      "provider": "bytes",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-65536-1000us-104857600bps-minimum-service",
+      "kind": "formal",
+      "label": "r2-normal-range-65536-1000us-104857600bps-minimum-service",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-64-0us",
+      "kind": "formal",
+      "label": "r2-normal-range-64-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented-bytes",
+      "kind": "formal",
+      "label": "r2-normal-instrumented-bytes",
+      "provider": "instrumented-bytes",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file",
+      "kind": "formal",
+      "label": "r2-normal-file",
+      "provider": "file",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "bytes",
+      "kind": "formal",
+      "label": "r2-normal-bytes",
+      "provider": "bytes",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    }
+  ],
+  "limitations": [
+    "provider construction is outside the operation clock",
+    "file observations are recently-written warm-cache observations",
+    "logical ReadAt counters are not physical filesystem or network I/O",
+    "two repeats provide descriptive variance only and no strong confidence claim",
+    "borrowed non-static input, publication atomicity, parallel scaling, and native producer coverage remain outside this matrix"
+  ],
+  "limits": {
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128,
+    "max_archive_compressed_bytes": 536870912,
+    "max_archive_entry_bytes": 536870912,
+    "max_archive_member_name_bytes": 4096,
+    "max_archive_members": 100000,
+    "max_archive_metadata_bytes": 67108864,
+    "max_archive_total_bytes": 2147483648,
+    "max_content_type_mappings": 100000,
+    "max_content_types_bytes": 8388608,
+    "max_input_bytes": 536870912,
+    "max_part_bytes": 536870912,
+    "max_parts": 100000,
+    "max_relationship_graph_nodes": 100000,
+    "max_relationship_parts": 100000,
+    "max_relationship_target_bytes": 4096,
+    "max_relationship_xml_bytes": 8388608,
+    "max_relationships_per_part": 100000,
+    "max_total_part_bytes": 536870912,
+    "max_total_relationship_xml_bytes": 67108864,
+    "max_total_relationship_xml_events": 8000000,
+    "max_total_relationships": 1000000,
+    "max_xml_attribute_bytes": 65536,
+    "max_xml_depth": 256,
+    "max_xml_events": 1000000
+  },
+  "machine": {
+    "path": "machine.json",
+    "sha256": "ceda2cd77fc770b3e98e652ffab259feac557e0196324b38ea306ae211b96866"
+  },
+  "performance_claim": "descriptive provider evidence; no cross-arm optimization claim",
+  "repeats": [
+    1,
+    2
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "samples": 30,
+  "schema": "docx-provider-matrix-protocol-v1",
+  "scopes": {
+    "allocation": "optional operation-scoped global-system-allocator region begins immediately before the operation clock and finishes immediately after it; normal binary runs report null and the allocator binary emits the existing Sample record",
+    "file": "FileSource is opened before each iteration and the staged file is recently written; this is a warm-cache/recent-file provider observation, not a filesystem-cold result",
+    "media": "compressed ZIP data ranges for word/media members only; a zero overlap proves only that the observed logical wrapper did not request or return those ranges",
+    "provider": "typed-owner source-backed DOCX provider baseline; direct comparison with the high-level filesystem facade is out of scope",
+    "range": "PptxRangeSource logical adapter counters; generic ReadAt behavior, not physical I/O",
+    "read": "caller-visible CountingReadAt calls around the provider source",
+    "setup": "corpus construction, source hashing, file staging, FileSource::open, instrumented wrapper construction, range-adapter construction, and limits construction are outside the clock",
+    "timing": "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside"
+  },
+  "source": {
+    "files": 7158,
+    "path": "validation-sources/55ce482e71532cfc3a923e87d6cc41bb381377e3bde9ae773e6c0df573dfab43.json",
+    "sha256": "55ce482e71532cfc3a923e87d6cc41bb381377e3bde9ae773e6c0df573dfab43"
+  },
+  "version": 1,
+  "warmups": 3
+}

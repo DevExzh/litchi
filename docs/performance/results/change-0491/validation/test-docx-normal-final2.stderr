@@ -1,0 +1,25 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0308]: mismatched types
+    --> src/docx_provider_lifecycle.rs:1187:33
+     |
+1187 |         let proof = media_proof(&snapshot, &[10..20]);
+     |                     ----------- ^^^^^^^^^ expected `Option<&CountingSnapshot>`, found `&CountingSnapshot`
+     |                     |
+     |                     arguments to this function are incorrect
+     |
+     = note:   expected enum `std::option::Option<&CountingSnapshot>`
+             found reference `&CountingSnapshot`
+note: function defined here
+    --> src/docx_provider_lifecycle.rs:617:4
+     |
+ 617 | fn media_proof(
+     |    ^^^^^^^^^^^
+ 618 |     snapshot: Option<&CountingSnapshot>,
+     |     -----------------------------------
+help: try wrapping the expression in `Some`
+     |
+1187 |         let proof = media_proof(Some(&snapshot), &[10..20]);
+     |                                 +++++         +
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-perf-baseline` (lib test) due to 1 previous error

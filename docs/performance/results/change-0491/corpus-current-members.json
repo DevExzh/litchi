@@ -1,0 +1,162 @@
+[
+  {
+    "name": "[Content_Types].xml",
+    "bytes": 1493,
+    "sha256": "b66f35da4ad29aafa5defd7e042fd8137ac0c9057bbd353124143a19537c60f2",
+    "compressed_bytes": 363,
+    "method": 8,
+    "crc32": 2206873615
+  },
+  {
+    "name": "_rels/.rels",
+    "bytes": 588,
+    "sha256": "f2ee5d069d316d080de4513502475fc76cbd64a7c536cf2420faad30a053aaae",
+    "compressed_bytes": 234,
+    "method": 8,
+    "crc32": 3447867690
+  },
+  {
+    "name": "docProps/app.xml",
+    "bytes": 700,
+    "sha256": "517e8c38bfeed466a2c512a2f25dadf4435ccb89962088c5f98509f70a5b4f6e",
+    "compressed_bytes": 364,
+    "method": 8,
+    "crc32": 4275287232
+  },
+  {
+    "name": "docProps/core.xml",
+    "bytes": 344,
+    "sha256": "2fce7b01b3fdc2f3a263ad6cf4b108789f7a42c931b3e36a7eb179ac6e189160",
+    "compressed_bytes": 212,
+    "method": 8,
+    "crc32": 2070736213
+  },
+  {
+    "name": "word/document.xml",
+    "bytes": 29098,
+    "sha256": "578fa03acc0baec54319ca5150d360489f39758813b5c9dc3a4157de26cddcb9",
+    "compressed_bytes": 1426,
+    "method": 8,
+    "crc32": 1012610293
+  },
+  {
+    "name": "word/_rels/document.xml.rels",
+    "bytes": 2057,
+    "sha256": "b171bb5f4adf4e0cbedcbc19e1ffe4b9fdbc957f821598f50c3e5c4615dccbd4",
+    "compressed_bytes": 324,
+    "method": 8,
+    "crc32": 2764216843
+  },
+  {
+    "name": "word/fontTable.xml",
+    "bytes": 2550,
+    "sha256": "a82f3626916d1da1df3efa5840594fa2b5deddba61cec1f1617abc5c2c7904d4",
+    "compressed_bytes": 607,
+    "method": 8,
+    "crc32": 2653799106
+  },
+  {
+    "name": "word/media/image1.png",
+    "bytes": 2097152,
+    "sha256": "e6b4c4c531a85ae0e423082001ef9ab508f0eb223a6ecf92c02d67fffc690f67",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 1420418009
+  },
+  {
+    "name": "word/media/image2.png",
+    "bytes": 2097152,
+    "sha256": "25e6354b8209c81d43dc93037657cf62db7c0a04909124dbf5e103cfaa748a66",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 3213364515
+  },
+  {
+    "name": "word/media/image3.png",
+    "bytes": 2097152,
+    "sha256": "3ecc77198be338346fd3cc666aaf1aeba40dddab6b3f69ce2c1eb7f4067c9fd1",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 2294610291
+  },
+  {
+    "name": "word/media/image4.png",
+    "bytes": 2097152,
+    "sha256": "bd23cae488cc6b2e141fa8842b3b9d149047381665291a3dc1a25c39d0fc61bd",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 1121261636
+  },
+  {
+    "name": "word/media/image5.png",
+    "bytes": 2097152,
+    "sha256": "506b479a2e697b8dad8787ac5a349316c11656f974295e42ec2405f95ed4c80e",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 3114236787
+  },
+  {
+    "name": "word/media/image6.png",
+    "bytes": 2097152,
+    "sha256": "5ad35540c2716f9ac0dc6f26fb0d9719cf87d6bec3f94196a2eb28f4fcd67940",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 1855150964
+  },
+  {
+    "name": "word/media/image7.png",
+    "bytes": 2097152,
+    "sha256": "c658669f30cfc320151a69f3abc7592646cfb0a19780e6dc28776e0fcf2f37d0",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 3285601353
+  },
+  {
+    "name": "word/media/image8.png",
+    "bytes": 2097152,
+    "sha256": "d9a56b969b79ca1e3df781863bf0bdaab10ea3c55f72c045b80862382e1fe417",
+    "compressed_bytes": 2097797,
+    "method": 8,
+    "crc32": 2982221589
+  },
+  {
+    "name": "word/numbering.xml",
+    "bytes": 7216,
+    "sha256": "e26e3e3112aca677fc6e4435a4dd4a914dddb0da2df9abf4950312483ce0f47e",
+    "compressed_bytes": 992,
+    "method": 8,
+    "crc32": 3047159362
+  },
+  {
+    "name": "word/settings.xml",
+    "bytes": 2534,
+    "sha256": "f7755c44aabfa788cb42394d5ee7f0df68d0f1187bf25f871026791f58df6777",
+    "compressed_bytes": 966,
+    "method": 8,
+    "crc32": 3087536036
+  },
+  {
+    "name": "word/styles.xml",
+    "bytes": 6180,
+    "sha256": "221fd032214677ccbcba6f1509cf55c07ad522e6e8fc09cab88778227b332f35",
+    "compressed_bytes": 794,
+    "method": 8,
+    "crc32": 24259070
+  },
+  {
+    "name": "word/theme/theme1.xml",
+    "bytes": 7641,
+    "sha256": "3af368e7c61433818fb0432524c61aa887ae417802652df8246f3dc8fdbb67a1",
+    "compressed_bytes": 1585,
+    "method": 8,
+    "crc32": 2045674208
+  },
+  {
+    "name": "word/webSettings.xml",
+    "bytes": 235,
+    "sha256": "d75ca912e722cc073c72a7f9a0699190745f4d9586e4a7695ce04fcfe94d6ac1",
+    "compressed_bytes": 163,
+    "method": 8,
+    "crc32": 414071298
+  }
+]

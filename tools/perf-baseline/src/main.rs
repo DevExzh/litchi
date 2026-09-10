@@ -12,6 +12,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("provider-lifecycle") => {
             return litchi_perf_baseline::pptx_provider_lifecycle::run_from_args(args);
         },
+        Some(selector) if selector == std::ffi::OsStr::new("docx-provider-lifecycle") => {
+            return litchi_perf_baseline::docx_provider_lifecycle::run_from_args(args);
+        },
         Some(selector) if selector == std::ffi::OsStr::new("pptx-pair-lifecycle") => {
             return litchi_perf_baseline::pptx_pair_lifecycle::run_from_args(args);
         },

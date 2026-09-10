@@ -1,0 +1,12 @@
+{
+  "head": "59b509a7f9508778b20b428d733fc107ec22f142",
+  "started_utc": "2026-09-09T16:38:10.397232+00:00",
+  "previous_turn": "verified progress: 0490 evidence sealed/committed; cleanup and rebase verified",
+  "scope": "DOCX source-provider and verified-cold baseline; no iWork work",
+  "protected_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "protected_local_files": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/report/spec-gap-audit.md": "d666f6e9f1d50b58943eac2f89272966b545d048f726482e17cd3c15fa7f0608",
+    "crates/litchi-keynote/src/document.rs": "867f3a2800bbe9b94c7dab382b1229446bd4c44e852e6a27ff22de4f9d8ae136"
+  }
+}

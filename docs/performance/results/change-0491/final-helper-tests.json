@@ -1,0 +1,89 @@
+{
+  "artifacts": {
+    "final-helper-tests.stderr": {
+      "bytes": 248,
+      "sha256": "8ab9d54e8b74aaf0549ba73c83435d380fb794701868904a91a8ed69f53ff6e0"
+    },
+    "final-helper-tests.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0491",
+    "-p",
+    "test_*.py"
+  ],
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T03:13:49.066580+00:00",
+  "helpers": {
+    "cleanup.py": {
+      "bytes": 46814,
+      "sha256": "52f2aa9b3bc10ab82a025248bd7c0779924b8f0e54dc114f51d7f3d7b5cef3ae"
+    },
+    "cold_matrix.py": {
+      "bytes": 79811,
+      "sha256": "b220b966ce68665c7e371e92fc1b1167445466aa8c5fed15278df4622aae8329"
+    },
+    "gate.py": {
+      "bytes": 3283,
+      "sha256": "f2c1ae53c001dbf9133d1c446d0aa73615557a9e17e5cfa27c40f128469e12a6"
+    },
+    "profile_providers.py": {
+      "bytes": 41243,
+      "sha256": "a41efca59c8e3cea136e4f56309b2ed4b3a65c61beb61a9c6f14ebd8e7d625f0"
+    },
+    "provider_matrix.py": {
+      "bytes": 73552,
+      "sha256": "ea63571118a4e52ac8a49df982597b2d2c377c7ca0c28ac38ee77f0e98193ee4"
+    },
+    "record_environment.py": {
+      "bytes": 5052,
+      "sha256": "becba451a8d9bff74cc9b050be2f2ca49f6ee730dc0b91087740f3aa4a3043e4"
+    },
+    "retain_build.py": {
+      "bytes": 2568,
+      "sha256": "99dbd7597a6fa13fa89c24298d017925e42add4f2fcd220ad2ea131bc62f4898"
+    },
+    "seal.py": {
+      "bytes": 37803,
+      "sha256": "e4242be1f966a735d73e13151f901c836c12caf88f606ca383067686421d2f97"
+    },
+    "support.py": {
+      "bytes": 4800,
+      "sha256": "2b4d60ab112e87ada247e19cb181cd3a2dee8259425898ba0b24aacebcb5f94a"
+    },
+    "test_cleanup.py": {
+      "bytes": 11371,
+      "sha256": "f53d3e6f547b58f0c7dc905aab2d0a41279a80522abe8043690c2b408e227b67"
+    },
+    "test_cold_matrix.py": {
+      "bytes": 22227,
+      "sha256": "9355a7d472db5e39095066e527127c0ad577c62e660374184eba424e8a3cdc24"
+    },
+    "test_profile_providers.py": {
+      "bytes": 3629,
+      "sha256": "bb6dbb07ff417070db2c5713b04f257c12705a97a325b4d4fe76bbd563e31d4b"
+    },
+    "test_provider_matrix.py": {
+      "bytes": 19085,
+      "sha256": "eee1a7ff07384f40f6acb9d778edf6d497b71a2d718013d6bcb76e1b1cb6f148"
+    },
+    "test_seal.py": {
+      "bytes": 3219,
+      "sha256": "844e59f27698b555055e23c0b353faf24960bc3fb465e0a2ef64cafbd5b5f801"
+    },
+    "write_results.py": {
+      "bytes": 8751,
+      "sha256": "f448b330586ae9d2a98ca9e7a1cc741b5f82c44251b115c4e3d66fe6dbcc21cc"
+    }
+  },
+  "scope": "read-only helper tests after final seal/cleanup descriptor correction; not a benchmark",
+  "started_utc": "2026-09-10T03:13:48.597706+00:00"
+}

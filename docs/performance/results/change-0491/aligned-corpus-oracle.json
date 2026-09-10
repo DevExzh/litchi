@@ -1,0 +1,10 @@
+{
+  "source_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+  "source_bytes": 16793036,
+  "page_size_bytes": 4096,
+  "padding_bytes": 564,
+  "aligned_source_bytes": 16793600,
+  "aligned_source_sha256": "d1e6f59e6c6c698aa91463a2ed341351da3b549b818122bc0a2b9b9b8449dc88",
+  "algorithm": "EOCD comment length and zero comment padding to next page",
+  "all_members_crc_and_bytes_equal": true
+}
