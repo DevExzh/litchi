@@ -43,6 +43,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "abba-0269-xlsx-repeated-store-cache",
                 "abba-0410-mce-attribute-names",
                 "abba-0413-cfb-chain-scratch",
+                "abba-0418-pptx-cross-copy-lifecycle",
+                "abba-0467-xlsx-cell-attributes-fixed-checkout",
             },
         )
         self.assertEqual(
@@ -56,6 +58,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "claim-0269-xlsx-repeated-store-cache",
                 "claim-0410-mce-attribute-names",
                 "claim-0413-cfb-chain-scratch",
+                "claim-0418-pptx-cross-copy-lifecycle",
+                "claim-0467-xlsx-cell-attributes",
             },
         )
         claim = claims["claim-0251-xlsx-xml-borrowed"]["value"]
