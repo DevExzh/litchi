@@ -123,6 +123,7 @@ pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc
     let total_relationship_xml = limits.max_metadata_bytes.max(limits.max_part_bytes);
     litchi_opc::ReadLimits::builder()
         .max_archive_members(archive_members)?
+        .max_archive_total_entries(archive_members)?
         .max_parts(parts)?
         .max_part_bytes(limits.max_part_bytes as u64)?
         .max_total_part_bytes(limits.max_part_bytes as u64)?
