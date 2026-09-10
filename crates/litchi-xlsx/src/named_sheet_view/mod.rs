@@ -8,6 +8,7 @@ mod codec;
 mod model;
 mod package;
 
+pub use crate::data_type_icons::ShowDataTypeIcons;
 pub use codec::{parse_named_sheet_views, write_named_sheet_views};
 pub use model::{
     ColumnFilter, DifferentialFormat, Extension, Filter, Guid, IconSet, Markup, Range,
