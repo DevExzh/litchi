@@ -1,0 +1,14 @@
+{
+  "reviewer": "pptx_presence_v3_review",
+  "verdict": "CLEAR for archival publication",
+  "fresh_extraction": "byte and mode identical to compact publication; no symlinks or special files",
+  "checksum_entries": 69,
+  "standalone_verifier": "passed",
+  "normal_latency_regression_percent": 37.36876449,
+  "allocation_calls_regression_percent": 119.40817491,
+  "allocated_bytes_regression_percent": 8.50744044,
+  "binary_bytes_omitted": 235414840,
+  "binary_rerun_supported": false,
+  "workload_started": false,
+  "production_delta_approved": false
+}
