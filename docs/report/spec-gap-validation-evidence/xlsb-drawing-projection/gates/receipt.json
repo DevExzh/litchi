@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "kind": "xlsb_drawing_skipped_projection_final_library_gates",
+  "status": "complete",
+  "toolchain": "1.95.0",
+  "rustup_home": "/tmp/litchi-spec-gap-rustup",
+  "target_dir": "/var/tmp/litchi-xlsb-drawing-current-target-20260910",
+  "profiles": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "offline_locked": true,
+  "focused": {
+    "command": "cargo +1.95.0 test -p litchi-xlsb --test drawing_skip_projection --offline --locked -- --nocapture",
+    "result": "4 passed, 0 failed",
+    "log": "gates/drawing-skip-focused.log",
+    "sha256": "9ef421e56689706bdec7e89c83ffd0bcabe352b08ab5ab34a032d88a3e99d1bc"
+  },
+  "tests": {
+    "command": "cargo +1.95.0 test -p litchi-xlsb --all-features --all-targets --offline --locked --no-fail-fast",
+    "result": "815 total passed (636 unit tests + 179 integration tests), 0 failed, 1 ignored; drawing_skip_projection 4/4",
+    "log": "gates/xlsb-all-features-all-targets-incremental0.log",
+    "sha256": "d19c81fa5fa79d4bf2a83706977123e9c0e8bcebca6b2350424007d9b98e1e07"
+  },
+  "clippy": {
+    "command": "cargo +1.95.0 clippy -p litchi-xlsb --all-features --all-targets --offline --locked -- -D warnings",
+    "result": "pass",
+    "log": "gates/xlsb-clippy-all-features-all-targets-incremental0.log",
+    "sha256": "0448d05d588402dd1ef32f25410abed52c01d4d777ab3f9148dafde86b1a3125"
+  },
+  "rustdoc": {
+    "command": "RUSTDOCFLAGS=-Dwarnings cargo +1.95.0 doc -p litchi-xlsb --all-features --no-deps --offline --locked",
+    "result": "pass",
+    "log": "gates/xlsb-rustdoc-all-features.log",
+    "sha256": "ad0b5ee4932a936769e35f0eaf8bb3870520a32979b621aee00aa9fb2639b8f3"
+  },
+  "format": {
+    "command": "rustup run stable rustfmt --edition 2024 --check crates/litchi-xlsb/tests/drawing_skip_projection.rs",
+    "result": "pass",
+    "log": "gates/drawing-skip-rustfmt.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source": {
+    "before": "gates/source-hashes-before.txt",
+    "after": "gates/source-hashes-after.txt",
+    "before_sha256": "95cfdccff4b85f3c36356de68e8ac38f22b358c884f2e404a1e1a995b6bcfa9a",
+    "after_sha256": "95cfdccff4b85f3c36356de68e8ac38f22b358c884f2e404a1e1a995b6bcfa9a",
+    "source_unchanged": true,
+    "paths": [
+      "crates/litchi-xlsb/src/calculation_chain/workbook.rs",
+      "crates/litchi-xlsb/src/cell_values/drawing_transfer.rs",
+      "crates/litchi-xlsb/src/cell_values/root.rs",
+      "crates/litchi-xlsb/src/cell_values/workbook.rs",
+      "crates/litchi-xlsb/src/cell_watches/workbook.rs",
+      "crates/litchi-xlsb/src/sparkline/workbook.rs",
+      "crates/litchi-xlsb/src/workbook/mod.rs",
+      "crates/litchi-xlsb/src/workbook/model.rs",
+      "crates/litchi-xlsb/src/workbook/package.rs",
+      "crates/litchi-xlsb/src/workbook/tests.rs",
+      "crates/litchi-xlsb/tests/drawing_skip_projection.rs",
+      "tools/perf-baseline/src/bin/xlsb_crud.rs",
+      "Cargo.lock"
+    ]
+  },
+  "workspace_lock": {
+    "path": "gates/workspace-Cargo.lock",
+    "sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b"
+  },
+  "fixture": {
+    "path": "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+    "sha256": "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+  },
+  "owned_test": {
+    "path": "crates/litchi-xlsb/tests/drawing_skip_projection.rs",
+    "sha256": "d7d7ed725c13c798a109e371e5a57687d2f8286046e4a3d6e4ea3b60db017e7e",
+    "coverage": [
+      "policy continuity through edit_opc, cell no-op, scalar publication, save, and reopen",
+      "malformed referenced and unrelated orphan drawing parts remain opaque",
+      "in-memory WorkbookPatch applies with the skipped target policy",
+      "eager durable decode rejects malformed images while explicit skipped decode accepts them",
+      "malformed skipped donor transfers a scalar to an eager target and durable inverse restores exact bytes"
+    ]
+  }
+}

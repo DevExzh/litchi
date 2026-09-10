@@ -11,6 +11,7 @@ use super::{Formula, FormulaKind, Groups, Limits};
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, SupportingLink};
+use crate::workbook::DrawingLoadPolicy;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -26,12 +27,14 @@ pub(crate) fn read_with_limits(
     worksheet::read_with_limits(part.blob(), limits).map_err(map_error)
 }
 
-/// Apply an exact-source commit atomically to one worksheet part.
-pub(crate) fn apply_with_external_link_limits(
+/// Apply a sparkline commit while retaining the workbook's drawing
+/// projection boundary.
+pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     commit: Commit,
     external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
 ) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -46,9 +49,10 @@ pub(crate) fn apply_with_external_link_limits(
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    crate::Workbook::from_opc_package_with_external_link_limits(
+    crate::Workbook::reparse_candidate_with_policy(
         candidate.clone(),
         external_link_limits,
+        drawing_load_policy,
     )?;
     *package = candidate;
     Ok(snapshot)

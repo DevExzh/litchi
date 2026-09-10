@@ -53,13 +53,12 @@ impl crate::Workbook {
         let current = patch.check_source(&self.package)?;
         if !patch.is_empty() {
             patch.check_publication_policy(&self.package)?;
+        } else {
+            return Ok(current);
         }
         let mut candidate = self.package.clone();
         let resulting = patch.apply_checked(&mut candidate, current)?;
-        let validated = Self::from_opc_package_with_external_link_limits(
-            candidate,
-            self.external_link_limits(),
-        )?;
+        let validated = self.reparse_candidate(candidate)?;
         *self = validated;
         Ok(resulting)
     }

@@ -1,0 +1,38 @@
+{
+  "schema": "xlsb-drawing-projection-root-verification-v1",
+  "parent_commit": "9cc442c5178f53a271a16e2f812dbb09a2aaa2f6",
+  "checks": {
+    "library_tests_passed": 815,
+    "harness_tests_passed": 9,
+    "existing_ignored_tests": 1,
+    "strict_clippy_rustdoc_format_and_diff": "passed",
+    "independent_review": "cleared",
+    "library_and_harness_source_hashes_match_current_files": true,
+    "release_report_count": 78,
+    "backend_case_combinations": 26,
+    "processes_per_combination": 3,
+    "timed_samples_per_process": 30,
+    "total_timed_samples": 2340,
+    "raw_percentiles_and_means_recomputed": true,
+    "applicable_semantic_refusal_and_preservation_gates_passed": true,
+    "source_counter_interval_sums_and_repeated_observations_checked": true,
+    "saved_output_hashes_stable_across_processes": true
+  },
+  "environment_observed_after_measurement": {
+    "cpu_model": "AMD EPYC 9R45",
+    "logical_cpu_count": 32,
+    "process_affinity_cpu_count": 32,
+    "machine": "x86_64",
+    "kernel_release": "7.0.0-1011-aws"
+  },
+  "source_read_scope": {
+    "fixture": "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+    "open_calls": 24,
+    "open_returned_bytes": 4007,
+    "open_materialized_parts": 1,
+    "selected_sheet_scan_additional_calls": 12,
+    "selected_sheet_scan_additional_returned_bytes": 2173,
+    "selected_sheet_scan_additional_materialized_parts": 4
+  },
+  "release_binary_sha256": "07f44c8b63fd46b94b66d024871f15b1933cea04062ad47134638ff1e54bdbca"
+}

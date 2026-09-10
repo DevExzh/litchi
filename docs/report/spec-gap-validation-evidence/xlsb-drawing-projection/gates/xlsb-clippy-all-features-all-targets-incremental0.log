@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized] target(s) in 7.36s
