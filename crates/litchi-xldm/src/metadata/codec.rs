@@ -804,6 +804,14 @@ fn validate_nested_constraints(object: &MetadataObject) -> MetadataResult<()> {
                 ],
             )?;
             require_collections(object, &[("Segments", "XMColumnSegment")])?;
+            if object
+                .collection("Segments")
+                .is_some_and(|segments| segments.iter().any(|segment| segment.members.len() != 3))
+            {
+                return Err(MetadataError::new(
+                    "primary XMRawColumn segments require a SubSegment member",
+                ));
+            }
             if object.data_objects.len() != 2
                 || object
                     .data_objects
@@ -846,14 +854,7 @@ fn validate_nested_constraints(object: &MetadataObject) -> MetadataResult<()> {
                 "XMRelationship requires one relationship index object",
             ));
         },
-        "XMColumnSegment" => require_member_classes(
-            object,
-            &[
-                ("SubSegment", &["XMColumnSegment"]),
-                ("CompressionInfo", &["@hybrid"]),
-                ("ColumnSegmentStats", &["XMColumnSegmentStats"]),
-            ],
-        )?,
+        "XMColumnSegment" => validate_column_segment_members(object)?,
         "XMMultiPartSegmentMap" => require_collections_multi(
             object,
             &[(
@@ -913,6 +914,10 @@ fn require_member_classes(
         let class = member.object.class.as_str();
         let valid = classes.contains(&class)
             || (classes.contains(&"@hybrid") && member.object.class.is_hybrid_compression())
+            || (classes.contains(&"@compression")
+                && (member.object.class.is_hybrid_compression()
+                    || member.object.class.as_str() == "XM123CompressionInfo"
+                    || member.object.class.no_split_width().is_some()))
             || classes.contains(&"@matching_subcompression");
         if !valid {
             return Err(MetadataError::new(format!(
@@ -921,6 +926,33 @@ fn require_member_classes(
         }
     }
     Ok(())
+}
+
+fn validate_column_segment_members(object: &MetadataObject) -> MetadataResult<()> {
+    // A primary segment has a SubSegment, CompressionInfo, and statistics.
+    // The nested subsegment described by §2.5.2.12 has only CompressionInfo
+    // and statistics; requiring the primary member set recursively makes
+    // every valid finite column segment impossible to parse.
+    match object.members.len() {
+        2 => require_member_classes(
+            object,
+            &[
+                ("CompressionInfo", &["@compression"]),
+                ("ColumnSegmentStats", &["XMColumnSegmentStats"]),
+            ],
+        ),
+        3 => require_member_classes(
+            object,
+            &[
+                ("SubSegment", &["XMColumnSegment"]),
+                ("CompressionInfo", &["@compression"]),
+                ("ColumnSegmentStats", &["XMColumnSegmentStats"]),
+            ],
+        ),
+        _ => Err(MetadataError::new(
+            "XMColumnSegment requires two nested-subsegment members or three primary-segment members",
+        )),
+    }
 }
 
 fn require_collections(object: &MetadataObject, required: &[(&str, &str)]) -> MetadataResult<()> {

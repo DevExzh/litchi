@@ -103,6 +103,8 @@ query, macro, chart, pivot, or external content is executed.
 | Ribbon and custom UI XML | 🟡 | 🟡 | 🟡 | Ribbon/customUI parts and relationships remain bounded/pass-through where exposed; UI activation and arbitrary extension semantics are not implemented. |
 | Unknown package parts and extension XML | 🟡 | ✅ | 🟡 | OPC graph editing preserves supported opaque parts and validates relationship topology. Typed writers do not claim lossless preservation through every semantic mutation of unknown XML. |
 
+| Data Model time groupings (`modelTimeGroupings`) | 🟡 | ✅ | 🟡 | Typed reads cover the [MS-XLSX] 2014-11 namespace and `{9835A34E-60A6-4A7C-AAB8-D5F71C897F49}` owner, preserve unknown sibling extensions byte-for-byte, validate table references during package load, and retain forward content-type values as `Other`. Package authoring resolves each table, source column, and calculated column through the neutral XLDM 140 identity closure before staging the exact reversible descriptor edit; incomplete or opaque inner closures and standalone `Other` values remain read-only. No native Excel acceptance claim is made. [MS-XLSX] §§2.2.4.11, 2.4.71, 2.6.152–2.6.154. |
+
 ## Explicit gaps
 
 | Feature family exposed by [MS-XLSX] | Status | Read | Write | Notes |

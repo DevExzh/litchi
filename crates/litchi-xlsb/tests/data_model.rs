@@ -3,7 +3,8 @@ use std::io::Cursor;
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
 use litchi_xlsb::data_model::{
-    DATA_MODEL_CONTENT_TYPE, DATA_MODEL_PART_NAME, Definition, Model, Table,
+    ContentType, DATA_MODEL_CONTENT_TYPE, DATA_MODEL_PART_NAME, Definition, Model, Table,
+    TimeGrouping, TimeGroupingColumn,
 };
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
 use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
@@ -21,6 +22,20 @@ fn definition() -> Definition {
         }],
         relationships: Vec::new(),
         time_groupings: Vec::new(),
+    }
+}
+
+fn time_grouping() -> TimeGrouping {
+    TimeGrouping {
+        table_name: "Sales".into(),
+        column_name: "Date".into(),
+        column_id: "Date".into(),
+        columns: vec![TimeGroupingColumn {
+            is_selected: true,
+            content_type: ContentType::Years,
+            column_name: "Date.Year".into(),
+            column_id: "Date.Year".into(),
+        }],
     }
 }
 
@@ -780,4 +795,37 @@ fn signed_noop_preserves_and_signed_change_requires_explicit_disposition() {
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
     ));
+}
+
+#[test]
+fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
+    let package = package();
+    let mut edit = package.data_model().expect("Data Model snapshot").edit();
+    let error = edit
+        .add_time_grouping(time_grouping())
+        .expect_err("opaque bytes without XLDM metadata cannot admit a grouping");
+    assert!(error.to_string().contains("XLDM outer proof failed"));
+    assert!(
+        edit.definition()
+            .expect("staged Data Model definition")
+            .time_groupings
+            .is_empty()
+    );
+}
+
+#[test]
+fn writer_rejects_time_grouping_before_retaining_unproven_opaque_payload() {
+    let mut writer = WorkbookWriter::new();
+    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    writer.set_connections(connections()).expect("connections");
+    let mut definition = definition();
+    definition.time_groupings.push(time_grouping());
+    let error = match writer
+        .set_data_model(Model::from_bytes(definition, vec![1, 2, 3, 4]).expect("model"))
+    {
+        Ok(_) => panic!("writer must prove retained groupings before staging"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("XLDM outer proof failed"));
+    assert!(writer.data_model().is_none());
 }

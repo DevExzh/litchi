@@ -27,7 +27,7 @@ const MAX_FILE_LIST_ITEMS: usize = 100_000;
 pub struct OlapError(String);
 
 impl OlapError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self(message.into())
     }
 }
@@ -353,6 +353,26 @@ pub fn inspect<'a>(
 
 pub fn validate(model: &OlapModel<'_>, metadata: &MetadataModel<'_>) -> OlapResult<()> {
     validate_model(model, metadata, None)
+}
+
+/// Validate section 2.6 again against the complete section 2.2 directory.
+///
+/// This is the source-bound form used by the identity closure proof; the
+/// ordinary [`validate`] function remains useful for callers with no outer
+/// directory available.
+pub fn validate_with_storage(
+    model: &OlapModel<'_>,
+    metadata: &MetadataModel<'_>,
+    storage: &Storage<'_>,
+) -> OlapResult<()> {
+    let mut paths = Vec::new();
+    paths.try_reserve(storage.files.len()).map_err(|error| {
+        OlapError::new(format!(
+            "cannot reserve XLDM OLAP storage path index: {error}"
+        ))
+    })?;
+    paths.extend(storage.files.iter().map(|entry| entry.path.as_str()));
+    validate_model(model, metadata, Some(&paths))
 }
 
 pub fn write_file(file: &OlapFile<'_>) -> OlapResult<Vec<u8>> {
@@ -781,31 +801,8 @@ fn validate_model(
             )));
         }
     }
-    let dimension_attributes: HashSet<_> = definitions
-        .iter()
-        .filter(|(_, value)| value.kind == OlapObjectKind::Dimension)
-        .flat_map(|(_, value)| value.attribute_ids.iter().map(String::as_str))
-        .collect();
-    for file in metadata
-        .files
-        .iter()
-        .filter(|file| file.kind == MetadataFileKind::Table)
-    {
-        for column in file
-            .table
-            .collection("Columns")
-            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated metadata"))
-        {
-            let id = column
-                .name
-                .as_deref()
-                .ok_or_else(|| OlapError::new("metadata column has no ID"))?;
-            if !dimension_attributes.contains(id) {
-                return Err(OlapError::new(format!(
-                    "column ID {id} has no dimension Attribute"
-                )));
-            }
-        }
+    if table_count != 0 {
+        super::identity::project_xldm140_identity(metadata, model)?;
     }
     let olap_hierarchies: Vec<_> = definitions
         .iter()
@@ -829,24 +826,6 @@ fn validate_model(
             return Err(OlapError::new(
                 "user hierarchy ID/offset cardinality mismatch",
             ));
-        }
-    }
-    let dimension_values: HashSet<_> = definitions
-        .iter()
-        .filter(|(_, value)| value.kind == OlapObjectKind::Dimension)
-        .flat_map(|(_, value)| descendant_scalars(&value.object))
-        .collect();
-    for relationship in &metadata.relationships {
-        for id in [
-            &relationship.primary_table,
-            &relationship.primary_column,
-            &relationship.foreign_column,
-        ] {
-            if !dimension_values.contains(id.as_str()) {
-                return Err(OlapError::new(format!(
-                    "relationship identifier {id} is absent from dimension metadata"
-                )));
-            }
         }
     }
     Ok(())
@@ -980,17 +959,6 @@ fn collect_hierarchies(object: &OlapElement) -> OlapResult<Vec<OlapHierarchy>> {
         });
     }
     Ok(result)
-}
-
-fn descendant_scalars(element: &OlapElement) -> Vec<&str> {
-    let mut values = Vec::new();
-    if element.children.is_empty() && !element.text.trim().is_empty() {
-        values.push(element.text.trim());
-    }
-    for child in &element.children {
-        values.extend(descendant_scalars(child));
-    }
-    values
 }
 
 fn parse_file_list(value: &str) -> OlapResult<Vec<String>> {

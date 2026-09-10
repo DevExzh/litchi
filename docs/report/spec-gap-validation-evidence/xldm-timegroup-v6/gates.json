@@ -1,0 +1,98 @@
+[
+  {
+    "gate": "tests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-xldm-root-full-v6-20260910-tests.log",
+    "sha256": "1ff3c0c91773e39649e0bb880a3ceffa55c717f444019b32cd59fc58ffbf988c"
+  },
+  {
+    "gate": "doctests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--doc",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-xldm-root-full-v6-20260910-doctests.log",
+    "sha256": "223982d2abd650348ac7478c0974750818ae9d6075b2ad92ce86e3b01f04ecb8"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-xldm-root-full-v6-20260910-clippy.log",
+    "sha256": "69dc1ee9e03faef02e8475e82cfdd44a6ae9080b404fd02e05b97e6e043f8e5d"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--no-deps",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-xldm-root-full-v6-20260910-rustdoc.log",
+    "sha256": "18c9de2d1ecd8dfd02ad7a7c58b3be0f89de3c59ab58a4cc1d5e1b354c8b904b"
+  }
+]

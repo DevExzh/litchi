@@ -267,6 +267,58 @@ impl Storage<'_> {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn test_xldm140_storage<'a>(bytes: &'a [u8], paths: &[&str]) -> Storage<'a> {
+    Storage {
+        header: Header {
+            backup_restore_sync_version: 1153,
+            fault_code: 0,
+            encryption_key_version: 0,
+            compression: Compression::Xpress,
+            directory_offset: Offset(0),
+            directory_size: Size(0),
+            file_count: u32::try_from(paths.len()).expect("test directory fits u32"),
+            object_id: String::new(),
+            data_offset: Offset(0),
+        },
+        header_encoding: XmlEncoding::Utf16Le,
+        directory_encoding: XmlEncoding::Utf16Le,
+        partition_marker: PartitionMarker {
+            partition_count: 0,
+            encoding: XmlEncoding::Utf16Le,
+            encoded_xml: &[],
+        },
+        backup_log: BackupLog {
+            backup_restore_sync_version: 1153,
+            server_root: String::new(),
+            object_name: String::new(),
+            object_id: String::new(),
+            write_access: WriteAccess::ReadWrite,
+            is_olap: false,
+            collations: Vec::new(),
+            languages: Vec::new(),
+            file_groups: Vec::new(),
+            encoding: XmlEncoding::Utf16Le,
+        },
+        files: paths
+            .iter()
+            .map(|path| FileEntry {
+                path: (*path).to_owned(),
+                kind: FileKind::OpaqueBinary,
+                offset: Offset(0),
+                stored_size: Size(0),
+                crc32: 0,
+                delete: false,
+                created_timestamp: 0,
+                access_timestamp: 0,
+                last_write_timestamp: 0,
+            })
+            .collect(),
+        bytes,
+        profile: StorageProfile::Xldm140,
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct Node {
     pub(super) name: String,

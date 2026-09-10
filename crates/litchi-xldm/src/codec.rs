@@ -1,5 +1,6 @@
 //! MS-XLDM outer-storage codec: bounded XML projection and exact snapshots.
 
+use super::identity::Xldm140FileReplacement;
 use super::model::{
     BOM, CRC_SIZE, Compression, FileEntry, FileKind, Header, MAX_DIRECTORY_BYTES, MAX_FILES,
     MAX_PARTITIONS, MAX_PATH_BYTES, MAX_STORAGE_BYTES, MAX_XML_DEPTH, MAX_XML_NODES,
@@ -142,6 +143,615 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
 pub fn write(storage: &Storage<'_>) -> Result<Vec<u8>> {
     inspect(storage.bytes)?;
     Ok(storage.bytes.to_vec())
+}
+
+/// Rewrite already-admitted allocation payloads without changing their
+/// lengths, directory records, or serial allocation layout.
+pub(super) fn rewrite_same_size_payloads(
+    storage: &Storage<'_>,
+    replacements: &[Xldm140FileReplacement<'_>],
+) -> Result<Vec<u8>> {
+    if storage.profile != StorageProfile::Xldm140 {
+        return Err(Error::Unsupported {
+            feature: "same-size inner XLDM rewrites require the version-140 profile",
+        });
+    }
+    if storage.bytes.len() > MAX_STORAGE_BYTES {
+        return Err(limit("storage bytes"));
+    }
+    if replacements.len() > MAX_FILES {
+        return Err(limit("replacement count"));
+    }
+    let mut indexes = Vec::new();
+    indexes
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| allocation("MS-XLDM replacement indexes", source))?;
+    let mut paths = std::collections::HashSet::new();
+    paths
+        .try_reserve(replacements.len())
+        .map_err(|source| allocation("MS-XLDM replacement paths", source))?;
+    for replacement in replacements {
+        if !paths.insert(replacement.storage_path) {
+            return Err(invalid(format!(
+                "duplicate XLDM replacement path {}",
+                replacement.storage_path
+            )));
+        }
+        let index = storage
+            .files
+            .iter()
+            .position(|entry| entry.path == replacement.storage_path)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "XLDM replacement path {} is absent from the source directory",
+                    replacement.storage_path
+                ))
+            })?;
+        let source = storage.file_payload(index).ok_or_else(|| {
+            invalid(format!(
+                "cannot resolve XLDM source payload {}",
+                replacement.storage_path
+            ))
+        })?;
+        if source.len() != replacement.payload.len() {
+            return Err(invalid(format!(
+                "XLDM replacement {} changes allocation size",
+                replacement.storage_path
+            )));
+        }
+        indexes.push(index);
+    }
+
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(storage.bytes.len())
+        .map_err(|source| allocation("MS-XLDM rewritten storage bytes", source))?;
+    result.extend_from_slice(storage.bytes);
+    for (replacement, index) in replacements.iter().zip(indexes) {
+        let entry = storage
+            .files
+            .get(index)
+            .ok_or_else(|| invalid("XLDM replacement index is out of range"))?;
+        let start = checked_usize(entry.offset.0, "file offset")?;
+        let payload_len = checked_usize(entry.stored_size.0, "file size")?
+            .checked_sub(CRC_SIZE)
+            .ok_or_else(|| limit("file size"))?;
+        let end = start
+            .checked_add(payload_len)
+            .ok_or_else(|| limit("payload range"))?;
+        if end > result.len() {
+            return Err(invalid("XLDM replacement payload range is outside storage"));
+        }
+        result[start..end].copy_from_slice(replacement.payload);
+        let marker = crc32(replacement.payload);
+        let marker = marker.to_le_bytes();
+        result[end..end + CRC_SIZE].copy_from_slice(&marker);
+    }
+    // This reparses the candidate before the caller inspects inner sections;
+    // no partially modified buffer escapes if the outer CRC or directory is
+    // invalid.
+    inspect(&result)?;
+    Ok(result)
+}
+
+/// Rewrite already-admitted inner allocations while rebuilding the serial
+/// files section and virtual directory for changed payload lengths. The
+/// partition marker, backup-log marker, directory order, and member paths are
+/// retained; callers use this primitive only after proving the typed closure
+/// and must re-inspect every nested section before publishing the result.
+pub(super) fn rewrite_variable_size_payloads(
+    storage: &Storage<'_>,
+    replacements: &[Xldm140FileReplacement<'_>],
+) -> Result<Vec<u8>> {
+    if storage.profile != StorageProfile::Xldm140 {
+        return Err(Error::Unsupported {
+            feature: "variable-size inner XLDM rewrites require the version-140 profile",
+        });
+    }
+    if storage.bytes.len() > MAX_STORAGE_BYTES {
+        return Err(limit("storage bytes"));
+    }
+    if replacements.is_empty() {
+        return Ok(storage.bytes.to_vec());
+    }
+    if replacements.len() > MAX_FILES {
+        return Err(limit("replacement count"));
+    }
+
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(storage.files.len())
+        .map_err(|source| allocation("MS-XLDM allocation order", source))?;
+    order.extend(0..storage.files.len());
+    order.sort_by_key(|index| storage.files[*index].offset);
+    if order.len() < 2 {
+        return Err(invalid(
+            "XLDM storage has no partition and backup-log allocation pair",
+        ));
+    }
+    let first = order[0];
+    let last = *order
+        .last()
+        .ok_or_else(|| invalid("XLDM allocation order is empty"))?;
+
+    let mut paths = std::collections::HashSet::new();
+    paths
+        .try_reserve(replacements.len())
+        .map_err(|source| allocation("MS-XLDM replacement paths", source))?;
+    let mut replacement_payloads: Vec<Option<&[u8]>> = Vec::new();
+    replacement_payloads
+        .try_reserve_exact(storage.files.len())
+        .map_err(|source| allocation("MS-XLDM replacement map", source))?;
+    replacement_payloads.resize(storage.files.len(), None);
+    for replacement in replacements {
+        if !paths.insert(replacement.storage_path) {
+            return Err(invalid(format!(
+                "duplicate XLDM replacement path {}",
+                replacement.storage_path
+            )));
+        }
+        let index = storage
+            .files
+            .iter()
+            .position(|entry| entry.path == replacement.storage_path)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "XLDM replacement path {} is absent from the source directory",
+                    replacement.storage_path
+                ))
+            })?;
+        if index == first || index == last {
+            return Err(invalid(format!(
+                "XLDM replacement {} would rewrite an outer marker allocation",
+                replacement.storage_path
+            )));
+        }
+        if replacement.payload.len() > MAX_STORAGE_BYTES {
+            return Err(limit("replacement payload bytes"));
+        }
+        replacement_payloads[index] = Some(replacement.payload);
+    }
+
+    let has_size_change = replacements.iter().any(|replacement| {
+        storage
+            .files
+            .iter()
+            .position(|entry| entry.path == replacement.storage_path)
+            .and_then(|index| storage.file_payload(index))
+            .is_some_and(|source| source.len() != replacement.payload.len())
+    });
+    let generated_backup_payload = if has_size_change {
+        let source_backup = storage
+            .file_payload(last)
+            .ok_or_else(|| invalid("cannot resolve XLDM source backup-log payload"))?;
+        Some(rewrite_backup_log_sizes(
+            source_backup,
+            storage,
+            &replacement_payloads,
+        )?)
+    } else {
+        None
+    };
+    replacement_payloads[last] = generated_backup_payload.as_deref();
+
+    let data_offset = checked_usize(storage.header.data_offset.0, "data offset")?;
+    if data_offset != XLDM_PAGE_SIZE {
+        return Err(invalid(
+            "XLDM variable rewrite requires a canonical data offset",
+        ));
+    }
+    let mut updated: Vec<Option<(u64, u64)>> = Vec::new();
+    updated
+        .try_reserve_exact(storage.files.len())
+        .map_err(|source| allocation("MS-XLDM updated directory entries", source))?;
+    updated.resize(storage.files.len(), None);
+    let mut cursor = data_offset
+        .checked_add(BOM.len())
+        .ok_or_else(|| limit("rewritten data range"))?;
+    for (position, index) in order.iter().copied().enumerate() {
+        if position == order.len() - 1 {
+            cursor = cursor
+                .checked_add(BOM.len())
+                .ok_or_else(|| limit("rewritten backup-log marker"))?;
+        }
+        let payload_len = replacement_payloads[index]
+            .or_else(|| storage.file_payload(index))
+            .ok_or_else(|| {
+                invalid(format!(
+                    "cannot resolve XLDM source payload {}",
+                    storage.files[index].path
+                ))
+            })?
+            .len();
+        let stored_size = payload_len
+            .checked_add(CRC_SIZE)
+            .ok_or_else(|| limit("rewritten allocation size"))?;
+        let start = cursor;
+        cursor = cursor
+            .checked_add(stored_size)
+            .ok_or_else(|| limit("rewritten data range"))?;
+        updated[index] = Some((
+            u64::try_from(start).map_err(|_source| limit("rewritten file offset"))?,
+            u64::try_from(stored_size).map_err(|_source| limit("rewritten file size"))?,
+        ));
+    }
+    let directory_offset = align_page(cursor)?;
+    let directory_xml_len = directory_xml_len(storage, &updated)?;
+    let directory_bytes_len = encoded_xml_len(
+        directory_xml_len,
+        storage.directory_encoding,
+        storage,
+        &updated,
+    )?;
+    if directory_bytes_len == 0 || directory_bytes_len > MAX_DIRECTORY_BYTES {
+        return Err(limit("rewritten directory bytes"));
+    }
+    let directory_end = directory_offset
+        .checked_add(directory_bytes_len)
+        .ok_or_else(|| limit("rewritten directory range"))?;
+    let output_len = align_page(directory_end)?;
+    if output_len > MAX_STORAGE_BYTES {
+        return Err(limit("rewritten storage bytes"));
+    }
+    let header_xml = rewritten_header_xml(storage, directory_offset, directory_bytes_len)?;
+    let header_bytes = encode_xml(&header_xml, storage.header_encoding)?;
+    let header_start = 2usize
+        .checked_add(encoded_utf16_len(XLDM_STREAM_SIGNATURE)?)
+        .ok_or_else(|| limit("header XML offset"))?;
+    let header_end = header_start
+        .checked_add(header_bytes.len())
+        .ok_or_else(|| limit("header XML range"))?;
+    if header_end > data_offset {
+        return Err(limit("rewritten header page bytes"));
+    }
+    let directory_xml = build_directory_xml(storage, &updated, directory_xml_len)?;
+    let directory_bytes = encode_xml(&directory_xml, storage.directory_encoding)?;
+    if directory_bytes.len() != directory_bytes_len {
+        return Err(invalid(
+            "rewritten directory size preflight disagrees with encoding",
+        ));
+    }
+
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(output_len)
+        .map_err(|source| allocation("MS-XLDM rewritten storage bytes", source))?;
+    result.resize(data_offset, 0);
+    result[..BOM.len()].copy_from_slice(&BOM);
+    let signature = encode_xml(XLDM_STREAM_SIGNATURE, XmlEncoding::Utf16Le)?;
+    let signature_end = 2usize
+        .checked_add(signature.len())
+        .ok_or_else(|| limit("header signature range"))?;
+    result[2..signature_end].copy_from_slice(&signature);
+    result[header_start..header_end].copy_from_slice(&header_bytes);
+    result.extend_from_slice(&BOM);
+    for (position, index) in order.iter().copied().enumerate() {
+        if position == order.len() - 1 {
+            result.extend_from_slice(&BOM);
+        }
+        let (expected_start, stored_size) =
+            updated[index].ok_or_else(|| invalid("missing rewritten directory entry"))?;
+        let expected_start = checked_usize(expected_start, "rewritten file offset")?;
+        if result.len() != expected_start {
+            return Err(invalid("rewritten allocation order is not serial"));
+        }
+        let payload = replacement_payloads[index]
+            .or_else(|| storage.file_payload(index))
+            .ok_or_else(|| {
+                invalid(format!(
+                    "cannot resolve XLDM source payload {}",
+                    storage.files[index].path
+                ))
+            })?;
+        result.extend_from_slice(payload);
+        result.extend_from_slice(&crc32(payload).to_le_bytes());
+        if result.len()
+            != expected_start
+                .checked_add(checked_usize(stored_size, "rewritten file size")?)
+                .ok_or_else(|| limit("rewritten allocation range"))?
+        {
+            return Err(invalid(
+                "rewritten allocation size disagrees with its preflight",
+            ));
+        }
+    }
+    if result.len() > directory_offset {
+        return Err(invalid(
+            "rewritten allocation section exceeds directory offset",
+        ));
+    }
+    result.resize(directory_offset, 0);
+    result.extend_from_slice(&directory_bytes);
+    result.resize(output_len, 0);
+    inspect(&result)?;
+    Ok(result)
+}
+
+fn align_page(value: usize) -> Result<usize> {
+    let remainder = value % XLDM_PAGE_SIZE;
+    if remainder == 0 {
+        Ok(value)
+    } else {
+        value
+            .checked_add(XLDM_PAGE_SIZE - remainder)
+            .ok_or_else(|| limit("page-aligned size"))
+    }
+}
+
+fn encoded_utf16_len(value: &str) -> Result<usize> {
+    value
+        .encode_utf16()
+        .count()
+        .checked_mul(2)
+        .ok_or_else(|| limit("UTF-16 XML bytes"))
+}
+
+fn encoded_xml_len(
+    _unencoded_len: usize,
+    encoding: XmlEncoding,
+    storage: &Storage<'_>,
+    updated: &[Option<(u64, u64)>],
+) -> Result<usize> {
+    // The directory consists solely of the deterministic fields emitted by
+    // build_directory_xml. Recount the exact text without allocating it so a
+    // hostile path/value set is rejected before the directory String or full
+    // rewritten storage buffer is materialized.
+    let mut length = "<VirtualDirectory>".len();
+    for (index, entry) in storage.files.iter().enumerate() {
+        let (_, stored_size) =
+            updated[index].ok_or_else(|| invalid("missing rewritten directory entry"))?;
+        let (offset, _) =
+            updated[index].ok_or_else(|| invalid("missing rewritten directory entry"))?;
+        for value in [
+            "<BackupFile><Path>",
+            "</Path><Size>",
+            "</Size><m_cbOffsetHeader>",
+            "</m_cbOffsetHeader><Delete>",
+            "</Delete><CreatedTimestamp>",
+            "</CreatedTimestamp><Access>",
+            "</Access><LastWriteTime>",
+            "</LastWriteTime></BackupFile>",
+        ] {
+            length = length
+                .checked_add(value.len())
+                .ok_or_else(|| limit("directory XML bytes"))?;
+        }
+        length = length
+            .checked_add(xml_text_len(entry.path.as_str())?)
+            .and_then(|value| value.checked_add(stored_size.to_string().len()))
+            .and_then(|value| value.checked_add(offset.to_string().len()))
+            .and_then(|value| value.checked_add(if entry.delete { "true" } else { "false" }.len()))
+            .and_then(|value| value.checked_add(entry.created_timestamp.to_string().len()))
+            .and_then(|value| value.checked_add(entry.access_timestamp.to_string().len()))
+            .and_then(|value| value.checked_add(entry.last_write_timestamp.to_string().len()))
+            .ok_or_else(|| limit("directory XML bytes"))?;
+    }
+    length = length
+        .checked_add("</VirtualDirectory>".len())
+        .ok_or_else(|| limit("directory XML bytes"))?;
+    let encoded = match encoding {
+        XmlEncoding::Utf8 => length,
+        XmlEncoding::Utf16Le => {
+            // All generated numeric/path text is UTF-8, but a path may carry
+            // supplementary scalars. Recount through the source values for an
+            // exact UTF-16 byte bound.
+            let xml = build_directory_xml(storage, updated, length)?;
+            encoded_utf16_len(&xml)?
+        },
+    };
+    Ok(encoded)
+}
+
+fn xml_text_len(value: &str) -> Result<usize> {
+    let mut length = 0usize;
+    for character in value.chars() {
+        let addition = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length = length
+            .checked_add(addition)
+            .ok_or_else(|| limit("XML escaped text bytes"))?;
+    }
+    Ok(length)
+}
+
+fn directory_xml_len(storage: &Storage<'_>, updated: &[Option<(u64, u64)>]) -> Result<usize> {
+    // This is the UTF-8 character-byte length used for UTF-8 directories and
+    // as a bounded construction capacity for UTF-16 directories.
+    encoded_xml_len(0, XmlEncoding::Utf8, storage, updated)
+}
+
+fn append_xml_text(output: &mut String, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&apos;"),
+            _ => output.push(character),
+        }
+    }
+}
+
+fn build_directory_xml(
+    storage: &Storage<'_>,
+    updated: &[Option<(u64, u64)>],
+    expected_len: usize,
+) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(expected_len)
+        .map_err(|source| allocation("MS-XLDM rewritten directory XML", source))?;
+    output.push_str("<VirtualDirectory>");
+    for (index, entry) in storage.files.iter().enumerate() {
+        let (offset, stored_size) =
+            updated[index].ok_or_else(|| invalid("missing rewritten directory entry"))?;
+        output.push_str("<BackupFile><Path>");
+        append_xml_text(&mut output, &entry.path);
+        output.push_str("</Path><Size>");
+        output.push_str(&stored_size.to_string());
+        output.push_str("</Size><m_cbOffsetHeader>");
+        output.push_str(&offset.to_string());
+        output.push_str("</m_cbOffsetHeader><Delete>");
+        output.push_str(if entry.delete { "true" } else { "false" });
+        output.push_str("</Delete><CreatedTimestamp>");
+        output.push_str(&entry.created_timestamp.to_string());
+        output.push_str("</CreatedTimestamp><Access>");
+        output.push_str(&entry.access_timestamp.to_string());
+        output.push_str("</Access><LastWriteTime>");
+        output.push_str(&entry.last_write_timestamp.to_string());
+        output.push_str("</LastWriteTime></BackupFile>");
+    }
+    output.push_str("</VirtualDirectory>");
+    if output.len() < expected_len {
+        return Err(invalid(
+            "rewritten directory XML size preflight undercounted",
+        ));
+    }
+    Ok(output)
+}
+
+fn rewritten_header_xml(
+    storage: &Storage<'_>,
+    directory_offset: usize,
+    directory_size: usize,
+) -> Result<String> {
+    let header = &storage.header;
+    let output = format!(
+        "<BackupLog><BackupRestoreSyncVersion>{}</BackupRestoreSyncVersion><Fault>false</Fault><faultcode>{}</faultcode><ErrorCode>true</ErrorCode><EncryptionFlag>false</EncryptionFlag><EncryptionKey>{}</EncryptionKey><ApplyCompression>true</ApplyCompression><m_cbOffsetHeader>{directory_offset}</m_cbOffsetHeader><DataSize>{directory_size}</DataSize><Files>{}</Files><ObjectID>{}</ObjectID><m_cbOffsetData>{}</m_cbOffsetData></BackupLog>",
+        header.backup_restore_sync_version,
+        header.fault_code,
+        header.encryption_key_version,
+        header.file_count,
+        header.object_id,
+        header.data_offset.0,
+    );
+    Ok(output)
+}
+
+fn encode_xml(value: &str, encoding: XmlEncoding) -> Result<Vec<u8>> {
+    let length = match encoding {
+        XmlEncoding::Utf8 => value.len(),
+        XmlEncoding::Utf16Le => encoded_utf16_len(value)?,
+    };
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|source| allocation("MS-XLDM XML bytes", source))?;
+    match encoding {
+        XmlEncoding::Utf8 => output.extend_from_slice(value.as_bytes()),
+        XmlEncoding::Utf16Le => {
+            for unit in value.encode_utf16() {
+                output.extend_from_slice(&unit.to_le_bytes());
+            }
+        },
+    }
+    Ok(output)
+}
+
+fn rewrite_backup_log_sizes(
+    source: &[u8],
+    storage: &Storage<'_>,
+    replacements: &[Option<&[u8]>],
+) -> Result<Vec<u8>> {
+    let (mut xml, encoding) = decode_marker_xml(source, StorageProfile::Xldm140)?;
+    let mut changed = false;
+    for (index, payload) in replacements.iter().enumerate() {
+        let Some(payload) = payload else {
+            continue;
+        };
+        if index >= storage.files.len() {
+            return Err(invalid("backup-log size rewrite index is out of range"));
+        }
+        let source_payload = storage
+            .file_payload(index)
+            .ok_or_else(|| invalid("cannot resolve source payload for backup-log size rewrite"))?;
+        if source_payload.len() == payload.len() {
+            continue;
+        }
+        let path = storage.files[index].path.as_str();
+        let size = i32::try_from(payload.len())
+            .map_err(|_source| limit("backup-log logged file size"))?
+            .to_string();
+        if !replace_backup_file_size(&mut xml, path, &size)? {
+            return Err(invalid(format!(
+                "backup log has no unique FileList member for rewritten path {path}"
+            )));
+        }
+        changed = true;
+    }
+    if !changed {
+        return Ok(source.to_vec());
+    }
+    encode_xml(&xml, encoding)
+}
+
+fn replace_backup_file_size(xml: &mut String, path: &str, size: &str) -> Result<bool> {
+    let mut cursor = 0usize;
+    let mut found = 0usize;
+    let mut replacement = None;
+    while let Some(relative) = xml[cursor..].find("<BackupFile") {
+        let start = cursor + relative;
+        let start_end = xml[start..]
+            .find('>')
+            .map(|offset| start + offset)
+            .ok_or_else(|| invalid("backup-log BackupFile start tag is unclosed"))?;
+        let close = xml[start_end + 1..]
+            .find("</BackupFile>")
+            .map(|offset| start_end + 1 + offset)
+            .ok_or_else(|| invalid("backup-log BackupFile element is unclosed"))?;
+        let block = &xml[start..close];
+        let storage_start = block
+            .find("<StoragePath>")
+            .ok_or_else(|| invalid("backup-log BackupFile has no StoragePath"))?;
+        let storage_value_start = start + storage_start + "<StoragePath>".len();
+        let storage_value_end = xml[storage_value_start..]
+            .find("</StoragePath>")
+            .map(|offset| storage_value_start + offset)
+            .ok_or_else(|| invalid("backup-log StoragePath is unclosed"))?;
+        let decoded = quick_xml::escape::unescape(&xml[storage_value_start..storage_value_end])
+            .map_err(|error| invalid(format!("backup-log StoragePath is not XML: {error}")))?;
+        if decoded == path {
+            found = found
+                .checked_add(1)
+                .ok_or_else(|| limit("backup-log size matches"))?;
+            let size_relative = block
+                .find("<Size>")
+                .ok_or_else(|| invalid("backup-log BackupFile has no Size"))?;
+            let value_start = start + size_relative + "<Size>".len();
+            let value_end = xml[value_start..]
+                .find("</Size>")
+                .map(|offset| value_start + offset)
+                .ok_or_else(|| invalid("backup-log Size is unclosed"))?;
+            if replacement.is_some() {
+                return Err(invalid(format!(
+                    "backup log contains duplicate FileList member {path}"
+                )));
+            }
+            replacement = Some((value_start, value_end));
+        }
+        cursor = close + "</BackupFile>".len();
+    }
+    let Some((value_start, value_end)) = replacement else {
+        return Ok(false);
+    };
+    if found != 1 {
+        return Err(invalid(format!(
+            "backup log contains ambiguous FileList member {path}"
+        )));
+    }
+    let raw_size = &xml[value_start..value_end];
+    if raw_size.trim() != raw_size {
+        return Err(invalid(
+            "backup-log Size value has unsupported surrounding whitespace",
+        ));
+    }
+    xml.replace_range(value_start..value_end, size);
+    Ok(true)
 }
 
 pub(super) fn bounded_leaf(node: &Node, label: &str) -> Result<String> {

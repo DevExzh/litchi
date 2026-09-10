@@ -9,13 +9,17 @@ use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 
-use super::model::{Definition, OpaqueXml, Relationship, Table};
+use super::model::{
+    CalculatedTimeColumn, Definition, ModelTimeGrouping, ModelTimeGroupingContentType,
+    ModelTimeGroupings, OpaqueXml, Relationship, Table,
+};
 use super::{
-    DATA_MODEL_EXTENSION_URI, MAX_DEPTH, MAX_EXTENSION_BYTES, MAX_NODES, MAX_RELATIONSHIPS,
-    MAX_REWRITE_BYTES, MAX_STRING_BYTES, MAX_TABLES, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES, SML,
-    STRICT_SML, X15, invalid, limit, xml_error,
+    DATA_MODEL_EXTENSION_URI, MAX_CALCULATED_TIME_COLUMNS, MAX_DEPTH, MAX_EXTENSION_BYTES,
+    MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES, MAX_STRING_BYTES, MAX_TABLES,
+    MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES, MODEL_TIME_GROUPINGS_EXTENSION_URI,
+    MODEL_TIME_GROUPINGS_NAMESPACE, SML, STRICT_SML, X15, invalid, limit, xml_error,
 };
 
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
@@ -64,6 +68,828 @@ struct XmlContext {
 pub fn parse_data_model(xml: &[u8]) -> Result<Definition> {
     let root = parse_document(xml)?;
     parse_data_model_node(&root)
+}
+
+/// Parse a standalone MS-XLSX `modelTimeGroupings` element.
+pub fn parse_model_time_groupings(xml: &[u8]) -> Result<ModelTimeGroupings> {
+    let root = parse_document(xml)?;
+    parse_model_time_groupings_node(&root)
+}
+
+/// Serialize a standalone MS-XLSX `modelTimeGroupings` element.
+pub fn write_model_time_groupings(value: &ModelTimeGroupings) -> Result<Vec<u8>> {
+    validate_model_time_groupings(value)?;
+    let encoded_size = serialized_model_time_groupings_size(value)?;
+    let mut output = Vec::new();
+    reserve_bytes(&mut output, encoded_size, "modelTimeGroupings bytes")?;
+    write_model_time_groupings_node(&mut output, value);
+    if output.len() != encoded_size {
+        return Err(invalid(
+            "serialized modelTimeGroupings size preflight mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+/// Project the known `modelTimeGroupings` child from an opaque Data Model
+/// extension list. The outer list and unknown siblings remain untouched.
+pub(crate) fn parse_model_time_groupings_extension(
+    xml: &[u8],
+) -> Result<Option<ModelTimeGroupings>> {
+    let spans = locate_model_time_groupings(xml)?;
+    let Some(child) = spans.child else {
+        return Ok(None);
+    };
+    parse_model_time_groupings_fragment(&xml[child.start..child.end], &child.qname, &child.bindings)
+        .map(Some)
+}
+
+/// Replace only the known `modelTimeGroupings` child in an opaque extension
+/// list. All unrelated bytes, comments, namespaces, and extension siblings
+/// are retained. `None` means that no extension list should be created.
+pub(crate) fn rewrite_model_time_groupings_extension(
+    source: Option<&[u8]>,
+    value: Option<&ModelTimeGroupings>,
+) -> Result<Option<Vec<u8>>> {
+    let value_size = value
+        .map(|value| {
+            validate_model_time_groupings(value)?;
+            serialized_model_time_groupings_size(value)
+        })
+        .transpose()?;
+    let Some(source) = source else {
+        let Some(value_size) = value_size else {
+            return Ok(None);
+        };
+        let output_size = new_model_time_groupings_document_size(value_size)?;
+        let node = write_model_time_groupings(value.ok_or_else(|| {
+            invalid("modelTimeGroupings value disappeared during serialization")
+        })?)?;
+        let mut output = Vec::new();
+        reserve_bytes(&mut output, output_size, "modelTimeGroupings bytes")?;
+        output.extend_from_slice(b"<x15:extLst xmlns:x15=\"");
+        escape(&mut output, X15);
+        output.extend_from_slice(b"\" xmlns=\"\"><x15:ext uri=\"");
+        escape(&mut output, MODEL_TIME_GROUPINGS_EXTENSION_URI);
+        output.extend_from_slice(b"\">");
+        output.extend_from_slice(&node);
+        output.extend_from_slice(b"</x15:ext></x15:extLst>");
+        if output.len() != output_size {
+            return Err(invalid(
+                "serialized modelTimeGroupings extension size preflight mismatch",
+            ));
+        }
+        return Ok(Some(output));
+    };
+    let spans = locate_model_time_groupings(source)?;
+    let Some(value_size) = value_size else {
+        let Some(child) = spans.child else {
+            return copy_bounded(source, "modelTimeGroupings bytes").map(Some);
+        };
+        if let Some(target) = &spans.target_extension
+            && !target.empty
+            && target.open_end <= child.start
+            && child.end <= target.close_start.unwrap_or(target.end)
+        {
+            let close_start = target
+                .close_start
+                .ok_or_else(|| invalid("missing modelTimeGroupings extension close tag"))?;
+            if is_xml_whitespace(&source[target.open_end..child.start])
+                && is_xml_whitespace(&source[child.end..close_start])
+            {
+                return splice(source, target.start..target.end, &[]).map(Some);
+            }
+        }
+        return splice(source, child.start..child.end, &[]).map(Some);
+    };
+    if let Some(child) = spans.child {
+        let _ = splice_length(source, child.start..child.end, value_size)?;
+        let node = write_model_time_groupings(value.ok_or_else(|| {
+            invalid("modelTimeGroupings value disappeared during serialization")
+        })?)?;
+        return splice(source, child.start..child.end, &node).map(Some);
+    }
+    let list = spans
+        .root
+        .ok_or_else(|| invalid("missing Data Model extension list"))?;
+    let extension = if let Some(target) = spans.target_extension {
+        if target.empty {
+            preflight_expand_empty(source, &target, value_size)?;
+            let node = write_model_time_groupings(value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?)?;
+            expand_empty(source, &target, &node)
+        } else {
+            let at = target
+                .close_start
+                .ok_or_else(|| invalid("missing modelTimeGroupings extension close tag"))?;
+            let _ = splice_length(source, at..at, value_size)?;
+            let node = write_model_time_groupings(value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?)?;
+            splice(source, at..at, &node)
+        }
+    } else {
+        let extension_size = model_time_groupings_extension_size(&list.qname, value_size)?;
+        if list.empty {
+            preflight_expand_empty(source, &list, extension_size)?;
+            let node = write_model_time_groupings(value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?)?;
+            let extension =
+                write_model_time_groupings_extension(&list.qname, &node, extension_size)?;
+            expand_empty(source, &list, &extension)
+        } else {
+            let at = list
+                .close_start
+                .ok_or_else(|| invalid("missing extension list close tag"))?;
+            let _ = splice_length(source, at..at, extension_size)?;
+            let node = write_model_time_groupings(value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?)?;
+            let extension =
+                write_model_time_groupings_extension(&list.qname, &node, extension_size)?;
+            splice(source, at..at, &extension)
+        }
+    };
+    extension.map(Some)
+}
+
+fn is_xml_whitespace(value: &[u8]) -> bool {
+    value
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+}
+
+fn parse_model_time_groupings_node(root: &Node) -> Result<ModelTimeGroupings> {
+    require(root, MODEL_TIME_GROUPINGS_NAMESPACE, "modelTimeGroupings")?;
+    no_attributes(root, &[])?;
+    whitespace(root)?;
+    if root.children.is_empty() {
+        return Err(invalid(
+            "modelTimeGroupings must contain at least one modelTimeGrouping",
+        ));
+    }
+    if root.children.len() > MAX_TIME_GROUPINGS {
+        return Err(limit("modelTimeGrouping count"));
+    }
+    let groupings = root
+        .children
+        .iter()
+        .map(parse_model_time_grouping_node)
+        .collect::<Result<Vec<_>>>()?;
+    let value = ModelTimeGroupings { groupings };
+    validate_model_time_groupings_for_read(&value)?;
+    Ok(value)
+}
+
+fn parse_model_time_groupings_fragment(
+    xml: &[u8],
+    qname: &[u8],
+    bindings: &[(Vec<u8>, Vec<u8>)],
+) -> Result<ModelTimeGroupings> {
+    let prefix = qname
+        .iter()
+        .position(|byte| *byte == b':')
+        .map(|index| &qname[..index]);
+    let wrapper_prefix = unique_wrapper_prefix(bindings);
+    const WRAPPER_NAMESPACE: &str = "urn:litchi-xlsx-model-time-groupings-wrapper";
+    let mut wrapped = Vec::with_capacity(xml.len().saturating_add(256));
+    wrapped.extend_from_slice(b"<");
+    wrapped.extend_from_slice(&wrapper_prefix);
+    wrapped.extend_from_slice(b":wrapper xmlns:");
+    wrapped.extend_from_slice(&wrapper_prefix);
+    wrapped.extend_from_slice(b"=\"");
+    wrapped.extend_from_slice(WRAPPER_NAMESPACE.as_bytes());
+    wrapped.push(b'"');
+    for (binding_prefix, namespace) in bindings {
+        if binding_prefix.as_slice() == b"xml" || binding_prefix.as_slice() == b"xmlns" {
+            continue;
+        }
+        wrapped.extend_from_slice(b" xmlns");
+        if !binding_prefix.is_empty() {
+            wrapped.push(b':');
+            wrapped.extend_from_slice(binding_prefix);
+        }
+        wrapped.extend_from_slice(b"=\"");
+        wrapped.extend_from_slice(namespace);
+        wrapped.push(b'"');
+    }
+    if prefix.is_some()
+        && !bindings
+            .iter()
+            .any(|(binding_prefix, _)| Some(binding_prefix.as_slice()) == prefix)
+    {
+        return Err(invalid("modelTimeGroupings namespace binding is absent"));
+    }
+    wrapped.extend_from_slice(b">");
+    wrapped.extend_from_slice(xml);
+    wrapped.extend_from_slice(b"</");
+    wrapped.extend_from_slice(&wrapper_prefix);
+    wrapped.extend_from_slice(b":wrapper>");
+    if wrapped.len() > MAX_XML_BYTES {
+        return Err(limit("XML bytes"));
+    }
+    let wrapper = parse_document(&wrapped)?;
+    require(&wrapper, WRAPPER_NAMESPACE, "wrapper")?;
+    if wrapper.children.len() != 1 {
+        return Err(invalid(
+            "modelTimeGroupings wrapper must contain one element",
+        ));
+    }
+    parse_model_time_groupings_node(&wrapper.children[0])
+}
+
+fn unique_wrapper_prefix(bindings: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+    let base = b"__litchi_wrapper";
+    let mut suffix = 0usize;
+    loop {
+        let mut candidate = base.to_vec();
+        if suffix != 0 {
+            candidate.extend_from_slice(suffix.to_string().as_bytes());
+        }
+        if bindings
+            .iter()
+            .all(|(prefix, _)| prefix.as_slice() != candidate.as_slice())
+        {
+            return candidate;
+        }
+        suffix = suffix.saturating_add(1);
+    }
+}
+
+fn qualified_name_len(owner_qname: &[u8], local_name: &[u8]) -> Result<usize> {
+    let prefix_len = owner_qname
+        .iter()
+        .position(|byte| *byte == b':')
+        .unwrap_or(0);
+    prefix_len
+        .checked_add((prefix_len != 0) as usize)
+        .and_then(|length| length.checked_add(local_name.len()))
+        .ok_or_else(|| limit("modelTimeGroupings bytes"))
+}
+
+fn append_qualified_name(output: &mut Vec<u8>, owner_qname: &[u8], local_name: &[u8]) {
+    if let Some(colon) = owner_qname.iter().position(|byte| *byte == b':') {
+        output.extend_from_slice(&owner_qname[..colon]);
+        output.push(b':');
+    }
+    output.extend_from_slice(local_name);
+}
+
+fn model_time_groupings_extension_size(owner_qname: &[u8], node_size: usize) -> Result<usize> {
+    let qname_size = qualified_name_len(owner_qname, b"ext")?;
+    let mut size = 0usize;
+    add_bytes_size(&mut size, b"<")?;
+    add_size(&mut size, qname_size)?;
+    add_bytes_size(&mut size, b" uri=\"")?;
+    add_escaped_size(&mut size, MODEL_TIME_GROUPINGS_EXTENSION_URI)?;
+    add_bytes_size(&mut size, b"\">")?;
+    add_size(&mut size, node_size)?;
+    add_bytes_size(&mut size, b"</")?;
+    add_size(&mut size, qname_size)?;
+    add_bytes_size(&mut size, b">")?;
+    if size > MAX_EXTENSION_BYTES {
+        return Err(limit("modelTimeGroupings bytes"));
+    }
+    Ok(size)
+}
+
+fn new_model_time_groupings_document_size(node_size: usize) -> Result<usize> {
+    let mut size = 0usize;
+    add_bytes_size(&mut size, b"<x15:extLst xmlns:x15=\"")?;
+    add_escaped_size(&mut size, X15)?;
+    add_bytes_size(&mut size, b"\" xmlns=\"\"><x15:ext uri=\"")?;
+    add_escaped_size(&mut size, MODEL_TIME_GROUPINGS_EXTENSION_URI)?;
+    add_bytes_size(&mut size, b"\">")?;
+    add_size(&mut size, node_size)?;
+    add_bytes_size(&mut size, b"</x15:ext></x15:extLst>")?;
+    if size > MAX_EXTENSION_BYTES {
+        return Err(limit("modelTimeGroupings bytes"));
+    }
+    Ok(size)
+}
+
+fn write_model_time_groupings_extension(
+    owner_qname: &[u8],
+    node: &[u8],
+    expected_size: usize,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reserve_bytes(&mut output, expected_size, "modelTimeGroupings bytes")?;
+    output.push(b'<');
+    append_qualified_name(&mut output, owner_qname, b"ext");
+    output.extend_from_slice(b" uri=\"");
+    escape(&mut output, MODEL_TIME_GROUPINGS_EXTENSION_URI);
+    output.extend_from_slice(b"\">");
+    output.extend_from_slice(node);
+    output.extend_from_slice(b"</");
+    append_qualified_name(&mut output, owner_qname, b"ext");
+    output.push(b'>');
+    if output.len() != expected_size {
+        return Err(invalid(
+            "serialized modelTimeGroupings extension size preflight mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+fn parse_model_time_grouping_node(node: &Node) -> Result<ModelTimeGrouping> {
+    require(node, MODEL_TIME_GROUPINGS_NAMESPACE, "modelTimeGrouping")?;
+    no_attributes(
+        node,
+        &[("", "tableName"), ("", "columnName"), ("", "columnId")],
+    )?;
+    whitespace(node)?;
+    if node.children.is_empty() {
+        return Err(invalid(
+            "modelTimeGrouping must contain at least one calculatedTimeColumn",
+        ));
+    }
+    if node.children.len() > MAX_CALCULATED_TIME_COLUMNS {
+        return Err(limit("calculatedTimeColumn count"));
+    }
+    let calculated_time_columns = node
+        .children
+        .iter()
+        .map(parse_calculated_time_column_node)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(ModelTimeGrouping {
+        table_name: required(node, "", "tableName")?.to_owned(),
+        column_name: required(node, "", "columnName")?.to_owned(),
+        column_id: required(node, "", "columnId")?.to_owned(),
+        calculated_time_columns,
+    })
+}
+
+fn parse_calculated_time_column_node(node: &Node) -> Result<CalculatedTimeColumn> {
+    require(node, MODEL_TIME_GROUPINGS_NAMESPACE, "calculatedTimeColumn")?;
+    no_attributes(
+        node,
+        &[
+            ("", "columnName"),
+            ("", "columnId"),
+            ("", "contentType"),
+            ("", "isSelected"),
+        ],
+    )?;
+    leaf(node)?;
+    let is_selected = parse_xml_boolean(required(node, "", "isSelected")?, "isSelected")?;
+    Ok(CalculatedTimeColumn {
+        column_name: required(node, "", "columnName")?.to_owned(),
+        column_id: required(node, "", "columnId")?.to_owned(),
+        content_type: parse_model_time_grouping_content_type(required(node, "", "contentType")?),
+        is_selected,
+    })
+}
+
+fn parse_model_time_grouping_content_type(value: &str) -> ModelTimeGroupingContentType {
+    match value {
+        "years" => ModelTimeGroupingContentType::Years,
+        "quarters" => ModelTimeGroupingContentType::Quarters,
+        "monthsindex" => ModelTimeGroupingContentType::MonthsIndex,
+        "months" => ModelTimeGroupingContentType::Months,
+        "daysindex" => ModelTimeGroupingContentType::DaysIndex,
+        "days" => ModelTimeGroupingContentType::Days,
+        "hours" => ModelTimeGroupingContentType::Hours,
+        "minutes" => ModelTimeGroupingContentType::Minutes,
+        "seconds" => ModelTimeGroupingContentType::Seconds,
+        value => ModelTimeGroupingContentType::Other(value.to_owned()),
+    }
+}
+
+fn model_time_grouping_content_type_value(value: &ModelTimeGroupingContentType) -> &str {
+    match value {
+        ModelTimeGroupingContentType::Years => "years",
+        ModelTimeGroupingContentType::Quarters => "quarters",
+        ModelTimeGroupingContentType::MonthsIndex => "monthsindex",
+        ModelTimeGroupingContentType::Months => "months",
+        ModelTimeGroupingContentType::DaysIndex => "daysindex",
+        ModelTimeGroupingContentType::Days => "days",
+        ModelTimeGroupingContentType::Hours => "hours",
+        ModelTimeGroupingContentType::Minutes => "minutes",
+        ModelTimeGroupingContentType::Seconds => "seconds",
+        ModelTimeGroupingContentType::Other(value) => value,
+    }
+}
+
+fn write_model_time_groupings_node(output: &mut Vec<u8>, value: &ModelTimeGroupings) {
+    output.extend_from_slice(b"<x14:modelTimeGroupings xmlns:x14=\"");
+    escape(output, MODEL_TIME_GROUPINGS_NAMESPACE);
+    output.extend_from_slice(b"\">");
+    for grouping in &value.groupings {
+        output.extend_from_slice(b"<x14:modelTimeGrouping");
+        attr(output, "tableName", &grouping.table_name);
+        attr(output, "columnName", &grouping.column_name);
+        attr(output, "columnId", &grouping.column_id);
+        output.push(b'>');
+        for column in &grouping.calculated_time_columns {
+            output.extend_from_slice(b"<x14:calculatedTimeColumn");
+            attr(output, "columnName", &column.column_name);
+            attr(output, "columnId", &column.column_id);
+            attr(
+                output,
+                "contentType",
+                model_time_grouping_content_type_value(&column.content_type),
+            );
+            attr(
+                output,
+                "isSelected",
+                if column.is_selected { "1" } else { "0" },
+            );
+            output.extend_from_slice(b"/>");
+        }
+        output.extend_from_slice(b"</x14:modelTimeGrouping>");
+    }
+    output.extend_from_slice(b"</x14:modelTimeGroupings>");
+}
+
+fn serialized_model_time_groupings_size(value: &ModelTimeGroupings) -> Result<usize> {
+    let mut size = 0usize;
+    add_bytes_size(&mut size, b"<x14:modelTimeGroupings xmlns:x14=\"")?;
+    add_escaped_size(&mut size, MODEL_TIME_GROUPINGS_NAMESPACE)?;
+    add_bytes_size(&mut size, b"\">")?;
+    for grouping in &value.groupings {
+        add_bytes_size(&mut size, b"<x14:modelTimeGrouping")?;
+        add_attribute_size(&mut size, "tableName", escaped_size(&grouping.table_name)?)?;
+        add_attribute_size(
+            &mut size,
+            "columnName",
+            escaped_size(&grouping.column_name)?,
+        )?;
+        add_attribute_size(&mut size, "columnId", escaped_size(&grouping.column_id)?)?;
+        add_bytes_size(&mut size, b">")?;
+        for column in &grouping.calculated_time_columns {
+            add_bytes_size(&mut size, b"<x14:calculatedTimeColumn")?;
+            add_attribute_size(&mut size, "columnName", escaped_size(&column.column_name)?)?;
+            add_attribute_size(&mut size, "columnId", escaped_size(&column.column_id)?)?;
+            add_attribute_size(
+                &mut size,
+                "contentType",
+                escaped_size(model_time_grouping_content_type_value(&column.content_type))?,
+            )?;
+            add_attribute_size(&mut size, "isSelected", 1)?;
+            add_bytes_size(&mut size, b"/>")?;
+        }
+        add_bytes_size(&mut size, b"</x14:modelTimeGrouping>")?;
+    }
+    add_bytes_size(&mut size, b"</x14:modelTimeGroupings>")?;
+    if size > MAX_EXTENSION_BYTES {
+        return Err(limit("modelTimeGroupings bytes"));
+    }
+    Ok(size)
+}
+
+fn validate_model_time_groupings(value: &ModelTimeGroupings) -> Result<()> {
+    validate_model_time_groupings_with_policy(value, false)
+}
+
+fn validate_model_time_groupings_for_read(value: &ModelTimeGroupings) -> Result<()> {
+    validate_model_time_groupings_with_policy(value, true)
+}
+
+fn validate_model_time_groupings_with_policy(
+    value: &ModelTimeGroupings,
+    allow_unknown_content_type: bool,
+) -> Result<()> {
+    if value.groupings.is_empty() {
+        return Err(invalid(
+            "modelTimeGroupings must contain at least one modelTimeGrouping",
+        ));
+    }
+    if value.groupings.len() > MAX_TIME_GROUPINGS {
+        return Err(limit("modelTimeGrouping count"));
+    }
+    for grouping in &value.groupings {
+        for (field, label) in [
+            (&grouping.table_name, "tableName"),
+            (&grouping.column_name, "columnName"),
+            (&grouping.column_id, "columnId"),
+        ] {
+            bounded_nonempty(field, label)?;
+        }
+        if grouping.calculated_time_columns.is_empty() {
+            return Err(invalid(
+                "modelTimeGrouping must contain at least one calculatedTimeColumn",
+            ));
+        }
+        if grouping.calculated_time_columns.len() > MAX_CALCULATED_TIME_COLUMNS {
+            return Err(limit("calculatedTimeColumn count"));
+        }
+        for column in &grouping.calculated_time_columns {
+            bounded_nonempty(&column.column_name, "columnName")?;
+            bounded_nonempty(&column.column_id, "columnId")?;
+            if !allow_unknown_content_type
+                && matches!(&column.content_type, ModelTimeGroupingContentType::Other(_))
+            {
+                return Err(Error::Unsupported {
+                    feature: "unknown modelTimeGrouping contentType is read-only until its schema semantics are implemented",
+                });
+            }
+            bounded_nonempty(
+                model_time_grouping_content_type_value(&column.content_type),
+                "contentType",
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn parse_xml_boolean(value: &str, label: &str) -> Result<bool> {
+    match value.trim() {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(invalid(format!("{label} must be an XML boolean"))),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TimeGroupingRole {
+    Root,
+    TargetExtension,
+    Child,
+    Other,
+}
+
+#[derive(Clone, Debug)]
+struct ElementSpan {
+    start: usize,
+    open_end: usize,
+    close_start: Option<usize>,
+    end: usize,
+    qname: Vec<u8>,
+    bindings: Vec<(Vec<u8>, Vec<u8>)>,
+    empty: bool,
+}
+
+#[derive(Default)]
+struct TimeGroupingSpans {
+    root: Option<ElementSpan>,
+    target_extension: Option<ElementSpan>,
+    child: Option<ElementSpan>,
+}
+
+struct ElementFrame {
+    role: TimeGroupingRole,
+    span: ElementSpan,
+}
+
+fn locate_model_time_groupings(xml: &[u8]) -> Result<TimeGroupingSpans> {
+    if xml.len() > MAX_EXTENSION_BYTES {
+        return Err(limit("extension bytes"));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack: Vec<ElementFrame> = Vec::new();
+    let mut found = TimeGroupingSpans::default();
+    let mut nodes = 0usize;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_source| limit("modelTimeGroupings source position"))?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_source| limit("modelTimeGroupings source position"))?;
+        match event {
+            Event::Start(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
+                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                    return Err(limit("XML structure"));
+                }
+                let role = time_grouping_role(&reader, &stack, &element)?;
+                let span = ElementSpan {
+                    start,
+                    open_end: end,
+                    close_start: None,
+                    end: 0,
+                    qname: element.name().as_ref().to_vec(),
+                    bindings: (role == TimeGroupingRole::Child)
+                        .then(|| namespace_bindings(&reader))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    empty: false,
+                };
+                stack.push(ElementFrame { role, span });
+            },
+            Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
+                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                    return Err(limit("XML structure"));
+                }
+                let role = time_grouping_role(&reader, &stack, &element)?;
+                let span = ElementSpan {
+                    start,
+                    open_end: end,
+                    close_start: None,
+                    end,
+                    qname: element.name().as_ref().to_vec(),
+                    bindings: (role == TimeGroupingRole::Child)
+                        .then(|| namespace_bindings(&reader))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    empty: true,
+                };
+                record_time_grouping_span(&mut found, role, &span)?;
+            },
+            Event::End(_) => {
+                let mut frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unbalanced modelTimeGroupings XML"))?;
+                frame.span.close_start = Some(start);
+                frame.span.end = end;
+                if frame.role != TimeGroupingRole::Other {
+                    record_time_grouping_span(&mut found, frame.role, &frame.span)?;
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated modelTimeGroupings XML"));
+    }
+    if found.root.is_none() {
+        return Err(invalid("model Data Model extension list is absent"));
+    }
+    Ok(found)
+}
+
+fn namespace_bindings(reader: &NsReader<&[u8]>) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let mut bindings = Vec::new();
+    for (prefix, namespace) in reader.resolver().bindings() {
+        let prefix = match prefix {
+            PrefixDeclaration::Default => &b""[..],
+            PrefixDeclaration::Named(prefix) => prefix,
+        };
+        if prefix == b"xml" || prefix == b"xmlns" {
+            continue;
+        }
+        bindings.push((prefix.to_vec(), namespace.as_ref().to_vec()));
+    }
+    Ok(bindings)
+}
+
+fn time_grouping_role(
+    reader: &NsReader<&[u8]>,
+    stack: &[ElementFrame],
+    element: &BytesStart<'_>,
+) -> Result<TimeGroupingRole> {
+    let depth = stack.len();
+    let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
+    let name = element.local_name();
+    if depth == 0 && namespace == X15 && name.as_ref() == b"extLst" {
+        return Ok(TimeGroupingRole::Root);
+    }
+    if depth == 1
+        && stack
+            .last()
+            .is_some_and(|frame| frame.role == TimeGroupingRole::Root)
+        && namespace == X15
+        && name.as_ref() == b"ext"
+        && extension_uri(element, reader.decoder())?.as_deref()
+            == Some(MODEL_TIME_GROUPINGS_EXTENSION_URI)
+    {
+        return Ok(TimeGroupingRole::TargetExtension);
+    }
+    if depth == 2
+        && stack
+            .last()
+            .is_some_and(|frame| frame.role == TimeGroupingRole::TargetExtension)
+        && namespace == MODEL_TIME_GROUPINGS_NAMESPACE
+        && name.as_ref() == b"modelTimeGroupings"
+    {
+        return Ok(TimeGroupingRole::Child);
+    }
+    Ok(TimeGroupingRole::Other)
+}
+
+fn record_time_grouping_span(
+    found: &mut TimeGroupingSpans,
+    role: TimeGroupingRole,
+    span: &ElementSpan,
+) -> Result<()> {
+    let destination = match role {
+        TimeGroupingRole::Root => &mut found.root,
+        TimeGroupingRole::TargetExtension => &mut found.target_extension,
+        TimeGroupingRole::Child => &mut found.child,
+        TimeGroupingRole::Other => return Ok(()),
+    };
+    if destination.replace(span.clone()).is_some() {
+        return Err(invalid("duplicate modelTimeGroupings owner"));
+    }
+    Ok(())
+}
+
+fn expand_empty(source: &[u8], span: &ElementSpan, child: &[u8]) -> Result<Vec<u8>> {
+    if !span.empty
+        || span.open_end < span.start + 2
+        || &source[span.open_end - 2..span.open_end] != b"/>"
+    {
+        return Err(invalid("invalid empty modelTimeGroupings owner"));
+    }
+    let replacement_size = span
+        .open_end
+        .checked_sub(span.start + 2)
+        .and_then(|size| size.checked_add(1))
+        .and_then(|size| size.checked_add(child.len()))
+        .and_then(|size| size.checked_add(2))
+        .and_then(|size| size.checked_add(span.qname.len()))
+        .and_then(|size| size.checked_add(1))
+        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
+    preflight_splice(
+        source,
+        span.start..span.end,
+        replacement_size,
+        "modelTimeGroupings bytes",
+    )?;
+    let mut replacement = Vec::new();
+    reserve_bytes(
+        &mut replacement,
+        replacement_size,
+        "modelTimeGroupings bytes",
+    )?;
+    replacement.extend_from_slice(&source[span.start..span.open_end - 2]);
+    replacement.push(b'>');
+    replacement.extend_from_slice(child);
+    replacement.extend_from_slice(b"</");
+    replacement.extend_from_slice(&span.qname);
+    replacement.extend_from_slice(b">");
+    splice(source, span.start..span.end, &replacement)
+}
+
+fn splice(source: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8>> {
+    let length = splice_length(source, range.clone(), replacement.len())?;
+    let mut output = Vec::new();
+    reserve_bytes(&mut output, length, "modelTimeGroupings bytes")?;
+    output.extend_from_slice(&source[..range.start]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&source[range.end..]);
+    Ok(output)
+}
+
+fn preflight_expand_empty(source: &[u8], span: &ElementSpan, child_size: usize) -> Result<usize> {
+    if !span.empty
+        || span.open_end < span.start + 2
+        || &source[span.open_end - 2..span.open_end] != b"/>"
+    {
+        return Err(invalid("invalid empty modelTimeGroupings owner"));
+    }
+    let replacement_size = span
+        .open_end
+        .checked_sub(span.start + 2)
+        .and_then(|size| size.checked_add(1))
+        .and_then(|size| size.checked_add(child_size))
+        .and_then(|size| size.checked_add(2))
+        .and_then(|size| size.checked_add(span.qname.len()))
+        .and_then(|size| size.checked_add(1))
+        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
+    preflight_splice(
+        source,
+        span.start..span.end,
+        replacement_size,
+        "modelTimeGroupings bytes",
+    )
+}
+
+fn splice_length(source: &[u8], range: Range<usize>, replacement_len: usize) -> Result<usize> {
+    if range.start > range.end || range.end > source.len() {
+        return Err(invalid("invalid modelTimeGroupings source range"));
+    }
+    preflight_splice(source, range, replacement_len, "modelTimeGroupings bytes")
+}
+
+fn preflight_splice(
+    source: &[u8],
+    range: Range<usize>,
+    replacement_len: usize,
+    resource: &'static str,
+) -> Result<usize> {
+    if range.start > range.end || range.end > source.len() {
+        return Err(invalid("invalid modelTimeGroupings source range"));
+    }
+    let length = source
+        .len()
+        .checked_sub(range.end - range.start)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
+    if length > MAX_EXTENSION_BYTES {
+        return Err(limit(resource));
+    }
+    Ok(length)
+}
+
+fn reserve_bytes(output: &mut Vec<u8>, size: usize, resource: &'static str) -> Result<()> {
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+fn copy_bounded(source: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    if source.len() > MAX_EXTENSION_BYTES {
+        return Err(limit(resource));
+    }
+    let mut output = Vec::new();
+    reserve_bytes(&mut output, source.len(), resource)?;
+    output.extend_from_slice(source);
+    Ok(output)
 }
 
 /// Close a detached extension's namespace context without rewriting its markup.
@@ -438,6 +1264,9 @@ pub(crate) fn validate_definition(
             let root = parse_document(&extension.xml)?;
             require(&root, X15, "extLst")?;
         }
+        // Validate the one typed extension owner while retaining every
+        // unrecognized sibling as opaque source bytes.
+        parse_model_time_groupings_extension(&extension.xml)?;
     }
     Ok(())
 }
@@ -2153,5 +2982,145 @@ mod tests {
     #[test]
     fn dot_segment_buffer_rejects_over_limit_before_reserving() {
         assert!(remove_dot_segments("a/b", 2).is_err());
+    }
+
+    fn sample_model_time_groupings() -> ModelTimeGroupings {
+        ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Date & Sales".into(),
+                column_name: "Order <Date>".into(),
+                column_id: "date-1".into(),
+                calculated_time_columns: vec![
+                    CalculatedTimeColumn {
+                        column_name: "Year".into(),
+                        column_id: "year-1".into(),
+                        content_type: ModelTimeGroupingContentType::Years,
+                        is_selected: true,
+                    },
+                    CalculatedTimeColumn {
+                        column_name: "Future".into(),
+                        column_id: "future-1".into(),
+                        content_type: ModelTimeGroupingContentType::Months,
+                        is_selected: false,
+                    },
+                ],
+            }],
+        }
+    }
+
+    #[test]
+    fn model_time_groupings_round_trip_and_escape_values() {
+        let expected = sample_model_time_groupings();
+        let xml = write_model_time_groupings(&expected).unwrap();
+        let text = String::from_utf8_lossy(&xml);
+        assert!(text.contains("Date &amp; Sales"));
+        assert!(text.contains("Order &lt;Date>"));
+        assert!(text.contains("isSelected=\"1\""));
+        assert!(text.contains("isSelected=\"0\""));
+        assert_eq!(parse_model_time_groupings(&xml).unwrap(), expected);
+    }
+
+    #[test]
+    fn model_time_groupings_unknown_content_type_is_read_only() {
+        let xml = format!(
+            r#"<x14:modelTimeGroupings xmlns:x14="{MODEL_TIME_GROUPINGS_NAMESPACE}">
+                <x14:modelTimeGrouping tableName="Date" columnName="OrderDate" columnId="d1">
+                    <x14:calculatedTimeColumn columnName="Future" columnId="f1" contentType="futureUnit" isSelected="0"/>
+                </x14:modelTimeGrouping>
+            </x14:modelTimeGroupings>"#
+        );
+        let parsed = parse_model_time_groupings(xml.as_bytes()).unwrap();
+        assert!(matches!(
+            &parsed.groupings[0].calculated_time_columns[0].content_type,
+            ModelTimeGroupingContentType::Other(value) if value == "futureUnit"
+        ));
+        assert!(matches!(
+            write_model_time_groupings(&parsed),
+            Err(Error::Unsupported { feature })
+                if feature.contains("unknown modelTimeGrouping contentType")
+        ));
+    }
+
+    #[test]
+    fn model_time_groupings_projection_splices_only_its_known_child() {
+        let source = format!(
+            r#"<x15:extLst xmlns:x15="{X15}" xmlns:t="{MODEL_TIME_GROUPINGS_NAMESPACE}" xmlns:u="{MODEL_TIME_GROUPINGS_NAMESPACE}">
+                <x15:ext uri="urn:vendor"><v:keep xmlns:v="urn:vendor" value="q:source"/></x15:ext>
+                <x15:ext uri="{MODEL_TIME_GROUPINGS_EXTENSION_URI}"><t:modelTimeGroupings>
+                    <u:modelTimeGrouping tableName="Date" columnName="OrderDate" columnId="d1">
+                        <u:calculatedTimeColumn columnName="Year" columnId="y1" contentType="years" isSelected="true"/>
+                    </u:modelTimeGrouping>
+                </t:modelTimeGroupings></x15:ext>
+            </x15:extLst>"#
+        );
+        let mut definition = parse_data_model(
+            format!(r#"<x15:dataModel xmlns:x15="{X15}">{source}</x15:dataModel>"#).as_bytes(),
+        )
+        .unwrap();
+        let expected = ModelTimeGroupings {
+            groupings: vec![ModelTimeGrouping {
+                table_name: "Date".into(),
+                column_name: "OrderDate".into(),
+                column_id: "d1".into(),
+                calculated_time_columns: vec![CalculatedTimeColumn {
+                    column_name: "Year".into(),
+                    column_id: "y1".into(),
+                    content_type: ModelTimeGroupingContentType::Years,
+                    is_selected: true,
+                }],
+            }],
+        };
+        assert_eq!(
+            definition.model_time_groupings().unwrap(),
+            Some(expected.clone())
+        );
+        let before = definition.extension_list.as_ref().unwrap().xml.clone();
+        definition
+            .set_model_time_groupings(Some(sample_model_time_groupings()))
+            .unwrap();
+        let updated = String::from_utf8_lossy(&definition.extension_list.as_ref().unwrap().xml);
+        assert!(updated.contains("urn:vendor"));
+        assert!(updated.contains("Date &amp; Sales"));
+        let no_op = definition.extension_list.as_ref().unwrap().xml.clone();
+        let current = definition.model_time_groupings().unwrap();
+        definition.set_model_time_groupings(current).unwrap();
+        assert_eq!(definition.extension_list.as_ref().unwrap().xml, no_op);
+        definition.set_model_time_groupings(None).unwrap();
+        let removed = String::from_utf8_lossy(&definition.extension_list.as_ref().unwrap().xml);
+        assert!(removed.contains("urn:vendor"));
+        assert!(!removed.contains(MODEL_TIME_GROUPINGS_EXTENSION_URI));
+        assert_ne!(before, definition.extension_list.as_ref().unwrap().xml);
+    }
+
+    #[test]
+    fn model_time_groupings_handles_inherited_default_namespace_and_owner_prefix() {
+        let source = format!(
+            r#"<x15:extLst xmlns:x15="{X15}" xmlns="urn:foreign" xmlns:t="{MODEL_TIME_GROUPINGS_NAMESPACE}">
+                <x15:ext uri="urn:vendor"><foreign:keep xmlns:foreign="urn:foreign"/></x15:ext>
+                <x15:ext uri="{MODEL_TIME_GROUPINGS_EXTENSION_URI}"><t:modelTimeGroupings>
+                    <t:modelTimeGrouping tableName="Date" columnName="OrderDate" columnId="d1">
+                        <t:calculatedTimeColumn columnName="Year" columnId="y1" contentType="years" isSelected="1"/>
+                    </t:modelTimeGrouping>
+                </t:modelTimeGroupings></x15:ext>
+            </x15:extLst>"#
+        );
+        let mut definition = parse_data_model(
+            format!(r#"<x15:dataModel xmlns:x15="{X15}">{source}</x15:dataModel>"#).as_bytes(),
+        )
+        .unwrap();
+        assert!(definition.model_time_groupings().unwrap().is_some());
+
+        let value = sample_model_time_groupings();
+        definition
+            .set_model_time_groupings(Some(value.clone()))
+            .unwrap();
+        let updated = String::from_utf8_lossy(&definition.extension_list.as_ref().unwrap().xml);
+        assert!(updated.contains("foreign:keep"));
+        assert_eq!(definition.model_time_groupings().unwrap(), Some(value));
+
+        definition.set_model_time_groupings(None).unwrap();
+        let removed = String::from_utf8_lossy(&definition.extension_list.as_ref().unwrap().xml);
+        assert!(removed.contains("urn:vendor"));
+        assert!(definition.model_time_groupings().unwrap().is_none());
     }
 }

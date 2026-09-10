@@ -129,6 +129,23 @@ impl Snapshot {
         self.connection_names.as_deref()
     }
 
+    /// Prove one workbook time-grouping record against the source XLDM part.
+    ///
+    /// The returned bindings are qualified by the XLDM table XML name and
+    /// raw-column identity.  This is an explicit proof operation: reading a
+    /// snapshot does not copy or decode the opaque model part, and a caller
+    /// receives an error for non-version-140, incomplete, or ambiguous inner
+    /// closure data.
+    pub fn prove_time_grouping(
+        &self,
+        grouping: &super::model::TimeGrouping,
+    ) -> Result<litchi_xldm::Xldm140TimeGroupingBinding> {
+        let part = self
+            .part()
+            .ok_or_else(|| invalid("cannot prove a time grouping without a Data Model part"))?;
+        super::proof::prove_time_grouping(part.bytes(), grouping)
+    }
+
     /// Whether this workbook carries a complete Data Model pair.
     #[must_use]
     pub fn is_present(&self) -> bool {
