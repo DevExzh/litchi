@@ -2668,8 +2668,13 @@ where
     let counter = counter_result?;
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
-    let cold_verified = cold_verified_preparation
-        .map(|preparation| cold_verified::complete(preparation, before, after));
+    let cold_verified = cold_verified_preparation.map(|preparation| {
+        cold_verified::complete(
+            cold_verified::observe_post(preparation, &source),
+            before,
+            after,
+        )
+    });
     let snapshot =
         counter.map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
 

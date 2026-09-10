@@ -2774,10 +2774,13 @@ are validated afterward against typed XLSX and OPC/property oracles.
 
 Warm, cold-requested, and admitted cold-verified cache states are explicit.
 Cold verification proves initial page-cache state plus positive process
-`read_bytes` on a page-aligned, independently hashed source; it does not prove
-physical device I/O. This is harness correctness and reproducibility coverage,
-not retained before/after evidence. See
-[change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md).
+`read_bytes` on a page-aligned, independently hashed source and retains a
+strict post-operation per-file `fincore` observation outside the timer; it does
+not prove physical device I/O. A missing, malformed, size-mismatched, or
+provenance-changed post probe is ineligible and cannot fall back to another
+cache mode. This is harness correctness and reproducibility coverage, not a
+performance claim. See [change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md)
+and [change 0496](changes/0496-cold-verified-cache-post-observation.md).
 
 ## Latest retained XLSX vendor-extension correctness shape (change 0262)
 
@@ -4220,6 +4223,17 @@ states; sample provenance contains aligned source SHA-256/size and fincore
 method/fallback fields, while stderr contents and absolute paths are omitted.
 See
 [`0236`](changes/0236-cold-verified-filesystem-evidence.md).
+
+Change 0496 retains one strict post-operation `fincore` observation in the
+same fresh child, outside the timed interval, under additive `fincore_post`
+fields. It requires post size and full fincore provenance to match the
+pre-operation probe, records post residency/dirty/writeback counters without
+requiring them to be zero, and reports `ineligible_post_fincore` for missing,
+malformed, size-mismatched, or changed post evidence without falling back to a
+different cache mode. A private ext4 host probe confirmed the existing
+per-file `fadvise`/`fincore` path without global cache eviction; this is
+capability evidence only, with no workload or performance claim. See
+[`0496`](changes/0496-cold-verified-cache-post-observation.md).
 
 Source-backed OPC payload retention is now optionally charged to a caller's
 hierarchical `Budget`. The managed cache preserves pinned handles, reserves

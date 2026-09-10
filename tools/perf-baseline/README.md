@@ -1602,6 +1602,10 @@ Cold-verified samples are admitted only when all of the following hold:
   dirty, and writeback bytes; only its basename, executable hash/version, and
   stderr digest/length plus method/fallback evidence are retained, and any
   unrecognized fallback is ineligible; and
+- the same child records one strict post-operation `fincore` observation. Its
+  size and residency/dirty/writeback counters are retained separately under
+  `fincore_post`; a missing, malformed, or changed post probe is an explicit
+  ineligible result and never falls back to `cold-requested` or `warm`; and
 - the child’s `/proc/self/io` `read_bytes` delta is positive during the
   source-touching interval.
 
@@ -1629,8 +1633,12 @@ does not prove physical-media temperature, device-cache state, or durable
 storage latency.
 
 Each sample uses a fresh child process and reports child operation time plus
-parent-observed wall time. A separate child primes the warm path immediately
-before each warm sample; the cold sample requests Linux `posix_fadvise`
+parent-observed wall time. The verified-cold child records the pre-operation
+page-cache observation after its private-file `DONTNEED` request and the
+post-operation observation immediately after the timed interval; neither
+fincore command is part of the timed operation. A separate child primes the
+warm path immediately before each warm sample; the cold sample requests Linux
+`posix_fadvise`
 `DONTNEED` immediately before timing and records whether that advisory request
 was accepted. `cold-requested` is a cache-state request, not a claim that the
 kernel or storage device delivered a guaranteed cold cache. The additive
@@ -4004,7 +4012,8 @@ When `cold-verified` is selected, the evidence object additionally records
 `cold_verified_samples` entry records the explicit status, numeric
 `filesystem_magic`, page/source and aligned-source byte counts, aligned-source
 SHA-256, fsync/advice state, fincore size/resident/dirty/writeback counts,
-`read_bytes_before`/`after`/`delta`, and method/fallback evidence. Fincore
+`read_bytes_before`/`after`/`delta`, the additive `fincore_post` status/size/
+resident/dirty/writeback observation, and method/fallback evidence. Fincore
 provenance is privacy-preserving: `fincore_tool` is only the canonical
 basename, `fincore_sha256` and `fincore_version` identify the executable, and
 `fincore_stderr_sha256`/`fincore_stderr_bytes` plus their version-stderr
